@@ -76,7 +76,30 @@ var (
 		},
 		JSON200: &[]astrocore.Organization{},
 	}
-	errNetwork = errors.New("network error")
+	errNetwork  = errors.New("network error")
+	description = "test workspace"
+	workspace1  = astrocore.Workspace{
+		Name:                         "test-workspace",
+		Description:                  &description,
+		ApiKeyOnlyDeploymentsDefault: false,
+		Id:                           "workspace-id",
+	}
+
+	workspaces = []astrocore.Workspace{
+		workspace1,
+	}
+
+	ListWorkspacesResponseOK = astrocore.ListWorkspacesResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.WorkspacesPaginated{
+			Limit:      1,
+			Offset:     0,
+			TotalCount: 1,
+			Workspaces: workspaces,
+		},
+	}
 )
 
 func Test_FetchDomainAuthConfig(t *testing.T) {
@@ -531,7 +554,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
-
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil)
 		ctx := config.Context{Domain: "test-domain", Organization: "test-org-id"}
 		buf := new(bytes.Buffer)
@@ -547,7 +570,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 		ctx := config.Context{Domain: "test-domain", Organization: "test-org-id"}
 		buf := new(bytes.Buffer)
 		err := CheckUserSession(&ctx, mockClient, mockCoreClient, buf)

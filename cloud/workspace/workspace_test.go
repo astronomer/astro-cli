@@ -8,10 +8,8 @@ import (
 	"os"
 	"testing"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -73,17 +71,10 @@ func TestListError(t *testing.T) {
 
 func TestGetWorkspaceSelection(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-
-	mockResponse := []astro.Workspace{
-		{
-			ID:    "test-id-1",
-			Label: "test-label",
-		},
-	}
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	t.Run("success", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return(mockResponse, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -102,24 +93,22 @@ func TestGetWorkspaceSelection(t *testing.T) {
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		resp, err := GetWorkspaceSelection(mockClient, buf)
+		resp, err := GetWorkspaceSelection(mockCoreClient, buf)
 		assert.NoError(t, err)
-		assert.Equal(t, mockResponse[0].ID, resp)
-		mockClient.AssertExpectations(t)
+		assert.Equal(t, "workspace-id", resp)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("list workspace failure", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 		buf := new(bytes.Buffer)
-		_, err := GetWorkspaceSelection(mockClient, buf)
+		_, err := GetWorkspaceSelection(mockCoreClient, buf)
 		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("invalid selection", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return(mockResponse, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("0")
@@ -138,57 +127,47 @@ func TestGetWorkspaceSelection(t *testing.T) {
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		_, err = GetWorkspaceSelection(mockClient, buf)
+		_, err = GetWorkspaceSelection(mockCoreClient, buf)
 		assert.ErrorIs(t, err, errInvalidWorkspaceKey)
-		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("get current context failure", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		err := config.ResetCurrentContext()
 		assert.NoError(t, err)
 
 		buf := new(bytes.Buffer)
-		_, err = GetWorkspaceSelection(mockClient, buf)
+		_, err = GetWorkspaceSelection(mockCoreClient, buf)
 		assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
-		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 
 func TestSwitch(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-
-	mockResponse := []astro.Workspace{
-		{
-			ID:    "test-id-1",
-			Label: "test-label",
-		},
-	}
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	t.Run("success", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return(mockResponse, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := Switch("test-id-1", mockClient, buf)
+		err := Switch("test-id-1", mockCoreClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "test-id-1")
-		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("list workspace failure", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
 		buf := new(bytes.Buffer)
-		err := Switch("test-id-1", mockClient, buf)
+		err := Switch("test-id-1", mockCoreClient, buf)
 		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("success with selection", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return(mockResponse, nil).Twice()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Twice()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -207,15 +186,14 @@ func TestSwitch(t *testing.T) {
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		err = Switch("", mockClient, buf)
+		err = Switch("", mockCoreClient, buf)
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "test-id-1")
-		mockClient.AssertExpectations(t)
+		assert.Contains(t, buf.String(), "workspace-id")
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failure with invalid selection", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return(mockResponse, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("0")
@@ -234,21 +212,19 @@ func TestSwitch(t *testing.T) {
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		err = Switch("", mockClient, buf)
+		err = Switch("", mockCoreClient, buf)
 		assert.ErrorIs(t, err, errInvalidWorkspaceKey)
-		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failure to get current context", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-
 		err := config.ResetCurrentContext()
 		assert.NoError(t, err)
 
 		buf := new(bytes.Buffer)
-		err = Switch("test-id-1", mockClient, buf)
+		err = Switch("test-id-1", mockCoreClient, buf)
 		assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
-		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 
