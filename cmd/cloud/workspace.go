@@ -207,6 +207,7 @@ func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "token",
@@ -227,6 +228,7 @@ func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newWorkspaceTokenListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -240,6 +242,7 @@ func newWorkspaceTokenListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "team",
@@ -257,6 +260,7 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -270,6 +274,7 @@ func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -290,6 +295,7 @@ func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [TOKEN_ID]",
@@ -309,6 +315,7 @@ func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rotate [TOKEN_ID]",
@@ -326,6 +333,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
@@ -342,6 +350,7 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newWorkspaceTokenAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [ORG_TOKEN_ID]",
