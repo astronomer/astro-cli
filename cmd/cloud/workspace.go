@@ -584,7 +584,6 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 		// make sure the id is lowercase
 		tokenID = strings.ToLower(args[0])
 	}
-
 	cmd.SilenceUsage = true
 	return workspace.RotateToken(tokenID, name, workspaceID, cleanTokenOutput, forceRotate, out, astroCoreClient)
 }
@@ -616,7 +615,7 @@ func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) er
 		}
 	}
 	cmd.SilenceUsage = true
-	return organization.AddOrgTokenToWorkspace(orgTokenID, tokenName, tokenRole, workspaceID, out, astroCoreClient)
+	return organization.AddOrgTokenToWorkspace(orgTokenID, orgTokenName, tokenRole, workspaceID, out, astroCoreClient)
 }
 
 func coalesceWorkspace() (string, error) {
