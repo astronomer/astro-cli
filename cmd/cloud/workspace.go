@@ -466,7 +466,7 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return workspace.Switch(id, astroClient, out)
+	return workspace.Switch(id, astroCoreClient, out)
 }
 
 func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
