@@ -138,6 +138,7 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
+
 	var token astrocore.ApiToken
 	if id == "" {
 		tokens, err := getWorkspaceTokens(workspace, client)
@@ -171,11 +172,24 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 		UpdateWorkspaceAPITokenRequest.Description = description
 	}
 
-	err = user.IsWorkspaceRoleValid(role)
-	if err != nil {
-		return err
+	if role == "" {
+		for i := range token.Roles {
+			if token.Roles[i].EntityType == workspaceEntity && token.Roles[i].EntityId == workspace {
+				role = token.Roles[i].Role
+			}
+		}
+		err := user.IsWorkspaceRoleValid(role)
+		if err != nil {
+			return err
+		}
+		UpdateWorkspaceAPITokenRequest.Role = role
+	} else {
+		err := user.IsWorkspaceRoleValid(role)
+		if err != nil {
+			return err
+		}
+		UpdateWorkspaceAPITokenRequest.Role = role
 	}
-	UpdateWorkspaceAPITokenRequest.Role = role
 
 	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenID, UpdateWorkspaceAPITokenRequest)
 	if err != nil {
@@ -350,6 +364,7 @@ func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.A
 
 	tab.Print(os.Stdout)
 	choice := input.Text("\n> ")
+
 	selected, ok := apiTokensMap[choice]
 	if !ok {
 		return astrocore.ApiToken{}, errInvalidWorkspaceTokenKey
@@ -417,8 +432,6 @@ func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.A
 				return astrocore.ApiToken{}, err
 			}
 		}
-	case name != "" && id != "":
-		return astrocore.ApiToken{}, errBothNameAndID
 	}
 	if token.Id == "" {
 		return astrocore.ApiToken{}, ErrWorkspaceTokenNotFound

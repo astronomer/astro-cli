@@ -601,16 +601,6 @@ func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 		tokenID = strings.ToLower(args[0])
 	}
 
-	if tokenRole == "" {
-		fmt.Println("select a Organization Role for the API token:")
-		// no role was provided so ask the user for it
-		var err error
-		tokenRole, err = selectOrganizationRole()
-		if err != nil {
-			return err
-		}
-	}
-
 	cmd.SilenceUsage = true
 	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, organizationID, out, astroCoreClient)
 }

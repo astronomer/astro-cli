@@ -574,16 +574,6 @@ func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 		tokenID = strings.ToLower(args[0])
 	}
 
-	if tokenRole == "" {
-		fmt.Println("select a Workspace Role for the API token:")
-		// no role was provided so ask the user for it
-		var err error
-		tokenRole, err = selectWorkspaceRole()
-		if err != nil {
-			return err
-		}
-	}
-
 	cmd.SilenceUsage = true
 	return workspace.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID, out, astroCoreClient)
 }

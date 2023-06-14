@@ -396,6 +396,17 @@ func UpdateToken(id, name, newName, description, role, organization string, out 
 		UpdateOrganizationAPITokenRequest.Description = description
 	}
 
+	//if role == "" {
+	//
+	//	UpdateOrganizationAPITokenRequest.Roles = token.Roles
+	//} else {
+	//	err := user.IsOrganizationRoleValid(role)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	UpdateOrganizationAPITokenRequest.Roles = role
+	//}
+
 	err = user.IsOrganizationRoleValid(role)
 	if err != nil {
 		return err
