@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"errors"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"
@@ -21,6 +22,7 @@ import (
 )
 
 var (
+	errInvalidOrganizationRoleKey      = errors.New("invalid organization role selection")
 	orgList                            = organization.List
 	orgSwitch                          = organization.Switch
 	orgExportAuditLogs                 = organization.ExportAuditLogs
@@ -630,7 +632,6 @@ func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 func selectOrganizationRole() (string, error) {
 	tokenRolesMap := map[string]string{}
 	tab := &printutil.Table{
-		Padding:        []int{44, 50},
 		DynamicPadding: true,
 		Header:         []string{"#", "ROLE"},
 	}
@@ -648,7 +649,7 @@ func selectOrganizationRole() (string, error) {
 	choice := input.Text("\n> ")
 	selected, ok := tokenRolesMap[choice]
 	if !ok {
-		return "", errInvalidWorkspaceRoleKey
+		return "", errInvalidOrganizationRoleKey
 	}
 	return selected, nil
 }
