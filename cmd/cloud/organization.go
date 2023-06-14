@@ -2,8 +2,8 @@ package cloud
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 	"io"
 	"io/fs"
 	"log"
@@ -12,9 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/printutil"
+
 	"github.com/spf13/cobra"
 
-	"errors"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"

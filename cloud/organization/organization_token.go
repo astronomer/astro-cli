@@ -3,6 +3,11 @@ package organization
 import (
 	httpContext "context"
 	"fmt"
+	"io"
+	"os"
+	"strconv"
+	"time"
+
 	"github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/user"
@@ -11,10 +16,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/pkg/errors"
-	"io"
-	"os"
-	"strconv"
-	"time"
 )
 
 var (
