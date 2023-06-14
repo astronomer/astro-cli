@@ -454,7 +454,7 @@ func RotateToken(id, name string, cleanOutput, force bool, out io.Writer, client
 		if err != nil {
 			return err
 		}
-		token, err = getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to add to the Workspace:", tokens)
+		token, err = getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to rotate:", tokens)
 		if err != nil {
 			return err
 		}
@@ -513,7 +513,7 @@ func DeleteToken(id, name string, force bool, out io.Writer, client astrocore.Co
 		if err != nil {
 			return err
 		}
-		token, err = getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to add to the Workspace:", tokens)
+		token, err = getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to delete:", tokens)
 		if err != nil {
 			return err
 		}
