@@ -77,7 +77,7 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 			return err
 		}
 	} else {
-		token, err = getOrganizationTokenById(id, ctx.OrganizationShortName, client)
+		token, err = getOrganizationTokenByID(id, ctx.OrganizationShortName, client)
 		if err != nil {
 			return err
 		}
@@ -182,7 +182,7 @@ func getOrganizationTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, e
 	return APITokens, nil
 }
 
-func getOrganizationTokenById(id string, orgShortName string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
+func getOrganizationTokenByID(id, orgShortName string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
 	resp, err := client.GetOrganizationApiTokenWithResponse(httpContext.Background(), orgShortName, id)
 	if err != nil {
 		return astrocore.ApiToken{}, err
@@ -285,7 +285,7 @@ func ListTokenRoles(id string, client astrocore.CoreClient, out io.Writer) (err 
 		if err != nil {
 			return err
 		}
-		apiToken, err = getOrganizationTokenById(id, ctx.OrganizationShortName, client)
+		apiToken, err = getOrganizationTokenByID(id, ctx.OrganizationShortName, client)
 		if err != nil {
 			return err
 		}
@@ -369,7 +369,7 @@ func UpdateToken(id, name, newName, description, role string, out io.Writer, cli
 			return err
 		}
 	} else {
-		token, err = getOrganizationTokenById(id, ctx.OrganizationShortName, client)
+		token, err = getOrganizationTokenByID(id, ctx.OrganizationShortName, client)
 		if err != nil {
 			return err
 		}
@@ -459,7 +459,7 @@ func RotateToken(id, name string, cleanOutput, force bool, out io.Writer, client
 			return err
 		}
 	} else {
-		token, err = getOrganizationTokenById(id, ctx.OrganizationShortName, client)
+		token, err = getOrganizationTokenByID(id, ctx.OrganizationShortName, client)
 		if err != nil {
 			return err
 		}
@@ -518,7 +518,7 @@ func DeleteToken(id, name string, force bool, out io.Writer, client astrocore.Co
 			return err
 		}
 	} else {
-		token, err = getOrganizationTokenById(id, ctx.OrganizationShortName, client)
+		token, err = getOrganizationTokenByID(id, ctx.OrganizationShortName, client)
 		if err != nil {
 			return err
 		}
