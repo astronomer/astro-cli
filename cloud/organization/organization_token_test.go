@@ -636,6 +636,72 @@ func TestDeleteToken(t *testing.T) {
 	})
 }
 
+func TestListTokenRoles(t *testing.T) {
+	t.Run("happy path - list token roles by id", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil).Twice()
+		err := ListTokenRoles("token1", mockClient, out)
+		assert.NoError(t, err)
+	})
+
+	t.Run("error path - list token roles by id - api error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseError, nil)
+		err := ListTokenRoles("token1", mockClient, out)
+		assert.ErrorContains(t, err, "failed to get token")
+	})
+
+	t.Run("error path - list token roles by id - no context", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err := ListTokenRoles("token1", mockClient, out)
+		assert.Error(t, err)
+	})
+
+	t.Run("happy path - list token roles no id", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil).Twice()
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err = ListTokenRoles("", mockClient, out)
+		assert.NoError(t, err)
+	})
+
+	t.Run("error path - list token roles no id - list tokens api error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseError, nil).Twice()
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err = ListTokenRoles("", mockClient, out)
+		assert.ErrorContains(t, err, "failed to list tokens")
+	})
+}
+
 func TestGetOrganizationToken(t *testing.T) {
 	t.Run("select token by id when name is empty", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
