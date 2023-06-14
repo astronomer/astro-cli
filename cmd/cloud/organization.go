@@ -591,7 +591,7 @@ func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	return organization.CreateToken(tokenName, tokenDescription, tokenRole, organizationID, tokenExpiration, cleanTokenOutput, out, astroCoreClient)
+	return organization.CreateToken(tokenName, tokenDescription, tokenRole, tokenExpiration, cleanTokenOutput, out, astroCoreClient)
 }
 
 func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -602,7 +602,7 @@ func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, organizationID, out, astroCoreClient)
+	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, out, astroCoreClient)
 }
 
 func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -613,7 +613,7 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.RotateToken(tokenID, name, organizationID, cleanTokenOutput, forceRotate, out, astroCoreClient)
+	return organization.RotateToken(tokenID, name, cleanTokenOutput, forceRotate, out, astroCoreClient)
 }
 
 func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -624,7 +624,7 @@ func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.DeleteToken(tokenID, name, organizationID, forceDelete, out, astroCoreClient)
+	return organization.DeleteToken(tokenID, name, forceDelete, out, astroCoreClient)
 }
 
 func selectOrganizationRole() (string, error) {

@@ -1046,7 +1046,7 @@ func TestOrganizationTokenCreate(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateOrganizationAPITokenResponseError, nil)
 		astroCoreClient = mockClient
-		cmdArgs := []string{"token", "create", "--name", "Token 1", "--role", "WORKSPACE_MEMBER"}
+		cmdArgs := []string{"token", "create", "--name", "Token 1", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "failed to create workspace")
 	})
@@ -1064,7 +1064,7 @@ func TestOrganizationTokenCreate(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateOrganizationAPITokenResponseOK, nil)
 		astroCoreClient = mockClient
-		cmdArgs := []string{"token", "create", "--name", "Token 1", "--role", "WORKSPACE_MEMBER"}
+		cmdArgs := []string{"token", "create", "--name", "Token 1", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
@@ -1084,7 +1084,7 @@ func TestOrganizationTokenCreate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 		astroCoreClient = mockClient
-		cmdArgs := []string{"token", "create", "--role", "WORKSPACE_MEMBER"}
+		cmdArgs := []string{"token", "create", "--role", "ORGANIZATION_MEMBER"}
 		_, err = execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})

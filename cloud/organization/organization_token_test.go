@@ -22,9 +22,9 @@ var (
 	fullName1    = "User 1"
 	fullName2    = "User 2"
 	token        = "token"
-	workspaceId  = "ck05r3bor07h40d02y2hw4n4v"
+	workspaceID  = "ck05r3bor07h40d02y2hw4n4v"
 
-	apiToken1 = astrocore.ApiToken{Id: "token1", Name: "Token 1", Token: &token, Description: description1, Type: "Type 1", Roles: []astrocore.ApiTokenRole{{EntityType: "WORKSPACE", EntityId: workspaceId, Role: "ORGANIZATION_MEMBER"}, {EntityId: "ORGANIZATION", Role: "ORGANIZATION_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName1}}
+	apiToken1 = astrocore.ApiToken{Id: "token1", Name: "Token 1", Token: &token, Description: description1, Type: "Type 1", Roles: []astrocore.ApiTokenRole{{EntityType: "WORKSPACE", EntityId: workspaceID, Role: "ORGANIZATION_MEMBER"}, {EntityId: "ORGANIZATION", Role: "ORGANIZATION_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName1}}
 	apiToken2 = astrocore.ApiToken{Id: "token1", Name: "Token 1", Token: &token, Description: description1, Type: "Type 1", Roles: []astrocore.ApiTokenRole{{EntityType: "ORGANIZATION", EntityId: "ORGANIZATION", Role: "ORGANIZATION_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName1}}
 
 	apiTokens = []astrocore.ApiToken{
@@ -145,7 +145,7 @@ var (
 
 func TestAddOrgTokenToWorkspace(t *testing.T) {
 	var (
-		workspace          = workspaceId
+		workspace          = workspaceID
 		role               = "WORKSPACE_MEMBER"
 		selectedTokenID    = "token1"
 		selectedTokenName  = "Token 1"
@@ -308,7 +308,7 @@ func TestCreateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateOrganizationAPITokenResponseOK, nil)
 
-		err := CreateToken("Token 1", "Description 1", "ORGANIZATION_MEMBER", "", 0, false, out, mockClient)
+		err := CreateToken("Token 1", "Description 1", "ORGANIZATION_MEMBER", 0, false, out, mockClient)
 
 		assert.NoError(t, err)
 	})
@@ -318,7 +318,7 @@ func TestCreateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-		err := CreateToken("Token 1", "Description 1", "ORGANIZATION_MEMBER", "", 0, false, out, mockClient)
+		err := CreateToken("Token 1", "Description 1", "ORGANIZATION_MEMBER", 0, false, out, mockClient)
 
 		assert.Error(t, err)
 	})
@@ -328,7 +328,7 @@ func TestCreateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-		err := CreateToken("Token 1", "Description 1", "InvalidRole", "", 0, false, out, mockClient)
+		err := CreateToken("Token 1", "Description 1", "InvalidRole", 0, false, out, mockClient)
 
 		assert.Error(t, err)
 	})
@@ -338,7 +338,7 @@ func TestCreateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-		err := CreateToken("", "Description 1", "ORGANIZATION_MEMBER", "", 0, true, out, mockClient)
+		err := CreateToken("", "Description 1", "ORGANIZATION_MEMBER", 0, true, out, mockClient)
 
 		assert.Equal(t, ErrInvalidName, err)
 	})
@@ -351,7 +351,7 @@ func TestUpdateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil).Twice()
 		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
-		err := UpdateToken("token1", "", "", "", "", "", out, mockClient)
+		err := UpdateToken("token1", "", "", "", "", out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -372,7 +372,7 @@ func TestUpdateToken(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpdateToken("", "", "", "", "", "", out, mockClient)
+		err = UpdateToken("", "", "", "", "", out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -393,7 +393,7 @@ func TestUpdateToken(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpdateToken("", "Token 1", "", "", "", "", out, mockClient)
+		err = UpdateToken("", "Token 1", "", "", "", out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -403,7 +403,7 @@ func TestUpdateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil).Twice()
 		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
-		err := UpdateToken("token1", "", "", "", "", "", out, mockClient)
+		err := UpdateToken("token1", "", "", "", "", out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -412,7 +412,7 @@ func TestUpdateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseError, nil)
-		err := UpdateToken("", "", "", "", "", "", out, mockClient)
+		err := UpdateToken("", "", "", "", "", out, mockClient)
 		assert.ErrorContains(t, err, "failed to list tokens")
 	})
 
@@ -421,7 +421,7 @@ func TestUpdateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
-		err := UpdateToken("", "invalid name", "", "", "", "", out, mockClient)
+		err := UpdateToken("", "invalid name", "", "", "", out, mockClient)
 		assert.Equal(t, errOrganizationTokenNotFound, err)
 	})
 
@@ -430,7 +430,7 @@ func TestUpdateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseError, nil)
-		err := UpdateToken("tokenId", "", "", "", "", "", out, mockClient)
+		err := UpdateToken("tokenId", "", "", "", "", out, mockClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
 
@@ -440,7 +440,7 @@ func TestUpdateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil)
 		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseError, nil)
-		err := UpdateToken("token3", "", "", "", "", "", out, mockClient)
+		err := UpdateToken("token3", "", "", "", "", out, mockClient)
 		assert.Equal(t, "failed to update token", err.Error())
 	})
 
@@ -448,7 +448,7 @@ func TestUpdateToken(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := UpdateToken("token1", "", "", "", "", "", out, mockClient)
+		err := UpdateToken("token1", "", "", "", "", out, mockClient)
 		assert.Error(t, err)
 	})
 
@@ -458,7 +458,7 @@ func TestUpdateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil)
 		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
-		err := UpdateToken("token1", "", "", "", "Invalid Role", "", out, mockClient)
+		err := UpdateToken("token1", "", "", "", "Invalid Role", out, mockClient)
 		assert.Equal(t, user.ErrInvalidOrganizationRole.Error(), err.Error())
 	})
 	t.Run("Happy path when applying workspace role", func(t *testing.T) {
@@ -467,7 +467,7 @@ func TestUpdateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
 		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
-		err := UpdateToken("", apiToken1.Name, "", "", "ORGANIZATION_MEMBER", "", out, mockClient)
+		err := UpdateToken("", apiToken1.Name, "", "", "ORGANIZATION_MEMBER", out, mockClient)
 		assert.NoError(t, err)
 	})
 }
@@ -479,7 +479,7 @@ func TestRotateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil)
 		mockClient.On("RotateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateOrganizationAPITokenResponseOK, nil)
-		err := RotateToken("token1", "", "", false, true, out, mockClient)
+		err := RotateToken("token1", "", false, true, out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -489,7 +489,7 @@ func TestRotateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
 		mockClient.On("RotateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateOrganizationAPITokenResponseOK, nil)
-		err := RotateToken("", apiToken1.Name, "", false, true, out, mockClient)
+		err := RotateToken("", apiToken1.Name, false, true, out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -499,7 +499,7 @@ func TestRotateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
 		mockClient.On("RotateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateOrganizationAPITokenResponseOK, nil)
-		err := RotateToken("", apiToken1.Name, "", true, false, out, mockClient)
+		err := RotateToken("", apiToken1.Name, true, false, out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -507,7 +507,7 @@ func TestRotateToken(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := RotateToken("token1", "", "", false, false, out, mockClient)
+		err := RotateToken("token1", "", false, false, out, mockClient)
 		assert.Error(t, err)
 	})
 
@@ -516,7 +516,7 @@ func TestRotateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseError, nil)
-		err := RotateToken("", "", "", false, false, out, mockClient)
+		err := RotateToken("", "", false, false, out, mockClient)
 		assert.ErrorContains(t, err, "failed to list tokens")
 	})
 
@@ -525,7 +525,7 @@ func TestRotateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
-		err := RotateToken("", "invalid name", "", false, false, out, mockClient)
+		err := RotateToken("", "invalid name", false, false, out, mockClient)
 		assert.Equal(t, errOrganizationTokenNotFound, err)
 	})
 
@@ -534,7 +534,7 @@ func TestRotateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseError, nil)
-		err := RotateToken("token1", "", "", false, false, out, mockClient)
+		err := RotateToken("token1", "", false, false, out, mockClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
 
@@ -544,7 +544,7 @@ func TestRotateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
 		mockClient.On("RotateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateOrganizationAPITokenResponseError, nil)
-		err := RotateToken("", apiToken1.Name, "", false, true, out, mockClient)
+		err := RotateToken("", apiToken1.Name, false, true, out, mockClient)
 		assert.Equal(t, "failed to update token", err.Error())
 	})
 }
@@ -556,7 +556,7 @@ func TestDeleteToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil).Twice()
 		mockClient.On("DeleteOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationAPITokenResponseOK, nil)
-		err := DeleteToken("", apiToken1.Name, "", false, out, mockClient)
+		err := DeleteToken("", apiToken1.Name, false, out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -566,7 +566,7 @@ func TestDeleteToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil).Twice()
 		mockClient.On("DeleteOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationAPITokenResponseOK, nil)
-		err := DeleteToken("token1", "", "", false, out, mockClient)
+		err := DeleteToken("token1", "", false, out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -576,7 +576,7 @@ func TestDeleteToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil).Twice()
 		mockClient.On("DeleteOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationAPITokenResponseOK, nil)
-		err := DeleteToken("", apiToken1.Name, "", false, out, mockClient)
+		err := DeleteToken("", apiToken1.Name, false, out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -584,7 +584,7 @@ func TestDeleteToken(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := DeleteToken("token1", "", "", false, out, mockClient)
+		err := DeleteToken("token1", "", false, out, mockClient)
 		assert.Error(t, err)
 	})
 
@@ -593,7 +593,7 @@ func TestDeleteToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseError, nil)
-		err := DeleteToken("token1", "", "", false, out, mockClient)
+		err := DeleteToken("token1", "", false, out, mockClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
 
@@ -602,7 +602,7 @@ func TestDeleteToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseError, nil)
-		err := DeleteToken("", apiToken1.Name, "", false, out, mockClient)
+		err := DeleteToken("", apiToken1.Name, false, out, mockClient)
 		assert.ErrorContains(t, err, "failed to list tokens")
 	})
 
@@ -611,7 +611,7 @@ func TestDeleteToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
-		err := DeleteToken("", "invalid name", "", false, out, mockClient)
+		err := DeleteToken("", "invalid name", false, out, mockClient)
 		assert.Equal(t, errOrganizationTokenNotFound, err)
 	})
 
@@ -621,7 +621,7 @@ func TestDeleteToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
 		mockClient.On("DeleteOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationAPITokenResponseError, nil)
-		err := DeleteToken("", apiToken1.Name, "", true, out, mockClient)
+		err := DeleteToken("", apiToken1.Name, true, out, mockClient)
 		assert.Equal(t, "failed to update token", err.Error())
 	})
 }

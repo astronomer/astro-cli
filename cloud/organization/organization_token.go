@@ -23,7 +23,6 @@ var (
 	errInvalidOrganizationTokenKey = errors.New("invalid Organization API token selection")
 	errOrganizationTokenNotFound   = errors.New("organization token specified was not found")
 	errOrgTokenInWorkspace         = errors.New("this Organization API token has already been added to the Workspace")
-	errBothNameAndID               = errors.New("both an API token name and id were specified. Specify either the name or the id not both")
 )
 
 const (
@@ -185,6 +184,9 @@ func getOrganizationTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, e
 
 func getOrganizationTokenById(id string, orgShortName string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
 	resp, err := client.GetOrganizationApiTokenWithResponse(httpContext.Background(), orgShortName, id)
+	if err != nil {
+		return astrocore.ApiToken{}, err
+	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return astrocore.ApiToken{}, err
@@ -292,9 +294,9 @@ func ListTokenRoles(id string, client astrocore.CoreClient, out io.Writer) (err 
 	tab := newTokenRolesTableOut()
 	for _, tokenRole := range apiToken.Roles {
 		role := tokenRole.Role
-		entityId := tokenRole.EntityId
+		entityID := tokenRole.EntityId
 		entityType := string(tokenRole.EntityType)
-		tab.AddRow([]string{entityType, entityId, role}, false)
+		tab.AddRow([]string{entityType, entityID, role}, false)
 	}
 	tab.Print(out)
 
@@ -302,7 +304,7 @@ func ListTokenRoles(id string, client astrocore.CoreClient, out io.Writer) (err 
 }
 
 // create a organization token
-func CreateToken(name, description, role, organization string, expiration int, cleanOutput bool, out io.Writer, client astrocore.CoreClient) error {
+func CreateToken(name, description, role string, expiration int, cleanOutput bool, out io.Writer, client astrocore.CoreClient) error {
 	err := user.IsOrganizationRoleValid(role)
 	if err != nil {
 		return err
@@ -317,9 +319,7 @@ func CreateToken(name, description, role, organization string, expiration int, c
 	if ctx.OrganizationShortName == "" {
 		return user.ErrNoShortName
 	}
-	if organization == "" {
-		organization = ctx.Organization
-	}
+
 	CreateOrganizationAPITokenRequest := astrocore.CreateOrganizationApiTokenJSONRequestBody{
 		Description: &description,
 		Name:        name,
@@ -349,7 +349,7 @@ func CreateToken(name, description, role, organization string, expiration int, c
 }
 
 // Update a organization token
-func UpdateToken(id, name, newName, description, role, organization string, out io.Writer, client astrocore.CoreClient) error {
+func UpdateToken(id, name, newName, description, role string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -357,9 +357,7 @@ func UpdateToken(id, name, newName, description, role, organization string, out 
 	if ctx.OrganizationShortName == "" {
 		return user.ErrNoShortName
 	}
-	if organization == "" {
-		organization = ctx.Organization
-	}
+
 	var token astrocore.ApiToken
 	if id == "" {
 		tokens, err := getOrganizationTokens(client)
@@ -440,7 +438,7 @@ func UpdateToken(id, name, newName, description, role, organization string, out 
 }
 
 // rotate a organization API token
-func RotateToken(id, name, organization string, cleanOutput, force bool, out io.Writer, client astrocore.CoreClient) error {
+func RotateToken(id, name string, cleanOutput, force bool, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -448,9 +446,7 @@ func RotateToken(id, name, organization string, cleanOutput, force bool, out io.
 	if ctx.OrganizationShortName == "" {
 		return user.ErrNoShortName
 	}
-	if organization == "" {
-		organization = ctx.Organization
-	}
+
 	var token astrocore.ApiToken
 
 	if id == "" {
@@ -501,7 +497,7 @@ func RotateToken(id, name, organization string, cleanOutput, force bool, out io.
 }
 
 // delete a organizations api token
-func DeleteToken(id, name, organization string, force bool, out io.Writer, client astrocore.CoreClient) error {
+func DeleteToken(id, name string, force bool, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -509,9 +505,7 @@ func DeleteToken(id, name, organization string, force bool, out io.Writer, clien
 	if ctx.OrganizationShortName == "" {
 		return user.ErrNoShortName
 	}
-	if organization == "" {
-		organization = ctx.Organization
-	}
+
 	var token astrocore.ApiToken
 
 	if id == "" {

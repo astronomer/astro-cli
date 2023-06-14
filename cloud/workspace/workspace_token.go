@@ -35,7 +35,6 @@ func newTokenSelectionTableOut() *printutil.Table {
 var (
 	errInvalidWorkspaceTokenKey = errors.New("invalid Workspace API token selection")
 	ErrWorkspaceTokenNotFound   = errors.New("no Workspace API token was found for the API token name you provided")
-	errBothNameAndID            = errors.New("both an API token name and id were specified. Specify either the name or the id not both")
 )
 
 const (
@@ -459,6 +458,9 @@ func TimeAgo(date time.Time) string {
 
 func getWorkspaceTokenById(id, workspaceId, orgShortName string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
 	resp, err := client.GetWorkspaceApiTokenWithResponse(httpContext.Background(), orgShortName, workspaceId, id)
+	if err != nil {
+		return astrocore.ApiToken{}, err
+	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return astrocore.ApiToken{}, err
