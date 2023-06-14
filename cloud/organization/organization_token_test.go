@@ -470,6 +470,16 @@ func TestUpdateToken(t *testing.T) {
 		err := UpdateToken("", apiToken1.Name, "", "", "ORGANIZATION_MEMBER", out, mockClient)
 		assert.NoError(t, err)
 	})
+
+	t.Run("Happy path when applying organization role using id", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil)
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
+		err := UpdateToken("token1", "", "", "", "ORGANIZATION_MEMBER", out, mockClient)
+		assert.NoError(t, err)
+	})
 }
 
 func TestRotateToken(t *testing.T) {
