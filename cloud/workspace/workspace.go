@@ -9,7 +9,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/config"
@@ -50,25 +49,25 @@ func GetCurrentWorkspace() (string, error) {
 }
 
 // List all workspaces
-func List(client astro.Client, out io.Writer) error {
+func List(client astrocore.CoreClient, out io.Writer) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	ws, err := client.ListWorkspaces(c.Organization)
+	ws, err := GetWorkspaces(client)
 	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return err
 	}
 
 	tab := newTableOut()
 	for i := range ws {
-		name := ws[i].Label
-		workspace := ws[i].ID
+		name := ws[i].Name
+		workspace := ws[i].Id
 
 		var color bool
 
-		if c.Workspace == ws[i].ID {
+		if c.Workspace == ws[i].Id {
 			color = true
 		} else {
 			color = false
@@ -81,7 +80,7 @@ func List(client astro.Client, out io.Writer) error {
 	return nil
 }
 
-var GetWorkspaceSelection = func(client astro.Client, out io.Writer) (string, error) {
+var GetWorkspaceSelection = func(client astrocore.CoreClient, out io.Writer) (string, error) {
 	tab := printutil.Table{
 		Padding:        []int{5, 44, 50},
 		DynamicPadding: true,
@@ -95,17 +94,17 @@ var GetWorkspaceSelection = func(client astro.Client, out io.Writer) (string, er
 		return "", err
 	}
 
-	ws, err := client.ListWorkspaces(c.Organization)
+	ws, err := GetWorkspaces(client)
 	if err != nil {
 		return "", err
 	}
 
-	deployMap := map[string]astro.Workspace{}
+	deployMap := map[string]astrocore.Workspace{}
 	for i := range ws {
 		index := i + 1
 
-		color := c.Workspace == ws[i].ID
-		tab.AddRow([]string{strconv.Itoa(index), ws[i].Label, ws[i].ID}, color)
+		color := c.Workspace == ws[i].Id
+		tab.AddRow([]string{strconv.Itoa(index), ws[i].Name, ws[i].Id}, color)
 
 		deployMap[strconv.Itoa(index)] = ws[i]
 	}
@@ -116,10 +115,10 @@ var GetWorkspaceSelection = func(client astro.Client, out io.Writer) (string, er
 		return "", errInvalidWorkspaceKey
 	}
 
-	return selected.ID, nil
+	return selected.Id, nil
 }
 
-func Switch(id string, client astro.Client, out io.Writer) error {
+func Switch(id string, client astrocore.CoreClient, out io.Writer) error {
 	if id == "" {
 		_id, err := GetWorkspaceSelection(client, out)
 		if err != nil {
@@ -135,7 +134,7 @@ func Switch(id string, client astro.Client, out io.Writer) error {
 	}
 
 	// validate workspace
-	_, err = client.ListWorkspaces(c.Organization)
+	_, err = GetWorkspaces(client)
 	if err != nil {
 		return errors.Wrap(err, "workspace id is not valid")
 	}
@@ -352,7 +351,14 @@ func GetWorkspaces(client astrocore.CoreClient) ([]astrocore.Workspace, error) {
 		return []astrocore.Workspace{}, user.ErrNoShortName
 	}
 
-	resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.OrganizationShortName, &astrocore.ListWorkspacesParams{})
+	sorts := []astrocore.ListWorkspacesParamsSorts{"name:asc"}
+	limit := 1000
+	workspaceListParams := &astrocore.ListWorkspacesParams{
+		Limit: &limit,
+		Sorts: &sorts,
+	}
+
+	resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceListParams)
 	if err != nil {
 		return []astrocore.Workspace{}, err
 	}

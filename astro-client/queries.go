@@ -1,15 +1,6 @@
 package astro
 
 var (
-	WorkspacesGetRequest = `
-	query GetWorkspaces($organizationId: Id!) {
-		workspaces(organizationId: $organizationId) {
-			id
-			label
-			organizationId
-		}
-	}`
-
 	WorkspaceDeploymentsGetRequest = `
 	query WorkspaceDeployments(
 		$organizationId: Id!, $workspaceId: Id
@@ -214,14 +205,6 @@ var (
 	  }
 	}
   `
-	GetWorkspace = `
-	query GetWorkspace($workspaceId: Id!) {
-		workspace(id:$workspaceId) {
-			id
-			label
-			organizationId
-		}
-	}`
 
 	GetWorkerQueueOptions = `
 	query workerQueueOptions {

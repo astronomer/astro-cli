@@ -62,7 +62,7 @@ var (
 
 const (
 	org              = "test-org-id"
-	ws               = "test-ws-id"
+	ws               = "workspace-id"
 	dagDeploy        = "disable"
 	region           = "us-central1"
 	mockOrgShortName = "test-org-short-name"
@@ -597,6 +597,32 @@ func TestCreate(t *testing.T) {
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockClient := new(astro_mocks.Client)
 
+	var (
+		workspaceTestDescription = "test workspace"
+		workspace1               = astrocore.Workspace{
+			Name:                         "test-workspace",
+			Description:                  &workspaceTestDescription,
+			ApiKeyOnlyDeploymentsDefault: false,
+			Id:                           "workspace-id",
+			OrganizationId:               "test-org-id",
+		}
+
+		workspaces = []astrocore.Workspace{
+			workspace1,
+		}
+		ListWorkspacesResponseOK = astrocore.ListWorkspacesResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.WorkspacesPaginated{
+				Limit:      1,
+				Offset:     0,
+				TotalCount: 1,
+				Workspaces: workspaces,
+			},
+		}
+	)
+
 	deploymentCreateInput := astro.CreateDeploymentInput{
 		WorkspaceID:           ws,
 		ClusterID:             csID,
@@ -633,7 +659,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(2)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
@@ -667,7 +693,7 @@ func TestCreate(t *testing.T) {
 		}, nil).Times(2)
 		deploymentCreateInput.APIKeyOnlyDeployments = true
 		defer func() { deploymentCreateInput.APIKeyOnlyDeployments = false }()
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
@@ -685,6 +711,8 @@ func TestCreate(t *testing.T) {
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
+		ctx.SetContextKey("organization_short_name", "test-org")
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -732,7 +760,6 @@ func TestCreate(t *testing.T) {
 		defer func() {
 			deploymentCreateInput1.DeploymentSpec.Executor = CeleryExecutor
 		}()
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{
 			{
@@ -823,7 +850,7 @@ func TestCreate(t *testing.T) {
 			deploymentCreateInput1.DeploymentSpec.Executor = CeleryExecutor
 		}()
 
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 
 		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
@@ -881,7 +908,7 @@ func TestCreate(t *testing.T) {
 		}, nil).Times(2)
 		deploymentCreateInput.DeploymentSpec.Executor = "KubeExecutor"
 		defer func() { deploymentCreateInput.DeploymentSpec.Executor = CeleryExecutor }()
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
@@ -914,7 +941,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(4)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Twice()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Twice()
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&mockListClustersResponse, nil).Twice()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
 
@@ -960,7 +987,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(2)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{}, errMock).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
@@ -1000,7 +1027,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(2)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&astrocore.ListClustersResponse{}, errMock).Once()
 		err := Create("test-name", ws, "test-desc", "invalid-cluster-id", "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.ErrorIs(t, err, errMock)
@@ -1052,8 +1079,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(2)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
-
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
@@ -1079,8 +1105,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(2)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
-
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		err := Create("", "test-invalid-id", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no workspaces with id")
@@ -1092,7 +1117,7 @@ func TestCreate(t *testing.T) {
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", org)
-
+		ctx.SetContextKey("organization_short_name", "test-org")
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1113,7 +1138,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(2)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
@@ -1173,7 +1198,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()

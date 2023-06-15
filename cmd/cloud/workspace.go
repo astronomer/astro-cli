@@ -454,7 +454,7 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 func workspaceList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.List(astroClient, out)
+	return workspace.List(astroCoreClient, out)
 }
 
 func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -466,7 +466,7 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return workspace.Switch(id, astroClient, out)
+	return workspace.Switch(id, astroCoreClient, out)
 }
 
 func workspaceCreate(cmd *cobra.Command, out io.Writer) error {

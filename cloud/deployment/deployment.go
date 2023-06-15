@@ -14,6 +14,7 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/organization"
+	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
@@ -165,7 +166,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 
 func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, clusterType string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, enforceCD *bool) error { //nolint
 	var organizationID string
-	var currentWorkspace astro.Workspace
+	var currentWorkspace astrocore.Workspace
 	var dagDeployEnabled bool
 
 	c, err := config.GetCurrentContext()
@@ -206,14 +207,14 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	// validate workspace
-	ws, err := client.ListWorkspaces(c.Organization)
+	ws, err := workspace.GetWorkspaces(coreClient)
 	if err != nil {
 		return err
 	}
 
 	for i := range ws {
-		if workspaceID == ws[i].ID {
-			organizationID = ws[i].OrganizationID
+		if workspaceID == ws[i].Id {
+			organizationID = ws[i].OrganizationId
 			currentWorkspace = ws[i]
 		}
 	}
@@ -221,7 +222,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	if organizationID == "" {
 		return fmt.Errorf(noWorkspaceMsg, workspaceID) //nolint:goerr113
 	}
-	fmt.Printf("Current Workspace: %s\n\n", currentWorkspace.Label)
+	fmt.Printf("Current Workspace: %s\n\n", currentWorkspace.Name)
 
 	// label input
 	if label == "" {

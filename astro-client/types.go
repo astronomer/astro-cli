@@ -13,8 +13,6 @@ type ResponseData struct {
 	DeployImage               *Image                       `json:"deployImage,omitempty"`
 	GetDeployment             Deployment                   `json:"deployment,omitempty"`
 	GetDeployments            []Deployment                 `json:"deployments,omitempty"`
-	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
-	GetWorkspace              Workspace                    `json:"workspace,omitempty"`
 	RuntimeReleases           []RuntimeRelease             `json:"runtimeReleases,omitempty"`
 	CreateDeployment          Deployment                   `json:"CreateDeployment,omitempty"`
 	GetDeploymentConfig       DeploymentConfig             `json:"deploymentConfigOptions,omitempty"`
