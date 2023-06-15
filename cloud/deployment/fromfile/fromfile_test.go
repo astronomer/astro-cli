@@ -27,7 +27,7 @@ const (
 var (
 	errTest           = errors.New("test error")
 	limit             = 1000
-	clusterType       = []astrocore.ListClustersParamsType{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
+	clusterType       = []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
 	clusterListParams = &astrocore.ListClustersParams{
 		Type:  &clusterType,
 		Limit: &limit,

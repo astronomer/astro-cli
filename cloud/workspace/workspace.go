@@ -237,7 +237,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	}
 	workspaceID := workspace.Id
 
-	workspaceUpdateRequest := astrocore.CreateWorkspaceJSONRequestBody{}
+	workspaceUpdateRequest := astrocore.UpdateWorkspaceRequest{}
 
 	if name == "" {
 		workspaceUpdateRequest.Name = workspace.Name
@@ -251,13 +251,13 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 		workspaceUpdateRequest.Description = &description
 	}
 	if enforceCD == "" {
-		workspaceUpdateRequest.ApiKeyOnlyDeploymentsDefault = &workspace.ApiKeyOnlyDeploymentsDefault
+		workspaceUpdateRequest.ApiKeyOnlyDeploymentsDefault = workspace.ApiKeyOnlyDeploymentsDefault
 	} else {
 		enforce, err := validateEnforceCD(enforceCD)
 		if err != nil {
 			return err
 		}
-		workspaceUpdateRequest.ApiKeyOnlyDeploymentsDefault = &enforce
+		workspaceUpdateRequest.ApiKeyOnlyDeploymentsDefault = enforce
 	}
 	resp, err := client.UpdateWorkspaceWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceID, workspaceUpdateRequest)
 	if err != nil {
