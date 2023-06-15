@@ -3519,7 +3519,7 @@ func TestGetWorkspaceIDFromName(t *testing.T) {
 		err                                                          error
 	)
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	expectedWorkspaceID = "test-workspace-id"
+	expectedWorkspaceID = "test-ws-id"
 	workspaceName = "test-workspace"
 	orgID = "test-org-id"
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -3538,7 +3538,7 @@ func TestGetWorkspaceIDFromName(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if workspace does not exist in organization", func(t *testing.T) {
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&[]astrocore.Workspace{}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&EmptyListWorkspacesResponseOK, nil).Once()
 
 		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, orgID, mockCoreClient)
 		assert.ErrorIs(t, err, errNotFound)
