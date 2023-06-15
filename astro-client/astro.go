@@ -13,8 +13,6 @@ import (
 var organizationShortNameRegex = regexp.MustCompile("[^a-z0-9-]")
 
 type Client interface {
-	// Workspace
-	GetWorkspace(workspaceID string) (Workspace, error)
 	// Deployment
 	CreateDeployment(input *CreateDeploymentInput) (Deployment, error)
 	UpdateDeployment(input *UpdateDeploymentInput) (Deployment, error)
@@ -190,20 +188,6 @@ func (c *HTTPClient) DeployImage(input DeployImageInput) (*Image, error) {
 		return nil, err
 	}
 	return resp.Data.DeployImage, nil
-}
-
-// GetWorkspace returns information about the workspace
-func (c *HTTPClient) GetWorkspace(workspaceID string) (Workspace, error) {
-	wsReq := Request{
-		Query:     GetWorkspace,
-		Variables: map[string]interface{}{"workspaceId": workspaceID},
-	}
-
-	wsResp, err := wsReq.DoWithPublicClient(c)
-	if err != nil {
-		return Workspace{}, err
-	}
-	return wsResp.Data.GetWorkspace, nil
 }
 
 // GetWorkerQueueOptions gets the worker-queue default options
