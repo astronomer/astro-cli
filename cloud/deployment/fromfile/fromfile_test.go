@@ -29,7 +29,7 @@ var (
 	limit             = 1000
 	clusterType       = []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
 	clusterListParams = &astrocore.ListClustersParams{
-		Type:  &clusterType,
+		Types: &clusterType,
 		Limit: &limit,
 	}
 	mockListClustersResponse = astrocore.ListClustersResponse{
