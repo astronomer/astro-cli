@@ -335,7 +335,6 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 			fmt.Printf(configSetDefaultWorkspace, w.Name)
 		}
 	}
-	fmt.Println("ssorijor")
 	return nil
 }
 

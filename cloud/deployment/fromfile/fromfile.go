@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
 	"github.com/astronomer/astro-cli/cloud/organization"
+	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/ghodss/yaml"
 )
@@ -111,7 +112,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 	switch action {
 	case createAction:
 		// map workspace name to id
-		workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, c.Organization, client)
+		workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, c.Organization, coreClient)
 		if err != nil {
 			return err
 		}
@@ -381,18 +382,19 @@ func getClusterInfoFromName(clusterName, organizationShortName string, coreClien
 // getWorkspaceIDFromName takes workspaceName and organizationID as its arguments.
 // It returns the workspaceID if the workspace is found in the organization.
 // It returns an errWorkspaceNotFound if the workspace does not exist in the organization.
-func getWorkspaceIDFromName(workspaceName, organizationID string, client astro.Client) (string, error) {
+func getWorkspaceIDFromName(workspaceName, organizationID string, client astrocore.CoreClient) (string, error) {
 	var (
-		existingWorkspaces []astro.Workspace
+		existingWorkspaces []astrocore.Workspace
 		err                error
 	)
-	existingWorkspaces, err = client.ListWorkspaces(organizationID)
+
+	existingWorkspaces, err = workspace.GetWorkspaces(client)
 	if err != nil {
 		return "", err
 	}
 	for i := range existingWorkspaces {
-		if existingWorkspaces[i].Label == workspaceName {
-			return existingWorkspaces[i].ID, nil
+		if existingWorkspaces[i].Name == workspaceName {
+			return existingWorkspaces[i].Id, nil
 		}
 	}
 	err = fmt.Errorf("workspace_name: %s %w in organization: %s", workspaceName, errNotFound, organizationID)
