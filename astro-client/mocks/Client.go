@@ -311,32 +311,6 @@ func (_m *Client) ListDeployments(organizationID string, workspaceID string) ([]
 	return r0, r1
 }
 
-// ListWorkspaces provides a mock function with given fields: organizationID
-func (_m *Client) ListWorkspaces(organizationID string) ([]astro.Workspace, error) {
-	ret := _m.Called(organizationID)
-
-	var r0 []astro.Workspace
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]astro.Workspace, error)); ok {
-		return rf(organizationID)
-	}
-	if rf, ok := ret.Get(0).(func(string) []astro.Workspace); ok {
-		r0 = rf(organizationID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]astro.Workspace)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(organizationID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // ModifyDeploymentVariable provides a mock function with given fields: input
 func (_m *Client) ModifyDeploymentVariable(input astro.EnvironmentVariablesInput) ([]astro.EnvironmentVariablesObject, error) {
 	ret := _m.Called(input)

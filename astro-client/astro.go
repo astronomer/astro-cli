@@ -14,7 +14,6 @@ var organizationShortNameRegex = regexp.MustCompile("[^a-z0-9-]")
 
 type Client interface {
 	// Workspace
-	ListWorkspaces(organizationID string) ([]Workspace, error)
 	GetWorkspace(workspaceID string) (Workspace, error)
 	// Deployment
 	CreateDeployment(input *CreateDeploymentInput) (Deployment, error)
@@ -36,19 +35,6 @@ type Client interface {
 	GetOrganizationAuditLogs(orgName string, earliest int) (io.ReadCloser, error)
 	// Alert Emails
 	UpdateAlertEmails(input UpdateDeploymentAlertsInput) (DeploymentAlerts, error)
-}
-
-func (c *HTTPClient) ListWorkspaces(organizationID string) ([]Workspace, error) {
-	wsReq := Request{
-		Query:     WorkspacesGetRequest,
-		Variables: map[string]interface{}{"organizationId": organizationID},
-	}
-
-	wsResp, err := wsReq.DoWithPublicClient(c)
-	if err != nil {
-		return []Workspace{}, err
-	}
-	return wsResp.Data.GetWorkspaces, nil
 }
 
 func (c *HTTPClient) CreateDeployment(input *CreateDeploymentInput) (Deployment, error) {

@@ -11,53 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestListWorkspaces(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockResponse := &Response{
-		Data: ResponseData{
-			GetWorkspaces: []Workspace{
-				{
-					ID:           "test-id",
-					Label:        "test-label",
-					Users:        []User{},
-					RoleBindings: []RoleBinding{},
-				},
-			},
-		},
-	}
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
-
-	t.Run("success", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		workspaces, err := astroClient.ListWorkspaces("organization-id")
-		assert.NoError(t, err)
-		assert.Equal(t, workspaces, mockResponse.Data.GetWorkspaces)
-	})
-
-	t.Run("error", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 500,
-				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		_, err := astroClient.ListWorkspaces("organization-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-}
-
 func TestCreateDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
