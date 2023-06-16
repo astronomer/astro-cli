@@ -2,13 +2,13 @@ package organization
 
 import (
 	httpContext "context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"time"
 
-	"errors"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/context"
