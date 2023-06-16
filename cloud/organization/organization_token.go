@@ -8,14 +8,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/astronomer/astro-cli/astro-client"
+	"errors"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -244,7 +243,7 @@ func ListTokens(client astrocore.CoreClient, out io.Writer) error {
 
 	apiTokens, err := getOrganizationTokens(client)
 	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return err
 	}
 
 	tab := newTokenTableOut()
