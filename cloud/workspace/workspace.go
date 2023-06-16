@@ -20,6 +20,7 @@ import (
 var (
 	errInvalidWorkspaceKey = errors.New("invalid workspace selection")
 	ErrInvalidName         = errors.New("no name provided for the workspace. Retry with a valid name")
+	ErrInvalidTokenName    = errors.New("no name provided for the workspace token. Retry with a valid name")
 	ErrWorkspaceNotFound   = errors.New("no workspace was found for the ID you provided")
 	ErrWrongEnforceInput   = errors.New("the input to the `--enforce-cicd` flag")
 )

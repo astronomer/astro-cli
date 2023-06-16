@@ -18,13 +18,14 @@ import (
 )
 
 var (
-	ErrNoShortName          = errors.New("cannot retrieve organization short name from context")
-	ErrInvalidRole          = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
-	ErrInvalidWorkspaceRole = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
-	ErrInvalidEmail         = errors.New("no email provided for the invite. Retry with a valid email address")
-	ErrInvalidUserKey       = errors.New("invalid User selected")
-	userPagnationLimit      = 100
-	ErrUserNotFound         = errors.New("no user was found for the email you provided")
+	ErrNoShortName             = errors.New("cannot retrieve organization short name from context")
+	ErrInvalidRole             = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	ErrInvalidWorkspaceRole    = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+	ErrInvalidOrganizationRole = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	ErrInvalidEmail            = errors.New("no email provided for the invite. Retry with a valid email address")
+	ErrInvalidUserKey          = errors.New("invalid User selected")
+	userPagnationLimit         = 100
+	ErrUserNotFound            = errors.New("no user was found for the email you provided")
 )
 
 func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient) error {
@@ -332,6 +333,19 @@ func IsWorkspaceRoleValid(role string) error {
 		}
 	}
 	return ErrInvalidWorkspaceRole
+}
+
+// IsOrgnaizationRoleValid checks if the requested role is valid
+// If the role is valid, it returns nil
+// error ErrInvalidOrgnaizationRole is returned if the role is not valid
+func IsOrganizationRoleValid(role string) error {
+	validRoles := []string{"ORGANIZATION_MEMBER", "ORGANIZATION_BILLING_ADMIN", "ORGANIZATION_OWNER"}
+	for _, validRole := range validRoles {
+		if role == validRole {
+			return nil
+		}
+	}
+	return ErrInvalidOrganizationRole
 }
 
 // Returns a list of all of an organizations users
