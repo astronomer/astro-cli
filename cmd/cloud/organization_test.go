@@ -278,14 +278,12 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
-		Body:    teamRequestErrorDelete,
-		JSON200: nil,
+		Body: teamRequestErrorDelete,
 	}
 	DeleteTeamResponseOK = astrocore.DeleteTeamResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &team1,
 	}
 	errorBodyUpdateTeamMembership, _ = json.Marshal(astrocore.Error{
 		Message: "failed to update team membership",

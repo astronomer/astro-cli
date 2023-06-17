@@ -174,14 +174,12 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &workspaceUser1,
 	}
 	DeleteWorkspaceUserResponseError = astrocore.DeleteWorkspaceUserResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
-		Body:    errorBodyUpdate,
-		JSON200: nil,
+		Body: errorBodyUpdate,
 	}
 	ListWorkspaceTeamsResponseOK = astrocore.ListWorkspaceTeamsResponse{
 		HTTPResponse: &http.Response{

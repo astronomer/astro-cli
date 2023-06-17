@@ -24,9 +24,9 @@ var (
 	disableCiCdEnforcement = false
 	errMock                = errors.New("mock error")
 	limit                  = 1000
-	clusterType            = []astrocore.ListClustersParamsType{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
+	clusterType            = []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
 	clusterListParams      = &astrocore.ListClustersParams{
-		Type:  &clusterType,
+		Types: &clusterType,
 		Limit: &limit,
 	}
 	mockListClustersResponse = astrocore.ListClustersResponse{
