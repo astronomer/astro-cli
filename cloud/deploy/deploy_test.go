@@ -610,7 +610,7 @@ func TestDeployFailure(t *testing.T) {
 	mockContainerHandler.AssertExpectations(t)
 }
 
-func TestDeployMonitoringDAGinNonHostedOrg(t *testing.T) {
+func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	mockDeplyResp := []astro.Deployment{
 		{
 			ID:             "test-id",
@@ -719,7 +719,7 @@ func TestDeployMonitoringDAGinNonHostedOrg(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-func TestDeployNoMonitoringDAGinHostedOrg(t *testing.T) {
+func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	mockDeplyResp := []astro.Deployment{
 		{
 			ID:             "test-id",
@@ -731,6 +731,7 @@ func TestDeployNoMonitoringDAGinHostedOrg(t *testing.T) {
 			},
 			CreatedAt:        time.Now(),
 			DagDeployEnabled: true,
+			Type:             "HOSTED_SHARED",
 		},
 		{
 			ID:             "test-id-2",
@@ -742,6 +743,7 @@ func TestDeployNoMonitoringDAGinHostedOrg(t *testing.T) {
 			},
 			CreatedAt:        time.Now(),
 			DagDeployEnabled: true,
+			Type:             "HOSTED_DEDICATED",
 		},
 	}
 

@@ -78,6 +78,7 @@ type deploymentInfo struct {
 	workspaceID      string
 	webserverURL     string
 	dagDeployEnabled bool
+	deploymentType   string
 }
 
 type InputDeploy struct {
@@ -137,11 +138,11 @@ func removeDagsFromDockerIgnore(fullpath string) error {
 	return nil
 }
 
-func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, error) {
+func deployDags(path, dagsPath, deploymentType, runtimeID string, client astro.Client) (string, error) {
 	// Check the dags directory
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
-	if !organization.IsOrgHosted() {
+	if !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentHosted(deploymentType) {
 		// Create monitoring dag file
 		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
 		if err != nil {
@@ -175,7 +176,7 @@ func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, 
 	// Delete the tar file
 	defer func() {
 		dagFile.Close()
-		if !organization.IsOrgHosted() {
+		if !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentHosted(deploymentType) {
 			os.Remove(monitoringDagPath)
 		}
 		err = os.Remove(dagFile.Name())
@@ -262,7 +263,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		versionID, err := deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
+		versionID, err := deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, client)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -341,7 +342,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			_, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
+			_, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, client)
 			if err != nil {
 				return err
 			}
@@ -385,6 +386,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 			currentDeployment.Workspace.ID,
 			currentDeployment.DeploymentSpec.Webserver.URL,
 			currentDeployment.DagDeployEnabled,
+			currentDeployment.Type,
 		}, nil
 	}
 	deployInfo, err := getImageName(cloudDomain, deploymentID, client)
