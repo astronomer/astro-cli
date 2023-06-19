@@ -1241,6 +1241,15 @@ func TestListTeamUsers(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("happy path ListTeamUsers team with no membership", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseEmptyMembership, nil).Twice()
+		err := ListTeamUsers(team1.Id, out, mockClient)
+		assert.NoError(t, err)
+	})
+
 	t.Run("error path when GetTeamWithResponse returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)

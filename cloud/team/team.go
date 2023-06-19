@@ -714,19 +714,23 @@ func ListTeamUsers(teamID string, out io.Writer, client astrocore.CoreClient) (e
 		DynamicPadding: true,
 		Header:         []string{"ID", "FullName", "Email"},
 	}
-	members := *team.Members
-	for i := range members {
-		var fullName string
-		if members[i].FullName != nil {
-			fullName = *members[i].FullName
+	if team.Members != nil {
+		members := *team.Members
+		for i := range members {
+			var fullName string
+			if members[i].FullName != nil {
+				fullName = *members[i].FullName
+			}
+			table.AddRow([]string{
+				members[i].UserId,
+				fullName,
+				members[i].Username,
+			}, false)
 		}
-		table.AddRow([]string{
-			members[i].UserId,
-			fullName,
-			members[i].Username,
-		}, false)
-	}
 
-	table.Print(out)
+		table.Print(out)
+		return nil
+	}
+	fmt.Println("The selected team has no members")
 	return nil
 }
