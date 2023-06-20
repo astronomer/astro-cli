@@ -69,7 +69,7 @@ func downloadDag(dagID, dagVersion string, addProviders bool, out io.Writer) {
 
 	githubRawSourceURL, exists := dagJSON["githubRawSourceUrl"].(string)
 	if !exists {
-	        log.Fatalf("Couldn't find key githubRawSourceUrl in Response! %v", dagJSON)
+		log.Fatalf("Couldn't find key githubRawSourceUrl in Response! %v", dagJSON)
 	}
 
 	filePath, exists := dagJSON["filePath"].(string)

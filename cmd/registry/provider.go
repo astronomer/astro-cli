@@ -104,7 +104,7 @@ func addProviderToRequirementsTxt(name, version string, out io.Writer) {
 	const filename = "requirements.txt"
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, writeAndReadPermissions)
 	defer f.Close()
-        if err != nil {
+	if err != nil {
 		log.Fatal(err)
 	}
 
