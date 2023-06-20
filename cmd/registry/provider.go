@@ -38,11 +38,10 @@ func newRegistryAddProviderCmd(out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) > 0 {
 				providerName := args[0]
-				addProviderByName(providerName, out)
 			} else {
 				providerName := input.Text("Enter the name of the provider package to download: ")
-				addProviderByName(providerName, out)
 			}
+			addProviderByName(providerName, out)
 		},
 	}
 	cmd.Flags().StringVar(&providerVersion, "version", "latest", "Provider Version to add. Optional")
@@ -104,10 +103,10 @@ func addProviderByIDAndVersion(providerID, providerVersion string, out io.Writer
 func addProviderToRequirementsTxt(name, version string, out io.Writer) {
 	const filename = "requirements.txt"
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, writeAndReadPermissions)
-	defer func(f *os.File) {
-		_ = f.Close()
-	}(f)
-	printutil.LogFatal(err)
+	defer f.Close()
+        if err != nil {
+		log.Fatal(err)
+	}
 
 	b, err := os.ReadFile(filename)
 	printutil.LogFatal(err)

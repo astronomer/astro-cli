@@ -28,7 +28,7 @@ func execProviderCmd(args ...string) (string, error) {
 func TestProviderAdd(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	_ = os.Remove("requirements.txt")
+	defer os.Remove("requirements.txt")
 
 	cmdArgs := []string{"add", "snowflake"}
 	resp, err := execProviderCmd(cmdArgs...)

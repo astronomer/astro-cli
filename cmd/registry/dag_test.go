@@ -28,7 +28,7 @@ func execDagCmd(args ...string) (string, error) {
 func TestDagAdd(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	_ = os.Remove("dags/sagemaker-batch-inference.py")
+	defer os.Remove("dags/sagemaker-batch-inference.py")
 
 	cmdArgs := []string{"add", "sagemaker-batch-inference"}
 	resp, err := execDagCmd(cmdArgs...)

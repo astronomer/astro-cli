@@ -125,25 +125,19 @@ func DownloadResponseToFile(sourceURL, path string) {
 		},
 	}
 	resp, err := client.Get(sourceURL) //nolint
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
+	defer resp.Body.Close()
 	printutil.LogFatal(err)
 
 	err = fileutil.WriteToFile(path, resp.Body)
 	printutil.LogFatal(err)
 
-	defer func(file *os.File) {
-		_ = file.Close()
-	}(file)
+	defer file.Close()
 	logrus.Infof("Downloaded %s from %s", path, sourceURL)
 }
 
 func RequestAndGetJSONBody(route string) map[string]interface{} {
 	res, err := http.Get(route) //nolint
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(res.Body)
+	defer res.Body.Close()
 	printutil.LogFatal(err)
 
 	body, err := io.ReadAll(res.Body)
