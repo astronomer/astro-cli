@@ -237,30 +237,6 @@ func (_m *Client) GetWorkerQueueOptions() (astro.WorkerQueueDefaultOptions, erro
 	return r0, r1
 }
 
-// GetWorkspace provides a mock function with given fields: workspaceID
-func (_m *Client) GetWorkspace(workspaceID string) (astro.Workspace, error) {
-	ret := _m.Called(workspaceID)
-
-	var r0 astro.Workspace
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (astro.Workspace, error)); ok {
-		return rf(workspaceID)
-	}
-	if rf, ok := ret.Get(0).(func(string) astro.Workspace); ok {
-		r0 = rf(workspaceID)
-	} else {
-		r0 = ret.Get(0).(astro.Workspace)
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(workspaceID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // InitiateDagDeployment provides a mock function with given fields: input
 func (_m *Client) InitiateDagDeployment(input astro.InitiateDagDeploymentInput) (astro.InitiateDagDeployment, error) {
 	ret := _m.Called(input)
@@ -278,32 +254,6 @@ func (_m *Client) InitiateDagDeployment(input astro.InitiateDagDeploymentInput) 
 
 	if rf, ok := ret.Get(1).(func(astro.InitiateDagDeploymentInput) error); ok {
 		r1 = rf(input)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ListClusters provides a mock function with given fields: organizationID
-func (_m *Client) ListClusters(organizationID string) ([]astro.Cluster, error) {
-	ret := _m.Called(organizationID)
-
-	var r0 []astro.Cluster
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]astro.Cluster, error)); ok {
-		return rf(organizationID)
-	}
-	if rf, ok := ret.Get(0).(func(string) []astro.Cluster); ok {
-		r0 = rf(organizationID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]astro.Cluster)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(organizationID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -330,32 +280,6 @@ func (_m *Client) ListDeployments(organizationID string, workspaceID string) ([]
 
 	if rf, ok := ret.Get(1).(func(string, string) error); ok {
 		r1 = rf(organizationID, workspaceID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ListWorkspaces provides a mock function with given fields: organizationID
-func (_m *Client) ListWorkspaces(organizationID string) ([]astro.Workspace, error) {
-	ret := _m.Called(organizationID)
-
-	var r0 []astro.Workspace
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]astro.Workspace, error)); ok {
-		return rf(organizationID)
-	}
-	if rf, ok := ret.Get(0).(func(string) []astro.Workspace); ok {
-		r0 = rf(organizationID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]astro.Workspace)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(organizationID)
 	} else {
 		r1 = ret.Error(1)
 	}

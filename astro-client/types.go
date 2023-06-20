@@ -13,8 +13,6 @@ type ResponseData struct {
 	DeployImage               *Image                       `json:"deployImage,omitempty"`
 	GetDeployment             Deployment                   `json:"deployment,omitempty"`
 	GetDeployments            []Deployment                 `json:"deployments,omitempty"`
-	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
-	GetWorkspace              Workspace                    `json:"workspace,omitempty"`
 	RuntimeReleases           []RuntimeRelease             `json:"runtimeReleases,omitempty"`
 	CreateDeployment          Deployment                   `json:"CreateDeployment,omitempty"`
 	GetDeploymentConfig       DeploymentConfig             `json:"deploymentConfigOptions,omitempty"`
@@ -72,11 +70,12 @@ type Deployment struct {
 
 // Cluster contains all components of an Astronomer Cluster
 type Cluster struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	CloudProvider string     `json:"cloudProvider"`
-	Region        string     `json:"region"`
-	NodePools     []NodePool `json:"nodePools"`
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	CloudProvider   string     `json:"cloudProvider"`
+	ProviderAccount string     `json:"providerAccount"`
+	Region          string     `json:"region"`
+	NodePools       []NodePool `json:"nodePools"`
 }
 
 type RuntimeRelease struct {

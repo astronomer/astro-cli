@@ -1,6 +1,7 @@
 package fromfile
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
 	"github.com/astronomer/astro-cli/cloud/organization"
+	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/ghodss/yaml"
 )
@@ -41,7 +43,7 @@ const (
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
 // inputFile can be in yaml or json format
 // It returns an error if any required information is missing or incorrectly specified.
-func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error { //nolint
 	var (
 		err                                            error
 		errHelp, clusterID, workspaceID, outputFormat  string
@@ -80,10 +82,27 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 	if err != nil {
 		return err
 	}
-	// map cluster name to id and collect node pools for cluster
-	clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.OrganizationShortName, coreClient)
-	if err != nil {
-		return err
+
+	if deployment.IsDeploymentHosted(formattedDeployment.Deployment.Configuration.DeploymentType) {
+		getSharedClusterParams := astrocore.GetSharedClusterParams{
+			Region:        formattedDeployment.Deployment.Configuration.Region,
+			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(formattedDeployment.Deployment.Configuration.CloudProvider),
+		}
+		response, err := coreClient.GetSharedClusterWithResponse(context.Background(), &getSharedClusterParams)
+		if err != nil {
+			return err
+		}
+		err = astrocore.NormalizeAPIError(response.HTTPResponse, response.Body)
+		if err != nil {
+			return err
+		}
+		clusterID = response.JSON200.Id
+	} else {
+		// map cluster name to id and collect node pools for cluster
+		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.OrganizationShortName, coreClient)
+		if err != nil {
+			return err
+		}
 	}
 
 	existingDeployments, err = deployment.GetDeployments(workspaceID, c.Organization, client)
@@ -93,7 +112,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 	switch action {
 	case createAction:
 		// map workspace name to id
-		workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, c.Organization, client)
+		workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, c.Organization, coreClient)
 		if err != nil {
 			return err
 		}
@@ -223,6 +242,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			Description:           deploymentFromFile.Deployment.Configuration.Description,
 			RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			SchedulerSize:         deploymentFromFile.Deployment.Configuration.SchedulerSize,
 			DeploymentSpec: astro.DeploymentCreateSpec{
 				Executor: deploymentFromFile.Deployment.Configuration.Executor,
 				Scheduler: astro.Scheduler{
@@ -244,6 +264,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			Label:            deploymentFromFile.Deployment.Configuration.Name,
 			Description:      deploymentFromFile.Deployment.Configuration.Description,
 			DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			SchedulerSize:    deploymentFromFile.Deployment.Configuration.SchedulerSize,
 			DeploymentSpec: astro.DeploymentCreateSpec{
 				Executor: deploymentFromFile.Deployment.Configuration.Executor,
 				Scheduler: astro.Scheduler{
@@ -297,14 +318,14 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 			if queue.Name == defaultQueue {
 				hasDefaultQueue = true
 			}
-			if !hasDefaultQueue && queue.Name != defaultQueue {
-				missingField := fmt.Sprintf("deployment.worker_queues[%d].name = default", i)
-				return fmt.Errorf("%w: %s", errRequiredField, missingField)
-			}
 			if queue.WorkerType == "" {
 				missingField := fmt.Sprintf("deployment.worker_queues[%d].worker_type", i)
 				return fmt.Errorf("%w: %s", errRequiredField, missingField)
 			}
+		}
+		if !hasDefaultQueue {
+			missingField := "default queue is missing under deployment.worker_queues"
+			return fmt.Errorf("%w: %s", errRequiredField, missingField)
 		}
 	}
 	return nil
@@ -361,18 +382,19 @@ func getClusterInfoFromName(clusterName, organizationShortName string, coreClien
 // getWorkspaceIDFromName takes workspaceName and organizationID as its arguments.
 // It returns the workspaceID if the workspace is found in the organization.
 // It returns an errWorkspaceNotFound if the workspace does not exist in the organization.
-func getWorkspaceIDFromName(workspaceName, organizationID string, client astro.Client) (string, error) {
+func getWorkspaceIDFromName(workspaceName, organizationID string, client astrocore.CoreClient) (string, error) {
 	var (
-		existingWorkspaces []astro.Workspace
+		existingWorkspaces []astrocore.Workspace
 		err                error
 	)
-	existingWorkspaces, err = client.ListWorkspaces(organizationID)
+
+	existingWorkspaces, err = workspace.GetWorkspaces(client)
 	if err != nil {
 		return "", err
 	}
 	for i := range existingWorkspaces {
-		if existingWorkspaces[i].Label == workspaceName {
-			return existingWorkspaces[i].ID, nil
+		if existingWorkspaces[i].Name == workspaceName {
+			return existingWorkspaces[i].Id, nil
 		}
 	}
 	err = fmt.Errorf("workspace_name: %s %w in organization: %s", workspaceName, errNotFound, organizationID)
@@ -432,6 +454,7 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 		err        error
 	)
 	requestedQueues := deploymentFromFile.Deployment.WorkerQs
+	deploymentType := deploymentFromFile.Deployment.Configuration.DeploymentType
 	// sort existing queues by name
 	if len(existingQueues) > 1 {
 		sort.Slice(existingQueues, func(i, j int) bool {
@@ -469,12 +492,16 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
 		qList[i].PodCPU = requestedQueues[i].PodCPU
 		qList[i].PodRAM = requestedQueues[i].PodRAM
-		// map worker type to node pool id
-		nodePoolID, err = getNodePoolIDFromWorkerType(requestedQueues[i].WorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
-		if err != nil {
-			return nil, err
+		if deployment.IsDeploymentDedicated(deploymentType) || deployment.IsDeploymentHosted(deploymentType) {
+			qList[i].AstroMachine = requestedQueues[i].WorkerType
+		} else {
+			// map worker type to node pool id
+			nodePoolID, err = getNodePoolIDFromWorkerType(requestedQueues[i].WorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
+			if err != nil {
+				return nil, err
+			}
+			qList[i].NodePoolID = nodePoolID
 		}
-		qList[i].NodePoolID = nodePoolID
 	}
 	return qList, nil
 }

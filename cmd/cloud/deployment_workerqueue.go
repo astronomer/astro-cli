@@ -21,7 +21,7 @@ func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "worker-queue",
 		Aliases: []string{"wq"},
-		Short:   "Manage deployment worker queues",
+		Short:   "Manage Deployment worker queues",
 		Long:    "Manage worker queues for an Astro Deployment.",
 	}
 	cmd.AddCommand(

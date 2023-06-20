@@ -301,7 +301,9 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		Workspace:   astro.Workspace{ID: "test-ws-id"},
 		ReleaseName: "great-release-name",
 		Cluster: astro.Cluster{
-			ID: "cluster-id",
+			ID:              "cluster-id",
+			CloudProvider:   "gcp",
+			ProviderAccount: "provider-account",
 			NodePools: []astro.NodePool{
 				{
 					ID:               "test-pool-id",
@@ -355,23 +357,27 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		Status:    "HEALTHY",
 	}
 
+	workloadIdentity := "astro-great-release-name@provider-account.iam.gserviceaccount.com"
+
 	t.Run("returns deployment metadata for the requested cloud deployment", func(t *testing.T) {
 		var actualDeploymentMeta deploymentMetadata
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
 		expectedCloudDomainURL := "cloud.astronomer.io/" + sourceDeployment.Workspace.ID +
 			"/deployments/" + sourceDeployment.ID + "/analytics"
 		expectedDeploymentMetadata := deploymentMetadata{
-			DeploymentID:   &sourceDeployment.ID,
-			WorkspaceID:    &sourceDeployment.Workspace.ID,
-			ClusterID:      &sourceDeployment.Cluster.ID,
-			AirflowVersion: &sourceDeployment.RuntimeRelease.AirflowVersion,
-			CurrentTag:     &sourceDeployment.DeploymentSpec.Image.Tag,
-			ReleaseName:    &sourceDeployment.ReleaseName,
-			DeploymentURL:  &expectedCloudDomainURL,
-			WebserverURL:   &sourceDeployment.DeploymentSpec.Webserver.URL,
-			CreatedAt:      &sourceDeployment.CreatedAt,
-			UpdatedAt:      &sourceDeployment.UpdatedAt,
-			Status:         &sourceDeployment.Status,
+			DeploymentID:     &sourceDeployment.ID,
+			WorkspaceID:      &sourceDeployment.Workspace.ID,
+			ClusterID:        &sourceDeployment.Cluster.ID,
+			AirflowVersion:   &sourceDeployment.RuntimeRelease.AirflowVersion,
+			CurrentTag:       &sourceDeployment.DeploymentSpec.Image.Tag,
+			ReleaseName:      &sourceDeployment.ReleaseName,
+			DeploymentURL:    &expectedCloudDomainURL,
+			WebserverURL:     &sourceDeployment.DeploymentSpec.Webserver.URL,
+			CreatedAt:        &sourceDeployment.CreatedAt,
+			UpdatedAt:        &sourceDeployment.UpdatedAt,
+			WorkloadIdentity: &workloadIdentity,
+			Status:           &sourceDeployment.Status,
 		}
 		rawDeploymentInfo, err := getDeploymentInfo(&sourceDeployment)
 		assert.NoError(t, err)
@@ -385,17 +391,18 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		expectedCloudDomainURL := "localhost:5000/" + sourceDeployment.Workspace.ID +
 			"/deployments/" + sourceDeployment.ID + "/analytics"
 		expectedDeploymentMetadata := deploymentMetadata{
-			DeploymentID:   &sourceDeployment.ID,
-			WorkspaceID:    &sourceDeployment.Workspace.ID,
-			ClusterID:      &sourceDeployment.Cluster.ID,
-			ReleaseName:    &sourceDeployment.ReleaseName,
-			AirflowVersion: &sourceDeployment.RuntimeRelease.AirflowVersion,
-			CurrentTag:     &sourceDeployment.DeploymentSpec.Image.Tag,
-			Status:         &sourceDeployment.Status,
-			CreatedAt:      &sourceDeployment.CreatedAt,
-			UpdatedAt:      &sourceDeployment.UpdatedAt,
-			DeploymentURL:  &expectedCloudDomainURL,
-			WebserverURL:   &sourceDeployment.DeploymentSpec.Webserver.URL,
+			DeploymentID:     &sourceDeployment.ID,
+			WorkspaceID:      &sourceDeployment.Workspace.ID,
+			ClusterID:        &sourceDeployment.Cluster.ID,
+			ReleaseName:      &sourceDeployment.ReleaseName,
+			AirflowVersion:   &sourceDeployment.RuntimeRelease.AirflowVersion,
+			CurrentTag:       &sourceDeployment.DeploymentSpec.Image.Tag,
+			Status:           &sourceDeployment.Status,
+			CreatedAt:        &sourceDeployment.CreatedAt,
+			UpdatedAt:        &sourceDeployment.UpdatedAt,
+			DeploymentURL:    &expectedCloudDomainURL,
+			WorkloadIdentity: &workloadIdentity,
+			WebserverURL:     &sourceDeployment.DeploymentSpec.Webserver.URL,
 		}
 		rawDeploymentInfo, err := getDeploymentInfo(&sourceDeployment)
 		assert.NoError(t, err)
@@ -938,6 +945,9 @@ func TestFormatPrintableDeployment(t *testing.T) {
         scheduler_count: 3
         cluster_name: test-cluster
         workspace_name: test-ws
+        deployment_type: ""
+        cloud_provider: ""
+        region: ""
     worker_queues:
         - name: default
           max_worker_count: 130
@@ -1092,7 +1102,10 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
-            "workspace_name": "test-ws"
+            "workspace_name": "test-ws",
+            "deployment_type": "",
+            "cloud_provider": "",
+            "region": ""
         },
         "worker_queues": [
             {

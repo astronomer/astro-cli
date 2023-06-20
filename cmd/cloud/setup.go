@@ -125,10 +125,7 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	if err != nil {
 		return err
 	}
-	err = migrateCloudConfig(coreClient)
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
@@ -174,6 +171,18 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 			return err
 		}
 		err = c.SetContextKey("workspace", c.LastUsedWorkspace)
+		if err != nil {
+			return err
+		}
+		err = c.SetContextKey("organization", c.Organization)
+		if err != nil {
+			return err
+		}
+		err = c.SetContextKey("organization_short_name", c.OrganizationShortName)
+		if err != nil {
+			return err
+		}
+		err = c.SetContextKey("organization_product", c.OrganizationProduct)
 		if err != nil {
 			return err
 		}
