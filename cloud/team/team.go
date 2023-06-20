@@ -12,6 +12,7 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -30,6 +31,11 @@ var (
 	ErrNoUsersFoundInOrg        = errors.New("no users found in your organization")
 	teamPagnationLimit          = 100
 )
+
+func confirmOperation() {
+	fmt.Printf("This is an IDP-managed team. Please avoid making changes in Astro whenever possible. \n%s to continue the operation or %s to abort", ansi.Green("Press Enter"), ansi.Red("^C"))
+	fmt.Scanln()
+}
 
 func CreateTeam(name, description string, out io.Writer, client astrocore.CoreClient) error {
 	if name == "" {
@@ -167,8 +173,10 @@ func UpdateTeam(id, name, description string, out io.Writer, client astrocore.Co
 			return ErrTeamNotFound
 		}
 	}
+	if team.IsIdpManaged {
+		confirmOperation()
+	}
 	teamID := team.Id
-
 	teamUpdateRequest := astrocore.UpdateTeamJSONRequestBody{}
 
 	if name == "" {
@@ -444,7 +452,7 @@ func GetOrgTeams(client astrocore.CoreClient) ([]astrocore.Team, error) {
 func ListOrgTeams(out io.Writer, client astrocore.CoreClient) error {
 	table := printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"ID", "Name", "Description", "CREATE DATE"},
+		Header:         []string{"ID", "NAME", "DESCRIPTION", "IDP MANAGED", "CREATE DATE"},
 	}
 	teams, err := GetOrgTeams(client)
 	if err != nil {
@@ -456,6 +464,7 @@ func ListOrgTeams(out io.Writer, client astrocore.CoreClient) error {
 			teams[i].Id,
 			teams[i].Name,
 			*teams[i].Description,
+			strconv.FormatBool(teams[i].IsIdpManaged),
 			teams[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}
@@ -495,6 +504,9 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 		if team.Id == "" {
 			return ErrTeamNotFound
 		}
+	}
+	if team.IsIdpManaged {
+		confirmOperation()
 	}
 	teamID := team.Id
 	resp, err := client.DeleteTeamWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID)
@@ -540,6 +552,9 @@ func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.Cor
 		if team.Id == "" {
 			return ErrTeamNotFound
 		}
+	}
+	if team.IsIdpManaged {
+		confirmOperation()
 	}
 	teamID = team.Id
 	if team.Members == nil {
@@ -609,6 +624,9 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 		if team.Id == "" {
 			return ErrTeamNotFound
 		}
+	}
+	if team.IsIdpManaged {
+		confirmOperation()
 	}
 	teamID = team.Id
 

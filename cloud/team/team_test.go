@@ -45,8 +45,17 @@ var (
 		Id:          "team1-id",
 		Members:     &teamMembers,
 	}
+	team2 = astrocore.Team{
+		CreatedAt:    time.Now(),
+		Name:         "team 2",
+		Description:  &description,
+		Id:           "team2-id",
+		Members:      &teamMembers,
+		IsIdpManaged: true,
+	}
 	teams = []astrocore.Team{
 		team1,
+		team2,
 	}
 	GetUserWithResponseOK = astrocore.GetUserResponse{
 		HTTPResponse: &http.Response{
@@ -59,6 +68,12 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &team1,
+	}
+	GetIDPManagedTeamWithResponseOK = astrocore.GetTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &team2,
 	}
 	errorBodyGet, _ = json.Marshal(astrocore.Error{
 		Message: "failed to get team",
