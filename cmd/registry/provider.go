@@ -118,7 +118,6 @@ func addProviderToRequirementsTxt(name, version string, out io.Writer) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
 
 	b, err := os.ReadFile(filename)
 	if err != nil {
@@ -137,4 +136,5 @@ func addProviderToRequirementsTxt(name, version string, out io.Writer) {
 		}
 		_, _ = fmt.Fprintf(out, "\nWrote %s to %s", providerString, filename)
 	}
+	defer f.Close()
 }
