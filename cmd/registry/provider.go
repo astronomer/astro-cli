@@ -73,25 +73,22 @@ func addProviderByName(providerName string, out io.Writer) {
 	providersJSON := httputil.RequestAndGetJSONBody(filledProviderRoute)
 	providers, exists := providersJSON["providers"].([]interface{})
 	if !exists {
-		key := "providers"
 		jsonString, _ := json.Marshal(providersJSON)
-		log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+		log.Fatalf("Couldn't find key 'providers' in Response! %s", jsonString)
 	}
 
 	for _, provider := range providers {
-		providersJSON := provider.(map[string]interface{})
+		childProvidersJSON := provider.(map[string]interface{})
 
-		providerID, childExists := providersJSON["name"].(string) // displayName??
-		if !exists {
-			key := "name"
-			jsonString, _ := json.Marshal(providersJSON)
-			log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
-		}
-		thisProviderVersion, childExists := providersJSON["version"].(string) // displayName??
+		providerID, childExists := childProvidersJSON["name"].(string) // displayName??
 		if !childExists {
-			key := "version"
-			jsonString, _ := json.Marshal(providersJSON)
-			log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+			jsonString, _ := json.Marshal(childProvidersJSON)
+			log.Fatalf("Couldn't find key 'name' in Response! %s", jsonString)
+		}
+		thisProviderVersion, childExists := childProvidersJSON["version"].(string) // displayName??
+		if !childExists {
+			jsonString, _ := json.Marshal(childProvidersJSON)
+			log.Fatalf("Couldn't find key 'version' in Response! %s", jsonString)
 		}
 		addProviderByIDAndVersion(providerID, thisProviderVersion, out)
 	}
@@ -103,16 +100,14 @@ func addProviderByIDAndVersion(providerID, providerVersion string, out io.Writer
 
 	name, exists := providersJSON["name"].(string)
 	if !exists {
-		key := "name"
 		jsonString, _ := json.Marshal(providersJSON)
-		log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+		log.Fatalf("Couldn't find key 'name' in Response! %s", jsonString)
 	}
 
 	version, exists := providersJSON["version"].(string)
 	if !exists {
-		key := "version"
 		jsonString, _ := json.Marshal(providersJSON)
-		log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+		log.Fatalf("Couldn't find key 'version' in Response! %s", jsonString)
 	}
 	addProviderToRequirementsTxt(name, version, out)
 }
@@ -120,7 +115,9 @@ func addProviderByIDAndVersion(providerID, providerVersion string, out io.Writer
 func addProviderToRequirementsTxt(name, version string, out io.Writer) {
 	const filename = "requirements.txt"
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, writeAndReadPermissions)
-	defer f.Close()
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
 	if err != nil {
 		log.Fatal(err)
 	}

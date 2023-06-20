@@ -75,27 +75,24 @@ func downloadDag(dagID, dagVersion string, addProviders bool, out io.Writer) {
 
 	filePath, exists := dagJSON["filePath"].(string)
 	if !exists {
-		key := "filePath"
 		jsonString, _ := json.Marshal(dagJSON)
-		log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+		log.Fatalf("Couldn't find key 'filePath' in Response! %s", jsonString)
 	}
 	httputil.DownloadResponseToFile(githubRawSourceURL, filePath)
 	_, _ = fmt.Fprintf(out, "Successfully added DAG %s:%s to %s ", dagID, dagVersion, filePath)
 
 	if addProviders {
-		providers, exists := dagJSON["providers"].([]interface{})
-		if !exists {
-			key := "providers"
+		providers, providersExists := dagJSON["providers"].([]interface{})
+		if !providersExists {
 			jsonString, _ := json.Marshal(dagJSON)
-			log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+			log.Fatalf("Couldn't find key 'providers' in Response! %s", jsonString)
 		}
 		for _, provider := range providers {
 			providerJSON := provider.(map[string]interface{})
-			providerID, nexists := providerJSON["name"].(string) // displayName??
-			if !nexists {
-				key := "name"
+			providerID, nameExists := providerJSON["name"].(string) // displayName??
+			if !nameExists {
 				jsonString, _ := json.Marshal(providerJSON)
-				log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+				log.Fatalf("Couldn't find key 'name' in Response! %s", jsonString)
 			}
 			log.Infof("Adding provider required for DAG: %s", providerID)
 			addProviderByName(providerID, out)
