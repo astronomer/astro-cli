@@ -138,11 +138,15 @@ func removeDagsFromDockerIgnore(fullpath string) error {
 	return nil
 }
 
+func shouldIncludeMonitoringDag(deploymentType string) bool {
+	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentHosted(deploymentType)
+}
+
 func deployDags(path, dagsPath, deploymentType, runtimeID string, client astro.Client) (string, error) {
 	// Check the dags directory
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
-	if !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentHosted(deploymentType) {
+	if shouldIncludeMonitoringDag(deploymentType) {
 		// Create monitoring dag file
 		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
 		if err != nil {
@@ -176,7 +180,7 @@ func deployDags(path, dagsPath, deploymentType, runtimeID string, client astro.C
 	// Delete the tar file
 	defer func() {
 		dagFile.Close()
-		if !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentHosted(deploymentType) {
+		if shouldIncludeMonitoringDag(deploymentType) {
 			os.Remove(monitoringDagPath)
 		}
 		err = os.Remove(dagFile.Name())
