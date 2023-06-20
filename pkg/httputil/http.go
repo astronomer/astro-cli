@@ -125,10 +125,11 @@ func DownloadResponseToFile(sourceURL, path string) {
 		},
 	}
 	resp, err := client.Get(sourceURL) //nolint
-	defer resp.Body.Close()
 	if err != nil {
 		logrus.Fatal(err)
 	}
+	defer resp.Body.Close()
+
 	err = fileutil.WriteToFile(path, resp.Body)
 	if err != nil {
 		logrus.Fatal(err)
@@ -139,10 +140,11 @@ func DownloadResponseToFile(sourceURL, path string) {
 
 func RequestAndGetJSONBody(route string) map[string]interface{} {
 	res, err := http.Get(route) //nolint
-	defer res.Body.Close()
 	if err != nil {
 		logrus.Fatal(err)
 	}
+	defer res.Body.Close()
+
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		logrus.Fatal(err)

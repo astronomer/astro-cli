@@ -115,12 +115,10 @@ func addProviderByIDAndVersion(providerID, providerVersion string, out io.Writer
 func addProviderToRequirementsTxt(name, version string, out io.Writer) {
 	const filename = "requirements.txt"
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, writeAndReadPermissions)
-	defer func(f *os.File) {
-		_ = f.Close()
-	}(f)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer f.Close()
 
 	b, err := os.ReadFile(filename)
 	if err != nil {
