@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 const writeAndReadPermissions = 0o655
@@ -31,15 +31,15 @@ func newRegistryProviderCmd(out io.Writer) *cobra.Command {
 
 func newRegistryAddProviderCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "add [PROVIDER]",
-		// Aliases: []string{"p"},
+		Use:   "add [PROVIDER]",
 		Short: "Download a provider package from the Astronomer Registry",
 		Long:  "Download a provider package as an Astro project dependency.",
 		Run: func(cmd *cobra.Command, args []string) {
+			var providerName string
 			if len(args) > 0 {
-				providerName := args[0]
+				providerName = args[0]
 			} else {
-				providerName := input.Text("Enter the name of the provider package to download: ")
+				providerName = input.Text("Enter the name of the provider package to download: ")
 			}
 			addProviderByName(providerName, out)
 		},
@@ -72,17 +72,27 @@ func addProviderByName(providerName string, out io.Writer) {
 
 	providersJSON := httputil.RequestAndGetJSONBody(filledProviderRoute)
 	providers, exists := providersJSON["providers"].([]interface{})
-	printutil.LogKeyNotExists(exists, "providers", providersJSON)
+	if !exists {
+		key := "providers"
+		jsonString, _ := json.Marshal(providersJSON)
+		log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+	}
 
 	for _, provider := range providers {
 		providersJSON := provider.(map[string]interface{})
 
 		providerID, childExists := providersJSON["name"].(string) // displayName??
-		printutil.LogKeyNotExists(childExists, "name", providersJSON)
-
+		if !exists {
+			key := "name"
+			jsonString, _ := json.Marshal(providersJSON)
+			log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+		}
 		thisProviderVersion, childExists := providersJSON["version"].(string) // displayName??
-		printutil.LogKeyNotExists(childExists, "name", providersJSON)
-
+		if !childExists {
+			key := "version"
+			jsonString, _ := json.Marshal(providersJSON)
+			log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+		}
 		addProviderByIDAndVersion(providerID, thisProviderVersion, out)
 	}
 }
@@ -92,11 +102,18 @@ func addProviderByIDAndVersion(providerID, providerVersion string, out io.Writer
 	providersJSON := httputil.RequestAndGetJSONBody(filledProviderRoute)
 
 	name, exists := providersJSON["name"].(string)
-	printutil.LogKeyNotExists(exists, "name", providersJSON)
+	if !exists {
+		key := "name"
+		jsonString, _ := json.Marshal(providersJSON)
+		log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+	}
 
 	version, exists := providersJSON["version"].(string)
-	printutil.LogKeyNotExists(exists, "version", providersJSON)
-
+	if !exists {
+		key := "version"
+		jsonString, _ := json.Marshal(providersJSON)
+		log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
+	}
 	addProviderToRequirementsTxt(name, version, out)
 }
 
@@ -109,7 +126,9 @@ func addProviderToRequirementsTxt(name, version string, out io.Writer) {
 	}
 
 	b, err := os.ReadFile(filename)
-	printutil.LogFatal(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	exists := strings.Contains(string(b), name)
 	if exists {
@@ -118,7 +137,9 @@ func addProviderToRequirementsTxt(name, version string, out io.Writer) {
 		log.Debugf("Couldn't find %s already in %s", name, string(b))
 		providerString := fmt.Sprintf("%s==%s", name, version)
 		_, err = f.WriteString(providerString + "\n")
-		printutil.LogFatal(err)
-		fmt.Fprintf(out, "\nWrote %s to %s", providerString, filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		_, _ = fmt.Fprintf(out, "\nWrote %s to %s", providerString, filename)
 	}
 }

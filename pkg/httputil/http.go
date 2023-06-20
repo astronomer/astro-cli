@@ -7,12 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/context/ctxhttp"
@@ -116,7 +114,9 @@ func (e *Error) Error() string {
 
 func DownloadResponseToFile(sourceURL, path string) {
 	file, err := fileutil.CreateFile(path)
-	printutil.LogFatal(err)
+	if err != nil {
+		logrus.Fatal(err)
+	}
 
 	client := http.Client{
 		CheckRedirect: func(r *http.Request, via []*http.Request) error {
@@ -126,11 +126,13 @@ func DownloadResponseToFile(sourceURL, path string) {
 	}
 	resp, err := client.Get(sourceURL) //nolint
 	defer resp.Body.Close()
-	printutil.LogFatal(err)
-
+	if err != nil {
+		logrus.Fatal(err)
+	}
 	err = fileutil.WriteToFile(path, resp.Body)
-	printutil.LogFatal(err)
-
+	if err != nil {
+		logrus.Fatal(err)
+	}
 	defer file.Close()
 	logrus.Infof("Downloaded %s from %s", path, sourceURL)
 }
@@ -138,17 +140,22 @@ func DownloadResponseToFile(sourceURL, path string) {
 func RequestAndGetJSONBody(route string) map[string]interface{} {
 	res, err := http.Get(route) //nolint
 	defer res.Body.Close()
-	printutil.LogFatal(err)
-
+	if err != nil {
+		logrus.Fatal(err)
+	}
 	body, err := io.ReadAll(res.Body)
-	printutil.LogFatal(err)
+	if err != nil {
+		logrus.Fatal(err)
+	}
 	if res.StatusCode > LastSuccessfulHTTPResponseCode {
 		logrus.Fatalf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
 	}
 
 	var bodyJSON map[string]interface{}
 	err = json.Unmarshal(body, &bodyJSON)
-	printutil.LogFatal(err)
+	if err != nil {
+		logrus.Fatal(err)
+	}
 	logrus.Debugf("%s - GET %s %s", res.Status, route, string(body))
 	return bodyJSON
 }
