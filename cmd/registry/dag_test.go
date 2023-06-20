@@ -13,7 +13,7 @@ import (
 
 func execDagCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
-	cmd := newRegistryDagCmd()
+	cmd := newRegistryDagCmd(os.Stdout)
 	cmd.SetOut(buf)
 	log.SetOutput(buf)
 	defer func() {

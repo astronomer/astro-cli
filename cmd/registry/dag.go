@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"io"
 	"net/url"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -27,19 +28,19 @@ var (
 	addProviders    bool
 )
 
-func newRegistryDagCmd() *cobra.Command {
+func newRegistryDagCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dag",
 		Aliases: []string{"d"},
 		Short:   "Interact with DAGs from the Astronomer Registry",
 	}
 	cmd.AddCommand(
-		newRegistryDagAddCmd(),
+		newRegistryDagAddCmd(out),
 	)
 	return cmd
 }
 
-func newRegistryDagAddCmd() *cobra.Command {
+func newRegistryDagAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "add [DAG ID]",
 		Aliases: []string{"a"},
@@ -53,7 +54,7 @@ func newRegistryDagAddCmd() *cobra.Command {
 				// no dagID was provided so ask the user for it
 				dagID = input.Text("Enter the DAG ID to add: ")
 			}
-			downloadDag(dagID, dagVersion, addProviders)
+			downloadDag(dagID, dagVersion, addProviders, out)
 		},
 	}
 	cmd.Flags().StringVar(&dagVersion, "version", "latest", "The DAG version to download. Optional.")
@@ -61,7 +62,7 @@ func newRegistryDagAddCmd() *cobra.Command {
 	return cmd
 }
 
-func downloadDag(dagID, dagVersion string, addProviders bool) {
+func downloadDag(dagID, dagVersion string, addProviders bool, out io.Writer) {
 	// https://api.astronomer.io/registryV2/v1alpha1/organizations/public/dags?sorts=displayName%3Aasc&limit=1&query=foo
 	filledDagRoute := getDagRoute(dagID, dagVersion)
 	dagJSON := httputil.RequestAndGetJSONBody(filledDagRoute)
@@ -73,7 +74,7 @@ func downloadDag(dagID, dagVersion string, addProviders bool) {
 	printutil.LogKeyNotExists(exists, "filePath", dagJSON)
 
 	httputil.DownloadResponseToFile(githubRawSourceURL, filePath)
-	fmt.Printf("Successfully added DAG %s:%s to %s", dagID, dagVersion, filePath)
+	fmt.Fprintf(out, "Successfully added DAG %s:%s to %s ", dagID, dagVersion, filePath)
 
 	if addProviders {
 		providers, exists := dagJSON["providers"].([]interface{})
@@ -83,7 +84,7 @@ func downloadDag(dagID, dagVersion string, addProviders bool) {
 			providerID, nexists := providerJSON["name"].(string) // displayName??
 			printutil.LogKeyNotExists(nexists, "name", providerJSON)
 			log.Infof("Adding provider required for DAG: %s", providerID)
-			addProviderByName(providerID)
+			addProviderByName(providerID, out)
 		}
 	}
 }

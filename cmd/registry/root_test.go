@@ -2,6 +2,7 @@ package registry
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -11,7 +12,7 @@ import (
 func TestRegistryCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	buf := new(bytes.Buffer)
-	deplyCmd := newRegistryCmd()
+	deplyCmd := newRegistryCmd(os.Stdout)
 	deplyCmd.SetOut(buf)
 	testUtil.SetupOSArgsForGinkgo()
 	_, err := deplyCmd.ExecuteC()

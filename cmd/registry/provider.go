@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"strings"
@@ -16,19 +17,19 @@ import (
 
 const writeAndReadPermissions = 0o655
 
-func newRegistryProviderCmd() *cobra.Command {
+func newRegistryProviderCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "provider",
 		Aliases: []string{"p"},
 		Short:   "Interact with Airflow Providers from the Astronomer Registry",
 	}
 	cmd.AddCommand(
-		newRegistryAddProviderCmd(),
+		newRegistryAddProviderCmd(out),
 	)
 	return cmd
 }
 
-func newRegistryAddProviderCmd() *cobra.Command {
+func newRegistryAddProviderCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "add [PROVIDER]",
 		// Aliases: []string{"p"},
@@ -37,10 +38,10 @@ func newRegistryAddProviderCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) > 0 {
 				providerName := args[0]
-				addProviderByName(providerName)
+				addProviderByName(providerName, out)
 			} else {
 				providerName := input.Text("Enter the name of the provider package to download: ")
-				addProviderByName(providerName)
+				addProviderByName(providerName, out)
 			}
 		},
 	}
@@ -67,7 +68,7 @@ func getProviderRoute(providerID, providerVersion string) string {
 	return getProviderURL.String()
 }
 
-func addProviderByName(providerName string) {
+func addProviderByName(providerName string, out io.Writer) {
 	filledProviderRoute := getProviderSearchRoute(providerName)
 
 	providersJSON := httputil.RequestAndGetJSONBody(filledProviderRoute)
@@ -83,11 +84,11 @@ func addProviderByName(providerName string) {
 		thisProviderVersion, childExists := providersJSON["version"].(string) // displayName??
 		printutil.LogKeyNotExists(childExists, "name", providersJSON)
 
-		addProviderByIDAndVersion(providerID, thisProviderVersion)
+		addProviderByIDAndVersion(providerID, thisProviderVersion, out)
 	}
 }
 
-func addProviderByIDAndVersion(providerID, providerVersion string) {
+func addProviderByIDAndVersion(providerID, providerVersion string, out io.Writer) {
 	filledProviderRoute := getProviderRoute(providerID, providerVersion)
 	providersJSON := httputil.RequestAndGetJSONBody(filledProviderRoute)
 
@@ -97,10 +98,10 @@ func addProviderByIDAndVersion(providerID, providerVersion string) {
 	version, exists := providersJSON["version"].(string)
 	printutil.LogKeyNotExists(exists, "version", providersJSON)
 
-	addProviderToRequirementsTxt(name, version)
+	addProviderToRequirementsTxt(name, version, out)
 }
 
-func addProviderToRequirementsTxt(name, version string) {
+func addProviderToRequirementsTxt(name, version string, out io.Writer) {
 	const filename = "requirements.txt"
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, writeAndReadPermissions)
 	defer func(f *os.File) {
@@ -119,6 +120,6 @@ func addProviderToRequirementsTxt(name, version string) {
 		providerString := fmt.Sprintf("%s==%s", name, version)
 		_, err = f.WriteString(providerString + "\n")
 		printutil.LogFatal(err)
-		fmt.Printf("Wrote %s to %s", providerString, filename)
+		fmt.Fprintf(out, "\nWrote %s to %s", providerString, filename)
 	}
 }

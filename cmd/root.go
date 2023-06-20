@@ -116,7 +116,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	}
 
 	rootCmd.AddCommand( // include all the commands for interacting with the registry
-		registry.AddCmds()...,
+		registry.AddCmds(os.Stdout)...,
 	)
 
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))

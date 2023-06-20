@@ -13,7 +13,7 @@ import (
 
 func execProviderCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
-	cmd := newRegistryProviderCmd()
+	cmd := newRegistryProviderCmd(os.Stdout)
 	cmd.SetOut(buf)
 	log.SetOutput(buf)
 	defer func() {
