@@ -136,5 +136,5 @@ func addProviderToRequirementsTxt(name, version string, out io.Writer) {
 		}
 		_, _ = fmt.Fprintf(out, "\nWrote %s to %s", providerString, filename)
 	}
-	defer f.Close()
+	_ = f.Close()
 }
