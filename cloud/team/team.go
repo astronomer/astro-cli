@@ -12,7 +12,6 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/context"
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -32,9 +31,9 @@ var (
 	teamPagnationLimit          = 100
 )
 
-func confirmOperation() {
-	fmt.Printf("This is an IDP-managed team. Please avoid making changes in Astro whenever possible. \n%s to continue the operation or %s to abort", ansi.Green("Press Enter"), ansi.Red("^C"))
-	fmt.Scanln()
+func confirmOperation() bool {
+	y, _ := input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?")
+	return y
 }
 
 func CreateTeam(name, description string, out io.Writer, client astrocore.CoreClient) error {
@@ -174,7 +173,10 @@ func UpdateTeam(id, name, description string, out io.Writer, client astrocore.Co
 		}
 	}
 	if team.IsIdpManaged {
-		confirmOperation()
+		y := confirmOperation()
+		if !y {
+			return nil
+		}
 	}
 	teamID := team.Id
 	teamUpdateRequest := astrocore.UpdateTeamJSONRequestBody{}
@@ -506,7 +508,10 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 		}
 	}
 	if team.IsIdpManaged {
-		confirmOperation()
+		y := confirmOperation()
+		if !y {
+			return nil
+		}
 	}
 	teamID := team.Id
 	resp, err := client.DeleteTeamWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID)
@@ -554,7 +559,10 @@ func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.Cor
 		}
 	}
 	if team.IsIdpManaged {
-		confirmOperation()
+		y := confirmOperation()
+		if !y {
+			return nil
+		}
 	}
 	teamID = team.Id
 	if team.Members == nil {
@@ -626,7 +634,10 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 		}
 	}
 	if team.IsIdpManaged {
-		confirmOperation()
+		y := confirmOperation()
+		if !y {
+			return nil
+		}
 	}
 	teamID = team.Id
 
