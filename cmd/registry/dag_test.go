@@ -5,11 +5,10 @@ import (
 	"os"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 func execDagCmd(args ...string) (string, error) {
