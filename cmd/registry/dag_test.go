@@ -39,5 +39,4 @@ func TestDagAdd(t *testing.T) {
 	assert.Contains(t, fileContents, "airflow", "The DAG has words in it")
 	assert.Contains(t, fileContents, "DAG", "The DAG has words in it")
 
-	_ = os.Remove("dags/sagemaker-batch-inference.py")
 }

@@ -44,5 +44,4 @@ func TestProviderAdd(t *testing.T) {
 	fileContents, _ = fileutil.ReadFileToString("requirements.txt")
 	assert.Regexp(t, `apache-airflow-providers-snowflake==\d+\.\d+\.\d+\n$`, fileContents, "We didn't write it again")
 
-	_ = os.Remove("requirements.txt")
 }
