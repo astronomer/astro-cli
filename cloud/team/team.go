@@ -31,6 +31,11 @@ var (
 	teamPagnationLimit          = 100
 )
 
+func confirmOperation() bool {
+	y, _ := input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?")
+	return y
+}
+
 func CreateTeam(name, description string, out io.Writer, client astrocore.CoreClient) error {
 	if name == "" {
 		return ErrInvalidName
@@ -167,8 +172,13 @@ func UpdateTeam(id, name, description string, out io.Writer, client astrocore.Co
 			return ErrTeamNotFound
 		}
 	}
+	if team.IsIdpManaged {
+		y := confirmOperation()
+		if !y {
+			return nil
+		}
+	}
 	teamID := team.Id
-
 	teamUpdateRequest := astrocore.UpdateTeamJSONRequestBody{}
 
 	if name == "" {
@@ -444,7 +454,7 @@ func GetOrgTeams(client astrocore.CoreClient) ([]astrocore.Team, error) {
 func ListOrgTeams(out io.Writer, client astrocore.CoreClient) error {
 	table := printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"ID", "Name", "Description", "CREATE DATE"},
+		Header:         []string{"ID", "NAME", "DESCRIPTION", "IDP MANAGED", "CREATE DATE"},
 	}
 	teams, err := GetOrgTeams(client)
 	if err != nil {
@@ -456,6 +466,7 @@ func ListOrgTeams(out io.Writer, client astrocore.CoreClient) error {
 			teams[i].Id,
 			teams[i].Name,
 			*teams[i].Description,
+			strconv.FormatBool(teams[i].IsIdpManaged),
 			teams[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}
@@ -494,6 +505,12 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 		}
 		if team.Id == "" {
 			return ErrTeamNotFound
+		}
+	}
+	if team.IsIdpManaged {
+		y := confirmOperation()
+		if !y {
+			return nil
 		}
 	}
 	teamID := team.Id
@@ -539,6 +556,12 @@ func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.Cor
 		}
 		if team.Id == "" {
 			return ErrTeamNotFound
+		}
+	}
+	if team.IsIdpManaged {
+		y := confirmOperation()
+		if !y {
+			return nil
 		}
 	}
 	teamID = team.Id
@@ -608,6 +631,12 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 		}
 		if team.Id == "" {
 			return ErrTeamNotFound
+		}
+	}
+	if team.IsIdpManaged {
+		y := confirmOperation()
+		if !y {
+			return nil
 		}
 	}
 	teamID = team.Id
