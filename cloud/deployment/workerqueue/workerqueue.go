@@ -63,7 +63,10 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		if err != nil {
 			return err
 		}
-		wQueueConcurrency = astroMachine.ConcurrentTasks // This is set based on the machine type the user chooses
+
+		if wQueueConcurrency == 0 && action == createAction {
+			wQueueConcurrency = astroMachine.ConcurrentTasks // This is set based on the machine type the user chooses if not explicitly passed by the user
+		}
 	} else {
 		// get the node poolID to use
 		nodePoolID, err = selectNodePool(workerType, requestedDeployment.Cluster.NodePools, out)
