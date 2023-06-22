@@ -865,11 +865,15 @@ func TestIsValidExecutor(t *testing.T) {
 }
 
 func TestIsValidCloudProvider(t *testing.T) {
-	t.Run("returns true if cloudProvider is GCP", func(t *testing.T) {
+	t.Run("returns true if cloudProvider is gcp", func(t *testing.T) {
 		actual := isValidCloudProvider("gcp")
 		assert.True(t, actual)
 	})
-	t.Run("returns false if cloudProvider is not GCP", func(t *testing.T) {
+	t.Run("returns true if cloudProvider is aws", func(t *testing.T) {
+		actual := isValidCloudProvider("aws")
+		assert.True(t, actual)
+	})
+	t.Run("returns false if cloudProvider is not gcp", func(t *testing.T) {
 		actual := isValidCloudProvider("azure")
 		assert.False(t, actual)
 	})
