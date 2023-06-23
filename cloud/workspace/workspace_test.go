@@ -467,6 +467,40 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
+	t.Run("ask to select the workspace if more than 1 exists", func(t *testing.T) {
+		workspace2 := astrocore.Workspace{
+			Name:                         "test-workspace-2",
+			Description:                  &description,
+			ApiKeyOnlyDeploymentsDefault: false,
+			Id:                           "workspace-id-2",
+		}
+
+		workspaces = []astrocore.Workspace{
+			workspace1,
+			workspace2,
+		}
+
+		ListWorkspacesResponseOK = astrocore.ListWorkspacesResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.WorkspacesPaginated{
+				Limit:      2,
+				Offset:     0,
+				TotalCount: 2,
+				Workspaces: workspaces,
+			},
+		}
+		expectedOutMessage := "Astro Workspace test-workspace was successfully updated\n"
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseOK, nil).Once()
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		err := Update("workspace-id", "update-workspace-test", "updated workspace", "ON", out, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
 	t.Run("error path when UpdateWorkspaceWithResponse return network error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)

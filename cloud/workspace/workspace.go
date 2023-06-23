@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -314,6 +315,18 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 }
 
 func selectWorkspace(workspaces []astrocore.Workspace) (astrocore.Workspace, error) {
+	if len(workspaces) == 0 {
+		return astrocore.Workspace{}, nil
+	}
+
+	if len(workspaces) == 1 {
+		fmt.Println("Only one Workspace was found. Using the following Workspace by default: \n" +
+			fmt.Sprintf("\n Workspace Name: %s", ansi.Bold(workspaces[0].Name)) +
+			fmt.Sprintf("\n Workspace ID: %s\n", ansi.Bold(workspaces[0].Id)))
+
+		return workspaces[0], nil
+	}
+
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
