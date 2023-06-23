@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	createAction     = "create"
-	updateAction     = "update"
-	defaultQueueName = "default"
+	createAction       = "create"
+	updateAction       = "update"
+	defaultQueueName   = "default"
+	podCPUErrorMessage = "pod_cpu in the request. It can only be used with KubernetesExecutor"
+	podRAMErrorMessage = "pod_ram in the request. It can only be used with KubernetesExecutor"
 )
 
 var (
@@ -100,10 +102,16 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 
 		queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
-
-		err = IsCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions)
-		if err != nil {
-			return err
+		if deployment.IsDeploymentHosted(requestedDeployment.Type) || deployment.IsDeploymentDedicated(requestedDeployment.Type) {
+			err = IsHostedCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &astroMachine)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = IsCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions)
+			if err != nil {
+				return err
+			}
 		}
 	case deployment.KubeExecutor:
 		err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdate)
@@ -213,12 +221,40 @@ func IsCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defa
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	if requestedWorkerQueue.PodCPU != "" {
-		errorMessage = "pod_cpu in the request. It can only be used with KubernetesExecutor"
-		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, errorMessage)
+		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
 	}
 	if requestedWorkerQueue.PodRAM != "" {
-		errorMessage = "pod_ram in the request. It can only be used with KubernetesExecutor"
-		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, errorMessage)
+		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
+	}
+	return nil
+}
+
+// IsHostedCeleryWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions and machineOptions.
+// if it adheres to them, it returns nil.
+// errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
+// ErrNotSupported is returned if PodCPU or PodRAM are requested.
+func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions, machineOptions *astro.Machine) error {
+	var errorMessage string
+	if !(requestedWorkerQueue.MinWorkerCount >= defaultOptions.MinWorkerCount.Floor) ||
+		!(requestedWorkerQueue.MinWorkerCount <= defaultOptions.MinWorkerCount.Ceiling) {
+		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", defaultOptions.MinWorkerCount.Floor, defaultOptions.MinWorkerCount.Ceiling)
+		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
+	}
+	if !(requestedWorkerQueue.MaxWorkerCount >= defaultOptions.MaxWorkerCount.Floor) ||
+		!(requestedWorkerQueue.MaxWorkerCount <= defaultOptions.MaxWorkerCount.Ceiling) {
+		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", defaultOptions.MaxWorkerCount.Floor, defaultOptions.MaxWorkerCount.Ceiling)
+		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
+	}
+	if !(requestedWorkerQueue.WorkerConcurrency >= machineOptions.ConcurrentTasks) ||
+		!(requestedWorkerQueue.WorkerConcurrency <= machineOptions.ConcurrentTasksMax) {
+		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", machineOptions.ConcurrentTasks, machineOptions.ConcurrentTasksMax)
+		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
+	}
+	if requestedWorkerQueue.PodCPU != "" {
+		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
+	}
+	if requestedWorkerQueue.PodRAM != "" {
+		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
 	}
 	return nil
 }

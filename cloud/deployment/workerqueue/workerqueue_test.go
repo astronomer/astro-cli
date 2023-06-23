@@ -605,16 +605,19 @@ func TestCreateHostedShared(t *testing.T) {
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 		AstroMachines: []astro.Machine{
 			{
-				Type:            "a5",
-				ConcurrentTasks: 5,
+				Type:               "a5",
+				ConcurrentTasks:    5,
+				ConcurrentTasksMax: 15,
 			},
 			{
-				Type:            "a10",
-				ConcurrentTasks: 10,
+				Type:               "a10",
+				ConcurrentTasks:    10,
+				ConcurrentTasksMax: 30,
 			},
 			{
-				Type:            "a20",
-				ConcurrentTasks: 20,
+				Type:               "a20",
+				ConcurrentTasks:    20,
+				ConcurrentTasksMax: 60,
 			},
 		},
 		Components: astro.Components{
@@ -1503,6 +1506,89 @@ func TestIsCeleryWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.PodCPU = ""
 		requestedWorkerQueue.PodRAM = "huge"
 		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		assert.ErrorIs(t, err, ErrNotSupported)
+		assert.Contains(t, err.Error(), "CeleryExecutor does not support pod_ram in the request. It can only be used with KubernetesExecutor")
+	})
+}
+
+func TestIsHostedCeleryWorkerQueueInputValid(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
+		MinWorkerCount: astro.WorkerQueueOption{
+			Floor:   0,
+			Ceiling: 20,
+			Default: 5,
+		},
+		MaxWorkerCount: astro.WorkerQueueOption{
+			Floor:   20,
+			Ceiling: 200,
+			Default: 125,
+		},
+		WorkerConcurrency: astro.WorkerQueueOption{
+			Floor:   175,
+			Ceiling: 275,
+			Default: 180,
+		},
+	}
+
+	mockMachineOptions := &astro.Machine{
+		Type:               "a5",
+		ConcurrentTasks:    5,
+		ConcurrentTasksMax: 15,
+	}
+	requestedWorkerQueue := &astro.WorkerQueue{
+		Name:              "test-worker-queue",
+		IsDefault:         false,
+		MaxWorkerCount:    0,
+		MinWorkerCount:    0,
+		WorkerConcurrency: 0,
+		NodePoolID:        "",
+	}
+
+	t.Run("happy path when min or max worker count and worker concurrency are within default floor and ceiling", func(t *testing.T) {
+		requestedWorkerQueue.MinWorkerCount = 0
+		requestedWorkerQueue.MaxWorkerCount = 25
+		requestedWorkerQueue.WorkerConcurrency = 10
+		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		assert.NoError(t, err)
+	})
+	t.Run("returns an error when min worker count is not between default floor and ceiling values", func(t *testing.T) {
+		requestedWorkerQueue.MinWorkerCount = 35
+		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
+		assert.Contains(t, err.Error(), "worker queue option is invalid: min worker count must be between 0 and 20")
+	})
+	t.Run("returns an error when max worker count is not between default floor and ceiling values", func(t *testing.T) {
+		requestedWorkerQueue.MinWorkerCount = 8
+		requestedWorkerQueue.MaxWorkerCount = 19
+		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
+		assert.Contains(t, err.Error(), "worker queue option is invalid: max worker count must be between 20 and 200")
+	})
+	t.Run("returns an error when worker concurrency is not between default floor and ceiling values", func(t *testing.T) {
+		requestedWorkerQueue.MinWorkerCount = 8
+		requestedWorkerQueue.MaxWorkerCount = 25
+		requestedWorkerQueue.WorkerConcurrency = 20
+		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
+		assert.Contains(t, err.Error(), "worker queue option is invalid: worker concurrency must be between 5 and 15")
+	})
+	t.Run("returns an error when podCPU is present in input", func(t *testing.T) {
+		requestedWorkerQueue.MinWorkerCount = 8
+		requestedWorkerQueue.MaxWorkerCount = 25
+		requestedWorkerQueue.WorkerConcurrency = 10
+		requestedWorkerQueue.PodCPU = "lots"
+		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		assert.ErrorIs(t, err, ErrNotSupported)
+		assert.Contains(t, err.Error(), "CeleryExecutor does not support pod_cpu in the request. It can only be used with KubernetesExecutor")
+	})
+	t.Run("returns an error when podRAM is present in input", func(t *testing.T) {
+		requestedWorkerQueue.MinWorkerCount = 8
+		requestedWorkerQueue.MaxWorkerCount = 25
+		requestedWorkerQueue.WorkerConcurrency = 10
+		requestedWorkerQueue.PodCPU = ""
+		requestedWorkerQueue.PodRAM = "huge"
+		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		assert.ErrorIs(t, err, ErrNotSupported)
 		assert.Contains(t, err.Error(), "CeleryExecutor does not support pod_ram in the request. It can only be used with KubernetesExecutor")
 	})
