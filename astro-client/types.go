@@ -269,12 +269,13 @@ type DeploymentConfig struct {
 }
 
 type Machine struct {
-	Type            string `json:"type"`
-	CPU             string `json:"cpu"`
-	Memory          string `json:"memory"`
-	StorageSize     string `json:"storageSize"`
-	ConcurrentTasks int    `json:"concurrentTasks"`
-	NodePoolType    string `json:"nodePoolType"`
+	Type               string `json:"type"`
+	CPU                string `json:"cpu"`
+	Memory             string `json:"memory"`
+	StorageSize        string `json:"storageSize"`
+	ConcurrentTasks    int    `json:"concurrentTasks"`
+	ConcurrentTasksMax int    `json:"concurrentTasksMax"`
+	NodePoolType       string `json:"nodePoolType"`
 }
 
 type MachineUnit struct {

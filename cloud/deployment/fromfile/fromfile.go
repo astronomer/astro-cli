@@ -184,10 +184,12 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 // It returns an error if getting default options fail.
 // It returns an error if worker-queue options are not valid.
 // It returns an error if node pool id could not be found for the worker type.
-func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astro.Deployment, nodePools []astrocore.NodePool, client astro.Client) (astro.CreateDeploymentInput, astro.UpdateDeploymentInput, error) {
+func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astro.Deployment, nodePools []astrocore.NodePool, client astro.Client) (astro.CreateDeploymentInput, astro.UpdateDeploymentInput, error) { //nolint
 	var (
 		defaultOptions astro.WorkerQueueDefaultOptions
+		configOptions  astro.DeploymentConfig
 		listQueues     []astro.WorkerQueue
+		astroMachine   astro.Machine
 		createInput    astro.CreateDeploymentInput
 		updateInput    astro.UpdateDeploymentInput
 		err            error
@@ -206,13 +208,33 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			if err != nil {
 				return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
 			}
+			if deployment.IsDeploymentHosted(deploymentFromFile.Deployment.Configuration.DeploymentType) || deployment.IsDeploymentDedicated(deploymentFromFile.Deployment.Configuration.DeploymentType) {
+				configOptions, err = client.GetDeploymentConfig()
+				if err != nil {
+					return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
+				}
+			}
 			for i := range listQueues {
 				// set default values if none were specified
 				a := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &listQueues[i], defaultOptions)
-				// check if queue is valid
-				err = workerqueue.IsCeleryWorkerQueueInputValid(a, defaultOptions)
-				if err != nil {
-					return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
+				if deployment.IsDeploymentHosted(deploymentFromFile.Deployment.Configuration.DeploymentType) || deployment.IsDeploymentDedicated(deploymentFromFile.Deployment.Configuration.DeploymentType) {
+					astroMachines := configOptions.AstroMachines
+					for j := range astroMachines {
+						if astroMachines[j].Type == listQueues[i].AstroMachine {
+							astroMachine = astroMachines[j]
+						}
+					}
+					// check if queue is valid
+					err = workerqueue.IsHostedCeleryWorkerQueueInputValid(a, defaultOptions, &astroMachine)
+					if err != nil {
+						return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
+					}
+				} else {
+					// check if queue is valid
+					err = workerqueue.IsCeleryWorkerQueueInputValid(a, defaultOptions)
+					if err != nil {
+						return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
+					}
 				}
 				// add it to the list of queues to be created
 				listQueues[i] = *a

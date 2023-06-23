@@ -981,13 +981,13 @@ deployment:
       is_default: true
       max_worker_count: 130
       min_worker_count: 12
-      worker_concurrency: 180
+      worker_concurrency: 10
       worker_type: a5
     - name: test-queue-1
       is_default: false
       max_worker_count: 175
       min_worker_count: 8
-      worker_concurrency: 176
+      worker_concurrency: 10
       worker_type: a5
   metadata:
     deployment_id: test-deployment-id
@@ -1045,6 +1045,38 @@ deployment:
 			}
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				AstroMachines: []astro.Machine{
+					{
+						Type:               "a5",
+						ConcurrentTasks:    5,
+						ConcurrentTasksMax: 15,
+					},
+					{
+						Type:               "a10",
+						ConcurrentTasks:    10,
+						ConcurrentTasksMax: 30,
+					},
+					{
+						Type:               "a20",
+						ConcurrentTasks:    20,
+						ConcurrentTasksMax: 60,
+					},
+				},
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Once()
 			mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
@@ -1225,7 +1257,7 @@ deployment:
                 "is_default": true,
                 "max_worker_count": 130,
                 "min_worker_count": 12,
-                "worker_concurrency": 180,
+                "worker_concurrency": 10,
                 "worker_type": "a5"
             },
             {
@@ -1233,7 +1265,7 @@ deployment:
                 "is_default": false,
                 "max_worker_count": 175,
                 "min_worker_count": 8,
-                "worker_concurrency": 176,
+                "worker_concurrency": 10,
                 "worker_type": "a5"
             }
         ],
@@ -1303,6 +1335,38 @@ deployment:
 				},
 				JSON200: &astrocore.SharedCluster{Id: "test-cluster-id"},
 			}
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				AstroMachines: []astro.Machine{
+					{
+						Type:               "a5",
+						ConcurrentTasks:    5,
+						ConcurrentTasksMax: 15,
+					},
+					{
+						Type:               "a10",
+						ConcurrentTasks:    10,
+						ConcurrentTasksMax: 30,
+					},
+					{
+						Type:               "a20",
+						ConcurrentTasks:    20,
+						ConcurrentTasksMax: 60,
+					},
+				},
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Once()
 			mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, mock.Anything).Return(mockOKResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()

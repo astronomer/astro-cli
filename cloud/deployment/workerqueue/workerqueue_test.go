@@ -605,16 +605,19 @@ func TestCreateHostedShared(t *testing.T) {
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 		AstroMachines: []astro.Machine{
 			{
-				Type:            "a5",
-				ConcurrentTasks: 5,
+				Type:               "a5",
+				ConcurrentTasks:    5,
+				ConcurrentTasksMax: 15,
 			},
 			{
-				Type:            "a10",
-				ConcurrentTasks: 10,
+				Type:               "a10",
+				ConcurrentTasks:    10,
+				ConcurrentTasksMax: 30,
 			},
 			{
-				Type:            "a20",
-				ConcurrentTasks: 20,
+				Type:               "a20",
+				ConcurrentTasks:    20,
+				ConcurrentTasksMax: 60,
 			},
 		},
 		Components: astro.Components{
