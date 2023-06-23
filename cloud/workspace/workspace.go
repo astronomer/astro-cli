@@ -23,6 +23,7 @@ var (
 	ErrInvalidName         = errors.New("no name provided for the workspace. Retry with a valid name")
 	ErrInvalidTokenName    = errors.New("no name provided for the workspace token. Retry with a valid name")
 	ErrWorkspaceNotFound   = errors.New("no workspace was found for the ID you provided")
+	ErrNoWorkspaceExists   = errors.New("no workspace was found in your organization")
 	ErrWrongEnforceInput   = errors.New("the input to the `--enforce-cicd` flag")
 )
 
@@ -224,6 +225,9 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	var workspace astrocore.Workspace
 	if id == "" {
 		workspace, err = selectWorkspace(workspaces)
+		if workspace.Id == "" {
+			return ErrNoWorkspaceExists
+		}
 		if err != nil {
 			return err
 		}
@@ -288,6 +292,9 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	var workspace astrocore.Workspace
 	if id == "" {
 		workspace, err = selectWorkspace(workspaces)
+		if workspace.Id == "" {
+			return ErrNoWorkspaceExists
+		}
 		if err != nil {
 			return err
 		}

@@ -364,6 +364,27 @@ func TestDelete(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
+	t.Run("print message if no workpaces found", func(t *testing.T) {
+		ws := []astrocore.Workspace{}
+
+		listWorkspacesResponseOK := astrocore.ListWorkspacesResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.WorkspacesPaginated{
+				Limit:      2,
+				Offset:     0,
+				TotalCount: 0,
+				Workspaces: ws,
+			},
+		}
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listWorkspacesResponseOK, nil).Once()
+		err := Delete("", out, mockClient)
+		assert.ErrorIs(t, err, ErrNoWorkspaceExists)
+	})
+
 	t.Run("error path when DeleteWorkspaceWithResponse return network error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -465,6 +486,28 @@ func TestUpdate(t *testing.T) {
 		err := Update("workspace-id", "update-workspace-test", "updated workspace", "ON", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
+	t.Run("print message if no workpaces found", func(t *testing.T) {
+		ws := []astrocore.Workspace{}
+
+		listWorkspacesResponseOK := astrocore.ListWorkspacesResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.WorkspacesPaginated{
+				Limit:      2,
+				Offset:     0,
+				TotalCount: 0,
+				Workspaces: ws,
+			},
+		}
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseOK, nil).Once()
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listWorkspacesResponseOK, nil).Once()
+		err := Update("", "update-workspace-test", "updated workspace", "ON", out, mockClient)
+		assert.ErrorIs(t, err, ErrNoWorkspaceExists)
 	})
 
 	t.Run("ask to select the workspace if more than 1 exists", func(t *testing.T) {
