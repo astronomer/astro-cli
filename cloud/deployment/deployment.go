@@ -794,6 +794,29 @@ var GetDeployments = func(ws, org string, client astro.Client) ([]astro.Deployme
 	return deployments, nil
 }
 
+var CoreGetDeployment = func(ws, org, deploymentId string, coreClient astrocore.CoreClient) (astrocore.Deployment, error) {
+	if org == "" {
+		c, err := config.GetCurrentContext()
+		if err != nil {
+			return astrocore.Deployment{}, err
+		}
+		org = c.OrganizationShortName
+	}
+
+	depIds := []string{deploymentId}
+	deploymentListParams := &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds,
+	}
+	resp, err := coreClient.ListDeploymentsWithResponse(context.Background(), org, deploymentListParams)
+	if err != nil {
+		return astrocore.Deployment{}, err
+	}
+
+	deploymentResponse := *resp.JSON200
+	deployments := deploymentResponse.Deployments
+	return deployments[0], nil
+}
+
 var SelectDeployment = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
 	// select deployment
 	if len(deployments) == 0 {
