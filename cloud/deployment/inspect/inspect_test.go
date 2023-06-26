@@ -230,6 +230,15 @@ func TestInspect(t *testing.T) {
 		assert.Contains(t, out.String(), deploymentName)
 		mockClient.AssertExpectations(t)
 	})
+	t.Run("returns an error if core deployment fails", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(nil, errGetDeployment).Once()
+		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, mockCoreClient, out, "", false)
+		assert.ErrorIs(t, err, errGetDeployment)
+		mockClient.AssertExpectations(t)
+	})
 	t.Run("returns an error if listing deployment fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)

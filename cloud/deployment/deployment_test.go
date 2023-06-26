@@ -425,7 +425,7 @@ func TestCoreGetDeployment(t *testing.T) {
 		ctx.SetContextKey("organization_short_name", org)
 		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 
-		deployment, err := CoreGetDeployment(ws, org, deploymentID, mockCoreClient)
+		deployment, err := CoreGetDeployment(ws, "", deploymentID, mockCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.Id)
 		mockCoreClient.AssertExpectations(t)
