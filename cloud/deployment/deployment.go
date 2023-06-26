@@ -32,6 +32,7 @@ var (
 	ErrInvalidRegionKey     = errors.New("invalid Region selected")
 	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
 	ErrWrongEnforceInput    = errors.New("the input to the `--enforce-cicd` flag")
+	ErrNoDeploymentExists   = errors.New("no deployment was found in this workspace")
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	CleanOutput      = false
@@ -814,6 +815,10 @@ var CoreGetDeployment = func(ws, org, deploymentId string, coreClient astrocore.
 
 	deploymentResponse := *resp.JSON200
 	deployments := deploymentResponse.Deployments
+
+	if len(deployments) == 0 {
+		return astrocore.Deployment{}, ErrNoDeploymentExists
+	}
 	return deployments[0], nil
 }
 

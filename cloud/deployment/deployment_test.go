@@ -387,6 +387,82 @@ func TestGetDeployment(t *testing.T) {
 	})
 }
 
+func TestCoreGetDeployment(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	deploymentID := "test-deployment-id"
+	depIds := []string{deploymentID}
+	deploymentListParams := &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds,
+	}
+	mockCoreDeploymentResponse := []astrocore.Deployment{
+		{
+			Id:     deploymentID,
+			Status: "HEALTHY",
+		},
+	}
+	mockListDeploymentsResponse := astrocore.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.DeploymentsPaginated{
+			Deployments: mockCoreDeploymentResponse,
+		},
+	}
+
+	t.Run("success", func(t *testing.T) {
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
+
+		deployment, err := CoreGetDeployment(ws, org, deploymentID, mockCoreClient)
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentID, deployment.Id)
+		mockCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("success from context", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_short_name", org)
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
+
+		deployment, err := CoreGetDeployment(ws, org, deploymentID, mockCoreClient)
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentID, deployment.Id)
+		mockCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("no deployments in workspace", func(t *testing.T) {
+		mockListDeploymentsResponse := astrocore.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.DeploymentsPaginated{
+				Deployments: []astrocore.Deployment{},
+			},
+		}
+
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
+		_, err := CoreGetDeployment(ws, org, deploymentID, mockCoreClient)
+		assert.ErrorIs(t, err, ErrNoDeploymentExists)
+		mockCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("context error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
+
+		_, err := CoreGetDeployment(ws, "", deploymentID, mockCoreClient)
+		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	})
+
+	t.Run("error in api response", func(t *testing.T) {
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(nil, errMock).Once()
+
+		_, err := CoreGetDeployment(ws, org, deploymentID, mockCoreClient)
+		assert.ErrorIs(t, err, errMock)
+		mockCoreClient.AssertExpectations(t)
+	})
+}
+
 func TestIsDeploymentHosted(t *testing.T) {
 	t.Run("if deployment type is hosted", func(t *testing.T) {
 		out := IsDeploymentHosted("HOSTED_SHARED")
