@@ -300,7 +300,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	if waitForStatus {
-		err = healthPoll(d.ID, workspaceID, client)
+		err = healthPoll(d.ID, workspaceID, coreClient)
 		if err != nil {
 			errOutput := createOutput(workspaceID, clusterType, &d)
 			if errOutput != nil {
@@ -547,7 +547,7 @@ func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizatio
 	return derivedClusterID, nil
 }
 
-func healthPoll(deploymentID, ws string, client astro.Client) error {
+func healthPoll(deploymentID, ws string, coreClient astrocore.CoreClient) error {
 	fmt.Printf("Waiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
 	time.Sleep(time.Duration(sleepTime) * time.Second)
 	buf := new(bytes.Buffer)
@@ -561,19 +561,14 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 		// Got a tick, we should check if deployment is healthy
 		case <-ticker.C:
 			buf.Reset()
-			deployments, err := GetDeployments(ws, "", client)
+			// get core deployment
+			currentDeployment, err := CoreGetDeployment(ws, "", deploymentID, coreClient)
 			if err != nil {
 				return err
 			}
 
-			var currentDeployment astro.Deployment
-			for i := range deployments {
-				if deployments[i].ID == deploymentID {
-					currentDeployment = deployments[i]
-				}
-			}
 			if currentDeployment.Status == "HEALTHY" {
-				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Label)
+				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Name)
 				return nil
 			}
 			continue

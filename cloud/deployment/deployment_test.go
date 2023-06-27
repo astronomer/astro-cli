@@ -697,6 +697,11 @@ func TestCreate(t *testing.T) {
 				Workspaces: workspaces,
 			},
 		}
+		deploymentID         = "test-deployment-id"
+		depIds               = []string{deploymentID}
+		deploymentListParams = &astrocore.ListDeploymentsParams{
+			DeploymentIds: &depIds,
+		}
 	)
 
 	deploymentCreateInput := astro.CreateDeploymentInput{
@@ -785,9 +790,9 @@ func TestCreate(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("organization", org)
 		ctx.SetContextKey("workspace", ws)
-		ctx.SetContextKey("organization_short_name", "test-org")
+		ctx.SetContextKey("organization_short_name", org)
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
@@ -876,7 +881,7 @@ func TestCreate(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("organization", org)
 		ctx.SetContextKey("workspace", ws)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
@@ -1019,15 +1024,29 @@ func TestCreate(t *testing.T) {
 		}, nil).Times(4)
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Twice()
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&mockListClustersResponse, nil).Twice()
-		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
+		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: deploymentID}, nil).Twice()
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
 		// setup wait for test
 		sleepTime = 1
 		tickNum = 2
+		mockCoreDeploymentResponse := []astrocore.Deployment{
+			{
+				Id:     deploymentID,
+				Status: "HEALTHY",
+			},
+		}
+		mockListDeploymentsResponse := astrocore.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.DeploymentsPaginated{
+				Deployments: mockCoreDeploymentResponse,
+			},
+		}
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Status: "UNHEALTHY"}}, nil).Once()
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Status: "HEALTHY"}}, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, org, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, true, &disableCiCdEnforcement)
 		assert.NoError(t, err)
 
@@ -1193,7 +1212,7 @@ func TestCreate(t *testing.T) {
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", org)
-		ctx.SetContextKey("organization_short_name", "test-org")
+		ctx.SetContextKey("organization_short_name", org)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1544,7 +1563,7 @@ func TestUpdate(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("organization", org)
 		ctx.SetContextKey("workspace", ws)
 		deploymentUpdateInput1 := astro.UpdateDeploymentInput{
 			ID:          "test-id",
