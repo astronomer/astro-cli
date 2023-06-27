@@ -10,6 +10,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -148,6 +150,90 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	}
 
 	return outb.String(), docErr
+}
+
+func (d *DockerImage) conflictCheck(workingDirectory, runtimeVersion string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+	// Change to location of Dockerfile
+	err := os.Chdir(buildConfig.Path)
+	if err != nil {
+		return "", err
+	}
+	args := []string{
+		"build",
+		"-t",
+		"conflict-check:latest",
+		"-f",
+		"conflict-check.Dockerfile",
+		".",
+	}
+
+	fmt.Println(args)
+
+	// Run the Docker build command
+	cmd := exec.Command(dockerCommand, args...)
+
+	// Create a buffer to capture the command output
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = io.MultiWriter(&stdout, os.Stdout)
+	cmd.Stderr = io.MultiWriter(&stderr, os.Stdout)
+
+	// Start the command execution
+	err = cmd.Start()
+	if err != nil {
+		return "", err
+	}
+
+	// Wait for the command to complete
+	err = cmd.Wait()
+
+	// Get the exit code
+	exitCode := ""
+	if _, ok := err.(*exec.ExitError); ok {
+		// The command exited with a non-zero status
+		exitCode = parseExitCode(stderr.String())
+	} else if err != nil {
+		// An error occurred while running the command
+		return "", err
+	}
+
+	// move results to upgrade test folder
+	// Create the destination folder if it doesn't exist
+	destFolder := filepath.Join(workingDirectory, "upgrade-test-"+runtimeVersion)
+	if err := os.MkdirAll(destFolder, 0755); err != nil {
+		return exitCode, err
+	}
+	// Run a temporary container to copy the file from the image
+	cmd = exec.Command("docker", "create", "--name", "temp-container", "conflict-check:latest")
+	if err := cmd.Run(); err != nil {
+		return exitCode, err
+	}
+	// Copy the result.txt file from the container to the destination folder
+	cmd = exec.Command("docker", "cp", "temp-container:/usr/local/airflow/result.txt", "./upgrade-test-"+runtimeVersion)
+	if err := cmd.Run(); err != nil {
+		// Remove the temporary container
+		cmd = exec.Command("docker", "rm", "-v", "temp-container")
+		if err := cmd.Run(); err != nil {
+			return exitCode, err
+		}
+		return exitCode, err
+	}
+
+	// Remove the temporary container
+	cmd = exec.Command("docker", "rm", "-v", "temp-container")
+	if err := cmd.Run(); err != nil {
+		return exitCode, err
+	}
+	return exitCode, nil
+}
+
+func parseExitCode(logs string) string {
+	re := regexp.MustCompile(`exit code: (\d+)`)
+	match := re.FindStringSubmatch(logs)
+	if len(match) > 1 {
+		return match[1]
+	}
+	return ""
 }
 
 func (d *DockerImage) Push(registry, username, token, remoteImage string) error {

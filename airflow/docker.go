@@ -458,6 +458,18 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
+func (d *DockerCompose) UpgradeTest(runtimeVersion string) error {
+	//check for dependency conflicts
+	exitCode, err := d.imageHandler.conflictCheck(d.airflowHome, runtimeVersion, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+	if err != nil {
+		return err
+	}
+	if strings.Contains(exitCode, "0") { // if the error code is 0 the pytests passed
+		return nil
+	}
+	return errors.New("Something went wrong while compiling your dependencies check the logs above for conflicts")
+}
+
 func (d *DockerCompose) Parse(customImageName, deployImageName string) error {
 	// check for file
 	path := d.airflowHome + "/" + DefaultTestPath

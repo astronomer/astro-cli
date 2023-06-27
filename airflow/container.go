@@ -33,6 +33,7 @@ type ContainerHandler interface {
 	ComposeExport(settingsFile, composeFile string) error
 	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string) (string, error)
 	Parse(customImageName, deployImageName string) error
+	UpgradeTest(runtimeVersion string) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -49,6 +50,7 @@ type ImageHandler interface {
 	TagLocalImage(localImage string) error
 	Run(dagID, envFile, settingsFile, containerName, dagFile string, taskLogs bool) error
 	Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config types.ImageBuildConfig) (string, error)
+	conflictCheck(workingDirectory, runtimeVersion string, config types.ImageBuildConfig) (string, error)
 }
 
 type DockerComposeAPI interface {

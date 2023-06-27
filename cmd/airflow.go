@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -119,6 +120,7 @@ func newDevRootCmd() *cobra.Command {
 		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
+		newAirflowUpgradeTestCmd(),
 	)
 	return cmd
 }
@@ -159,6 +161,24 @@ func newAirflowInitCmd() *cobra.Command {
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
 		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
 	}
+	return cmd
+}
+
+func newAirflowUpgradeTestCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "upgrade-test",
+		Short:   "Run some tests to see if your enviroment and DAGs are compatable with new version of Airflow or Runtime",
+		Long:    "Run some tests to see if your enviroment and DAGs are compatable with new version of Airflow or Runtime",
+		Example: initCloudExample,
+		Args:    cobra.MaximumNArgs(1),
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+		RunE: airflowUpgradeTest,
+	}
+	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to upgrade too. If not specified, latest is assumed.")
+	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Specify a version of Astro Runtime that you want to upgrade too. If not specified, the latest is assumed.")
 	return cmd
 }
 
@@ -498,6 +518,79 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf(configInitProjectConfigMsg+"\n", config.WorkingPath)
 	}
 
+	return nil
+}
+
+func airflowUpgradeTest(cmd *cobra.Command, args []string) error {
+	// Validate runtimeVersion and airflowVersion
+	if airflowVersion != "" && runtimeVersion != "" {
+		return errInvalidBothAirflowAndRuntimeVersions
+	}
+	// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided)
+	var err error
+	defaultImageTag := runtimeVersion
+	if defaultImageTag == "" {
+		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
+		defaultImageTag = prepareDefaultAirflowImageTag(airflowVersion, httpClient)
+	}
+
+	defaultImageName := airflow.AstroRuntimeImageName
+	if useAstronomerCertified {
+		defaultImageName = airflow.AstronomerCertifiedImageName
+		fmt.Printf("Initializing Astro project\nPulling Airflow development files from Astronomer Certified Airflow Version %s\n", defaultImageTag)
+	} else {
+		fmt.Printf("Initializing Astro project\nPulling Airflow development files from Astro Runtime %s\n", defaultImageTag)
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	// Execute method
+	err = airflow.InitUpgradeCheck(config.WorkingPath, defaultImageName, defaultImageTag)
+	if err != nil {
+		err = removeConflictCheck()
+		if err != nil {
+			return err
+		}
+		return err
+	}
+
+	imageName := "tmp-upgrade-test"
+
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
+	if err != nil {
+		err = removeConflictCheck()
+		if err != nil {
+			return err
+		}
+		return err
+	}
+
+	err = containerHandler.UpgradeTest(defaultImageTag)
+	if err != nil {
+		err = removeConflictCheck()
+		if err != nil {
+			return err
+		}
+		return err
+	}
+
+	fmt.Println("\n" + ansi.Green("✔") + " All Pytests passed!")
+
+	// remove conflict-check.Dockerfile
+	err = removeConflictCheck()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func removeConflictCheck() error {
+	err := os.Remove("conflict-check.Dockerfile")
+	if err != nil {
+		return fmt.Errorf("failed to remove file: %v", err)
+	}
 	return nil
 }
 
