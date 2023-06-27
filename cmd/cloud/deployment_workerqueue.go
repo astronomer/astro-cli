@@ -16,7 +16,7 @@ var (
 	workerType         string
 	name               string
 	force              bool
-	errZeroConcurrency = errors.New("Worker concurrency cannot be 0. Min value starts from 1")
+	errZeroConcurrency = errors.New("Worker concurrency cannot be 0. Minimum value starts from 1")
 )
 
 func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
