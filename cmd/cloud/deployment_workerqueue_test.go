@@ -460,6 +460,11 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedHelp)
 	})
+	t.Run("throw error if worker concurrency is set as 0", func(t *testing.T) {
+		cmdArgs := []string{"worker-queue", "update", "--concurrency", "0"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.ErrorIs(t, err, errZeroConcurrency)
+	})
 	t.Run("happy path update worker queue", func(t *testing.T) {
 		deploymentRespWithQueues := []astro.Deployment{
 			{
