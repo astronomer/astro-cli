@@ -1571,7 +1571,7 @@ func TestIsHostedCeleryWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.WorkerConcurrency = 20
 		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
-		assert.Contains(t, err.Error(), "worker queue option is invalid: worker concurrency must be between 5 and 15")
+		assert.Contains(t, err.Error(), "worker queue option is invalid: worker concurrency must be between 1 and 15")
 	})
 	t.Run("returns an error when podCPU is present in input", func(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 8
