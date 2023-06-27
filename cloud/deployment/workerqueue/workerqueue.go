@@ -246,9 +246,10 @@ func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	// The floor for worker concurrency for hosted deployments is always 1 for all astro machines
-	if !(requestedWorkerQueue.WorkerConcurrency >= 1) ||
+	workerConcurrenyFloor := 1
+	if !(requestedWorkerQueue.WorkerConcurrency >= workerConcurrenyFloor) ||
 		!(requestedWorkerQueue.WorkerConcurrency <= machineOptions.ConcurrentTasksMax) {
-		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", machineOptions.ConcurrentTasks, machineOptions.ConcurrentTasksMax)
+		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", workerConcurrenyFloor, machineOptions.ConcurrentTasksMax)
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	if requestedWorkerQueue.PodCPU != "" {
