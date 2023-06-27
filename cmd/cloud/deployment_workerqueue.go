@@ -3,18 +3,20 @@ package cloud
 import (
 	"io"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
 )
 
 var (
-	concurrency    int
-	minWorkerCount int
-	maxWorkerCount int
-	workerType     string
-	name           string
-	force          bool
+	concurrency        int
+	minWorkerCount     int
+	maxWorkerCount     int
+	workerType         string
+	name               string
+	force              bool
+	errZeroConcurrency = errors.New("Worker concurrency cannot be 0. Min value starts from 1")
 )
 
 func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
@@ -98,6 +100,10 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
+	}
+
+	if cmd.Flags().Changed("concurrency") && concurrency == 0 {
+		return errZeroConcurrency
 	}
 
 	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroClient, out)
