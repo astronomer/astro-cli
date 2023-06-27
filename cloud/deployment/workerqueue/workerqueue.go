@@ -245,7 +245,7 @@ func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue
 		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", defaultOptions.MaxWorkerCount.Floor, defaultOptions.MaxWorkerCount.Ceiling)
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
-	if !(requestedWorkerQueue.WorkerConcurrency >= machineOptions.ConcurrentTasks) ||
+	if !(requestedWorkerQueue.WorkerConcurrency >= 1) ||
 		!(requestedWorkerQueue.WorkerConcurrency <= machineOptions.ConcurrentTasksMax) {
 		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", machineOptions.ConcurrentTasks, machineOptions.ConcurrentTasksMax)
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
