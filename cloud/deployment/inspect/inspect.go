@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/organization"
 )
@@ -92,7 +93,7 @@ const (
 	gcpMaxChar = 30
 )
 
-func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, out io.Writer, requestedField string, template bool) error {
+func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, requestedField string, template bool) error {
 	var (
 		requestedDeployment                                                        astro.Deployment
 		err                                                                        error
@@ -105,8 +106,14 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 		return err
 	}
 
+	// get core deployment
+	coreDeployment, err := deployment.CoreGetDeployment(wsID, "", requestedDeployment.ID, coreClient)
+	if err != nil {
+		return err
+	}
+
 	// create a map for deployment.information
-	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment)
+	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment, coreDeployment)
 	if err != nil {
 		return err
 	}
@@ -134,7 +141,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 	return nil
 }
 
-func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface{}, error) {
+func getDeploymentInfo(sourceDeployment *astro.Deployment, coreDeployment astrocore.Deployment) (map[string]interface{}, error) { //nolint
 	var (
 		deploymentURL string
 		err           error
@@ -164,7 +171,7 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 		"created_at":        sourceDeployment.CreatedAt,
 		"updated_at":        sourceDeployment.UpdatedAt,
 		"workload_identity": getWorkloadIdentity(sourceDeployment),
-		"status":            sourceDeployment.Status,
+		"status":            coreDeployment.Status,
 	}, nil
 }
 
@@ -203,7 +210,7 @@ func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
 	}
 }
 
-func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astro.Client, requestedField string) (value any, err error) {
+func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astro.Client, coreClient astrocore.CoreClient, requestedField string) (value any, err error) {
 	var (
 		requestedDeployment                                                        astro.Deployment
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
@@ -214,8 +221,14 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astr
 		return nil, err
 	}
 
+	// get core deployment
+	coreDeployment, err := deployment.CoreGetDeployment(wsID, "", requestedDeployment.ID, coreClient)
+	if err != nil {
+		return nil, err
+	}
+
 	// create a map for deployment.information
-	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment)
+	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment, coreDeployment)
 	if err != nil {
 		return nil, err
 	}

@@ -32,6 +32,7 @@ var (
 	ErrInvalidRegionKey     = errors.New("invalid Region selected")
 	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
 	ErrWrongEnforceInput    = errors.New("the input to the `--enforce-cicd` flag")
+	ErrNoDeploymentExists   = errors.New("no deployment was found in this workspace")
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	CleanOutput      = false
@@ -299,7 +300,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	if waitForStatus {
-		err = healthPoll(d.ID, workspaceID, client)
+		err = healthPoll(d.ID, workspaceID, coreClient)
 		if err != nil {
 			errOutput := createOutput(workspaceID, clusterType, &d)
 			if errOutput != nil {
@@ -546,7 +547,7 @@ func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizatio
 	return derivedClusterID, nil
 }
 
-func healthPoll(deploymentID, ws string, client astro.Client) error {
+func healthPoll(deploymentID, ws string, coreClient astrocore.CoreClient) error {
 	fmt.Printf("Waiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
 	time.Sleep(time.Duration(sleepTime) * time.Second)
 	buf := new(bytes.Buffer)
@@ -560,19 +561,14 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 		// Got a tick, we should check if deployment is healthy
 		case <-ticker.C:
 			buf.Reset()
-			deployments, err := GetDeployments(ws, "", client)
+			// get core deployment
+			currentDeployment, err := CoreGetDeployment(ws, "", deploymentID, coreClient)
 			if err != nil {
 				return err
 			}
 
-			var currentDeployment astro.Deployment
-			for i := range deployments {
-				if deployments[i].ID == deploymentID {
-					currentDeployment = deployments[i]
-				}
-			}
 			if currentDeployment.Status == "HEALTHY" {
-				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Label)
+				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Name)
 				return nil
 			}
 			continue
@@ -792,6 +788,33 @@ var GetDeployments = func(ws, org string, client astro.Client) ([]astro.Deployme
 	}
 
 	return deployments, nil
+}
+
+var CoreGetDeployment = func(ws, org, deploymentId string, coreClient astrocore.CoreClient) (astrocore.Deployment, error) {
+	if org == "" {
+		c, err := config.GetCurrentContext()
+		if err != nil {
+			return astrocore.Deployment{}, err
+		}
+		org = c.OrganizationShortName
+	}
+
+	depIds := []string{deploymentId}
+	deploymentListParams := &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds,
+	}
+	resp, err := coreClient.ListDeploymentsWithResponse(context.Background(), org, deploymentListParams)
+	if err != nil {
+		return astrocore.Deployment{}, err
+	}
+
+	deploymentResponse := *resp.JSON200
+	deployments := deploymentResponse.Deployments
+
+	if len(deployments) == 0 {
+		return astrocore.Deployment{}, ErrNoDeploymentExists
+	}
+	return deployments[0], nil
 }
 
 var SelectDeployment = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {

@@ -194,7 +194,7 @@ func IsOrgHosted() bool {
 }
 
 func ListClusters(organizationShortName string, coreClient astrocore.CoreClient) ([]astrocore.Cluster, error) {
-	clusterTypes := []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
+	clusterTypes := []astrocore.ListClustersParamsTypes{astrocore.ListClustersParamsTypesBRINGYOUROWNCLOUD, astrocore.ListClustersParamsTypesHOSTED}
 	limit := 1000
 	clusterListParams := &astrocore.ListClustersParams{
 		Types: &clusterTypes,

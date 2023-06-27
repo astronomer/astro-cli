@@ -7,6 +7,8 @@ import (
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	airflowclient_mocks "github.com/astronomer/astro-cli/airflow-client/mocks"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/pkg/errors"
@@ -41,6 +43,8 @@ func TestConnectionList(t *testing.T) {
 	airflowAPIClient = mockClient
 	mockAstroClient := new(astro_mocks.Client)
 	astroClient = mockAstroClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
 
 	t.Run("-h prints list help", func(t *testing.T) {
 		cmdArgs := []string{"connection", "list", "-h"}
@@ -49,6 +53,7 @@ func TestConnectionList(t *testing.T) {
 		assert.Contains(t, resp, expectedHelp)
 	})
 	t.Run("any errors from api are returned and connections are not listed", func(t *testing.T) {
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("GetConnections", mock.Anything).Return(mockResp, errTest).Once()
 		cmdArgs := []string{"connection", "list", "-d", "test-deployment-id"}
@@ -57,6 +62,7 @@ func TestConnectionList(t *testing.T) {
 	})
 	t.Run("any context errors from api are returned and connections are not listed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("GetConnections", mock.Anything).Return(mockResp, nil).Once()
 		cmdArgs := []string{"connection", "list"}
@@ -72,6 +78,8 @@ func TestConnectionCreate(t *testing.T) {
 	airflowAPIClient = mockClient
 	mockAstroClient := new(astro_mocks.Client)
 	astroClient = mockAstroClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
 
 	t.Run("-h prints create  help", func(t *testing.T) {
 		cmdArgs := []string{"connection", "create", "-h"}
@@ -81,6 +89,7 @@ func TestConnectionCreate(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and connections are not created", func(t *testing.T) {
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("CreateConnection", mock.AnythingOfType("string"), mock.AnythingOfType("*airflowclient.Connection")).Return(errTest).Once()
 		cmdArgs := []string{"connection", "create", "-d", "test-deployment-id", "--conn-id", "conn-id", "--conn-type", "conn-type"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -96,6 +105,7 @@ func TestConnectionCreate(t *testing.T) {
 	})
 	t.Run("successful airflow variable create", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("CreateConnection", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
 		cmdArgs := []string{"connection", "create", "-d", "test-deployment-id", "--conn-id", "conn-id", "--conn-type", "conn-type"}
@@ -111,6 +121,8 @@ func TestConnectionUpdate(t *testing.T) {
 	airflowAPIClient = mockClient
 	mockAstroClient := new(astro_mocks.Client)
 	astroClient = mockAstroClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
 
 	t.Run("-h prints update help", func(t *testing.T) {
 		cmdArgs := []string{"connection", "update", "-h"}
@@ -120,6 +132,7 @@ func TestConnectionUpdate(t *testing.T) {
 	})
 
 	t.Run("any errors from api are returned and connections are not updated", func(t *testing.T) {
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("UpdateConnection", mock.AnythingOfType("string"), mock.AnythingOfType("*airflowclient.Connection")).Return(errTest).Once()
 		cmdArgs := []string{"connection", "update", "-d", "test-deployment-id", "--conn-id", "conn-id"}
@@ -129,6 +142,7 @@ func TestConnectionUpdate(t *testing.T) {
 
 	t.Run("any context errors from api are returned and connections are not updated", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("UpdateConnection", mock.AnythingOfType("string"), mock.AnythingOfType("*airflowclient.Connection")).Return(nil).Once()
 		cmdArgs := []string{"connection", "update"}
@@ -139,6 +153,7 @@ func TestConnectionUpdate(t *testing.T) {
 	t.Run("successful connection update", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("UpdateConnection", mock.AnythingOfType("string"), mock.AnythingOfType("*airflowclient.Connection")).Return(nil).Once()
 		cmdArgs := []string{"connection", "update", "-d", "test-deployment-id", "--conn-id", "conn-id"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -153,6 +168,16 @@ func TestConnectionCopy(t *testing.T) {
 	airflowAPIClient = mockClient
 	mockAstroClient := new(astro_mocks.Client)
 	astroClient = mockAstroClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
+	depIds1 := []string{"test-deployment-id"}
+	deploymentListParams1 := &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds1,
+	}
+	depIds2 := []string{"test-deployment-id-1"}
+	deploymentListParams2 := &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds2,
+	}
 
 	t.Run("-h prints copy help", func(t *testing.T) {
 		cmdArgs := []string{"connection", "copy", "-h"}
@@ -163,6 +188,8 @@ func TestConnectionCopy(t *testing.T) {
 
 	t.Run("any errors from api are returned and connections are not copied", func(t *testing.T) {
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams1).Return(&mockListDeploymentsResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams2).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("GetConnections", mock.Anything).Return(mockResp, errTest).Once()
 		cmdArgs := []string{"connection", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -172,6 +199,8 @@ func TestConnectionCopy(t *testing.T) {
 	t.Run("any context errors from api are returned and connections are not copied", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams1).Return(&mockListDeploymentsResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams2).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("CopyConnections", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Once()
 		cmdArgs := []string{"connection", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -183,6 +212,8 @@ func TestConnectionCopy(t *testing.T) {
 		mockClient.On("GetConnections", mock.Anything).Return(mockResp, nil).Twice()
 		mockClient.On("UpdateConnection", mock.AnythingOfType("string"), mock.AnythingOfType("*airflowclient.Connection")).Return(nil).Twice()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams1).Return(&mockListDeploymentsResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams2).Return(&mockListDeploymentsResponse, nil).Once()
 		cmdArgs := []string{"connection", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -227,6 +258,8 @@ func TestVariableUpdate(t *testing.T) {
 	airflowAPIClient = mockClient
 	mockAstroClient := new(astro_mocks.Client)
 	astroClient = mockAstroClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
 
 	t.Run("-h prints update help", func(t *testing.T) {
 		cmdArgs := []string{"airflow-variable", "update", "-h"}
@@ -236,6 +269,7 @@ func TestVariableUpdate(t *testing.T) {
 	})
 
 	t.Run("any errors from api are returned and variables are not updated", func(t *testing.T) {
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(errTest).Once()
 		cmdArgs := []string{"airflow-variable", "update", "-d", "test-deployment-id", "--key", "KEY"}
@@ -245,6 +279,7 @@ func TestVariableUpdate(t *testing.T) {
 
 	t.Run("any context errors from api are returned and airflow variables are not updated", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
 		cmdArgs := []string{"airflow-variable", "update"}
@@ -255,6 +290,7 @@ func TestVariableUpdate(t *testing.T) {
 	t.Run("successful airflow variable update", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
 		cmdArgs := []string{"airflow-variable", "update", "-d", "test-deployment-id", "--key", "KEY"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -269,6 +305,8 @@ func TestVaraibleCreate(t *testing.T) {
 	airflowAPIClient = mockClient
 	mockAstroClient := new(astro_mocks.Client)
 	astroClient = mockAstroClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
 
 	t.Run("-h prints create  help", func(t *testing.T) {
 		cmdArgs := []string{"airflow-variable", "create", "-h"}
@@ -278,6 +316,7 @@ func TestVaraibleCreate(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and variables are not created", func(t *testing.T) {
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("CreateVariable", mock.AnythingOfType("string"), mock.Anything).Return(errTest).Once()
 		cmdArgs := []string{"airflow-variable", "create", "-d", "test-deployment-id", "--key", "KEY", "--value", "VAR"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -285,6 +324,7 @@ func TestVaraibleCreate(t *testing.T) {
 	})
 	t.Run("any context errors from api are returned and variables are not created", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("CreateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
 		cmdArgs := []string{"airflow-variable", "create"}
@@ -294,6 +334,7 @@ func TestVaraibleCreate(t *testing.T) {
 
 	t.Run("successful airflow variable create", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("CreateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
 		cmdArgs := []string{"airflow-variable", "create", "-d", "test-deployment-id", "--key", "KEY", "--value", "VAR"}
@@ -309,6 +350,16 @@ func TestVariableCopy(t *testing.T) {
 	airflowAPIClient = mockClient
 	mockAstroClient := new(astro_mocks.Client)
 	astroClient = mockAstroClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
+	depIds1 := []string{"test-deployment-id"}
+	deploymentListParams1 := &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds1,
+	}
+	depIds2 := []string{"test-deployment-id-1"}
+	deploymentListParams2 := &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds2,
+	}
 
 	t.Run("-h prints copy help", func(t *testing.T) {
 		cmdArgs := []string{"airflow-variable", "copy", "-h"}
@@ -319,6 +370,8 @@ func TestVariableCopy(t *testing.T) {
 
 	t.Run("any errors from api are returned and variables are not copied", func(t *testing.T) {
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams1).Return(&mockListDeploymentsResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams2).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("GetVariables", mock.Anything).Return(mockResp, errTest).Once()
 		cmdArgs := []string{"airflow-variable", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -328,6 +381,8 @@ func TestVariableCopy(t *testing.T) {
 	t.Run("any context errors from api are returned and variables are not copied", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams1).Return(&mockListDeploymentsResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams2).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("Copyvariables", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Once()
 		cmdArgs := []string{"airflow-variable", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -339,6 +394,8 @@ func TestVariableCopy(t *testing.T) {
 		mockClient.On("GetVariables", mock.Anything).Return(mockResp, nil).Twice()
 		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Twice()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams1).Return(&mockListDeploymentsResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams2).Return(&mockListDeploymentsResponse, nil).Once()
 		cmdArgs := []string{"airflow-variable", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -352,6 +409,8 @@ func TestPoolList(t *testing.T) {
 	airflowAPIClient = mockClient
 	mockAstroClient := new(astro_mocks.Client)
 	astroClient = mockAstroClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
 
 	t.Run("-h prints list help", func(t *testing.T) {
 		cmdArgs := []string{"pool", "list", "-h"}
@@ -360,6 +419,7 @@ func TestPoolList(t *testing.T) {
 		assert.Contains(t, resp, expectedHelp)
 	})
 	t.Run("any errors from api are returned and pools are not listed", func(t *testing.T) {
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("GetPools", mock.Anything).Return(mockResp, errTest).Once()
 		cmdArgs := []string{"pool", "list", "-d", "test-deployment-id"}
@@ -368,6 +428,7 @@ func TestPoolList(t *testing.T) {
 	})
 	t.Run("any context errors from api are returned and pools are not listed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("GetPools", mock.Anything).Return(mockResp, nil).Once()
 		cmdArgs := []string{"pool", "list", "-d", "test-deployment-id"}
@@ -383,6 +444,8 @@ func TestPoolUpdate(t *testing.T) {
 	airflowAPIClient = mockClient
 	mockAstroClient := new(astro_mocks.Client)
 	astroClient = mockAstroClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
 
 	t.Run("-h prints update help", func(t *testing.T) {
 		cmdArgs := []string{"pool", "update", "-h"}
@@ -393,6 +456,7 @@ func TestPoolUpdate(t *testing.T) {
 
 	t.Run("any errors from api are returned and pools are not updated", func(t *testing.T) {
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("UpdatePool", mock.AnythingOfType("string"), mock.Anything).Return(errTest).Once()
 		cmdArgs := []string{"pool", "update", "-d", "test-deployment-id", "--name", "name"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -402,6 +466,7 @@ func TestPoolUpdate(t *testing.T) {
 	t.Run("any context errors from api are returned and pools are not updated", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("UpdatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
 		cmdArgs := []string{"pool", "update"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -411,6 +476,7 @@ func TestPoolUpdate(t *testing.T) {
 	t.Run("successful pool update", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("UpdatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
 		cmdArgs := []string{"pool", "update", "-d", "test-deployment-id", "--name", "name"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -425,6 +491,8 @@ func TestPoolCreate(t *testing.T) {
 	airflowAPIClient = mockClient
 	mockAstroClient := new(astro_mocks.Client)
 	astroClient = mockAstroClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
 
 	t.Run("-h prints create  help", func(t *testing.T) {
 		cmdArgs := []string{"pool", "create", "-h"}
@@ -434,6 +502,7 @@ func TestPoolCreate(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and pools are not created", func(t *testing.T) {
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("CreatePool", mock.AnythingOfType("string"), mock.Anything).Return(errTest).Once()
 		cmdArgs := []string{"pool", "create", "-d", "test-deployment-id", "--name", "name"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -442,6 +511,7 @@ func TestPoolCreate(t *testing.T) {
 	t.Run("any context errors from api are returned and pools are not created", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("CreatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
 		cmdArgs := []string{"pool", "create"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -451,6 +521,7 @@ func TestPoolCreate(t *testing.T) {
 	t.Run("successful pool create", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("CreatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
 		cmdArgs := []string{"pool", "create", "-d", "test-deployment-id", "--name", "name"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -465,6 +536,16 @@ func TestPoolCopy(t *testing.T) {
 	airflowAPIClient = mockClient
 	mockAstroClient := new(astro_mocks.Client)
 	astroClient = mockAstroClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
+	depIds1 := []string{"test-deployment-id"}
+	deploymentListParams1 := &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds1,
+	}
+	depIds2 := []string{"test-deployment-id-1"}
+	deploymentListParams2 := &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds2,
+	}
 
 	t.Run("-h prints copy help", func(t *testing.T) {
 		cmdArgs := []string{"pool", "copy", "-h"}
@@ -475,6 +556,8 @@ func TestPoolCopy(t *testing.T) {
 
 	t.Run("any errors from api are returned and pools are not copied", func(t *testing.T) {
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams1).Return(&mockListDeploymentsResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams2).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("GetPools", mock.Anything).Return(mockResp, errTest).Once()
 		cmdArgs := []string{"pool", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -484,6 +567,8 @@ func TestPoolCopy(t *testing.T) {
 	t.Run("any context errors from api are returned and pools are not copied", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams1).Return(&mockListDeploymentsResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams2).Return(&mockListDeploymentsResponse, nil).Once()
 		cmdArgs := []string{"pool", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
@@ -493,6 +578,8 @@ func TestPoolCopy(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockClient.On("GetPools", mock.Anything).Return(mockResp, nil).Twice()
 		mockClient.On("UpdatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Twice()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams1).Return(&mockListDeploymentsResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams2).Return(&mockListDeploymentsResponse, nil).Once()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
 		cmdArgs := []string{"pool", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
