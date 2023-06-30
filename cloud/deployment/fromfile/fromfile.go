@@ -242,6 +242,8 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 			SchedulerSize:         deploymentFromFile.Deployment.Configuration.SchedulerSize,
+			APIKeyOnlyDeployments: deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments,
+			IsHighAvailability:    deploymentFromFile.Deployment.Configuration.IsHighAvailability,
 			DeploymentSpec: astro.DeploymentCreateSpec{
 				Executor: deploymentFromFile.Deployment.Configuration.Executor,
 				Scheduler: astro.Scheduler{
@@ -258,12 +260,14 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 				fmt.Errorf("changing an existing deployment's cluster %w", errNotPermitted)
 		}
 		updateInput = astro.UpdateDeploymentInput{
-			ID:               existingDeployment.ID,
-			ClusterID:        clusterID,
-			Label:            deploymentFromFile.Deployment.Configuration.Name,
-			Description:      deploymentFromFile.Deployment.Configuration.Description,
-			DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
-			SchedulerSize:    deploymentFromFile.Deployment.Configuration.SchedulerSize,
+			ID:                    existingDeployment.ID,
+			ClusterID:             clusterID,
+			Label:                 deploymentFromFile.Deployment.Configuration.Name,
+			Description:           deploymentFromFile.Deployment.Configuration.Description,
+			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			SchedulerSize:         deploymentFromFile.Deployment.Configuration.SchedulerSize,
+			APIKeyOnlyDeployments: deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments,
+			IsHighAvailability:    deploymentFromFile.Deployment.Configuration.IsHighAvailability,
 			DeploymentSpec: astro.DeploymentCreateSpec{
 				Executor: deploymentFromFile.Deployment.Configuration.Executor,
 				Scheduler: astro.Scheduler{

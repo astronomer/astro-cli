@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/astronomer/astro-cli/astro-client"
@@ -1022,6 +1023,8 @@ deployment:
     cluster_name: test-cluster
     workspace_name: test-workspace
     deployment_type: HOSTED_DEDICATED
+    is_high_availability: true
+    ci_cd_enforcement: true
   worker_queues:
     - name: default
       is_default: true
@@ -1112,6 +1115,8 @@ deployment:
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, out)
 			assert.NoError(t, err)
 			assert.Contains(t, out.String(), "configuration:\n        name: "+createdDeployment.Label)
+			assert.Contains(t, out.String(), "ci_cd_enforcement: "+strconv.FormatBool(createdDeployment.APIKeyOnlyDeployments))
+			assert.Contains(t, out.String(), "is_high_availability: "+strconv.FormatBool(createdDeployment.IsHighAvailability))
 			assert.Contains(t, out.String(), "metadata:\n        deployment_id: "+createdDeployment.ID)
 			mockClient.AssertExpectations(t)
 			mockCoreClient.AssertExpectations(t)
