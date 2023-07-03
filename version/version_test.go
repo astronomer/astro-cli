@@ -17,11 +17,11 @@ func TestGithubAPITimeout(t *testing.T) {
 		time.Sleep(5 * time.Second) // sleeping and doing nothing
 	}))
 	defer ts.Close()
-	url, err := url.Parse(fmt.Sprintf("%s/", ts.URL))
+	githubURL, err := url.Parse(fmt.Sprintf("%s/", ts.URL))
 	assert.NoError(t, err)
 
 	githubClient := github.NewClient(&http.Client{Timeout: 1 * time.Second}) // client side timeout should be less than server side sleep defined above
-	githubClient.BaseURL = url
+	githubClient.BaseURL = githubURL
 
 	start := time.Now()
 	release, err := getLatestRelease(githubClient, "test", "test")
