@@ -950,9 +950,10 @@ type CreateSsoConnectionRequest struct {
 
 // CreateTeamRequest defines model for CreateTeamRequest.
 type CreateTeamRequest struct {
-	Description *string   `json:"description,omitempty"`
-	MemberIds   *[]string `json:"memberIds,omitempty"`
-	Name        string    `json:"name"`
+	Description      *string   `json:"description,omitempty"`
+	MemberIds        *[]string `json:"memberIds,omitempty"`
+	Name             string    `json:"name"`
+	OrganizationRole *string   `json:"organizationRole,omitempty"`
 }
 
 // CreateUserInviteRequest defines model for CreateUserInviteRequest.
@@ -1320,6 +1321,11 @@ type ManagedDomainStatus string
 // MetronomeDashboard defines model for MetronomeDashboard.
 type MetronomeDashboard struct {
 	Url string `json:"url"`
+}
+
+// MutateOrgTeamRoleRequest defines model for MutateOrgTeamRoleRequest.
+type MutateOrgTeamRoleRequest struct {
+	Role string `json:"role"`
 }
 
 // MutateOrgUserRoleRequest defines model for MutateOrgUserRoleRequest.
@@ -1695,19 +1701,20 @@ type TaskInstanceState string
 
 // Team defines model for Team.
 type Team struct {
-	CreatedAt      time.Time            `json:"createdAt"`
-	CreatedBy      *BasicSubjectProfile `json:"createdBy,omitempty"`
-	Description    *string              `json:"description,omitempty"`
-	Id             string               `json:"id"`
-	IsIdpManaged   bool                 `json:"isIdpManaged"`
-	Members        *[]TeamMember        `json:"members,omitempty"`
-	MembersCount   *int                 `json:"membersCount,omitempty"`
-	Name           string               `json:"name"`
-	OrganizationId string               `json:"organizationId"`
-	Roles          *[]TeamRole          `json:"roles,omitempty"`
-	RolesCount     *int                 `json:"rolesCount,omitempty"`
-	UpdatedAt      time.Time            `json:"updatedAt"`
-	UpdatedBy      *BasicSubjectProfile `json:"updatedBy,omitempty"`
+	CreatedAt        time.Time            `json:"createdAt"`
+	CreatedBy        *BasicSubjectProfile `json:"createdBy,omitempty"`
+	Description      *string              `json:"description,omitempty"`
+	Id               string               `json:"id"`
+	IsIdpManaged     bool                 `json:"isIdpManaged"`
+	Members          *[]TeamMember        `json:"members,omitempty"`
+	MembersCount     *int                 `json:"membersCount,omitempty"`
+	Name             string               `json:"name"`
+	OrganizationId   string               `json:"organizationId"`
+	OrganizationRole string               `json:"organizationRole"`
+	Roles            *[]TeamRole          `json:"roles,omitempty"`
+	RolesCount       *int                 `json:"rolesCount,omitempty"`
+	UpdatedAt        time.Time            `json:"updatedAt"`
+	UpdatedBy        *BasicSubjectProfile `json:"updatedBy,omitempty"`
 }
 
 // TeamMember defines model for TeamMember.
@@ -2560,6 +2567,9 @@ type UpdateTeamJSONRequestBody = UpdateTeamRequest
 // AddTeamMembersJSONRequestBody defines body for AddTeamMembers for application/json ContentType.
 type AddTeamMembersJSONRequestBody = AddTeamMembersRequest
 
+// MutateOrgTeamRoleJSONRequestBody defines body for MutateOrgTeamRole for application/json ContentType.
+type MutateOrgTeamRoleJSONRequestBody = MutateOrgTeamRoleRequest
+
 // MutateOrgUserRoleJSONRequestBody defines body for MutateOrgUserRole for application/json ContentType.
 type MutateOrgUserRoleJSONRequestBody = MutateOrgUserRoleRequest
 
@@ -2874,6 +2884,11 @@ type ClientInterface interface {
 
 	// RemoveTeamMember request
 	RemoveTeamMember(ctx context.Context, organizationId string, teamId string, memberId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MutateOrgTeamRole request with any body
+	MutateOrgTeamRoleWithBody(ctx context.Context, organizationId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	MutateOrgTeamRole(ctx context.Context, organizationId string, teamId string, body MutateOrgTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListOrgUsers request
 	ListOrgUsers(ctx context.Context, organizationId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3891,6 +3906,30 @@ func (c *Client) AddTeamMembers(ctx context.Context, organizationId string, team
 
 func (c *Client) RemoveTeamMember(ctx context.Context, organizationId string, teamId string, memberId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRemoveTeamMemberRequest(c.Server, organizationId, teamId, memberId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MutateOrgTeamRoleWithBody(ctx context.Context, organizationId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateOrgTeamRoleRequestWithBody(c.Server, organizationId, teamId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MutateOrgTeamRole(ctx context.Context, organizationId string, teamId string, body MutateOrgTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateOrgTeamRoleRequest(c.Server, organizationId, teamId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7599,6 +7638,60 @@ func NewRemoveTeamMemberRequest(server string, organizationId string, teamId str
 	return req, nil
 }
 
+// NewMutateOrgTeamRoleRequest calls the generic MutateOrgTeamRole builder with application/json body
+func NewMutateOrgTeamRoleRequest(server string, organizationId string, teamId string, body MutateOrgTeamRoleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMutateOrgTeamRoleRequestWithBody(server, organizationId, teamId, "application/json", bodyReader)
+}
+
+// NewMutateOrgTeamRoleRequestWithBody generates requests for MutateOrgTeamRole with any type of body
+func NewMutateOrgTeamRoleRequestWithBody(server string, organizationId string, teamId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s/role", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListOrgUsersRequest generates requests for ListOrgUsers
 func NewListOrgUsersRequest(server string, organizationId string, params *ListOrgUsersParams) (*http.Request, error) {
 	var err error
@@ -9723,6 +9816,11 @@ type ClientWithResponsesInterface interface {
 	// RemoveTeamMember request
 	RemoveTeamMemberWithResponse(ctx context.Context, organizationId string, teamId string, memberId string, reqEditors ...RequestEditorFn) (*RemoveTeamMemberResponse, error)
 
+	// MutateOrgTeamRole request with any body
+	MutateOrgTeamRoleWithBodyWithResponse(ctx context.Context, organizationId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateOrgTeamRoleResponse, error)
+
+	MutateOrgTeamRoleWithResponse(ctx context.Context, organizationId string, teamId string, body MutateOrgTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateOrgTeamRoleResponse, error)
+
 	// ListOrgUsers request
 	ListOrgUsersWithResponse(ctx context.Context, organizationId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*ListOrgUsersResponse, error)
 
@@ -11378,6 +11476,33 @@ func (r RemoveTeamMemberResponse) StatusCode() int {
 	return 0
 }
 
+type MutateOrgTeamRoleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TeamRole
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r MutateOrgTeamRoleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MutateOrgTeamRoleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListOrgUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -12771,6 +12896,23 @@ func (c *ClientWithResponses) RemoveTeamMemberWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseRemoveTeamMemberResponse(rsp)
+}
+
+// MutateOrgTeamRoleWithBodyWithResponse request with arbitrary body returning *MutateOrgTeamRoleResponse
+func (c *ClientWithResponses) MutateOrgTeamRoleWithBodyWithResponse(ctx context.Context, organizationId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateOrgTeamRoleResponse, error) {
+	rsp, err := c.MutateOrgTeamRoleWithBody(ctx, organizationId, teamId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateOrgTeamRoleResponse(rsp)
+}
+
+func (c *ClientWithResponses) MutateOrgTeamRoleWithResponse(ctx context.Context, organizationId string, teamId string, body MutateOrgTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateOrgTeamRoleResponse, error) {
+	rsp, err := c.MutateOrgTeamRole(ctx, organizationId, teamId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateOrgTeamRoleResponse(rsp)
 }
 
 // ListOrgUsersWithResponse request returning *ListOrgUsersResponse
@@ -16503,6 +16645,67 @@ func ParseRemoveTeamMemberResponse(rsp *http.Response) (*RemoveTeamMemberRespons
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMutateOrgTeamRoleResponse parses an HTTP response from a MutateOrgTeamRoleWithResponse call
+func ParseMutateOrgTeamRoleResponse(rsp *http.Response) (*MutateOrgTeamRoleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MutateOrgTeamRoleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TeamRole
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
