@@ -33,7 +33,8 @@ var (
 	settingsFile           string
 	composeFile            string
 	exportComposeFile      string
-	pytestArgs             []string
+	pytestArgs             string
+	pytestFile             string
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
@@ -94,6 +95,7 @@ astro dev init --airflow-version 2.2.3
 	pytestDir = "/tests"
 
 	airflowUpgradeCheckCmd = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
+	errPytestArgs          = errors.New("")
 )
 
 func newDevRootCmd() *cobra.Command {
@@ -164,7 +166,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start a local Airflow environment",
-		Long:  "Start a local Airflow environment. This command will spin up 3 Docker containers on your machine, each for a different Airflow component: Webserver, Scheduler, and Postgres.",
+		Long:  "Start a local Airflow environment. This command will spin up 4 Docker containers on your machine, each for a different Airflow component: Webserver, scheduler, triggerer and metadata database.",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -179,7 +181,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
 	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
 	cmd.Flags().DurationVar(&waitTime, "wait", 1*time.Minute, "Duration to wait for webserver to get healthy. The default is 5 minutes on M1 architecture and 1 minute for everything else. Use --wait 2m to wait for 2 minutes.")
-	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Provide the location of compose file if you wish to use a custom compose file with the start command")
+	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Location of a custom compose file to use for starting Airflow")
 
 	return cmd
 }
@@ -203,7 +205,7 @@ func newAirflowRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                "run",
 		Short:              "Run Airflow CLI commands within your local Airflow environment",
-		Long:               "Run Airflow CLI commands within your local Airflow environment. These commands are run in the Webserver container but can interact with your local Scheduler, Workers, and Postgres Database.",
+		Long:               "Run Airflow CLI commands within your local Airflow environment. These commands run in the webserver container but can interact with your local scheduler, workers, and metadata database.",
 		PreRunE:            utils.EnsureProjectDir,
 		RunE:               airflowRun,
 		Example:            RunExample,
@@ -220,7 +222,7 @@ func newAirflowLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs",
 		Short:   "Display component logs for your local Airflow environment",
-		Long:    "Display Scheduler, Worker, and Webserver logs for your local Airflow environment",
+		Long:    "Display scheduler, worker, and webserver logs for your local Airflow environment",
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    airflowLogs,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -297,6 +299,7 @@ func newAirflowPytestCmd() *cobra.Command {
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    airflowPytest,
 	}
+	cmd.Flags().StringVarP(&pytestArgs, "args", "a", "", "pytest arguments you'd like passed to the pytest command. Surround the args in quotes. For example 'astro dev pytest --args \"--cov-config path\"'")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to run pytest with")
 	return cmd
@@ -633,7 +636,11 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 
 	// Get release name from args, if passed
 	if len(args) > 0 {
-		pytestArgs = args
+		pytestFile = args[0]
+	}
+
+	if len(args) > 1 {
+		return errPytestArgs
 	}
 
 	// Check if tests directory exists
@@ -658,7 +665,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	exitCode, err := containerHandler.Pytest(pytestArgs, customImageName, "")
+	exitCode, err := containerHandler.Pytest(pytestFile, customImageName, "", pytestArgs)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("pytests failed")

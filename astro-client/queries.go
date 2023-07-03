@@ -1,15 +1,6 @@
 package astro
 
 var (
-	WorkspacesGetRequest = `
-	query GetWorkspaces($organizationId: Id!) {
-		workspaces(organizationId: $organizationId) {
-			id
-			label
-			organizationId
-		}
-	}`
-
 	WorkspaceDeploymentsGetRequest = `
 	query WorkspaceDeployments(
 		$organizationId: Id!, $workspaceId: Id
@@ -20,12 +11,15 @@ var (
 			description
 			releaseName
 			dagDeployEnabled
+			apiKeyOnlyDeployments
 			schedulerSize
+			type
 			isHighAvailability
 			cluster {
 				id
 				name
 				cloudProvider
+				providerAccount
 				region
 				nodePools {
 					id
@@ -37,6 +31,7 @@ var (
 			workerQueues {
 				id
 				name
+				astroMachine
 				isDefault
 				nodePoolId
 				podCpu
@@ -103,6 +98,7 @@ var (
 			status
 			dagDeployEnabled
 			schedulerSize
+			type
 			isHighAvailability
 			runtimeRelease {
 				version
@@ -135,6 +131,7 @@ var (
 			workerQueues {
 				id
 				name
+				astroMachine
 				isDefault
 				nodePoolId
 				workerConcurrency
@@ -166,22 +163,6 @@ var (
 	}
 	`
 
-	GetClusters = `
-	query clusters($organizationId: Id!) {
-		clusters(organizationId: $organizationId) {
-			id
-			name
-			cloudProvider
-			nodePools {
-				id
-				isDefault
-				maxNodeCount
-				nodeInstanceType
-			}
-		}
-	}
-	`
-
 	GetDeploymentConfigOptions = `
 	query deploymentConfigOptions {
 	  deploymentConfigOptions {
@@ -197,6 +178,7 @@ var (
 		}
 		astroMachines {
 			concurrentTasks
+			concurrentTasksMax
 			cpu
 			memory
 			nodePoolType
@@ -205,6 +187,7 @@ var (
 		}
 		defaultAstroMachine {
 			concurrentTasks
+			concurrentTasksMax
 			cpu
 			memory
 			nodePoolType
@@ -224,14 +207,6 @@ var (
 	  }
 	}
   `
-	GetWorkspace = `
-	query GetWorkspace($workspaceId: Id!) {
-		workspace(id:$workspaceId) {
-			id
-			label
-			organizationId
-		}
-	}`
 
 	GetWorkerQueueOptions = `
 	query workerQueueOptions {

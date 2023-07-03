@@ -65,30 +65,6 @@ func (_m *Client) CreateImage(input astro.CreateImageInput) (*astro.Image, error
 	return r0, r1
 }
 
-// CreateUserInvite provides a mock function with given fields: input
-func (_m *Client) CreateUserInvite(input astro.CreateUserInviteInput) (astro.UserInvite, error) {
-	ret := _m.Called(input)
-
-	var r0 astro.UserInvite
-	var r1 error
-	if rf, ok := ret.Get(0).(func(astro.CreateUserInviteInput) (astro.UserInvite, error)); ok {
-		return rf(input)
-	}
-	if rf, ok := ret.Get(0).(func(astro.CreateUserInviteInput) astro.UserInvite); ok {
-		r0 = rf(input)
-	} else {
-		r0 = ret.Get(0).(astro.UserInvite)
-	}
-
-	if rf, ok := ret.Get(1).(func(astro.CreateUserInviteInput) error); ok {
-		r1 = rf(input)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // DeleteDeployment provides a mock function with given fields: input
 func (_m *Client) DeleteDeployment(input astro.DeleteDeploymentInput) (astro.Deployment, error) {
 	ret := _m.Called(input)
@@ -237,32 +213,6 @@ func (_m *Client) GetOrganizationAuditLogs(orgName string, earliest int) (io.Rea
 	return r0, r1
 }
 
-// GetOrganizations provides a mock function with given fields:
-func (_m *Client) GetOrganizations() ([]astro.Organization, error) {
-	ret := _m.Called()
-
-	var r0 []astro.Organization
-	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]astro.Organization, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() []astro.Organization); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]astro.Organization)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetWorkerQueueOptions provides a mock function with given fields:
 func (_m *Client) GetWorkerQueueOptions() (astro.WorkerQueueDefaultOptions, error) {
 	ret := _m.Called()
@@ -280,30 +230,6 @@ func (_m *Client) GetWorkerQueueOptions() (astro.WorkerQueueDefaultOptions, erro
 
 	if rf, ok := ret.Get(1).(func() error); ok {
 		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetWorkspace provides a mock function with given fields: workspaceID
-func (_m *Client) GetWorkspace(workspaceID string) (astro.Workspace, error) {
-	ret := _m.Called(workspaceID)
-
-	var r0 astro.Workspace
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (astro.Workspace, error)); ok {
-		return rf(workspaceID)
-	}
-	if rf, ok := ret.Get(0).(func(string) astro.Workspace); ok {
-		r0 = rf(workspaceID)
-	} else {
-		r0 = ret.Get(0).(astro.Workspace)
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(workspaceID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -335,32 +261,6 @@ func (_m *Client) InitiateDagDeployment(input astro.InitiateDagDeploymentInput) 
 	return r0, r1
 }
 
-// ListClusters provides a mock function with given fields: organizationID
-func (_m *Client) ListClusters(organizationID string) ([]astro.Cluster, error) {
-	ret := _m.Called(organizationID)
-
-	var r0 []astro.Cluster
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]astro.Cluster, error)); ok {
-		return rf(organizationID)
-	}
-	if rf, ok := ret.Get(0).(func(string) []astro.Cluster); ok {
-		r0 = rf(organizationID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]astro.Cluster)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(organizationID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // ListDeployments provides a mock function with given fields: organizationID, workspaceID
 func (_m *Client) ListDeployments(organizationID string, workspaceID string) ([]astro.Deployment, error) {
 	ret := _m.Called(organizationID, workspaceID)
@@ -380,32 +280,6 @@ func (_m *Client) ListDeployments(organizationID string, workspaceID string) ([]
 
 	if rf, ok := ret.Get(1).(func(string, string) error); ok {
 		r1 = rf(organizationID, workspaceID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ListWorkspaces provides a mock function with given fields: organizationID
-func (_m *Client) ListWorkspaces(organizationID string) ([]astro.Workspace, error) {
-	ret := _m.Called(organizationID)
-
-	var r0 []astro.Workspace
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]astro.Workspace, error)); ok {
-		return rf(organizationID)
-	}
-	if rf, ok := ret.Get(0).(func(string) []astro.Workspace); ok {
-		r0 = rf(organizationID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]astro.Workspace)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(organizationID)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -19,6 +19,7 @@ var (
 	ErrorRequest  = errors.New("failed to perform request")
 	ErrorBaseURL  = errors.New("invalid baseurl")
 	HTTPStatus200 = 200
+	HTTPStatus204 = 204
 )
 
 // a shorter alias
@@ -41,6 +42,7 @@ func requestEditor(ctx httpContext.Context, req *http.Request) error {
 	req.Header.Add("x-astro-client-identifier", "cli")
 	req.Header.Add("x-astro-client-version", version.CurrVersion)
 	req.Header.Add("x-client-os-identifier", os+"-"+arch)
+	req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.CurrVersion))
 	return nil
 }
 
@@ -52,7 +54,7 @@ func NewCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
 }
 
 func NormalizeAPIError(httpResp *http.Response, body []byte) error {
-	if httpResp.StatusCode != HTTPStatus200 {
+	if httpResp.StatusCode != HTTPStatus200 && httpResp.StatusCode != HTTPStatus204 {
 		decode := Error{}
 		err := json.NewDecoder(bytes.NewReader(body)).Decode(&decode)
 		if err != nil {

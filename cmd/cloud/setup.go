@@ -15,6 +15,7 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
+	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -124,10 +125,7 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	if err != nil {
 		return err
 	}
-	err = migrateCloudConfig(coreClient)
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
@@ -173,6 +171,18 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 			return err
 		}
 		err = c.SetContextKey("workspace", c.LastUsedWorkspace)
+		if err != nil {
+			return err
+		}
+		err = c.SetContextKey("organization", c.Organization)
+		if err != nil {
+			return err
+		}
+		err = c.SetContextKey("organization_short_name", c.OrganizationShortName)
+		if err != nil {
+			return err
+		}
+		err = c.SetContextKey("organization_product", c.OrganizationProduct)
 		if err != nil {
 			return err
 		}
@@ -324,7 +334,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
 	// get workspace ID
-	deployments, err := astroClient.ListDeployments(orgID, "")
+	deployments, err := deployment.GetDeployments("", orgID, astroClient)
 	if err != nil {
 		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}

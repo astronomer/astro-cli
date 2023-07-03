@@ -31,7 +31,7 @@ type ContainerHandler interface {
 	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
 	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error
 	ComposeExport(settingsFile, composeFile string) error
-	Pytest(pytestArgs []string, customImageName, deployImageName string) (string, error)
+	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string) (string, error)
 	Parse(customImageName, deployImageName string) error
 }
 

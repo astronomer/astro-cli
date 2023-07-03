@@ -366,7 +366,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, client, nil)
+		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, client, nil)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
@@ -452,9 +452,8 @@ func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerH
 	if pytest != allTests && pytest != parseAndPytest {
 		pytestFile = pytest
 	}
-	pytestArgs := []string{pytestFile}
 
-	exitCode, err := containerHandler.Pytest(pytestArgs, "", deployImage)
+	exitCode, err := containerHandler.Pytest(pytestFile, "", deployImage, "")
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")

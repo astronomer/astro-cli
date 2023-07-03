@@ -13,9 +13,6 @@ type ResponseData struct {
 	DeployImage               *Image                       `json:"deployImage,omitempty"`
 	GetDeployment             Deployment                   `json:"deployment,omitempty"`
 	GetDeployments            []Deployment                 `json:"deployments,omitempty"`
-	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
-	GetWorkspace              Workspace                    `json:"workspace,omitempty"`
-	GetClusters               []Cluster                    `json:"clusters,omitempty"`
 	RuntimeReleases           []RuntimeRelease             `json:"runtimeReleases,omitempty"`
 	CreateDeployment          Deployment                   `json:"CreateDeployment,omitempty"`
 	GetDeploymentConfig       DeploymentConfig             `json:"deploymentConfigOptions,omitempty"`
@@ -49,33 +46,36 @@ type AuthUser struct {
 
 // Deployment defines structure of a astrohub response Deployment object
 type Deployment struct {
-	ID                 string         `json:"id"`
-	Label              string         `json:"label"`
-	Description        string         `json:"description"`
-	WebserverStatus    string         `json:"webserverStatus"`
-	Status             string         `json:"status"`
-	ReleaseName        string         `json:"releaseName"`
-	Version            string         `json:"version"`
-	DagDeployEnabled   bool           `json:"dagDeployEnabled"`
-	AlertEmails        []string       `json:"alertEmails"`
-	Cluster            Cluster        `json:"cluster"`
-	Workspace          Workspace      `json:"workspace"`
-	RuntimeRelease     RuntimeRelease `json:"runtimeRelease"`
-	DeploymentSpec     DeploymentSpec `json:"deploymentSpec"`
-	SchedulerSize      string         `json:"schedulerSize"`
-	IsHighAvailability bool           `json:"isHighAvailability"`
-	WorkerQueues       []WorkerQueue  `json:"workerQueues"`
-	CreatedAt          time.Time      `json:"createdAt"`
-	UpdatedAt          time.Time      `json:"updatedAt"`
+	ID                    string         `json:"id"`
+	Label                 string         `json:"label"`
+	Description           string         `json:"description"`
+	WebserverStatus       string         `json:"webserverStatus"`
+	Status                string         `json:"status"`
+	ReleaseName           string         `json:"releaseName"`
+	Version               string         `json:"version"`
+	Type                  string         `json:"type"`
+	DagDeployEnabled      bool           `json:"dagDeployEnabled"`
+	APIKeyOnlyDeployments bool           `json:"apiKeyOnlyDeployments"`
+	AlertEmails           []string       `json:"alertEmails"`
+	Cluster               Cluster        `json:"cluster"`
+	Workspace             Workspace      `json:"workspace"`
+	RuntimeRelease        RuntimeRelease `json:"runtimeRelease"`
+	DeploymentSpec        DeploymentSpec `json:"deploymentSpec"`
+	SchedulerSize         string         `json:"schedulerSize"`
+	IsHighAvailability    bool           `json:"isHighAvailability"`
+	WorkerQueues          []WorkerQueue  `json:"workerQueues"`
+	CreatedAt             time.Time      `json:"createdAt"`
+	UpdatedAt             time.Time      `json:"updatedAt"`
 }
 
 // Cluster contains all components of an Astronomer Cluster
 type Cluster struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	CloudProvider string     `json:"cloudProvider"`
-	Region        string     `json:"region"`
-	NodePools     []NodePool `json:"nodePools"`
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	CloudProvider   string     `json:"cloudProvider"`
+	ProviderAccount string     `json:"providerAccount"`
+	Region          string     `json:"region"`
+	NodePools       []NodePool `json:"nodePools"`
 }
 
 type RuntimeRelease struct {
@@ -243,17 +243,8 @@ type CeleryExecutorConfig struct {
 	Name string `json:"name"`
 }
 
-type KubernetesExecutorDefaultPodConfig struct {
-	CPU           int `json:"cpu"`
-	CPULimitCores int `json:"cpuLimitCores"`
-	Memory        int `json:"memory"`
-	MinPodCount   int `json:"minPodCount"`
-	Concurrency   int `json:"concurrency"`
-}
-
 type KubernetesExecutorConfig struct {
-	Name       string                             `json:"name"`
-	DefaultPod KubernetesExecutorDefaultPodConfig `json:"defaultPod"`
+	Name string `json:"name"`
 }
 
 type ExecutorConfig struct {
@@ -278,12 +269,13 @@ type DeploymentConfig struct {
 }
 
 type Machine struct {
-	Type            string `json:"type"`
-	CPU             string `json:"cpu"`
-	Memory          string `json:"memory"`
-	StorageSize     string `json:"storageSize"`
-	ConcurrentTasks int    `json:"concurrentTasks"`
-	NodePoolType    string `json:"nodePoolType"`
+	Type               string `json:"type"`
+	CPU                string `json:"cpu"`
+	Memory             string `json:"memory"`
+	StorageSize        string `json:"storageSize"`
+	ConcurrentTasks    int    `json:"concurrentTasks"`
+	ConcurrentTasksMax int    `json:"concurrentTasksMax"`
+	NodePoolType       string `json:"nodePoolType"`
 }
 
 type MachineUnit struct {
@@ -338,6 +330,7 @@ type CreateDeploymentInput struct {
 	WorkerQueues          []WorkerQueue        `json:"workerQueues"`
 	IsHighAvailability    bool                 `json:"isHighAvailability"`
 	SchedulerSize         string               `json:"schedulerSize"`
+	APIKeyOnlyDeployments bool                 `json:"apiKeyOnlyDeployments"`
 }
 
 type DeploymentCreateSpec struct {
@@ -346,15 +339,16 @@ type DeploymentCreateSpec struct {
 }
 
 type UpdateDeploymentInput struct {
-	ID                 string               `json:"id"`
-	ClusterID          string               `json:"clusterId"`
-	Label              string               `json:"label"`
-	Description        string               `json:"description"`
-	DagDeployEnabled   bool                 `json:"dagDeployEnabled"`
-	DeploymentSpec     DeploymentCreateSpec `json:"deploymentSpec"`
-	IsHighAvailability bool                 `json:"isHighAvailability"`
-	SchedulerSize      string               `json:"schedulerSize"`
-	WorkerQueues       []WorkerQueue        `json:"workerQueues"`
+	ID                    string               `json:"id"`
+	ClusterID             string               `json:"clusterId"`
+	Label                 string               `json:"label"`
+	Description           string               `json:"description"`
+	DagDeployEnabled      bool                 `json:"dagDeployEnabled"`
+	APIKeyOnlyDeployments bool                 `json:"apiKeyOnlyDeployments"`
+	DeploymentSpec        DeploymentCreateSpec `json:"deploymentSpec"`
+	IsHighAvailability    bool                 `json:"isHighAvailability"`
+	SchedulerSize         string               `json:"schedulerSize"`
+	WorkerQueues          []WorkerQueue        `json:"workerQueues"`
 }
 
 type DeleteDeploymentInput struct {
@@ -390,6 +384,7 @@ type UserInvite struct {
 type WorkerQueue struct {
 	ID                string `json:"id,omitempty"` // Empty when creating new WorkerQueues
 	Name              string `json:"name"`
+	AstroMachine      string `json:"astroMachine"`
 	IsDefault         bool   `json:"isDefault"`
 	MaxWorkerCount    int    `json:"maxWorkerCount,omitempty"`
 	MinWorkerCount    int    `json:"minWorkerCount"`
