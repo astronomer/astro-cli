@@ -184,10 +184,32 @@ func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earlies
 		return err
 	}
 	logStreamBuffer.Close()
+	fmt.Println("Finished exporting logs to local GZIP file")
 	return nil
 }
 
 func IsOrgHosted() bool {
 	c, _ := context.GetCurrentContext()
 	return c.OrganizationProduct == "HOSTED"
+}
+
+func ListClusters(organizationShortName string, coreClient astrocore.CoreClient) ([]astrocore.Cluster, error) {
+	clusterTypes := []astrocore.ListClustersParamsTypes{astrocore.ListClustersParamsTypesBRINGYOUROWNCLOUD, astrocore.ListClustersParamsTypesHOSTED}
+	limit := 1000
+	clusterListParams := &astrocore.ListClustersParams{
+		Types: &clusterTypes,
+		Limit: &limit,
+	}
+	resp, err := coreClient.ListClustersWithResponse(http_context.Background(), organizationShortName, clusterListParams)
+	if err != nil {
+		return nil, err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	csPaginated := *resp.JSON200
+	cs := csPaginated.Clusters
+
+	return cs, nil
 }

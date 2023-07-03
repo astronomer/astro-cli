@@ -405,7 +405,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", false, false, 1*time.Minute).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", false, false, 1*time.Minute).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -420,7 +420,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", false, false, 1*time.Minute).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", false, false, 1*time.Minute).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -693,7 +693,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop").Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", true, true, 1*time.Minute).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -726,7 +726,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop").Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", true, true, 1*time.Minute).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -751,13 +751,15 @@ func TestAirflowRestart(t *testing.T) {
 
 func TestAirflowPytest(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", []string{"test-pytest-file"}, "", "").Return("0", nil).Once()
+			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "").Return("0", nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -767,13 +769,15 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("exit code 1", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", []string{"test-pytest-file"}, "", "").Return("exit code 1", errMock).Once()
+			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "").Return("exit code 1", errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -783,13 +787,15 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("pytest file doesnot exists", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = "/testfile-not-exists"
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", []string{"test-pytest-file"}, "", "").Return("0", nil).Once()
+			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "").Return("0", nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -799,13 +805,15 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", []string{"test-pytest-file"}, "", "").Return("0", errMock).Once()
+			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "").Return("0", errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -815,6 +823,8 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
@@ -830,6 +840,7 @@ func TestAirflowPytest(t *testing.T) {
 	t.Run("projectNameUnique failure", func(t *testing.T) {
 		cmd := newAirflowParseCmd()
 		args := []string{}
+		pytestDir = ""
 
 		projectNameUnique = func() (string, error) {
 			return "", errMock
@@ -1088,6 +1099,23 @@ func TestAirflowObjectExport(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("ExportSettings", "airflow_settings.yaml", ".env", connections, variables, pools, envExport).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowSettingsExport(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("success compose export", func(t *testing.T) {
+		cmd := newObjectExportCmd()
+		cmd.Flag("compose").Value.Set("true")
+
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("ComposeExport", "airflow_settings.yaml", exportComposeFile).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 

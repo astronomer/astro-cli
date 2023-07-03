@@ -42,8 +42,10 @@ const (
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
+	M1ImageRuntimeVersion          = "6.0.4"
 	pytestDirectory                = "tests"
 	OpenCmd                        = "open"
+	dockerCmd                      = "docker"
 
 	composeCreateErrMsg      = "error creating docker-compose project"
 	composeStatusCheckErrMsg = "error checking docker-compose status"
@@ -86,6 +88,8 @@ type ComposeConfig struct {
 	PostgresPassword      string
 	PostgresHost          string
 	PostgresPort          string
+	PostgresRepository    string
+	PostgresTag           string
 	AirflowEnvFile        string
 	AirflowImage          string
 	AirflowHome           string
@@ -152,9 +156,9 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 // Start starts a local airflow development cluster
 //
 //nolint:gocognit
-func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser bool, waitTime time.Duration) error {
+func (d *DockerCompose) Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration) error {
 	// check if docker is up for macOS
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == "darwin" && config.CFG.DockerCommand.GetString() == dockerCmd {
 		err := startDocker()
 		if err != nil {
 			return err
@@ -211,7 +215,7 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 	}
 
 	// Create a compose project
-	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels)
+	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", settingsFile, composeFile, imageLabels)
 	if err != nil {
 		return errors.Wrap(err, composeCreateErrMsg)
 	}
@@ -223,8 +227,14 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 	if err != nil {
 		return errors.Wrap(err, composeRecreateErrMsg)
 	}
+	var airflowMessage string
+	if CheckM1Image(imageLabels) {
+		airflowMessage = " This might take a few minutes…"
+	} else {
+		airflowMessage = ""
+	}
 
-	fmt.Println("\n\nAirflow is starting up! This might take a few minutes…")
+	fmt.Println("\n\nAirflow is starting up!" + airflowMessage)
 
 	airflowDockerVersion, err := d.checkAiflowVersion()
 	if err != nil {
@@ -236,7 +246,7 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 	// default is 1 minute
 	if waitTime != 1*time.Minute {
 		startupTimeout = waitTime
-	} else if isM1(runtime.GOOS, runtime.GOARCH) {
+	} else if CheckM1Image(imageLabels) {
 		// user did not provide a waitTime
 		// if running darwin/M1 architecture
 		// we wait for a longer startup time
@@ -250,6 +260,36 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 	return nil
 }
 
+func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
+	// Get project containers
+	_, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
+		All: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	// get image lables
+	imageLabels, err := d.imageHandler.ListLabels()
+	if err != nil {
+		return err
+	}
+
+	// Generate the docker-compose yaml
+	yaml, err := generateConfig(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels)
+	if err != nil {
+		return errors.Wrap(err, "failed to create Compose file")
+	}
+
+	// write the yaml to a file
+	err = os.WriteFile(composeFile, []byte(yaml), 0o666) //nolint:gosec, gomnd
+	if err != nil {
+		return errors.Wrap(err, "failed to write to compose file")
+	}
+
+	return nil
+}
+
 // Stop a running docker project
 func (d *DockerCompose) Stop() error {
 	imageLabels, err := d.imageHandler.ListLabels()
@@ -258,7 +298,7 @@ func (d *DockerCompose) Stop() error {
 	}
 
 	// Create a compose project
-	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", "", imageLabels)
+	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", "", "", imageLabels)
 	if err != nil {
 		return errors.Wrap(err, composeCreateErrMsg)
 	}
@@ -377,7 +417,7 @@ func (d *DockerCompose) Run(args []string, user string) error {
 
 // Pytest creates and runs a container containing the users airflow image, requirments, packages, and volumes(DAGs folder, etc...)
 // These containers runs pytest on a specified pytest file (pytestFile). This function is used in the dev parse and dev pytest commands
-func (d *DockerCompose) Pytest(pytestArgs []string, customImageName, deployImageName string) (string, error) {
+func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string) (string, error) {
 	// deployImageName may be provided to the function if it is being used in the deploy command
 	if deployImageName == "" {
 		// build image
@@ -396,16 +436,7 @@ func (d *DockerCompose) Pytest(pytestArgs []string, customImageName, deployImage
 	}
 
 	// determine pytest args and file
-	var pytestFile string
-	if len(pytestArgs) > 0 {
-		pytestFile = pytestArgs[0]
-	}
-	if len(strings.Fields(pytestFile)) > 1 {
-		pytestArgs = strings.Fields(pytestFile)
-		pytestFile = ""
-	} else if len(pytestArgs) > 1 {
-		pytestArgs = strings.Fields(pytestArgs[1])
-	}
+	pytestArgs := strings.Fields(pytestArgsString)
 
 	// Determine pytest file
 	if pytestFile != ".astro/test_dag_integrity_default.py" {
@@ -444,8 +475,7 @@ func (d *DockerCompose) Parse(customImageName, deployImageName string) error {
 	fmt.Println("\nChecking your DAGs for errors,\nthis might take a minute if you haven't run this command before…")
 
 	pytestFile := DefaultTestPath
-	pytestArgs := []string{pytestFile}
-	exitCode, err := d.Pytest(pytestArgs, customImageName, deployImageName)
+	exitCode, err := d.Pytest(pytestFile, customImageName, deployImageName, "")
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("See above for errors detected in your DAGs")
@@ -508,14 +538,6 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 		return err
 	}
 
-	fileState, err := fileutil.Exists(settingsFile, nil)
-	if err != nil {
-		return errors.Wrap(err, errSettingsPath)
-	}
-	if !fileState {
-		return errNoFile
-	}
-
 	if envExport {
 		err = envExportSettings(containerID, envFile, airflowDockerVersion, connections, variables)
 		if err != nil {
@@ -523,6 +545,14 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 		}
 		fmt.Println("\nAirflow objects exported to env file")
 		return nil
+	}
+
+	fileState, err := fileutil.Exists(settingsFile, nil)
+	if err != nil {
+		return errors.Wrap(err, errSettingsPath)
+	}
+	if !fileState {
+		return errNoFile
 	}
 
 	err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
@@ -668,11 +698,20 @@ func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
 }
 
 // createProject creates project with yaml config as context
-var createDockerProject = func(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string) (*types.Project, error) {
+var createDockerProject = func(projectName, airflowHome, envFile, buildImage, settingsFile, composeFile string, imageLabels map[string]string) (*types.Project, error) {
 	// Generate the docker-compose yaml
-	yaml, err := generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile, imageLabels)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create project")
+	var yaml string
+	var err error
+	if composeFile == "" {
+		yaml, err = generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile, imageLabels)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create project")
+		}
+	} else {
+		yaml, err = fileutil.ReadFileToString(composeFile)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read compose file")
+		}
 	}
 
 	var configs []types.ConfigFile
@@ -825,6 +864,23 @@ var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 	return versions.GreaterThanOrEqualTo(runtimeVersion, triggererAllowedRuntimeVersion), nil
 }
 
+// CheckM1Image checks if the CLI is currently running on M1 architecture
+// next it checks if the runtime version of the image building is above 6.0.4
+// if the image is M1 architecture and runtime version is less than or equal to 6.0.4 it will print true
+var CheckM1Image = func(imageLabels map[string]string) bool {
+	if !isM1(runtime.GOOS, runtime.GOARCH) {
+		// the architecture is not arm64 no need to print message
+		return false
+	}
+	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
+	if !ok {
+		// cannot determine runtime version print message by default
+		return true
+	}
+
+	return versions.LessThanOrEqualTo(runtimeVersion, M1ImageRuntimeVersion)
+}
+
 func checkServiceState(serviceState, expectedState string) bool {
 	scrubbedState := strings.Split(serviceState, " ")[0]
 	return scrubbedState == expectedState
@@ -838,7 +894,7 @@ func startDocker() error {
 	if err != nil {
 		// open docker
 		fmt.Println("\nDocker is not running. Starting up the Docker engine…")
-		err = cmdExec(OpenCmd, buf, os.Stderr, "-a", "docker")
+		err = cmdExec(OpenCmd, buf, os.Stderr, "-a", dockerCmd)
 		if err != nil {
 			return err
 		}

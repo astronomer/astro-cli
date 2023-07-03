@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,6 +18,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
 	docker_types "github.com/docker/docker/api/types"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -369,10 +369,10 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
 		assert.NoError(t, err)
 
-		err = mockDockerCompose.Start("custom-image", "", noCache, false, waitTime)
+		err = mockDockerCompose.Start("custom-image", "", "", noCache, false, waitTime)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -405,7 +405,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", noCache, false, defaultTimeOut)
+		err := mockDockerCompose.Start("", "", "", noCache, false, defaultTimeOut)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -439,7 +439,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", noCache, false, defaultTimeOut)
+		err := mockDockerCompose.Start("", "", "", noCache, false, defaultTimeOut)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -467,7 +467,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", noCache, false, userProvidedTimeOut)
+		err := mockDockerCompose.Start("", "", "", noCache, false, userProvidedTimeOut)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -494,10 +494,10 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
 		assert.NoError(t, err)
 
-		err = mockDockerCompose.Start("custom-image", "", noCache, false, waitTime)
+		err = mockDockerCompose.Start("custom-image", "", "", noCache, false, waitTime)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -510,7 +510,7 @@ func TestDockerComposeStart(t *testing.T) {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.Start("", "", false, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", false, false, waitTime)
 		assert.Contains(t, err.Error(), "cannot start, project already running")
 
 		composeMock.AssertExpectations(t)
@@ -522,7 +522,7 @@ func TestDockerComposeStart(t *testing.T) {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.Start("", "", false, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", false, false, waitTime)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		composeMock.AssertExpectations(t)
@@ -545,7 +545,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -570,7 +570,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -596,7 +596,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -622,8 +622,78 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
 		assert.ErrorIs(t, err, errMockDocker)
+
+		imageHandler.AssertExpectations(t)
+		composeMock.AssertExpectations(t)
+	})
+}
+
+func TestDockerComposeExport(t *testing.T) {
+	testUtils.InitTestConfig(testUtils.LocalPlatform)
+	mockDockerCompose := DockerCompose{projectName: "test", airflowHome: "/home/airflow", envFile: "/home/airflow/.env"}
+
+	t.Run("success", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mock.Anything, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.ComposeExport("settings.yaml", "docker-compose.yaml")
+		assert.NoError(t, err)
+
+		imageHandler.AssertExpectations(t)
+		composeMock.AssertExpectations(t)
+	})
+
+	t.Run("compose ps failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mock.Anything, api.PsOptions{All: true}).Return(nil, errMockDocker).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.ComposeExport("settings.yaml", "docker-compose.yaml")
+		assert.ErrorIs(t, err, errMockDocker)
+
+		imageHandler.AssertExpectations(t)
+		composeMock.AssertExpectations(t)
+	})
+
+	t.Run("list label failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{}, errMockDocker).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mock.Anything, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.ComposeExport("settings.yaml", "docker-compose.yaml")
+		assert.ErrorIs(t, err, errMockDocker)
+
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("generate yaml failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mock.Anything, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.ComposeExport("", "")
+		assert.ErrorContains(t, err, "failed to write to compose file")
 
 		imageHandler.AssertExpectations(t)
 		composeMock.AssertExpectations(t)
@@ -868,7 +938,7 @@ func TestDockerComposePytest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		resp, err := mockDockerCompose.Pytest([]string{}, "", "")
+		resp, err := mockDockerCompose.Pytest("", "", "", "")
 
 		assert.NoError(t, err)
 		assert.Equal(t, "", resp)
@@ -883,7 +953,7 @@ func TestDockerComposePytest(t *testing.T) {
 		mockResponse := "1"
 		mockDockerCompose.imageHandler = imageHandler
 
-		resp, err := mockDockerCompose.Pytest([]string{}, "", "")
+		resp, err := mockDockerCompose.Pytest("", "", "", "")
 		assert.Contains(t, err.Error(), "something went wrong while Pytesting your DAGs")
 		assert.Equal(t, mockResponse, resp)
 		imageHandler.AssertExpectations(t)
@@ -895,7 +965,7 @@ func TestDockerComposePytest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		_, err := mockDockerCompose.Pytest([]string{}, "", "")
+		_, err := mockDockerCompose.Pytest("", "", "", "")
 		assert.ErrorIs(t, err, errMockDocker)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1554,7 +1624,7 @@ func TestCreateDockerProject(t *testing.T) {
 	assert.NoError(t, err)
 	config.InitConfig(fs)
 	t.Run("case when project doesnot have docker-compose.override.yml", func(t *testing.T) {
-		prj, err := createDockerProject("test", "", "", "test-image:latest", "", map[string]string{})
+		prj, err := createDockerProject("test", "", "", "test-image:latest", "", "", map[string]string{})
 		assert.NoError(t, err)
 		postgresService := types.ServiceConfig{}
 		serviceFound := false
@@ -1571,7 +1641,7 @@ func TestCreateDockerProject(t *testing.T) {
 
 	t.Run("case when project has docker-compose.override.yml", func(t *testing.T) {
 		composeOverrideFilename = "./testfiles/docker-compose.override.yml"
-		prj, err := createDockerProject("test", "", "", "test-image:latest", "", map[string]string{})
+		prj, err := createDockerProject("test", "", "", "test-image:latest", "", "", map[string]string{})
 		assert.NoError(t, err)
 		postgresService := types.ServiceConfig{}
 		serviceFound := false

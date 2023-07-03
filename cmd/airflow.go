@@ -31,7 +31,10 @@ var (
 	envFile                string
 	customImageName        string
 	settingsFile           string
-	pytestArgs             []string
+	composeFile            string
+	exportComposeFile      string
+	pytestArgs             string
+	pytestFile             string
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
@@ -46,6 +49,7 @@ var (
 	pools                  bool
 	envExport              bool
 	noBrowser              bool
+	compose                bool
 	waitTime               time.Duration
 	RunExample             = `
 # Create default admin user.
@@ -91,6 +95,7 @@ astro dev init --airflow-version 2.2.3
 	pytestDir = "/tests"
 
 	airflowUpgradeCheckCmd = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
+	errPytestArgs          = errors.New("")
 )
 
 func newDevRootCmd() *cobra.Command {
@@ -161,7 +166,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start a local Airflow environment",
-		Long:  "Start a local Airflow environment. This command will spin up 3 Docker containers on your machine, each for a different Airflow component: Webserver, Scheduler, and Postgres.",
+		Long:  "Start a local Airflow environment. This command will spin up 4 Docker containers on your machine, each for a different Airflow component: Webserver, scheduler, triggerer and metadata database.",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -176,6 +181,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
 	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
 	cmd.Flags().DurationVar(&waitTime, "wait", 1*time.Minute, "Duration to wait for webserver to get healthy. The default is 5 minutes on M1 architecture and 1 minute for everything else. Use --wait 2m to wait for 2 minutes.")
+	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Location of a custom compose file to use for starting Airflow")
 
 	return cmd
 }
@@ -199,7 +205,7 @@ func newAirflowRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                "run",
 		Short:              "Run Airflow CLI commands within your local Airflow environment",
-		Long:               "Run Airflow CLI commands within your local Airflow environment. These commands are run in the Webserver container but can interact with your local Scheduler, Workers, and Postgres Database.",
+		Long:               "Run Airflow CLI commands within your local Airflow environment. These commands run in the webserver container but can interact with your local scheduler, workers, and metadata database.",
 		PreRunE:            utils.EnsureProjectDir,
 		RunE:               airflowRun,
 		Example:            RunExample,
@@ -216,7 +222,7 @@ func newAirflowLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs",
 		Short:   "Display component logs for your local Airflow environment",
-		Long:    "Display Scheduler, Worker, and Webserver logs for your local Airflow environment",
+		Long:    "Display scheduler, worker, and webserver logs for your local Airflow environment",
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    airflowLogs,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -293,6 +299,7 @@ func newAirflowPytestCmd() *cobra.Command {
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    airflowPytest,
 	}
+	cmd.Flags().StringVarP(&pytestArgs, "args", "a", "", "pytest arguments you'd like passed to the pytest command. Surround the args in quotes. For example 'astro dev pytest --args \"--cov-config path\"'")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to run pytest with")
 	return cmd
@@ -356,8 +363,8 @@ func newAirflowObjectRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "object",
 		Aliases: []string{"obj"},
-		Short:   "Manage local Airflow Connections, Variables, and Pools",
-		Long:    "Manage local Airflow Connections, Variables, and Pools. You can export and import this objects from a local Airflow environment to an Airflow settings file",
+		Short:   "Configure your local Airflow environment.",
+		Long:    "Manage local Airflow connections, variables, and pools. Import or export your objects to your Airflow settings file. Configure Airflow's startup behavior using a Compose file.",
 	}
 	cmd.AddCommand(
 		newObjectImportCmd(),
@@ -369,7 +376,7 @@ func newAirflowObjectRootCmd() *cobra.Command {
 func newObjectImportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "import",
-		Short: "Create and update local Airflow objects from a local YAML file",
+		Short: "Create and update local Airflow connections, variables, and pools from a local YAML file",
 		Long:  "This command creates all connections, variables, and pools from a YAML configuration file in your local Airflow environment. Airflow must be running locally for this command to work",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -388,8 +395,8 @@ func newObjectImportCmd() *cobra.Command {
 func newObjectExportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Export all Airflow objects to a settings YAML or env file.",
-		Long:  "This command exports all Airflow objects to a settings YAML file or env file. Airflow must be running locally for this command to work",
+		Short: "Export local Airflow connections, variables, pools, and startup configurations as YAML or environment variables.",
+		Long:  "Export local Airflow connections, variables, or pools as YAML or environment variables. Airflow must be running locally to export Airflow objects. Use the '--compose' flag to export the Compose file used to start up Airflow.",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -403,7 +410,9 @@ func newObjectExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Export pools to a settings file. Note pools cannot be exported to a env file ")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "The location of the file to store exported Airflow objects as YAML. Default is 'airflow_settings.yaml'")
 	cmd.Flags().BoolVarP(&envExport, "env-export", "n", false, "Export Airflow objects as Astro environment variables.")
+	cmd.Flags().BoolVarP(&compose, "compose", "", false, "Export the Compose file used to start Airflow locally.")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "The location of the file to store exported Airflow objects as Astro environment variables. Default is '.env'.")
+	cmd.Flags().StringVarP(&exportComposeFile, "compose-file", "", "compose.yaml", "The location to export the Compose file used to start Airflow locally.")
 	return cmd
 }
 
@@ -507,7 +516,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.Start(customImageName, settingsFile, noCache, noBrowser, waitTime)
+	return containerHandler.Start(customImageName, settingsFile, composeFile, noCache, noBrowser, waitTime)
 }
 
 // airflowRun
@@ -617,7 +626,7 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 	// don't startup browser on restart
 	noBrowser = true
 
-	return containerHandler.Start(customImageName, settingsFile, noCache, noBrowser, waitTime)
+	return containerHandler.Start(customImageName, settingsFile, composeFile, noCache, noBrowser, waitTime)
 }
 
 // run pytest on an airflow project
@@ -627,7 +636,11 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 
 	// Get release name from args, if passed
 	if len(args) > 0 {
-		pytestArgs = args
+		pytestFile = args[0]
+	}
+
+	if len(args) > 1 {
+		return errPytestArgs
 	}
 
 	// Check if tests directory exists
@@ -652,7 +665,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	exitCode, err := containerHandler.Pytest(pytestArgs, customImageName, "")
+	exitCode, err := containerHandler.Pytest(pytestFile, customImageName, "", pytestArgs)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("pytests failed")
@@ -749,6 +762,11 @@ func airflowSettingsExport(cmd *cobra.Command, args []string) error {
 	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
+	}
+
+	if compose {
+		fmt.Println("Exporting compose file to " + exportComposeFile)
+		return containerHandler.ComposeExport(settingsFile, exportComposeFile)
 	}
 
 	return containerHandler.ExportSettings(settingsFile, envFile, connections, variables, pools, envExport)

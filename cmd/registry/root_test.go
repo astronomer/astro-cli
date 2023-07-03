@@ -1,4 +1,4 @@
-package cloud
+package registry
 
 import (
 	"bytes"
@@ -9,14 +9,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUserRootCommand(t *testing.T) {
-	expectedHelp := "Manage users in your Astro Organization."
+func TestRegistryCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	buf := new(bytes.Buffer)
-	cmd := newUserCmd(os.Stdout)
-	cmd.SetOut(buf)
+	deplyCmd := newRegistryCmd(os.Stdout)
+	deplyCmd.SetOut(buf)
 	testUtil.SetupOSArgsForGinkgo()
-	_, err := cmd.ExecuteC()
+	_, err := deplyCmd.ExecuteC()
 	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), expectedHelp)
+	assert.Contains(t, buf.String(), "Astronomer Registry")
 }

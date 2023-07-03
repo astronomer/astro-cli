@@ -113,21 +113,21 @@ func TestWriteStringToFile(t *testing.T) {
 		s    string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name         string
+		args         args
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "basic case",
-			args:    args{path: "./test.out", s: "testing"},
-			wantErr: false,
+			name:         "basic case",
+			args:         args{path: "./test.out", s: "testing"},
+			errAssertion: assert.NoError,
 		},
 	}
 	defer afero.NewOsFs().Remove("./test.out")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := WriteStringToFile(tt.args.path, tt.args.s); (err != nil) != tt.wantErr {
-				t.Errorf("WriteStringToFile() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.errAssertion(t, WriteStringToFile(tt.args.path, tt.args.s)) {
+				return
 			}
 			if _, err := os.Open(tt.args.path); err != nil {
 				t.Errorf("Error opening file %s", tt.args.path)
@@ -147,14 +147,14 @@ func TestTar(t *testing.T) {
 		target string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name         string
+		args         args
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "basic case",
-			args:    args{source: "./test", target: "/tmp"},
-			wantErr: false,
+			name:         "basic case",
+			args:         args{source: "./test", target: "/tmp"},
+			errAssertion: assert.NoError,
 		},
 	}
 	defer afero.NewOsFs().Remove(path)
@@ -163,8 +163,8 @@ func TestTar(t *testing.T) {
 	defer afero.NewOsFs().Remove("/tmp/test.tar")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := Tar(tt.args.source, tt.args.target); (err != nil) != tt.wantErr {
-				t.Errorf("Tar() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.errAssertion(t, Tar(tt.args.source, tt.args.target)) {
+				return
 			}
 			filePath := "/tmp/test.tar"
 			if _, err := os.Create(filePath); err != nil {
@@ -244,6 +244,46 @@ func TestRead(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			actualResp, actualErr := Read(tt.args.path)
+			if tt.errResp != "" && actualErr != nil {
+				assert.Contains(t, actualErr.Error(), tt.errResp)
+			} else {
+				assert.NoError(t, actualErr)
+			}
+			assert.Equal(t, tt.expectedResp, actualResp)
+		})
+	}
+}
+
+func TestReadFileToString(t *testing.T) {
+	filePath := "./test.out"
+	content := "testing"
+	WriteStringToFile(filePath, content)
+	defer afero.NewOsFs().Remove(filePath)
+	type args struct {
+		path string
+	}
+	tests := []struct {
+		name         string
+		args         args
+		expectedResp string
+		errResp      string
+	}{
+		{
+			name:         "should read file contents successfully",
+			args:         args{path: filePath},
+			expectedResp: content,
+			errResp:      "",
+		},
+		{
+			name:         "error on read file content",
+			args:         args{path: "incorrect-file"},
+			expectedResp: "",
+			errResp:      "no such file or directory",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actualResp, actualErr := ReadFileToString(tt.args.path)
 			if tt.errResp != "" && actualErr != nil {
 				assert.Contains(t, actualErr.Error(), tt.errResp)
 			} else {

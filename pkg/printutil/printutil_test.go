@@ -3,7 +3,6 @@ package printutil
 import (
 	"bytes"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,22 +47,22 @@ func TestTablePrint(t *testing.T) {
 		DynamicPadding  bool
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		wantOut string
-		wantErr bool
+		name         string
+		fields       fields
+		wantOut      string
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "empty table case",
-			fields:  fields{NoResultsMsg: "no rows present"},
-			wantOut: "no rows present",
-			wantErr: false,
+			name:         "empty table case",
+			fields:       fields{NoResultsMsg: "no rows present"},
+			wantOut:      "no rows present",
+			errAssertion: assert.NoError,
 		},
 		{
-			name:    "basic case",
-			fields:  fields{SuccessMsg: "printed all rows", Rows: []Row{{Raw: []string{"testing"}}}},
-			wantOut: "printed all rows",
-			wantErr: false,
+			name:         "basic case",
+			fields:       fields{SuccessMsg: "printed all rows", Rows: []Row{{Raw: []string{"testing"}}}},
+			wantOut:      "printed all rows",
+			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
@@ -83,13 +82,10 @@ func TestTablePrint(t *testing.T) {
 				DynamicPadding:  tt.fields.DynamicPadding,
 			}
 			out := &bytes.Buffer{}
-			if err := tr.Print(out); (err != nil) != tt.wantErr {
-				t.Errorf("Table.Print() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.errAssertion(t, tr.Print(out)) {
 				return
 			}
-			if gotOut := out.String(); !strings.Contains(gotOut, tt.wantOut) {
-				t.Errorf("Table.Print() = %v, want %v", gotOut, tt.wantOut)
-			}
+			assert.Contains(t, out.String(), tt.wantOut)
 		})
 	}
 }
@@ -110,22 +106,22 @@ func TestTablePrintWithIndex(t *testing.T) {
 		DynamicPadding  bool
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		wantOut string
-		wantErr bool
+		name         string
+		fields       fields
+		wantOut      string
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "empty table case",
-			fields:  fields{NoResultsMsg: "no rows present"},
-			wantOut: "no rows present",
-			wantErr: false,
+			name:         "empty table case",
+			fields:       fields{NoResultsMsg: "no rows present"},
+			wantOut:      "no rows present",
+			errAssertion: assert.NoError,
 		},
 		{
-			name:    "basic case",
-			fields:  fields{SuccessMsg: "printed all rows", Rows: []Row{{Raw: []string{"testing"}}}},
-			wantOut: "printed all rows",
-			wantErr: false,
+			name:         "basic case",
+			fields:       fields{SuccessMsg: "printed all rows", Rows: []Row{{Raw: []string{"testing"}}}},
+			wantOut:      "printed all rows",
+			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
@@ -145,13 +141,10 @@ func TestTablePrintWithIndex(t *testing.T) {
 				DynamicPadding:  tt.fields.DynamicPadding,
 			}
 			out := &bytes.Buffer{}
-			if err := tr.PrintWithPageNumber(10, out); (err != nil) != tt.wantErr {
-				t.Errorf("Table.PrintWithPageNumber() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.errAssertion(t, tr.PrintWithPageNumber(10, out)) {
 				return
 			}
-			if gotOut := out.String(); !strings.Contains(gotOut, tt.wantOut) {
-				t.Errorf("Table.PrintWithPageNumber() = %v, want %v", gotOut, tt.wantOut)
-			}
+			assert.Contains(t, out.String(), tt.wantOut)
 		})
 	}
 }
@@ -200,9 +193,7 @@ func TestTablePrintHeader(t *testing.T) {
 			}
 			out := &bytes.Buffer{}
 			tr.PrintHeader(out)
-			if gotOut := out.String(); !strings.Contains(gotOut, tt.wantOut) {
-				t.Errorf("Table.PrintHeader() = %v, want %v", gotOut, tt.wantOut)
-			}
+			assert.Contains(t, out.String(), tt.wantOut)
 		})
 	}
 }
@@ -251,9 +242,7 @@ func TestTablePrintRows(t *testing.T) {
 			}
 			out := &bytes.Buffer{}
 			tr.PrintRows(out, 0)
-			if gotOut := out.String(); !strings.Contains(gotOut, tt.wantOut) {
-				t.Errorf("Table.PrintRows() = %v, want %v", gotOut, tt.wantOut)
-			}
+			assert.Contains(t, out.String(), tt.wantOut)
 		})
 	}
 }

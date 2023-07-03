@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/manifoldco/promptui"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestText(t *testing.T) {
@@ -57,32 +58,32 @@ func TestConfirm(t *testing.T) {
 		promptText string
 	}
 	tests := []struct {
-		name        string
-		inputString string
-		args        args
-		want        bool
-		wantErr     bool
+		name         string
+		inputString  string
+		args         args
+		want         bool
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:        "no case",
-			inputString: "n",
-			args:        args{promptText: "enter y or n"},
-			want:        false,
-			wantErr:     false,
+			name:         "no case",
+			inputString:  "n",
+			args:         args{promptText: "enter y or n"},
+			want:         false,
+			errAssertion: assert.NoError,
 		},
 		{
-			name:        "yes case",
-			inputString: "y",
-			args:        args{promptText: "enter y or n"},
-			want:        true,
-			wantErr:     false,
+			name:         "yes case",
+			inputString:  "y",
+			args:         args{promptText: "enter y or n"},
+			want:         true,
+			errAssertion: assert.NoError,
 		},
 		{
-			name:        "no input",
-			inputString: "",
-			args:        args{promptText: "enter y or n"},
-			want:        false,
-			wantErr:     false,
+			name:         "no input",
+			inputString:  "",
+			args:         args{promptText: "enter y or n"},
+			want:         false,
+			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
@@ -102,10 +103,10 @@ func TestConfirm(t *testing.T) {
 			os.Stdin = r
 
 			got, err := Confirm(tt.args.promptText)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Confirm() error = %v, wantErr %v", err, tt.wantErr)
+			if !tt.errAssertion(t, err) {
 				return
 			}
+
 			if got != tt.want {
 				t.Errorf("Confirm() = %v, want %v", got, tt.want)
 			}
@@ -121,18 +122,18 @@ func TestPassword(t *testing.T) {
 		promptText string
 	}
 	tests := []struct {
-		name        string
-		inputString string
-		args        args
-		want        string
-		wantErr     bool
+		name         string
+		inputString  string
+		args         args
+		want         string
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:        "unsupported error",
-			inputString: "",
-			args:        args{"enter pass"},
-			want:        "",
-			wantErr:     true,
+			name:         "unsupported error",
+			inputString:  "",
+			args:         args{"enter pass"},
+			want:         "",
+			errAssertion: assert.Error,
 		},
 	}
 	for _, tt := range tests {
@@ -152,10 +153,10 @@ func TestPassword(t *testing.T) {
 			os.Stdin = r
 
 			got, err := Password(tt.args.promptText)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Password() error = %v, wantErr %v", err, tt.wantErr)
+			if !tt.errAssertion(t, err) {
 				return
 			}
+
 			if got != tt.want {
 				t.Errorf("Password() = %v, want %v", got, tt.want)
 			}
@@ -170,38 +171,38 @@ func TestPromptGetConfirmation(t *testing.T) {
 	runner := GetYesNoSelector(PromptContent{Label: "test label, enter y/n"})
 	runner.Keys = &promptui.SelectKeys{Next: promptui.Key{Code: rune('S')}, Prev: promptui.Key{Code: rune('W')}, PageUp: promptui.Key{Code: rune('D')}, PageDown: promptui.Key{Code: rune('A')}}
 	tests := []struct {
-		name        string
-		inputString string
-		want        bool
-		wantErr     bool
+		name         string
+		inputString  string
+		want         bool
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:        "basic yes case",
-			inputString: "\n",
-			want:        true,
-			wantErr:     false,
+			name:         "basic yes case",
+			inputString:  "\n",
+			want:         true,
+			errAssertion: assert.NoError,
 		},
 		{
-			name:        "basic no case",
-			inputString: "S\n",
-			want:        false,
-			wantErr:     false,
+			name:         "basic no case",
+			inputString:  "S\n",
+			want:         false,
+			errAssertion: assert.NoError,
 		},
 		{
-			name:        "no input case",
-			inputString: "",
-			want:        false,
-			wantErr:     true,
+			name:         "no input case",
+			inputString:  "",
+			want:         false,
+			errAssertion: assert.Error,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			runner.Stdin = io.NopCloser(strings.NewReader(tt.inputString))
 			got, err := PromptGetConfirmation(runner)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("PromptGetConfirmation() error = %v, wantErr %v", err, tt.wantErr)
+			if !tt.errAssertion(t, err) {
 				return
 			}
+
 			if got != tt.want {
 				t.Errorf("PromptGetConfirmation() = %v, want %v", got, tt.want)
 			}

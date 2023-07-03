@@ -1,16 +1,6 @@
 package astro
 
-// TODO: @adam2k Reorganize based on this issue - https://github.com/astronomer/issues/issues/1991
 var (
-	WorkspacesGetRequest = `
-	query GetWorkspaces($organizationId: Id!) {
-		workspaces(organizationId: $organizationId) {
-			id
-			label
-			organizationId
-		}
-	}`
-
 	WorkspaceDeploymentsGetRequest = `
 	query WorkspaceDeployments(
 		$organizationId: Id!, $workspaceId: Id
@@ -21,10 +11,16 @@ var (
 			description
 			releaseName
 			dagDeployEnabled
+			apiKeyOnlyDeployments
+			schedulerSize
+			type
+			isHighAvailability
 			cluster {
 				id
 				name
 				cloudProvider
+				providerAccount
+				region
 				nodePools {
 					id
 					isDefault
@@ -35,6 +31,7 @@ var (
 			workerQueues {
 				id
 				name
+				astroMachine
 				isDefault
 				nodePoolId
 				podCpu
@@ -100,6 +97,9 @@ var (
 			createdAt
 			status
 			dagDeployEnabled
+			schedulerSize
+			type
+			isHighAvailability
 			runtimeRelease {
 				version
 				airflowVersion
@@ -131,6 +131,7 @@ var (
 			workerQueues {
 				id
 				name
+				astroMachine
 				isDefault
 				nodePoolId
 				workerConcurrency
@@ -139,19 +140,6 @@ var (
 			}
 		}
 	}`
-
-	SelfQuery = `
-	query selfQuery {
-		self {
-		user {
-			roleBindings {
-			role
-			}
-		}
-		authenticatedOrganizationId
-		}
-	}
-	`
 
 	DeploymentHistoryQuery = `
 	query deploymentHistory(
@@ -175,22 +163,6 @@ var (
 	}
 	`
 
-	GetClusters = `
-	query clusters($organizationId: Id!) {
-		clusters(organizationId: $organizationId) {
-			id
-			name
-			cloudProvider
-			nodePools {
-				id
-				isDefault
-				maxNodeCount
-				nodeInstanceType
-			}
-		}
-	}
-	`
-
 	GetDeploymentConfigOptions = `
 	query deploymentConfigOptions {
 	  deploymentConfigOptions {
@@ -204,17 +176,37 @@ var (
 			channel
 			version
 		}
+		astroMachines {
+			concurrentTasks
+			concurrentTasksMax
+			cpu
+			memory
+			nodePoolType
+			storageSize
+			type
+		}
+		defaultAstroMachine {
+			concurrentTasks
+			concurrentTasksMax
+			cpu
+			memory
+			nodePoolType
+			storageSize
+			type
+		}
+		defaultSchedulerSize {
+			cpu
+			memory
+			size
+		}
+		schedulerSizes {
+			cpu
+			memory
+			size
+		}
 	  }
 	}
   `
-	GetWorkspace = `
-	query GetWorkspace($workspaceId: Id!) {
-		workspace(id:$workspaceId) {
-			id
-			label
-			organizationId
-		}
-	}`
 
 	GetWorkerQueueOptions = `
 	query workerQueueOptions {
@@ -236,13 +228,4 @@ var (
 			}
 		}
 	}`
-
-	GetOrganizations = `
-	query Query {
-		organizations {
-		  id
-		  name
-		}
-	  }
-	`
 )

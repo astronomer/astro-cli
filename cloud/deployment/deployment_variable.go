@@ -13,6 +13,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	errVarBool         = false
+	errVarCreateUpdate = errors.New("there was an error while creating or updating one or more of the environment variables. Check the logs above for more information")
+)
+
 func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string, useEnvFile bool, client astro.Client, out io.Writer) error {
 	varTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
@@ -21,7 +26,7 @@ func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string,
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client, nil)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, client, nil)
 	if err != nil {
 		return err
 	}
@@ -67,7 +72,7 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client, nil)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, client, nil)
 	if err != nil {
 		return err
 	}
@@ -95,9 +100,11 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 	}
 	if variableValue == "" && variableKey != "" {
 		fmt.Fprintf(out, "Variable with key %s not created or updated\nYou must provide a variable value", variableKey)
+		errVarBool = true
 	}
 	if variableValue != "" && variableKey == "" {
 		fmt.Fprintf(out, "Variable with value %s not created or updated with flags\nYou must provide a variable key", variableValue)
+		errVarBool = true
 	}
 	// add new variables from list of variables provided through args
 	if len(variableList) > 0 {
@@ -129,10 +136,13 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 
 	if index == 0 {
 		fmt.Fprintln(out, "\nNo variables for this Deployment")
-		return nil
+	} else {
+		fmt.Fprintln(out, "\nUpdated list of your Deployment's variables:")
+		varTab.Print(out)
 	}
-	fmt.Fprintln(out, "\nUpdated list of your Deployment's variables:")
-	varTab.Print(out)
+	if errVarBool {
+		return errVarCreateUpdate
+	}
 
 	return nil
 }
@@ -233,10 +243,12 @@ func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astro.E
 			val = pair[1]
 			if key == "" || val == "" {
 				fmt.Printf("Input %s has blank key or value\n", variableList[i])
+				errVarBool = true
 				continue
 			}
 		} else {
 			fmt.Printf("Input %s is not a valid key value pair, should be of the form key=value\n", variableList[i])
+			errVarBool = true
 			continue
 		}
 		newEnvironmentVariables = addVariable(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, key, val, updateVars, makeSecret, out)
@@ -261,29 +273,40 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 		}
 		if len(strings.SplitN(vars[i], "=", 2)) == 1 { //nolint:gomnd
 			fmt.Printf("%s is an improperly formatted variable, no variable created\n", vars[i])
+			errVarBool = true
 			continue
 		}
 		key := strings.SplitN(vars[i], "=", 2)[0]   //nolint:gomnd
 		value := strings.SplitN(vars[i], "=", 2)[1] //nolint:gomnd
 		if key == "" {
 			fmt.Printf("empty key! skipping creating variable with value: %s\n", value)
+			errVarBool = true
 			continue
 		}
 		if value == "" {
 			fmt.Printf("empty value! skipping creating variable with key: %s\n", key)
+			errVarBool = true
 			continue
 		}
 		// check if key is listed twice in file
 		existFile, _ := contains(newKeyList, key)
 		if existFile {
 			fmt.Printf("key %s already exists within the file specified, skipping creation\n", key)
+			errVarBool = true
 			continue
 		}
+
+		fmt.Printf("Cleaning quotes and whitespaces from variable value - %s", value)
+		value = strings.Trim(value, `"`)
+		value = strings.Trim(value, `'`)
+		value = strings.TrimSpace(value)
+
 		// check if key already exists
 		exist, num := contains(oldKeyList, key)
 		if exist {
 			if !updateVars { // only update a variable if a user specifys
 				fmt.Printf("key %s already exists skipping creation use the --update flag to update old variables\n", key)
+				errVarBool = true
 				continue
 			}
 			// update variable
