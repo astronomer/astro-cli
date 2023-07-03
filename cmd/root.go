@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/astronomer/astro-cli/cmd/registry"
 
@@ -70,8 +72,8 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Check for latest version
 			if config.CFG.UpgradeMessage.GetBool() {
-				// create github client
-				githubClient := github.NewClient(nil)
+				// create github client with 3 second timeout, setting an aggresive timeout since its not mandatory to get a response in each command execution
+				githubClient := github.NewClient(&http.Client{Timeout: 3 * time.Second})
 				// compare current version to latest
 				err = version.CompareVersions(githubClient, "astronomer", "astro-cli")
 				if err != nil {
