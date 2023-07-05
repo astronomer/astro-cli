@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -66,6 +67,13 @@ var (
 var (
 	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
 	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+	errTimedOut        = errors.New("timed out waiting for the deployment to become healthy")
+)
+
+var (
+	sleepTime  = 90
+	tickNum    = 10
+	timeoutNum = 180
 )
 
 type deploymentInfo struct {
@@ -89,6 +97,7 @@ type InputDeploy struct {
 	DeploymentName string
 	Prompt         bool
 	Dags           bool
+	WaitForStatus  bool
 	DagsPath       string
 }
 
@@ -196,7 +205,7 @@ func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, 
 }
 
 // Deploy pushes a new docker image
-func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
+func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.CoreClient) error { //nolint
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -342,6 +351,13 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			}
 		}
 
+		if deployInput.WaitForStatus {
+			err = deploySuccess(deployInfo.deploymentID, deployInfo.workspaceID, coreClient)
+			if err != nil {
+				return err
+			}
+		}
+
 		fmt.Println("Successfully pushed image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
 			"\n\n Access your Deployment: \n" +
 			fmt.Sprintf("\n Deployment View: %s", ansi.Bold("https://"+deploymentURL)) +
@@ -349,6 +365,35 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 	}
 
 	return nil
+}
+
+func deploySuccess(deploymentID, ws string, coreClient astrocore.CoreClient) error {
+	fmt.Printf("\n Waiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
+	time.Sleep(time.Duration(sleepTime) * time.Second)
+	buf := new(bytes.Buffer)
+	timeout := time.After(time.Duration(timeoutNum) * time.Second)
+	ticker := time.NewTicker(time.Duration(tickNum) * time.Second)
+	for {
+		select {
+		// Got a timeout! fail with a timeout error
+		case <-timeout:
+			return errTimedOut
+		// Got a tick, we should check if deployment is healthy
+		case <-ticker.C:
+			buf.Reset()
+			// get core deployment
+			currentDeployment, err := deployment.CoreGetDeployment(ws, "", deploymentID, coreClient)
+			if err != nil {
+				return err
+			}
+
+			if currentDeployment.Status == "HEALTHY" {
+				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Name)
+				return nil
+			}
+			continue
+		}
+	}
 }
 
 func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, client astro.Client) (deploymentInfo, error) {

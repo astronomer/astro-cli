@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
@@ -25,11 +26,14 @@ func TestDeployImage(t *testing.T) {
 		return nil
 	}
 
-	DeployImage = func(deployInput cloud.InputDeploy, client astro.Client) error {
+	DeployImage = func(deployInput cloud.InputDeploy, client astro.Client, coreClient astrocore.CoreClient) error {
 		return nil
 	}
 
 	err := execDeployCmd([]string{"-f"}...)
+	assert.NoError(t, err)
+
+	err = execDeployCmd([]string{"test-deployment-id", "-f", "--wait"}...)
 	assert.NoError(t, err)
 
 	err = execDeployCmd([]string{"test-deployment-id", "--save"}...)
