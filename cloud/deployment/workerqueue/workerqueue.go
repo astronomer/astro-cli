@@ -10,6 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 
 	"github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -37,7 +38,7 @@ var (
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
-func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, out io.Writer) error { //nolint
+func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error { //nolint
 	var (
 		requestedDeployment                  astro.Deployment
 		err                                  error
@@ -48,9 +49,14 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		defaultOptions                       astro.WorkerQueueDefaultOptions
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, false, client, nil)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, client, coreClient)
 	if err != nil {
 		return err
+	}
+
+	if requestedDeployment.ID == "" {
+		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(ws))
+		return nil
 	}
 
 	if deployment.IsDeploymentHosted(requestedDeployment.Type) || deployment.IsDeploymentDedicated(requestedDeployment.Type) {
@@ -419,7 +425,7 @@ func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer
 // user gets prompted if no name for the queue to delete was specified
 // An errQueueDoesNotExist is returned if queue to delete does not exist
 // An errCannotDeleteDefaultQueue is returned if a user chooses the default queue
-func Delete(ws, deploymentID, deploymentName, name string, force bool, client astro.Client, out io.Writer) error {
+func Delete(ws, deploymentID, deploymentName, name string, force bool, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 	var (
 		requestedDeployment          astro.Deployment
 		err                          error
@@ -428,9 +434,14 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 		queue                        astro.WorkerQueue
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, false, client, nil)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, client, coreClient)
 	if err != nil {
 		return err
+	}
+
+	if requestedDeployment.ID == "" {
+		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(ws))
+		return nil
 	}
 
 	// prompt for queue name if one was not provided
