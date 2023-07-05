@@ -333,6 +333,14 @@ func TestInspect(t *testing.T) {
 		assert.Contains(t, out.String(), "a5")
 		mockClient.AssertExpectations(t)
 	})
+	t.Run("when no deployments in workspace", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return([]astro.Deployment{}, nil).Once()
+		err := Inspect(workspaceID, "", "", "yaml", mockClient, mockCoreClient, out, "", false)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
 }
 
 func TestGetDeploymentInspectInfo(t *testing.T) {

@@ -1013,6 +1013,14 @@ func TestUpdate(t *testing.T) {
 			assert.ErrorIs(t, err, errUpdateDeployment)
 			mockClient.AssertExpectations(t)
 		})
+		t.Run("when no deployments exists in the workspace", func(t *testing.T) {
+			out := new(bytes.Buffer)
+			mockClient := new(astro_mocks.Client)
+			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{}, nil).Once()
+			err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 0, 0, 0, true, mockClient, mockCoreClient, out)
+			assert.NoError(t, err)
+			mockClient.AssertExpectations(t)
+		})
 	})
 	t.Run("when executor is CE", func(t *testing.T) {
 		t.Run("happy path update existing worker queue for a deployment", func(t *testing.T) {
@@ -1346,6 +1354,14 @@ func TestDelete(t *testing.T) {
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errUpdateDeployment).Once()
 		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockClient, mockCoreClient, out)
 		assert.ErrorIs(t, err, errUpdateDeployment)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("when no deployments exists in the workspace", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{}, nil).Once()
+		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockClient, mockCoreClient, out)
+		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
 }
