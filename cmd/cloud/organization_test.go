@@ -740,6 +740,28 @@ func TestTeamUpdateOrgRole(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
 	})
+
+	t.Run("command asks for input when no role is passed in index out of range", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("MutateOrgTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgTeamRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+
+		cmdArgs := []string{"team", "update-org-role", team1.Id}
+		expectedInput := []byte("5")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		_, err = execOrganizationCmd(cmdArgs...)
+		assert.EqualError(t, err, "invalid organization role selection")
+	})
 }
 
 func TestTeamCreate(t *testing.T) {
@@ -761,6 +783,51 @@ func TestTeamCreate(t *testing.T) {
 		resp, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
+	})
+	t.Run("valid id with valid name and description updates team no role passed in", func(t *testing.T) {
+		expectedOut := fmt.Sprintf("Astro Team %s was successfully created\n", team1.Name)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "create", team1.Id, "--name", team1.Name, "--description", *team1.Description}
+
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		resp, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+
+	t.Run("error no role passed in index out of range", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "create", team1.Id, "--name", team1.Name, "--description", *team1.Description}
+
+		// mock os.Stdin
+		expectedInput := []byte("4")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		_, err = execOrganizationCmd(cmdArgs...)
+		assert.EqualError(t, err, "invalid organization role selection")
 	})
 
 	t.Run("any errors from api are returned and role is not created", func(t *testing.T) {
