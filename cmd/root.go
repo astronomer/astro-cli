@@ -39,10 +39,6 @@ func NewRootCmd() *cobra.Command {
 	var err error
 	httpClient := houston.NewHTTPClient()
 	houstonClient = houston.NewClient(httpClient)
-	houstonVersion, err = houstonClient.GetPlatformVersion(nil)
-	if err != nil {
-		softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
-	}
 
 	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
@@ -52,6 +48,10 @@ func NewRootCmd() *cobra.Command {
 	isCloudCtx := context.IsCloudContext()
 	if !isCloudCtx {
 		ctx = softwarePlatform
+		houstonVersion, err = houstonClient.GetPlatformVersion(nil)
+		if err != nil {
+			softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
+		}
 	}
 
 	rootCmd := &cobra.Command{
