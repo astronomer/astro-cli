@@ -10,7 +10,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -152,7 +151,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	return outb.String(), docErr
 }
 
-func (d *DockerImage) conflictCheck(workingDirectory, runtimeVersion string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
+func (d *DockerImage) conflictCheck(workingDirectory, testHomeDirectory string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
 	dockerCommand := config.CFG.DockerCommand.GetString()
 	// Change to location of Dockerfile
 	err := os.Chdir(buildConfig.Path)
@@ -198,18 +197,18 @@ func (d *DockerImage) conflictCheck(workingDirectory, runtimeVersion string, bui
 	}
 
 	// move results to upgrade test folder
-	// Create the destination folder if it doesn't exist
-	destFolder := filepath.Join(workingDirectory, "upgrade-test-"+runtimeVersion)
-	if err := os.MkdirAll(destFolder, 0755); err != nil {
-		return exitCode, err
-	}
+	// // Create the destination folder if it doesn't exist
+	// destFolder := filepath.Join(workingDirectory, "upgrade-test-"+runtimeVersion)
+	// if err := os.MkdirAll(destFolder, 0755); err != nil {
+	// 	return exitCode, err
+	// }
 	// Run a temporary container to copy the file from the image
 	cmd = exec.Command("docker", "create", "--name", "temp-container", "conflict-check:latest")
 	if err := cmd.Run(); err != nil {
 		return exitCode, err
 	}
 	// Copy the result.txt file from the container to the destination folder
-	cmd = exec.Command("docker", "cp", "temp-container:/usr/local/airflow/result.txt", "./upgrade-test-"+runtimeVersion)
+	cmd = exec.Command("docker", "cp", "temp-container:/usr/local/airflow/result.txt", "./"+testHomeDirectory)
 	if err := cmd.Run(); err != nil {
 		// Remove the temporary container
 		cmd = exec.Command("docker", "rm", "-v", "temp-container")
@@ -234,6 +233,32 @@ func parseExitCode(logs string) string {
 		return match[1]
 	}
 	return ""
+}
+
+func (d *DockerImage) createPipFreeze(pipFreezeFile string) error {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+	// Define the Docker command and arguments
+	dockerArgs := []string{"run", "--rm", d.imageName, "pip", "freeze"}
+
+	// Create a file to store the command output
+	file, err := os.Create(pipFreezeFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Set the output file as the destination for the command output
+	cmd := exec.Command(dockerCommand, dockerArgs...)
+	cmd.Stdout = file
+	cmd.Stderr = os.Stderr
+
+	// Run the Docker command
+	err = cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *DockerImage) Push(registry, username, token, remoteImage string) error {

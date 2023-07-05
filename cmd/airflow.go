@@ -51,6 +51,8 @@ var (
 	envExport              bool
 	noBrowser              bool
 	compose                bool
+	dependencyTest         bool
+	versionTest            bool
 	waitTime               time.Duration
 	RunExample             = `
 # Create default admin user.
@@ -179,6 +181,8 @@ func newAirflowUpgradeTestCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to upgrade too. If not specified, latest is assumed.")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Specify a version of Astro Runtime that you want to upgrade too. If not specified, the latest is assumed.")
+	cmd.Flags().BoolVarP(&dependencyTest, "dependency-test", "d", false, "dependency-check only")
+	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "dependency-check only")
 	return cmd
 }
 
@@ -566,7 +570,7 @@ func airflowUpgradeTest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = containerHandler.UpgradeTest(defaultImageTag)
+	err = containerHandler.UpgradeTest(defaultImageTag, dependencyTest, versionTest)
 	if err != nil {
 		err = removeConflictCheck()
 		if err != nil {
@@ -574,8 +578,6 @@ func airflowUpgradeTest(cmd *cobra.Command, args []string) error {
 		}
 		return err
 	}
-
-	fmt.Println("\n" + ansi.Green("✔") + " All Pytests passed!")
 
 	// remove conflict-check.Dockerfile
 	err = removeConflictCheck()

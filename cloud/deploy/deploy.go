@@ -31,7 +31,7 @@ const (
 	parse                  = "parse"
 	astroDomain            = "astronomer.io"
 	registryUsername       = "cli"
-	runtimeImageLabel      = "io.astronomer.docker.runtime.version"
+	runtimeImageLabel      = airflow.RuntimeImageLabel
 	defaultRuntimeVersion  = "4.2.5"
 	dagParseAllowedVersion = "4.1.0"
 
