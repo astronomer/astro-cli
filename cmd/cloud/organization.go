@@ -332,7 +332,7 @@ func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 
 func newOrganizationTeamUpdateRoleCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "update-role [team-id]",
+		Use:   "update-org-role [team-id]",
 		Short: "Update a the role of a team in an Astro Organization",
 		Long: "Update the role of a team in an Astro Organization\n$astro workspace team update [team-id] --role [ORGANIZATION_MEMBER, " +
 			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
@@ -362,9 +362,6 @@ func updateOrganizationTeamRole(cmd *cobra.Command, args []string, out io.Writer
 	}
 
 	cmd.SilenceUsage = true
-	fmt.Println("AAAAA")
-	fmt.Println(id)
-	fmt.Println(updateOrganizationRole)
 	return team.UpdateOrgTeamRole(id, updateOrganizationRole, out, astroCoreClient)
 }
 
