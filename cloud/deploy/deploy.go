@@ -67,7 +67,6 @@ var (
 var (
 	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
 	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
-	errTimedOut        = errors.New("timed out waiting for the deployment to become healthy")
 )
 
 var (
@@ -352,7 +351,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		if deployInput.WaitForStatus {
-			err = deploySuccess(deployInfo.deploymentID, deployInfo.workspaceID, coreClient)
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, timeoutNum, coreClient)
 			if err != nil {
 				return err
 			}
@@ -365,35 +364,6 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 	}
 
 	return nil
-}
-
-func deploySuccess(deploymentID, ws string, coreClient astrocore.CoreClient) error {
-	fmt.Printf("\n Waiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
-	time.Sleep(time.Duration(sleepTime) * time.Second)
-	buf := new(bytes.Buffer)
-	timeout := time.After(time.Duration(timeoutNum) * time.Second)
-	ticker := time.NewTicker(time.Duration(tickNum) * time.Second)
-	for {
-		select {
-		// Got a timeout! fail with a timeout error
-		case <-timeout:
-			return errTimedOut
-		// Got a tick, we should check if deployment is healthy
-		case <-ticker.C:
-			buf.Reset()
-			// get core deployment
-			currentDeployment, err := deployment.CoreGetDeployment(ws, "", deploymentID, coreClient)
-			if err != nil {
-				return err
-			}
-
-			if currentDeployment.Status == "HEALTHY" {
-				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Name)
-				return nil
-			}
-			continue
-		}
-	}
 }
 
 func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, client astro.Client) (deploymentInfo, error) {
