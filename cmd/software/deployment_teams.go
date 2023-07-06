@@ -32,9 +32,10 @@ const (
 
 func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "team",
-		Short: "Manage deployment team resources",
-		Long:  "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
+		Use:     "team",
+		Aliases: []string{"te", "teams"},
+		Short:   "Manage deployment team resources",
+		Long:    "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
 	_ = cmd.MarkFlagRequired("deployment-id")
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment to associate team to")

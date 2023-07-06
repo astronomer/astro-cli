@@ -362,7 +362,7 @@ func newAirflowBashCmd() *cobra.Command {
 func newAirflowObjectRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "object",
-		Aliases: []string{"obj"},
+		Aliases: []string{"obj", "objects"},
 		Short:   "Configure your local Airflow environment.",
 		Long:    "Manage local Airflow connections, variables, and pools. Import or export your objects to your Airflow settings file. Configure Airflow's startup behavior using a Compose file.",
 	}

@@ -37,7 +37,7 @@ const (
 func newDeploymentConnectionRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "connection",
-		Aliases: []string{"con"},
+		Aliases: []string{"con", "connections"},
 		Short:   "Manage deployment connections",
 		Long:    "Manage connections for an Astro Deployment.",
 	}
@@ -231,7 +231,7 @@ func newDeploymentAirflowVariableCopyCmd(out io.Writer) *cobra.Command {
 func newDeploymentPoolRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "pool",
-		Aliases: []string{"pl"},
+		Aliases: []string{"pl", "pools"},
 		Short:   "Manage Deployment's Airflow pools",
 		Long:    "Manage Airflow pools stored for an Astro Deployment",
 	}

@@ -125,7 +125,7 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 func newOrganizationUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "user",
-		Aliases: []string{"us"},
+		Aliases: []string{"us", "users"},
 		Short:   "Manage users in your Astro Organization",
 		Long:    "Manage users in your Astro Organization.",
 	}
@@ -266,7 +266,7 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "team",
-		Aliases: []string{"te"},
+		Aliases: []string{"te", "teams"},
 		Short:   "Manage teams in your Astro Organization",
 		Long:    "Manage teams in your Astro Organization.",
 	}
@@ -375,9 +375,10 @@ func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 
 func newOrganizationTeamUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "user",
-		Short: "Manage users in your Astro Team",
-		Long:  "Manage users in your Astro Team.",
+		Use:     "user",
+		Aliases: []string{"us", "users"},
+		Short:   "Manage users in your Astro Team",
+		Long:    "Manage users in your Astro Team.",
 	}
 	cmd.SetOut(out)
 	cmd.AddCommand(
