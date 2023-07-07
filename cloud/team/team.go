@@ -145,58 +145,7 @@ func UpdateWorkspaceTeamRole(id, role, workspace string, out io.Writer, client a
 	return nil
 }
 
-func UpdateOrgTeamRole(id, role string, out io.Writer, client astrocore.CoreClient) error {
-	err := user.IsOrganizationRoleValid(role)
-	if err != nil {
-		return err
-	}
-	ctx, err := context.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
-
-	var team astrocore.Team
-	if id == "" {
-		teams, err := GetOrgTeams(client)
-		if err != nil {
-			return err
-		}
-		if len(teams) == 0 {
-			return ErrNoTeamsFoundInOrg
-		}
-		team, err = selectTeam(teams)
-		if err != nil {
-			return err
-		}
-	} else {
-		team, err = GetTeam(client, id)
-
-		if err != nil {
-			return err
-		}
-		if team.Id == "" {
-			return ErrTeamNotFound
-		}
-	}
-	teamID := team.Id
-
-	teamMutateRequest := astrocore.MutateOrgTeamRoleRequest{Role: role}
-	resp, err := client.MutateOrgTeamRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID, teamMutateRequest)
-	if err != nil {
-		return err
-	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "The organizations team %s role was successfully updated to %s\n", teamID, role)
-	return nil
-}
-
-func UpdateTeam(id, name, description string, out io.Writer, client astrocore.CoreClient) error {
+func UpdateTeam(id, name, description, role string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -258,6 +207,23 @@ func UpdateTeam(id, name, description string, out io.Writer, client astrocore.Co
 		return err
 	}
 	fmt.Fprintf(out, "Astro Team %s was successfully updated\n", team.Name)
+
+	if role != "" {
+		err := user.IsOrganizationRoleValid(role)
+		if err != nil {
+			return err
+		}
+		teamMutateRoleRequest := astrocore.MutateOrgTeamRoleRequest{Role: role}
+		resp, err := client.MutateOrgTeamRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID, teamMutateRoleRequest)
+		if err != nil {
+			return err
+		}
+		err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "Astro Team role %s was successfully updated to %s\n", team.Name, role)
+	}
 	return nil
 }
 

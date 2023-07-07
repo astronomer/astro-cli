@@ -277,7 +277,6 @@ func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
 		newTeamCreateCmd(out),
 		newOrganizationTeamListCmd(out),
 		newTeamUpdateCmd(out),
-		newOrganizationTeamUpdateRoleCmd(out),
 		newTeamDeleteCmd(out),
 		newOrganizationTeamUserRootCmd(out),
 	)
@@ -315,6 +314,8 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
+	cmd.Flags().StringVarP(&updateOrganizationRole, "role", "r", "", "The new role for the "+
+		"team. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER ")
 	return cmd
 }
 
@@ -327,42 +328,7 @@ func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 
-	return team.UpdateTeam(id, teamName, teamDescription, out, astroCoreClient)
-}
-
-func newOrganizationTeamUpdateRoleCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "update-org-role [team-id]",
-		Short: "Update a the role of a team in an Astro Organization",
-		Long: "Update the role of a team in an Astro Organization\n$astro workspace team update [team-id] --role [ORGANIZATION_MEMBER, " +
-			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateOrganizationTeamRole(cmd, args, out)
-		},
-	}
-	cmd.Flags().StringVarP(&updateOrganizationRole, "role", "r", "", "The new role for the "+
-		"team. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER ")
-	return cmd
-}
-
-func updateOrganizationTeamRole(cmd *cobra.Command, args []string, out io.Writer) error {
-	var id string
-
-	// if an id was provided in the args we use it
-	if len(args) > 0 {
-		id = args[0]
-	}
-	var err error
-	if updateOrganizationRole == "" {
-		// no role was provided so ask the user for it
-		updateOrganizationRole, err = selectOrganizationRole()
-		if err != nil {
-			return err
-		}
-	}
-
-	cmd.SilenceUsage = true
-	return team.UpdateOrgTeamRole(id, updateOrganizationRole, out, astroCoreClient)
+	return team.UpdateTeam(id, teamName, teamDescription, updateOrganizationRole, out, astroCoreClient)
 }
 
 func newTeamCreateCmd(out io.Writer) *cobra.Command {

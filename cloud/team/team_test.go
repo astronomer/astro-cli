@@ -193,6 +193,9 @@ var (
 			Role: "WORKSPACE_MEMBER",
 		},
 	}
+	errorBodyUpdateRole, _ = json.Marshal(astrocore.Error{
+		Message: "failed to update team role",
+	})
 	errorBodyUpdate, _ = json.Marshal(astrocore.Error{
 		Message: "failed to update team",
 	})
@@ -245,7 +248,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
-		Body: errorBodyUpdate,
+		Body: errorBodyUpdateRole,
 	}
 	CreateTeamResponseOK = astrocore.CreateTeamResponse{
 		HTTPResponse: &http.Response{
@@ -827,9 +830,54 @@ func TestUpdate(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
-		err := UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		err := UpdateTeam(team1.Id, "name", "description", "", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
+	t.Run("happy path Update - with role", func(t *testing.T) {
+		role := "ORGANIZATION_OWNER"
+		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully updated\nAstro Team role %s was successfully updated to %s\n", team1.Name, team1.Name, role)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		mockClient.On("MutateOrgTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgTeamRoleResponseOK, nil).Once()
+		err := UpdateTeam(team1.Id, "name", "description", role, out, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
+	t.Run("unhappy path Update - with invalid role", func(t *testing.T) {
+		role := "WORKSPACE_VIEWER"
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		err := UpdateTeam(team1.Id, "name", "description", role, out, mockClient)
+		assert.EqualError(t, err, "requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	})
+
+	t.Run("unhappy path Update - with role MutateOrgTeamRoleWithResponse error", func(t *testing.T) {
+		role := "ORGANIZATION_OWNER"
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		mockClient.On("MutateOrgTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgTeamRoleResponseError, nil).Once()
+		err := UpdateTeam(team1.Id, "name", "description", role, out, mockClient)
+		assert.EqualError(t, err, "failed to update team role")
+	})
+
+	t.Run("unhappy path Update - with role MutateOrgTeamRoleWithResponse network error", func(t *testing.T) {
+		role := "ORGANIZATION_OWNER"
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		mockClient.On("MutateOrgTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
+		err := UpdateTeam(team1.Id, "name", "description", role, out, mockClient)
+		assert.EqualError(t, err, "network error")
 	})
 
 	t.Run("happy path Update with idp managed team", func(t *testing.T) {
@@ -839,7 +887,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
 		defer testUtil.MockUserInput(t, "y")()
-		err := UpdateTeam(team2.Id, "name", "description", out, mockClient)
+		err := UpdateTeam(team2.Id, "name", "description", "", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -850,7 +898,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
 		defer testUtil.MockUserInput(t, "n")()
-		err := UpdateTeam(team2.Id, "name", "description", out, mockClient)
+		err := UpdateTeam(team2.Id, "name", "description", "", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, "", out.String())
 	})
@@ -861,7 +909,7 @@ func TestUpdate(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
-		err := UpdateTeam(team1.Id, "name", "", out, mockClient)
+		err := UpdateTeam(team1.Id, "name", "", "", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -872,7 +920,7 @@ func TestUpdate(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
-		err := UpdateTeam(team1.Id, "", "description", out, mockClient)
+		err := UpdateTeam(team1.Id, "", "description", "", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -881,7 +929,7 @@ func TestUpdate(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseEmpty, nil).Twice()
-		err := UpdateTeam("", "name", "description", out, mockClient)
+		err := UpdateTeam("", "name", "description", "", out, mockClient)
 		assert.EqualError(t, err, "no teams found in your organization")
 	})
 
@@ -889,7 +937,7 @@ func TestUpdate(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
-		err := UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		err := UpdateTeam(team1.Id, "name", "description", "", out, mockClient)
 		assert.EqualError(t, err, "network error")
 	})
 
@@ -898,7 +946,7 @@ func TestUpdate(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		err := UpdateTeam(team1.Id, "name", "description", "", out, mockClient)
 		assert.EqualError(t, err, "network error")
 	})
 
@@ -907,7 +955,7 @@ func TestUpdate(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseError, nil).Once()
-		err := UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		err := UpdateTeam(team1.Id, "name", "description", "", out, mockClient)
 		assert.EqualError(t, err, "failed to update team")
 	})
 
@@ -919,7 +967,7 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		err = UpdateTeam(team1.Id, "name", "description", "", out, mockClient)
 		assert.EqualError(t, err, "cannot retrieve organization short name from context")
 	})
 
@@ -928,7 +976,7 @@ func TestUpdate(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		err := UpdateTeam(team1.Id, "name", "description", "", out, mockClient)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -953,7 +1001,7 @@ func TestUpdate(t *testing.T) {
 		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully updated\n", team1.Name)
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
 
-		err = UpdateTeam("", "name", "description", out, mockClient)
+		err = UpdateTeam("", "name", "description", "", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -1504,108 +1552,6 @@ func TestGetWorkspaceTeams(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		_, err := GetWorkspaceTeams(mockClient, "", 10)
 		assert.Error(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
-	})
-}
-
-func TestUpdateOrgTeamRole(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	t.Run("happy path Mutate org team role", func(t *testing.T) {
-		expectedOutMessage := fmt.Sprintf("The organizations team %s role was successfully updated to ORGANIZATION_MEMBER\n", team1.Id)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("MutateOrgTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgTeamRoleResponseOK, nil).Once()
-		err := UpdateOrgTeamRole(team1.Id, "ORGANIZATION_MEMBER", out, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
-	})
-
-	t.Run("error path invalid org role", func(t *testing.T) {
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := UpdateOrgTeamRole("", "WORKSPACE_OWNER", out, mockClient)
-		assert.EqualError(t, err, "requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
-	})
-
-	t.Run("error path no org teams found", func(t *testing.T) {
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseEmpty, nil).Twice()
-		err := UpdateOrgTeamRole("", "ORGANIZATION_MEMBER", out, mockClient)
-		assert.EqualError(t, err, "no teams found in your organization")
-	})
-
-	t.Run("error path when GetTeamWithResponse return network error", func(t *testing.T) {
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
-		err := UpdateOrgTeamRole(team1.Id, "ORGANIZATION_MEMBER", out, mockClient)
-		assert.EqualError(t, err, "network error")
-	})
-
-	t.Run("error path when MutateOrgTeamRoleWithResponse return network error", func(t *testing.T) {
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("MutateOrgTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := UpdateOrgTeamRole(team1.Id, "ORGANIZATION_MEMBER", out, mockClient)
-		assert.EqualError(t, err, "network error")
-	})
-
-	t.Run("error path when MutateOrgTeamRoleWithResponse returns an error", func(t *testing.T) {
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("MutateOrgTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgTeamRoleResponseError, nil).Once()
-		err := UpdateOrgTeamRole(team1.Id, "ORGANIZATION_MEMBER", out, mockClient)
-		assert.EqualError(t, err, "failed to update team")
-	})
-
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = UpdateOrgTeamRole(team1.Id, "ORGANIZATION_MEMBER", out, mockClient)
-		assert.EqualError(t, err, "cannot retrieve organization short name from context")
-	})
-
-	t.Run("error path when getting current context returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.Initial)
-		expectedOutMessage := ""
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := UpdateOrgTeamRole(team1.Id, "ORGANIZATION_MEMBER", out, mockClient)
-		assert.Error(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
-	})
-	t.Run("UpdateOrgTeamRole no id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		out := new(bytes.Buffer)
-
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
-		// mock os.Stdin
-		expectedInput := []byte("1")
-		r, w, err := os.Pipe()
-		assert.NoError(t, err)
-		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
-		expectedOutMessage := fmt.Sprintf("The organizations team %s role was successfully updated to ORGANIZATION_MEMBER\n", team1.Id)
-		mockClient.On("MutateOrgTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgTeamRoleResponseOK, nil).Once()
-
-		err = UpdateOrgTeamRole("", "ORGANIZATION_MEMBER", out, mockClient)
-		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 }
