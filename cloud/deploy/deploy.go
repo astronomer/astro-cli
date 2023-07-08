@@ -69,12 +69,6 @@ var (
 	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
 )
 
-var (
-	sleepTime  = 90
-	tickNum    = 10
-	timeoutNum = 180
-)
-
 type deploymentInfo struct {
 	deploymentID     string
 	namespace        string
@@ -274,6 +268,13 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			return err
 		}
 
+		if deployInput.WaitForStatus {
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, 30, 10, 180, coreClient)
+			if err != nil {
+				return err
+			}
+		}
+
 		fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(versionID) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
 			"\n\n Access your Deployment: \n" +
 			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
@@ -351,7 +352,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		if deployInput.WaitForStatus {
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, timeoutNum, coreClient)
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, 90, 10, 180, coreClient)
 			if err != nil {
 				return err
 			}
