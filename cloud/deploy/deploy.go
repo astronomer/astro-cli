@@ -69,6 +69,13 @@ var (
 	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
 )
 
+var (
+	sleepTime              = 90
+	dagOnlyDeploySleepTime = 30
+	tickNum                = 10
+	timeoutNum             = 180
+)
+
 type deploymentInfo struct {
 	deploymentID     string
 	namespace        string
@@ -269,7 +276,8 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		if deployInput.WaitForStatus {
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, 30, 10, 180, coreClient)
+			// Keeping wait timeout low since dag only deploy is faster
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, dagOnlyDeploySleepTime, tickNum, timeoutNum, coreClient)
 			if err != nil {
 				return err
 			}
@@ -352,7 +360,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		if deployInput.WaitForStatus {
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, 90, 10, 180, coreClient)
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, timeoutNum, coreClient)
 			if err != nil {
 				return err
 			}
