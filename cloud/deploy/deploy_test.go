@@ -60,11 +60,11 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
-	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(3)
+	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(4)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}}}, nil).Once()
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
-	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
-	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(5)
+	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
+	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -127,6 +127,14 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	deployInput.DeploymentName = "test-name"
 	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
+
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Pytest = ""
+	deployInput.WaitForStatus = true
+	sleepTime = 1
+	timeoutNum = 1
+	err = Deploy(deployInput, mockClient, mockCoreClient)
+	assert.ErrorContains(t, err, "timed out waiting for the deployment to become healthy")
 
 	mockClient.AssertExpectations(t)
 	mockCoreClient.AssertExpectations(t)
@@ -335,8 +343,8 @@ func TestDagsDeploySuccess(t *testing.T) {
 	mockClient := new(astro_mocks.Client)
 
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(3)
-	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(4)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(4)
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(5)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(5)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -350,7 +358,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		Status:                   "SUCCEEDED",
 		Message:                  "DAGs uploaded successfully",
 	}
-	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(4)
+	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(5)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockClient, mockCoreClient)
@@ -387,6 +395,14 @@ func TestDagsDeploySuccess(t *testing.T) {
 	deployInput.Pytest = parseAndPytest
 	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
+
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Pytest = ""
+	deployInput.WaitForStatus = true
+	dagOnlyDeploySleepTime = 1
+	timeoutNum = 1
+	err = Deploy(deployInput, mockClient, mockCoreClient)
+	assert.ErrorContains(t, err, "timed out waiting for the deployment to become healthy")
 
 	defer os.RemoveAll("./testfiles/dags/")
 

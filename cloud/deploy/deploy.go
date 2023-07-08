@@ -281,6 +281,13 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			if err != nil {
 				return err
 			}
+
+			fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(versionID) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful." +
+				"\n\n Access your Deployment: \n" +
+				fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
+				fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
+
+			return nil
 		}
 
 		fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(versionID) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
