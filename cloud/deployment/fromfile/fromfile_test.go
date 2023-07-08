@@ -2801,10 +2801,12 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+				minCount := -1
 				qList = []inspect.Workerq{
 					{
 						Name:           "default",
 						WorkerType:     "test-worker-1",
+						MinWorkerCount: &minCount,
 						MaxWorkerCount: 10,
 					},
 				}
@@ -2838,10 +2840,12 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+				minCount := -1
 				qList = []inspect.Workerq{
 					{
 						Name:              "default",
 						WorkerType:        "test-worker-1",
+						MinWorkerCount:    &minCount,
 						WorkerConcurrency: 10,
 					},
 				}
@@ -2948,18 +2952,21 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+			minCount := -1
 			qList = []inspect.Workerq{
 				{
-					Name:       "default",
-					WorkerType: "test-worker-1",
+					Name:           "default",
+					WorkerType:     "test-worker-1",
+					MinWorkerCount: &minCount,
 				},
 			}
 			deploymentFromFile.Deployment.WorkerQs = qList
 			expectedQList = []astro.WorkerQueue{
 				{
-					Name:       "default",
-					IsDefault:  true,
-					NodePoolID: "test-pool-id",
+					Name:           "default",
+					IsDefault:      true,
+					NodePoolID:     "test-pool-id",
+					MinWorkerCount: minCount,
 				},
 			}
 			existingPools = []astrocore.NodePool{
@@ -3233,18 +3240,21 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+			minCount := -1
 			qList = []inspect.Workerq{
 				{
-					Name:       "default",
-					WorkerType: "test-worker-1",
+					Name:           "default",
+					WorkerType:     "test-worker-1",
+					MinWorkerCount: &minCount,
 				},
 			}
 			deploymentFromFile.Deployment.WorkerQs = qList
 			expectedQList = []astro.WorkerQueue{
 				{
-					Name:       "default",
-					IsDefault:  true,
-					NodePoolID: "test-pool-id",
+					Name:           "default",
+					IsDefault:      true,
+					NodePoolID:     "test-pool-id",
+					MinWorkerCount: minCount,
 				},
 			}
 			existingPools = []astrocore.NodePool{
