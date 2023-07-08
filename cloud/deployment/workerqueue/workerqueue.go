@@ -284,7 +284,7 @@ func IsKubernetesWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue) 
 		errorMessage = "pod ram in the request. It will be calculated based on the requested worker type"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
-	if requestedWorkerQueue.MinWorkerCount != 0 {
+	if requestedWorkerQueue.MinWorkerCount != -1 {
 		errorMessage = "minimum worker count in the request. It can only be used with CeleryExecutor"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
