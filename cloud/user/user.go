@@ -220,7 +220,7 @@ func ListOrgUsers(out io.Writer, client astrocore.CoreClient) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"FULLNAME", "EMAIL", "ID", "ORGANIZATION ROLE", "CREATE DATE"},
+		Header:         []string{"FULLNAME", "EMAIL", "ID", "ORGANIZATION ROLE", "IDP MANAGED", "CREATE DATE"},
 	}
 	users, err := GetOrgUsers(client)
 	if err != nil {
@@ -233,6 +233,7 @@ func ListOrgUsers(out io.Writer, client astrocore.CoreClient) error {
 			users[i].Username,
 			users[i].Id,
 			*users[i].OrgRole,
+			strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged),
 			users[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}
@@ -392,7 +393,7 @@ func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace st
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"FULLNAME", "EMAIL", "ID", "WORKSPACE ROLE", "CREATE DATE"},
+		Header:         []string{"FULLNAME", "EMAIL", "ID", "WORKSPACE ROLE", "IDP MANAGED", "CREATE DATE"},
 	}
 	users, err := GetWorkspaceUsers(client, workspace, userPagnationLimit)
 	if err != nil {
@@ -405,6 +406,7 @@ func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace st
 			users[i].Username,
 			users[i].Id,
 			*users[i].WorkspaceRole,
+			strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged),
 			users[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}
