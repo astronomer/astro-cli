@@ -481,7 +481,7 @@ func TestCreate(t *testing.T) {
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(keDeployment, nil).Once()
-			err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "default", createAction, "test-instance-type-1", 0, 0, 0, false, mockClient, mockCoreClient, out)
+			err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "default", createAction, "test-instance-type-1", -1, 0, 0, false, mockClient, mockCoreClient, out)
 			assert.ErrorIs(t, err, errCannotUpdateExistingQueue)
 			mockClient.AssertExpectations(t)
 		})
@@ -1091,7 +1091,7 @@ func TestUpdate(t *testing.T) {
 			}, nil).Once()
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(keDeployment, nil).Twice()
 			mockClient.On("UpdateDeployment", &updateKEDeploymentInput).Return(keDeployment[0], nil).Once()
-			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type", 0, 0, 0, true, mockClient, mockCoreClient, out)
+			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type", -1, 0, 0, true, mockClient, mockCoreClient, out)
 			assert.NoError(t, err)
 			assert.Contains(t, out.String(), expectedOutMessage)
 			mockClient.AssertExpectations(t)
@@ -1120,7 +1120,7 @@ func TestUpdate(t *testing.T) {
 			defer func() { updateKEDeploymentInput.WorkerQueues[0].NodePoolID = origNodePoolID }()
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(keDeployment, nil).Twice()
 			mockClient.On("UpdateDeployment", &updateKEDeploymentInput).Return(keDeployment[0], nil).Once()
-			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type-1", 0, 0, 0, true, mockClient, mockCoreClient, out)
+			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type-1", -1, 0, 0, true, mockClient, mockCoreClient, out)
 			assert.NoError(t, err)
 			assert.Contains(t, out.String(), expectedOutMessage)
 			mockClient.AssertExpectations(t)
@@ -1129,7 +1129,7 @@ func TestUpdate(t *testing.T) {
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(keDeployment, nil).Once()
-			err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", updateAction, "test-instance-type-1", 0, 0, 0, false, mockClient, mockCoreClient, out)
+			err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", updateAction, "test-instance-type-1", -1, 0, 0, false, mockClient, mockCoreClient, out)
 			assert.ErrorIs(t, err, ErrNotSupported)
 			assert.ErrorContains(t, err, "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
 			mockClient.AssertExpectations(t)
@@ -1618,8 +1618,11 @@ func TestIsHostedCeleryWorkerQueueInputValid(t *testing.T) {
 func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	requestedWorkerQueue := &astro.WorkerQueue{
-		Name:       "default",
-		NodePoolID: "test-pool-id",
+		Name:              "default",
+		NodePoolID:        "test-pool-id",
+		MinWorkerCount:    -1,
+		MaxWorkerCount:    0,
+		WorkerConcurrency: 0,
 	}
 
 	t.Run("returns nil when queue input is valid", func(t *testing.T) {
@@ -1630,8 +1633,11 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.Name = "test-queue"
 		defer func() {
 			requestedWorkerQueue = &astro.WorkerQueue{
-				Name:       "default",
-				NodePoolID: "test-pool-id",
+				Name:              "default",
+				NodePoolID:        "test-pool-id",
+				MinWorkerCount:    -1,
+				MaxWorkerCount:    0,
+				WorkerConcurrency: 0,
 			}
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
@@ -1642,8 +1648,11 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.PodCPU = "1.0"
 		defer func() {
 			requestedWorkerQueue = &astro.WorkerQueue{
-				Name:       "default",
-				NodePoolID: "test-pool-id",
+				Name:              "default",
+				NodePoolID:        "test-pool-id",
+				MinWorkerCount:    -1,
+				MaxWorkerCount:    0,
+				WorkerConcurrency: 0,
 			}
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
@@ -1654,8 +1663,11 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.PodRAM = "1.0"
 		defer func() {
 			requestedWorkerQueue = &astro.WorkerQueue{
-				Name:       "default",
-				NodePoolID: "test-pool-id",
+				Name:              "default",
+				NodePoolID:        "test-pool-id",
+				MinWorkerCount:    -1,
+				MaxWorkerCount:    0,
+				WorkerConcurrency: 0,
 			}
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
@@ -1666,8 +1678,11 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 8
 		defer func() {
 			requestedWorkerQueue = &astro.WorkerQueue{
-				Name:       "default",
-				NodePoolID: "test-pool-id",
+				Name:              "default",
+				NodePoolID:        "test-pool-id",
+				MinWorkerCount:    -1,
+				MaxWorkerCount:    0,
+				WorkerConcurrency: 0,
 			}
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
@@ -1678,8 +1693,11 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.MaxWorkerCount = 25
 		defer func() {
 			requestedWorkerQueue = &astro.WorkerQueue{
-				Name:       "default",
-				NodePoolID: "test-pool-id",
+				Name:              "default",
+				NodePoolID:        "test-pool-id",
+				MinWorkerCount:    -1,
+				MaxWorkerCount:    0,
+				WorkerConcurrency: 0,
 			}
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
@@ -1690,8 +1708,11 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.WorkerConcurrency = 350
 		defer func() {
 			requestedWorkerQueue = &astro.WorkerQueue{
-				Name:       "default",
-				NodePoolID: "test-pool-id",
+				Name:              "default",
+				NodePoolID:        "test-pool-id",
+				MinWorkerCount:    -1,
+				MaxWorkerCount:    0,
+				WorkerConcurrency: 0,
 			}
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
