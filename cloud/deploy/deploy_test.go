@@ -29,10 +29,10 @@ var (
 	initiatedDagDeploymentID = "test-dag-deployment-id"
 	runtimeID                = "test-id"
 	dagURL                   = "http://fake-url.windows.core.net"
-	mockCoreClient           = new(astrocore_mocks.ClientWithResponsesInterface)
 )
 
 func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockDeplyResp := astro.Deployment{
 		ID:             "test-id",
 		ReleaseName:    "test-name",
@@ -53,17 +53,18 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
+		WaitForStatus:  false,
 		Dags:           false,
 	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
-	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(3)
+	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(4)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}}}, nil).Once()
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
-	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
-	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(5)
+	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
+	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -127,7 +128,16 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Pytest = ""
+	deployInput.WaitForStatus = true
+	sleepTime = 1
+	timeoutNum = 1
+	err = Deploy(deployInput, mockClient, mockCoreClient)
+	assert.ErrorContains(t, err, "timed out waiting for the deployment to become healthy")
+
 	mockClient.AssertExpectations(t)
+	mockCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 	mockContainerHandler.AssertExpectations(t)
 }
@@ -136,6 +146,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	os.Mkdir("./testfiles/dags", os.ModePerm)
 	path := "./testfiles/dags/test.py"
 	fileutil.WriteStringToFile(path, "testing")
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	mockDeplyResp := astro.Deployment{
 		ID:             "test-id",
@@ -157,6 +168,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
+		WaitForStatus:  false,
 		Dags:           false,
 	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -270,6 +282,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
+		WaitForStatus:  false,
 		Dags:           false,
 	}
 	defer testUtil.MockUserInput(t, "y")()
@@ -280,11 +293,13 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	defer os.RemoveAll("./testfiles/dags/")
 
 	mockClient.AssertExpectations(t)
+	mockCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 	mockContainerHandler.AssertExpectations(t)
 }
 
 func TestDagsDeploySuccess(t *testing.T) {
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockDeplyResp := []astro.Deployment{
 		{
 			ID:             "test-id",
@@ -320,6 +335,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		DeploymentName: "",
 		Prompt:         true,
 		Dags:           true,
+		WaitForStatus:  false,
 		DagsPath:       "./testfiles/dags",
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -327,8 +343,8 @@ func TestDagsDeploySuccess(t *testing.T) {
 	mockClient := new(astro_mocks.Client)
 
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(3)
-	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(4)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(4)
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(5)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(5)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -342,7 +358,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		Status:                   "SUCCEEDED",
 		Message:                  "DAGs uploaded successfully",
 	}
-	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(4)
+	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(5)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockClient, mockCoreClient)
@@ -380,8 +396,17 @@ func TestDagsDeploySuccess(t *testing.T) {
 	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Pytest = ""
+	deployInput.WaitForStatus = true
+	dagOnlyDeploySleepTime = 1
+	timeoutNum = 1
+	err = Deploy(deployInput, mockClient, mockCoreClient)
+	assert.ErrorContains(t, err, "timed out waiting for the deployment to become healthy")
+
 	defer os.RemoveAll("./testfiles/dags/")
 
+	mockCoreClient.AssertExpectations(t)
 	mockClient.AssertExpectations(t)
 }
 
@@ -389,6 +414,7 @@ func TestNoDagsDeploy(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("true")
 	mockClient := new(astro_mocks.Client)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
@@ -432,18 +458,21 @@ func TestNoDagsDeploy(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
+		WaitForStatus:  false,
 		Dags:           true,
 	}
 	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
+	mockCoreClient.AssertExpectations(t)
 }
 
 func TestDagsDeployFailed(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	mockDeplyResp := []astro.Deployment{
 		{
@@ -479,6 +508,7 @@ func TestDagsDeployFailed(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
+		WaitForStatus:  false,
 		Dags:           true,
 	}
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(3)
@@ -513,6 +543,7 @@ func TestDagsDeployFailed(t *testing.T) {
 	assert.Error(t, err)
 
 	mockClient.AssertExpectations(t)
+	mockCoreClient.AssertExpectations(t)
 }
 
 func TestDeployFailure(t *testing.T) {
@@ -526,6 +557,7 @@ func TestDeployFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	err := config.ResetCurrentContext()
 	assert.NoError(t, err)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
@@ -536,6 +568,7 @@ func TestDeployFailure(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
+		WaitForStatus:  false,
 		Dags:           false,
 	}
 
@@ -608,6 +641,7 @@ func TestDeployFailure(t *testing.T) {
 	assert.ErrorIs(t, err, envFileMissing)
 
 	mockClient.AssertExpectations(t)
+	mockCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 	mockContainerHandler.AssertExpectations(t)
 }

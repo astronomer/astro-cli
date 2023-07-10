@@ -33,6 +33,9 @@ func TestDeployImage(t *testing.T) {
 	err := execDeployCmd([]string{"-f"}...)
 	assert.NoError(t, err)
 
+	err = execDeployCmd([]string{"test-deployment-id", "-f", "--wait"}...)
+	assert.NoError(t, err)
+
 	err = execDeployCmd([]string{"test-deployment-id", "--save"}...)
 	assert.NoError(t, err)
 
@@ -49,6 +52,9 @@ func TestDeployImage(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = execDeployCmd([]string{"test-deployment-id", "--dags"}...)
+	assert.NoError(t, err)
+
+	err = execDeployCmd([]string{"test-deployment-id", "--dags", "--wait"}...)
 	assert.NoError(t, err)
 
 	err = execDeployCmd([]string{"-f", "test-deployment-id", "--dags", "--pytest"}...)

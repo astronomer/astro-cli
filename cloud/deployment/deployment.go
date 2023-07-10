@@ -300,7 +300,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	if waitForStatus {
-		err = healthPoll(d.ID, workspaceID, coreClient)
+		err = HealthPoll(d.ID, workspaceID, sleepTime, tickNum, timeoutNum, coreClient)
 		if err != nil {
 			errOutput := createOutput(workspaceID, clusterType, &d)
 			if errOutput != nil {
@@ -547,8 +547,8 @@ func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizatio
 	return derivedClusterID, nil
 }
 
-func healthPoll(deploymentID, ws string, coreClient astrocore.CoreClient) error {
-	fmt.Printf("Waiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
+func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, coreClient astrocore.CoreClient) error {
+	fmt.Printf("\nWaiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
 	time.Sleep(time.Duration(sleepTime) * time.Second)
 	buf := new(bytes.Buffer)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
