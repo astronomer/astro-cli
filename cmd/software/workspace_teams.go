@@ -28,9 +28,10 @@ $ astro workspace team list --workspace-id <workspace-id>`
 
 func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "team",
-		Short: "Manage Workspace Team resources",
-		Long:  "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
+		Use:     "team",
+		Aliases: []string{"te", "teams"},
+		Short:   "Manage Workspace Team resources",
+		Long:    "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace to associate team to")
 	cmd.AddCommand(

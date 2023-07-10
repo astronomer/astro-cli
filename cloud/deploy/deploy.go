@@ -226,7 +226,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
-	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, client)
+	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, client, coreClient)
 	if err != nil {
 		return err
 	}
@@ -382,7 +382,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 	return nil
 }
 
-func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, client astro.Client) (deploymentInfo, error) {
+func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, client astro.Client, coreClient astrocore.CoreClient) (deploymentInfo, error) {
 	// Use config deployment if provided
 	if deploymentID == "" {
 		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
@@ -397,7 +397,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, client, nil)
+		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, client, coreClient)
 		if err != nil {
 			return deploymentInfo{}, err
 		}

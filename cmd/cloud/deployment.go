@@ -82,7 +82,7 @@ var (
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deployment",
-		Aliases: []string{"de"},
+		Aliases: []string{"de", "deployments"},
 		Short:   "Manage your Deployments running on Astronomer",
 		Long:    "Create or manage Deployments running on Astro according to your Organization and Workspace permissions.",
 	}
@@ -212,7 +212,7 @@ func newDeploymentDeleteCmd() *cobra.Command {
 func newDeploymentVariableRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "variable",
-		Aliases: []string{"var"},
+		Aliases: []string{"var", "variables"},
 		Short:   "Manage Deployment environment variables",
 		Long:    "Manage environment variables for an Astro Deployment. These variables can be used in DAGs or to customize your Airflow environment",
 	}

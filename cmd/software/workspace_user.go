@@ -22,9 +22,10 @@ const defaultWorkspaceUserPageSize = 100
 
 func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "user",
-		Short: "Manage Workspace User resources",
-		Long:  "Users can be added or removed from Workspaces",
+		Use:     "user",
+		Aliases: []string{"us", "users"},
+		Short:   "Manage Workspace User resources",
+		Long:    "Users can be added or removed from Workspaces",
 	}
 	cmd.AddCommand(
 		newWorkspaceUserAddCmd(out),
