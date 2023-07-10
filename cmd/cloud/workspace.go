@@ -134,7 +134,7 @@ func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "user",
-		Aliases: []string{"us"},
+		Aliases: []string{"us", "users"},
 		Short:   "Manage users in your Astro Workspace",
 		Long:    "Manage users in your Astro Workspace.",
 	}
@@ -246,7 +246,7 @@ func newWorkspaceTokenListCmd(out io.Writer) *cobra.Command {
 func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "team",
-		Aliases: []string{"te"},
+		Aliases: []string{"te", "teams"},
 		Short:   "Manage teams in your Astro Workspace",
 		Long:    "Manage teams in your Astro Workspace.",
 	}

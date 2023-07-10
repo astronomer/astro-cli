@@ -22,7 +22,7 @@ var (
 func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "worker-queue",
-		Aliases: []string{"wq"},
+		Aliases: []string{"wq", "worker-queues"},
 		Short:   "Manage Deployment worker queues",
 		Long:    "Manage worker queues for an Astro Deployment.",
 	}
