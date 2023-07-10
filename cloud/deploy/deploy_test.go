@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/astro-client"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -28,6 +29,7 @@ var (
 	initiatedDagDeploymentID = "test-dag-deployment-id"
 	runtimeID                = "test-id"
 	dagURL                   = "http://fake-url.windows.core.net"
+	mockCoreClient           = new(astrocore_mocks.ClientWithResponsesInterface)
 )
 
 func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
@@ -102,27 +104,27 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	os.Stdin = r
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = "test-id"
 	deployInput.Pytest = "pytest"
 	deployInput.Prompt = false
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	// test custom image
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.ImageName = "custom-image"
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	config.CFG.ProjectDeployment.SetProjectString("test-id")
 	// test both deploymentID and name used
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.DeploymentName = "test-name"
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
@@ -221,37 +223,37 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	os.Stdin = r
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = "test-id"
 	deployInput.Pytest = "pytest"
 	deployInput.Prompt = false
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	config.CFG.ProjectDeployment.SetProjectString("test-id")
 	// test both deploymentID and name used
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.DeploymentName = "test-name"
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	// test custom image with dag deploy enabled
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.ImageName = "custom-image"
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	os.Mkdir("./testfiles1/", os.ModePerm)
@@ -271,7 +273,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		Dags:           false,
 	}
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles1/")
@@ -343,7 +345,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(4)
 
 	defer testUtil.MockUserInput(t, "y")()
-	err := Deploy(deployInput, mockClient)
+	err := Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	// Test pytest with dags deploy
@@ -365,17 +367,17 @@ func TestDagsDeploySuccess(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
@@ -432,7 +434,7 @@ func TestNoDagsDeploy(t *testing.T) {
 		Prompt:         true,
 		Dags:           true,
 	}
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
@@ -483,7 +485,7 @@ func TestDagsDeployFailed(t *testing.T) {
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(2)
 
 	defer testUtil.MockUserInput(t, "y")()
-	err := Deploy(deployInput, mockClient)
+	err := Deploy(deployInput, mockClient, mockCoreClient)
 	assert.Equal(t, err.Error(), "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update test-id --dag-deploy enable' to enable DAG-only deploys.")
 
 	mockImageHandler := new(mocks.ImageHandler)
@@ -502,12 +504,12 @@ func TestDagsDeployFailed(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.Error(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.Error(t, err)
 
 	mockClient.AssertExpectations(t)
@@ -538,7 +540,7 @@ func TestDeployFailure(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, nil)
+	err = Deploy(deployInput, nil, mockCoreClient)
 	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 
 	// airflow parse failure
@@ -589,20 +591,20 @@ func TestDeployFailure(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = ""
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.ErrorIs(t, err, errDagsParseFailed)
 
 	mockClient.On("ListDeployments", org, "invalid-workspace").Return(mockDeplyResp, nil).Once()
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = "test-id"
 	deployInput.WsID = "invalid-workspace"
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.WsID = ws
 	deployInput.EnvFile = "invalid-path"
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.ErrorIs(t, err, envFileMissing)
 
 	mockClient.AssertExpectations(t)

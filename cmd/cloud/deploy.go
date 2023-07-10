@@ -139,5 +139,5 @@ func deploy(cmd *cobra.Command, args []string) error {
 		DagsPath:       dagsPath,
 	}
 
-	return DeployImage(deployInput, astroClient)
+	return DeployImage(deployInput, astroClient, astroCoreClient)
 }
