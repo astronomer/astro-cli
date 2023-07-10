@@ -84,7 +84,7 @@ $ astro deployment runtime migrate --deployment-id=<deployment-id> --cancel
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deployment",
-		Aliases: []string{"de"},
+		Aliases: []string{"de", "deployments"},
 		Short:   "Manage Astronomer Deployments",
 		Long:    "Deployments are individual Airflow clusters running on an installation of the Astronomer platform.",
 	}
