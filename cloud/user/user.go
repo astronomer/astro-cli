@@ -20,7 +20,7 @@ import (
 var (
 	ErrNoShortName             = errors.New("cannot retrieve organization short name from context")
 	ErrInvalidRole             = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
-	ErrInvalidWorkspaceRole    = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+	ErrInvalidWorkspaceRole    = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
 	ErrInvalidOrganizationRole = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	ErrInvalidEmail            = errors.New("no email provided for the invite. Retry with a valid email address")
 	ErrInvalidUserKey          = errors.New("invalid User selected")
@@ -327,7 +327,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 // If the role is valid, it returns nil
 // error ErrInvalidWorkspaceRole is returned if the role is not valid
 func IsWorkspaceRoleValid(role string) error {
-	validRoles := []string{"WORKSPACE_MEMBER", "WORKSPACE_OPERATOR", "WORKSPACE_OWNER"}
+	validRoles := []string{"WORKSPACE_MEMBER", "WORKSPACE_AUTHOR", "WORKSPACE_OPERATOR", "WORKSPACE_OWNER"}
 	for _, validRole := range validRoles {
 		if role == validRole {
 			return nil
