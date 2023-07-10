@@ -169,6 +169,11 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 	if targetOrg == nil {
 		return errInvalidOrganizationName
 	}
+
+	if targetOrg.Id == c.Organization {
+		fmt.Fprintln(out, "You selected the same organization as the current one. No switch was made")
+		return nil
+	}
 	return SwitchWithContext(c.Domain, targetOrg, astroClient, coreClient, out)
 }
 
