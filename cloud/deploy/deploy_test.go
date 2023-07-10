@@ -29,7 +29,6 @@ var (
 	initiatedDagDeploymentID = "test-dag-deployment-id"
 	runtimeID                = "test-id"
 	dagURL                   = "http://fake-url.windows.core.net"
-	mockCoreClient           = new(astrocore_mocks.ClientWithResponsesInterface)
 )
 
 func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
