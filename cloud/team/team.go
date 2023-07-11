@@ -36,7 +36,11 @@ func confirmOperation() bool {
 	return y
 }
 
-func CreateTeam(name, description string, out io.Writer, client astrocore.CoreClient) error {
+func CreateTeam(name, description, role string, out io.Writer, client astrocore.CoreClient) error {
+	err := user.IsOrganizationRoleValid(role)
+	if err != nil {
+		return err
+	}
 	if name == "" {
 		return ErrInvalidName
 	}
@@ -48,8 +52,9 @@ func CreateTeam(name, description string, out io.Writer, client astrocore.CoreCl
 		return user.ErrNoShortName
 	}
 	teamCreateRequest := astrocore.CreateTeamJSONRequestBody{
-		Description: &description,
-		Name:        name,
+		Description:      &description,
+		Name:             name,
+		OrganizationRole: &role,
 	}
 	resp, err := client.CreateTeamWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamCreateRequest)
 	if err != nil {
@@ -140,7 +145,7 @@ func UpdateWorkspaceTeamRole(id, role, workspace string, out io.Writer, client a
 	return nil
 }
 
-func UpdateTeam(id, name, description string, out io.Writer, client astrocore.CoreClient) error {
+func UpdateTeam(id, name, description, role string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -202,6 +207,23 @@ func UpdateTeam(id, name, description string, out io.Writer, client astrocore.Co
 		return err
 	}
 	fmt.Fprintf(out, "Astro Team %s was successfully updated\n", team.Name)
+
+	if role != "" {
+		err := user.IsOrganizationRoleValid(role)
+		if err != nil {
+			return err
+		}
+		teamMutateRoleRequest := astrocore.MutateOrgTeamRoleRequest{Role: role}
+		resp, err := client.MutateOrgTeamRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID, teamMutateRoleRequest)
+		if err != nil {
+			return err
+		}
+		err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "Astro Team role %s was successfully updated to %s\n", team.Name, role)
+	}
 	return nil
 }
 
@@ -454,7 +476,7 @@ func GetOrgTeams(client astrocore.CoreClient) ([]astrocore.Team, error) {
 func ListOrgTeams(out io.Writer, client astrocore.CoreClient) error {
 	table := printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"ID", "NAME", "DESCRIPTION", "IDP MANAGED", "CREATE DATE"},
+		Header:         []string{"ID", "NAME", "DESCRIPTION", "ORG ROLE", "IDP MANAGED", "CREATE DATE"},
 	}
 	teams, err := GetOrgTeams(client)
 	if err != nil {
@@ -466,6 +488,7 @@ func ListOrgTeams(out io.Writer, client astrocore.CoreClient) error {
 			teams[i].Id,
 			teams[i].Name,
 			*teams[i].Description,
+			teams[i].OrganizationRole,
 			strconv.FormatBool(teams[i].IsIdpManaged),
 			teams[i].CreatedAt.Format(time.RFC3339),
 		}, false)

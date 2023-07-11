@@ -39,6 +39,8 @@ var (
 	teamID                             string
 	userID                             string
 	organizationID                     string
+	updateOrganizationRole             string
+	teamOrgRole                        string
 )
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
@@ -312,6 +314,8 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
+	cmd.Flags().StringVarP(&updateOrganizationRole, "role", "r", "", "The new role for the "+
+		"team. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER ")
 	return cmd
 }
 
@@ -324,7 +328,7 @@ func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 
-	return team.UpdateTeam(id, teamName, teamDescription, out, astroCoreClient)
+	return team.UpdateTeam(id, teamName, teamDescription, updateOrganizationRole, out, astroCoreClient)
 }
 
 func newTeamCreateCmd(out io.Writer) *cobra.Command {
@@ -339,12 +343,24 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire team within quotes \"\" ")
 	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team in quotes \"\"")
+	cmd.Flags().StringVarP(&teamOrgRole, "role", "r", "", "The role for the "+
+		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER")
+
 	return cmd
 }
 
 func teamCreate(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return team.CreateTeam(teamName, teamDescription, out, astroCoreClient)
+	if teamOrgRole == "" {
+		fmt.Println("select a Organization Role for the new team:")
+		// no role was provided so ask the user for it
+		var err error
+		teamOrgRole, err = selectOrganizationRole()
+		if err != nil {
+			return err
+		}
+	}
+	return team.CreateTeam(teamName, teamDescription, teamOrgRole, out, astroCoreClient)
 }
 
 func newTeamDeleteCmd(out io.Writer) *cobra.Command {
