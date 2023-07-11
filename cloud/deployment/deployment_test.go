@@ -1426,7 +1426,7 @@ func TestSelectCluster(t *testing.T) {
 	})
 }
 
-func TestUpdate(t *testing.T) {
+func TestUpdate(t *testing.T) { //nolint
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 
@@ -1666,6 +1666,111 @@ func TestUpdate(t *testing.T) {
 		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "small", "disable", 5, 3, []astro.WorkerQueue{}, false, nil, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("successfully update deployment for larger scheduler", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", org)
+		ctx.SetContextKey("workspace", ws)
+		deploymentUpdateInput1 := astro.UpdateDeploymentInput{
+			ID:          "test-id",
+			ClusterID:   "",
+			Label:       "",
+			Description: "",
+			DeploymentSpec: astro.DeploymentCreateSpec{
+				Executor:  CeleryExecutor,
+				Scheduler: astro.Scheduler{AU: 5, Replicas: 3},
+			},
+			IsHighAvailability: true,
+			SchedulerSize:      "medium",
+			WorkerQueues: []astro.WorkerQueue{
+				{
+					Name:       "test-queue",
+					IsDefault:  false,
+					NodePoolID: "test-node-pool-id",
+				},
+			},
+		}
+		deploymentResponse := astro.Deployment{
+			ID:             "test-id",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			Type:           "HOSTED_DEDICATED",
+			DeploymentSpec: astro.DeploymentSpec{Executor: CeleryExecutor, Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
+			Cluster: astro.Cluster{
+				NodePools: []astro.NodePool{
+					{
+						ID:               "test-node-pool-id",
+						IsDefault:        true,
+						NodeInstanceType: "test-default-node-pool",
+						CreatedAt:        time.Time{},
+					},
+				},
+			},
+			SchedulerSize: "large",
+			WorkerQueues: []astro.WorkerQueue{
+				{
+					ID:         "test-queue-id",
+					Name:       "default",
+					IsDefault:  true,
+					NodePoolID: "test-default-node-pool",
+				},
+				{
+					Name:       "test-queue",
+					IsDefault:  false,
+					NodePoolID: "test-node-pool-id",
+				},
+			},
+		}
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
+		expectedQueue := []astro.WorkerQueue{
+			{
+				Name:       "test-queue",
+				IsDefault:  false,
+				NodePoolID: "test-node-pool-id",
+			},
+		}
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResponse}, nil).Once()
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Times(1)
+
+		// mock os.Stdin
+		input := []byte("y")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		err = Update("test-id", "", ws, "", "", "", CeleryExecutor, "medium", "enable", 0, 0, expectedQueue, false, nil, mockClient)
+		assert.NoError(t, err)
 	})
 
 	t.Run("failed to validate resources", func(t *testing.T) {

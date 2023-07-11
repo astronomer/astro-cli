@@ -676,10 +676,13 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		queueCreateUpdate = true
 		deploymentUpdate.WorkerQueues = wQueueList
 	}
-	// validate resources requests
-	resourcesValid := validateResources(schedulerAU, schedulerReplicas, configOption)
-	if !resourcesValid {
-		return nil
+
+	if !(IsDeploymentHosted(currentDeployment.Type) || IsDeploymentDedicated(currentDeployment.Type)) {
+		// validate au resources requests
+		resourcesValid := validateResources(schedulerAU, schedulerReplicas, configOption)
+		if !resourcesValid {
+			return nil
+		}
 	}
 
 	// confirm changes with user only if force=false
