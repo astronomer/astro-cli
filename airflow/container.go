@@ -52,7 +52,7 @@ type ImageHandler interface {
 	TagLocalImage(localImage string) error
 	Run(dagID, envFile, settingsFile, containerName, dagFile string, taskLogs bool) error
 	Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, config types.ImageBuildConfig) (string, error)
-	conflictCheck(workingDirectory, runtimeVersion string, config types.ImageBuildConfig) (string, error)
+	conflictCheck(workingDirectory, testHomeDirectory string, buildConfig types.ImageBuildConfig) (string, error)
 	createPipFreeze(altImageName, pipFreezeFile string) error
 }
 

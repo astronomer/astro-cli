@@ -45,7 +45,7 @@ func TestDockerImageBuild(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
-		err = handler.Build(options)
+		err = handler.Build("", options)
 		assert.NoError(t, err)
 	})
 
@@ -56,7 +56,7 @@ func TestDockerImageBuild(t *testing.T) {
 			assert.Contains(t, args, "--no-cache")
 			return nil
 		}
-		err = handler.Build(options)
+		err = handler.Build("", options)
 		assert.NoError(t, err)
 	})
 
@@ -64,7 +64,7 @@ func TestDockerImageBuild(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
-		err = handler.Build(options)
+		err = handler.Build("", options)
 		assert.Contains(t, err.Error(), errMock.Error())
 	})
 
@@ -76,7 +76,7 @@ func TestDockerImageBuild(t *testing.T) {
 			Output:          false,
 		}
 
-		err = handler.Build(options)
+		err = handler.Build("", options)
 		assert.Error(t, err)
 	})
 
@@ -108,7 +108,7 @@ func TestDockerImagePytest(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
-		_, err = handler.Pytest("", "", "", []string{}, options)
+		_, err = handler.Pytest("", "", "", "", []string{}, false, options)
 		assert.NoError(t, err)
 	})
 
@@ -123,7 +123,7 @@ func TestDockerImagePytest(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
-		_, err = handler.Pytest("", "", "", []string{}, options)
+		_, err = handler.Pytest("", "", "", "", []string{}, false, options)
 		assert.Contains(t, err.Error(), errMock.Error())
 	})
 
@@ -134,7 +134,7 @@ func TestDockerImagePytest(t *testing.T) {
 			NoCache:         false,
 		}
 
-		_, err = handler.Pytest("", "", "", []string{}, options)
+		_, err = handler.Pytest("", "", "", "", []string{}, false, options)
 		assert.Error(t, err)
 	})
 
@@ -203,7 +203,7 @@ func TestDockerImageGetLabel(t *testing.T) {
 			return nil
 		}
 
-		resp, err := handler.GetLabel(mockLabel)
+		resp, err := handler.GetLabel("", mockLabel)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResp, resp)
 	})
@@ -215,7 +215,7 @@ func TestDockerImageGetLabel(t *testing.T) {
 			return errMockDocker
 		}
 
-		_, err := handler.GetLabel(mockLabel)
+		_, err := handler.GetLabel("", mockLabel)
 		assert.ErrorIs(t, err, errMockDocker)
 	})
 
@@ -228,7 +228,7 @@ func TestDockerImageGetLabel(t *testing.T) {
 			return nil
 		}
 
-		_, err := handler.GetLabel(mockLabel)
+		_, err := handler.GetLabel("", mockLabel)
 		assert.ErrorIs(t, err, errGetImageLabel)
 	})
 }

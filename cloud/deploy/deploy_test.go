@@ -65,7 +65,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
@@ -184,7 +184,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
@@ -349,7 +349,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 	// Test pytest with dags deploy
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
@@ -488,7 +488,7 @@ func TestDagsDeployFailed(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("4.2.5", nil)
 		return mockImageHandler
 	}
@@ -560,7 +560,7 @@ func TestDeployFailure(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("4.2.5", nil)
 		return mockImageHandler
 	}
@@ -624,7 +624,7 @@ func TestBuildImageFailure(t *testing.T) {
 	assert.ErrorIs(t, err, errMock)
 
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("4.2.5", nil)
 		return mockImageHandler
 	}
