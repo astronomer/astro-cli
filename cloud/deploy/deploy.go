@@ -92,17 +92,6 @@ type InputDeploy struct {
 	DagsPath       string
 }
 
-func getRegistryURL(domain string) string {
-	var registry string
-	if domain == "localhost" {
-		registry = config.CFG.LocalRegistry.GetString()
-	} else {
-		registry = "images." + strings.Split(domain, ".")[0] + ".cloud"
-	}
-
-	return registry
-}
-
 func removeDagsFromDockerIgnore(fullpath string) error {
 	f, err := os.Open(fullpath)
 	if err != nil {
@@ -314,7 +303,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		}
 
 		nextTag := "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
-		registry := getRegistryURL(domain)
+		registry := airflow.GetRegistryURL(domain)
 		repository := registry + "/" + deployInfo.organizationID + "/" + deployInfo.deploymentID
 		// TODO: Resolve the edge case where two people push the same nextTag at the same time
 		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
@@ -536,7 +525,7 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 
 		dagsIgnoreSet = true
 	}
-	err = imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
+	err = imageHandler.Build("", types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
 	if err != nil {
 		return err
 	}
@@ -565,7 +554,7 @@ func buildImage(path, currentVersion, deployImage, imageName string, dagDeployEn
 				return "", err
 			}
 		} else {
-			err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
+			err := imageHandler.Build("", types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
 			if err != nil {
 				return "", err
 			}
@@ -588,7 +577,7 @@ func buildImage(path, currentVersion, deployImage, imageName string, dagDeployEn
 
 	DockerfileImage := docker.GetImageFromParsedFile(cmds)
 
-	version, err = imageHandler.GetLabel(runtimeImageLabel)
+	version, err = imageHandler.GetLabel("", runtimeImageLabel)
 	if err != nil {
 		fmt.Println("unable get runtime version from image")
 	}

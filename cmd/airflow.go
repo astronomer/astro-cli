@@ -10,6 +10,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
+	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -36,6 +37,7 @@ var (
 	exportComposeFile      string
 	pytestArgs             string
 	pytestFile             string
+	deploymentID           string
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
@@ -53,6 +55,7 @@ var (
 	compose                bool
 	dependencyTest         bool
 	versionTest            bool
+	dagTest                bool
 	waitTime               time.Duration
 	RunExample             = `
 # Create default admin user.
@@ -101,7 +104,7 @@ astro dev init --airflow-version 2.2.3
 	errPytestArgs          = errors.New("")
 )
 
-func newDevRootCmd() *cobra.Command {
+func newDevRootCmd(astroClient astro.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -122,7 +125,7 @@ func newDevRootCmd() *cobra.Command {
 		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
-		newAirflowUpgradeTestCmd(),
+		newAirflowUpgradeTestCmd(astroClient),
 	)
 	return cmd
 }
@@ -166,7 +169,7 @@ func newAirflowInitCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowUpgradeTestCmd() *cobra.Command {
+func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade-test",
 		Short:   "Run some tests to see if your enviroment and DAGs are compatable with new version of Airflow or Runtime",
@@ -177,12 +180,17 @@ func newAirflowUpgradeTestCmd() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		RunE: airflowUpgradeTest,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return airflowUpgradeTest(cmd, args, astroClient)
+		},
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to upgrade too. If not specified, latest is assumed.")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Specify a version of Astro Runtime that you want to upgrade too. If not specified, the latest is assumed.")
-	cmd.Flags().BoolVarP(&dependencyTest, "dependency-test", "d", false, "dependency-check only")
-	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "dependency-check only")
+	cmd.Flags().BoolVarP(&dependencyTest, "dependency-test", "d", false, "dependency conflict test only")
+	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "dependency version comparison only")
+	cmd.Flags().BoolVarP(&dagTest, "dag-test", "", false, "dag test only")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of Deployment your want check dependency versions against. Using ")
+
 	return cmd
 }
 
@@ -525,7 +533,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func airflowUpgradeTest(cmd *cobra.Command, args []string) error {
+func airflowUpgradeTest(cmd *cobra.Command, args []string, astroClient astro.Client) error {
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersions
@@ -541,9 +549,9 @@ func airflowUpgradeTest(cmd *cobra.Command, args []string) error {
 	defaultImageName := airflow.AstroRuntimeImageName
 	if useAstronomerCertified {
 		defaultImageName = airflow.AstronomerCertifiedImageName
-		fmt.Printf("Initializing Astro project\nPulling Airflow development files from Astronomer Certified Airflow Version %s\n", defaultImageTag)
+		fmt.Printf("Testing a Upgrade to Astronomer Certified Airflow Version %s\n\n", defaultImageTag)
 	} else {
-		fmt.Printf("Initializing Astro project\nPulling Airflow development files from Astro Runtime %s\n", defaultImageTag)
+		fmt.Printf("Testing a Upgrade to Astronomer Runtime %s\n", defaultImageTag)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -570,7 +578,7 @@ func airflowUpgradeTest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = containerHandler.UpgradeTest(defaultImageTag, dependencyTest, versionTest)
+	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, dependencyTest, versionTest, dagTest, astroClient)
 	if err != nil {
 		err = removeConflictCheck()
 		if err != nil {
