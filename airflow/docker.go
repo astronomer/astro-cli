@@ -473,7 +473,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conflictTest, versionTest, dagTest bool, client astro.Client) error {
+func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conflictTest, versionTest, dagTest bool, client astro.Client) error { //nolint:gocognit
 	// figure out which tests to run
 	if !conflictTest && !versionTest && !dagTest {
 		conflictTest = true
@@ -684,7 +684,8 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag string) erro
 	}
 
 	// Write the updated content to the new Dockerfile
-	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0o600)
+	var filePerm os.FileMode = 0o600
+	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), filePerm)
 	if err != nil {
 		return err
 	}
@@ -692,7 +693,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag string) erro
 	return nil
 }
 
-func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
+func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error { //nolint:gocognit
 	// Open the before file for reading
 	before, err := os.Open(beforeFile)
 	if err != nil {
@@ -760,13 +761,14 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
 	addedPackages := []string{}
 	airflowUpdate := []string{}
 	// Iterate over the versions map and categorize the changes
+	var change bool
+	var updateType string
 	for pkg, ver := range pgkVersions {
 		beforeVer := ver[0]
 		afterVer := ver[1]
 
 		if beforeVer != "" && afterVer != "" && beforeVer != afterVer {
-			var change bool
-			var updateType string
+
 			if !hasPip440ExtraParts(beforeVer) || !hasPip440ExtraParts(afterVer) {
 				change = true
 				updateType = unknown
