@@ -323,6 +323,7 @@ deployment:
 		mockClient = new(astro_mocks.Client)
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(createdDeployment, nil)
@@ -620,6 +621,7 @@ deployment:
 			},
 		}
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(updatedDeployment, nil)
@@ -865,11 +867,15 @@ func TestIsValidExecutor(t *testing.T) {
 }
 
 func TestIsValidCloudProvider(t *testing.T) {
-	t.Run("returns true if cloudProvider is GCP", func(t *testing.T) {
+	t.Run("returns true if cloudProvider is gcp", func(t *testing.T) {
 		actual := isValidCloudProvider("gcp")
 		assert.True(t, actual)
 	})
-	t.Run("returns false if cloudProvider is not GCP", func(t *testing.T) {
+	t.Run("returns true if cloudProvider is aws", func(t *testing.T) {
+		actual := isValidCloudProvider("aws")
+		assert.True(t, actual)
+	})
+	t.Run("returns false if cloudProvider is not gcp", func(t *testing.T) {
 		actual := isValidCloudProvider("azure")
 		assert.False(t, actual)
 	})

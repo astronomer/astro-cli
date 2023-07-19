@@ -35,9 +35,10 @@ var (
 
 func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "user",
-		Short: "Manage Deployment user resources",
-		Long:  "Users can be added or removed from Deployment",
+		Use:     "user",
+		Aliases: []string{"us", "users"},
+		Short:   "Manage Deployment user resources",
+		Long:    "Users can be added or removed from Deployment",
 	}
 	cmd.AddCommand(
 		newDeploymentUserListCmd(out),

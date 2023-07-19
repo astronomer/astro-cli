@@ -169,6 +169,18 @@ func TestSwitch(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 
+	t.Run("switching to a current organization", func(t *testing.T) {
+		mockGQLClient := new(astro_mocks.Client)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err := Switch("org1", mockGQLClient, mockCoreClient, buf, false)
+		assert.NoError(t, err)
+		assert.Equal(t, "You selected the same organization as the current one. No switch was made\n", buf.String())
+		mockCoreClient.AssertExpectations(t)
+	})
+
 	t.Run("successful switch without name", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -177,7 +189,7 @@ func TestSwitch(t *testing.T) {
 			return nil
 		}
 		// mock os.Stdin
-		input := []byte("1")
+		input := []byte("2")
 		r, w, err := os.Pipe()
 		if err != nil {
 			t.Fatal(err)

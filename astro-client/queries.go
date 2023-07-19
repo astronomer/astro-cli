@@ -178,6 +178,7 @@ var (
 		}
 		astroMachines {
 			concurrentTasks
+			concurrentTasksMax
 			cpu
 			memory
 			nodePoolType
@@ -186,6 +187,7 @@ var (
 		}
 		defaultAstroMachine {
 			concurrentTasks
+			concurrentTasksMax
 			cpu
 			memory
 			nodePoolType

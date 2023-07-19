@@ -23,12 +23,14 @@ var (
 	errorNetwork = errors.New("network error")
 	errorInvite  = errors.New("test-inv-error")
 	orgRole      = "ORGANIZATION_MEMBER"
+	isIdpManaged = true
 	user1        = astrocore.User{
-		CreatedAt: time.Now(),
-		FullName:  "user 1",
-		Id:        "user1-id",
-		OrgRole:   &orgRole,
-		Username:  "user@1.com",
+		CreatedAt:                   time.Now(),
+		FullName:                    "user 1",
+		Id:                          "user1-id",
+		OrgRole:                     &orgRole,
+		OrgUserRelationIsIdpManaged: &isIdpManaged,
+		Username:                    "user@1.com",
 	}
 	users = []astrocore.User{
 		user1,
@@ -94,11 +96,12 @@ var (
 var (
 	workspaceRole  = "WORKSPACE_MEMBER"
 	workspaceUser1 = astrocore.User{
-		CreatedAt:     time.Now(),
-		FullName:      "user 1",
-		Id:            "user1-id",
-		WorkspaceRole: &workspaceRole,
-		Username:      "user@1.com",
+		CreatedAt:                   time.Now(),
+		FullName:                    "user 1",
+		Id:                          "user1-id",
+		WorkspaceRole:               &workspaceRole,
+		OrgUserRelationIsIdpManaged: &isIdpManaged,
+		Username:                    "user@1.com",
 	}
 	workspaceUsers = []astrocore.User{
 		workspaceUser1,

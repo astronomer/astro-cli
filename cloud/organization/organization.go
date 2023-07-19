@@ -169,6 +169,11 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 	if targetOrg == nil {
 		return errInvalidOrganizationName
 	}
+
+	if targetOrg.Id == c.Organization {
+		fmt.Fprintln(out, "You selected the same organization as the current one. No switch was made")
+		return nil
+	}
 	return SwitchWithContext(c.Domain, targetOrg, astroClient, coreClient, out)
 }
 
@@ -194,7 +199,7 @@ func IsOrgHosted() bool {
 }
 
 func ListClusters(organizationShortName string, coreClient astrocore.CoreClient) ([]astrocore.Cluster, error) {
-	clusterTypes := []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
+	clusterTypes := []astrocore.ListClustersParamsTypes{astrocore.ListClustersParamsTypesBRINGYOUROWNCLOUD, astrocore.ListClustersParamsTypesHOSTED}
 	limit := 1000
 	clusterListParams := &astrocore.ListClustersParams{
 		Types: &clusterTypes,
