@@ -80,6 +80,9 @@ var (
 	isM1           = util.IsM1
 
 	composeOverrideFilename = "docker-compose.override.yml"
+
+	stopPostgresWaitTimeout = 10 * time.Second
+	stopPostgresWaitTicker  = 1 * time.Second
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -317,8 +320,8 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 	// Adding check on wether all containers have exited or not, because in case of restart command with immediate start after stop execution,
 	// in windows machine it take a fraction of second for container to be in exited state, after docker compose completes the stop command execution
 	// causing the dev start for airflow to fail
-	timeout := time.After(time.Duration(10) * time.Second)
-	ticker := time.NewTicker(time.Duration(1) * time.Second)
+	timeout := time.After(stopPostgresWaitTimeout)
+	ticker := time.NewTicker(stopPostgresWaitTicker)
 	for {
 		select {
 		case <-timeout:
