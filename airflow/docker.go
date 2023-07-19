@@ -524,7 +524,7 @@ func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conf
 	testHomeDirectory := "upgrade-test-" + currentRuntimeVersion + "->" + newRuntimeVersion
 
 	destFolder := filepath.Join(d.airflowHome, testHomeDirectory)
-	if err := os.MkdirAll(destFolder, 0755); err != nil {
+	if err := os.MkdirAll(destFolder, 0o755); err != nil {
 		return err
 	}
 	newDockerFile := destFolder + "/Dockerfile"
@@ -633,7 +633,6 @@ func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conf
 			}
 		} else {
 			fmt.Println("\n" + ansi.Green("✔") + " no errors detected in your DAGs ")
-
 		}
 	}
 	fmt.Println("\nTest Summary:")
@@ -683,7 +682,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag string) erro
 	}
 
 	// Write the updated content to the new Dockerfile
-	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0644)
+	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0o644)
 	if err != nil {
 		return err
 	}
