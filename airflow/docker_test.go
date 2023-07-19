@@ -713,7 +713,7 @@ func TestDockerComposeStop(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Stop()
+		err := mockDockerCompose.Stop(false)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -726,7 +726,7 @@ func TestDockerComposeStop(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Stop()
+		err := mockDockerCompose.Stop(false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -742,7 +742,7 @@ func TestDockerComposeStop(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Stop()
+		err := mockDockerCompose.Stop(false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"runtime"
 	"strings"
@@ -33,12 +32,14 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
 	componentName                  = "airflow"
 	podman                         = "podman"
 	dockerStateUp                  = "running"
+	dockerExitState                = "exited"
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
@@ -291,7 +292,7 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 }
 
 // Stop a running docker project
-func (d *DockerCompose) Stop() error {
+func (d *DockerCompose) Stop(waitForExit bool) error {
 	imageLabels, err := d.imageHandler.ListLabels()
 	if err != nil {
 		return err
@@ -309,7 +310,38 @@ func (d *DockerCompose) Stop() error {
 		return errors.Wrap(err, composePauseErrMsg)
 	}
 
-	return nil
+	if !waitForExit {
+		return nil
+	}
+
+	// Adding check on wether all containers have exited or not, because in case of restart command with immediate start after stop execution,
+	// in windows machine it take a fraction of second for container to be in exited state, after docker compose completes the stop command execution
+	// causing the dev start for airflow to fail
+	timeout := time.After(time.Duration(10) * time.Second)
+	ticker := time.NewTicker(time.Duration(1) * time.Second)
+	for {
+		select {
+		case <-timeout:
+			log.Debug("timed out waiting for postgres container to be in exited state")
+			return nil
+		case <-ticker.C:
+			psInfo, _ := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
+				All: true,
+			})
+			for i := range psInfo {
+				// we only need to check for postgres container state, since all other containers depends on postgres container
+				// so docker compose will ensure that postgres container going in shutting down phase only after all other containers have exited
+				if strings.Contains(psInfo[i].Name, PostgresDockerContainerName) {
+					if psInfo[i].State == dockerExitState {
+						log.Debug("postgres container reached exited state")
+						return nil
+					} else {
+						log.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
+					}
+				}
+			}
+		}
+	}
 }
 
 func (d *DockerCompose) PS() error {
