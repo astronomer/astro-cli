@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -40,6 +39,7 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -55,6 +55,11 @@ const (
 	OpenCmd                        = "open"
 	dockerCmd                      = "docker"
 	registryUsername               = "cli"
+	unknown                        = "unknown"
+	major                          = "major"
+	patch                          = "patch"
+	minor                          = "minor"
+	partsNum                       = 2
 
 	composeCreateErrMsg      = "error creating docker-compose project"
 	composeStatusCheckErrMsg = "error checking docker-compose status"
@@ -469,7 +474,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 
 func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conflictTest, versionTest, dagTest bool, client astro.Client) error {
 	// figure out which tests to run
-	if conflictTest == false && versionTest == false && dagTest == false {
+	if !conflictTest && !versionTest && !dagTest {
 		conflictTest = true
 		versionTest = true
 		dagTest = true
@@ -524,7 +529,7 @@ func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conf
 	}
 	newDockerFile := destFolder + "/Dockerfile"
 
-	//check for dependency conflicts
+	// check for dependency conflicts
 	if conflictTest {
 		fmt.Println("\nChecking your 'requirments.txt' for dependency conflicts with the new version of Airflow")
 		fmt.Println("\nThis may take a few minutes...")
@@ -658,7 +663,7 @@ func GetRegistryURL(domain string) string {
 
 func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag string) error {
 	// Read the content of the old Dockerfile
-	content, err := ioutil.ReadFile(oldDockerfilePath)
+	content, err := os.ReadFile(oldDockerfilePath)
 	if err != nil {
 		return err
 	}
@@ -669,8 +674,8 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag string) erro
 	for _, line := range lines {
 		if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/astro-runtime:") {
 			// Replace the tag on the matching line
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
+			parts := strings.SplitN(line, ":", partsNum)
+			if len(parts) == partsNum {
 				line = parts[0] + ":" + newTag
 			}
 		}
@@ -678,7 +683,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag string) erro
 	}
 
 	// Write the updated content to the new Dockerfile
-	err = ioutil.WriteFile(newDockerfilePath, []byte(newContent.String()), 0644)
+	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0644)
 	if err != nil {
 		return err
 	}
@@ -709,17 +714,17 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
 	defer output.Close()
 
 	// Create a map to store versions by package name
-	versions := make(map[string][2]string)
+	pgkVersions := make(map[string][2]string)
 
 	// Read versions from the before file and store them in the map
 	beforeScanner := bufio.NewScanner(before)
 	for beforeScanner.Scan() {
 		line := beforeScanner.Text()
 		parts := strings.Split(line, "==")
-		if len(parts) == 2 {
+		if len(parts) == partsNum {
 			pkg := parts[0]
 			ver := parts[1]
-			versions[pkg] = [2]string{ver, ""}
+			pgkVersions[pkg] = [2]string{ver, ""}
 		}
 	}
 
@@ -728,14 +733,14 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
 	for afterScanner.Scan() {
 		line := afterScanner.Text()
 		parts := strings.Split(line, "==")
-		if len(parts) == 2 {
+		if len(parts) == partsNum {
 			pkg := parts[0]
 			ver := parts[1]
-			if v, ok := versions[pkg]; ok {
+			if v, ok := pgkVersions[pkg]; ok {
 				v[1] = ver
-				versions[pkg] = v
+				pgkVersions[pkg] = v
 			} else {
-				versions[pkg] = [2]string{"", ver}
+				pgkVersions[pkg] = [2]string{"", ver}
 			}
 		}
 	}
@@ -754,7 +759,7 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
 	addedPackages := []string{}
 	airflowUpdate := []string{}
 	// Iterate over the versions map and categorize the changes
-	for pkg, ver := range versions {
+	for pkg, ver := range pgkVersions {
 		beforeVer := ver[0]
 		afterVer := ver[1]
 
@@ -763,51 +768,53 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
 			var updateType string
 			if !hasPip440ExtraParts(beforeVer) || !hasPip440ExtraParts(afterVer) {
 				change = true
-				updateType = "unknown"
+				updateType = unknown
 			}
 			change, updateType, err = checkVersionChange(beforeVer, afterVer)
 			if err != nil {
 				if err.Error() == "Invalid Semantic Version" {
 					change = true
-					updateType = "unknown"
+					updateType = unknown
 				} else {
 					return err
 				}
 			}
 			if !change {
 				change = true
-				updateType = "unknown"
+				updateType = unknown
 			}
 			pkgUpdate := pkg + " " + beforeVer + " >> " + afterVer
 
 			// Categorize the packages based on the update type
-			if strings.Contains(pkg, "apache-airflow-providers-") {
+			switch {
+			case strings.Contains(pkg, "apache-airflow-providers-"):
 				switch updateType {
-				case "major":
+				case major:
 					majorUpdatesAirflowProviders = append(majorUpdatesAirflowProviders, pkgUpdate)
-				case "minor":
+				case minor:
 					minorUpdatesAirflowProviders = append(minorUpdatesAirflowProviders, pkgUpdate)
-				case "patch":
+				case patch:
 					patchUpdatesAirflowProviders = append(patchUpdatesAirflowProviders, pkgUpdate)
-				case "unknown":
+				case unknown:
 					unknownUpdatesAirflowProviders = append(unknownUpdatesAirflowProviders, pkgUpdate)
 				}
-			} else if pkg == "apache-airflow" {
+			case pkg == "apache-airflow":
 				airflowUpdate = append(airflowUpdate, pkgUpdate)
-			} else {
+			default:
 				switch updateType {
-				case "major":
+				case major:
 					majorUpdates = append(majorUpdates, pkgUpdate)
-				case "minor":
+				case minor:
 					minorUpdates = append(minorUpdates, pkgUpdate)
-				case "patch":
+				case patch:
 					patchUpdates = append(patchUpdates, pkgUpdate)
-				case "unknown":
+				case unknown:
 					unknownUpdates = append(unknownUpdates, pkgUpdate)
 				}
 			}
 		}
-		if strings.Contains(pkg, "apache-airflow-providers-") {
+		switch {
+		case strings.Contains(pkg, "apache-airflow-providers-"):
 			if beforeVer != "" && afterVer == "" {
 				pkgUpdate := pkg + "==" + beforeVer
 				removedPackagesAirflowProviders = append(removedPackagesAirflowProviders, pkgUpdate)
@@ -816,7 +823,7 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
 				pkgUpdate := pkg + "==" + afterVer
 				addedPackagesAirflowProviders = append(addedPackagesAirflowProviders, pkgUpdate)
 			}
-		} else {
+		default:
 			if beforeVer != "" && afterVer == "" {
 				pkgUpdate := pkg + "==" + beforeVer
 				removedPackages = append(removedPackages, pkgUpdate)
@@ -841,113 +848,69 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
 	sort.Strings(addedPackages)
 	sort.Strings(removedPackages)
 
+	titles := []string{
+		"Apache Airflow Update:\n",
+		"Airflow Providers Unknown Updates:\n",
+		"Airflow Providers Major Updates:\n",
+		"Airflow Providers Minor Updates:\n",
+		"Airflow Providers Patch Updates:\n",
+		"Added Airflow Providers:\n",
+		"Removed Airflow Providers:\n",
+		"Unknown Updates:\n",
+		"Major Updates:\n",
+		"Minor Updates:\n",
+		"Patch Updates:\n",
+		"Added Packages:\n",
+		"Removed Packages:\n",
+	}
+	pkgLists := [][]string{
+		airflowUpdate,
+		unknownUpdatesAirflowProviders,
+		majorUpdatesAirflowProviders,
+		minorUpdatesAirflowProviders,
+		patchUpdatesAirflowProviders,
+		addedPackagesAirflowProviders,
+		removedPackagesAirflowProviders,
+		unknownUpdates,
+		majorUpdates,
+		minorUpdates,
+		patchUpdates,
+		addedPackages,
+		removedPackages,
+	}
+
 	// Write the categorized updates to the output file
 	writer := bufio.NewWriter(output)
 
-	if len(airflowUpdate) > 0 {
-		writer.WriteString("Apache Airflow Update:\n")
-		for _, pkg := range airflowUpdate {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
+	for i, title := range titles {
+		writeToCompareFile(title, pkgLists[i], writer)
 	}
 
-	if len(unknownUpdatesAirflowProviders) > 0 {
-		writer.WriteString("Airflow Providers Unknown Updates:\n")
-		for _, pkg := range unknownUpdatesAirflowProviders {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
-	}
-
-	if len(majorUpdatesAirflowProviders) > 0 {
-		writer.WriteString("Airflow Providers Major Updates:\n")
-		for _, pkg := range majorUpdatesAirflowProviders {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
-	}
-
-	if len(minorUpdatesAirflowProviders) > 0 {
-		writer.WriteString("Airflow Providers Minor Updates:\n")
-		for _, pkg := range minorUpdatesAirflowProviders {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
-	}
-
-	if len(patchUpdatesAirflowProviders) > 0 {
-		writer.WriteString("Airflow Providers Patch Updates:\n")
-		for _, pkg := range patchUpdatesAirflowProviders {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
-	}
-	if len(addedPackagesAirflowProviders) > 0 {
-		writer.WriteString("Added Airflow Providers:\n")
-		for _, pkg := range addedPackagesAirflowProviders {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
-	}
-	if len(removedPackagesAirflowProviders) > 0 {
-		writer.WriteString("Removed Airflow Providers:\n")
-		for _, pkg := range removedPackagesAirflowProviders {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
-	}
-
-	if len(unknownUpdates) > 0 {
-		writer.WriteString("Unknown Updates:\n")
-		for _, pkg := range unknownUpdates {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
-	}
-
-	if len(majorUpdates) > 0 {
-		writer.WriteString("Major Updates:\n")
-		for _, pkg := range majorUpdates {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
-	}
-
-	if len(minorUpdates) > 0 {
-		writer.WriteString("Minor Updates:\n")
-		for _, pkg := range minorUpdates {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
-	}
-
-	if len(patchUpdates) > 0 {
-		writer.WriteString("Patch Updates:\n")
-		for _, pkg := range patchUpdates {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
-	}
-	if len(addedPackages) > 0 {
-		writer.WriteString("Added Packages:\n")
-		for _, pkg := range addedPackages {
-			writer.WriteString(pkg + "\n")
-		}
-		writer.WriteString("\n")
-	}
-	if len(removedPackages) > 0 {
-		writer.WriteString("Removed Packages:\n")
-		for _, pkg := range removedPackages {
-			writer.WriteString(pkg + "\n")
-		}
-	}
 	// Flush the buffer to ensure all data is written to the file
 	writer.Flush()
 	return nil
 }
 
-func checkVersionChange(before string, after string) (bool, string, error) {
+func writeToCompareFile(title string, pkgList []string, writer *bufio.Writer) {
+	if len(pkgList) > 0 {
+		_, err := writer.WriteString(title)
+		if err != nil {
+			logrus.Debug(err)
+		}
+		for _, pkg := range pkgList {
+			_, err = writer.WriteString(pkg + "\n")
+			if err != nil {
+				logrus.Debug(err)
+			}
+		}
+		_, err = writer.WriteString("\n")
+		if err != nil {
+			logrus.Debug(err)
+		}
+	}
+}
+
+func checkVersionChange(before, after string) (bool, string, error) {
 	beforeVer, err := semver.NewVersion(before)
 	if err != nil {
 		return false, "", err
@@ -958,15 +921,16 @@ func checkVersionChange(before string, after string) (bool, string, error) {
 		return false, "", err
 	}
 
-	if afterVer.Major() > beforeVer.Major() {
+	switch {
+	case afterVer.Major() > beforeVer.Major():
 		return true, "major", nil
-	} else if afterVer.Minor() > beforeVer.Minor() {
+	case afterVer.Minor() > beforeVer.Minor():
 		return true, "minor", nil
-	} else if afterVer.Patch() > beforeVer.Patch() {
+	case afterVer.Patch() > beforeVer.Patch():
 		return true, "patch", nil
+	default:
+		return false, "", nil
 	}
-
-	return false, "", nil
 }
 
 func hasPip440ExtraParts(version string) bool {

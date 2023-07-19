@@ -31,6 +31,7 @@ const (
 	pushingImagePrompt = "Pushing image to Astronomer registry"
 	astroRunContainer  = "astro-run"
 	pullingImagePrompt = "Pulling image from Astronomer registry"
+	prefix             = "Bearer "
 )
 
 var errGetImageLabel = errors.New("error getting image label")
@@ -351,7 +352,6 @@ func (d *DockerImage) Pull(registry, username, token, remoteImage string) error 
 	var err error
 	if username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
 		pass := token
-		prefix := "Bearer "
 		pass = strings.TrimPrefix(pass, prefix)
 		cmd := "echo \"" + pass + "\"" + " | " + dockerCommand + " login " + registry + " -u " + username + " --password-stdin"
 		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
@@ -543,7 +543,6 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 	var err error
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
 		pass := authConfig.Password
-		prefix := "Bearer "
 		pass = strings.TrimPrefix(pass, prefix)
 		cmd := "echo \"" + pass + "\"" + " | " + dockerCommand + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
 		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist

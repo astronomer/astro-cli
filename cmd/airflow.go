@@ -172,16 +172,15 @@ func newAirflowInitCmd() *cobra.Command {
 func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade-test",
-		Short:   "Run some tests to see if your enviroment and DAGs are compatable with new version of Airflow or Runtime",
-		Long:    "Run some tests to see if your enviroment and DAGs are compatable with new version of Airflow or Runtime",
+		Short:   "Run some tests to see if your environment and DAGs are compatable with new version of Airflow or Runtime",
+		Long:    "Run some tests to see if your environment and DAGs are compatable with new version of Airflow or Runtime",
 		Example: initCloudExample,
-		Args:    cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return airflowUpgradeTest(cmd, args, astroClient)
+			return airflowUpgradeTest(cmd, astroClient)
 		},
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to upgrade too. If not specified, latest is assumed.")
@@ -533,7 +532,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func airflowUpgradeTest(cmd *cobra.Command, args []string, astroClient astro.Client) error {
+func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error {
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersions
@@ -599,7 +598,7 @@ func airflowUpgradeTest(cmd *cobra.Command, args []string, astroClient astro.Cli
 func removeConflictCheck() error {
 	err := os.Remove("conflict-check.Dockerfile")
 	if err != nil {
-		return fmt.Errorf("failed to remove file: %v", err)
+		return errors.Wrap(err, "failed to remove file")
 	}
 	return nil
 }
