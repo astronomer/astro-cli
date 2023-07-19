@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -524,7 +525,8 @@ func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conf
 	testHomeDirectory := "upgrade-test-" + currentRuntimeVersion + "->" + newRuntimeVersion
 
 	destFolder := filepath.Join(d.airflowHome, testHomeDirectory)
-	if err := os.MkdirAll(destFolder, 0o755); err != nil {
+	var filePerms fs.FileMode = 0o755
+	if err := os.MkdirAll(destFolder, filePerms); err != nil {
 		return err
 	}
 	newDockerFile := destFolder + "/Dockerfile"
@@ -682,7 +684,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag string) erro
 	}
 
 	// Write the updated content to the new Dockerfile
-	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0o644)
+	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0o600)
 	if err != nil {
 		return err
 	}
@@ -909,7 +911,7 @@ func writeToCompareFile(title string, pkgList []string, writer *bufio.Writer) {
 	}
 }
 
-func checkVersionChange(before, after string) (bool, string, error) {
+func checkVersionChange(before, after string) (change bool, updateType string, err error) {
 	beforeVer, err := semver.NewVersion(before)
 	if err != nil {
 		return false, "", err
