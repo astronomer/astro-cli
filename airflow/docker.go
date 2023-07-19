@@ -766,9 +766,7 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error { //n
 	for pkg, ver := range pgkVersions {
 		beforeVer := ver[0]
 		afterVer := ver[1]
-
 		if beforeVer != "" && afterVer != "" && beforeVer != afterVer {
-
 			if !hasPip440ExtraParts(beforeVer) || !hasPip440ExtraParts(afterVer) {
 				change = true
 				updateType = unknown
