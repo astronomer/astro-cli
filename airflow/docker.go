@@ -335,9 +335,8 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 					if psInfo[i].State == dockerExitState {
 						log.Debug("postgres container reached exited state")
 						return nil
-					} else {
-						log.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
 					}
+					log.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
 				}
 			}
 		}
