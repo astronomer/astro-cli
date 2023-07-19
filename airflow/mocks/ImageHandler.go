@@ -26,6 +26,44 @@ func (_m *ImageHandler) Build(dockerfile string, config types.ImageBuildConfig) 
 	return r0
 }
 
+// ConflictCheck provides a mock function with given fields: workingDirectory, testHomeDirectory, buildConfig
+func (_m *ImageHandler) ConflictCheck(workingDirectory string, testHomeDirectory string, buildConfig types.ImageBuildConfig) (string, error) {
+	ret := _m.Called(workingDirectory, testHomeDirectory, buildConfig)
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, string, types.ImageBuildConfig) (string, error)); ok {
+		return rf(workingDirectory, testHomeDirectory, buildConfig)
+	}
+	if rf, ok := ret.Get(0).(func(string, string, types.ImageBuildConfig) string); ok {
+		r0 = rf(workingDirectory, testHomeDirectory, buildConfig)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(string, string, types.ImageBuildConfig) error); ok {
+		r1 = rf(workingDirectory, testHomeDirectory, buildConfig)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreatePipFreeze provides a mock function with given fields: altImageName, pipFreezeFile
+func (_m *ImageHandler) CreatePipFreeze(altImageName string, pipFreezeFile string) error {
+	ret := _m.Called(altImageName, pipFreezeFile)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(altImageName, pipFreezeFile)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetLabel provides a mock function with given fields: altImageName, labelName
 func (_m *ImageHandler) GetLabel(altImageName string, labelName string) (string, error) {
 	ret := _m.Called(altImageName, labelName)
@@ -149,44 +187,6 @@ func (_m *ImageHandler) TagLocalImage(localImage string) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string) error); ok {
 		r0 = rf(localImage)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// conflictCheck provides a mock function with given fields: workingDirectory, testHomeDirectory, buildConfig
-func (_m *ImageHandler) conflictCheck(workingDirectory string, testHomeDirectory string, buildConfig types.ImageBuildConfig) (string, error) {
-	ret := _m.Called(workingDirectory, testHomeDirectory, buildConfig)
-
-	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, types.ImageBuildConfig) (string, error)); ok {
-		return rf(workingDirectory, testHomeDirectory, buildConfig)
-	}
-	if rf, ok := ret.Get(0).(func(string, string, types.ImageBuildConfig) string); ok {
-		r0 = rf(workingDirectory, testHomeDirectory, buildConfig)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	if rf, ok := ret.Get(1).(func(string, string, types.ImageBuildConfig) error); ok {
-		r1 = rf(workingDirectory, testHomeDirectory, buildConfig)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// createPipFreeze provides a mock function with given fields: altImageName, pipFreezeFile
-func (_m *ImageHandler) createPipFreeze(altImageName string, pipFreezeFile string) error {
-	ret := _m.Called(altImageName, pipFreezeFile)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(altImageName, pipFreezeFile)
 	} else {
 		r0 = ret.Error(0)
 	}

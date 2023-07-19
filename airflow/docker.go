@@ -528,7 +528,7 @@ func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conf
 	if conflictTest {
 		fmt.Println("\nChecking your 'requirments.txt' for dependency conflicts with the new version of Airflow")
 		fmt.Println("\nThis may take a few minutes...")
-		exitCode, err := d.imageHandler.conflictCheck(d.airflowHome, testHomeDirectory, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+		exitCode, err := d.imageHandler.ConflictCheck(d.airflowHome, testHomeDirectory, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 		if err != nil {
 			return err
 		}
@@ -546,7 +546,7 @@ func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conf
 		// pip freeze old Airflow image
 		fmt.Println("\nObtaining pip freeze for current Airflow version")
 		currentRuntimePipFreezeFile := d.airflowHome + "/" + testHomeDirectory + "/pip_freeze_" + currentRuntimeVersion + ".txt"
-		err = d.imageHandler.createPipFreeze(deploymentImage, currentRuntimePipFreezeFile)
+		err = d.imageHandler.CreatePipFreeze(deploymentImage, currentRuntimePipFreezeFile)
 		if err != nil {
 			return err
 		}
@@ -563,7 +563,7 @@ func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conf
 		// pip freeze new airflow image
 		fmt.Println("\nObtaining pip freeze for new Airflow version")
 		newRuntimePipFreezeFile := d.airflowHome + "/" + testHomeDirectory + "/pip_freeze_" + newRuntimeVersion + ".txt"
-		err = d.imageHandler.createPipFreeze("", newRuntimePipFreezeFile)
+		err = d.imageHandler.CreatePipFreeze("", newRuntimePipFreezeFile)
 		if err != nil {
 			return err
 		}
