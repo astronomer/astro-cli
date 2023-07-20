@@ -134,7 +134,7 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 	return nil
 }
 
-func InitUpgradeTest(path, airflowImageName, airflowImageTag string) error {
+func initConflictTest(path, airflowImageName, airflowImageTag string) error {
 	// Map of files to create
 	files := map[string]string{
 		"conflict-check.Dockerfile": fmt.Sprintf(testConflictsDockerfile, airflowImageName, airflowImageTag),

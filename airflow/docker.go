@@ -567,24 +567,7 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 
 	// check for dependency conflicts
 	if conflictTest {
-		// create files needed for upgrade test
-		err := InitUpgradeTest(config.WorkingPath, newImageName, newAirflowVersion)
-		if err != nil {
-			err = removeConflictCheck()
-			if err != nil {
-				return err
-			}
-			return err
-		}
-		err = d.conflictTest(testHomeDirectory)
-		if err != nil {
-			err = removeConflictCheck()
-			if err != nil {
-				return err
-			}
-			return err
-		}
-		err = removeConflictCheck()
+		err = d.conflictTest(testHomeDirectory, newImageName, newAirflowVersion)
 		if err != nil {
 			return err
 		}
@@ -617,12 +600,26 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 	return nil
 }
 
-func (d *DockerCompose) conflictTest(testHomeDirectory string) error {
+func (d *DockerCompose) conflictTest(testHomeDirectory, newImageName, newAirflowVersion string) error {
 	fmt.Println("\nChecking your 'requirments.txt' for dependency conflicts with the new version of Airflow")
 	fmt.Println("\nThis may take a few minutes...")
 
+	// create files needed for conflict test
+	err := initConflictTest(config.WorkingPath, newImageName, newAirflowVersion)
+	if err != nil {
+		err := os.Remove("conflict-check.Dockerfile")
+		if err != nil {
+			return errors.Wrap(err, "failed to remove file")
+		}
+		return err
+	}
+
 	exitCode, err := d.imageHandler.ConflictCheck(d.airflowHome, testHomeDirectory, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 	if err != nil {
+		err := os.Remove("conflict-check.Dockerfile")
+		if err != nil {
+			return errors.Wrap(err, "failed to remove file")
+		}
 		return err
 	}
 	if strings.Contains(exitCode, "0") || exitCode == "" { // if the error code is 0 the pytests passed
@@ -631,14 +628,6 @@ func (d *DockerCompose) conflictTest(testHomeDirectory string) error {
 		fmt.Println("\nSomething went wrong while compiling your dependencies check the logs above for conflicts")
 		fmt.Println("If there are conflicts remove them from your 'requirments.txt' and rerun this test\nYou will see the best candidate in the 'conflict-test-results.txt' file")
 		return err
-	}
-	return nil
-}
-
-func removeConflictCheck() error {
-	err := os.Remove("conflict-check.Dockerfile")
-	if err != nil {
-		return errors.Wrap(err, "failed to remove file")
 	}
 	return nil
 }

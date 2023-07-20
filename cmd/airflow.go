@@ -52,7 +52,7 @@ var (
 	envExport              bool
 	noBrowser              bool
 	compose                bool
-	dependencyTest         bool
+	conflictTest           bool
 	versionTest            bool
 	dagTest                bool
 	waitTime               time.Duration
@@ -183,11 +183,31 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to upgrade too. If not specified, latest is assumed.")
-	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Specify a version of Astro Runtime that you want to upgrade too. If not specified, the latest is assumed.")
-	cmd.Flags().BoolVarP(&dependencyTest, "dependency-test", "d", false, "dependency conflict test only")
+	cmd.Flags().BoolVarP(&conflictTest, "conflict-test", "d", false, "dependency conflict test only")
 	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "dependency version comparison only")
 	cmd.Flags().BoolVarP(&dagTest, "dag-test", "", false, "dag test only")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of Deployment your want check dependency versions against. Using ")
+	var err error
+	var avoidACFlag bool
+
+	// In case user is connected to Astronomer Platform and is connected to older version of platform
+	if context.IsCloudContext() || houstonVersion == "" || (!context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.29.0"})) {
+		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Specify a version of Astro Runtime that you want to create an Astro project with. If not specified, the latest is assumed. You can change this version in your Dockerfile at any time.")
+	} else { // default to using AC flag, since runtime is not available for these cases
+		useAstronomerCertified = true
+		avoidACFlag = true
+	}
+
+	if !context.IsCloudContext() && !avoidACFlag {
+		cmd.Example = initSoftwareExample
+		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, specify an Astronomer Certified Airflow image to upgrade to instead of Astro Runtime.")
+	}
+
+	_, err = context.GetCurrentContext()
+	if err != nil && !avoidACFlag { // Case when user is not logged in to any platform
+		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, specify an Astronomer Certified Airflow image to upgrade to instead of Astro Runtime.")
+		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
+	}
 
 	return cmd
 }
@@ -562,7 +582,7 @@ func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error {
 		return err
 	}
 
-	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, dependencyTest, versionTest, dagTest, astroClient)
+	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, conflictTest, versionTest, dagTest, astroClient)
 	if err != nil {
 		return err
 	}
