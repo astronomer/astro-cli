@@ -35,7 +35,7 @@ var (
 	Dockerfile string
 
 	//go:embed include/test-conflicts.dockerfile
-	testConflitcsDockerfile string
+	testConflictsDockerfile string
 
 	//go:embed include/dockerignore
 	Dockerignore string
@@ -134,10 +134,10 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 	return nil
 }
 
-func InitUpgradeCheck(path, airflowImageName, airflowImageTag string) error {
+func InitUpgradeTest(path, airflowImageName, airflowImageTag string) error {
 	// Map of files to create
 	files := map[string]string{
-		"conflict-check.Dockerfile": fmt.Sprintf(testConflitcsDockerfile, airflowImageName, airflowImageTag),
+		"conflict-check.Dockerfile": fmt.Sprintf(testConflictsDockerfile, airflowImageName, airflowImageTag),
 	}
 	// Initialize files
 	if err := initFiles(path, files); err != nil {
