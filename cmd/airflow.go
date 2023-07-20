@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -556,50 +555,18 @@ func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	// create files needed for upgrade test
-	err = airflow.InitUpgradeTest(config.WorkingPath, defaultImageName, defaultImageTag)
-	if err != nil {
-		err = removeConflictCheck()
-		if err != nil {
-			return err
-		}
-		return err
-	}
-
 	imageName := "tmp-upgrade-test"
 
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
 	if err != nil {
-		err = removeConflictCheck()
-		if err != nil {
-			return err
-		}
 		return err
 	}
 
-	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, dependencyTest, versionTest, dagTest, astroClient)
-	if err != nil {
-		err = removeConflictCheck()
-		if err != nil {
-			return err
-		}
-		return err
-	}
-
-	// remove conflict-check.Dockerfile
-	err = removeConflictCheck()
+	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, dependencyTest, versionTest, dagTest, astroClient)
 	if err != nil {
 		return err
 	}
 
-	return nil
-}
-
-func removeConflictCheck() error {
-	err := os.Remove("conflict-check.Dockerfile")
-	if err != nil {
-		return errors.Wrap(err, "failed to remove file")
-	}
 	return nil
 }
 

@@ -44,6 +44,7 @@ import (
 
 const (
 	RuntimeImageLabel              = "io.astronomer.docker.runtime.version"
+	AirflowImageLabel              = "io.astronomer.docker.airflow.version"
 	componentName                  = "airflow"
 	podman                         = "podman"
 	dockerStateUp                  = "running"
@@ -500,7 +501,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conflictTest, versionTest, dagTest bool, client astro.Client) error {
+func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName string, conflictTest, versionTest, dagTest bool, client astro.Client) error {
 	// figure out which tests to run
 	if !conflictTest && !versionTest && !dagTest {
 		conflictTest = true
@@ -544,12 +545,18 @@ func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conf
 		}
 	}
 	// get current Airflow version
-	currentRuntimeVersion, err := d.imageHandler.GetLabel(deploymentImage, RuntimeImageLabel)
+	currentAirflowVersion, err := d.imageHandler.GetLabel(deploymentImage, RuntimeImageLabel)
 	if err != nil {
 		return err
 	}
+	if currentAirflowVersion == "" {
+		currentAirflowVersion, err = d.imageHandler.GetLabel(deploymentImage, AirflowImageLabel)
+		if err != nil {
+			return err
+		}
+	}
 	// create test home directory
-	testHomeDirectory := "upgrade-test-" + currentRuntimeVersion + "->" + newRuntimeVersion
+	testHomeDirectory := "upgrade-test-" + currentAirflowVersion + "->" + newAirflowVersion
 
 	destFolder := filepath.Join(d.airflowHome, testHomeDirectory)
 	var filePerms fs.FileMode = 0o755
@@ -560,20 +567,37 @@ func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conf
 
 	// check for dependency conflicts
 	if conflictTest {
-		err := d.conflictTest(testHomeDirectory)
+		// create files needed for upgrade test
+		err := InitUpgradeTest(config.WorkingPath, newImageName, newAirflowVersion)
+		if err != nil {
+			err = removeConflictCheck()
+			if err != nil {
+				return err
+			}
+			return err
+		}
+		err = d.conflictTest(testHomeDirectory)
+		if err != nil {
+			err = removeConflictCheck()
+			if err != nil {
+				return err
+			}
+			return err
+		}
+		err = removeConflictCheck()
 		if err != nil {
 			return err
 		}
 	}
 	var pipFreezeCompareFile string
 	if versionTest {
-		err := d.versionTest(testHomeDirectory, currentRuntimeVersion, deploymentImage, newDockerFile, newRuntimeVersion)
+		err := d.versionTest(testHomeDirectory, currentAirflowVersion, deploymentImage, newDockerFile, newAirflowVersion)
 		if err != nil {
 			return err
 		}
 	}
 	if dagTest {
-		err := d.dagTest(testHomeDirectory, newRuntimeVersion, newDockerFile)
+		err := d.dagTest(testHomeDirectory, newAirflowVersion, newDockerFile)
 		if err != nil {
 			return err
 		}
@@ -596,6 +620,7 @@ func (d *DockerCompose) UpgradeTest(newRuntimeVersion, deploymentID string, conf
 func (d *DockerCompose) conflictTest(testHomeDirectory string) error {
 	fmt.Println("\nChecking your 'requirments.txt' for dependency conflicts with the new version of Airflow")
 	fmt.Println("\nThis may take a few minutes...")
+
 	exitCode, err := d.imageHandler.ConflictCheck(d.airflowHome, testHomeDirectory, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 	if err != nil {
 		return err
@@ -610,17 +635,25 @@ func (d *DockerCompose) conflictTest(testHomeDirectory string) error {
 	return nil
 }
 
-func (d *DockerCompose) versionTest(testHomeDirectory, currentRuntimeVersion, deploymentImage, newDockerFile, newRuntimeVersion string) error {
+func removeConflictCheck() error {
+	err := os.Remove("conflict-check.Dockerfile")
+	if err != nil {
+		return errors.Wrap(err, "failed to remove file")
+	}
+	return nil
+}
+
+func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, deploymentImage, newDockerFile, newAirflowVersion string) error {
 	fmt.Println("\nComparing dependency versions between current and upgraded environment")
 	// pip freeze old Airflow image
 	fmt.Println("\nObtaining pip freeze for current Airflow version")
-	currentRuntimePipFreezeFile := d.airflowHome + "/" + testHomeDirectory + "/pip_freeze_" + currentRuntimeVersion + ".txt"
-	err := d.imageHandler.CreatePipFreeze(deploymentImage, currentRuntimePipFreezeFile)
+	currentAirflowPipFreezeFile := d.airflowHome + "/" + testHomeDirectory + "/pip_freeze_" + currentAirflowVersion + ".txt"
+	err := d.imageHandler.CreatePipFreeze(deploymentImage, currentAirflowPipFreezeFile)
 	if err != nil {
 		return err
 	}
 	// build image with the new airflow version
-	err = upgradeDockerfile(d.dockerfile, newDockerFile, newRuntimeVersion)
+	err = upgradeDockerfile(d.dockerfile, newDockerFile, newAirflowVersion)
 	if err != nil {
 		return err
 	}
@@ -631,15 +664,15 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentRuntimeVersion, de
 	}
 	// pip freeze new airflow image
 	fmt.Println("\nObtaining pip freeze for new Airflow version")
-	newRuntimePipFreezeFile := d.airflowHome + "/" + testHomeDirectory + "/pip_freeze_" + newRuntimeVersion + ".txt"
-	err = d.imageHandler.CreatePipFreeze("", newRuntimePipFreezeFile)
+	newAirflowPipFreezeFile := d.airflowHome + "/" + testHomeDirectory + "/pip_freeze_" + newAirflowVersion + ".txt"
+	err = d.imageHandler.CreatePipFreeze("", newAirflowPipFreezeFile)
 	if err != nil {
 		return err
 	}
 	// compare pip freeze files
 	fmt.Println("\nComparing pip freeze files")
 	pipFreezeCompareFile := d.airflowHome + "/" + testHomeDirectory + "/dependency_compare.txt"
-	err = CreateVersionTestFile(currentRuntimePipFreezeFile, newRuntimePipFreezeFile, pipFreezeCompareFile)
+	err = CreateVersionTestFile(currentAirflowPipFreezeFile, newAirflowPipFreezeFile, pipFreezeCompareFile)
 	if err != nil {
 		return err
 	}
@@ -647,11 +680,11 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentRuntimeVersion, de
 	return nil
 }
 
-func (d *DockerCompose) dagTest(testHomeDirectory, newRuntimeVersion, newDockerFile string) error {
-	fmt.Printf("\nChecking the DAGs in this project for errors against the new Airflow version %s\n", newRuntimeVersion)
+func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerFile string) error {
+	fmt.Printf("\nChecking the DAGs in this project for errors against the new Airflow version %s\n", newAirflowVersion)
 
 	// build image with the new runtime version
-	err := upgradeDockerfile(d.dockerfile, newDockerFile, newRuntimeVersion)
+	err := upgradeDockerfile(d.dockerfile, newDockerFile, newAirflowVersion)
 	if err != nil {
 		return err
 	}
