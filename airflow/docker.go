@@ -843,7 +843,7 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
 	return nil
 }
 
-func iteratePkgMap(pgkVersions map[string][2]string) error {
+func iteratePkgMap(pgkVersions map[string][2]string) error { //nolint:gocognit
 	// Iterate over the versions map and categorize the changes
 	for pkg, ver := range pgkVersions {
 		beforeVer := ver[0]
