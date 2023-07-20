@@ -745,7 +745,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag string) erro
 	return nil
 }
 
-func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error { //nolint:gocognit
+func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error { //nolint:gocognit //nolint:gocyclo
 	// Open the before file for reading
 	before, err := os.Open(beforeFile)
 	if err != nil {
