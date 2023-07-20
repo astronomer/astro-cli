@@ -5,7 +5,6 @@
 .env
 .idea/
 .vscode/
-testbin/
 airflow/docker-compose.yaml
 airflow/Dockerfile
 airflow/pod-config.yml
@@ -21,5 +20,6 @@ meta/
 packages.txt
 requirements.txt
 sagemaker-batch-inference.py
+testbin/
 testbin/golangci-lint
 vendor/github.com/theupdateframework/notary/Dockerfile
