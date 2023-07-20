@@ -10,7 +10,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -799,6 +798,53 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error { //n
 		}
 	}
 	// Iterate over the versions map and categorize the changes
+	err = iteratePkgMap(pgkVersions)
+	if err != nil {
+		return err
+	}
+	// sort lists into alphabetical order
+	sort.Strings(unknownUpdatesAirflowProviders)
+	sort.Strings(majorUpdatesAirflowProviders)
+	sort.Strings(minorUpdatesAirflowProviders)
+	sort.Strings(patchUpdatesAirflowProviders)
+	sort.Strings(addedPackagesAirflowProviders)
+	sort.Strings(removedPackagesAirflowProviders)
+	sort.Strings(unknownUpdates)
+	sort.Strings(majorUpdates)
+	sort.Strings(minorUpdates)
+	sort.Strings(patchUpdates)
+	sort.Strings(addedPackages)
+	sort.Strings(removedPackages)
+	pkgLists := [][]string{
+		airflowUpdate,
+		unknownUpdatesAirflowProviders,
+		majorUpdatesAirflowProviders,
+		minorUpdatesAirflowProviders,
+		patchUpdatesAirflowProviders,
+		addedPackagesAirflowProviders,
+		removedPackagesAirflowProviders,
+		unknownUpdates,
+		majorUpdates,
+		minorUpdates,
+		patchUpdates,
+		addedPackages,
+		removedPackages,
+	}
+
+	// Write the categorized updates to the output file
+	writer := bufio.NewWriter(output)
+
+	for i, title := range titles {
+		writeToCompareFile(title, pkgLists[i], writer)
+	}
+
+	// Flush the buffer to ensure all data is written to the file
+	writer.Flush()
+	return nil
+}
+
+func iteratePkgMap(pgkVersions map[string][2]string) error {
+	// Iterate over the versions map and categorize the changes
 	for pkg, ver := range pgkVersions {
 		beforeVer := ver[0]
 		afterVer := ver[1]
@@ -810,9 +856,6 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error { //n
 				} else {
 					return err
 				}
-			}
-			if !hasPip440ExtraParts(beforeVer) || !hasPip440ExtraParts(afterVer) {
-				updateType = unknown
 			}
 			if !change {
 				updateType = unknown
@@ -868,44 +911,6 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error { //n
 			}
 		}
 	}
-	// sort lists into alphabetical order
-	sort.Strings(unknownUpdatesAirflowProviders)
-	sort.Strings(majorUpdatesAirflowProviders)
-	sort.Strings(minorUpdatesAirflowProviders)
-	sort.Strings(patchUpdatesAirflowProviders)
-	sort.Strings(addedPackagesAirflowProviders)
-	sort.Strings(removedPackagesAirflowProviders)
-	sort.Strings(unknownUpdates)
-	sort.Strings(majorUpdates)
-	sort.Strings(minorUpdates)
-	sort.Strings(patchUpdates)
-	sort.Strings(addedPackages)
-	sort.Strings(removedPackages)
-	pkgLists := [][]string{
-		airflowUpdate,
-		unknownUpdatesAirflowProviders,
-		majorUpdatesAirflowProviders,
-		minorUpdatesAirflowProviders,
-		patchUpdatesAirflowProviders,
-		addedPackagesAirflowProviders,
-		removedPackagesAirflowProviders,
-		unknownUpdates,
-		majorUpdates,
-		minorUpdates,
-		patchUpdates,
-		addedPackages,
-		removedPackages,
-	}
-
-	// Write the categorized updates to the output file
-	writer := bufio.NewWriter(output)
-
-	for i, title := range titles {
-		writeToCompareFile(title, pkgLists[i], writer)
-	}
-
-	// Flush the buffer to ensure all data is written to the file
-	writer.Flush()
 	return nil
 }
 
@@ -949,22 +954,6 @@ func checkVersionChange(before, after string) (change bool, updateType string, e
 	default:
 		return false, "", nil
 	}
-}
-
-func hasPip440ExtraParts(version string) bool {
-	// Define a regular expression pattern to match the major.minor.patch segment of the version
-	pattern := `^(\d+(\.\d+)*).*`
-
-	// Match the pattern against the version string
-	re := regexp.MustCompile(pattern)
-	matches := re.FindStringSubmatch(version)
-
-	if len(matches) > 1 {
-		majorMinorPatch := matches[1]
-		return version != majorMinorPatch
-	}
-
-	return false
 }
 
 func (d *DockerCompose) Parse(customImageName, deployImageName string) error {
