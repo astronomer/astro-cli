@@ -799,27 +799,22 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error { //n
 		}
 	}
 	// Iterate over the versions map and categorize the changes
-	var change bool
-	var updateType string
 	for pkg, ver := range pgkVersions {
 		beforeVer := ver[0]
 		afterVer := ver[1]
 		if beforeVer != "" && afterVer != "" && beforeVer != afterVer {
-			if !hasPip440ExtraParts(beforeVer) || !hasPip440ExtraParts(afterVer) {
-				change = true
-				updateType = unknown
-			}
-			change, updateType, err = checkVersionChange(beforeVer, afterVer)
+			change, updateType, err := checkVersionChange(beforeVer, afterVer)
 			if err != nil {
 				if err.Error() == "Invalid Semantic Version" {
-					change = true
 					updateType = unknown
 				} else {
 					return err
 				}
 			}
+			if !hasPip440ExtraParts(beforeVer) || !hasPip440ExtraParts(afterVer) {
+				updateType = unknown
+			}
 			if !change {
-				change = true
 				updateType = unknown
 			}
 			pkgUpdate := pkg + " " + beforeVer + " >> " + afterVer
