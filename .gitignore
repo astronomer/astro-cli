@@ -20,5 +20,6 @@ meta/
 packages.txt
 requirements.txt
 sagemaker-batch-inference.py
+testbin/
 testbin/golangci-lint
 vendor/github.com/theupdateframework/notary/Dockerfile
