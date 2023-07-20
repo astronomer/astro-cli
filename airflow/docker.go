@@ -843,7 +843,7 @@ func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
 	return nil
 }
 
-func iteratePkgMap(pgkVersions map[string][2]string) error { //nolint:gocognit
+func iteratePkgMap(pgkVersions map[string][2]string) error {
 	// Iterate over the versions map and categorize the changes
 	for pkg, ver := range pgkVersions {
 		beforeVer := ver[0]
@@ -863,32 +863,7 @@ func iteratePkgMap(pgkVersions map[string][2]string) error { //nolint:gocognit
 			pkgUpdate := pkg + " " + beforeVer + " >> " + afterVer
 
 			// Categorize the packages based on the update type
-			switch {
-			case strings.Contains(pkg, "apache-airflow-providers-"):
-				switch updateType {
-				case major:
-					majorUpdatesAirflowProviders = append(majorUpdatesAirflowProviders, pkgUpdate)
-				case minor:
-					minorUpdatesAirflowProviders = append(minorUpdatesAirflowProviders, pkgUpdate)
-				case patch:
-					patchUpdatesAirflowProviders = append(patchUpdatesAirflowProviders, pkgUpdate)
-				case unknown:
-					unknownUpdatesAirflowProviders = append(unknownUpdatesAirflowProviders, pkgUpdate)
-				}
-			case pkg == "apache-airflow":
-				airflowUpdate = append(airflowUpdate, pkgUpdate)
-			default:
-				switch updateType {
-				case major:
-					majorUpdates = append(majorUpdates, pkgUpdate)
-				case minor:
-					minorUpdates = append(minorUpdates, pkgUpdate)
-				case patch:
-					patchUpdates = append(patchUpdates, pkgUpdate)
-				case unknown:
-					unknownUpdates = append(unknownUpdates, pkgUpdate)
-				}
-			}
+			whichList(pkg, pkgUpdate, updateType)
 		}
 		switch {
 		case strings.Contains(pkg, "apache-airflow-providers-"):
@@ -912,6 +887,36 @@ func iteratePkgMap(pgkVersions map[string][2]string) error { //nolint:gocognit
 		}
 	}
 	return nil
+}
+
+func whichList(pkg, pkgUpdate, updateType string) {
+	// Categorize the packages based on the update type
+	switch {
+	case strings.Contains(pkg, "apache-airflow-providers-"):
+		switch updateType {
+		case major:
+			majorUpdatesAirflowProviders = append(majorUpdatesAirflowProviders, pkgUpdate)
+		case minor:
+			minorUpdatesAirflowProviders = append(minorUpdatesAirflowProviders, pkgUpdate)
+		case patch:
+			patchUpdatesAirflowProviders = append(patchUpdatesAirflowProviders, pkgUpdate)
+		case unknown:
+			unknownUpdatesAirflowProviders = append(unknownUpdatesAirflowProviders, pkgUpdate)
+		}
+	case pkg == "apache-airflow":
+		airflowUpdate = append(airflowUpdate, pkgUpdate)
+	default:
+		switch updateType {
+		case major:
+			majorUpdates = append(majorUpdates, pkgUpdate)
+		case minor:
+			minorUpdates = append(minorUpdates, pkgUpdate)
+		case patch:
+			patchUpdates = append(patchUpdates, pkgUpdate)
+		case unknown:
+			unknownUpdates = append(unknownUpdates, pkgUpdate)
+		}
+	}
 }
 
 func writeToCompareFile(title string, pkgList []string, writer *bufio.Writer) {
