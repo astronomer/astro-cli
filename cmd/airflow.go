@@ -556,8 +556,8 @@ func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	// Execute method
-	err = airflow.InitUpgradeCheck(config.WorkingPath, defaultImageName, defaultImageTag)
+	// create files needed for upgrade test
+	err = airflow.InitUpgradeTest(config.WorkingPath, defaultImageName, defaultImageTag)
 	if err != nil {
 		err = removeConflictCheck()
 		if err != nil {
