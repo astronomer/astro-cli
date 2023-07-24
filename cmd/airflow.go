@@ -171,8 +171,8 @@ func newAirflowInitCmd() *cobra.Command {
 func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade-test",
-		Short:   "Run some tests to see if your environment and DAGs are compatable with new version of Airflow or Runtime",
-		Long:    "Run some tests to see if your environment and DAGs are compatable with new version of Airflow or Runtime",
+		Short:   "Run some tests to see if your environment and DAGs are compatable with a new version of Airflow or Runtime",
+		Long:    "Run some tests to see if your environment and DAGs are compatable with a new version of Airflow or Runtime",
 		Example: initCloudExample,
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

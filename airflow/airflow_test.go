@@ -87,3 +87,25 @@ func TestInit(t *testing.T) {
 		assert.True(t, exist)
 	}
 }
+
+func TestInitConflictTest(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "temp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	err = initConflictTest(tmpDir, "astro-runtime", "test")
+	assert.NoError(t, err)
+
+	expectedFiles := []string{
+		"conflict-check.Dockerfile",
+	}
+	for _, file := range expectedFiles {
+		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
+		assert.NoError(t, err)
+		assert.True(t, exist)
+	}
+	err = os.Remove("conflict-check.Dockerfile")
+	assert.NoError(t, err)
+}

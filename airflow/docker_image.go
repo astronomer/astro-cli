@@ -168,7 +168,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	return outb.String(), docErr
 }
 
-func (d *DockerImage) ConflictCheck(workingDirectory, testHomeDirectory string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
+func (d *DockerImage) ConflictTest(workingDirectory, testHomeDirectory string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
 	dockerCommand := config.CFG.DockerCommand.GetString()
 	// delete container
 	err := cmdExec(dockerCommand, nil, nil, "rm", "astro-temp-container")
@@ -262,13 +262,8 @@ func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error 
 	}
 	defer file.Close()
 
-	// Set the output file as the destination for the command output
-	cmd := exec.Command(dockerCommand, dockerArgs...)
-	cmd.Stdout = file
-	cmd.Stderr = os.Stderr
-
 	// Run the Docker command
-	err = cmd.Run()
+	err = cmdExec(dockerCommand, file, os.Stderr, dockerArgs...)
 	if err != nil {
 		return err
 	}

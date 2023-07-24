@@ -530,9 +530,12 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 		deploymentImage = fmt.Sprintf("%s:%s", repository, currentImageTag)
 		token := c.Token
 		// Splitting out the Bearer part from the token
-		splittedToken := strings.Split(token, " ")[1]
+		splittedToken := strings.Split(token, " ")
+		if len(splittedToken) > 1 {
+			token = strings.Split(token, " ")[1]
+		}
 		fmt.Printf("\nPulling image from Astro Deployment %s\n\n", currentDeployment.Label)
-		err = d.imageHandler.Pull(registry, registryUsername, splittedToken, deploymentImage)
+		err = d.imageHandler.Pull(registry, registryUsername, token, deploymentImage)
 		if err != nil {
 			return err
 		}
@@ -614,13 +617,13 @@ func (d *DockerCompose) conflictTest(testHomeDirectory, newImageName, newAirflow
 		return err
 	}
 
-	exitCode, err := d.imageHandler.ConflictCheck(d.airflowHome, testHomeDirectory, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
-	if err != nil {
+	exitCode, conflictErr := d.imageHandler.ConflictTest(d.airflowHome, testHomeDirectory, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+	if conflictErr != nil {
 		err := os.Remove("conflict-check.Dockerfile")
 		if err != nil {
 			return errors.Wrap(err, "failed to remove file")
 		}
-		return err
+		return conflictErr
 	}
 	if strings.Contains(exitCode, "0") || exitCode == "" { // if the error code is 0 the pytests passed
 		fmt.Println("There were no dependency conflicts found")
@@ -641,6 +644,10 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, de
 	if err != nil {
 		return err
 	}
+	fmt.Println(d.dockerfile)
+	fmt.Println(newDockerFile)
+	fmt.Println(newAirflowVersion)
+
 	// build image with the new airflow version
 	err = upgradeDockerfile(d.dockerfile, newDockerFile, newAirflowVersion)
 	if err != nil {

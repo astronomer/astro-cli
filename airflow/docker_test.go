@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"io"
 	"os"
@@ -12,8 +13,12 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
+	"github.com/astronomer/astro-cli/astro-client"
+	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/config"
 
+	"github.com/astronomer/astro-cli/pkg/fileutil"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
@@ -27,6 +32,10 @@ import (
 var (
 	errMockDocker   = errors.New("mock docker compose error")
 	errMockSettings = errors.New("mock Settings error")
+	//go:embed include/pip_freeze_new-version.txt
+	pipFreezeFile string
+	//go:embed include/pip_freeze_old-version.txt
+	pipFreezeFile2 string
 )
 
 var airflowVersionLabel = "2.2.5"
@@ -968,6 +977,299 @@ func TestDockerComposePytest(t *testing.T) {
 		_, err := mockDockerCompose.Pytest("", "", "", "")
 		assert.ErrorIs(t, err, errMockDocker)
 		imageHandler.AssertExpectations(t)
+	})
+}
+
+func TestDockerComposedUpgradeTest(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	cwd, err := os.Getwd()
+	assert.NoError(t, err)
+	mockDockerCompose := DockerCompose{projectName: "test", dockerfile: "Dockerfile", airflowHome: cwd}
+
+	pipFreeze := "upgrade-test-old-version->new-version/pip_freeze_old-version.txt"
+	pipFreeze2 := "upgrade-test-old-version->new-version/pip_freeze_new-version.txt"
+	parseTest := cwd + "/.astro/test_dag_integrity_default.py"
+	// Write files out
+	err = fileutil.WriteStringToFile(pipFreeze, pipFreezeFile)
+	assert.NoError(t, err)
+	err = fileutil.WriteStringToFile(pipFreeze2, pipFreezeFile2)
+	assert.NoError(t, err)
+	err = fileutil.WriteStringToFile(parseTest, "")
+	assert.NoError(t, err)
+
+	defer afero.NewOsFs().Remove(pipFreeze)
+	defer afero.NewOsFs().Remove(pipFreeze2)
+	defer afero.NewOsFs().Remove(parseTest)
+	defer afero.NewOsFs().Remove("upgrade-test-old-version->new-version/Dockerfile")
+	defer afero.NewOsFs().Remove("upgrade-test-old-version->new-version/dependency_compare.txt")
+	defer afero.NewOsFs().Remove("upgrade-test-old-version->new-version")
+
+	t.Run("success no deployment id", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Times(3)
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", false, false, false, nil)
+
+		assert.NoError(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("success with deployment id", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Times(2)
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", false, false, false, mockClient)
+
+		assert.NoError(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("image build failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		// imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(errMockDocker).Once()
+		// imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		// imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		// imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", false, false, false, nil)
+		assert.Error(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("GetLabel failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		// imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", errMockDocker)
+		// imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		// imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", false, false, false, nil)
+		assert.Error(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("GetLabel failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		// imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", errMockDocker)
+		// imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		// imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", false, false, false, nil)
+		assert.Error(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("ConflictTest failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		// imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", errMockDocker).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		// imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", false, false, false, nil)
+		assert.Error(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("Create old pip freeze failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		// imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(errMockDocker).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		// imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", false, false, false, nil)
+		assert.Error(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("build new image failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		// imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(errMockDocker).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(errMockDocker).Once()
+		// imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", false, false, false, nil)
+		assert.Error(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("build new image for pytest failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		// imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Twice()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(errMockDocker).Once()
+		// imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", false, false, false, nil)
+		assert.Error(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("pytest failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		// imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Times(3)
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", errMockDocker).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", false, false, false, nil)
+		assert.Error(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("get deployments failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, errMockDocker).Once()
+		// imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		// imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Times(3)
+		// imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		// imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		// imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", errMockDocker).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", false, false, false, mockClient)
+		assert.Error(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("image pull failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker)
+		// imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Times(3)
+		// imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		// imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		// imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", errMockDocker).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", false, false, false, mockClient)
+		assert.Error(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("build new image failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		// imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Twice()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(errMockDocker).Once()
+		// imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", false, false, false, nil)
+		assert.Error(t, err)
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("no domain", func(t *testing.T) {
+		err := config.ResetCurrentContext()
+		assert.NoError(t, err)
+		// imageHandler := new(mocks.ImageHandler)
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		// imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		// imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Times(2)
+		// imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+		// imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
+		// imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
+		// imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		// mockDockerCompose.imageHandler = imageHandler
+
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", false, false, false, nil)
+		assert.Error(t, err)
 	})
 }
 

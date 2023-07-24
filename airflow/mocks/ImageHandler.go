@@ -26,8 +26,8 @@ func (_m *ImageHandler) Build(dockerfile string, config types.ImageBuildConfig) 
 	return r0
 }
 
-// ConflictCheck provides a mock function with given fields: workingDirectory, testHomeDirectory, buildConfig
-func (_m *ImageHandler) ConflictCheck(workingDirectory string, testHomeDirectory string, buildConfig types.ImageBuildConfig) (string, error) {
+// ConflictTest provides a mock function with given fields: workingDirectory, testHomeDirectory, buildConfig
+func (_m *ImageHandler) ConflictTest(workingDirectory string, testHomeDirectory string, buildConfig types.ImageBuildConfig) (string, error) {
 	ret := _m.Called(workingDirectory, testHomeDirectory, buildConfig)
 
 	var r0 string
