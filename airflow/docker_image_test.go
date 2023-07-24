@@ -250,6 +250,14 @@ func TestDockerImageConflictTest(t *testing.T) {
 	cmdExec = previousCmdExec
 }
 
+func TestParseExitCode(t *testing.T) {
+	output := "exit code: 1"
+	t.Run("success", func(t *testing.T) {
+		_ = parseExitCode(output)
+		_ = parseExitCode("")
+	})
+}
+
 func TestDockerCreatePipFreeze(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	handler := DockerImage{
