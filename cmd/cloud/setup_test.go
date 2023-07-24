@@ -20,7 +20,10 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-var errorLogin = errors.New("failed to login")
+var (
+	errorLogin              = errors.New("failed to login")
+	mockOrganizationProduct = astrocore.OrganizationProductHYBRID
+)
 
 func TestSetup(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -30,7 +33,7 @@ func TestSetup(t *testing.T) {
 		cmd := &cobra.Command{Use: "login"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
-		err = Setup(cmd, []string{}, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -43,7 +46,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, []string{}, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -56,7 +59,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, []string{}, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -69,7 +72,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, []string{}, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -82,7 +85,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, []string{}, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -95,7 +98,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "context"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, []string{}, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -108,7 +111,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "completion"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, []string{}, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -125,7 +128,7 @@ func TestSetup(t *testing.T) {
 			return nil
 		}
 
-		err = Setup(cmd, []string{}, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -142,7 +145,7 @@ func TestSetup(t *testing.T) {
 			return nil
 		}
 
-		err = Setup(cmd, []string{}, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -158,13 +161,13 @@ func TestSetup(t *testing.T) {
 				StatusCode: 200,
 			},
 			JSON200: &[]astrocore.Organization{
-				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name"},
+				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name", Product: &mockOrganizationProduct},
 			},
 		}
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", "test-org-id", "").Return(mockDeplyResp, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
 
 		cmd := &cobra.Command{Use: "deploy"}
 		testUtil.SetupOSArgsForGinkgo()
@@ -196,55 +199,7 @@ func TestSetup(t *testing.T) {
 			}
 		})
 
-		err = Setup(cmd, []string{}, mockClient, mockCoreClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
-	})
-
-	t.Run("use API token for virtual runtime", func(t *testing.T) {
-		mockOrgsResponse := astrocore.ListOrganizationsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &[]astrocore.Organization{
-				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name"},
-			},
-		}
-		mockClient := new(astro_mocks.Client)
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrgsResponse, nil).Once()
-
-		cmd := &cobra.Command{Use: "deploy"}
-		testUtil.SetupOSArgsForGinkgo()
-		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
-
-		rootCmd := &cobra.Command{Use: "astro"}
-		rootCmd.AddCommand(cmd)
-
-		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
-			return nil
-		}
-
-		t.Setenv("ASTRONOMER_KEY_ID", "key")
-		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
-
-		mockResp := TokenResponse{
-			AccessToken: "test-token",
-			IDToken:     "test-id",
-		}
-		jsonResponse, err := json.Marshal(mockResp)
-		assert.NoError(t, err)
-
-		client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-
-		err = Setup(cmd, []string{"vr-id"}, mockClient, mockCoreClient)
+		err = Setup(cmd, mockClient, mockCoreClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -265,13 +220,13 @@ func TestCheckAPIKeys(t *testing.T) {
 				StatusCode: 200,
 			},
 			JSON200: &[]astrocore.Organization{
-				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name"},
+				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name", Product: &mockOrganizationProduct},
 			},
 		}
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", "test-org-id", "").Return(mockDeplyResp, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
 
 		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
@@ -301,7 +256,7 @@ func TestCheckAPIKeys(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIKeys(mockClient, mockCoreClient, false, []string{})
+		_, err = checkAPIKeys(mockClient, mockCoreClient, false)
 		assert.NoError(t, err)
 	})
 }
@@ -339,12 +294,21 @@ func TestCheckToken(t *testing.T) {
 
 func TestCheckAPIToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockOrgsResponse := astrocore.ListOrganizationsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &[]astrocore.Organization{
+			{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name", Product: &mockOrganizationProduct},
+		},
+	}
+
 	t.Run("test context switch", func(t *testing.T) {
 		permissions := []string{
-			"",
 			"workspaceId:workspace-id",
 			"organizationId:org-ID",
-			"orgShortNameId:org-short-name",
+			"orgShortName:org-short-name",
 		}
 		mockClaims := util.CustomClaims{
 			Permissions: permissions,
@@ -358,6 +322,8 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
 		// Switch context
@@ -366,7 +332,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIToken(true, []string{})
+		_, err = checkAPIToken(true, mockCoreClient)
 		assert.NoError(t, err)
 	})
 
@@ -384,6 +350,8 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
 		// Switch context
@@ -392,7 +360,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIToken(true, []string{})
+		_, err = checkAPIToken(true, mockCoreClient)
 		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 }

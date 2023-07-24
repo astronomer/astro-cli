@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -68,6 +69,13 @@ var (
 	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
 )
 
+var (
+	sleepTime              = 90
+	dagOnlyDeploySleepTime = 30
+	tickNum                = 10
+	timeoutNum             = 180
+)
+
 type deploymentInfo struct {
 	deploymentID     string
 	namespace        string
@@ -89,6 +97,7 @@ type InputDeploy struct {
 	DeploymentName string
 	Prompt         bool
 	Dags           bool
+	WaitForStatus  bool
 	DagsPath       string
 }
 
@@ -101,6 +110,39 @@ func getRegistryURL(domain string) string {
 	}
 
 	return registry
+}
+
+func removeDagsFromDockerIgnore(fullpath string) error {
+	f, err := os.Open(fullpath)
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	var bs []byte
+	buf := bytes.NewBuffer(bs)
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		text := scanner.Text()
+		if text != "dags/" {
+			_, err = buf.WriteString(text + "\n")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, error) {
@@ -163,7 +205,7 @@ func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, 
 }
 
 // Deploy pushes a new docker image
-func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
+func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.CoreClient) error { //nolint
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -184,27 +226,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
-	// Deploy dags if deployInput runtimeId is virtual runtime
-	if strings.HasPrefix(deployInput.RuntimeID, "vr-") {
-		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
-			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
-
-			if !i {
-				fmt.Println("Canceling deploy...")
-				return nil
-			}
-		}
-		fmt.Println("Initiating DAG deploy for: " + deployInput.RuntimeID)
-		versionID, err := deployDags(deployInput.Path, dagsPath, deployInput.RuntimeID, client)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(versionID) + " to Astro. Go to the Astro UI to view your data pipeline. The Astro UI takes about 1 minute to update.")
-		return nil
-	}
-
-	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, client)
+	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, client, coreClient)
 	if err != nil {
 		return err
 	}
@@ -253,11 +275,34 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			return err
 		}
 
+		if deployInput.WaitForStatus {
+			// Keeping wait timeout low since dag only deploy is faster
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, dagOnlyDeploySleepTime, tickNum, timeoutNum, coreClient)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(versionID) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful." +
+				"\n\n Access your Deployment: \n" +
+				fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
+				fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
+
+			return nil
+		}
+
 		fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(versionID) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
 			"\n\n Access your Deployment: \n" +
 			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
 			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
+		fullpath := filepath.Join(deployInput.Path, ".dockerignore")
+		fileExist, _ := fileutil.Exists(fullpath, nil)
+		if fileExist {
+			err := removeDagsFromDockerIgnore(fullpath)
+			if err != nil {
+				return errors.New("Found dags entry in .dockerignore file. Remove this entry and try again")
+			}
+		}
 		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil)
 		if !envFileExists && deployInput.EnvFile != ".env" {
 			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
@@ -321,16 +366,23 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			}
 		}
 
-		fmt.Println("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
+		if deployInput.WaitForStatus {
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, timeoutNum, coreClient)
+			if err != nil {
+				return err
+			}
+		}
+
+		fmt.Println("Successfully pushed image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
 			"\n\n Access your Deployment: \n" +
-			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
-			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
+			fmt.Sprintf("\n Deployment View: %s", ansi.Bold("https://"+deploymentURL)) +
+			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold("https://"+deployInfo.webserverURL)))
 	}
 
 	return nil
 }
 
-func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, client astro.Client) (deploymentInfo, error) {
+func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, client astro.Client, coreClient astrocore.CoreClient) (deploymentInfo, error) {
 	// Use config deployment if provided
 	if deploymentID == "" {
 		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
@@ -345,7 +397,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, client)
+		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, client, coreClient)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
@@ -431,9 +483,8 @@ func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerH
 	if pytest != allTests && pytest != parseAndPytest {
 		pytestFile = pytest
 	}
-	pytestArgs := []string{pytestFile}
 
-	exitCode, err := containerHandler.Pytest(pytestArgs, "", deployImage)
+	exitCode, err := containerHandler.Pytest(pytestFile, "", deployImage, "")
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
@@ -477,6 +528,17 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	dockerIgnoreCreate := false
 	fullpath := filepath.Join(path, ".dockerignore")
 
+	defer func() {
+		// remove dags from .dockerignore file if we set it
+		if dagsIgnoreSet {
+			removeDagsFromDockerIgnore(fullpath) //nolint:errcheck
+		}
+		// remove created docker ignore file
+		if dockerIgnoreCreate {
+			os.Remove(fullpath)
+		}
+	}()
+
 	fileExist, _ := fileutil.Exists(fullpath, nil)
 	if !fileExist {
 		// Create a dockerignore file and add the dags folder entry
@@ -510,40 +572,9 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 		return err
 	}
 
-	defer func() {
-		// remove created docker ignore file
-		if dockerIgnoreCreate {
-			os.Remove(fullpath)
-		}
-	}()
-
 	// remove dags from .dockerignore file if we set it
 	if dagsIgnoreSet {
-		f, err := os.Open(fullpath)
-		if err != nil {
-			return err
-		}
-
-		defer f.Close()
-
-		var bs []byte
-		buf := bytes.NewBuffer(bs)
-
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			text := scanner.Text()
-			if text != "dags/" {
-				_, err = buf.WriteString(text + "\n")
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			return err
-		}
-		err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
+		err = removeDagsFromDockerIgnore(fullpath)
 		if err != nil {
 			return err
 		}

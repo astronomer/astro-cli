@@ -20,8 +20,8 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(imageName, settingsFile string, noCache, noBrowser bool, waitTime time.Duration) error
-	Stop() error
+	Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration) error
+	Stop(waitForExit bool) error
 	PS() error
 	Kill() error
 	Logs(follow bool, containerNames ...string) error
@@ -30,7 +30,8 @@ type ContainerHandler interface {
 	RunDAG(dagID, settingsFile, dagFile string, noCache, taskLogs bool) error
 	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
 	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error
-	Pytest(pytestArgs []string, customImageName, deployImageName string) (string, error)
+	ComposeExport(settingsFile, composeFile string) error
+	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string) (string, error)
 	Parse(customImageName, deployImageName string) error
 }
 
@@ -143,6 +144,8 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		PostgresPassword:      config.CFG.PostgresPassword.GetString(),
 		PostgresHost:          config.CFG.PostgresHost.GetString(),
 		PostgresPort:          config.CFG.PostgresPort.GetString(),
+		PostgresRepository:    config.CFG.PostgresRepository.GetString(),
+		PostgresTag:           config.CFG.PostgresTag.GetString(),
 		AirflowImage:          airflowImage,
 		AirflowHome:           airflowHome,
 		AirflowUser:           "astro",

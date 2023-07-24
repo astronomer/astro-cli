@@ -84,7 +84,7 @@ $ astro deployment runtime migrate --deployment-id=<deployment-id> --cancel
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deployment",
-		Aliases: []string{"de"},
+		Aliases: []string{"de", "deployments"},
 		Short:   "Manage Astronomer Deployments",
 		Long:    "Deployments are individual Airflow clusters running on an installation of the Astronomer platform.",
 	}
@@ -152,7 +152,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 	cmd.Flags().StringVarP(&deploymentCreateLabel, "label", "l", "", "Label of your deployment")
 	cmd.Flags().StringVarP(&executor, "executor", "e", celeryExecutorArg, "The executor used in your Airflow deployment, one of: local, celery, or kubernetes")
-	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
+	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired Airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	_ = cmd.MarkFlagRequired("label")
@@ -163,8 +163,8 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [deployment ID]",
 		Aliases: []string{"de"},
-		Short:   "Delete an airflow deployment",
-		Long:    "Delete an airflow deployment",
+		Short:   "Delete an Airflow Deployment",
+		Long:    "Delete an Airflow Deployment",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentDelete(cmd, args, out)
@@ -180,13 +180,13 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List airflow deployments",
-		Long:    "List airflow deployments",
+		Short:   "List Airflow Deployment",
+		Long:    "List Airflow Deployment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentList(cmd, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
+	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show Deployments across all Workspaces")
 	return cmd
 }
 
@@ -201,8 +201,8 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
-		Short:   "Update airflow deployments",
-		Long:    "Update airflow deployments",
+		Short:   "Update Airflow Deployments",
+		Long:    "Update Airflow Deployments",
 		Example: example,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -230,7 +230,7 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 	}
 
 	if triggererEnabled {
-		cmd.Flags().IntVarP(&updateTriggererReplicas, "triggerer-replicas", "", -1, "Number of replicas to use for triggerer airflow component, valid 0-2")
+		cmd.Flags().IntVarP(&updateTriggererReplicas, "triggerer-replicas", "", -1, "Number of replicas to use for triggerer Airflow component, valid 0-2")
 	}
 
 	//noline:dupl
@@ -245,11 +245,13 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 }
 
 func addGitSyncDeploymentFlags(cmd *cobra.Command) {
+	const defaultSyncInterval = 60
+
 	cmd.Flags().StringVarP(&gitRevision, "git-revision", "v", "", "Git revision (tag or hash) to check out")
 	cmd.Flags().StringVarP(&gitRepoURL, "git-repository-url", "u", "", "The repository URL of the git repo")
 	cmd.Flags().StringVarP(&gitBranchName, "git-branch-name", "b", "", "The Branch name of the git repo we will be syncing from")
 	cmd.Flags().StringVarP(&gitDAGDir, "dag-directory-path", "p", "", "The directory where dags are stored in repo")
-	cmd.Flags().IntVarP(&gitSyncInterval, "sync-interval", "s", 1, "The interval in seconds in which git-sync will be polling git for updates")
+	cmd.Flags().IntVarP(&gitSyncInterval, "sync-interval", "s", defaultSyncInterval, "The interval in seconds in which git-sync will be polling git for updates")
 	cmd.Flags().StringVarP(&sshKey, "ssh-key", "", "", "Path to the ssh public key file to use to clone your git repo")
 	cmd.Flags().StringVarP(&knowHosts, "known-hosts", "", "", "Path to the known hosts file to use to clone your git repo")
 }

@@ -2,13 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"net/http"
 	"os"
+	"time"
 
+	"github.com/astronomer/astro-cli/cmd/registry"
+
+	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
-	"github.com/astronomer/astro-cli/cmd/sql"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
@@ -37,11 +41,8 @@ func NewRootCmd() *cobra.Command {
 	var err error
 	httpClient := houston.NewHTTPClient()
 	houstonClient = houston.NewClient(httpClient)
-	houstonVersion, err = houstonClient.GetPlatformVersion(nil)
-	if err != nil {
-		softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
-	}
 
+	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
 	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
 
@@ -49,6 +50,10 @@ func NewRootCmd() *cobra.Command {
 	isCloudCtx := context.IsCloudContext()
 	if !isCloudCtx {
 		ctx = softwarePlatform
+		houstonVersion, err = houstonClient.GetPlatformVersion(nil)
+		if err != nil {
+			softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
+		}
 	}
 
 	rootCmd := &cobra.Command{
@@ -67,8 +72,8 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Check for latest version
 			if config.CFG.UpgradeMessage.GetBool() {
-				// create github client
-				githubClient := github.NewClient(nil)
+				// create github client with 3 second timeout, setting an aggressive timeout since its not mandatory to get a response in each command execution
+				githubClient := github.NewClient(&http.Client{Timeout: 3 * time.Second})
 				// compare current version to latest
 				err = version.CompareVersions(githubClient, "astronomer", "astro-cli")
 				if err != nil {
@@ -76,7 +81,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 				}
 			}
 			if isCloudCtx {
-				err = cloudCmd.Setup(cmd, args, astroClient, astroCoreClient)
+				err = cloudCmd.Setup(cmd, astroClient, astroCoreClient)
 				if err != nil {
 					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 				}
@@ -101,15 +106,9 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newRunCommand(),
 	)
 
-	if config.CFG.SQLCLI.GetBool() {
-		rootCmd.AddCommand(
-			sql.NewFlowCommand(),
-		)
-	}
-
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			cloudCmd.AddCmds(astroClient, astroCoreClient, os.Stdout)...,
+			cloudCmd.AddCmds(astroClient, astroCoreClient, airflowClient, os.Stdout)...,
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(
@@ -117,6 +116,10 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		)
 		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}
+
+	rootCmd.AddCommand( // include all the commands for interacting with the registry
+		registry.AddCmds(os.Stdout)...,
+	)
 
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")

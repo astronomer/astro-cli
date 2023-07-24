@@ -66,6 +66,8 @@ var (
 		PostgresPassword:      newCfg("postgres.password", "postgres"),
 		PostgresHost:          newCfg("postgres.host", "postgres"),
 		PostgresPort:          newCfg("postgres.port", "5432"),
+		PostgresRepository:    newCfg("postgres.repository", "docker.io/postgres"),
+		PostgresTag:           newCfg("postgres.tag", "12.6"),
 		ProjectDeployment:     newCfg("project.deployment", ""),
 		ProjectName:           newCfg("project.name", ""),
 		ProjectWorkspace:      newCfg("project.workspace", ""),
@@ -79,8 +81,6 @@ var (
 		SkipParse:             newCfg("skip_parse", "false"),
 		Interactive:           newCfg("interactive", "false"),
 		PageSize:              newCfg("page_size", "20"),
-		SQLCLI:                newCfg("beta.sql_cli", "false"),
-		AuditLogs:             newCfg("beta.audit_logs", "false"),
 		UpgradeMessage:        newCfg("upgrade_message", "true"),
 		DisableAstroRun:       newCfg("disable_astro_run", "false"),
 	}

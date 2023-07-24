@@ -27,6 +27,8 @@ type cfgs struct {
 	PostgresPassword      cfg
 	PostgresHost          cfg
 	PostgresPort          cfg
+	PostgresRepository    cfg
+	PostgresTag           cfg
 	ProjectName           cfg
 	ProjectDeployment     cfg
 	ProjectWorkspace      cfg
@@ -39,7 +41,6 @@ type cfgs struct {
 	SkipParse             cfg
 	Interactive           cfg
 	PageSize              cfg
-	SQLCLI                cfg
 	AuditLogs             cfg
 	UpgradeMessage        cfg
 	DisableAstroRun       cfg

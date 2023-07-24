@@ -1,10 +1,13 @@
 package cloud
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/stretchr/testify/mock"
 
@@ -12,10 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewDeploymentInspectCmd(t *testing.T) {
-	expectedHelp := "Inspect an Astro Deployment."
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	deploymentResponse := []astro.Deployment{
+var (
+	deploymentResponse = []astro.Deployment{
 		{
 			ID:          "test-deployment-id",
 			Label:       "test-deployment-label",
@@ -102,8 +103,32 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 			},
 		},
 	}
+	mockCoreDeploymentResponse = []astrocore.Deployment{
+		{
+			Status: "HEALTHY",
+		},
+	}
+	mockListDeploymentsResponse = astrocore.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.DeploymentsPaginated{
+			Deployments: mockCoreDeploymentResponse,
+		},
+	}
+	depIds               = []string{"test-deployment-id"}
+	deploymentListParams = &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds,
+	}
+)
+
+func TestNewDeploymentInspectCmd(t *testing.T) {
+	expectedHelp := "Inspect an Astro Deployment."
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 	astroClient = mockClient
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mockCoreClient
 	t.Run("-h prints help", func(t *testing.T) {
 		cmdArgs := []string{"inspect", "-h"}
 		resp, err := execDeploymentCmd(cmdArgs...)
@@ -111,6 +136,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		assert.Contains(t, resp, expectedHelp)
 	})
 	t.Run("returns deployment in yaml format when a deployment name was provided", func(t *testing.T) {
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		cmdArgs := []string{"inspect", "-n", "test-deployment-label"}
 		resp, err := execDeploymentCmd(cmdArgs...)
@@ -122,6 +148,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 	})
 	t.Run("returns deployment in yaml format when a deployment id was provided", func(t *testing.T) {
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		cmdArgs := []string{"inspect", "test-deployment-id"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -132,6 +159,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 	})
 	t.Run("returns deployment template in yaml format when a deployment id was provided", func(t *testing.T) {
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		cmdArgs := []string{"inspect", "test-deployment-id", "--template"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -142,6 +170,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 	})
 	t.Run("returns a deployment's specific field", func(t *testing.T) {
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		cmdArgs := []string{"inspect", "-n", "test-deployment-label", "-k", "metadata.cluster_id"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)

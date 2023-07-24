@@ -8,37 +8,47 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/yaml.v3"
 
 	"github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/cloud/organization"
 )
 
 type deploymentMetadata struct {
-	DeploymentID   *string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
-	WorkspaceID    *string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
-	ClusterID      *string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
-	ReleaseName    *string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
-	AirflowVersion *string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
-	CurrentTag     *string    `mapstructure:"current_tag" yaml:"current_tag" json:"current_tag"`
-	Status         *string    `mapstructure:"status" yaml:"status" json:"status"`
-	CreatedAt      *time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
-	UpdatedAt      *time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
-	DeploymentURL  *string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
-	WebserverURL   *string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
+	DeploymentID     *string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
+	WorkspaceID      *string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
+	ClusterID        *string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
+	ReleaseName      *string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
+	AirflowVersion   *string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
+	CurrentTag       *string    `mapstructure:"current_tag" yaml:"current_tag" json:"current_tag"`
+	Status           *string    `mapstructure:"status" yaml:"status" json:"status"`
+	CreatedAt        *time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
+	UpdatedAt        *time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	DeploymentURL    *string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
+	WebserverURL     *string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
+	WorkloadIdentity *string    `mapstructure:"workload_identity" yaml:"workload_identity" json:"workload_identity"`
 }
 
 type deploymentConfig struct {
-	Name             string `mapstructure:"name" yaml:"name" json:"name"`
-	Description      string `mapstructure:"description" yaml:"description" json:"description"`
-	RunTimeVersion   string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
-	DagDeployEnabled bool   `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
-	Executor         string `mapstructure:"executor" yaml:"executor" json:"executor"`
-	SchedulerAU      int    `mapstructure:"scheduler_au" yaml:"scheduler_au" json:"scheduler_au"`
-	SchedulerCount   int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
-	ClusterName      string `mapstructure:"cluster_name" yaml:"cluster_name" json:"cluster_name"`
-	WorkspaceName    string `mapstructure:"workspace_name" yaml:"workspace_name" json:"workspace_name"`
+	Name                  string `mapstructure:"name" yaml:"name" json:"name"`
+	Description           string `mapstructure:"description" yaml:"description" json:"description"`
+	RunTimeVersion        string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
+	DagDeployEnabled      bool   `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
+	APIKeyOnlyDeployments bool   `mapstructure:"ci_cd_enforcement" yaml:"ci_cd_enforcement" json:"ci_cd_enforcement"`
+	SchedulerSize         string `mapstructure:"scheduler_size" yaml:"scheduler_size" json:"scheduler_size"`
+	IsHighAvailability    bool   `mapstructure:"is_high_availability" yaml:"is_high_availability" json:"is_high_availability"`
+	Executor              string `mapstructure:"executor" yaml:"executor" json:"executor"`
+	SchedulerAU           int    `mapstructure:"scheduler_au" yaml:"scheduler_au" json:"scheduler_au"`
+	SchedulerCount        int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
+	ClusterName           string `mapstructure:"cluster_name" yaml:"cluster_name" json:"cluster_name"`
+	WorkspaceName         string `mapstructure:"workspace_name" yaml:"workspace_name" json:"workspace_name"`
+	DeploymentType        string `mapstructure:"deployment_type" yaml:"deployment_type" json:"deployment_type"`
+	CloudProvider         string `mapstructure:"cloud_provider" yaml:"cloud_provider" json:"cloud_provider"`
+	Region                string `mapstructure:"region" yaml:"region" json:"region"`
 }
 
 type Workerq struct {
@@ -78,10 +88,13 @@ var (
 )
 
 const (
-	jsonFormat = "json"
+	jsonFormat    = "json"
+	notApplicable = "N/A"
+	// max number of characters for gcp service accounts
+	gcpMaxChar = 30
 )
 
-func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, out io.Writer, requestedField string, template bool) error {
+func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, requestedField string, template bool) error {
 	var (
 		requestedDeployment                                                        astro.Deployment
 		err                                                                        error
@@ -89,13 +102,24 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, client)
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, true, client, coreClient)
+	if err != nil {
+		return err
+	}
+
+	if requestedDeployment.ID == "" {
+		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(wsID))
+		return nil
+	}
+
+	// get core deployment
+	coreDeployment, err := deployment.CoreGetDeployment(wsID, "", requestedDeployment.ID, coreClient)
 	if err != nil {
 		return err
 	}
 
 	// create a map for deployment.information
-	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment)
+	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment, coreDeployment)
 	if err != nil {
 		return err
 	}
@@ -123,7 +147,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 	return nil
 }
 
-func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface{}, error) {
+func getDeploymentInfo(sourceDeployment *astro.Deployment, coreDeployment astrocore.Deployment) (map[string]interface{}, error) { //nolint
 	var (
 		deploymentURL string
 		err           error
@@ -133,37 +157,58 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 	if err != nil {
 		return nil, err
 	}
+	clusterID := sourceDeployment.Cluster.ID
+	releaseName := sourceDeployment.ReleaseName
+	if organization.IsOrgHosted() {
+		if deployment.IsDeploymentHosted(sourceDeployment.Type) {
+			clusterID = sourceDeployment.Cluster.Region
+		}
+		releaseName = notApplicable
+	}
 	return map[string]interface{}{
-		"deployment_id":   sourceDeployment.ID,
-		"workspace_id":    sourceDeployment.Workspace.ID,
-		"cluster_id":      sourceDeployment.Cluster.ID,
-		"airflow_version": sourceDeployment.RuntimeRelease.AirflowVersion,
-		"current_tag":     sourceDeployment.DeploymentSpec.Image.Tag,
-		"release_name":    sourceDeployment.ReleaseName,
-		"deployment_url":  deploymentURL,
-		"webserver_url":   sourceDeployment.DeploymentSpec.Webserver.URL,
-		"created_at":      sourceDeployment.CreatedAt,
-		"updated_at":      sourceDeployment.UpdatedAt,
-		"status":          sourceDeployment.Status,
+		"deployment_id":     sourceDeployment.ID,
+		"workspace_id":      sourceDeployment.Workspace.ID,
+		"cluster_id":        clusterID,
+		"airflow_version":   sourceDeployment.RuntimeRelease.AirflowVersion,
+		"current_tag":       sourceDeployment.DeploymentSpec.Image.Tag,
+		"release_name":      releaseName,
+		"deployment_url":    deploymentURL,
+		"webserver_url":     sourceDeployment.DeploymentSpec.Webserver.URL,
+		"created_at":        sourceDeployment.CreatedAt,
+		"updated_at":        sourceDeployment.UpdatedAt,
+		"workload_identity": getWorkloadIdentity(sourceDeployment),
+		"status":            coreDeployment.Status,
 	}, nil
 }
 
 func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interface{} {
+	clusterName := sourceDeployment.Cluster.Name
+	if organization.IsOrgHosted() {
+		if deployment.IsDeploymentHosted(sourceDeployment.Type) {
+			clusterName = sourceDeployment.Cluster.Region
+		}
+	}
 	return map[string]interface{}{
-		"name":               sourceDeployment.Label,
-		"description":        sourceDeployment.Description,
-		"workspace_name":     sourceDeployment.Workspace.Label,
-		"cluster_name":       sourceDeployment.Cluster.Name,
-		"runtime_version":    sourceDeployment.RuntimeRelease.Version,
-		"dag_deploy_enabled": sourceDeployment.DagDeployEnabled,
-		"scheduler_au":       sourceDeployment.DeploymentSpec.Scheduler.AU,
-		"scheduler_count":    sourceDeployment.DeploymentSpec.Scheduler.Replicas,
-		"executor":           sourceDeployment.DeploymentSpec.Executor,
+		"name":                 sourceDeployment.Label,
+		"description":          sourceDeployment.Description,
+		"workspace_name":       sourceDeployment.Workspace.Label,
+		"deployment_type":      sourceDeployment.Type,
+		"cloud_provider":       sourceDeployment.Cluster.CloudProvider,
+		"region":               sourceDeployment.Cluster.Region,
+		"cluster_name":         clusterName,
+		"runtime_version":      sourceDeployment.RuntimeRelease.Version,
+		"dag_deploy_enabled":   sourceDeployment.DagDeployEnabled,
+		"ci_cd_enforcement":    sourceDeployment.APIKeyOnlyDeployments,
+		"scheduler_size":       sourceDeployment.SchedulerSize,
+		"is_high_availability": sourceDeployment.IsHighAvailability,
+		"scheduler_au":         sourceDeployment.DeploymentSpec.Scheduler.AU,
+		"scheduler_count":      sourceDeployment.DeploymentSpec.Scheduler.Replicas,
+		"executor":             sourceDeployment.DeploymentSpec.Executor,
 	}
 }
 
 func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
-	qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor)
+	qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor, sourceDeployment.Type)
 	return map[string]interface{}{
 		"alert_emails":          sourceDeployment.AlertEmails,
 		"worker_queues":         qList,
@@ -171,10 +216,46 @@ func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
 	}
 }
 
-func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool, sourceExecutor string) []map[string]interface{} {
+func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astro.Client, coreClient astrocore.CoreClient, requestedField string) (value any, err error) {
+	var (
+		requestedDeployment                                                        astro.Deployment
+		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
+	)
+	// get or select the deployment
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, false, client, coreClient)
+	if err != nil {
+		return nil, err
+	}
+
+	// get core deployment
+	coreDeployment, err := deployment.CoreGetDeployment(wsID, "", requestedDeployment.ID, coreClient)
+	if err != nil {
+		return nil, err
+	}
+
+	// create a map for deployment.information
+	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment, coreDeployment)
+	if err != nil {
+		return nil, err
+	}
+	// create a map for deployment.configuration
+	deploymentConfigMap = getDeploymentConfig(&requestedDeployment)
+	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.astronomer_variables
+	additionalMap = getAdditional(&requestedDeployment)
+	// create a map for the entire deployment
+	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
+
+	value, err = getSpecificField(printableDeployment, requestedField)
+	if err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
+func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool, sourceExecutor, deploymentType string) []map[string]interface{} {
 	var resources map[string]interface{}
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))
-	for _, queue := range sourceDeploymentQs {
+	for _, queue := range sourceDeploymentQs { //nolint
 		if sourceExecutor == "CeleryExecutor" {
 			resources = map[string]interface{}{
 				"max_worker_count":   queue.MaxWorkerCount,
@@ -187,10 +268,16 @@ func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.Nod
 				"pod_ram": queue.PodRAM,
 			}
 		}
+		var workerType string
+		if deployment.IsDeploymentDedicated(deploymentType) || deployment.IsDeploymentHosted(deploymentType) {
+			workerType = queue.AstroMachine
+		} else {
+			workerType = getWorkerTypeFromNodePoolID(queue.NodePoolID, sourceNodePools)
+		}
 		newQ := map[string]interface{}{
 			"name": queue.Name,
 			// map worker type to node pool id
-			"worker_type": getWorkerTypeFromNodePoolID(queue.NodePoolID, sourceNodePools),
+			"worker_type": workerType,
 		}
 
 		// add resources to queue
@@ -313,4 +400,24 @@ func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
 	template.Deployment.EnvVars = newEnvVars
 
 	return template
+}
+
+func getWorkloadIdentity(de *astro.Deployment) string {
+	// deployment workload identity only applies to AWS and GCP for now
+	if de.Cluster.CloudProvider == "gcp" {
+		return fmt.Sprintf("%s@%s.iam.gserviceaccount.com", getGCPServiceAccountName(de), de.Cluster.ProviderAccount)
+	}
+	if de.Cluster.CloudProvider == "aws" {
+		return fmt.Sprintf("arn:aws:iam::%s:role/AirflowS3Logs-%s", de.Cluster.ProviderAccount, de.Cluster.ID)
+	}
+	return ""
+}
+
+func getGCPServiceAccountName(d *astro.Deployment) string {
+	name := fmt.Sprintf("astro-%s", d.ReleaseName)
+	if len(name) > gcpMaxChar { // GCP service accounts can only have a max of 30 characters
+		truncated := name[:gcpMaxChar]
+		return strings.TrimRight(truncated, "-") // for cosmetics, ensure the last character isn't a hyphen
+	}
+	return name
 }

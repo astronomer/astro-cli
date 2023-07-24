@@ -2,7 +2,6 @@ package cloud
 
 import (
 	"fmt"
-	"strings"
 
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cmd/utils"
@@ -20,6 +19,7 @@ var (
 	pytest           bool
 	parse            bool
 	dags             bool
+	waitForDeploy    bool
 	dagsPath         string
 	deployExample    = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
@@ -68,6 +68,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
+	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
 	return cmd
 }
@@ -96,7 +97,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	if (!strings.HasPrefix(deploymentID, "vr-")) && (deploymentID == "" || forcePrompt || workspaceID == "") {
+	if deploymentID == "" || forcePrompt || workspaceID == "" {
 		var err error
 		workspaceID, err = coalesceWorkspace()
 		if err != nil {
@@ -137,8 +138,9 @@ func deploy(cmd *cobra.Command, args []string) error {
 		DeploymentName: deploymentName,
 		Prompt:         forcePrompt,
 		Dags:           dags,
+		WaitForStatus:  waitForDeploy,
 		DagsPath:       dagsPath,
 	}
 
-	return DeployImage(deployInput, astroClient)
+	return DeployImage(deployInput, astroClient, astroCoreClient)
 }

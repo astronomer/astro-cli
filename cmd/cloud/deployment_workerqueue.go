@@ -3,25 +3,27 @@ package cloud
 import (
 	"io"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
 )
 
 var (
-	concurrency    int
-	minWorkerCount int
-	maxWorkerCount int
-	workerType     string
-	name           string
-	force          bool
+	concurrency        int
+	minWorkerCount     int
+	maxWorkerCount     int
+	workerType         string
+	name               string
+	force              bool
+	errZeroConcurrency = errors.New("Worker concurrency cannot be 0. Minimum value starts from 1")
 )
 
 func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "worker-queue",
-		Aliases: []string{"wq"},
-		Short:   "Manage deployment worker queues",
+		Aliases: []string{"wq", "worker-queues"},
+		Short:   "Manage Deployment worker queues",
 		Long:    "Manage worker queues for an Astro Deployment.",
 	}
 	cmd.AddCommand(
@@ -100,7 +102,11 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 		return err
 	}
 
-	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroClient, out)
+	if cmd.Flags().Changed("concurrency") && concurrency == 0 {
+		return errZeroConcurrency
+	}
+
+	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroClient, astroCoreClient, out)
 }
 
 func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -110,5 +116,5 @@ func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	return workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroClient, out)
+	return workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroClient, astroCoreClient, out)
 }

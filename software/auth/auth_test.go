@@ -35,29 +35,28 @@ func TestBasicAuth(t *testing.T) {
 		password string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
+		name         string
+		args         args
+		want         string
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "successfully authenticated",
-			args:    args{username: "test", password: "test"},
-			want:    mockToken,
-			wantErr: false,
+			name:         "successfully authenticated",
+			args:         args{username: "test", password: "test"},
+			want:         mockToken,
+			errAssertion: assert.NoError,
 		},
 		{
-			name:    "successfully authenticated without password",
-			args:    args{username: "test"},
-			want:    mockToken,
-			wantErr: false,
+			name:         "successfully authenticated without password",
+			args:         args{username: "test"},
+			want:         mockToken,
+			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := basicAuth(tt.args.username, tt.args.password, &config.Context{}, houstonMock)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("basicAuth() error = %v, wantErr %v", err, tt.wantErr)
+			if !tt.errAssertion(t, err) {
 				return
 			}
 			if got != tt.want {
@@ -141,34 +140,29 @@ func TestRegistryAuthSuccess(t *testing.T) {
 	houstonMock.On("GetAppConfig", nil).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil)
 
 	tests := []struct {
-		name    string
-		domain  string
-		wantErr bool
-		err     error
+		name         string
+		domain       string
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "localhost domain",
-			domain:  "localhost",
-			wantErr: false,
-			err:     nil,
+			name:         "localhost domain",
+			domain:       "localhost",
+			errAssertion: assert.NoError,
 		},
 		{
-			name:    "houston domain",
-			domain:  "houston",
-			wantErr: false,
-			err:     nil,
+			name:         "houston domain",
+			domain:       "houston",
+			errAssertion: assert.NoError,
 		},
 		{
-			name:    "localhost platform domain",
-			domain:  "localhost.me",
-			wantErr: false,
-			err:     nil,
+			name:         "localhost platform domain",
+			domain:       "localhost.me",
+			errAssertion: assert.NoError,
 		},
 		{
-			name:    "platform dev domain",
-			domain:  "test.astro.io",
-			wantErr: false,
-			err:     nil,
+			name:         "platform dev domain",
+			domain:       "test.astro.io",
+			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
@@ -180,13 +174,7 @@ func TestRegistryAuthSuccess(t *testing.T) {
 			err = ctx.SwitchContext()
 			assert.NoError(t, err)
 
-			err = registryAuth(houstonMock, out)
-			if tt.wantErr {
-				assert.NotNil(t, err)
-				assert.ErrorIs(t, err, tt.err)
-			} else {
-				assert.NoError(t, err)
-			}
+			tt.errAssertion(t, registryAuth(houstonMock, out))
 		})
 	}
 	mockRegistryHandler.AssertExpectations(t)
@@ -253,8 +241,7 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock.On("ValidateWorkspaceID", "test-workspace-id").Return(&houston.Workspace{ID: "test-workspace-id"}, nil).Once()
 
 		out := &bytes.Buffer{}
-		if err := Login("localhost", false, "test", "test", "0.29.0", houstonMock, out); (err != nil) != false {
-			t.Errorf("Login() error = %v, wantErr %v", err, false)
+		if !assert.NoError(t, Login("localhost", false, "test", "test", "0.29.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
@@ -263,8 +250,7 @@ func TestLoginSuccess(t *testing.T) {
 
 		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
 		out = &bytes.Buffer{}
-		if err := Login("localhost", false, "test", "test", "0.30.0", houstonMock, out); (err != nil) != false {
-			t.Errorf("Login() error = %v, wantErr %v", err, false)
+		if assert.NoError(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-id"}, gotOut) {
@@ -294,8 +280,7 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock.On("ValidateWorkspaceID", "ck05r3bor07h40d02y2hw4n4v").Return(&houston.Workspace{}, nil).Once()
 
 		out := &bytes.Buffer{}
-		if err := Login("localhost", false, "test", "test", "0.30.0", houstonMock, out); (err != nil) != false {
-			t.Errorf("Login() error = %v, wantErr %v", err, false)
+		if assert.NoError(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-id"}, gotOut) {
@@ -324,8 +309,7 @@ func TestLoginSuccess(t *testing.T) {
 		}
 
 		out := &bytes.Buffer{}
-		if err := Login("localhost", false, "test", "test", "0.30.0", houstonMock, out); (err != nil) != false {
-			t.Errorf("Login() error = %v, wantErr %v", err, false)
+		if assert.NoError(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "ck05r3bor07h40d02y2hw4n4v"}, gotOut) {
@@ -357,8 +341,7 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock.On("ValidateWorkspaceID", "test-workspace-1").Return(&houston.Workspace{}, nil).Once()
 
 		out := &bytes.Buffer{}
-		if err := Login("localhost", false, "test", "test", "0.30.0", houstonMock, out); (err != nil) != false {
-			t.Errorf("Login() error = %v, wantErr %v", err, false)
+		if assert.NoError(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-1"}, gotOut) {
@@ -380,8 +363,7 @@ func TestLoginFailure(t *testing.T) {
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(nil, errMockRegistry)
 
 		out := &bytes.Buffer{}
-		if err := Login("localhost", false, "test", "test", "0.30.0", houstonMock, out); !errors.Is(err, errMockRegistry) {
-			t.Errorf("Login() error = %v, wantErr %v", err, errMockRegistry)
+		if !assert.ErrorIs(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
@@ -396,8 +378,7 @@ func TestLoginFailure(t *testing.T) {
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything).Return("", errMockRegistry)
 
 		out := &bytes.Buffer{}
-		if err := Login("localhost", false, "test", "test", "0.30.0", houstonMock, out); !errors.Is(err, errMockRegistry) {
-			t.Errorf("Login() error = %v, wantErr %v", err, errMockRegistry)
+		if assert.ErrorIs(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
@@ -413,8 +394,7 @@ func TestLoginFailure(t *testing.T) {
 		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{}, errMockRegistry).Once()
 
 		out := &bytes.Buffer{}
-		if err := Login("localhost", false, "test", "test", "0.30.0", houstonMock, out); !errors.Is(err, errMockRegistry) {
-			t.Errorf("Login() error = %v, wantErr %v", err, errMockRegistry)
+		if assert.ErrorIs(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
@@ -431,8 +411,7 @@ func TestLoginFailure(t *testing.T) {
 		houstonMock.On("GetAppConfig", nil).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil)
 
 		out := &bytes.Buffer{}
-		if err := Login("dev.astro.io", false, "test", "test", "0.30.0", houstonMock, out); !errors.Is(err, nil) {
-			t.Errorf("Login() error = %v, wantErr %v", err, nil)
+		if assert.NoError(t, Login("dev.astro.io", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"dev.astro.io", "No default workspace detected"}, gotOut) {
@@ -455,8 +434,7 @@ func TestLoginFailure(t *testing.T) {
 		}
 
 		out := &bytes.Buffer{}
-		if err := Login("test.astro.io", false, "test", "test", "0.30.0", houstonMock, out); !errors.Is(err, nil) {
-			t.Errorf("Login() error = %v, wantErr %v", err, nil)
+		if assert.NoError(t, Login("test.astro.io", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"test.astro.io", "Failed to authenticate to the registry"}, gotOut) {
@@ -505,26 +483,24 @@ func TestCheckClusterDomain(t *testing.T) {
 		domain string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name         string
+		args         args
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "new domain, not present in existing domains",
-			args:    args{domain: "test.astro.io"},
-			wantErr: false,
+			name:         "new domain, not present in existing domains",
+			args:         args{domain: "test.astro.io"},
+			errAssertion: assert.NoError,
 		},
 		{
-			name:    "switch to existing domain",
-			args:    args{domain: "localhost"},
-			wantErr: false,
+			name:         "switch to existing domain",
+			args:         args{domain: "localhost"},
+			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := checkClusterDomain(tt.args.domain); (err != nil) != tt.wantErr {
-				t.Errorf("checkClusterDomain() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			tt.errAssertion(t, checkClusterDomain(tt.args.domain))
 		})
 	}
 }
@@ -545,29 +521,28 @@ func TestGetAuthTokenSuccess(t *testing.T) {
 		ctx        *config.Context
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
+		name         string
+		args         args
+		want         string
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "basic test with user & pass",
-			args:    args{username: "test", password: "test", authConfig: &houston.AuthConfig{LocalEnabled: true}, ctx: &config.Context{Domain: "localhost"}},
-			want:    mockToken,
-			wantErr: false,
+			name:         "basic test with user & pass",
+			args:         args{username: "test", password: "test", authConfig: &houston.AuthConfig{LocalEnabled: true}, ctx: &config.Context{Domain: "localhost"}},
+			want:         mockToken,
+			errAssertion: assert.NoError,
 		},
 		{
-			name:    "basic test with oauth token",
-			args:    args{username: "", password: "", authConfig: &houston.AuthConfig{LocalEnabled: true, AuthProviders: []houston.AuthProvider{{Name: "oAuth-test-provider"}}}, ctx: &config.Context{Domain: "localhost"}},
-			want:    "",
-			wantErr: false,
+			name:         "basic test with oauth token",
+			args:         args{username: "", password: "", authConfig: &houston.AuthConfig{LocalEnabled: true, AuthProviders: []houston.AuthProvider{{Name: "oAuth-test-provider"}}}, ctx: &config.Context{Domain: "localhost"}},
+			want:         "",
+			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := getAuthToken(tt.args.username, tt.args.password, tt.args.authConfig, tt.args.ctx, houstonMock)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getAuthToken() error = %v, wantErr %v", err, tt.wantErr)
+			if !tt.errAssertion(t, err) {
 				return
 			}
 			if got != tt.want {
@@ -586,8 +561,7 @@ func TestGetAuthTokenFailure(t *testing.T) {
 	config.InitConfig(fs)
 
 	got, err := getAuthToken("", "", &houston.AuthConfig{LocalEnabled: true}, &config.Context{Domain: "localhost"}, nil)
-	if !errors.Is(err, errOAuthDisabled) {
-		t.Errorf("getAuthToken() error = %v, wantErr %v", err, errOAuthDisabled)
+	if !assert.ErrorIs(t, err, errOAuthDisabled) {
 		return
 	}
 	assert.Equal(t, got, "")
@@ -596,8 +570,7 @@ func TestGetAuthTokenFailure(t *testing.T) {
 	houstonMock.On("AuthenticateWithBasicAuth", mock.Anything).Return("", errMockRegistry)
 
 	_, err = getAuthToken("test", "test", &houston.AuthConfig{LocalEnabled: true}, &config.Context{Domain: "localhost"}, houstonMock)
-	if !errors.Is(err, errMockRegistry) {
-		t.Errorf("getAuthToken() error = %v, wantErr %v", err, errMockRegistry)
+	if !assert.ErrorIs(t, err, errMockRegistry) {
 		return
 	}
 	houstonMock.AssertExpectations(t)

@@ -64,12 +64,15 @@ class magic_dict(dict):
         return {}.get(key, "MOCKED_KEY_VALUE")
 
 
-def variable_get_monkeypatch(key: str, default_var=None, deserialize_json=False):
+_no_default = object()  # allow falsey defaults
+
+
+def variable_get_monkeypatch(key: str, default_var=_no_default, deserialize_json=False):
     print(
         f"Attempted to get Variable value during parse, returning a mocked value for {key}"
     )
 
-    if default_var:
+    if default_var is not _no_default:
         return default_var
     if deserialize_json:
         return magic_dict()

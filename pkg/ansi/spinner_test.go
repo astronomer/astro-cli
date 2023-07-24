@@ -3,6 +3,8 @@ package ansi
 import (
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var errMock = errors.New("mock error")
@@ -13,26 +15,26 @@ func TestSpinner(t *testing.T) {
 		fn   func() error
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name         string
+		args         args
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "basic case",
-			args:    args{text: "testing", fn: func() error { return nil }},
-			wantErr: false,
+			name:         "basic case",
+			args:         args{text: "testing", fn: func() error { return nil }},
+			errAssertion: assert.NoError,
 		},
 		{
-			name:    "basic error case",
-			args:    args{text: "testing", fn: func() error { return errMock }},
-			wantErr: true,
+			name: "basic error case",
+			args: args{text: "testing", fn: func() error { return errMock }},
+			errAssertion: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
+				return assert.ErrorIs(t, err, errMock, msgAndArgs...)
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := Spinner(tt.args.text, tt.args.fn); (err != nil) != tt.wantErr && !errors.Is(err, errMock) {
-				t.Errorf("Spinner() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			tt.errAssertion(t, Spinner(tt.args.text, tt.args.fn))
 		})
 	}
 }

@@ -14,6 +14,8 @@ import (
 	"github.com/spf13/afero"
 )
 
+const openPermissions = 0o777
+
 var (
 	perm     os.FileMode = 0o777
 	openFile             = os.OpenFile
@@ -153,6 +155,14 @@ func Read(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
+func ReadFileToString(filename string) (string, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 func Contains(elems []string, param string) (exist bool, position int) {
 	for index, elem := range elems {
 		if param == elem {
@@ -218,4 +228,11 @@ func RemoveLineFromFile(filePath, lineText, commentText string) error {
 	}
 	f.Close()
 	return err
+}
+
+func CreateFile(p string) (*os.File, error) {
+	if err := os.MkdirAll(filepath.Dir(p), openPermissions); err != nil {
+		return nil, err
+	}
+	return os.Create(p)
 }

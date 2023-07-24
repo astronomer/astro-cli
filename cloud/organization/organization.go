@@ -35,7 +35,8 @@ func newTableOut() *printutil.Table {
 }
 
 func ListOrganizations(coreClient astrocore.CoreClient) ([]astrocore.Organization, error) {
-	resp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
+	organizationListParams := &astrocore.ListOrganizationsParams{}
+	resp, err := coreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 	if err != nil {
 		return nil, err
 	}
@@ -115,8 +116,13 @@ func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (*
 
 func SwitchWithContext(domain string, targetOrg *astrocore.Organization, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 	c, _ := context.GetCurrentContext()
+
 	// reset org context
-	_ = c.SetOrganizationContext(targetOrg.Id, targetOrg.ShortName)
+	orgProduct := "HYBRID"
+	if targetOrg.Product != nil {
+		orgProduct = fmt.Sprintf("%s", *targetOrg.Product) //nolint
+	}
+	_ = c.SetOrganizationContext(targetOrg.Id, targetOrg.ShortName, orgProduct)
 	// need to reset all relevant keys because of https://github.com/spf13/viper/issues/1106 :shrug
 	_ = c.SetContextKey("token", c.Token)
 	_ = c.SetContextKey("refreshtoken", c.RefreshToken)
@@ -163,6 +169,11 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 	if targetOrg == nil {
 		return errInvalidOrganizationName
 	}
+
+	if targetOrg.Id == c.Organization {
+		fmt.Fprintln(out, "You selected the same organization as the current one. No switch was made")
+		return nil
+	}
 	return SwitchWithContext(c.Domain, targetOrg, astroClient, coreClient, out)
 }
 
@@ -178,5 +189,32 @@ func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earlies
 		return err
 	}
 	logStreamBuffer.Close()
+	fmt.Println("Finished exporting logs to local GZIP file")
 	return nil
+}
+
+func IsOrgHosted() bool {
+	c, _ := context.GetCurrentContext()
+	return c.OrganizationProduct == "HOSTED"
+}
+
+func ListClusters(organizationShortName string, coreClient astrocore.CoreClient) ([]astrocore.Cluster, error) {
+	clusterTypes := []astrocore.ListClustersParamsTypes{astrocore.ListClustersParamsTypesBRINGYOUROWNCLOUD, astrocore.ListClustersParamsTypesHOSTED}
+	limit := 1000
+	clusterListParams := &astrocore.ListClustersParams{
+		Types: &clusterTypes,
+		Limit: &limit,
+	}
+	resp, err := coreClient.ListClustersWithResponse(http_context.Background(), organizationShortName, clusterListParams)
+	if err != nil {
+		return nil, err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	csPaginated := *resp.JSON200
+	cs := csPaginated.Clusters
+
+	return cs, nil
 }
