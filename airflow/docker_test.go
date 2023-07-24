@@ -988,12 +988,15 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 	pipFreeze := "upgrade-test-old-version->new-version/pip_freeze_old-version.txt"
 	pipFreeze2 := "upgrade-test-old-version->new-version/pip_freeze_new-version.txt"
 	parseTest := cwd + "/.astro/test_dag_integrity_default.py"
+	oldDockerFile := cwd + "/Dockerfile"
 	// Write files out
 	err = fileutil.WriteStringToFile(pipFreeze, pipFreezeFile)
 	assert.NoError(t, err)
 	err = fileutil.WriteStringToFile(pipFreeze2, pipFreezeFile2)
 	assert.NoError(t, err)
 	err = fileutil.WriteStringToFile(parseTest, "")
+	assert.NoError(t, err)
+	err = fileutil.WriteStringToFile(oldDockerFile, "")
 	assert.NoError(t, err)
 
 	defer afero.NewOsFs().Remove(pipFreeze)
@@ -1002,6 +1005,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 	defer afero.NewOsFs().Remove("upgrade-test-old-version->new-version/Dockerfile")
 	defer afero.NewOsFs().Remove("upgrade-test-old-version->new-version/dependency_compare.txt")
 	defer afero.NewOsFs().Remove("upgrade-test-old-version->new-version")
+	defer afero.NewOsFs().Remove(oldDockerFile)
 
 	t.Run("success no deployment id", func(t *testing.T) {
 		imageHandler := new(mocks.ImageHandler)
