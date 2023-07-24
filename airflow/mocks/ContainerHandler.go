@@ -199,13 +199,13 @@ func (_m *ContainerHandler) Start(imageName string, settingsFile string, compose
 	return r0
 }
 
-// Stop provides a mock function with given fields:
-func (_m *ContainerHandler) Stop() error {
-	ret := _m.Called()
+// Stop provides a mock function with given fields: waitForExit
+func (_m *ContainerHandler) Stop(waitForExit bool) error {
+	ret := _m.Called(waitForExit)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(waitForExit)
 	} else {
 		r0 = ret.Error(0)
 	}

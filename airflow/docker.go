@@ -39,7 +39,11 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
+<<<<<<< HEAD
 	"github.com/sirupsen/logrus"
+=======
+	log "github.com/sirupsen/logrus"
+>>>>>>> main
 )
 
 const (
@@ -48,6 +52,7 @@ const (
 	componentName                  = "airflow"
 	podman                         = "podman"
 	dockerStateUp                  = "running"
+	dockerExitState                = "exited"
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
@@ -93,6 +98,7 @@ var (
 	startupTimeout time.Duration
 	isM1           = util.IsM1
 
+<<<<<<< HEAD
 	composeOverrideFilename         = "docker-compose.override.yml"
 	majorUpdatesAirflowProviders    = []string{}
 	minorUpdatesAirflowProviders    = []string{}
@@ -122,6 +128,12 @@ var (
 		"Added Packages:\n",
 		"Removed Packages:\n",
 	}
+=======
+	composeOverrideFilename = "docker-compose.override.yml"
+
+	stopPostgresWaitTimeout = 10 * time.Second
+	stopPostgresWaitTicker  = 1 * time.Second
+>>>>>>> main
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -334,7 +346,7 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 }
 
 // Stop a running docker project
-func (d *DockerCompose) Stop() error {
+func (d *DockerCompose) Stop(waitForExit bool) error {
 	imageLabels, err := d.imageHandler.ListLabels()
 	if err != nil {
 		return err
@@ -352,7 +364,37 @@ func (d *DockerCompose) Stop() error {
 		return errors.Wrap(err, composePauseErrMsg)
 	}
 
-	return nil
+	if !waitForExit {
+		return nil
+	}
+
+	// Adding check on wether all containers have exited or not, because in case of restart command with immediate start after stop execution,
+	// in windows machine it take a fraction of second for container to be in exited state, after docker compose completes the stop command execution
+	// causing the dev start for airflow to fail
+	timeout := time.After(stopPostgresWaitTimeout)
+	ticker := time.NewTicker(stopPostgresWaitTicker)
+	for {
+		select {
+		case <-timeout:
+			log.Debug("timed out waiting for postgres container to be in exited state")
+			return nil
+		case <-ticker.C:
+			psInfo, _ := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
+				All: true,
+			})
+			for i := range psInfo {
+				// we only need to check for postgres container state, since all other containers depends on postgres container
+				// so docker compose will ensure that postgres container going in shutting down phase only after all other containers have exited
+				if strings.Contains(psInfo[i].Name, PostgresDockerContainerName) {
+					if psInfo[i].State == dockerExitState {
+						log.Debug("postgres container reached exited state")
+						return nil
+					}
+					log.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
+				}
+			}
+		}
+	}
 }
 
 func (d *DockerCompose) PS() error {

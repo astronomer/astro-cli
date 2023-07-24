@@ -690,7 +690,7 @@ func TestAirflowStop(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Stop").Return(nil).Once()
+			mockContainerHandler.On("Stop", false).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -705,7 +705,7 @@ func TestAirflowStop(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Stop").Return(errMock).Once()
+			mockContainerHandler.On("Stop", false).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -735,7 +735,7 @@ func TestAirflowRestart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Stop").Return(nil).Once()
+			mockContainerHandler.On("Stop", true).Return(nil).Once()
 			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
@@ -752,7 +752,7 @@ func TestAirflowRestart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Stop").Return(errMock).Once()
+			mockContainerHandler.On("Stop", true).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -768,7 +768,7 @@ func TestAirflowRestart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Stop").Return(nil).Once()
+			mockContainerHandler.On("Stop", true).Return(nil).Once()
 			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}

@@ -22,7 +22,7 @@ import (
 
 type ContainerHandler interface {
 	Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration) error
-	Stop() error
+	Stop(waitForExit bool) error
 	PS() error
 	Kill() error
 	Logs(follow bool, containerNames ...string) error

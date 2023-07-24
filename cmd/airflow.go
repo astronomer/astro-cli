@@ -690,7 +690,7 @@ func airflowStop(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.Stop()
+	return containerHandler.Stop(false)
 }
 
 // Stop an airflow cluster
@@ -703,7 +703,7 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = containerHandler.Stop()
+	err = containerHandler.Stop(true)
 	if err != nil {
 		return err
 	}

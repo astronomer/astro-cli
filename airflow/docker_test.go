@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -721,9 +722,85 @@ func TestDockerComposeStop(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Stop()
+		err := mockDockerCompose.Stop(false)
 		assert.NoError(t, err)
 
+		imageHandler.AssertExpectations(t)
+		composeMock.AssertExpectations(t)
+	})
+
+	t.Run("success with wait but on first try", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Stop", mock.Anything, mock.Anything, api.StopOptions{}).Return(nil).Once()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-postgres", Name: "test-postgres", State: "exited"}}, nil).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		logrus.SetLevel(5) // debug level
+		var out bytes.Buffer
+		logrus.SetOutput(&out)
+
+		err := mockDockerCompose.Stop(true)
+		assert.NoError(t, err)
+
+		assert.Contains(t, out.String(), "postgres container reached exited state")
+		imageHandler.AssertExpectations(t)
+		composeMock.AssertExpectations(t)
+	})
+
+	t.Run("success after waiting for once", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Stop", mock.Anything, mock.Anything, api.StopOptions{}).Return(nil).Once()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-postgres", Name: "test-postgres", State: "running"}}, nil).Once()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-postgres", Name: "test-postgres", State: "exited"}}, nil).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		logrus.SetLevel(5) // debug level
+		var out bytes.Buffer
+		logrus.SetOutput(&out)
+
+		err := mockDockerCompose.Stop(true)
+		assert.NoError(t, err)
+
+		assert.Contains(t, out.String(), "postgres container is still in running state, waiting for it to be in exited state")
+		assert.Contains(t, out.String(), "postgres container reached exited state")
+		imageHandler.AssertExpectations(t)
+		composeMock.AssertExpectations(t)
+	})
+
+	t.Run("time out during the wait for postgres exit", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Stop", mock.Anything, mock.Anything, api.StopOptions{}).Return(nil).Once()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-postgres", Name: "test-postgres", State: "running"}}, nil)
+
+		// reducing timeout
+		stopPostgresWaitTimeout = 11 * time.Millisecond
+		stopPostgresWaitTicker = 10 * time.Millisecond
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		logrus.SetLevel(5) // debug level
+		var out bytes.Buffer
+		logrus.SetOutput(&out)
+
+		err := mockDockerCompose.Stop(true)
+		assert.NoError(t, err)
+
+		assert.Contains(t, out.String(), "postgres container is still in running state, waiting for it to be in exited state")
+		assert.Contains(t, out.String(), "timed out waiting for postgres container to be in exited state")
 		imageHandler.AssertExpectations(t)
 		composeMock.AssertExpectations(t)
 	})
@@ -734,7 +811,7 @@ func TestDockerComposeStop(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Stop()
+		err := mockDockerCompose.Stop(false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -750,7 +827,7 @@ func TestDockerComposeStop(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Stop()
+		err := mockDockerCompose.Stop(false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
