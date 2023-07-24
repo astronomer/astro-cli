@@ -111,6 +111,19 @@ func TestDockerImagePytest(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("copy error", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			switch {
+			case args[0] == "cp":
+				return errMock
+			default:
+				return nil
+			}
+		}
+		_, err = handler.Pytest("", "", "", "", []string{}, true, options)
+		assert.Contains(t, err.Error(), errMock.Error())
+	})
+
 	t.Run("pytest error", func(t *testing.T) {
 		options = airflowTypes.ImageBuildConfig{
 			Path:            cwd,
