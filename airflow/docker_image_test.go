@@ -83,6 +83,7 @@ func TestDockerImageBuild(t *testing.T) {
 }
 
 func TestDockerImagePytest(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}

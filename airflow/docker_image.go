@@ -152,9 +152,9 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		err = cmdExec(dockerCommand, nil, stderr, "cp", "astro-pytest:/usr/local/airflow/dag-test-report.html", "./"+testHomeDirectory)
 		if err != nil {
 			// Remove the temporary container
-			err = cmdExec(dockerCommand, nil, stderr, "rm", "astro-pytest")
-			if err != nil {
-				return outb.String(), err
+			err2 := cmdExec(dockerCommand, nil, stderr, "rm", "astro-pytest")
+			if err2 != nil {
+				return outb.String(), err2
 			}
 			return outb.String(), err
 		}
