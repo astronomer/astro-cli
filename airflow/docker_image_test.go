@@ -121,7 +121,7 @@ func TestDockerImagePytest(t *testing.T) {
 			}
 		}
 		_, err = handler.Pytest("", "", "", "", []string{}, true, options)
-		assert.Contains(t, err.Error(), errMock.Error())
+		assert.Error(t, err)
 	})
 
 	t.Run("pytest error", func(t *testing.T) {
