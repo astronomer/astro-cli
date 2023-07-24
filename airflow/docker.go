@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -39,11 +38,7 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
-<<<<<<< HEAD
 	"github.com/sirupsen/logrus"
-=======
-	log "github.com/sirupsen/logrus"
->>>>>>> main
 )
 
 const (
@@ -98,8 +93,6 @@ var (
 	startupTimeout time.Duration
 	isM1           = util.IsM1
 
-<<<<<<< HEAD
-	composeOverrideFilename         = "docker-compose.override.yml"
 	majorUpdatesAirflowProviders    = []string{}
 	minorUpdatesAirflowProviders    = []string{}
 	patchUpdatesAirflowProviders    = []string{}
@@ -128,12 +121,10 @@ var (
 		"Added Packages:\n",
 		"Removed Packages:\n",
 	}
-=======
 	composeOverrideFilename = "docker-compose.override.yml"
 
 	stopPostgresWaitTimeout = 10 * time.Second
 	stopPostgresWaitTicker  = 1 * time.Second
->>>>>>> main
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -186,12 +177,12 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 
 	dockerCli, err := command.NewDockerCli()
 	if err != nil {
-		log.Fatalf("error creating compose client %s", err)
+		logrus.Fatalf("error creating compose client %s", err)
 	}
 
 	err = dockerCli.Initialize(flags.NewClientOptions())
 	if err != nil {
-		log.Fatalf("error init compose client %s", err)
+		logrus.Fatalf("error init compose client %s", err)
 	}
 
 	composeService := compose.NewComposeService(dockerCli.Client(), &configfile.ConfigFile{})
@@ -376,7 +367,7 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 	for {
 		select {
 		case <-timeout:
-			log.Debug("timed out waiting for postgres container to be in exited state")
+			logrus.Debug("timed out waiting for postgres container to be in exited state")
 			return nil
 		case <-ticker.C:
 			psInfo, _ := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
@@ -387,10 +378,10 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 				// so docker compose will ensure that postgres container going in shutting down phase only after all other containers have exited
 				if strings.Contains(psInfo[i].Name, PostgresDockerContainerName) {
 					if psInfo[i].State == dockerExitState {
-						log.Debug("postgres container reached exited state")
+						logrus.Debug("postgres container reached exited state")
 						return nil
 					}
-					log.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
+					logrus.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
 				}
 			}
 		}
