@@ -149,11 +149,8 @@ func TestDockerImageConflictTest(t *testing.T) {
 	assert.NoError(t, err)
 
 	dockerIgnoreFile := cwd + "/.dockerignore"
-	dockerFile := cwd + "/conflict-check.Dockerfile"
 	fileutil.WriteStringToFile(dockerIgnoreFile, "")
-	fileutil.WriteStringToFile(dockerFile, "FROM quay.io/astronomer/astro-runtime:7.4.2")
 	defer afero.NewOsFs().Remove(dockerIgnoreFile)
-	defer afero.NewOsFs().Remove(dockerFile)
 
 	options := airflowTypes.ImageBuildConfig{
 		Path:            cwd,

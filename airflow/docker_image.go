@@ -189,9 +189,6 @@ func (d *DockerImage) ConflictTest(workingDirectory, testHomeDirectory string, b
 		".",
 	}
 
-	// // Run the Docker build command
-	// cmd := exec.Command(dockerCommand, args...)
-
 	// Create a buffer to capture the command output
 	var stdout, stderr bytes.Buffer
 	multiStdout := io.MultiWriter(&stdout, os.Stdout)
@@ -202,8 +199,6 @@ func (d *DockerImage) ConflictTest(workingDirectory, testHomeDirectory string, b
 	if err != nil {
 		return "", err
 	}
-	// Wait for the command to complete
-	// err = cmd.Wait()
 	// Get the exit code
 	exitCode := ""
 	if _, ok := err.(*exec.ExitError); ok {
