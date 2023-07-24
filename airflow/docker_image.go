@@ -189,21 +189,21 @@ func (d *DockerImage) ConflictTest(workingDirectory, testHomeDirectory string, b
 		".",
 	}
 
-	// Run the Docker build command
-	cmd := exec.Command(dockerCommand, args...)
+	// // Run the Docker build command
+	// cmd := exec.Command(dockerCommand, args...)
 
 	// Create a buffer to capture the command output
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = io.MultiWriter(&stdout, os.Stdout)
-	cmd.Stderr = io.MultiWriter(&stderr, os.Stdout)
+	multiStdout := io.MultiWriter(&stdout, os.Stdout)
+	multiStderr := io.MultiWriter(&stderr, os.Stdout)
 
 	// Start the command execution
-	err = cmd.Start()
+	err = cmdExec(dockerCommand, multiStdout, multiStderr, args...)
 	if err != nil {
 		return "", err
 	}
 	// Wait for the command to complete
-	err = cmd.Wait()
+	// err = cmd.Wait()
 	// Get the exit code
 	exitCode := ""
 	if _, ok := err.(*exec.ExitError); ok {
@@ -214,19 +214,19 @@ func (d *DockerImage) ConflictTest(workingDirectory, testHomeDirectory string, b
 		return "", err
 	}
 	// Run a temporary container to copy the file from the image
-	cmd = exec.Command(dockerCommand, "create", "--name", "astro-temp-container", "conflict-check:latest")
-	if err := cmd.Run(); err != nil {
+	err = cmdExec(dockerCommand, nil, nil, "create", "--name", "astro-temp-container", "conflict-check:latest")
+	if err != nil {
 		return exitCode, err
 	}
 	// Copy the result.txt file from the container to the destination folder
-	cmd = exec.Command(dockerCommand, "cp", "astro-temp-container:/usr/local/airflow/conflict-test-results.txt", "./"+testHomeDirectory)
-	if err := cmd.Run(); err != nil {
+	err1 := cmdExec(dockerCommand, nil, nil, "cp", "astro-temp-container:/usr/local/airflow/conflict-test-results.txt", "./"+testHomeDirectory)
+	if err1 != nil {
 		// Remove the temporary container
 		err = cmdExec(dockerCommand, nil, nil, "rm", "astro-temp-container")
 		if err != nil {
 			return exitCode, err
 		}
-		return exitCode, err
+		return exitCode, err1
 	}
 
 	// Remove the temporary container

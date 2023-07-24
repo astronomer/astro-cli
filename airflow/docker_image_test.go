@@ -197,7 +197,7 @@ func TestDockerImageConflictTest(t *testing.T) {
 
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			switch {
-			case args[1] == "cp":
+			case args[0] == "cp":
 				return errMock
 			default:
 				return nil
@@ -217,7 +217,7 @@ func TestDockerImageConflictTest(t *testing.T) {
 
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			switch {
-			case args[1] == "rm":
+			case args[0] == "rm":
 				return errMock
 			default:
 				return nil
