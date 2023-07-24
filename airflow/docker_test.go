@@ -1030,6 +1030,20 @@ func TestDockerComposePytest(t *testing.T) {
 		imageHandler.AssertExpectations(t)
 	})
 
+	t.Run("success custom image", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("TagLocalImage", mock.Anything).Return(nil)
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, []string{}, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		resp, err := mockDockerCompose.Pytest("", "custom-image-name", "", "")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "", resp)
+		imageHandler.AssertExpectations(t)
+	})
+
 	t.Run("unexpected exit code", func(t *testing.T) {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
