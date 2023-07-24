@@ -106,8 +106,4 @@ func TestInitConflictTest(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, exist)
 	}
-	cwd, err := os.Getwd()
-	assert.NoError(t, err)
-	err = os.Remove(cwd + "/conflict-check.Dockerfile")
-	assert.NoError(t, err)
 }
