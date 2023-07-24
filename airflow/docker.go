@@ -501,7 +501,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName string, conflictTest, versionTest, dagTest bool, client astro.Client) error {
+func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName string, conflictTest, versionTest, dagTest bool, client astro.Client) error { //nolint:gocognit
 	// figure out which tests to run
 	if !conflictTest && !versionTest && !dagTest {
 		conflictTest = true

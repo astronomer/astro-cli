@@ -10,7 +10,6 @@ import (
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/spf13/afero"
@@ -68,7 +67,6 @@ func TestDockerImageBuild(t *testing.T) {
 		err = handler.Build("", options)
 		assert.Contains(t, err.Error(), errMock.Error())
 	})
-
 	t.Run("unable to read file error", func(t *testing.T) {
 		options := airflowTypes.ImageBuildConfig{
 			Path:            "incorrect-path",
@@ -127,7 +125,6 @@ func TestDockerImagePytest(t *testing.T) {
 		_, err = handler.Pytest("", "", "", "", []string{}, false, options)
 		assert.Contains(t, err.Error(), errMock.Error())
 	})
-
 	t.Run("unable to read file error", func(t *testing.T) {
 		options := airflowTypes.ImageBuildConfig{
 			Path:            "incorrect-path",
@@ -143,7 +140,7 @@ func TestDockerImagePytest(t *testing.T) {
 }
 
 func TestDockerImageConflictTest(t *testing.T) {
-	testUtils.InitTestConfig(testUtils.LocalPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -226,7 +223,6 @@ func TestDockerImageConflictTest(t *testing.T) {
 		_, err = handler.ConflictTest("", "", options)
 		assert.Error(t, err)
 	})
-
 	t.Run("unable to read file error", func(t *testing.T) {
 		options := airflowTypes.ImageBuildConfig{
 			Path:            "incorrect-path",
@@ -262,18 +258,14 @@ func TestDockerCreatePipFreeze(t *testing.T) {
 		err := handler.CreatePipFreeze("", pipFreeze)
 		assert.NoError(t, err)
 	})
-
 	t.Run("create pip freeze error", func(t *testing.T) {
-
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
 		err := handler.CreatePipFreeze("", pipFreeze)
 		assert.Error(t, err)
 	})
-
 	t.Run("unable to read file error", func(t *testing.T) {
-
 		err := handler.CreatePipFreeze("", "")
 		assert.Error(t, err)
 	})
@@ -282,16 +274,10 @@ func TestDockerCreatePipFreeze(t *testing.T) {
 }
 
 func TestDockerPull(t *testing.T) {
-	testUtils.InitTestConfig(testUtils.LocalPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}
-
-	// cwd, err := os.Getwd()
-	// assert.NoError(t, err)
-
-	// pipFreeze := cwd + "/pip-freeze-test.txt"
-	// defer afero.NewOsFs().Remove(pipFreeze)
 
 	previousCmdExec := cmdExec
 
@@ -310,9 +296,7 @@ func TestDockerPull(t *testing.T) {
 		err := handler.Pull("", "username", "", "")
 		assert.NoError(t, err)
 	})
-
 	t.Run("pull error", func(t *testing.T) {
-
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
@@ -321,7 +305,6 @@ func TestDockerPull(t *testing.T) {
 	})
 
 	t.Run("login error", func(t *testing.T) {
-
 		err := handler.Pull("", "username", "", "")
 		assert.Error(t, err)
 	})
