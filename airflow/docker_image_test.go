@@ -149,8 +149,11 @@ func TestDockerImageConflictTest(t *testing.T) {
 	assert.NoError(t, err)
 
 	dockerIgnoreFile := cwd + "/.dockerignore"
+	dockerFile := cwd + "/conflict-check.Dockerfile"
 	fileutil.WriteStringToFile(dockerIgnoreFile, "")
+	fileutil.WriteStringToFile(dockerFile, "")
 	defer afero.NewOsFs().Remove(dockerIgnoreFile)
+	defer afero.NewOsFs().Remove(dockerFile)
 
 	options := airflowTypes.ImageBuildConfig{
 		Path:            cwd,
