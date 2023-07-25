@@ -1076,8 +1076,8 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 	assert.NoError(t, err)
 	mockDockerCompose := DockerCompose{projectName: "test", dockerfile: "Dockerfile", airflowHome: cwd}
 
-	pipFreeze := "upgrade-test-old-version->new-version/pip_freeze_old-version.txt"
-	pipFreeze2 := "upgrade-test-old-version->new-version/pip_freeze_new-version.txt"
+	pipFreeze := "upgrade-test-old-version--new-version/pip_freeze_old-version.txt"
+	pipFreeze2 := "upgrade-test-old-version--new-version/pip_freeze_new-version.txt"
 	parseTest := cwd + "/.astro/test_dag_integrity_default.py"
 	oldDockerFile := cwd + "/Dockerfile"
 	// Write files out
@@ -1093,9 +1093,9 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 	defer afero.NewOsFs().Remove(pipFreeze)
 	defer afero.NewOsFs().Remove(pipFreeze2)
 	defer afero.NewOsFs().Remove(parseTest)
-	defer afero.NewOsFs().Remove("upgrade-test-old-version->new-version/Dockerfile")
-	defer afero.NewOsFs().Remove("upgrade-test-old-version->new-version/dependency_compare.txt")
-	defer afero.NewOsFs().Remove("upgrade-test-old-version->new-version")
+	defer afero.NewOsFs().Remove("upgrade-test-old-version--new-version/Dockerfile")
+	defer afero.NewOsFs().Remove("upgrade-test-old-version--new-version/dependency_compare.txt")
+	defer afero.NewOsFs().Remove("upgrade-test-old-version--new-version")
 	defer afero.NewOsFs().Remove(oldDockerFile)
 
 	t.Run("success no deployment id", func(t *testing.T) {

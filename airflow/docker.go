@@ -534,7 +534,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName string, conflictTest, versionTest, dagTest bool, client astro.Client) error { //nolint:gocognit
+func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName string, conflictTest, versionTest, dagTest bool, client astro.Client) error {
 	// figure out which tests to run
 	if !conflictTest && !versionTest && !dagTest {
 		conflictTest = true
@@ -544,31 +544,7 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 	// if user supplies deployment id pull down current image
 	var deploymentImage string
 	if deploymentID != "" {
-		c, err := config.GetCurrentContext()
-		if err != nil {
-			return err
-		}
-		domain := c.Domain
-		if domain == "" {
-			return errors.New("no domain set, re-authenticate")
-		}
-		ws := c.Workspace
-		registry := GetRegistryURL(domain)
-		repository := registry + "/" + c.Organization + "/" + deploymentID
-		currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, client, nil)
-		if err != nil {
-			return err
-		}
-		currentImageTag := currentDeployment.DeploymentSpec.Image.Tag
-		deploymentImage = fmt.Sprintf("%s:%s", repository, currentImageTag)
-		token := c.Token
-		// Splitting out the Bearer part from the token
-		splittedToken := strings.Split(token, " ")
-		if len(splittedToken) > 1 {
-			token = strings.Split(token, " ")[1]
-		}
-		fmt.Printf("\nPulling image from Astro Deployment %s\n\n", currentDeployment.Label)
-		err = d.imageHandler.Pull(registry, registryUsername, token, deploymentImage)
+		err := d.pullImageFromDeployment(deploymentID, client)
 		if err != nil {
 			return err
 		}
@@ -592,7 +568,7 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 		}
 	}
 	// create test home directory
-	testHomeDirectory := "upgrade-test-" + currentAirflowVersion + "->" + newAirflowVersion
+	testHomeDirectory := "upgrade-test-" + currentAirflowVersion + "--" + newAirflowVersion
 
 	destFolder := filepath.Join(d.airflowHome, testHomeDirectory)
 	var filePerms fs.FileMode = 0o755
@@ -633,6 +609,38 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 		fmt.Printf("\tDAG Parse Test HTML Report: %s\n", "dag-test-report.html")
 	}
 
+	return nil
+}
+
+func (d *DockerCompose) pullImageFromDeployment(deploymentID string, client astro.Client) error {
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	domain := c.Domain
+	if domain == "" {
+		return errors.New("no domain set, re-authenticate")
+	}
+	ws := c.Workspace
+	registry := GetRegistryURL(domain)
+	repository := registry + "/" + c.Organization + "/" + deploymentID
+	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, client, nil)
+	if err != nil {
+		return err
+	}
+	currentImageTag := currentDeployment.DeploymentSpec.Image.Tag
+	deploymentImage := fmt.Sprintf("%s:%s", repository, currentImageTag)
+	token := c.Token
+	// Splitting out the Bearer part from the token
+	splittedToken := strings.Split(token, " ")
+	if len(splittedToken) > 1 {
+		token = strings.Split(token, " ")[1]
+	}
+	fmt.Printf("\nPulling image from Astro Deployment %s\n\n", currentDeployment.Label)
+	err = d.imageHandler.Pull(registry, registryUsername, token, deploymentImage)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -918,7 +926,7 @@ func iteratePkgMap(pgkVersions map[string][2]string) error { //nolint:gocognit
 			pkgUpdate := pkg + " " + beforeVer + " >> " + afterVer
 
 			// Categorize the packages based on the update type
-			whichList(pkg, pkgUpdate, updateType)
+			categorizeAirflowProviderPackage(pkg, pkgUpdate, updateType)
 		}
 		switch {
 		case strings.Contains(pkg, "apache-airflow-providers-"):
