@@ -171,8 +171,8 @@ func newAirflowInitCmd() *cobra.Command {
 func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade-test",
-		Short:   "Run tests to see if your environment and DAGs are compatable with a new version of Airflow or Runtime",
-		Long:    "Run some tests to see if your environment and DAGs are compatable with a new version of Airflow or Runtime",
+		Short:   "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime",
+		Long:    "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime",
 		Example: initCloudExample,
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -182,29 +182,30 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 			return airflowUpgradeTest(cmd, astroClient)
 		},
 	}
-	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to upgrade to. If not specified, latest is assumed.")
-	cmd.Flags().BoolVarP(&conflictTest, "conflict-test", "d", false, "dependency conflict test only")
-	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "dependency version comparison only")
+	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The versions of Airflow you want to upgrade to. If not specified, latest is assumed.")
+	cmd.Flags().BoolVarP(&conflictTest, "conflict-test", "d", false, "Only run Python and OS dependency tests")
+	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "Only run Python and OS dependency version tests")
 	cmd.Flags().BoolVarP(&dagTest, "dag-test", "", false, "dag test only")
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of Deployment your want check dependency versions against. Using ")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against. ")
 	var err error
 	var avoidACFlag bool
 
 	// In case user is connected to Astronomer Platform and is connected to older version of platform
 	if context.IsCloudContext() || houstonVersion == "" || (!context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.29.0"})) {
-		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Version of Astro Runtime that you want to upgrade. If not specified, the latest is assumed.")
+		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "The version of Astro Runtime you want to upgrade to. If not specified, the latest is assumed.")
 	} else { // default to using AC flag, since runtime is not available for these cases
 		useAstronomerCertified = true
 		avoidACFlag = true
 	}
 
 	if !context.IsCloudContext() && !avoidACFlag {
-		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, specify an Astronomer Certified Airflow image to upgrade to instead of Astro Runtime.")
+		cmd.Example = initSoftwareExample
+		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "Use an Astronomer Certified image instead of Astro Runtime. Use the airflow-version flag to specify your AC version.")
 	}
 
 	_, err = context.GetCurrentContext()
 	if err != nil && !avoidACFlag { // Case when user is not logged in to any platform
-		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, specify an Astronomer Certified Airflow image to upgrade to instead of Astro Runtime.")
+		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "Use an Astronomer Certified image instead of Astro Runtime. Use the airflow-version flag to specify your AC version.")
 		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
 	}
 
@@ -566,9 +567,9 @@ func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error {
 	defaultImageName := airflow.AstroRuntimeImageName
 	if useAstronomerCertified {
 		defaultImageName = airflow.AstronomerCertifiedImageName
-		fmt.Printf("Testing a Upgrade to Astronomer Certified Airflow Version %s\n\n", defaultImageTag)
+		fmt.Printf("Testing an upgrade to Astronomer Certified Airflow version %s\n\n", defaultImageTag)
 	} else {
-		fmt.Printf("Testing a Upgrade to Astronomer Runtime %s\n", defaultImageTag)
+		fmt.Printf("Testing an upgrade to Astro Runtime %s\n", defaultImageTag)
 	}
 
 	// Silence Usage as we have now validated command input
