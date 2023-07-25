@@ -13,8 +13,6 @@ type ResponseData struct {
 	DeployImage               *Image                       `json:"deployImage,omitempty"`
 	GetDeployment             Deployment                   `json:"deployment,omitempty"`
 	GetDeployments            []Deployment                 `json:"deployments,omitempty"`
-	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
-	GetWorkspace              Workspace                    `json:"workspace,omitempty"`
 	RuntimeReleases           []RuntimeRelease             `json:"runtimeReleases,omitempty"`
 	CreateDeployment          Deployment                   `json:"CreateDeployment,omitempty"`
 	GetDeploymentConfig       DeploymentConfig             `json:"deploymentConfigOptions,omitempty"`
@@ -271,12 +269,13 @@ type DeploymentConfig struct {
 }
 
 type Machine struct {
-	Type            string `json:"type"`
-	CPU             string `json:"cpu"`
-	Memory          string `json:"memory"`
-	StorageSize     string `json:"storageSize"`
-	ConcurrentTasks int    `json:"concurrentTasks"`
-	NodePoolType    string `json:"nodePoolType"`
+	Type               string `json:"type"`
+	CPU                string `json:"cpu"`
+	Memory             string `json:"memory"`
+	StorageSize        string `json:"storageSize"`
+	ConcurrentTasks    int    `json:"concurrentTasks"`
+	ConcurrentTasksMax int    `json:"concurrentTasksMax"`
+	NodePoolType       string `json:"nodePoolType"`
 }
 
 type MachineUnit struct {

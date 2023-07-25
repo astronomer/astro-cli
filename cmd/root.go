@@ -2,7 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"net/http"
 	"os"
+	"time"
+
+	"github.com/astronomer/astro-cli/cmd/registry"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	astro "github.com/astronomer/astro-cli/astro-client"
@@ -37,10 +41,6 @@ func NewRootCmd() *cobra.Command {
 	var err error
 	httpClient := houston.NewHTTPClient()
 	houstonClient = houston.NewClient(httpClient)
-	houstonVersion, err = houstonClient.GetPlatformVersion(nil)
-	if err != nil {
-		softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
-	}
 
 	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
@@ -50,6 +50,10 @@ func NewRootCmd() *cobra.Command {
 	isCloudCtx := context.IsCloudContext()
 	if !isCloudCtx {
 		ctx = softwarePlatform
+		houstonVersion, err = houstonClient.GetPlatformVersion(nil)
+		if err != nil {
+			softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
+		}
 	}
 
 	rootCmd := &cobra.Command{
@@ -68,8 +72,8 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Check for latest version
 			if config.CFG.UpgradeMessage.GetBool() {
-				// create github client
-				githubClient := github.NewClient(nil)
+				// create github client with 3 second timeout, setting an aggressive timeout since its not mandatory to get a response in each command execution
+				githubClient := github.NewClient(&http.Client{Timeout: 3 * time.Second})
 				// compare current version to latest
 				err = version.CompareVersions(githubClient, "astronomer", "astro-cli")
 				if err != nil {
@@ -112,6 +116,10 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		)
 		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}
+
+	rootCmd.AddCommand( // include all the commands for interacting with the registry
+		registry.AddCmds(os.Stdout)...,
+	)
 
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")

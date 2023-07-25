@@ -14,6 +14,8 @@ import (
 	"github.com/spf13/afero"
 )
 
+const openPermissions = 0o777
+
 var (
 	perm     os.FileMode = 0o777
 	openFile             = os.OpenFile
@@ -226,4 +228,11 @@ func RemoveLineFromFile(filePath, lineText, commentText string) error {
 	}
 	f.Close()
 	return err
+}
+
+func CreateFile(p string) (*os.File, error) {
+	if err := os.MkdirAll(filepath.Dir(p), openPermissions); err != nil {
+		return nil, err
+	}
+	return os.Create(p)
 }

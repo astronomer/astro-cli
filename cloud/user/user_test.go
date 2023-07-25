@@ -23,12 +23,14 @@ var (
 	errorNetwork = errors.New("network error")
 	errorInvite  = errors.New("test-inv-error")
 	orgRole      = "ORGANIZATION_MEMBER"
+	isIdpManaged = true
 	user1        = astrocore.User{
-		CreatedAt: time.Now(),
-		FullName:  "user 1",
-		Id:        "user1-id",
-		OrgRole:   &orgRole,
-		Username:  "user@1.com",
+		CreatedAt:                   time.Now(),
+		FullName:                    "user 1",
+		Id:                          "user1-id",
+		OrgRole:                     &orgRole,
+		OrgUserRelationIsIdpManaged: &isIdpManaged,
+		Username:                    "user@1.com",
 	}
 	users = []astrocore.User{
 		user1,
@@ -94,11 +96,12 @@ var (
 var (
 	workspaceRole  = "WORKSPACE_MEMBER"
 	workspaceUser1 = astrocore.User{
-		CreatedAt:     time.Now(),
-		FullName:      "user 1",
-		Id:            "user1-id",
-		WorkspaceRole: &workspaceRole,
-		Username:      "user@1.com",
+		CreatedAt:                   time.Now(),
+		FullName:                    "user 1",
+		Id:                          "user1-id",
+		WorkspaceRole:               &workspaceRole,
+		OrgUserRelationIsIdpManaged: &isIdpManaged,
+		Username:                    "user@1.com",
 	}
 	workspaceUsers = []astrocore.User{
 		workspaceUser1,
@@ -140,14 +143,12 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &workspaceUser1,
 	}
 	DeleteWorkspaceUserResponseError = astrocore.DeleteWorkspaceUserResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
-		Body:    errorBodyUpdate,
-		JSON200: nil,
+		Body: errorBodyUpdate,
 	}
 )
 
@@ -796,5 +797,18 @@ func TestGetUser(t *testing.T) {
 		_, err := GetUser(mockClient, user1.Id)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
+	})
+}
+
+func TestIsOrganizationRoleValid(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		err := IsOrganizationRoleValid("ORGANIZATION_MEMBER")
+		assert.NoError(t, err)
+	})
+
+	t.Run("error path", func(t *testing.T) {
+		err := IsOrganizationRoleValid("Invalid Role")
+		assert.Error(t, err)
+		assert.Equal(t, ErrInvalidOrganizationRole, err)
 	})
 }

@@ -10,15 +10,18 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 
 	"github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 const (
-	createAction     = "create"
-	updateAction     = "update"
-	defaultQueueName = "default"
+	createAction       = "create"
+	updateAction       = "update"
+	defaultQueueName   = "default"
+	podCPUErrorMessage = "pod_cpu in the request. It can only be used with KubernetesExecutor"
+	podRAMErrorMessage = "pod_ram in the request. It can only be used with KubernetesExecutor"
 )
 
 var (
@@ -35,7 +38,7 @@ var (
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
-func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, out io.Writer) error { //nolint
+func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error { //nolint
 	var (
 		requestedDeployment                  astro.Deployment
 		err                                  error
@@ -46,9 +49,14 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		defaultOptions                       astro.WorkerQueueDefaultOptions
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, false, client, nil)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, client, coreClient)
 	if err != nil {
 		return err
+	}
+
+	if requestedDeployment.ID == "" {
+		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(ws))
+		return nil
 	}
 
 	if deployment.IsDeploymentHosted(requestedDeployment.Type) || deployment.IsDeploymentDedicated(requestedDeployment.Type) {
@@ -63,7 +71,10 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		if err != nil {
 			return err
 		}
-		wQueueConcurrency = astroMachine.ConcurrentTasks // This is set based on the machine type the user chooses
+
+		if wQueueConcurrency == 0 && action == createAction {
+			wQueueConcurrency = astroMachine.ConcurrentTasks // This is set based on the machine type the user chooses if not explicitly passed by the user
+		}
 	} else {
 		// get the node poolID to use
 		nodePoolID, err = selectNodePool(workerType, requestedDeployment.Cluster.NodePools, out)
@@ -97,10 +108,16 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 
 		queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
-
-		err = IsCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions)
-		if err != nil {
-			return err
+		if deployment.IsDeploymentHosted(requestedDeployment.Type) || deployment.IsDeploymentDedicated(requestedDeployment.Type) {
+			err = IsHostedCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &astroMachine)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = IsCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions)
+			if err != nil {
+				return err
+			}
 		}
 	case deployment.KubeExecutor:
 		err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdate)
@@ -210,12 +227,42 @@ func IsCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defa
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	if requestedWorkerQueue.PodCPU != "" {
-		errorMessage = "pod_cpu in the request. It can only be used with KubernetesExecutor"
-		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, errorMessage)
+		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
 	}
 	if requestedWorkerQueue.PodRAM != "" {
-		errorMessage = "pod_ram in the request. It can only be used with KubernetesExecutor"
-		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, errorMessage)
+		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
+	}
+	return nil
+}
+
+// IsHostedCeleryWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions and machineOptions.
+// if it adheres to them, it returns nil.
+// errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
+// ErrNotSupported is returned if PodCPU or PodRAM are requested.
+func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions, machineOptions *astro.Machine) error {
+	var errorMessage string
+	if !(requestedWorkerQueue.MinWorkerCount >= defaultOptions.MinWorkerCount.Floor) ||
+		!(requestedWorkerQueue.MinWorkerCount <= defaultOptions.MinWorkerCount.Ceiling) {
+		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", defaultOptions.MinWorkerCount.Floor, defaultOptions.MinWorkerCount.Ceiling)
+		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
+	}
+	if !(requestedWorkerQueue.MaxWorkerCount >= defaultOptions.MaxWorkerCount.Floor) ||
+		!(requestedWorkerQueue.MaxWorkerCount <= defaultOptions.MaxWorkerCount.Ceiling) {
+		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", defaultOptions.MaxWorkerCount.Floor, defaultOptions.MaxWorkerCount.Ceiling)
+		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
+	}
+	// The floor for worker concurrency for hosted deployments is always 1 for all astro machines
+	workerConcurrenyFloor := 1
+	if !(requestedWorkerQueue.WorkerConcurrency >= workerConcurrenyFloor) ||
+		!(requestedWorkerQueue.WorkerConcurrency <= machineOptions.ConcurrentTasksMax) {
+		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", workerConcurrenyFloor, machineOptions.ConcurrentTasksMax)
+		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
+	}
+	if requestedWorkerQueue.PodCPU != "" {
+		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
+	}
+	if requestedWorkerQueue.PodRAM != "" {
+		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
 	}
 	return nil
 }
@@ -237,7 +284,7 @@ func IsKubernetesWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue) 
 		errorMessage = "pod ram in the request. It will be calculated based on the requested worker type"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
-	if requestedWorkerQueue.MinWorkerCount != 0 {
+	if requestedWorkerQueue.MinWorkerCount != -1 {
 		errorMessage = "minimum worker count in the request. It can only be used with CeleryExecutor"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
@@ -378,7 +425,7 @@ func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer
 // user gets prompted if no name for the queue to delete was specified
 // An errQueueDoesNotExist is returned if queue to delete does not exist
 // An errCannotDeleteDefaultQueue is returned if a user chooses the default queue
-func Delete(ws, deploymentID, deploymentName, name string, force bool, client astro.Client, out io.Writer) error {
+func Delete(ws, deploymentID, deploymentName, name string, force bool, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 	var (
 		requestedDeployment          astro.Deployment
 		err                          error
@@ -387,9 +434,14 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 		queue                        astro.WorkerQueue
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, false, client, nil)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, client, coreClient)
 	if err != nil {
 		return err
+	}
+
+	if requestedDeployment.ID == "" {
+		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(ws))
+		return nil
 	}
 
 	// prompt for queue name if one was not provided

@@ -362,7 +362,7 @@ func newAirflowBashCmd() *cobra.Command {
 func newAirflowObjectRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "object",
-		Aliases: []string{"obj"},
+		Aliases: []string{"obj", "objects"},
 		Short:   "Configure your local Airflow environment.",
 		Long:    "Manage local Airflow connections, variables, and pools. Import or export your objects to your Airflow settings file. Configure Airflow's startup behavior using a Compose file.",
 	}
@@ -601,7 +601,7 @@ func airflowStop(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.Stop()
+	return containerHandler.Stop(false)
 }
 
 // Stop an airflow cluster
@@ -614,7 +614,7 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = containerHandler.Stop()
+	err = containerHandler.Stop(true)
 	if err != nil {
 		return err
 	}

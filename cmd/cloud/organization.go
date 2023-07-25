@@ -2,13 +2,17 @@ package cloud
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/astronomer/astro-cli/pkg/printutil"
 
 	"github.com/spf13/cobra"
 
@@ -19,6 +23,7 @@ import (
 )
 
 var (
+	errInvalidOrganizationRoleKey      = errors.New("invalid organization role selection")
 	orgList                            = organization.List
 	orgSwitch                          = organization.Switch
 	orgExportAuditLogs                 = organization.ExportAuditLogs
@@ -33,6 +38,9 @@ var (
 	teamName                           string
 	teamID                             string
 	userID                             string
+	organizationID                     string
+	updateOrganizationRole             string
+	teamOrgRole                        string
 )
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
@@ -48,6 +56,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 		newOrganizationUserRootCmd(out),
 		newOrganizationTeamRootCmd(out),
 		newOrganizationAuditLogs(out),
+		newOrganizationTokenRootCmd(out),
 	)
 	return cmd
 }
@@ -118,7 +127,7 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 func newOrganizationUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "user",
-		Aliases: []string{"us"},
+		Aliases: []string{"us", "users"},
 		Short:   "Manage users in your Astro Organization",
 		Long:    "Manage users in your Astro Organization.",
 	}
@@ -259,7 +268,7 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "team",
-		Aliases: []string{"te"},
+		Aliases: []string{"te", "teams"},
 		Short:   "Manage teams in your Astro Organization",
 		Long:    "Manage teams in your Astro Organization.",
 	}
@@ -305,6 +314,8 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
+	cmd.Flags().StringVarP(&updateOrganizationRole, "role", "r", "", "The new role for the "+
+		"team. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER ")
 	return cmd
 }
 
@@ -317,7 +328,7 @@ func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 
-	return team.UpdateTeam(id, teamName, teamDescription, out, astroCoreClient)
+	return team.UpdateTeam(id, teamName, teamDescription, updateOrganizationRole, out, astroCoreClient)
 }
 
 func newTeamCreateCmd(out io.Writer) *cobra.Command {
@@ -332,12 +343,24 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire team within quotes \"\" ")
 	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team in quotes \"\"")
+	cmd.Flags().StringVarP(&teamOrgRole, "role", "r", "", "The role for the "+
+		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER")
+
 	return cmd
 }
 
 func teamCreate(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return team.CreateTeam(teamName, teamDescription, out, astroCoreClient)
+	if teamOrgRole == "" {
+		fmt.Println("select a Organization Role for the new team:")
+		// no role was provided so ask the user for it
+		var err error
+		teamOrgRole, err = selectOrganizationRole()
+		if err != nil {
+			return err
+		}
+	}
+	return team.CreateTeam(teamName, teamDescription, teamOrgRole, out, astroCoreClient)
 }
 
 func newTeamDeleteCmd(out io.Writer) *cobra.Command {
@@ -368,9 +391,10 @@ func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 
 func newOrganizationTeamUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "user",
-		Short: "Manage users in your Astro Team",
-		Long:  "Manage users in your Astro Team.",
+		Use:     "user",
+		Aliases: []string{"us", "users"},
+		Short:   "Manage users in your Astro Team",
+		Long:    "Manage users in your Astro Team.",
 	}
 	cmd.SetOut(out)
 	cmd.AddCommand(
@@ -435,4 +459,228 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
 func listUsersCmd(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 	return team.ListTeamUsers(teamID, out, astroCoreClient)
+}
+
+// org tokens
+
+//nolint:dupl
+func newOrganizationTokenRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "token",
+		Aliases: []string{"to"},
+		Short:   "Manage tokens in your Astro Organization",
+		Long:    "Manage tokens in your Astro Organization.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newOrganizationTokenListCmd(out),
+		newOrganizationTokenListRolesCmd(out),
+		newOrganizationTokenCreateCmd(out),
+		newOrganizationTokenUpdateCmd(out),
+		newOrganizationTokenRotateCmd(out),
+		newOrganizationTokenDeleteCmd(out),
+	)
+	cmd.PersistentFlags().StringVar(&organizationID, "organization-id", "", "organization where you would like to manage tokens")
+	return cmd
+}
+
+//nolint:dupl
+func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the API tokens in an Astro Organization",
+		Long:    "List all the API tokens in an Astro Organization",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listOrganizationToken(cmd, out)
+		},
+	}
+	return cmd
+}
+
+//nolint:dupl
+func newOrganizationTokenListRolesCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "roles [TOKEN_ID]",
+		Short: "List roles for an organization API token",
+		Long:  "List roles for an organization API token\n$astro organization token roles [TOKEN_ID] ",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listOrganizationTokenRoles(cmd, args, out)
+		},
+	}
+	return cmd
+}
+
+//nolint:dupl
+func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "Create an API token in an Astro Organization",
+		Long: "Create an API token in an Astro Organization\n$astro organization token create --name [token name] --role [ORGANIZATION_MEMBER, " +
+			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_MEMBER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return createOrganizationToken(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
+	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the "+
+		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER")
+	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Expiration of the token in days. If the flag isn't used the token won't have an expiration. Must be between 1 and 3650 days. ")
+	return cmd
+}
+
+//nolint:dupl
+func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update [TOKEN_ID]",
+		Aliases: []string{"up"},
+		Short:   "Update a Organization or Organaization API token",
+		Long: "Update a Organization or Organaization API token that has a role in an Astro Organization\n$astro organization token update [TOKEN_ID] --name [new token name] --role [ORGANIZATION_MEMBER, " +
+			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return updateOrganizationToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&name, "name", "t", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the "+
+		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	return cmd
+}
+
+//nolint:dupl
+func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "rotate [TOKEN_ID]",
+		Aliases: []string{"ro"},
+		Short:   "Rotate a Organization API token",
+		Long:    "Rotate a Organization API token. You can only rotate Organization API tokens. You cannot rotate Workspace API tokens with this command",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return rotateOrganizationToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
+	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVarP(&forceRotate, "force", "f", false, "Rotate the Organization API token without showing a warning")
+
+	return cmd
+}
+
+//nolint:dupl
+func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete [TOKEN_ID]",
+		Aliases: []string{"de"},
+		Short:   "Delete a Organization API token or remove an Organization API token from a Organization",
+		Long:    "Delete a Organization API token or remove an Organization API token from a Organization",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deleteOrganizationToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Delete or remove the API token without showing a warning")
+
+	return cmd
+}
+
+//nolint:dupl
+func listOrganizationToken(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return organization.ListTokens(astroCoreClient, out)
+}
+
+//nolint:dupl
+func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer) error {
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		tokenID = strings.ToLower(args[0])
+	}
+	cmd.SilenceUsage = true
+	return organization.ListTokenRoles(tokenID, astroCoreClient, out)
+}
+
+//nolint:dupl
+func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
+	if tokenName == "" {
+		// no role was provided so ask the user for it
+		tokenName = input.Text("Enter a name for the new Organization API token: ")
+	}
+	if tokenRole == "" {
+		fmt.Println("select a Organization Role for the new API token:")
+		// no role was provided so ask the user for it
+		var err error
+		tokenRole, err = selectOrganizationRole()
+		if err != nil {
+			return err
+		}
+	}
+	cmd.SilenceUsage = true
+
+	return organization.CreateToken(tokenName, tokenDescription, tokenRole, tokenExpiration, cleanTokenOutput, out, astroCoreClient)
+}
+
+//nolint:dupl
+func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		tokenID = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, out, astroCoreClient)
+}
+
+//nolint:dupl
+func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		tokenID = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return organization.RotateToken(tokenID, name, cleanTokenOutput, forceRotate, out, astroCoreClient)
+}
+
+//nolint:dupl
+func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		tokenID = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return organization.DeleteToken(tokenID, name, forceDelete, out, astroCoreClient)
+}
+
+//nolint:dupl
+func selectOrganizationRole() (string, error) {
+	tokenRolesMap := map[string]string{}
+	tab := &printutil.Table{
+		DynamicPadding: true,
+		Header:         []string{"#", "ROLE"},
+	}
+	roles := []string{"ORGANIZATION_MEMBER", "ORGANIZATION_BILLING_ADMIN", "ORGANIZATION_OWNER"}
+	for i := range roles {
+		index := i + 1
+		tab.AddRow([]string{
+			strconv.Itoa(index),
+			roles[i],
+		}, false)
+		tokenRolesMap[strconv.Itoa(index)] = roles[i]
+	}
+
+	tab.Print(os.Stdout)
+	choice := input.Text("\n> ")
+	selected, ok := tokenRolesMap[choice]
+	if !ok {
+		return "", errInvalidOrganizationRoleKey
+	}
+	return selected, nil
 }

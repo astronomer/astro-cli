@@ -116,7 +116,7 @@ func TestDeploymentLogs(t *testing.T) {
 func TestDeploymentCreate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	ws := "test-ws-id"
+	ws := "workspace-id"
 	csID := "test-cluster-id"
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
@@ -173,7 +173,7 @@ func TestDeploymentCreate(t *testing.T) {
 			},
 		},
 	}, nil).Times(14)
-	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id", Label: "test-ws"}}, nil).Times(7)
+	mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(5)
 	mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(4)
 	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
 	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Times(6)
@@ -321,8 +321,9 @@ deployment:
 			},
 		}
 		mockClient = new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{{ID: ws, OrganizationID: orgID, Label: "test-workspace"}}, nil)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(createdDeployment, nil)
@@ -357,6 +358,7 @@ deployment:
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("organization_short_name", "test-org")
 		ctx.SetContextKey("workspace", ws)
 		mockOKResponse := &astrocore.GetSharedClusterResponse{
 			HTTPResponse: &http.Response{
@@ -378,6 +380,7 @@ deployment:
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization_short_name", "test-org")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
 		cmdArgs := []string{
@@ -406,6 +409,8 @@ deployment:
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
+		ctx.SetContextKey("organization_short_name", "test-org")
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		astroCoreClient = mockCoreClient
 		cmdArgs := []string{
@@ -616,6 +621,7 @@ deployment:
 			},
 		}
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(updatedDeployment, nil)
@@ -861,11 +867,15 @@ func TestIsValidExecutor(t *testing.T) {
 }
 
 func TestIsValidCloudProvider(t *testing.T) {
-	t.Run("returns true if cloudProvider is GCP", func(t *testing.T) {
+	t.Run("returns true if cloudProvider is gcp", func(t *testing.T) {
 		actual := isValidCloudProvider("gcp")
 		assert.True(t, actual)
 	})
-	t.Run("returns false if cloudProvider is not GCP", func(t *testing.T) {
+	t.Run("returns true if cloudProvider is aws", func(t *testing.T) {
+		actual := isValidCloudProvider("aws")
+		assert.True(t, actual)
+	})
+	t.Run("returns false if cloudProvider is not gcp", func(t *testing.T) {
 		actual := isValidCloudProvider("azure")
 		assert.False(t, actual)
 	})

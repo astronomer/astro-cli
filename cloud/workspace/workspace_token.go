@@ -2,25 +2,23 @@ package workspace
 
 import (
 	httpContext "context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"time"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/pkg/errors"
 )
 
 func newTokenTableOut() *printutil.Table {
 	return &printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
 		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "WORKSPACE ROLE", "CREATED", "CREATED BY"},
 	}
@@ -28,7 +26,6 @@ func newTokenTableOut() *printutil.Table {
 
 func newTokenSelectionTableOut() *printutil.Table {
 	return &printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
 		Header:         []string{"#", "ID", "NAME", "DESCRIPTION", "SCOPE", "WORKSPACE ROLE", "CREATED", "CREATED BY"},
 	}
@@ -37,7 +34,6 @@ func newTokenSelectionTableOut() *printutil.Table {
 var (
 	errInvalidWorkspaceTokenKey = errors.New("invalid Workspace API token selection")
 	ErrWorkspaceTokenNotFound   = errors.New("no Workspace API token was found for the API token name you provided")
-	errBothNameAndID            = errors.New("both an API token name and id were specified. Specify either the name or the id not both")
 )
 
 const (
@@ -57,7 +53,7 @@ func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) er
 
 	apiTokens, err := getWorkspaceTokens(workspace, client)
 	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return err
 	}
 
 	tab := newTokenTableOut()
@@ -88,7 +84,7 @@ func CreateToken(name, description, role, workspace string, expiration int, clea
 		return err
 	}
 	if name == "" {
-		return ErrInvalidName
+		return ErrInvalidTokenName
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -140,14 +136,24 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
-	tokens, err := getWorkspaceTokens(workspace, client)
-	if err != nil {
-		return err
+
+	var token astrocore.ApiToken
+	if id == "" {
+		tokens, err := getWorkspaceTokens(workspace, client)
+		if err != nil {
+			return err
+		}
+		token, err = getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to update:", tokens)
+		if err != nil {
+			return err
+		}
+	} else {
+		token, err = getWorkspaceTokenByID(id, workspace, ctx.OrganizationShortName, client)
+		if err != nil {
+			return err
+		}
 	}
-	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to update:", tokens)
-	if err != nil {
-		return err
-	}
+
 	apiTokenID := token.Id
 
 	UpdateWorkspaceAPITokenRequest := astrocore.UpdateWorkspaceApiTokenJSONRequestBody{}
@@ -163,9 +169,10 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 	} else {
 		UpdateWorkspaceAPITokenRequest.Description = description
 	}
+
 	if role == "" {
 		for i := range token.Roles {
-			if token.Roles[i].EntityId == workspaceEntity {
+			if token.Roles[i].EntityType == workspaceEntity && token.Roles[i].EntityId == workspace {
 				role = token.Roles[i].Role
 			}
 		}
@@ -181,6 +188,7 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 		}
 		UpdateWorkspaceAPITokenRequest.Role = role
 	}
+
 	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenID, UpdateWorkspaceAPITokenRequest)
 	if err != nil {
 		return err
@@ -205,13 +213,21 @@ func RotateToken(id, name, workspace string, cleanOutput, force bool, out io.Wri
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
-	tokens, err := getWorkspaceTokens(workspace, client)
-	if err != nil {
-		return err
-	}
-	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to rotate:", tokens)
-	if err != nil {
-		return err
+	var token astrocore.ApiToken
+	if id == "" {
+		tokens, err := getWorkspaceTokens(workspace, client)
+		if err != nil {
+			return err
+		}
+		token, err = getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to update:", tokens)
+		if err != nil {
+			return err
+		}
+	} else {
+		token, err = getWorkspaceTokenByID(id, workspace, ctx.OrganizationShortName, client)
+		if err != nil {
+			return err
+		}
 	}
 	apiTokenID := token.Id
 
@@ -257,13 +273,21 @@ func DeleteToken(id, name, workspace string, force bool, out io.Writer, client a
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
-	tokens, err := getWorkspaceTokens(workspace, client)
-	if err != nil {
-		return err
-	}
-	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace APItoken you would like to delete or remove:", tokens)
-	if err != nil {
-		return err
+	var token astrocore.ApiToken
+	if id == "" {
+		tokens, err := getWorkspaceTokens(workspace, client)
+		if err != nil {
+			return err
+		}
+		token, err = getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to update:", tokens)
+		if err != nil {
+			return err
+		}
+	} else {
+		token, err = getWorkspaceTokenByID(id, workspace, ctx.OrganizationShortName, client)
+		if err != nil {
+			return err
+		}
 	}
 	apiTokenID := token.Id
 	if string(token.Type) == workspaceEntity {
@@ -338,6 +362,7 @@ func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.A
 
 	tab.Print(os.Stdout)
 	choice := input.Text("\n> ")
+
 	selected, ok := apiTokensMap[choice]
 	if !ok {
 		return astrocore.ApiToken{}, errInvalidWorkspaceTokenKey
@@ -405,8 +430,6 @@ func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.A
 				return astrocore.ApiToken{}, err
 			}
 		}
-	case name != "" && id != "":
-		return astrocore.ApiToken{}, errBothNameAndID
 	}
 	if token.Id == "" {
 		return astrocore.ApiToken{}, ErrWorkspaceTokenNotFound
@@ -430,4 +453,16 @@ func TimeAgo(date time.Time) string {
 	default:
 		return "Just now"
 	}
+}
+
+func getWorkspaceTokenByID(id, workspaceID, orgShortName string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
+	resp, err := client.GetWorkspaceApiTokenWithResponse(httpContext.Background(), orgShortName, workspaceID, id)
+	if err != nil {
+		return astrocore.ApiToken{}, err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return astrocore.ApiToken{}, err
+	}
+	return *resp.JSON200, nil
 }

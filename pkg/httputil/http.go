@@ -3,13 +3,20 @@ package httputil
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 
+	"github.com/sirupsen/logrus"
+
+	"github.com/astronomer/astro-cli/pkg/fileutil"
+
 	"github.com/pkg/errors"
 	"golang.org/x/net/context/ctxhttp"
 )
+
+const LastSuccessfulHTTPResponseCode = 299
 
 // HTTPClient returns an HTTP Client struct that can execute HTTP requests
 type HTTPClient struct {
@@ -103,4 +110,54 @@ func newError(resp *http.Response) *Error {
 // Error implemented to match Error interface
 func (e *Error) Error() string {
 	return fmt.Sprintf("API error (%d): %s", e.Status, e.Message)
+}
+
+func DownloadResponseToFile(sourceURL, path string) {
+	file, err := fileutil.CreateFile(path)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	client := http.Client{
+		CheckRedirect: func(r *http.Request, via []*http.Request) error {
+			r.URL.Opaque = r.URL.Path
+			return nil
+		},
+	}
+	resp, err := client.Get(sourceURL) //nolint
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	err = fileutil.WriteToFile(path, resp.Body)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	defer file.Close()
+	logrus.Infof("Downloaded %s from %s", path, sourceURL)
+}
+
+func RequestAndGetJSONBody(route string) map[string]interface{} {
+	res, err := http.Get(route) //nolint
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	if res.StatusCode > LastSuccessfulHTTPResponseCode {
+		logrus.Fatalf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
+	}
+
+	var bodyJSON map[string]interface{}
+	err = json.Unmarshal(body, &bodyJSON)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	logrus.Debugf("%s - GET %s %s", res.Status, route, string(body))
+	return bodyJSON
 }

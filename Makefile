@@ -2,7 +2,6 @@ GIT_COMMIT_SHORT=$(shell git rev-parse --short HEAD)
 VERSION ?= SNAPSHOT-${GIT_COMMIT_SHORT}
 
 LDFLAGS_VERSION=-X github.com/astronomer/astro-cli/version.CurrVersion=${VERSION}
-ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 
 CORE_OPENAPI_SPEC=../astro/apps/core/docs/public/public_v1alpha1.yaml
 
@@ -11,6 +10,22 @@ OUTPUT ?= astro
 GOLANGCI_LINT_VERSION ?=v1.50.1
 
 PWD=$(shell pwd)
+
+## Location to install dependencies to
+ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
+$(ENVTEST_ASSETS_DIR):
+	mkdir -p $(ENVTEST_ASSETS_DIR)
+
+## Tool Binaries
+MOCKERY ?= $(ENVTEST_ASSETS_DIR)/mockery
+
+## Tool versions
+MOCKERY_VERSION ?= v2.32.0
+
+.PHONY: kustomize
+mockery: $(ENVTEST_ASSETS_DIR)
+	(test -s $(MOCKERY) && $(MOCKERY) --version | grep -i $(MOCKERY_VERSION)) || GOBIN=$(ENVTEST_ASSETS_DIR) go install github.com/vektra/mockery/v2@$(MOCKERY_VERSION)
+
 
 lint:
 	@test -f ${ENVTEST_ASSETS_DIR}/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} ${GOLANGCI_LINT_VERSION}
@@ -24,7 +39,7 @@ core_api_gen:
     ifeq (, $(shell which oapi-codegen))
 	go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest
     endif
-	oapi-codegen -include-tags=User,Organization,Invite,Workspace,Cluster,Options,Team,ApiToken -generate=types,client -package=astrocore "${CORE_OPENAPI_SPEC}" > ./astro-client-core/api.gen.go
+	oapi-codegen -include-tags=User,Organization,Invite,Workspace,Cluster,Options,Team,ApiToken,Deployment -generate=types,client -package=astrocore "${CORE_OPENAPI_SPEC}" > ./astro-client-core/api.gen.go
 	make mock_astro_core
 
 test:
@@ -36,7 +51,7 @@ temp-astro:
 temp-astro-flow:
 	./astro flow init $(shell mktemp -d)
 
-mock: mock_airflow mock_houston mock_astro mock_pkg mock_astro_core mock_airflow_api
+mock: mockery mock_airflow mock_houston mock_astro mock_pkg mock_astro_core mock_airflow_api
 
 mock_houston:
 	mockery --filename=ClientInterface.go --output=houston/mocks --dir=houston --outpkg=houston_mocks --name ClientInterface
