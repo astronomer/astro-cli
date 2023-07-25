@@ -678,9 +678,6 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, de
 	if err != nil {
 		return err
 	}
-	fmt.Println(d.dockerfile)
-	fmt.Println(newDockerFile)
-	fmt.Println(newAirflowVersion)
 
 	// build image with the new airflow version
 	err = upgradeDockerfile(d.dockerfile, newDockerFile, newAirflowVersion)
