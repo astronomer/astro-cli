@@ -687,6 +687,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
@@ -715,7 +716,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(4)
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	// Test pytest with dags deploy
@@ -737,21 +738,22 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
 
+	mockCoreClient.AssertExpectations(t)
 	mockClient.AssertExpectations(t)
 }
 
@@ -798,6 +800,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
@@ -826,7 +829,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(4)
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	// Test pytest with dags deploy
@@ -848,21 +851,22 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
 
+	mockCoreClient.AssertExpectations(t)
 	mockClient.AssertExpectations(t)
 }
 
