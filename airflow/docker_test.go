@@ -32,9 +32,9 @@ import (
 var (
 	errMockDocker   = errors.New("mock docker compose error")
 	errMockSettings = errors.New("mock Settings error")
-	//go:embed include/pip_freeze_new-version.txt
+	//go:embed testfiles/pip_freeze_new-version.txt
 	pipFreezeFile string
-	//go:embed include/pip_freeze_old-version.txt
+	//go:embed testfiles/pip_freeze_old-version.txt
 	pipFreezeFile2 string
 )
 
