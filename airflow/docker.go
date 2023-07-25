@@ -642,20 +642,13 @@ func (d *DockerCompose) conflictTest(testHomeDirectory, newImageName, newAirflow
 
 	// create files needed for conflict test
 	err := initConflictTest(config.WorkingPath, newImageName, newAirflowVersion)
+	defer os.Remove("conflict-check.Dockerfile")
 	if err != nil {
-		err := os.Remove("conflict-check.Dockerfile")
-		if err != nil {
-			return errors.Wrap(err, "failed to remove file")
-		}
 		return err
 	}
 
 	exitCode, conflictErr := d.imageHandler.ConflictTest(d.airflowHome, testHomeDirectory, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 	if conflictErr != nil {
-		err := os.Remove("conflict-check.Dockerfile")
-		if err != nil {
-			return errors.Wrap(err, "failed to remove file")
-		}
 		return conflictErr
 	}
 	if strings.Contains(exitCode, "0") || exitCode == "" { // if the error code is 0 the pytests passed
@@ -951,7 +944,7 @@ func iteratePkgMap(pgkVersions map[string][2]string) error { //nolint:gocognit
 	return nil
 }
 
-func whichList(pkg, pkgUpdate, updateType string) {
+func categorizeAirflowProviderPackage(pkg, pkgUpdate, updateType string) {
 	// Categorize the packages based on the update type
 	switch {
 	case strings.Contains(pkg, "apache-airflow-providers-"):

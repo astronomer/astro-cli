@@ -171,7 +171,7 @@ func newAirflowInitCmd() *cobra.Command {
 func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade-test",
-		Short:   "Run some tests to see if your environment and DAGs are compatable with a new version of Airflow or Runtime",
+		Short:   "Run tests to see if your environment and DAGs are compatable with a new version of Airflow or Runtime",
 		Long:    "Run some tests to see if your environment and DAGs are compatable with a new version of Airflow or Runtime",
 		Example: initCloudExample,
 		// ignore PersistentPreRunE of root command
@@ -182,7 +182,7 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 			return airflowUpgradeTest(cmd, astroClient)
 		},
 	}
-	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to upgrade too. If not specified, latest is assumed.")
+	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to upgrade to. If not specified, latest is assumed.")
 	cmd.Flags().BoolVarP(&conflictTest, "conflict-test", "d", false, "dependency conflict test only")
 	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "dependency version comparison only")
 	cmd.Flags().BoolVarP(&dagTest, "dag-test", "", false, "dag test only")
