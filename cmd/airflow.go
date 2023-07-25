@@ -183,9 +183,9 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The versions of Airflow you want to upgrade to. If not specified, latest is assumed.")
-	cmd.Flags().BoolVarP(&conflictTest, "conflict-test", "d", false, "Test for conflicts between the new Airflow version's dependencies and your requirements file. Test runs by default. Use this flag to only run this test.")
-	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "Compare the Provider packages and dependencies before and after the upgrade. See which packages were removed, added, and/or updated. Test runs by default. Use this flag to only run this test.")
-	cmd.Flags().BoolVarP(&dagTest, "dag-test", "", false, "Test your DAGs for import errors against the upgraded environment.  Test runs by default. Use this flag to only run this test.")
+	cmd.Flags().BoolVarP(&conflictTest, "conflict-test", "d", false, "Only run conflict tests. These tests check whether you will have dependency conflicts after you upgrade.")
+	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "Only run version tests. These tests show you how the versions of your unpinned dependencies will change after you upgrade.")
+	cmd.Flags().BoolVarP(&dagTest, "dag-test", "", false, "Only run DAG tests. These tests check whether your DAGs will generate import errors after you upgrade.")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against. ")
 	var err error
 	var avoidACFlag bool
@@ -579,6 +579,12 @@ func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error {
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
 	if err != nil {
 		return err
+	}
+
+	// add upgrade-test* to the gitignore
+	err = fileutil.AddLineToFile("./.gitignore", "upgrade-test*", "")
+	if err != nil {
+		fmt.Printf("failed to add 'upgrade-test*' to .gitignore: %s", err.Error())
 	}
 
 	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, conflictTest, versionTest, dagTest, astroClient)
