@@ -192,14 +192,13 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 
 	// In case user is connected to Astronomer Platform and is connected to older version of platform
 	if context.IsCloudContext() || houstonVersion == "" || (!context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.29.0"})) {
-		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Specify a version of Astro Runtime that you want to create an Astro project with. If not specified, the latest is assumed. You can change this version in your Dockerfile at any time.")
+		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Version of Astro Runtime that you want to upgrade. If not specified, the latest is assumed.")
 	} else { // default to using AC flag, since runtime is not available for these cases
 		useAstronomerCertified = true
 		avoidACFlag = true
 	}
 
 	if !context.IsCloudContext() && !avoidACFlag {
-		cmd.Example = initSoftwareExample
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, specify an Astronomer Certified Airflow image to upgrade to instead of Astro Runtime.")
 	}
 
