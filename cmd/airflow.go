@@ -171,8 +171,8 @@ func newAirflowInitCmd() *cobra.Command {
 func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade-test",
-		Short:   "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime",
-		Long:    "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime",
+		Short:   "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test resluts.",
+		Long:    "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test resluts.",
 		Example: initCloudExample,
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -183,9 +183,9 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The versions of Airflow you want to upgrade to. If not specified, latest is assumed.")
-	cmd.Flags().BoolVarP(&conflictTest, "conflict-test", "d", false, "Only run Python and OS dependency tests")
-	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "Only run Python and OS dependency version tests")
-	cmd.Flags().BoolVarP(&dagTest, "dag-test", "", false, "dag test only")
+	cmd.Flags().BoolVarP(&conflictTest, "conflict-test", "d", false, "Test for conflicts between the new Airflow version's dependencies and your requirements file. Test runs by default. Use this flag to only run this test.")
+	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "Compare the Provider packages and dependencies before and after the upgrade. See which packages were removed, added, and/or updated. Test runs by default. Use this flag to only run this test.")
+	cmd.Flags().BoolVarP(&dagTest, "dag-test", "", false, "Test your DAGs for import errors against the upgraded environment.  Test runs by default. Use this flag to only run this test.")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against. ")
 	var err error
 	var avoidACFlag bool
@@ -199,7 +199,6 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 	}
 
 	if !context.IsCloudContext() && !avoidACFlag {
-		cmd.Example = initSoftwareExample
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "Use an Astronomer Certified image instead of Astro Runtime. Use the airflow-version flag to specify your AC version.")
 	}
 
