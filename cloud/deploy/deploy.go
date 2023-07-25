@@ -16,6 +16,7 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -85,6 +86,7 @@ type deploymentInfo struct {
 	workspaceID      string
 	webserverURL     string
 	dagDeployEnabled bool
+	deploymentType   string
 }
 
 type InputDeploy struct {
@@ -145,18 +147,24 @@ func removeDagsFromDockerIgnore(fullpath string) error {
 	return nil
 }
 
-func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, error) {
+func shouldIncludeMonitoringDag(deploymentType string) bool {
+	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentHosted(deploymentType)
+}
+
+func deployDags(path, dagsPath, deploymentType, runtimeID string, client astro.Client) (string, error) {
 	// Check the dags directory
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
-	// Create monitoring dag file
-	err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
-	if err != nil {
-		return "", err
+	if shouldIncludeMonitoringDag(deploymentType) {
+		// Create monitoring dag file
+		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	// Generate the dags tar
-	err = fileutil.Tar(dagsPath, path)
+	err := fileutil.Tar(dagsPath, path)
 	if err != nil {
 		return "", err
 	}
@@ -181,7 +189,9 @@ func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, 
 	// Delete the tar file
 	defer func() {
 		dagFile.Close()
-		os.Remove(monitoringDagPath)
+		if shouldIncludeMonitoringDag(deploymentType) {
+			os.Remove(monitoringDagPath)
+		}
 		err = os.Remove(dagFile.Name())
 		if err != nil {
 			fmt.Println("\nFailed to delete dags tar file: ", err.Error())
@@ -266,7 +276,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		versionID, err := deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
+		versionID, err := deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, client)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -360,7 +370,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			_, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
+			_, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, client)
 			if err != nil {
 				return err
 			}
@@ -411,6 +421,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 			currentDeployment.Workspace.ID,
 			currentDeployment.DeploymentSpec.Webserver.URL,
 			currentDeployment.DagDeployEnabled,
+			currentDeployment.Type,
 		}, nil
 	}
 	deployInfo, err := getImageName(cloudDomain, deploymentID, client)
