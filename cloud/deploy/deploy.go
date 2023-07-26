@@ -483,7 +483,7 @@ func parseDAGs(deployImage string, containerHandler airflow.ContainerHandler) er
 			return errDagsParseFailed
 		}
 	} else {
-		fmt.Println("Skiping parsing dags due to skip parse being set to true in either the config.yaml or local environment variables")
+		fmt.Println("Skipping parsing dags due to skip parse being set to true in either the config.yaml or local environment variables")
 	}
 
 	return nil
