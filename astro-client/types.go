@@ -317,6 +317,7 @@ type DeployImageInput struct {
 	Tag              string `json:"tag"`
 	Repository       string `json:"repository"`
 	DagDeployEnabled bool   `json:"dagDeployEnabled"`
+	Description      string `json:"description"`
 }
 
 type CreateDeploymentInput struct {

@@ -561,7 +561,7 @@ func TestDeployImage(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		image, err := astroClient.DeployImage(DeployImageInput{})
+		image, err := astroClient.DeployImage(&DeployImageInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, image, mockResponse.Data.DeployImage)
 	})
@@ -576,7 +576,7 @@ func TestDeployImage(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.DeployImage(DeployImageInput{})
+		_, err := astroClient.DeployImage(&DeployImageInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
