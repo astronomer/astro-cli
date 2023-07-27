@@ -186,7 +186,8 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 	cmd.Flags().BoolVarP(&conflictTest, "conflict-test", "d", false, "Only run conflict tests. These tests check whether you will have dependency conflicts after you upgrade.")
 	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "Only run version tests. These tests show you how the versions of your dependencies will change after you upgrade.")
 	cmd.Flags().BoolVarP(&dagTest, "dag-test", "", false, "Only run DAG tests. These tests check whether your DAGs will generate import errors after you upgrade.")
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against. ")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against.")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of the upgraded image. Updates the FROM line in your Dockerfile to pull this image for the upgrade.")
 	var err error
 	var avoidACFlag bool
 
@@ -587,7 +588,7 @@ func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error {
 		fmt.Printf("failed to add 'upgrade-test*' to .gitignore: %s", err.Error())
 	}
 
-	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, conflictTest, versionTest, dagTest, astroClient)
+	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, customImageName, conflictTest, versionTest, dagTest, astroClient)
 	if err != nil {
 		return err
 	}

@@ -213,13 +213,13 @@ func (_m *ContainerHandler) Stop(waitForExit bool) error {
 	return r0
 }
 
-// UpgradeTest provides a mock function with given fields: runtimeVersion, deploymentID, newImageName, dependencyTest, versionTest, dagTest, client
-func (_m *ContainerHandler) UpgradeTest(runtimeVersion string, deploymentID string, newImageName string, dependencyTest bool, versionTest bool, dagTest bool, client astro.Client) error {
-	ret := _m.Called(runtimeVersion, deploymentID, newImageName, dependencyTest, versionTest, dagTest, client)
+// UpgradeTest provides a mock function with given fields: runtimeVersion, deploymentID, newImageName, customImageName, dependencyTest, versionTest, dagTest, client
+func (_m *ContainerHandler) UpgradeTest(runtimeVersion string, deploymentID string, newImageName string, customImageName string, dependencyTest bool, versionTest bool, dagTest bool, client astro.Client) error {
+	ret := _m.Called(runtimeVersion, deploymentID, newImageName, customImageName, dependencyTest, versionTest, dagTest, client)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, bool, bool, bool, astro.Client) error); ok {
-		r0 = rf(runtimeVersion, deploymentID, newImageName, dependencyTest, versionTest, dagTest, client)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, bool, bool, astro.Client) error); ok {
+		r0 = rf(runtimeVersion, deploymentID, newImageName, customImageName, dependencyTest, versionTest, dagTest, client)
 	} else {
 		r0 = ret.Error(0)
 	}

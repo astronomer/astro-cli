@@ -534,7 +534,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName string, conflictTest, versionTest, dagTest bool, client astro.Client) error {
+func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName, customImage string, conflictTest, versionTest, dagTest bool, client astro.Client) error {
 	// figure out which tests to run
 	if !conflictTest && !versionTest && !dagTest {
 		conflictTest = true
@@ -586,13 +586,13 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 	}
 	var pipFreezeCompareFile string
 	if versionTest {
-		err := d.versionTest(testHomeDirectory, currentAirflowVersion, deploymentImage, newDockerFile, newAirflowVersion)
+		err := d.versionTest(testHomeDirectory, currentAirflowVersion, deploymentImage, newDockerFile, newAirflowVersion, customImage)
 		if err != nil {
 			return err
 		}
 	}
 	if dagTest {
-		err := d.dagTest(testHomeDirectory, newAirflowVersion, newDockerFile)
+		err := d.dagTest(testHomeDirectory, newAirflowVersion, newDockerFile, customImage)
 		if err != nil {
 			return err
 		}
@@ -669,7 +669,7 @@ func (d *DockerCompose) conflictTest(testHomeDirectory, newImageName, newAirflow
 	return nil
 }
 
-func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, deploymentImage, newDockerFile, newAirflowVersion string) error {
+func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, deploymentImage, newDockerFile, newAirflowVersion, customImage string) error {
 	fmt.Println("\nComparing dependency versions between current and upgraded environment")
 	// pip freeze old Airflow image
 	fmt.Println("\nObtaining pip freeze for current Airflow version")
@@ -680,7 +680,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, de
 	}
 
 	// build image with the new airflow version
-	err = upgradeDockerfile(d.dockerfile, newDockerFile, newAirflowVersion)
+	err = upgradeDockerfile(d.dockerfile, newDockerFile, newAirflowVersion, customImage)
 	if err != nil {
 		return err
 	}
@@ -707,11 +707,11 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, de
 	return nil
 }
 
-func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerFile string) error {
+func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerFile, customImage string) error {
 	fmt.Printf("\nChecking the DAGs in this project for errors against the new Airflow version %s\n", newAirflowVersion)
 
 	// build image with the new runtime version
-	err := upgradeDockerfile(d.dockerfile, newDockerFile, newAirflowVersion)
+	err := upgradeDockerfile(d.dockerfile, newDockerFile, newAirflowVersion, customImage)
 	if err != nil {
 		return err
 	}
@@ -773,7 +773,7 @@ func GetRegistryURL(domain string) string {
 	return registry
 }
 
-func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag string) error {
+func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage string) error {
 	// Read the content of the old Dockerfile
 	content, err := os.ReadFile(oldDockerfilePath)
 	if err != nil {
@@ -782,16 +782,28 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag string) erro
 
 	lines := strings.Split(string(content), "\n")
 	var newContent strings.Builder
-
-	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/astro-runtime:") {
-			// Replace the tag on the matching line
-			parts := strings.SplitN(line, ":", partsNum)
-			if len(parts) == partsNum {
-				line = parts[0] + ":" + newTag
+	if newImage != "" {
+		for _, line := range lines {
+			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/astro-runtime:") {
+				// Replace the tag on the matching line
+				parts := strings.SplitN(line, ":", partsNum)
+				if len(parts) == partsNum {
+					line = parts[0] + ":" + newTag
+				}
 			}
+			newContent.WriteString(line)
 		}
-		newContent.WriteString(line)
+	} else {
+		for _, line := range lines {
+			if strings.HasPrefix(strings.TrimSpace(line), "FROM ") {
+				// Replace the tag on the matching line
+				parts := strings.SplitN(line, " ", partsNum)
+				if len(parts) == partsNum {
+					line = parts[0] + newImage
+				}
+			}
+			newContent.WriteString(line)
+		}
 	}
 
 	// Write the updated content to the new Dockerfile
