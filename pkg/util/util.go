@@ -9,9 +9,6 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/pkg/errors"
-
-	// "Masterminds/semver" does not support the format of pre-release tags for SQL CLI, so we're using "hashicorp/go-version"
-	goVersion "github.com/hashicorp/go-version"
 )
 
 type CustomClaims struct {
@@ -101,21 +98,6 @@ func IsM1(myOS, myArch string) bool {
 		return strings.Contains(myArch, "arm")
 	}
 	return false
-}
-
-func IsRequiredVersionMet(currentVersion, requiredVersion string) (bool, error) {
-	v1, err := goVersion.NewVersion(currentVersion)
-	if err != nil {
-		return false, err
-	}
-	constraints, err := goVersion.NewConstraint(requiredVersion)
-	if err != nil {
-		return false, err
-	}
-	if constraints.Check(v1) {
-		return true, nil
-	}
-	return false, nil
 }
 
 func ParseAPIToken(astroAPIToken string) (*CustomClaims, error) {
