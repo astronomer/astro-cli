@@ -31,6 +31,7 @@ var (
 	errNotFound                       = errors.New("does not exist")
 	errInvalidValue                   = errors.New("is not valid")
 	errNotPermitted                   = errors.New("is not permitted")
+	canCiCdDeploy                     = deployment.CanCiCdDeploy
 )
 
 const (
@@ -147,7 +148,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 		workspaceID = existingDeployment.Workspace.ID
 
 		if formattedDeployment.Deployment.Configuration.APIKeyOnlyDeployments && formattedDeployment.Deployment.Configuration.DagDeployEnabled {
-			if !deployment.CanCiCdDeploy(c.Token) {
+			if !canCiCdDeploy(c.Token) {
 				return deployment.ErrCiCdEnforcementUpdate
 			}
 		}
