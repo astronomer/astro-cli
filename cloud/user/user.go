@@ -142,7 +142,7 @@ func SelectUser(users []astrocore.User, workspace bool) (astrocore.User, error) 
 		Header:         []string{"#", "FULLNAME", "EMAIL", "ID", roleColumn, "CREATE DATE"},
 	}
 
-	fmt.Println("\nPlease select the user who's role you would like to update:")
+	fmt.Println("\nPlease select the user:")
 
 	userMap := map[string]astrocore.User{}
 	for i := range users {

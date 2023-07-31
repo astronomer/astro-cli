@@ -4,6 +4,7 @@ import (
 	httpContext "context"
 	"errors"
 	"fmt"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"io"
 	"os"
 	"strconv"
@@ -42,7 +43,11 @@ func CreateTeam(name, description, role string, out io.Writer, client astrocore.
 		return err
 	}
 	if name == "" {
-		return ErrInvalidName
+		fmt.Println("Please specify a name for your Team")
+		name = input.Text(ansi.Bold("\nTeam name: "))
+		if name == "" {
+			return errors.New("you must give your Team a name")
+		}
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
