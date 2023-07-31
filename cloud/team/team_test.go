@@ -1019,6 +1019,18 @@ func TestCreate(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
+	t.Run("happy path no name passed so user types one in when prompted", func(t *testing.T) {
+		teamName := "Test Team Name"
+		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully created\n", teamName)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateTeamResponseOK, nil).Once()
+		defer testUtil.MockUserInput(t, teamName)()
+		err := CreateTeam("", *team1.Description, "ORGANIZATION_MEMBER", out, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
 	t.Run("error path when CreateTeamWithResponse return network error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1056,12 +1068,12 @@ func TestCreate(t *testing.T) {
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
-	t.Run("error path no name passed in", func(t *testing.T) {
+	t.Run("error path no name passed in and user doesn't type one in when prompted", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		err := CreateTeam("", *team1.Description, "ORGANIZATION_MEMBER", out, mockClient)
-		assert.EqualError(t, err, "no name provided for the team. Retry with a valid name")
+		assert.EqualError(t, err, "you must give your Team a name")
 	})
 
 	t.Run("error path invalid org role", func(t *testing.T) {

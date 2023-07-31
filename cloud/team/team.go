@@ -12,6 +12,7 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -28,6 +29,7 @@ var (
 	ErrNoTeamsFoundInWorkspace  = errors.New("no teams found in your workspace")
 	ErrNoTeamMembersFoundInTeam = errors.New("no team members found in team")
 	ErrNoUsersFoundInOrg        = errors.New("no users found in your organization")
+	ErrNoTeamNameProvided       = errors.New("you must give your Team a name")
 	teamPagnationLimit          = 100
 )
 
@@ -42,7 +44,11 @@ func CreateTeam(name, description, role string, out io.Writer, client astrocore.
 		return err
 	}
 	if name == "" {
-		return ErrInvalidName
+		fmt.Println("Please specify a name for your Team")
+		name = input.Text(ansi.Bold("\nTeam name: "))
+		if name == "" {
+			return ErrNoTeamNameProvided
+		}
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
