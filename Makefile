@@ -48,9 +48,6 @@ test:
 temp-astro:
 	cd $(shell mktemp -d) && ${PWD}/astro dev init
 
-temp-astro-flow:
-	./astro flow init $(shell mktemp -d)
-
 mock: mockery mock_airflow mock_houston mock_astro mock_pkg mock_astro_core mock_airflow_api
 
 mock_houston:
