@@ -782,7 +782,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 
 	lines := strings.Split(string(content), "\n")
 	var newContent strings.Builder
-	if newImage != "" {
+	if newImage == "" {
 		for _, line := range lines {
 			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/astro-runtime:") {
 				// Replace the tag on the matching line
