@@ -1441,7 +1441,7 @@ func TestCanCiCdDeploy(t *testing.T) {
 	assert.Equal(t, canDeploy, false)
 
 	parseToken = func(astroAPIToken string) (*util.CustomClaims, error) {
-		return nil, errors.New("Bad Token")
+		return nil, errMock
 	}
 	canDeploy = CanCiCdDeploy("bearer token")
 	assert.Equal(t, canDeploy, false)
