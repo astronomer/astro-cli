@@ -37,6 +37,7 @@ var (
 	ErrCiCdEnforcementUpdate = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
 	// Monkey patched to write unit tests
 	createDeployment = Create
+	canCiCdDeploy    = CanCiCdDeploy
 	CleanOutput      = false
 )
 
@@ -674,7 +675,7 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 	}
 
 	if deploymentUpdate.APIKeyOnlyDeployments && dagDeploy != "" {
-		if !CanCiCdDeploy(c.Token) {
+		if !canCiCdDeploy(c.Token) {
 			return ErrCiCdEnforcementUpdate
 		}
 	}

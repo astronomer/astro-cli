@@ -2053,6 +2053,47 @@ func TestUpdate(t *testing.T) { //nolint
 		mockClient.AssertExpectations(t)
 	})
 
+	t.Run("do not update deployment to enable dag deploy if ci-cd enforcement is enabled", func(t *testing.T) {
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
+		deploymentResp = astro.Deployment{
+			ID:               "test-id",
+			DagDeployEnabled: true,
+			DeploymentSpec: astro.DeploymentSpec{
+				Executor: CeleryExecutor,
+			},
+			APIKeyOnlyDeployments: true,
+		}
+
+		canCiCdDeploy = func(astroAPIToken string) bool {
+			return false
+		}
+
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
+		err := Update("test-id", "", ws, "", "", "enable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, nil, mockClient)
+		assert.ErrorIs(t, err, ErrCiCdEnforcementUpdate)
+
+		mockClient.AssertExpectations(t)
+	})
+
 	t.Run("update deployment to disable dag deploy", func(t *testing.T) {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
