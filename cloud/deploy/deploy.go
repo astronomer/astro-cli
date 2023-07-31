@@ -101,6 +101,7 @@ type InputDeploy struct {
 	Dags           bool
 	WaitForStatus  bool
 	DagsPath       string
+	Description    string
 }
 
 func removeDagsFromDockerIgnore(fullpath string) error {
@@ -353,7 +354,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		// Deploy the image
-		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, deployInfo.dagDeployEnabled, client)
+		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, deployInput.Description, deployInfo.dagDeployEnabled, client)
 		if err != nil {
 			return err
 		}
@@ -666,15 +667,16 @@ func buildImage(path, currentVersion, deployImage, imageName string, dagDeployEn
 }
 
 // Deploy the image
-func imageDeploy(imageCreateResID, deploymentID, repository, nextTag string, dagDeployEnabled bool, client astro.Client) error {
+func imageDeploy(imageCreateResID, deploymentID, repository, nextTag, description string, dagDeployEnabled bool, client astro.Client) error {
 	imageDeployInput := astro.DeployImageInput{
 		ImageID:          imageCreateResID,
 		DeploymentID:     deploymentID,
 		Repository:       repository,
 		Tag:              nextTag,
 		DagDeployEnabled: dagDeployEnabled,
+		Description:      description,
 	}
-	resp, err := client.DeployImage(imageDeployInput)
+	resp, err := client.DeployImage(&imageDeployInput)
 	if err != nil {
 		return err
 	}

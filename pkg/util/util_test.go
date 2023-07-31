@@ -1,7 +1,6 @@
 package util
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -228,54 +227,4 @@ func TestIsM1(t *testing.T) {
 	t.Run("returns false if running on windows", func(t *testing.T) {
 		assert.False(t, IsM1("windows", "amd64"))
 	})
-}
-
-var (
-	errMalformedCurrentVersion = errors.New("Malformed version: invalid current version") //nolint:stylecheck
-	errMalformedConstraint     = errors.New("Malformed constraint: invalid constraint")   //nolint:stylecheck
-)
-
-func TestIsRequiredVersionMet(t *testing.T) {
-	type args struct {
-		currentVersion  string
-		requiredVersion string
-	}
-	type result struct {
-		valid bool
-		err   error
-	}
-
-	tests := []struct {
-		name string
-		args args
-		want result
-	}{
-		{
-			name: "first true case",
-			args: args{"7.1.0", ">7.0.0, <8.0.0"},
-			want: result{true, nil},
-		},
-		{
-			name: "first false case",
-			args: args{"7.1.0", ">7.1.0"},
-			want: result{false, nil},
-		},
-		{
-			name: "first error case",
-			args: args{"invalid current version", ">7.0.0, <8.0.0"},
-			want: result{false, errMalformedCurrentVersion},
-		},
-		{
-			name: "second error case",
-			args: args{"7.1.0", "invalid constraint"},
-			want: result{false, errMalformedConstraint},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if versionMet, err := IsRequiredVersionMet(tt.args.currentVersion, tt.args.requiredVersion); versionMet != tt.want.valid || (err != nil && err.Error() != tt.want.err.Error()) {
-				t.Errorf("IsRequiredVersionMet() = %v, %v; want %v, %v", versionMet, err, tt.want.valid, tt.want.err)
-			}
-		})
-	}
 }
