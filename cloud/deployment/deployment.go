@@ -38,6 +38,7 @@ var (
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	canCiCdDeploy    = CanCiCdDeploy
+	parseToken       = util.ParseAPIToken
 	CleanOutput      = false
 )
 
@@ -75,7 +76,7 @@ func newTableOutAll() *printutil.Table {
 func CanCiCdDeploy(bearerToken string) bool {
 	token := strings.Split(bearerToken, " ")[1] // Stripping Bearer
 	// Parse the token to peek at the custom claims
-	claims, err := util.ParseAPIToken(token)
+	claims, err := parseToken(token)
 	if err != nil {
 		fmt.Println("Unable to Parse Token")
 		return false

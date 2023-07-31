@@ -15,6 +15,7 @@ import (
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -1424,6 +1425,42 @@ func TestSelectCluster(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to find specified Cluster")
 	})
+}
+
+func TestCanCiCdDeploy(t *testing.T) {
+	permissions := []string{}
+	mockClaims := util.CustomClaims{
+		Permissions: permissions,
+	}
+
+	parseToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+		return &mockClaims, nil
+	}
+
+	canDeploy := CanCiCdDeploy("bearer token")
+	assert.Equal(t, canDeploy, false)
+
+	parseToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+		return nil, errors.New("Bad Token")
+	}
+	canDeploy = CanCiCdDeploy("bearer token")
+	assert.Equal(t, canDeploy, false)
+
+	permissions = []string{
+		"workspaceId:workspace-id",
+		"organizationId:org-ID",
+		"orgShortName:org-short-name",
+	}
+	mockClaims = util.CustomClaims{
+		Permissions: permissions,
+	}
+
+	parseToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+		return &mockClaims, nil
+	}
+
+	canDeploy = CanCiCdDeploy("bearer token")
+	assert.Equal(t, canDeploy, true)
 }
 
 func TestUpdate(t *testing.T) { //nolint
