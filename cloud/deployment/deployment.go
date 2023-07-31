@@ -34,7 +34,7 @@ var (
 	errTimedOut              = errors.New("timed out waiting for the deployment to become healthy")
 	ErrWrongEnforceInput     = errors.New("the input to the `--enforce-cicd` flag")
 	ErrNoDeploymentExists    = errors.New("no deployment was found in this workspace")
-	ErrCiCdEnforcementUpdate = errors.New("Cannot update dag deploy since ci/cd enforcement is enabled for this deployment")
+	ErrCiCdEnforcementUpdate = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	CleanOutput      = false
