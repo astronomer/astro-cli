@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
@@ -27,12 +28,13 @@ import (
 )
 
 var (
-	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
-	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
-	ErrInvalidRegionKey     = errors.New("invalid Region selected")
-	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
-	ErrWrongEnforceInput    = errors.New("the input to the `--enforce-cicd` flag")
-	ErrNoDeploymentExists   = errors.New("no deployment was found in this workspace")
+	errInvalidDeployment     = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
+	ErrInvalidDeploymentKey  = errors.New("invalid Deployment selected")
+	ErrInvalidRegionKey      = errors.New("invalid Region selected")
+	errTimedOut              = errors.New("timed out waiting for the deployment to become healthy")
+	ErrWrongEnforceInput     = errors.New("the input to the `--enforce-cicd` flag")
+	ErrNoDeploymentExists    = errors.New("no deployment was found in this workspace")
+	ErrCiCdEnforcementUpdate = errors.New("Cannot update dag deploy since ci/cd enforcement is enabled for this deployment")
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	CleanOutput      = false
@@ -67,6 +69,23 @@ func newTableOutAll() *printutil.Table {
 		DynamicPadding: true,
 		Header:         []string{"NAME", "WORKSPACE", "NAMESPACE", "CLUSTER", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT"},
 	}
+}
+
+func CanCiCdDeploy(bearerToken string) bool {
+	token := strings.Split(bearerToken, " ")[1] // Stripping Bearer
+	// Parse the token to peek at the custom claims
+	claims, err := util.ParseAPIToken(token)
+	if err != nil {
+		fmt.Println("Unable to Parse Token")
+		return false
+	}
+
+	// Only API Tokens and API Keys have permissions
+	if len(claims.Permissions) > 0 {
+		return true
+	}
+
+	return false
 }
 
 // List all airflow deployments
@@ -646,6 +665,17 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 			deploymentUpdate.IsHighAvailability = true
 		} else if highAvailability == "disable" { //nolint
 			deploymentUpdate.IsHighAvailability = false
+		}
+	}
+
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	if deploymentUpdate.APIKeyOnlyDeployments && dagDeploy != "" {
+		if !CanCiCdDeploy(c.Token) {
+			return ErrCiCdEnforcementUpdate
 		}
 	}
 

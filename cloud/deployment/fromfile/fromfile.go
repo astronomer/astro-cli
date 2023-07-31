@@ -146,6 +146,12 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 		existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
 		workspaceID = existingDeployment.Workspace.ID
 
+		if formattedDeployment.Deployment.Configuration.APIKeyOnlyDeployments && formattedDeployment.Deployment.Configuration.DagDeployEnabled {
+			if !deployment.CanCiCdDeploy(c.Token) {
+				return deployment.ErrCiCdEnforcementUpdate
+			}
+		}
+
 		// transform formattedDeployment to DeploymentUpdateInput
 		_, updateInput, err = getCreateOrUpdateInput(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, client)
 		if err != nil {
