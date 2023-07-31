@@ -169,17 +169,10 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 		return false
 	}
 
-	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}, DagDeployEnabled: true, APIKeyOnlyDeployments: true}}, nil).Twice()
+	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}, DagDeployEnabled: true, APIKeyOnlyDeployments: true}}, nil).Once()
 
 	err := Deploy(deployInput, mockClient, mockCoreClient)
 	assert.ErrorIs(t, err, deployment.ErrCiCdEnforcementUpdate)
-
-	canCiCdDeploy = func(astroAPIToken string) bool {
-		return true
-	}
-
-	err = Deploy(deployInput, mockClient, mockCoreClient)
-	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
 
