@@ -63,12 +63,12 @@ var (
 	airflowImageHandler  = airflow.ImageHandlerInit
 	containerHandlerInit = airflow.ContainerHandlerInit
 	azureUploader        = azure.Upload
+	canCiCdDeploy        = deployment.CanCiCdDeploy
 )
 
 var (
-	errDagsParseFailed       = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	envFileMissing           = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
-	errCiCdEnforcementDeploy = errors.New("cannot deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
+	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
 )
 
 var (
@@ -245,8 +245,8 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 	}
 
 	if deployInfo.cicdEnforcement {
-		if !deployment.CanCiCdDeploy(c.Token) {
-			return errCiCdEnforcementDeploy
+		if !canCiCdDeploy(c.Token) {
+			return deployment.ErrCiCdEnforcementUpdate
 		}
 	}
 

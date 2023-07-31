@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/astro-client"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -140,6 +141,50 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	mockCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 	mockContainerHandler.AssertExpectations(t)
+}
+
+func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
+	os.Mkdir("./testfiles/dags", os.ModePerm)
+	path := "./testfiles/dags/test.py"
+	fileutil.WriteStringToFile(path, "testing")
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+
+	deployInput := InputDeploy{
+		Path:           "./testfiles/",
+		RuntimeID:      "",
+		WsID:           ws,
+		Pytest:         "parse",
+		EnvFile:        "./testfiles/.env",
+		ImageName:      "",
+		DeploymentName: "",
+		Prompt:         true,
+		WaitForStatus:  false,
+		Dags:           false,
+	}
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+	mockClient := new(astro_mocks.Client)
+
+	canCiCdDeploy = func(astroAPIToken string) bool {
+		return false
+	}
+
+	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}, DagDeployEnabled: true, APIKeyOnlyDeployments: true}}, nil).Twice()
+
+	err := Deploy(deployInput, mockClient, mockCoreClient)
+	assert.ErrorIs(t, err, deployment.ErrCiCdEnforcementUpdate)
+
+	canCiCdDeploy = func(astroAPIToken string) bool {
+		return true
+	}
+
+	err = Deploy(deployInput, mockClient, mockCoreClient)
+	assert.NoError(t, err)
+
+	defer os.RemoveAll("./testfiles/dags/")
+
+	mockClient.AssertExpectations(t)
+	mockCoreClient.AssertExpectations(t)
 }
 
 func TestDeployWithDagsDeploySuccess(t *testing.T) {
