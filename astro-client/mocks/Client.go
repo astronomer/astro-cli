@@ -90,15 +90,15 @@ func (_m *Client) DeleteDeployment(input astro.DeleteDeploymentInput) (astro.Dep
 }
 
 // DeployImage provides a mock function with given fields: input
-func (_m *Client) DeployImage(input astro.DeployImageInput) (*astro.Image, error) {
+func (_m *Client) DeployImage(input *astro.DeployImageInput) (*astro.Image, error) {
 	ret := _m.Called(input)
 
 	var r0 *astro.Image
 	var r1 error
-	if rf, ok := ret.Get(0).(func(astro.DeployImageInput) (*astro.Image, error)); ok {
+	if rf, ok := ret.Get(0).(func(*astro.DeployImageInput) (*astro.Image, error)); ok {
 		return rf(input)
 	}
-	if rf, ok := ret.Get(0).(func(astro.DeployImageInput) *astro.Image); ok {
+	if rf, ok := ret.Get(0).(func(*astro.DeployImageInput) *astro.Image); ok {
 		r0 = rf(input)
 	} else {
 		if ret.Get(0) != nil {
@@ -106,7 +106,7 @@ func (_m *Client) DeployImage(input astro.DeployImageInput) (*astro.Image, error
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(astro.DeployImageInput) error); ok {
+	if rf, ok := ret.Get(1).(func(*astro.DeployImageInput) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)

@@ -26,7 +26,7 @@ type Client interface {
 	ReportDagDeploymentStatus(input *ReportDagDeploymentStatusInput) (DagDeploymentStatus, error)
 	// Image
 	CreateImage(input CreateImageInput) (*Image, error)
-	DeployImage(input DeployImageInput) (*Image, error)
+	DeployImage(input *DeployImageInput) (*Image, error)
 	// WorkerQueues
 	GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error)
 	// Organizations
@@ -177,7 +177,7 @@ func (c *HTTPClient) CreateImage(input CreateImageInput) (*Image, error) {
 	return resp.Data.CreateImage, nil
 }
 
-func (c *HTTPClient) DeployImage(input DeployImageInput) (*Image, error) {
+func (c *HTTPClient) DeployImage(input *DeployImageInput) (*Image, error) {
 	req := Request{
 		Query:     DeployImage,
 		Variables: map[string]interface{}{"imageDeployInput": input},

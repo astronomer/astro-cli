@@ -1,6 +1,5 @@
 *.test
 .astro/
-.Dockerfile.sql_cli
 .DS_Store
 .env
 .idea/
@@ -21,5 +20,6 @@ meta/
 packages.txt
 requirements.txt
 sagemaker-batch-inference.py
+testbin/
 testbin/golangci-lint
 vendor/github.com/theupdateframework/notary/Dockerfile

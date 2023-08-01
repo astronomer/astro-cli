@@ -16,6 +16,7 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -62,11 +63,13 @@ var (
 	airflowImageHandler  = airflow.ImageHandlerInit
 	containerHandlerInit = airflow.ContainerHandlerInit
 	azureUploader        = azure.Upload
+	canCiCdDeploy        = deployment.CanCiCdDeploy
 )
 
 var (
-	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+	errDagsParseFailed       = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	envFileMissing           = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+	errCiCdEnforcementUpdate = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
 )
 
 var (
@@ -85,6 +88,8 @@ type deploymentInfo struct {
 	workspaceID      string
 	webserverURL     string
 	dagDeployEnabled bool
+	deploymentType   string
+	cicdEnforcement  bool
 }
 
 type InputDeploy struct {
@@ -99,6 +104,7 @@ type InputDeploy struct {
 	Dags           bool
 	WaitForStatus  bool
 	DagsPath       string
+	Description    string
 }
 
 func getRegistryURL(domain string) string {
@@ -145,18 +151,24 @@ func removeDagsFromDockerIgnore(fullpath string) error {
 	return nil
 }
 
-func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, error) {
+func shouldIncludeMonitoringDag(deploymentType string) bool {
+	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentHosted(deploymentType)
+}
+
+func deployDags(path, dagsPath, deploymentType, runtimeID string, client astro.Client) (string, error) {
 	// Check the dags directory
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
-	// Create monitoring dag file
-	err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
-	if err != nil {
-		return "", err
+	if shouldIncludeMonitoringDag(deploymentType) {
+		// Create monitoring dag file
+		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	// Generate the dags tar
-	err = fileutil.Tar(dagsPath, path)
+	err := fileutil.Tar(dagsPath, path)
 	if err != nil {
 		return "", err
 	}
@@ -181,7 +193,9 @@ func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, 
 	// Delete the tar file
 	defer func() {
 		dagFile.Close()
-		os.Remove(monitoringDagPath)
+		if shouldIncludeMonitoringDag(deploymentType) {
+			os.Remove(monitoringDagPath)
+		}
 		err = os.Remove(dagFile.Name())
 		if err != nil {
 			fmt.Println("\nFailed to delete dags tar file: ", err.Error())
@@ -231,6 +245,12 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		return err
 	}
 
+	if deployInfo.cicdEnforcement {
+		if !canCiCdDeploy(c.Token) {
+			return errCiCdEnforcementUpdate
+		}
+	}
+
 	if deployInput.WsID != deployInfo.workspaceID {
 		fmt.Printf(invalidWorkspaceID, deployInput.WsID)
 		return nil
@@ -266,7 +286,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		versionID, err := deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
+		versionID, err := deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, client)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -354,13 +374,13 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		// Deploy the image
-		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, deployInfo.dagDeployEnabled, client)
+		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, deployInput.Description, deployInfo.dagDeployEnabled, client)
 		if err != nil {
 			return err
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			_, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
+			_, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, client)
 			if err != nil {
 				return err
 			}
@@ -411,6 +431,8 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 			currentDeployment.Workspace.ID,
 			currentDeployment.DeploymentSpec.Webserver.URL,
 			currentDeployment.DagDeployEnabled,
+			currentDeployment.Type,
+			currentDeployment.APIKeyOnlyDeployments,
 		}, nil
 	}
 	deployInfo, err := getImageName(cloudDomain, deploymentID, client)
@@ -472,7 +494,7 @@ func parseDAGs(deployImage string, containerHandler airflow.ContainerHandler) er
 			return errDagsParseFailed
 		}
 	} else {
-		fmt.Println("Skiping parsing dags due to skip parse being set to true in either the config.yaml or local environment variables")
+		fmt.Println("Skipping parsing dags due to skip parse being set to true in either the config.yaml or local environment variables")
 	}
 
 	return nil
@@ -666,15 +688,16 @@ func buildImage(path, currentVersion, deployImage, imageName string, dagDeployEn
 }
 
 // Deploy the image
-func imageDeploy(imageCreateResID, deploymentID, repository, nextTag string, dagDeployEnabled bool, client astro.Client) error {
+func imageDeploy(imageCreateResID, deploymentID, repository, nextTag, description string, dagDeployEnabled bool, client astro.Client) error {
 	imageDeployInput := astro.DeployImageInput{
 		ImageID:          imageCreateResID,
 		DeploymentID:     deploymentID,
 		Repository:       repository,
 		Tag:              nextTag,
 		DagDeployEnabled: dagDeployEnabled,
+		Description:      description,
 	}
-	resp, err := client.DeployImage(imageDeployInput)
+	resp, err := client.DeployImage(&imageDeployInput)
 	if err != nil {
 		return err
 	}

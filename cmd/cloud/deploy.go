@@ -13,15 +13,20 @@ import (
 )
 
 var (
-	forceDeploy      bool
-	forcePrompt      bool
-	saveDeployConfig bool
-	pytest           bool
-	parse            bool
-	dags             bool
-	waitForDeploy    bool
-	dagsPath         string
-	deployExample    = `
+	forceDeploy       bool
+	forcePrompt       bool
+	saveDeployConfig  bool
+	pytest            bool
+	parse             bool
+	dags              bool
+	waitForDeploy     bool
+	dagsPath          string
+	pytestFile        string
+	envFile           string
+	imageName         string
+	deploymentName    string
+	deployDescription string
+	deployExample     = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
 
   $ astro deploy <deployment ID>
@@ -33,13 +38,6 @@ Menu will be presented if you do not specify a deployment ID:
 
 	DeployImage      = cloud.Deploy
 	EnsureProjectDir = utils.EnsureProjectDir
-)
-
-var (
-	pytestFile     string
-	envFile        string
-	imageName      string
-	deploymentName string
 )
 
 const (
@@ -70,6 +68,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
+	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	return cmd
 }
 
@@ -140,6 +139,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		Dags:           dags,
 		WaitForStatus:  waitForDeploy,
 		DagsPath:       dagsPath,
+		Description:    deployDescription,
 	}
 
 	return DeployImage(deployInput, astroClient, astroCoreClient)
