@@ -2090,7 +2090,7 @@ func TestUpdate(t *testing.T) { //nolint
 		mockClient.AssertExpectations(t)
 	})
 
-	t.Run("do not update deployment to enable dag deploy if ci-cd enforcement is enabled", func(t *testing.T) {
+	t.Run("throw warning to enable dag deploy if ci-cd enforcement is enabled", func(t *testing.T) {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -2125,8 +2125,9 @@ func TestUpdate(t *testing.T) { //nolint
 		}
 
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
+		defer testUtil.MockUserInput(t, "y")()
 		err := Update("test-id", "", ws, "", "", "enable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, nil, mockClient)
-		assert.ErrorIs(t, err, ErrCiCdEnforcementUpdate)
+		assert.NoError(t, err)
 
 		mockClient.AssertExpectations(t)
 	})

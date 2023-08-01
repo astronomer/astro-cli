@@ -14,7 +14,6 @@ import (
 	"github.com/astronomer/astro-cli/astro-client"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
-	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -172,7 +171,7 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}, DagDeployEnabled: true, APIKeyOnlyDeployments: true}}, nil).Once()
 
 	err := Deploy(deployInput, mockClient, mockCoreClient)
-	assert.ErrorIs(t, err, deployment.ErrCiCdEnforcementUpdate)
+	assert.ErrorIs(t, err, errCiCdEnforcementUpdate)
 
 	defer os.RemoveAll("./testfiles/dags/")
 

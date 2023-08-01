@@ -2056,6 +2056,23 @@ deployment:
 					},
 				},
 			}
+			mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+				MinWorkerCount: astro.WorkerQueueOption{
+					Floor:   1,
+					Ceiling: 20,
+					Default: 5,
+				},
+				MaxWorkerCount: astro.WorkerQueueOption{
+					Floor:   16,
+					Ceiling: 200,
+					Default: 125,
+				},
+				WorkerConcurrency: astro.WorkerQueueOption{
+					Floor:   175,
+					Ceiling: 275,
+					Default: 180,
+				},
+			}
 			updatedDeployment := astro.Deployment{
 				ID:          "test-deployment-id",
 				Label:       "test-deployment-label",
@@ -2066,12 +2083,14 @@ deployment:
 			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{existingDeployment}, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil)
+			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			canCiCdDeploy = func(astroAPIToken string) bool {
 				return false
 			}
 
 			err = CreateOrUpdate("deployment.yaml", "update", mockClient, mockCoreClient, out)
-			assert.ErrorIs(t, err, deployment.ErrCiCdEnforcementUpdate)
+			defer testUtil.MockUserInput(t, "n")()
+			assert.NoError(t, err)
 			mockClient.AssertExpectations(t)
 			mockCoreClient.AssertExpectations(t)
 		})

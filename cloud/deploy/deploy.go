@@ -67,8 +67,9 @@ var (
 )
 
 var (
-	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+	errDagsParseFailed       = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	envFileMissing           = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+	errCiCdEnforcementUpdate = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
 )
 
 var (
@@ -246,7 +247,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 
 	if deployInfo.cicdEnforcement {
 		if !canCiCdDeploy(c.Token) {
-			return deployment.ErrCiCdEnforcementUpdate
+			return errCiCdEnforcementUpdate
 		}
 	}
 

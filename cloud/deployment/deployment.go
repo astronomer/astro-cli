@@ -28,13 +28,12 @@ import (
 )
 
 var (
-	errInvalidDeployment     = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
-	ErrInvalidDeploymentKey  = errors.New("invalid Deployment selected")
-	ErrInvalidRegionKey      = errors.New("invalid Region selected")
-	errTimedOut              = errors.New("timed out waiting for the deployment to become healthy")
-	ErrWrongEnforceInput     = errors.New("the input to the `--enforce-cicd` flag")
-	ErrNoDeploymentExists    = errors.New("no deployment was found in this workspace")
-	ErrCiCdEnforcementUpdate = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
+	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
+	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
+	ErrInvalidRegionKey     = errors.New("invalid Region selected")
+	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
+	ErrWrongEnforceInput    = errors.New("the input to the `--enforce-cicd` flag")
+	ErrNoDeploymentExists   = errors.New("no deployment was found in this workspace")
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	canCiCdDeploy    = CanCiCdDeploy
@@ -677,7 +676,14 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 
 	if deploymentUpdate.APIKeyOnlyDeployments && dagDeploy != "" {
 		if !canCiCdDeploy(c.Token) {
-			return ErrCiCdEnforcementUpdate
+			fmt.Printf("\nWarning: You are trying to update dag deploy setting on a deployment with ci-cd enforcement enabled. You will not be able to deploy your dags using the CLI and that dags will not be visible in the UI and new tasks will not start." +
+				"\nEither disable ci-cd enforcement or please cancel this operation and use API Tokens or API Keys instead.")
+			y, _ := input.Confirm("\n\nAre you sure you want to continue?")
+
+			if !y {
+				fmt.Println("Canceling Deployment update")
+				return nil
+			}
 		}
 	}
 
