@@ -786,29 +786,28 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 		for _, line := range lines {
 			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/astro-runtime:") {
 				// Replace the tag on the matching line
-				parts := strings.SplitN(line, ":", partsNum)
-				if len(parts) == partsNum {
+				parts := strings.SplitN(line, ":", 2)
+				if len(parts) == 2 {
 					line = parts[0] + ":" + newTag
 				}
 			}
-			newContent.WriteString(line)
+			newContent.WriteString(line + "\n") // Add a newline after each line
 		}
 	} else {
 		for _, line := range lines {
 			if strings.HasPrefix(strings.TrimSpace(line), "FROM ") {
 				// Replace the tag on the matching line
-				parts := strings.SplitN(line, " ", partsNum)
-				if len(parts) == partsNum {
-					line = parts[0] + newImage
+				parts := strings.SplitN(line, " ", 2)
+				if len(parts) == 2 {
+					line = parts[0] + " " + newImage
 				}
 			}
-			newContent.WriteString(line)
+			newContent.WriteString(line + "\n") // Add a newline after each line
 		}
 	}
 
-	// Write the updated content to the new Dockerfile
-	var filePerm os.FileMode = 0o600
-	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), filePerm)
+	// Write the new content to the new Dockerfile
+	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0644)
 	if err != nil {
 		return err
 	}
