@@ -2125,7 +2125,7 @@ func TestUpdate(t *testing.T) { //nolint
 		}
 
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
-		defer testUtil.MockUserInput(t, "y")()
+		defer testUtil.MockUserInput(t, "n")()
 		err := Update("test-id", "", ws, "", "", "enable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, nil, mockClient)
 		assert.NoError(t, err)
 
