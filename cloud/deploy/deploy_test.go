@@ -142,6 +142,43 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	mockContainerHandler.AssertExpectations(t)
 }
 
+func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
+	os.Mkdir("./testfiles/dags", os.ModePerm)
+	path := "./testfiles/dags/test.py"
+	fileutil.WriteStringToFile(path, "testing")
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+
+	deployInput := InputDeploy{
+		Path:           "./testfiles/",
+		RuntimeID:      "",
+		WsID:           ws,
+		Pytest:         "parse",
+		EnvFile:        "./testfiles/.env",
+		ImageName:      "",
+		DeploymentName: "",
+		Prompt:         true,
+		WaitForStatus:  false,
+		Dags:           false,
+	}
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+	mockClient := new(astro_mocks.Client)
+
+	canCiCdDeploy = func(astroAPIToken string) bool {
+		return false
+	}
+
+	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}, DagDeployEnabled: true, APIKeyOnlyDeployments: true}}, nil).Once()
+
+	err := Deploy(deployInput, mockClient, mockCoreClient)
+	assert.ErrorIs(t, err, errCiCdEnforcementUpdate)
+
+	defer os.RemoveAll("./testfiles/dags/")
+
+	mockClient.AssertExpectations(t)
+	mockCoreClient.AssertExpectations(t)
+}
+
 func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	os.Mkdir("./testfiles/dags", os.ModePerm)
 	path := "./testfiles/dags/test.py"

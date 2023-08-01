@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
@@ -35,6 +36,8 @@ var (
 	ErrNoDeploymentExists   = errors.New("no deployment was found in this workspace")
 	// Monkey patched to write unit tests
 	createDeployment = Create
+	canCiCdDeploy    = CanCiCdDeploy
+	parseToken       = util.ParseAPIToken
 	CleanOutput      = false
 )
 
@@ -67,6 +70,23 @@ func newTableOutAll() *printutil.Table {
 		DynamicPadding: true,
 		Header:         []string{"NAME", "WORKSPACE", "NAMESPACE", "CLUSTER", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT"},
 	}
+}
+
+func CanCiCdDeploy(bearerToken string) bool {
+	token := strings.Split(bearerToken, " ")[1] // Stripping Bearer
+	// Parse the token to peek at the custom claims
+	claims, err := parseToken(token)
+	if err != nil {
+		fmt.Println("Unable to Parse Token")
+		return false
+	}
+
+	// Only API Tokens and API Keys have permissions
+	if len(claims.Permissions) > 0 {
+		return true
+	}
+
+	return false
 }
 
 // List all airflow deployments
@@ -646,6 +666,24 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 			deploymentUpdate.IsHighAvailability = true
 		} else if highAvailability == "disable" { //nolint
 			deploymentUpdate.IsHighAvailability = false
+		}
+	}
+
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	if deploymentUpdate.APIKeyOnlyDeployments && dagDeploy != "" {
+		if !canCiCdDeploy(c.Token) {
+			fmt.Printf("\nWarning: You are trying to update dag deploy setting on a deployment with ci-cd enforcement enabled. You will not be able to deploy your dags using the CLI and that dags will not be visible in the UI and new tasks will not start." +
+				"\nEither disable ci-cd enforcement or please cancel this operation and use API Tokens or API Keys instead.")
+			y, _ := input.Confirm("\n\nAre you sure you want to continue?")
+
+			if !y {
+				fmt.Println("Canceling Deployment update")
+				return nil
+			}
 		}
 	}
 

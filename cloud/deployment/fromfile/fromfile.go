@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/ghodss/yaml"
 )
 
@@ -31,6 +32,7 @@ var (
 	errNotFound                       = errors.New("does not exist")
 	errInvalidValue                   = errors.New("is not valid")
 	errNotPermitted                   = errors.New("is not permitted")
+	canCiCdDeploy                     = deployment.CanCiCdDeploy
 )
 
 const (
@@ -151,6 +153,20 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 		if err != nil {
 			return err
 		}
+
+		if formattedDeployment.Deployment.Configuration.APIKeyOnlyDeployments && updateInput.DagDeployEnabled {
+			if !canCiCdDeploy(c.Token) {
+				fmt.Printf("\nWarning: You are trying to update dag deploy setting on a deployment with ci-cd enforcement enabled. You will not be able to deploy your dags using the CLI and that dags will not be visible in the UI and new tasks will not start." +
+					"\nEither disable ci-cd enforcement or please cancel this operation and use API Tokens or API Keys instead.")
+				y, _ := input.Confirm("\n\nAre you sure you want to continue?")
+
+				if !y {
+					fmt.Println("Canceling Deployment update")
+					return nil
+				}
+			}
+		}
+
 		// update the deployment
 		createdOrUpdatedDeployment, err = client.UpdateDeployment(&updateInput)
 		if err != nil {
@@ -555,18 +571,18 @@ func hasAlertEmails(deploymentFromFile *inspect.FormattedDeployment) bool {
 // It returns an error if it fails to update the alert emails for a deployment.
 func createAlertEmails(deploymentFromFile *inspect.FormattedDeployment, deploymentID string, client astro.Client) (astro.DeploymentAlerts, error) {
 	var (
-		input       astro.UpdateDeploymentAlertsInput
+		alertsInput astro.UpdateDeploymentAlertsInput
 		alertEmails []string
 		alerts      astro.DeploymentAlerts
 		err         error
 	)
 
 	alertEmails = deploymentFromFile.Deployment.AlertEmails
-	input = astro.UpdateDeploymentAlertsInput{
+	alertsInput = astro.UpdateDeploymentAlertsInput{
 		DeploymentID: deploymentID,
 		AlertEmails:  alertEmails,
 	}
-	alerts, err = client.UpdateAlertEmails(input)
+	alerts, err = client.UpdateAlertEmails(alertsInput)
 	if err != nil {
 		return astro.DeploymentAlerts{}, err
 	}
