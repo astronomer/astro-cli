@@ -1976,6 +1976,124 @@ deployment:
 			mockClient.AssertExpectations(t)
 			mockCoreClient.AssertExpectations(t)
 		})
+		t.Run("return an error when enabling dag deploy for ci-cd enforced deployment", func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			out := new(bytes.Buffer)
+			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+			filePath = "./deployment.yaml"
+			data = `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name: test-deployment-label
+    description: description 1
+    runtime_version: 6.0.0
+    dag_deploy_enabled: true
+    ci_cd_enforcement: true
+    executor: CeleryExecutor
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_name: test-cluster
+    workspace_name: test-workspace
+    deployment_type: HYBRID
+  worker_queues:
+    - name: default
+      is_default: true
+      max_worker_count: 130
+      min_worker_count: 12
+      worker_concurrency: 180
+      worker_type: test-worker-1
+    - name: test-queue-1
+      is_default: false
+      max_worker_count: 175
+      min_worker_count: 8
+      worker_concurrency: 176
+      worker_type: test-worker-2
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    webserver_url: some-url
+  alert_emails:
+    - test1@test.com
+    - test2@test.com
+`
+			orgID = "test-org-id"
+			existingDeployment := astro.Deployment{
+				ID:                    "test-deployment-id",
+				Label:                 "test-deployment-label",
+				Description:           "description",
+				APIKeyOnlyDeployments: true,
+				Cluster: astro.Cluster{
+					ID:   "test-cluster-id",
+					Name: "test-cluster",
+					NodePools: []astro.NodePool{
+						{
+							ID:               "test-pool-id",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-1",
+						},
+						{
+							ID:               "test-pool-id-2",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-2",
+						},
+					},
+				},
+			}
+			mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+				MinWorkerCount: astro.WorkerQueueOption{
+					Floor:   1,
+					Ceiling: 20,
+					Default: 5,
+				},
+				MaxWorkerCount: astro.WorkerQueueOption{
+					Floor:   16,
+					Ceiling: 200,
+					Default: 125,
+				},
+				WorkerConcurrency: astro.WorkerQueueOption{
+					Floor:   175,
+					Ceiling: 275,
+					Default: 180,
+				},
+			}
+			updatedDeployment := astro.Deployment{
+				ID:          "test-deployment-id",
+				Label:       "test-deployment-label",
+				Description: "description 1",
+			}
+			fileutil.WriteStringToFile(filePath, data)
+			defer afero.NewOsFs().Remove(filePath)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
+			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{existingDeployment}, nil).Once()
+			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil)
+			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+			canCiCdDeploy = func(astroAPIToken string) bool {
+				return false
+			}
+
+			err = CreateOrUpdate("deployment.yaml", "update", mockClient, mockCoreClient, out)
+			defer testUtil.MockUserInput(t, "n")()
+			assert.NoError(t, err)
+			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
+		})
 		t.Run("reads the json file and updates an existing deployment", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			out := new(bytes.Buffer)

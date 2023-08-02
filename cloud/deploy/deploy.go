@@ -63,11 +63,13 @@ var (
 	airflowImageHandler  = airflow.ImageHandlerInit
 	containerHandlerInit = airflow.ContainerHandlerInit
 	azureUploader        = azure.Upload
+	canCiCdDeploy        = deployment.CanCiCdDeploy
 )
 
 var (
-	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+	errDagsParseFailed       = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	envFileMissing           = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+	errCiCdEnforcementUpdate = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
 )
 
 var (
@@ -87,6 +89,7 @@ type deploymentInfo struct {
 	webserverURL     string
 	dagDeployEnabled bool
 	deploymentType   string
+	cicdEnforcement  bool
 }
 
 type InputDeploy struct {
@@ -229,6 +232,12 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, client, coreClient)
 	if err != nil {
 		return err
+	}
+
+	if deployInfo.cicdEnforcement {
+		if !canCiCdDeploy(c.Token) {
+			return errCiCdEnforcementUpdate
+		}
 	}
 
 	if deployInput.WsID != deployInfo.workspaceID {
@@ -412,6 +421,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 			currentDeployment.DeploymentSpec.Webserver.URL,
 			currentDeployment.DagDeployEnabled,
 			currentDeployment.Type,
+			currentDeployment.APIKeyOnlyDeployments,
 		}, nil
 	}
 	deployInfo, err := getImageName(cloudDomain, deploymentID, client)
