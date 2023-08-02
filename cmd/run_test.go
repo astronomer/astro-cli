@@ -24,7 +24,7 @@ func TestRun(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("RunDAG", "test-dag", "airflow_settings.yaml", "", false, false).Return(nil).Once()
+			mockContainerHandler.On("RunDAG", "test-dag", "airflow_settings.yaml", "", "", false, false).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -39,7 +39,7 @@ func TestRun(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("RunDAG", "test-dag", "airflow_settings.yaml", "", false, false).Return(errMock).Once()
+			mockContainerHandler.On("RunDAG", "test-dag", "airflow_settings.yaml", "", "", false, false).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 

@@ -655,7 +655,7 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	return "", err
 }
 
-func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile string, noCache, taskLogs bool) error {
+func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile, executionDate string, noCache, taskLogs bool) error {
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
@@ -668,7 +668,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile string, noCache, tas
 		for i := range psInfo {
 			if checkServiceState(psInfo[i].State, dockerStateUp) {
 				if strings.Contains(psInfo[i].Name, SchedulerDockerContainerName) {
-					err = d.imageHandler.Run(dagID, d.envFile, settingsFile, psInfo[i].Name, dagFile, taskLogs)
+					err = d.imageHandler.Run(dagID, d.envFile, settingsFile, psInfo[i].Name, dagFile, executionDate, taskLogs)
 					if err != nil {
 						return err
 					}
@@ -706,7 +706,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile string, noCache, tas
 		return err
 	}
 
-	err = d.imageHandler.Run(dagID, d.envFile, settingsFile, "", dagFile, taskLogs)
+	err = d.imageHandler.Run(dagID, d.envFile, settingsFile, "", dagFile, executionDate, taskLogs)
 	if err != nil {
 		return err
 	}

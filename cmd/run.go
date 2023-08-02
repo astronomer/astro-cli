@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	dagID    string
-	dagFile  string
-	taskLogs bool
+	dagID         string
+	dagFile       string
+	executionDate string
+	taskLogs      bool
 )
 
 func newRunCommand() *cobra.Command {
@@ -30,6 +31,8 @@ func newRunCommand() *cobra.Command {
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file for importing Airflow objects")
 	cmd.Flags().StringVarP(&dagFile, "dag-file", "d", "", "(Optional) The file where your DAG is located. Use this flag to parse only the DAG file that has the DAG you want to run. You may get parsing errors related to other DAGs if you don't specify a DAG file")
+	cmd.Flags().StringVarP(&executionDate, "execution-date", "", "", "(Optional) Execution date for the dagrun. Defaults to now. Acceptable date formats: %Y-%m-%d, %Y-%m-%dT%H:%M:%S, %Y-%m-%d %H:%M:%S")
+	cmd.Flags().BoolVarP(&taskLogs, "verbose", "", false, "(Optional) Print out the logs of the dag run")
 
 	return cmd
 }
@@ -53,5 +56,5 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.RunDAG(dagID, settingsFile, dagFile, noCache, taskLogs)
+	return containerHandler.RunDAG(dagID, settingsFile, dagFile, executionDate, noCache, taskLogs)
 }
