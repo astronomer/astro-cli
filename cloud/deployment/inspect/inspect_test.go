@@ -24,9 +24,11 @@ import (
 var (
 	errGetDeployment           = errors.New("test get deployment error")
 	errMarshal                 = errors.New("test error")
+	workloadIdentity           = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
 	mockCoreDeploymentResponse = []astrocore.Deployment{
 		{
-			Status: "HEALTHY",
+			Status:           "HEALTHY",
+			WorkloadIdentity: &workloadIdentity,
 		},
 	}
 	mockListDeploymentsResponse = astrocore.ListDeploymentsResponse{
@@ -410,8 +412,6 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 	deploymentListParams := &astrocore.ListDeploymentsParams{
 		DeploymentIds: &depIds,
 	}
-
-	workloadIdentity := "astro-great-release-name@provider-account.iam.gserviceaccount.com"
 
 	t.Run("returns deployment metadata for the requested cloud deployment", func(t *testing.T) {
 		var actualDeploymentMeta deploymentMetadata

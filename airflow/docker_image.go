@@ -421,7 +421,7 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 	return nil
 }
 
-func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile string, taskLogs bool) error {
+func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error {
 	dockerCommand := config.CFG.DockerCommand.GetString()
 
 	stdout := os.Stdout
@@ -484,6 +484,16 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile s
 	if settingsFileExist {
 		cmdArgs = append(cmdArgs, []string{"./" + settingsFile}...)
 	}
+	args = append(args, cmdArgs...)
+
+	if executionDate != "" {
+		cmdArgs = append(cmdArgs, []string{"--execution-date", executionDate}...)
+	}
+
+	if taskLogs {
+		cmdArgs = append(cmdArgs, []string{"--verbose"}...)
+	}
+
 	args = append(args, cmdArgs...)
 
 	fmt.Println("\nStarting a DAG run for " + dagID + "...")

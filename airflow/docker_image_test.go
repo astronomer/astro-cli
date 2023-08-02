@@ -565,7 +565,7 @@ func TestDockerImageRun(t *testing.T) {
 			return nil
 		}
 
-		err = handler.Run("", "./testfiles/airflow_settings.yaml", "", "", "", true)
+		err = handler.Run("", "./testfiles/airflow_settings.yaml", "", "", "", "", true)
 		assert.NoError(t, err)
 	})
 
@@ -574,7 +574,7 @@ func TestDockerImageRun(t *testing.T) {
 			return nil
 		}
 
-		err = handler.Run("", "./testfiles/airflow_settings_invalid.yaml", "", "test-container", "", true)
+		err = handler.Run("", "./testfiles/airflow_settings_invalid.yaml", "", "test-container", "", "", true)
 		assert.NoError(t, err)
 	})
 
@@ -583,7 +583,7 @@ func TestDockerImageRun(t *testing.T) {
 			return errExecMock
 		}
 
-		err = handler.Run("", "./testfiles/airflow_settings.yaml", "", "", "", true)
+		err = handler.Run("", "./testfiles/airflow_settings.yaml", "", "", "", "", true)
 		assert.Contains(t, err.Error(), errExecMock.Error())
 	})
 

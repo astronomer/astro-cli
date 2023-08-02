@@ -166,13 +166,13 @@ func (_m *ImageHandler) Pytest(pytestFile string, airflowHome string, envFile st
 	return r0, r1
 }
 
-// Run provides a mock function with given fields: dagID, envFile, settingsFile, containerName, dagFile, taskLogs
-func (_m *ImageHandler) Run(dagID string, envFile string, settingsFile string, containerName string, dagFile string, taskLogs bool) error {
-	ret := _m.Called(dagID, envFile, settingsFile, containerName, dagFile, taskLogs)
+// Run provides a mock function with given fields: dagID, envFile, settingsFile, containerName, dagFile, executionDate, taskLogs
+func (_m *ImageHandler) Run(dagID string, envFile string, settingsFile string, containerName string, dagFile string, executionDate string, taskLogs bool) error {
+	ret := _m.Called(dagID, envFile, settingsFile, containerName, dagFile, executionDate, taskLogs)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, string, bool) error); ok {
-		r0 = rf(dagID, envFile, settingsFile, containerName, dagFile, taskLogs)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, string, string, bool) error); ok {
+		r0 = rf(dagID, envFile, settingsFile, containerName, dagFile, executionDate, taskLogs)
 	} else {
 		r0 = ret.Error(0)
 	}

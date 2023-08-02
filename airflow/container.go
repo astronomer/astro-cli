@@ -28,7 +28,7 @@ type ContainerHandler interface {
 	Logs(follow bool, containerNames ...string) error
 	Run(args []string, user string) error
 	Bash(container string) error
-	RunDAG(dagID, settingsFile, dagFile string, noCache, taskLogs bool) error
+	RunDAG(dagID, settingsFile, dagFile, executionDate string, noCache, taskLogs bool) error
 	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
 	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error
 	ComposeExport(settingsFile, composeFile string) error
@@ -50,7 +50,7 @@ type ImageHandler interface {
 	GetLabel(altImageName, labelName string) (string, error)
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
-	Run(dagID, envFile, settingsFile, containerName, dagFile string, taskLogs bool) error
+	Run(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error
 	Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, config types.ImageBuildConfig) (string, error)
 	ConflictTest(workingDirectory, testHomeDirectory string, buildConfig types.ImageBuildConfig) (string, error)
 	CreatePipFreeze(altImageName, pipFreezeFile string) error
