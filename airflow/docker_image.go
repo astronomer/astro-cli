@@ -349,7 +349,7 @@ func (d *DockerImage) Pull(registry, username, token, remoteImage string) error 
 	if err != nil {
 		return err
 	}
-	// docker push <image>
+	// docker pull <image>
 	err = cmdExec(dockerCommand, os.Stdout, os.Stderr, "pull", remoteImage)
 	if err != nil {
 		return err
