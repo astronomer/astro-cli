@@ -583,7 +583,6 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 			return err
 		}
 	}
-	var pipFreezeCompareFile string
 	if versionTest {
 		err := d.versionTest(testHomeDirectory, currentAirflowVersion, deploymentImage, newDockerFile, newAirflowVersion, customImage)
 		if err != nil {
@@ -602,7 +601,7 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 		fmt.Printf("\tDependency Conflict Test Results file: %s\n", "conflict-test-results.txt")
 	}
 	if versionTest {
-		fmt.Printf("\tDependency Version Comparison Results file: %s\n", pipFreezeCompareFile)
+		fmt.Printf("\tDependency Version Comparison Results file: %s\n", "dependency_compare.txt")
 	}
 	if dagTest {
 		fmt.Printf("\tDAG Parse Test HTML Report: %s\n", "dag-test-report.html")
