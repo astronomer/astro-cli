@@ -15,6 +15,7 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 var errMock = errors.New("mock error")
@@ -438,6 +439,48 @@ func TestAirflowStart(t *testing.T) {
 		}
 
 		err := airflowStart(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
+}
+
+func TestAirflowUpgradeTest(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowUpgradeTestCmd(nil)
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, nil).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowUpgradeTest(cmd, nil)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowUpgradeTestCmd(nil)
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, nil).Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowUpgradeTest(cmd, nil)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowUpgradeTestCmd(nil)
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowUpgradeTest(cmd, nil)
 		assert.ErrorIs(t, err, errMock)
 	})
 }

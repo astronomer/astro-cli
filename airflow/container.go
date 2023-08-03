@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow/types"
+	"github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -33,6 +34,7 @@ type ContainerHandler interface {
 	ComposeExport(settingsFile, composeFile string) error
 	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string) (string, error)
 	Parse(customImageName, deployImageName string) error
+	UpgradeTest(runtimeVersion, deploymentID, newImageName, customImageName string, dependencyTest, versionTest, dagTest bool, client astro.Client) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -42,13 +44,16 @@ type RegistryHandler interface {
 
 // ImageHandler defines methods require to handle all operations on/for container images
 type ImageHandler interface {
-	Build(config types.ImageBuildConfig) error
+	Build(dockerfile string, config types.ImageBuildConfig) error
 	Push(registry, username, token, remoteImage string) error
-	GetLabel(labelName string) (string, error)
+	Pull(registry, username, token, remoteImage string) error
+	GetLabel(altImageName, labelName string) (string, error)
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
 	Run(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error
-	Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config types.ImageBuildConfig) (string, error)
+	Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, config types.ImageBuildConfig) (string, error)
+	ConflictTest(workingDirectory, testHomeDirectory string, buildConfig types.ImageBuildConfig) (string, error)
+	CreatePipFreeze(altImageName, pipFreezeFile string) error
 }
 
 type DockerComposeAPI interface {

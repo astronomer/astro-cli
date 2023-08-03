@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -29,6 +30,8 @@ const (
 	EchoCmd            = "echo"
 	pushingImagePrompt = "Pushing image to Astronomer registry"
 	astroRunContainer  = "astro-run"
+	pullingImagePrompt = "Pulling image from Astronomer registry"
+	prefix             = "Bearer "
 )
 
 var errGetImageLabel = errors.New("error getting image label")
@@ -41,9 +44,11 @@ func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
+func (d *DockerImage) Build(dockerfile string, buildConfig airflowTypes.ImageBuildConfig) error {
 	dockerCommand := config.CFG.DockerCommand.GetString()
-
+	if dockerfile == "" {
+		dockerfile = "Dockerfile"
+	}
 	err := os.Chdir(buildConfig.Path)
 	if err != nil {
 		return err
@@ -52,6 +57,8 @@ func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
 		"build",
 		"-t",
 		d.imageName,
+		"-f",
+		dockerfile,
 		".",
 	}
 	if buildConfig.NoCache {
@@ -77,7 +84,7 @@ func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
 	return err
 }
 
-func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
+func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
 	// delete container
 	dockerCommand := config.CFG.DockerCommand.GetString()
 	err := cmdExec(dockerCommand, nil, nil, "rm", "astro-pytest")
@@ -140,7 +147,18 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	if err != nil {
 		log.Debug(err)
 	}
-
+	if htmlReport {
+		// Copy the dag-test-report.html file from the container to the destination folder
+		err = cmdExec(dockerCommand, nil, stderr, "cp", "astro-pytest:/usr/local/airflow/dag-test-report.html", "./"+testHomeDirectory)
+		if err != nil {
+			// Remove the temporary container
+			err2 := cmdExec(dockerCommand, nil, stderr, "rm", "astro-pytest")
+			if err2 != nil {
+				return outb.String(), err2
+			}
+			return outb.String(), err
+		}
+	}
 	// delete container
 	err = cmdExec(dockerCommand, nil, stderr, "rm", "astro-pytest")
 	if err != nil {
@@ -148,6 +166,104 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	}
 
 	return outb.String(), docErr
+}
+
+func (d *DockerImage) ConflictTest(workingDirectory, testHomeDirectory string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+	// delete container
+	err := cmdExec(dockerCommand, nil, nil, "rm", "astro-temp-container")
+	if err != nil {
+		log.Debug(err)
+	}
+	// Change to location of Dockerfile
+	err = os.Chdir(buildConfig.Path)
+	if err != nil {
+		return "", err
+	}
+	args := []string{
+		"build",
+		"-t",
+		"conflict-check:latest",
+		"-f",
+		"conflict-check.Dockerfile",
+		".",
+	}
+
+	// Create a buffer to capture the command output
+	var stdout, stderr bytes.Buffer
+	multiStdout := io.MultiWriter(&stdout, os.Stdout)
+	multiStderr := io.MultiWriter(&stderr, os.Stdout)
+
+	// Start the command execution
+	err = cmdExec(dockerCommand, multiStdout, multiStderr, args...)
+	if err != nil {
+		return "", err
+	}
+	// Get the exit code
+	exitCode := ""
+	if _, ok := err.(*exec.ExitError); ok {
+		// The command exited with a non-zero status
+		exitCode = parseExitCode(stderr.String())
+	} else if err != nil {
+		// An error occurred while running the command
+		return "", err
+	}
+	// Run a temporary container to copy the file from the image
+	err = cmdExec(dockerCommand, nil, nil, "create", "--name", "astro-temp-container", "conflict-check:latest")
+	if err != nil {
+		return exitCode, err
+	}
+	// Copy the result.txt file from the container to the destination folder
+	err1 := cmdExec(dockerCommand, nil, nil, "cp", "astro-temp-container:/usr/local/airflow/conflict-test-results.txt", "./"+testHomeDirectory)
+	if err1 != nil {
+		// Remove the temporary container
+		err = cmdExec(dockerCommand, nil, nil, "rm", "astro-temp-container")
+		if err != nil {
+			return exitCode, err
+		}
+		return exitCode, err1
+	}
+
+	// Remove the temporary container
+	err = cmdExec(dockerCommand, nil, nil, "rm", "astro-temp-container")
+	if err != nil {
+		return exitCode, err
+	}
+	return exitCode, nil
+}
+
+func parseExitCode(logs string) string {
+	re := regexp.MustCompile(`exit code: (\d+)`)
+	match := re.FindStringSubmatch(logs)
+	if len(match) > 1 {
+		return match[1]
+	}
+	return ""
+}
+
+func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+	// Define the Docker command and arguments
+	imageName := d.imageName
+	if altImageName != "" {
+		imageName = altImageName
+	}
+	dockerArgs := []string{"run", "--rm", imageName, "pip", "freeze"}
+
+	// Create a file to store the command output
+	file, err := os.Create(pipFreezeFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Run the Docker command
+	err = cmdExec(dockerCommand, file, os.Stderr, dockerArgs...)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *DockerImage) Push(registry, username, token, remoteImage string) error {
@@ -219,6 +335,29 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 	return nil
 }
 
+func (d *DockerImage) Pull(registry, username, token, remoteImage string) error {
+	// Pulling image to registry
+	fmt.Println(pullingImagePrompt)
+	dockerCommand := config.CFG.DockerCommand.GetString()
+	var err error
+	if username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
+		pass := token
+		pass = strings.TrimPrefix(pass, prefix)
+		cmd := "echo \"" + pass + "\"" + " | " + dockerCommand + " login " + registry + " -u " + username + " --password-stdin"
+		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
+	}
+	if err != nil {
+		return err
+	}
+	// docker pull <image>
+	err = cmdExec(dockerCommand, os.Stdout, os.Stderr, "pull", remoteImage)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 var displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback func(jsonmessage.JSONMessage)) error {
 	out := cliCommand.NewOutStream(os.Stdout)
 	err := jsonmessage.DisplayJSONMessagesToStream(responseBody, out, nil)
@@ -228,14 +367,18 @@ var displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback f
 	return nil
 }
 
-func (d *DockerImage) GetLabel(labelName string) (string, error) {
+func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 	dockerCommand := config.CFG.DockerCommand.GetString()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
 	labelFmt := fmt.Sprintf("{{ index .Config.Labels %q }}", labelName)
 	var label string
-	err := cmdExec(dockerCommand, stdout, stderr, "inspect", "--format", labelFmt, d.imageName)
+	imageName := d.imageName
+	if altImageName != "" {
+		imageName = altImageName
+	}
+	err := cmdExec(dockerCommand, stdout, stderr, "inspect", "--format", labelFmt, imageName)
 	if err != nil {
 		return label, err
 	}
@@ -400,7 +543,6 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 	var err error
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
 		pass := authConfig.Password
-		prefix := "Bearer "
 		pass = strings.TrimPrefix(pass, prefix)
 		cmd := "echo \"" + pass + "\"" + " | " + dockerCommand + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
 		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist

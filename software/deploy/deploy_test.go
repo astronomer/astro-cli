@@ -164,8 +164,8 @@ func TestBuildPushDockerImageSuccessWithBYORegistry(t *testing.T) {
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("", nil).Once()
-		mockImageHandler.On("GetLabel", airflowImageLabel).Return("1.10.12", nil).Once()
+		mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("", nil).Once()
+		mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("1.10.12", nil).Once()
 		return mockImageHandler
 	}
 

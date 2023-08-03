@@ -1,18 +1,24 @@
 package airflow
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	semver "github.com/Masterminds/semver/v3"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
+	"github.com/astronomer/astro-cli/astro-client"
+	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -32,10 +38,12 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 const (
+	RuntimeImageLabel              = "io.astronomer.docker.runtime.version"
+	AirflowImageLabel              = "io.astronomer.docker.airflow.version"
 	componentName                  = "airflow"
 	podman                         = "podman"
 	dockerStateUp                  = "running"
@@ -47,6 +55,12 @@ const (
 	pytestDirectory                = "tests"
 	OpenCmd                        = "open"
 	dockerCmd                      = "docker"
+	registryUsername               = "cli"
+	unknown                        = "unknown"
+	major                          = "major"
+	patch                          = "patch"
+	minor                          = "minor"
+	partsNum                       = 2
 
 	composeCreateErrMsg      = "error creating docker-compose project"
 	composeStatusCheckErrMsg = "error checking docker-compose status"
@@ -79,6 +93,34 @@ var (
 	startupTimeout time.Duration
 	isM1           = util.IsM1
 
+	majorUpdatesAirflowProviders    = []string{}
+	minorUpdatesAirflowProviders    = []string{}
+	patchUpdatesAirflowProviders    = []string{}
+	unknownUpdatesAirflowProviders  = []string{}
+	removedPackagesAirflowProviders = []string{}
+	addedPackagesAirflowProviders   = []string{}
+	majorUpdates                    = []string{}
+	minorUpdates                    = []string{}
+	patchUpdates                    = []string{}
+	unknownUpdates                  = []string{}
+	removedPackages                 = []string{}
+	addedPackages                   = []string{}
+	airflowUpdate                   = []string{}
+	titles                          = []string{
+		"Apache Airflow Update:\n",
+		"Airflow Providers Unknown Updates:\n",
+		"Airflow Providers Major Updates:\n",
+		"Airflow Providers Minor Updates:\n",
+		"Airflow Providers Patch Updates:\n",
+		"Added Airflow Providers:\n",
+		"Removed Airflow Providers:\n",
+		"Unknown Updates:\n",
+		"Major Updates:\n",
+		"Minor Updates:\n",
+		"Patch Updates:\n",
+		"Added Packages:\n",
+		"Removed Packages:\n",
+	}
 	composeOverrideFilename = "docker-compose.override.yml"
 
 	stopPostgresWaitTimeout = 10 * time.Second
@@ -135,12 +177,12 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 
 	dockerCli, err := command.NewDockerCli()
 	if err != nil {
-		log.Fatalf("error creating compose client %s", err)
+		logrus.Fatalf("error creating compose client %s", err)
 	}
 
 	err = dockerCli.Initialize(flags.NewClientOptions())
 	if err != nil {
-		log.Fatalf("error init compose client %s", err)
+		logrus.Fatalf("error init compose client %s", err)
 	}
 
 	composeService := compose.NewComposeService(dockerCli.Client(), &configfile.ConfigFile{})
@@ -194,7 +236,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile string, noCac
 				fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 			}
 		}
-		imageBuildErr := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+		imageBuildErr := d.imageHandler.Build(d.dockerfile, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
 		if !config.CFG.DisableAstroRun.GetBool() {
 			// remove astro-run-dag from requirments.txt
 			err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
@@ -325,7 +367,7 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 	for {
 		select {
 		case <-timeout:
-			log.Debug("timed out waiting for postgres container to be in exited state")
+			logrus.Debug("timed out waiting for postgres container to be in exited state")
 			return nil
 		case <-ticker.C:
 			psInfo, _ := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
@@ -336,10 +378,10 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 				// so docker compose will ensure that postgres container going in shutting down phase only after all other containers have exited
 				if strings.Contains(psInfo[i].Name, PostgresDockerContainerName) {
 					if psInfo[i].State == dockerExitState {
-						log.Debug("postgres container reached exited state")
+						logrus.Debug("postgres container reached exited state")
 						return nil
 					}
-					log.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
+					logrus.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
 				}
 			}
 		}
@@ -456,7 +498,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	if deployImageName == "" {
 		// build image
 		if customImageName == "" {
-			err := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+			err := d.imageHandler.Build(d.dockerfile, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 			if err != nil {
 				return "", err
 			}
@@ -482,7 +524,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	}
 
 	// run pytests
-	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, pytestArgs, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, "", pytestArgs, false, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 	if err != nil {
 		return exitCode, err
 	}
@@ -490,6 +532,504 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 		return "", nil
 	}
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
+}
+
+func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName, customImage string, conflictTest, versionTest, dagTest bool, client astro.Client) error {
+	// figure out which tests to run
+	if !conflictTest && !versionTest && !dagTest {
+		conflictTest = true
+		versionTest = true
+		dagTest = true
+	}
+	// if user supplies deployment id pull down current image
+	var deploymentImage string
+	if deploymentID != "" {
+		err := d.pullImageFromDeployment(deploymentID, client)
+		if err != nil {
+			return err
+		}
+	} else {
+		// build image for current Airflow version to get current Airflow version
+		fmt.Println("\nBuilding image for current Airflow version")
+		imageBuildErr := d.imageHandler.Build(d.dockerfile, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+		if imageBuildErr != nil {
+			return imageBuildErr
+		}
+	}
+	// get current Airflow version
+	currentAirflowVersion, err := d.imageHandler.GetLabel(deploymentImage, RuntimeImageLabel)
+	if err != nil {
+		return err
+	}
+	if currentAirflowVersion == "" {
+		currentAirflowVersion, err = d.imageHandler.GetLabel(deploymentImage, AirflowImageLabel)
+		if err != nil {
+			return err
+		}
+	}
+	// create test home directory
+	testHomeDirectory := "upgrade-test-" + currentAirflowVersion + "--" + newAirflowVersion
+
+	destFolder := filepath.Join(d.airflowHome, testHomeDirectory)
+	var filePerms fs.FileMode = 0o755
+	if err := os.MkdirAll(destFolder, filePerms); err != nil {
+		return err
+	}
+	newDockerFile := destFolder + "/Dockerfile"
+
+	// check for dependency conflicts
+	if conflictTest {
+		err = d.conflictTest(testHomeDirectory, newImageName, newAirflowVersion)
+		if err != nil {
+			return err
+		}
+	}
+	var pipFreezeCompareFile string
+	if versionTest {
+		err := d.versionTest(testHomeDirectory, currentAirflowVersion, deploymentImage, newDockerFile, newAirflowVersion, customImage)
+		if err != nil {
+			return err
+		}
+	}
+	if dagTest {
+		err := d.dagTest(testHomeDirectory, newAirflowVersion, newDockerFile, customImage)
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Println("\nTest Summary:")
+	fmt.Printf("\tUpgrade Test Results Directory: %s\n", testHomeDirectory)
+	if conflictTest {
+		fmt.Printf("\tDependency Conflict Test Results file: %s\n", "conflict-test-results.txt")
+	}
+	if versionTest {
+		fmt.Printf("\tDependency Version Comparison Results file: %s\n", pipFreezeCompareFile)
+	}
+	if dagTest {
+		fmt.Printf("\tDAG Parse Test HTML Report: %s\n", "dag-test-report.html")
+	}
+
+	return nil
+}
+
+func (d *DockerCompose) pullImageFromDeployment(deploymentID string, client astro.Client) error {
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	domain := c.Domain
+	if domain == "" {
+		return errors.New("no domain set, re-authenticate")
+	}
+	ws := c.Workspace
+	registry := GetRegistryURL(domain)
+	repository := registry + "/" + c.Organization + "/" + deploymentID
+	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, client, nil)
+	if err != nil {
+		return err
+	}
+	currentImageTag := currentDeployment.DeploymentSpec.Image.Tag
+	deploymentImage := fmt.Sprintf("%s:%s", repository, currentImageTag)
+	token := c.Token
+	// Splitting out the Bearer part from the token
+	splittedToken := strings.Split(token, " ")
+	if len(splittedToken) > 1 {
+		token = strings.Split(token, " ")[1]
+	}
+	fmt.Printf("\nPulling image from Astro Deployment %s\n\n", currentDeployment.Label)
+	err = d.imageHandler.Pull(registry, registryUsername, token, deploymentImage)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *DockerCompose) conflictTest(testHomeDirectory, newImageName, newAirflowVersion string) error {
+	fmt.Println("\nChecking your 'requirments.txt' for dependency conflicts with the new version of Airflow")
+	fmt.Println("\nThis may take a few minutes...")
+
+	// create files needed for conflict test
+	err := initConflictTest(config.WorkingPath, newImageName, newAirflowVersion)
+	defer os.Remove("conflict-check.Dockerfile")
+	if err != nil {
+		return err
+	}
+
+	exitCode, conflictErr := d.imageHandler.ConflictTest(d.airflowHome, testHomeDirectory, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+	if conflictErr != nil {
+		return conflictErr
+	}
+	if strings.Contains(exitCode, "0") || exitCode == "" { // if the error code is 0 the pytests passed
+		fmt.Println("There were no dependency conflicts found")
+	} else {
+		fmt.Println("\nSomething went wrong while compiling your dependencies check the logs above for conflicts")
+		fmt.Println("If there are conflicts remove them from your 'requirments.txt' and rerun this test\nYou will see the best candidate in the 'conflict-test-results.txt' file")
+		return err
+	}
+	return nil
+}
+
+func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, deploymentImage, newDockerFile, newAirflowVersion, customImage string) error {
+	fmt.Println("\nComparing dependency versions between current and upgraded environment")
+	// pip freeze old Airflow image
+	fmt.Println("\nObtaining pip freeze for current Airflow version")
+	currentAirflowPipFreezeFile := d.airflowHome + "/" + testHomeDirectory + "/pip_freeze_" + currentAirflowVersion + ".txt"
+	err := d.imageHandler.CreatePipFreeze(deploymentImage, currentAirflowPipFreezeFile)
+	if err != nil {
+		return err
+	}
+
+	// build image with the new airflow version
+	err = upgradeDockerfile(d.dockerfile, newDockerFile, newAirflowVersion, customImage)
+	if err != nil {
+		return err
+	}
+	fmt.Println("\nBuilding image for new Airflow version")
+	imageBuildErr := d.imageHandler.Build(newDockerFile, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+	if imageBuildErr != nil {
+		return imageBuildErr
+	}
+	// pip freeze new airflow image
+	fmt.Println("\nObtaining pip freeze for new Airflow version")
+	newAirflowPipFreezeFile := d.airflowHome + "/" + testHomeDirectory + "/pip_freeze_" + newAirflowVersion + ".txt"
+	err = d.imageHandler.CreatePipFreeze("", newAirflowPipFreezeFile)
+	if err != nil {
+		return err
+	}
+	// compare pip freeze files
+	fmt.Println("\nComparing pip freeze files")
+	pipFreezeCompareFile := d.airflowHome + "/" + testHomeDirectory + "/dependency_compare.txt"
+	err = CreateVersionTestFile(currentAirflowPipFreezeFile, newAirflowPipFreezeFile, pipFreezeCompareFile)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Pip Freeze comparison can be found at \n" + pipFreezeCompareFile)
+	return nil
+}
+
+func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerFile, customImage string) error {
+	fmt.Printf("\nChecking the DAGs in this project for errors against the new Airflow version %s\n", newAirflowVersion)
+
+	// build image with the new runtime version
+	err := upgradeDockerfile(d.dockerfile, newDockerFile, newAirflowVersion, customImage)
+	if err != nil {
+		return err
+	}
+
+	// add pytest-html to the requirements
+	err = fileutil.AddLineToFile("./requirements.txt", "pytest-html", "# This package is needed for the upgrade dag test. It will be removed once the test is over")
+	if err != nil {
+		fmt.Printf("Adding 'pytest-html' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
+	}
+	fmt.Println("\nBuilding image for new Airflow version")
+	imageBuildErr := d.imageHandler.Build(newDockerFile, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+
+	// remove pytest-html to the requirements
+	err = fileutil.RemoveLineFromFile("./requirements.txt", "pytest-html", " # This package is needed for the upgrade dag test. It will be removed once the test is over")
+	if err != nil {
+		fmt.Printf("Removing package 'pytest-html' from requirements.txt unsuccessful: %s\n", err.Error())
+	}
+	if imageBuildErr != nil {
+		return imageBuildErr
+	}
+	// check for file
+	path := d.airflowHome + "/" + DefaultTestPath
+
+	fileExist, err := util.Exists(path)
+	if err != nil {
+		return err
+	}
+	if !fileExist {
+		fmt.Println("\nThe file " + path + " which is needed for the parse test does not exist. Please run `astro dev init` to create it")
+
+		return err
+	}
+	// run parse test
+	pytestFile := DefaultTestPath
+	// create html report
+	htmlReportArgs := "--html=dag-test-report.html --self-contained-html"
+	// compare pip freeze files
+	fmt.Println("\nRunning parse test")
+	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, testHomeDirectory, strings.Fields(htmlReportArgs), true, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+	if err != nil {
+		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
+			fmt.Println("See above for errors detected in your DAGs")
+		} else {
+			return errors.Wrap(err, "something went wrong while parsing your DAGs")
+		}
+	} else {
+		fmt.Println("\n" + ansi.Green("✔") + " no errors detected in your DAGs ")
+	}
+	return nil
+}
+
+func GetRegistryURL(domain string) string {
+	var registry string
+	if domain == "localhost" {
+		registry = config.CFG.LocalRegistry.GetString()
+	} else {
+		registry = "images." + strings.Split(domain, ".")[0] + ".cloud"
+	}
+	return registry
+}
+
+func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage string) error {
+	// Read the content of the old Dockerfile
+	content, err := os.ReadFile(oldDockerfilePath)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var newContent strings.Builder
+	if newImage == "" {
+		for _, line := range lines {
+			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/astro-runtime:") {
+				// Replace the tag on the matching line
+				parts := strings.SplitN(line, ":", partsNum)
+				if len(parts) == partsNum {
+					line = parts[0] + ":" + newTag
+				}
+			}
+			newContent.WriteString(line + "\n") // Add a newline after each line
+		}
+	} else {
+		for _, line := range lines {
+			if strings.HasPrefix(strings.TrimSpace(line), "FROM ") {
+				// Replace the tag on the matching line
+				parts := strings.SplitN(line, " ", partsNum)
+				if len(parts) == partsNum {
+					line = parts[0] + " " + newImage
+				}
+			}
+			newContent.WriteString(line + "\n") // Add a newline after each line
+		}
+	}
+
+	// Write the new content to the new Dockerfile
+	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0o600) //nolint:gomnd
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
+	// Open the before file for reading
+	before, err := os.Open(beforeFile)
+	if err != nil {
+		return err
+	}
+	defer before.Close()
+
+	// Open the after file for reading
+	after, err := os.Open(afterFile)
+	if err != nil {
+		return err
+	}
+	defer after.Close()
+
+	// Create the output file for writing
+	output, err := os.Create(outputFile)
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+
+	// Create a map to store versions by package name
+	pgkVersions := make(map[string][2]string)
+
+	// Read versions from the before file and store them in the map
+	beforeScanner := bufio.NewScanner(before)
+	for beforeScanner.Scan() {
+		line := beforeScanner.Text()
+		parts := strings.Split(line, "==")
+		if len(parts) == partsNum {
+			pkg := parts[0]
+			ver := parts[1]
+			pgkVersions[pkg] = [2]string{ver, ""}
+		}
+	}
+
+	// Read versions from the after file and update the map with the new versions
+	afterScanner := bufio.NewScanner(after)
+	for afterScanner.Scan() {
+		line := afterScanner.Text()
+		parts := strings.Split(line, "==")
+		if len(parts) == partsNum {
+			pkg := parts[0]
+			ver := parts[1]
+			if v, ok := pgkVersions[pkg]; ok {
+				v[1] = ver
+				pgkVersions[pkg] = v
+			} else {
+				pgkVersions[pkg] = [2]string{"", ver}
+			}
+		}
+	}
+	// Iterate over the versions map and categorize the changes
+	err = iteratePkgMap(pgkVersions)
+	if err != nil {
+		return err
+	}
+	// sort lists into alphabetical order
+	sort.Strings(unknownUpdatesAirflowProviders)
+	sort.Strings(majorUpdatesAirflowProviders)
+	sort.Strings(minorUpdatesAirflowProviders)
+	sort.Strings(patchUpdatesAirflowProviders)
+	sort.Strings(addedPackagesAirflowProviders)
+	sort.Strings(removedPackagesAirflowProviders)
+	sort.Strings(unknownUpdates)
+	sort.Strings(majorUpdates)
+	sort.Strings(minorUpdates)
+	sort.Strings(patchUpdates)
+	sort.Strings(addedPackages)
+	sort.Strings(removedPackages)
+	pkgLists := [][]string{
+		airflowUpdate,
+		unknownUpdatesAirflowProviders,
+		majorUpdatesAirflowProviders,
+		minorUpdatesAirflowProviders,
+		patchUpdatesAirflowProviders,
+		addedPackagesAirflowProviders,
+		removedPackagesAirflowProviders,
+		unknownUpdates,
+		majorUpdates,
+		minorUpdates,
+		patchUpdates,
+		addedPackages,
+		removedPackages,
+	}
+
+	// Write the categorized updates to the output file
+	writer := bufio.NewWriter(output)
+
+	for i, title := range titles {
+		writeToCompareFile(title, pkgLists[i], writer)
+	}
+
+	// Flush the buffer to ensure all data is written to the file
+	writer.Flush()
+	return nil
+}
+
+func iteratePkgMap(pgkVersions map[string][2]string) error { //nolint:gocognit
+	// Iterate over the versions map and categorize the changes
+	for pkg, ver := range pgkVersions {
+		beforeVer := ver[0]
+		afterVer := ver[1]
+		if beforeVer != "" && afterVer != "" && beforeVer != afterVer {
+			change, updateType, err := checkVersionChange(beforeVer, afterVer)
+			if err != nil {
+				if err.Error() == "Invalid Semantic Version" {
+					updateType = unknown
+				} else {
+					return err
+				}
+			}
+			if !change {
+				updateType = unknown
+			}
+			pkgUpdate := pkg + " " + beforeVer + " >> " + afterVer
+
+			// Categorize the packages based on the update type
+			categorizeAirflowProviderPackage(pkg, pkgUpdate, updateType)
+		}
+		switch {
+		case strings.Contains(pkg, "apache-airflow-providers-"):
+			if beforeVer != "" && afterVer == "" {
+				pkgUpdate := pkg + "==" + beforeVer
+				removedPackagesAirflowProviders = append(removedPackagesAirflowProviders, pkgUpdate)
+			}
+			if beforeVer == "" && afterVer != "" {
+				pkgUpdate := pkg + "==" + afterVer
+				addedPackagesAirflowProviders = append(addedPackagesAirflowProviders, pkgUpdate)
+			}
+		default:
+			if beforeVer != "" && afterVer == "" {
+				pkgUpdate := pkg + "==" + beforeVer
+				removedPackages = append(removedPackages, pkgUpdate)
+			}
+			if beforeVer == "" && afterVer != "" {
+				pkgUpdate := pkg + "==" + afterVer
+				addedPackages = append(addedPackages, pkgUpdate)
+			}
+		}
+	}
+	return nil
+}
+
+func categorizeAirflowProviderPackage(pkg, pkgUpdate, updateType string) {
+	// Categorize the packages based on the update type
+	switch {
+	case strings.Contains(pkg, "apache-airflow-providers-"):
+		switch updateType {
+		case major:
+			majorUpdatesAirflowProviders = append(majorUpdatesAirflowProviders, pkgUpdate)
+		case minor:
+			minorUpdatesAirflowProviders = append(minorUpdatesAirflowProviders, pkgUpdate)
+		case patch:
+			patchUpdatesAirflowProviders = append(patchUpdatesAirflowProviders, pkgUpdate)
+		case unknown:
+			unknownUpdatesAirflowProviders = append(unknownUpdatesAirflowProviders, pkgUpdate)
+		}
+	case pkg == "apache-airflow":
+		airflowUpdate = append(airflowUpdate, pkgUpdate)
+	default:
+		switch updateType {
+		case major:
+			majorUpdates = append(majorUpdates, pkgUpdate)
+		case minor:
+			minorUpdates = append(minorUpdates, pkgUpdate)
+		case patch:
+			patchUpdates = append(patchUpdates, pkgUpdate)
+		case unknown:
+			unknownUpdates = append(unknownUpdates, pkgUpdate)
+		}
+	}
+}
+
+func writeToCompareFile(title string, pkgList []string, writer *bufio.Writer) {
+	if len(pkgList) > 0 {
+		_, err := writer.WriteString(title)
+		if err != nil {
+			logrus.Debug(err)
+		}
+		for _, pkg := range pkgList {
+			_, err = writer.WriteString(pkg + "\n")
+			if err != nil {
+				logrus.Debug(err)
+			}
+		}
+		_, err = writer.WriteString("\n")
+		if err != nil {
+			logrus.Debug(err)
+		}
+	}
+}
+
+func checkVersionChange(before, after string) (change bool, updateType string, err error) {
+	beforeVer, err := semver.NewVersion(before)
+	if err != nil {
+		return false, "", err
+	}
+
+	afterVer, err := semver.NewVersion(after)
+	if err != nil {
+		return false, "", err
+	}
+
+	switch {
+	case afterVer.Major() > beforeVer.Major():
+		return true, "major", nil
+	case afterVer.Minor() > beforeVer.Minor():
+		return true, "minor", nil
+	case afterVer.Patch() > beforeVer.Patch():
+		return true, "patch", nil
+	default:
+		return false, "", nil
+	}
 }
 
 func (d *DockerCompose) Parse(customImageName, deployImageName string) error {
@@ -701,7 +1241,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile, executionDate strin
 			fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
 		}
 	}()
-	err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+	err = d.imageHandler.Build(d.dockerfile, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
 	if err != nil {
 		return err
 	}

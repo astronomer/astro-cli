@@ -45,7 +45,7 @@ func TestDockerImageBuild(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
-		err = handler.Build(options)
+		err = handler.Build("", options)
 		assert.NoError(t, err)
 	})
 
@@ -56,7 +56,7 @@ func TestDockerImageBuild(t *testing.T) {
 			assert.Contains(t, args, "--no-cache")
 			return nil
 		}
-		err = handler.Build(options)
+		err = handler.Build("", options)
 		assert.NoError(t, err)
 	})
 
@@ -64,10 +64,9 @@ func TestDockerImageBuild(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
-		err = handler.Build(options)
+		err = handler.Build("", options)
 		assert.Contains(t, err.Error(), errMock.Error())
 	})
-
 	t.Run("unable to read file error", func(t *testing.T) {
 		options := airflowTypes.ImageBuildConfig{
 			Path:            "incorrect-path",
@@ -76,7 +75,7 @@ func TestDockerImageBuild(t *testing.T) {
 			Output:          false,
 		}
 
-		err = handler.Build(options)
+		err = handler.Build("", options)
 		assert.Error(t, err)
 	})
 
@@ -84,6 +83,7 @@ func TestDockerImageBuild(t *testing.T) {
 }
 
 func TestDockerImagePytest(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -108,8 +108,21 @@ func TestDockerImagePytest(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
-		_, err = handler.Pytest("", "", "", []string{}, options)
+		_, err = handler.Pytest("", "", "", "", []string{}, true, options)
 		assert.NoError(t, err)
+	})
+
+	t.Run("copy error", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			switch {
+			case args[0] == "cp":
+				return errMock
+			default:
+				return nil
+			}
+		}
+		_, err = handler.Pytest("", "", "", "", []string{}, true, options)
+		assert.Error(t, err)
 	})
 
 	t.Run("pytest error", func(t *testing.T) {
@@ -123,10 +136,9 @@ func TestDockerImagePytest(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
-		_, err = handler.Pytest("", "", "", []string{}, options)
+		_, err = handler.Pytest("", "", "", "", []string{}, false, options)
 		assert.Contains(t, err.Error(), errMock.Error())
 	})
-
 	t.Run("unable to read file error", func(t *testing.T) {
 		options := airflowTypes.ImageBuildConfig{
 			Path:            "incorrect-path",
@@ -134,7 +146,188 @@ func TestDockerImagePytest(t *testing.T) {
 			NoCache:         false,
 		}
 
-		_, err = handler.Pytest("", "", "", []string{}, options)
+		_, err = handler.Pytest("", "", "", "", []string{}, false, options)
+		assert.Error(t, err)
+	})
+
+	cmdExec = previousCmdExec
+}
+
+func TestDockerImageConflictTest(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
+	cwd, err := os.Getwd()
+	assert.NoError(t, err)
+
+	dockerIgnoreFile := cwd + "/.dockerignore"
+	fileutil.WriteStringToFile(dockerIgnoreFile, "")
+	defer afero.NewOsFs().Remove(dockerIgnoreFile)
+
+	options := airflowTypes.ImageBuildConfig{
+		Path:            cwd,
+		TargetPlatforms: []string{"linux/amd64"},
+		NoCache:         false,
+		Output:          true,
+	}
+
+	previousCmdExec := cmdExec
+
+	t.Run("conflict test success", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+		_, err = handler.ConflictTest("", "", options)
+		assert.NoError(t, err)
+	})
+
+	t.Run("conflict test create error", func(t *testing.T) {
+		options = airflowTypes.ImageBuildConfig{
+			Path:            cwd,
+			TargetPlatforms: []string{"linux/amd64"},
+			NoCache:         false,
+			Output:          false,
+		}
+
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return errMock
+		}
+		_, err = handler.ConflictTest("", "", options)
+		assert.Error(t, err)
+	})
+
+	t.Run("conflict test cp error", func(t *testing.T) {
+		options = airflowTypes.ImageBuildConfig{
+			Path:            cwd,
+			TargetPlatforms: []string{"linux/amd64"},
+			NoCache:         false,
+			Output:          false,
+		}
+
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			switch {
+			case args[0] == "cp":
+				return errMock
+			default:
+				return nil
+			}
+		}
+		_, err = handler.ConflictTest("", "", options)
+		assert.Error(t, err)
+	})
+
+	t.Run("conflict test rm error", func(t *testing.T) {
+		options = airflowTypes.ImageBuildConfig{
+			Path:            cwd,
+			TargetPlatforms: []string{"linux/amd64"},
+			NoCache:         false,
+			Output:          false,
+		}
+
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			switch {
+			case args[0] == "rm":
+				return errMock
+			default:
+				return nil
+			}
+		}
+		_, err = handler.ConflictTest("", "", options)
+		assert.Error(t, err)
+	})
+	t.Run("unable to read file error", func(t *testing.T) {
+		options := airflowTypes.ImageBuildConfig{
+			Path:            "incorrect-path",
+			TargetPlatforms: []string{"linux/amd64"},
+			NoCache:         false,
+		}
+
+		_, err = handler.ConflictTest("", "", options)
+		assert.Error(t, err)
+	})
+
+	cmdExec = previousCmdExec
+}
+
+func TestParseExitCode(t *testing.T) {
+	output := "exit code: 1"
+	t.Run("success", func(t *testing.T) {
+		_ = parseExitCode(output)
+		_ = parseExitCode("")
+	})
+}
+
+func TestDockerCreatePipFreeze(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
+	cwd, err := os.Getwd()
+	assert.NoError(t, err)
+
+	pipFreeze := cwd + "/pip-freeze-test.txt"
+	defer afero.NewOsFs().Remove(pipFreeze)
+
+	previousCmdExec := cmdExec
+
+	t.Run("create pip freeze success", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+		err := handler.CreatePipFreeze("", pipFreeze)
+		assert.NoError(t, err)
+	})
+	t.Run("create pip freeze error", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return errMock
+		}
+		err := handler.CreatePipFreeze("", pipFreeze)
+		assert.Error(t, err)
+	})
+	t.Run("unable to read file error", func(t *testing.T) {
+		err := handler.CreatePipFreeze("", "")
+		assert.Error(t, err)
+	})
+
+	cmdExec = previousCmdExec
+}
+
+func TestDockerPull(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
+	previousCmdExec := cmdExec
+
+	t.Run("pull image without username", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+		err := handler.Pull("", "", "", "")
+		assert.NoError(t, err)
+	})
+
+	t.Run("pull image with username", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+		err := handler.Pull("", "username", "", "")
+		assert.NoError(t, err)
+	})
+	t.Run("pull error", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return errMock
+		}
+		err := handler.Pull("", "", "", "")
+		assert.Error(t, err)
+	})
+
+	t.Run("login error", func(t *testing.T) {
+		err := handler.Pull("", "username", "", "")
 		assert.Error(t, err)
 	})
 
@@ -203,7 +396,7 @@ func TestDockerImageGetLabel(t *testing.T) {
 			return nil
 		}
 
-		resp, err := handler.GetLabel(mockLabel)
+		resp, err := handler.GetLabel("", mockLabel)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResp, resp)
 	})
@@ -215,7 +408,7 @@ func TestDockerImageGetLabel(t *testing.T) {
 			return errMockDocker
 		}
 
-		_, err := handler.GetLabel(mockLabel)
+		_, err := handler.GetLabel("", mockLabel)
 		assert.ErrorIs(t, err, errMockDocker)
 	})
 
@@ -228,7 +421,7 @@ func TestDockerImageGetLabel(t *testing.T) {
 			return nil
 		}
 
-		_, err := handler.GetLabel(mockLabel)
+		_, err := handler.GetLabel("", mockLabel)
 		assert.ErrorIs(t, err, errGetImageLabel)
 	})
 }

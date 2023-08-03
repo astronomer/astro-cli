@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
+	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -35,6 +36,7 @@ var (
 	exportComposeFile      string
 	pytestArgs             string
 	pytestFile             string
+	deploymentID           string
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
@@ -50,6 +52,9 @@ var (
 	envExport              bool
 	noBrowser              bool
 	compose                bool
+	conflictTest           bool
+	versionTest            bool
+	dagTest                bool
 	waitTime               time.Duration
 	RunExample             = `
 # Create default admin user.
@@ -98,7 +103,7 @@ astro dev init --airflow-version 2.2.3
 	errPytestArgs          = errors.New("")
 )
 
-func newDevRootCmd() *cobra.Command {
+func newDevRootCmd(astroClient astro.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -119,6 +124,7 @@ func newDevRootCmd() *cobra.Command {
 		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
+		newAirflowUpgradeTestCmd(astroClient),
 	)
 	return cmd
 }
@@ -159,6 +165,49 @@ func newAirflowInitCmd() *cobra.Command {
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
 		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
 	}
+	return cmd
+}
+
+func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "upgrade-test",
+		Short: "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test resluts.",
+		Long:  "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test resluts.",
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return airflowUpgradeTest(cmd, astroClient)
+		},
+	}
+	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The version of Airflow you want to upgrade to. The default is the latest available version. Tests are run against the equivalent Astro Runtime version. ")
+	cmd.Flags().BoolVarP(&conflictTest, "conflict-test", "c", false, "Only run conflict tests. These tests check whether you will have dependency conflicts after you upgrade.")
+	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "Only run version tests. These tests show you how the versions of your dependencies will change after you upgrade.")
+	cmd.Flags().BoolVarP(&dagTest, "dag-test", "d", false, "Only run DAG tests. These tests check whether your DAGs will generate import errors after you upgrade.")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against.")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "n", "", "Name of the upgraded image. Updates the FROM line in your Dockerfile to pull this image for the upgrade.")
+	var err error
+	var avoidACFlag bool
+
+	// In case user is connected to Astronomer Platform and is connected to older version of platform
+	if context.IsCloudContext() || houstonVersion == "" || (!context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.29.0"})) {
+		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "The version of Astro Runtime you want to upgrade to. The default is the latest available version.")
+	} else { // default to using AC flag, since runtime is not available for these cases
+		useAstronomerCertified = true
+		avoidACFlag = true
+	}
+
+	if !context.IsCloudContext() && !avoidACFlag {
+		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "Use an Astronomer Certified image instead of Astro Runtime. Use the airflow-version flag to specify your AC version.")
+	}
+
+	_, err = context.GetCurrentContext()
+	if err != nil && !avoidACFlag { // Case when user is not logged in to any platform
+		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "Use an Astronomer Certified image instead of Astro Runtime. Use the airflow-version flag to specify your AC version.")
+		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
+	}
+
 	return cmd
 }
 
@@ -496,6 +545,51 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf(configReinitProjectConfigMsg+"\n", config.WorkingPath)
 	} else {
 		fmt.Printf(configInitProjectConfigMsg+"\n", config.WorkingPath)
+	}
+
+	return nil
+}
+
+func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error {
+	// Validate runtimeVersion and airflowVersion
+	if airflowVersion != "" && runtimeVersion != "" {
+		return errInvalidBothAirflowAndRuntimeVersions
+	}
+	// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided)
+	var err error
+	defaultImageTag := runtimeVersion
+	if defaultImageTag == "" {
+		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
+		defaultImageTag = prepareDefaultAirflowImageTag(airflowVersion, httpClient)
+	}
+
+	defaultImageName := airflow.AstroRuntimeImageName
+	if useAstronomerCertified {
+		defaultImageName = airflow.AstronomerCertifiedImageName
+		fmt.Printf("Testing an upgrade to Astronomer Certified Airflow version %s\n\n", defaultImageTag)
+	} else {
+		fmt.Printf("Testing an upgrade to Astro Runtime %s\n", defaultImageTag)
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	imageName := "tmp-upgrade-test"
+
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
+	if err != nil {
+		return err
+	}
+
+	// add upgrade-test* to the gitignore
+	err = fileutil.AddLineToFile("./.gitignore", "upgrade-test*", "")
+	if err != nil {
+		fmt.Printf("failed to add 'upgrade-test*' to .gitignore: %s", err.Error())
+	}
+
+	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, customImageName, conflictTest, versionTest, dagTest, astroClient)
+	if err != nil {
+		return err
 	}
 
 	return nil
