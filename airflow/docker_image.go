@@ -484,7 +484,6 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile, 
 	if settingsFileExist {
 		cmdArgs = append(cmdArgs, []string{"./" + settingsFile}...)
 	}
-	args = append(args, cmdArgs...)
 
 	if executionDate != "" {
 		cmdArgs = append(cmdArgs, []string{"--execution-date", executionDate}...)
@@ -498,6 +497,8 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile, 
 
 	fmt.Println("\nStarting a DAG run for " + dagID + "...")
 	fmt.Println("\nLoading DAGs...")
+	log.Debug("args passed to docker command:")
+	log.Debug(args)
 
 	cmdErr := cmdExec(dockerCommand, stdout, stderr, args...)
 	// add back later fmt.Println("\nSee the output of this command for errors. To view task logs, use the '--task-logs' flag.")
