@@ -3,6 +3,7 @@ package airflow
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -547,6 +548,7 @@ func TestUseBash(t *testing.T) {
 }
 
 func TestDockerImageRun(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -562,6 +564,21 @@ func TestDockerImageRun(t *testing.T) {
 
 	t.Run("run success without container", func(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			if args[0] == "run" {
+				expectedArgs := []string{
+					"run_dag",
+					"./dags/", "",
+					"./", "--verbose",
+				}
+				for i := 0; i < 5; i++ {
+					if expectedArgs[i] != args[i+15] {
+						fmt.Println(args[i+15])
+						fmt.Println(expectedArgs[i])
+						return errors.New("args error") // Elements from index 0 to 4 in slice1 are not equal to elements from index 5 to 9 in slice2
+					}
+				}
+			}
+
 			return nil
 		}
 
