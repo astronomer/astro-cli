@@ -536,8 +536,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 
 func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName, customImage string, conflictTest, versionTest, dagTest bool, client astro.Client) error {
 	// figure out which tests to run
-	if !conflictTest && !versionTest && !dagTest {
-		conflictTest = true
+	if !versionTest && !dagTest {
 		versionTest = true
 		dagTest = true
 	}
