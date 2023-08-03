@@ -182,7 +182,6 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The version of Airflow you want to upgrade to. The default is the latest available version. Tests are run against the equivalent Astro Runtime version. ")
-	cmd.Flags().BoolVarP(&conflictTest, "conflict-test", "c", false, "Only run conflict tests. These tests check whether you will have dependency conflicts after you upgrade.")
 	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "Only run version tests. These tests show you how the versions of your dependencies will change after you upgrade.")
 	cmd.Flags().BoolVarP(&dagTest, "dag-test", "d", false, "Only run DAG tests. These tests check whether your DAGs will generate import errors after you upgrade.")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against.")
