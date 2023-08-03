@@ -574,7 +574,7 @@ func TestDockerImageRun(t *testing.T) {
 					if expectedArgs[i] != args[i+15] {
 						fmt.Println(args[i+15])
 						fmt.Println(expectedArgs[i])
-						return errors.New("args error") // Elements from index 0 to 4 in slice1 are not equal to elements from index 5 to 9 in slice2
+						return errMock // Elements from index 0 to 4 in slice1 are not equal to elements from index 5 to 9 in slice2
 					}
 				}
 			}
