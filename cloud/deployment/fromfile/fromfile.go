@@ -33,6 +33,7 @@ var (
 	errInvalidValue                   = errors.New("is not valid")
 	errNotPermitted                   = errors.New("is not permitted")
 	canCiCdDeploy                     = deployment.CanCiCdDeploy
+	dagDeploy                         bool
 )
 
 const (
@@ -117,6 +118,11 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 		workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, c.Organization, coreClient)
 		if err != nil {
 			return err
+		}
+		// get correct value for dag deploy
+		dagDeploy = formattedDeployment.Deployment.Configuration.DagDeployEnabled
+		if organization.IsOrgHosted() {
+			dagDeploy = true
 		}
 		// check if deployment exists
 		if deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
@@ -279,7 +285,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			Label:                 deploymentFromFile.Deployment.Configuration.Name,
 			Description:           deploymentFromFile.Deployment.Configuration.Description,
 			RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			DagDeployEnabled:      dagDeploy,
 			SchedulerSize:         deploymentFromFile.Deployment.Configuration.SchedulerSize,
 			APIKeyOnlyDeployments: deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments,
 			IsHighAvailability:    deploymentFromFile.Deployment.Configuration.IsHighAvailability,
