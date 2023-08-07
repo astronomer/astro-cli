@@ -2812,7 +2812,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					Label:                 deploymentFromFile.Deployment.Configuration.Name,
 					Description:           deploymentFromFile.Deployment.Configuration.Description,
 					RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-					DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+					DagDeployEnabled:      *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 					DeploymentSpec: astro.DeploymentCreateSpec{
 						Executor: deployment.CeleryExecutor,
 						Scheduler: astro.Scheduler{
@@ -3044,7 +3044,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				Label:                 deploymentFromFile.Deployment.Configuration.Name,
 				Description:           deploymentFromFile.Deployment.Configuration.Description,
 				RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-				DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled:      *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: deployment.CeleryExecutor,
 					Scheduler: astro.Scheduler{
@@ -3105,7 +3105,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				Label:                 deploymentFromFile.Deployment.Configuration.Name,
 				Description:           deploymentFromFile.Deployment.Configuration.Description,
 				RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-				DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled:      *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: deployment.KubeExecutor,
 					Scheduler: astro.Scheduler{
@@ -3203,7 +3203,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				Label:                 deploymentFromFile.Deployment.Configuration.Name,
 				Description:           deploymentFromFile.Deployment.Configuration.Description,
 				RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-				DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled:      *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: deployment.CeleryExecutor,
 					Scheduler: astro.Scheduler{
@@ -3246,7 +3246,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				ClusterID:        clusterID,
 				Label:            deploymentFromFile.Deployment.Configuration.Name,
 				Description:      deploymentFromFile.Deployment.Configuration.Description,
-				DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled: *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: "CeleryExecutor",
 					Scheduler: astro.Scheduler{
@@ -3331,7 +3331,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				ClusterID:        clusterID,
 				Label:            deploymentFromFile.Deployment.Configuration.Name,
 				Description:      deploymentFromFile.Deployment.Configuration.Description,
-				DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled: *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: deploymentFromFile.Deployment.Configuration.Executor,
 					Scheduler: astro.Scheduler{
@@ -3418,7 +3418,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				ClusterID:        clusterID,
 				Label:            deploymentFromFile.Deployment.Configuration.Name,
 				Description:      deploymentFromFile.Deployment.Configuration.Description,
-				DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled: *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: deploymentFromFile.Deployment.Configuration.Executor,
 					Scheduler: astro.Scheduler{
@@ -3524,7 +3524,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				ClusterID:        clusterID,
 				Label:            deploymentFromFile.Deployment.Configuration.Name,
 				Description:      deploymentFromFile.Deployment.Configuration.Description,
-				DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled: *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: "CeleryExecutor",
 					Scheduler: astro.Scheduler{

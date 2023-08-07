@@ -120,9 +120,14 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 			return err
 		}
 		// get correct value for dag deploy
-		dagDeploy = formattedDeployment.Deployment.Configuration.DagDeployEnabled
-		if organization.IsOrgHosted() {
-			dagDeploy = true
+		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil {
+			if organization.IsOrgHosted() {
+				dagDeploy = true
+			} else {
+				dagDeploy = false
+			}
+		} else {
+			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
 		}
 		// check if deployment exists
 		if deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
@@ -153,6 +158,13 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 		// this deployment exists so update it
 		existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
 		workspaceID = existingDeployment.Workspace.ID
+
+		// determine dagDeploy
+		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil {
+			dagDeploy = existingDeployment.DagDeployEnabled
+		} else {
+			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
+		}
 
 		// transform formattedDeployment to DeploymentUpdateInput
 		_, updateInput, err = getCreateOrUpdateInput(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, client)
@@ -309,7 +321,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			ClusterID:             clusterID,
 			Label:                 deploymentFromFile.Deployment.Configuration.Name,
 			Description:           deploymentFromFile.Deployment.Configuration.Description,
-			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			DagDeployEnabled:      dagDeploy,
 			SchedulerSize:         deploymentFromFile.Deployment.Configuration.SchedulerSize,
 			APIKeyOnlyDeployments: deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments,
 			IsHighAvailability:    deploymentFromFile.Deployment.Configuration.IsHighAvailability,

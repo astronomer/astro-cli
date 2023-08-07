@@ -562,7 +562,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			RunTimeVersion:   sourceDeployment.RuntimeRelease.Version,
 			SchedulerAU:      sourceDeployment.DeploymentSpec.Scheduler.AU,
 			SchedulerCount:   sourceDeployment.DeploymentSpec.Scheduler.Replicas,
-			DagDeployEnabled: sourceDeployment.DagDeployEnabled,
+			DagDeployEnabled: &sourceDeployment.DagDeployEnabled,
 			Executor:         sourceDeployment.DeploymentSpec.Executor,
 		}
 		rawDeploymentConfig := getDeploymentConfig(&sourceDeployment)
