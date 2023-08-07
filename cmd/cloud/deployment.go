@@ -147,7 +147,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "Workspace to create the Deployment in")
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
-	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "disable", "Enables DAG-only deploys for the Deployment")
+	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the Deployment")
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the Deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the Deployment to create. File can be in either JSON or YAML format.")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
@@ -364,6 +364,13 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
+	}
+	if dagDeploy == "" {
+		if organization.IsOrgHosted() {
+			dagDeploy = enable
+		} else {
+			dagDeploy = disable
+		}
 	}
 
 	// Get latest runtime version
