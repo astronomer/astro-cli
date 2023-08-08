@@ -2735,6 +2735,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				mockClient.AssertExpectations(t)
 			})
 			t.Run("sets default queue options if none were requested", func(t *testing.T) {
+				dagDeploy := false
 				deploymentFromFile = inspect.FormattedDeployment{}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2743,7 +2744,9 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+				deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+
 				minCount := -1
 				qList = []inspect.Workerq{
 					{
