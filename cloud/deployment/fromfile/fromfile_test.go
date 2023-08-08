@@ -2735,7 +2735,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				mockClient.AssertExpectations(t)
 			})
 			t.Run("sets default queue options if none were requested", func(t *testing.T) {
-				dagDeploy := true
 				deploymentFromFile = inspect.FormattedDeployment{}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2744,6 +2743,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+				dagDeploy = true
 				deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 
@@ -3040,6 +3040,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			dagDeploy = true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 
 			expectedDeploymentInput = astro.CreateDeploymentInput{
 				WorkspaceID:           workspaceID,
@@ -3073,6 +3075,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+			dagDeploy = true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 			minCount := -1
 			qList = []inspect.Workerq{
 				{
@@ -3134,6 +3138,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			dagDeploy = true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 			minCount := 3
 			qList = []inspect.Workerq{
 				{
@@ -3236,6 +3242,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
+			dagDeploy = true
 			existingDeployment := astro.Deployment{
 				ID:    deploymentID,
 				Label: "test-deployment",
@@ -3303,6 +3311,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+			dagDeploy = true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 
 			existingPools := []astro.NodePool{
 				{
@@ -3361,6 +3371,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+			dagDeploy = true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 			minCount := -1
 			qList = []inspect.Workerq{
 				{
@@ -3448,6 +3460,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			dagDeploy = true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 			minCount := 3
 			qList = []inspect.Workerq{
 				{
