@@ -596,7 +596,7 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 
 func buildImage(path, currentVersion, deployImage, imageName string, dagDeployEnabled bool, client astro.Client) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
-
+	var DockerfileImage string
 	if imageName == "" {
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
@@ -612,6 +612,15 @@ func buildImage(path, currentVersion, deployImage, imageName string, dagDeployEn
 				return "", err
 			}
 		}
+
+		// parse dockerfile
+		cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(path, dockerfile))
+		}
+
+		DockerfileImage = docker.GetImageFromParsedFile(cmds)
+
 	} else {
 		// skip build if an imageName is passed
 		fmt.Println(composeSkipImageBuildingPromptMsg)
@@ -620,15 +629,9 @@ func buildImage(path, currentVersion, deployImage, imageName string, dagDeployEn
 		if err != nil {
 			return "", err
 		}
-	}
 
-	// parse dockerfile
-	cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(path, dockerfile))
+		DockerfileImage = "custom image"
 	}
-
-	DockerfileImage := docker.GetImageFromParsedFile(cmds)
 
 	version, err = imageHandler.GetLabel("", runtimeImageLabel)
 	if err != nil {
