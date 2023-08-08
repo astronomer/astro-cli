@@ -2735,7 +2735,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				mockClient.AssertExpectations(t)
 			})
 			t.Run("sets default queue options if none were requested", func(t *testing.T) {
-				dagDeploy := false
+				dagDeploy := true
 				deploymentFromFile = inspect.FormattedDeployment{}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
