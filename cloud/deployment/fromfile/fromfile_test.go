@@ -882,7 +882,6 @@ deployment:
     name: test-deployment-label
     description: description
     runtime_version: 6.0.0
-    dag_deploy_enabled: true
     executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
@@ -1859,7 +1858,6 @@ deployment:
     name: test-deployment-label
     description: description 1
     runtime_version: 6.0.0
-    dag_deploy_enabled: true
     executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
