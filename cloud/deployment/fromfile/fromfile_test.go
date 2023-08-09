@@ -882,7 +882,6 @@ deployment:
     name: test-deployment-label
     description: description
     runtime_version: 6.0.0
-    dag_deploy_enabled: true
     executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
@@ -1859,7 +1858,6 @@ deployment:
     name: test-deployment-label
     description: description 1
     runtime_version: 6.0.0
-    dag_deploy_enabled: true
     executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
@@ -2562,6 +2560,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			dagDeploy := true
 			minCount := 3
 			qList = []inspect.Workerq{
 				{
@@ -2612,7 +2611,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 
 			expectedDeploymentInput = astro.CreateDeploymentInput{}
 			mockClient := new(astro_mocks.Client)
-			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
+			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, dagDeploy, mockClient)
 			assert.ErrorContains(t, err, "worker_type: test-worker-8 does not exist in cluster: test-cluster")
 			assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 			mockClient.AssertExpectations(t)
@@ -2628,6 +2627,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+				dagDeploy := true
 				minCountThirty := 30
 				minCountThree := 3
 				qList = []inspect.Workerq{
@@ -2680,7 +2680,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
 				mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
+				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, dagDeploy, mockClient)
 				assert.ErrorContains(t, err, "worker queue option is invalid: min worker count")
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
@@ -2695,6 +2695,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+				dagDeploy := true
 				minCountThirty := 30
 				minCountThree := 3
 				qList = []inspect.Workerq{
@@ -2729,7 +2730,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
 				mockClient.On("GetWorkerQueueOptions").Return(astro.WorkerQueueDefaultOptions{}, errTest).Once()
-				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
+				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, dagDeploy, mockClient)
 				assert.ErrorContains(t, err, "failed to get worker queue default options")
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
@@ -2743,7 +2744,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+				dagDeploy := true
+				deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+
 				minCount := -1
 				qList = []inspect.Workerq{
 					{
@@ -2812,7 +2816,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					Label:                 deploymentFromFile.Deployment.Configuration.Name,
 					Description:           deploymentFromFile.Deployment.Configuration.Description,
 					RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-					DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+					DagDeployEnabled:      *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 					DeploymentSpec: astro.DeploymentCreateSpec{
 						Executor: deployment.CeleryExecutor,
 						Scheduler: astro.Scheduler{
@@ -2824,7 +2828,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				}
 				mockClient := new(astro_mocks.Client)
 				mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
+				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, dagDeploy, mockClient)
 				assert.NoError(t, err)
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
@@ -2841,6 +2845,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+				dagDeploy := true
 				qList = []inspect.Workerq{
 					{
 						Name:       "default",
@@ -2866,7 +2871,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
-				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
+				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, dagDeploy, mockClient)
 				assert.ErrorContains(t, err, "KubernetesExecutor does not support more than one worker queue. (2) were requested")
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
@@ -2881,6 +2886,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+				dagDeploy := true
 				minCount := 10
 				qList = []inspect.Workerq{
 					{
@@ -2904,7 +2910,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
-				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
+				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, dagDeploy, mockClient)
 				assert.ErrorContains(t, err, "KubernetesExecutor does not support minimum worker count in the request. It can only be used with CeleryExecutor")
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
@@ -2919,6 +2925,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+				dagDeploy := true
 				minCount := -1
 				qList = []inspect.Workerq{
 					{
@@ -2943,7 +2950,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
-				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
+				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, dagDeploy, mockClient)
 				assert.ErrorContains(t, err, "KubernetesExecutor does not support maximum worker count in the request. It can only be used with CeleryExecutor")
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
@@ -2958,6 +2965,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+				dagDeploy := true
 				minCount := -1
 				qList = []inspect.Workerq{
 					{
@@ -2982,7 +2990,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
-				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
+				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, dagDeploy, mockClient)
 				assert.ErrorContains(t, err, "KubernetesExecutor does not support worker concurrency in the request. It can only be used with CeleryExecutor")
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
@@ -2997,6 +3005,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+				dagDeploy := true
 				qList = []inspect.Workerq{
 					{
 						Name:       "default",
@@ -3019,7 +3028,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
-				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
+				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, dagDeploy, mockClient)
 				assert.ErrorContains(t, err, "KubernetesExecutor does not support pod ram in the request. It will be calculated based on the requested worker type")
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
@@ -3037,6 +3046,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			dagDeploy := true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 
 			expectedDeploymentInput = astro.CreateDeploymentInput{
 				WorkspaceID:           workspaceID,
@@ -3044,7 +3055,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				Label:                 deploymentFromFile.Deployment.Configuration.Name,
 				Description:           deploymentFromFile.Deployment.Configuration.Description,
 				RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-				DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled:      *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: deployment.CeleryExecutor,
 					Scheduler: astro.Scheduler{
@@ -3055,7 +3066,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				WorkerQueues: nil,
 			}
 			mockClient := new(astro_mocks.Client)
-			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, nil, mockClient)
+			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, nil, dagDeploy, mockClient)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 			mockClient.AssertExpectations(t)
@@ -3070,6 +3081,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+			dagDeploy := true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 			minCount := -1
 			qList = []inspect.Workerq{
 				{
@@ -3105,7 +3118,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				Label:                 deploymentFromFile.Deployment.Configuration.Name,
 				Description:           deploymentFromFile.Deployment.Configuration.Description,
 				RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-				DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled:      *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: deployment.KubeExecutor,
 					Scheduler: astro.Scheduler{
@@ -3116,7 +3129,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				WorkerQueues: expectedQList,
 			}
 			mockClient := new(astro_mocks.Client)
-			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
+			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, dagDeploy, mockClient)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 			mockClient.AssertExpectations(t)
@@ -3131,6 +3144,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			dagDeploy := true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 			minCount := 3
 			qList = []inspect.Workerq{
 				{
@@ -3203,7 +3218,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				Label:                 deploymentFromFile.Deployment.Configuration.Name,
 				Description:           deploymentFromFile.Deployment.Configuration.Description,
 				RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-				DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled:      *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: deployment.CeleryExecutor,
 					Scheduler: astro.Scheduler{
@@ -3215,7 +3230,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			}
 			mockClient := new(astro_mocks.Client)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
+			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, dagDeploy, mockClient)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 			mockClient.AssertExpectations(t)
@@ -3233,6 +3248,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			dagDeploy := true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 			existingDeployment := astro.Deployment{
 				ID:    deploymentID,
 				Label: "test-deployment",
@@ -3246,7 +3263,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				ClusterID:        clusterID,
 				Label:            deploymentFromFile.Deployment.Configuration.Name,
 				Description:      deploymentFromFile.Deployment.Configuration.Description,
-				DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled: *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: "CeleryExecutor",
 					Scheduler: astro.Scheduler{
@@ -3257,7 +3274,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				WorkerQueues: nil,
 			}
 			mockClient := new(astro_mocks.Client)
-			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, nil, mockClient)
+			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, nil, dagDeploy, mockClient)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
 			mockClient.AssertExpectations(t)
@@ -3273,6 +3290,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			dagDeploy := true
 			existingDeployment := astro.Deployment{
 				ID:    deploymentID,
 				Label: "test-deployment",
@@ -3283,7 +3301,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 
 			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{}
 			mockClient := new(astro_mocks.Client)
-			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, "diff-cluster", workspaceID, "update", &existingDeployment, nil, mockClient)
+			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, "diff-cluster", workspaceID, "update", &existingDeployment, nil, dagDeploy, mockClient)
 			assert.ErrorIs(t, err, errNotPermitted)
 			assert.ErrorContains(t, err, "changing an existing deployment's cluster is not permitted")
 			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
@@ -3300,6 +3318,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+			dagDeploy := true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 
 			existingPools := []astro.NodePool{
 				{
@@ -3331,7 +3351,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				ClusterID:        clusterID,
 				Label:            deploymentFromFile.Deployment.Configuration.Name,
 				Description:      deploymentFromFile.Deployment.Configuration.Description,
-				DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled: *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: deploymentFromFile.Deployment.Configuration.Executor,
 					Scheduler: astro.Scheduler{
@@ -3342,7 +3362,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				WorkerQueues: nil, // a default queue is created by the api
 			}
 			mockClient := new(astro_mocks.Client)
-			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, nil, mockClient)
+			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, nil, dagDeploy, mockClient)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
 			mockClient.AssertExpectations(t)
@@ -3358,6 +3378,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+			dagDeploy := true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 			minCount := -1
 			qList = []inspect.Workerq{
 				{
@@ -3418,7 +3440,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				ClusterID:        clusterID,
 				Label:            deploymentFromFile.Deployment.Configuration.Name,
 				Description:      deploymentFromFile.Deployment.Configuration.Description,
-				DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled: *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: deploymentFromFile.Deployment.Configuration.Executor,
 					Scheduler: astro.Scheduler{
@@ -3429,7 +3451,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				WorkerQueues: expectedQList,
 			}
 			mockClient := new(astro_mocks.Client)
-			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, mockClient)
+			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, mockClient)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
 			mockClient.AssertExpectations(t)
@@ -3445,6 +3467,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			dagDeploy := true
+			deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 			minCount := 3
 			qList = []inspect.Workerq{
 				{
@@ -3524,7 +3548,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				ClusterID:        clusterID,
 				Label:            deploymentFromFile.Deployment.Configuration.Name,
 				Description:      deploymentFromFile.Deployment.Configuration.Description,
-				DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DagDeployEnabled: *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
 					Executor: "CeleryExecutor",
 					Scheduler: astro.Scheduler{
@@ -3536,7 +3560,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			}
 			mockClient := new(astro_mocks.Client)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, mockClient)
+			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, mockClient)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
 			mockClient.AssertExpectations(t)
