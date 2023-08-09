@@ -57,6 +57,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 		existingDeployments                            []astro.Deployment
 		nodePools                                      []astrocore.NodePool
 		jsonOutput                                     bool
+		dagDeploy                                      bool
 	)
 
 	// get file contents as []byte
@@ -118,6 +119,16 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 		if err != nil {
 			return err
 		}
+		// get correct value for dag deploy
+		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil {
+			if organization.IsOrgHosted() {
+				dagDeploy = true
+			} else {
+				dagDeploy = false
+			}
+		} else {
+			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
+		}
 		// check if deployment exists
 		if deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
 			// create does not allow updating existing deployments
@@ -127,7 +138,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 		}
 		// this deployment does not exist so create it
 		// transform formattedDeployment to DeploymentCreateInput
-		createInput, _, err = getCreateOrUpdateInput(&formattedDeployment, clusterID, workspaceID, createAction, &astro.Deployment{}, nodePools, client)
+		createInput, _, err = getCreateOrUpdateInput(&formattedDeployment, clusterID, workspaceID, createAction, &astro.Deployment{}, nodePools, dagDeploy, client)
 		if err != nil {
 			return err
 		}
@@ -148,8 +159,15 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 		existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
 		workspaceID = existingDeployment.Workspace.ID
 
+		// determine dagDeploy
+		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil {
+			dagDeploy = existingDeployment.DagDeployEnabled
+		} else {
+			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
+		}
+
 		// transform formattedDeployment to DeploymentUpdateInput
-		_, updateInput, err = getCreateOrUpdateInput(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, client)
+		_, updateInput, err = getCreateOrUpdateInput(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, dagDeploy, client)
 		if err != nil {
 			return err
 		}
@@ -200,7 +218,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 // It returns an error if getting default options fail.
 // It returns an error if worker-queue options are not valid.
 // It returns an error if node pool id could not be found for the worker type.
-func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astro.Deployment, nodePools []astrocore.NodePool, client astro.Client) (astro.CreateDeploymentInput, astro.UpdateDeploymentInput, error) { //nolint
+func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astro.Deployment, nodePools []astrocore.NodePool, dagDeploy bool, client astro.Client) (astro.CreateDeploymentInput, astro.UpdateDeploymentInput, error) { //nolint
 	var (
 		defaultOptions astro.WorkerQueueDefaultOptions
 		configOptions  astro.DeploymentConfig
@@ -279,7 +297,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			Label:                 deploymentFromFile.Deployment.Configuration.Name,
 			Description:           deploymentFromFile.Deployment.Configuration.Description,
 			RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			DagDeployEnabled:      dagDeploy,
 			SchedulerSize:         deploymentFromFile.Deployment.Configuration.SchedulerSize,
 			APIKeyOnlyDeployments: deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments,
 			IsHighAvailability:    deploymentFromFile.Deployment.Configuration.IsHighAvailability,
@@ -303,7 +321,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			ClusterID:             clusterID,
 			Label:                 deploymentFromFile.Deployment.Configuration.Name,
 			Description:           deploymentFromFile.Deployment.Configuration.Description,
-			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			DagDeployEnabled:      dagDeploy,
 			SchedulerSize:         deploymentFromFile.Deployment.Configuration.SchedulerSize,
 			APIKeyOnlyDeployments: deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments,
 			IsHighAvailability:    deploymentFromFile.Deployment.Configuration.IsHighAvailability,
