@@ -101,16 +101,6 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		"-i",
 		"--name",
 		"astro-pytest",
-		"-v",
-		airflowHome + "/dags:/usr/local/airflow/dags:rw",
-		"-v",
-		airflowHome + "/plugins:/usr/local/airflow/plugins:rw",
-		"-v",
-		airflowHome + "/include:/usr/local/airflow/include:rw",
-		"-v",
-		airflowHome + "/.astro:/usr/local/airflow/.astro:rw",
-		"-v",
-		airflowHome + "/tests:/usr/local/airflow/tests:rw",
 	}
 	fileExist, err := util.Exists(airflowHome + "/" + envFile)
 	if err != nil {
