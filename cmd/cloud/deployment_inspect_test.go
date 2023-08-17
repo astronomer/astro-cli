@@ -16,7 +16,6 @@ import (
 )
 
 var (
-	workloadIdentity   = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
 	deploymentResponse = []astro.Deployment{
 		{
 			ID:          "test-deployment-id",
@@ -106,8 +105,7 @@ var (
 	}
 	mockCoreDeploymentResponse = []astrocore.Deployment{
 		{
-			Status:           "HEALTHY",
-			WorkloadIdentity: &workloadIdentity,
+			Status: "HEALTHY",
 		},
 	}
 	mockListDeploymentsResponse = astrocore.ListDeploymentsResponse{
