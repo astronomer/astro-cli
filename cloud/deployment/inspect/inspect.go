@@ -147,8 +147,9 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 
 func getDeploymentInfo(sourceDeployment *astro.Deployment, coreDeployment astrocore.Deployment) (map[string]interface{}, error) { //nolint
 	var (
-		deploymentURL string
-		err           error
+		deploymentURL    string
+		workloadIdentity string
+		err              error
 	)
 
 	deploymentURL, err = deployment.GetDeploymentURL(sourceDeployment.ID, sourceDeployment.Workspace.ID)
@@ -163,6 +164,9 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment, coreDeployment astroc
 		}
 		releaseName = notApplicable
 	}
+	if coreDeployment.WorkloadIdentity != nil {
+		workloadIdentity = *coreDeployment.WorkloadIdentity
+	}
 	return map[string]interface{}{
 		"deployment_id":     sourceDeployment.ID,
 		"workspace_id":      sourceDeployment.Workspace.ID,
@@ -174,7 +178,7 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment, coreDeployment astroc
 		"webserver_url":     sourceDeployment.DeploymentSpec.Webserver.URL,
 		"created_at":        sourceDeployment.CreatedAt,
 		"updated_at":        sourceDeployment.UpdatedAt,
-		"workload_identity": *coreDeployment.WorkloadIdentity,
+		"workload_identity": workloadIdentity,
 		"status":            coreDeployment.Status,
 	}, nil
 }
