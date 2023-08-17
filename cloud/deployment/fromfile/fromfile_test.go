@@ -28,9 +28,11 @@ const (
 var (
 	errTest                    = errors.New("test error")
 	limit                      = 1000
+	workloadIdentity           = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
 	mockCoreDeploymentResponse = []astrocore.Deployment{
 		{
-			Status: "HEALTHY",
+			Status:           "HEALTHY",
+			WorkloadIdentity: &workloadIdentity,
 		},
 	}
 	mockListDeploymentsResponse = astrocore.ListDeploymentsResponse{
@@ -197,6 +199,7 @@ deployment:
     release_name: great-release-name
     airflow_version: 2.4.0
     status: UNHEALTHY
+    workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
     deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
@@ -254,6 +257,7 @@ deployment:
     release_name: great-release-name
     airflow_version: 2.4.0
     status: UNHEALTHY
+    workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
     deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
@@ -316,6 +320,7 @@ deployment:
     release_name: great-release-name
     airflow_version: 2.4.0
     status: UNHEALTHY
+    workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
     deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
@@ -380,6 +385,7 @@ deployment:
     release_name: great-release-name
     airflow_version: 2.4.0
     status: UNHEALTHY
+    workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
     deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
@@ -444,6 +450,7 @@ deployment:
     release_name: great-release-name
     airflow_version: 2.4.0
     status: UNHEALTHY
+    workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
     deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
@@ -508,6 +515,7 @@ deployment:
             "release_name": "great-release-name",
             "airflow_version": "2.4.0",
             "status": "UNHEALTHY",
+            "workloadIdentity": "astro-great-release-name@provider-account.iam.gserviceaccount.com",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
             "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
@@ -609,6 +617,7 @@ deployment:
     release_name: great-release-name
     airflow_version: 2.4.0
     status: UNHEALTHY
+    workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
     deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
@@ -715,6 +724,7 @@ deployment:
             "release_name": "great-release-name",
             "airflow_version": "2.4.0",
             "status": "UNHEALTHY",
+            "workloadIdentity": "astro-great-release-name@provider-account.iam.gserviceaccount.com",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
             "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
@@ -816,6 +826,7 @@ deployment:
             "release_name": "great-release-name",
             "airflow_version": "2.4.0",
             "status": "UNHEALTHY",
+			"workloadIdentity": "astro-great-release-name@provider-account.iam.gserviceaccount.com",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
             "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
