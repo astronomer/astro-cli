@@ -174,7 +174,7 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment, coreDeployment astroc
 		"webserver_url":     sourceDeployment.DeploymentSpec.Webserver.URL,
 		"created_at":        sourceDeployment.CreatedAt,
 		"updated_at":        sourceDeployment.UpdatedAt,
-		"workload_identity": coreDeployment.WorkloadIdentity,
+		"workload_identity": *coreDeployment.WorkloadIdentity,
 		"status":            coreDeployment.Status,
 	}, nil
 }
