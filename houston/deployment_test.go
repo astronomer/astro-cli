@@ -273,7 +273,7 @@ func TestGetDeployment(t *testing.T) {
 						{Type: "flower", URL: "http://flower.com"},
 					},
 					CreatedAt: time.Time{},
-					UpdatedAt: time.Time{},	
+					UpdatedAt: time.Time{},
 				},
 			},
 		},

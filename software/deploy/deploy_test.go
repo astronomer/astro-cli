@@ -41,7 +41,7 @@ var (
 				{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
 			},
 			CreatedAt: time.Time{},
-			UpdatedAt: time.Time{},	
+			UpdatedAt: time.Time{},
 		},
 	}
 )
