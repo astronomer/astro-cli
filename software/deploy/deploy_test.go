@@ -22,25 +22,27 @@ var (
 	errSomeContainerIssue = errors.New("some container issue")
 	errMockHouston        = errors.New("some houston error")
 
-	mockDeployment = &houston.Deployment{
-		ID:                    "cknz133ra49758zr9w34b87ua",
-		Type:                  "airflow",
-		Label:                 "test",
-		ReleaseName:           "testDeploymentName",
-		Version:               "0.15.6",
-		AirflowVersion:        "2.0.0",
-		DesiredAirflowVersion: "2.0.0",
-		DeploymentInfo:        houston.DeploymentInfo{},
-		Workspace: houston.Workspace{
-			ID:    "ckn4phn1k0104v5xtrer5lpli",
-			Label: "w1",
+	mockDeployment = []houston.Deployment{
+		{
+			ID:                    "cknz133ra49758zr9w34b87ua",
+			Type:                  "airflow",
+			Label:                 "test",
+			ReleaseName:           "testDeploymentName",
+			Version:               "0.15.6",
+			AirflowVersion:        "2.0.0",
+			DesiredAirflowVersion: "2.0.0",
+			DeploymentInfo:        houston.DeploymentInfo{},
+			Workspace: houston.Workspace{
+				ID:    "ckn4phn1k0104v5xtrer5lpli",
+				Label: "w1",
+			},
+			Urls: []houston.DeploymentURL{
+				{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+				{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+			},
+			CreatedAt: time.Time{},
+			UpdatedAt: time.Time{},	
 		},
-		Urls: []houston.DeploymentURL{
-			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
-			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
-		},
-		CreatedAt: time.Time{},
-		UpdatedAt: time.Time{},
 	}
 )
 

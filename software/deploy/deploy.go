@@ -150,7 +150,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 		return err
 	}
 
-	deploymentLink := getAirflowUILink(deploymentID, deploymentInfo.Urls)
+	deploymentLink := getAirflowUILink(deploymentID, deploymentInfo[0].Urls)
 	fmt.Printf("Successfully pushed Docker image to Astronomer registry, it can take a few minutes to update the deployment with the new image. Navigate to the Astronomer UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
 	return nil
@@ -167,7 +167,7 @@ func deploymentExists(deploymentID string, deployments []houston.Deployment) boo
 	return false
 }
 
-func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool) error {
+func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo []houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool) error {
 	// Build our image
 	fmt.Println(imageBuildingPrompt)
 
@@ -193,10 +193,10 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 	// ignoring the error as user can be connected to platform where runtime is not enabled
 	runtimeReleases, _ := houston.Call(houstonClient.GetRuntimeReleases)("")
 	var validTags string
-	if config.CFG.ShowWarnings.GetBool() && deploymentInfo.DesiredAirflowVersion != "" && !deploymentConfig.IsValidTag(tag) {
+	if config.CFG.ShowWarnings.GetBool() && deploymentInfo[0].DesiredAirflowVersion != "" && !deploymentConfig.IsValidTag(tag) {
 		validTags = strings.Join(deploymentConfig.GetValidTags(tag), ", ")
 	}
-	if config.CFG.ShowWarnings.GetBool() && deploymentInfo.DesiredRuntimeVersion != "" && !runtimeReleases.IsValidVersion(tag) {
+	if config.CFG.ShowWarnings.GetBool() && deploymentInfo[0].DesiredRuntimeVersion != "" && !runtimeReleases.IsValidVersion(tag) {
 		validTags = strings.Join(runtimeReleases.GreaterVersions(tag), ", ")
 	}
 	if validTags != "" {

@@ -350,6 +350,28 @@ var (
 				}
 			}`,
 		},
+		{
+			version: "0.30.8",
+			query: `
+			query GetDeployment(
+				$id: String!
+			){
+				deployment(
+					where: {deploymentId: $id}
+				){
+					id
+					airflowVersion
+					desiredAirflowVersion
+					runtimeVersion
+					desiredRuntimeVersion
+					runtimeAirflowVersion
+					urls {
+						type
+						url
+					}
+				}
+			}`,
+		},
 	}
 
 	DeploymentDeleteRequest = `
@@ -539,7 +561,7 @@ func (h ClientImplementation) UpdateDeployment(variables map[string]interface{})
 }
 
 // GetDeployment - get a deployment
-func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, error) {
+func (h ClientImplementation) GetDeployment(deploymentID string) ([]Deployment, error) {
 	reqQuery := DeploymentGetRequest.GreatestLowerBound(version)
 	req := Request{
 		Query:     reqQuery,
@@ -551,7 +573,7 @@ func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, e
 		return nil, handleAPIErr(err)
 	}
 
-	return &res.Data.GetDeployment, nil
+	return res.Data.GetDeployment, nil
 }
 
 // UpdateDeploymentAirflow - update airflow on a deployment

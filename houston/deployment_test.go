@@ -255,24 +255,26 @@ func TestGetDeployment(t *testing.T) {
 
 	mockDeployment := &Response{
 		Data: ResponseData{
-			GetDeployment: Deployment{
-				ID:                    "deployment-test-id",
-				Type:                  "airflow",
-				Label:                 "test deployment",
-				ReleaseName:           "prehistoric-gravity-930",
-				Version:               "2.2.0",
-				AirflowVersion:        "2.2.0",
-				DesiredAirflowVersion: "2.2.0",
-				DeploymentInfo:        DeploymentInfo{},
-				Workspace: Workspace{
-					ID: "test-workspace-id",
+			GetDeployment: []Deployment{
+				{
+					ID:                    "deployment-test-id",
+					Type:                  "airflow",
+					Label:                 "test deployment",
+					ReleaseName:           "prehistoric-gravity-930",
+					Version:               "2.2.0",
+					AirflowVersion:        "2.2.0",
+					DesiredAirflowVersion: "2.2.0",
+					DeploymentInfo:        DeploymentInfo{},
+					Workspace: Workspace{
+						ID: "test-workspace-id",
+					},
+					Urls: []DeploymentURL{
+						{Type: "airflow", URL: "http://airflow.com"},
+						{Type: "flower", URL: "http://flower.com"},
+					},
+					CreatedAt: time.Time{},
+					UpdatedAt: time.Time{},	
 				},
-				Urls: []DeploymentURL{
-					{Type: "airflow", URL: "http://airflow.com"},
-					{Type: "flower", URL: "http://flower.com"},
-				},
-				CreatedAt: time.Time{},
-				UpdatedAt: time.Time{},
 			},
 		},
 	}

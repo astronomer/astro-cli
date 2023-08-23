@@ -55,7 +55,7 @@ type ClientInterface interface {
 	DeleteDeployment(req DeleteDeploymentRequest) (*Deployment, error)
 	ListDeployments(filters ListDeploymentsRequest) ([]Deployment, error)
 	UpdateDeployment(variables map[string]interface{}) (*Deployment, error)
-	GetDeployment(deploymentID string) (*Deployment, error)
+	GetDeployment(deploymentID string) ([]Deployment, error)
 	UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error)
 	UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
 	CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)

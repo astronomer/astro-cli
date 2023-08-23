@@ -607,19 +607,19 @@ func (_m *ClientInterface) GetAvailableNamespaces(_a0 interface{}) ([]houston.Na
 }
 
 // GetDeployment provides a mock function with given fields: deploymentID
-func (_m *ClientInterface) GetDeployment(deploymentID string) (*houston.Deployment, error) {
+func (_m *ClientInterface) GetDeployment(deploymentID string) ([]houston.Deployment, error) {
 	ret := _m.Called(deploymentID)
 
-	var r0 *houston.Deployment
+	var r0 []houston.Deployment
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (*houston.Deployment, error)); ok {
+	if rf, ok := ret.Get(0).(func(string) ([]houston.Deployment, error)); ok {
 		return rf(deploymentID)
 	}
-	if rf, ok := ret.Get(0).(func(string) *houston.Deployment); ok {
+	if rf, ok := ret.Get(0).(func(string) []houston.Deployment); ok {
 		r0 = rf(deploymentID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*houston.Deployment)
+			r0 = ret.Get(0).([]houston.Deployment)
 		}
 	}
 

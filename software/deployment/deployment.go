@@ -376,10 +376,12 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 
 // Upgrade airflow deployment
 func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInterface, out io.Writer) error {
-	deployment, err := houston.Call(client.GetDeployment)(id)
+	deployments, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return err
 	}
+
+	deployment := deployments[0]
 
 	if deployment.RuntimeVersion != "" {
 		return errDeploymentNotOnAirflow
@@ -422,10 +424,12 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInter
 
 // Upgrade airflow deployment
 func AirflowUpgradeCancel(id string, client houston.ClientInterface, out io.Writer) error {
-	deployment, err := houston.Call(client.GetDeployment)(id)
+	deployments, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return err
 	}
+
+	deployment := deployments[0]
 
 	if deployment.DesiredAirflowVersion != deployment.AirflowVersion {
 		vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": deployment.AirflowVersion}
@@ -447,10 +451,12 @@ func AirflowUpgradeCancel(id string, client houston.ClientInterface, out io.Writ
 
 // RuntimeUpgrade is to upgrade a deployment to newer runtime version
 func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInterface, out io.Writer) error {
-	deployment, err := houston.Call(client.GetDeployment)(id)
+	deployments, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return err
 	}
+
+	deployment := deployments[0]
 
 	if deployment.RuntimeVersion == "" && deployment.AirflowVersion != "" {
 		return errDeploymentNotOnRuntime
@@ -496,10 +502,12 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 
 // RuntimeUpgradeCancel is to cancel an upgrade operation for a deployment
 func RuntimeUpgradeCancel(id string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
-	deployment, err := houston.Call(client.GetDeployment)(id)
+	deployments, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return err
 	}
+
+	deployment := deployments[0]
 
 	if deployment.DesiredRuntimeVersion != deployment.RuntimeVersion {
 		vars := map[string]interface{}{"deploymentUuid": id}
@@ -521,10 +529,12 @@ func RuntimeUpgradeCancel(id string, client houston.ClientInterface, out io.Writ
 
 // RuntimeMigrate is to migrate a deployment from using airflow version to runtime version
 func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.Writer) error {
-	deployment, err := houston.Call(client.GetDeployment)(deploymentID)
+	deployments, err := houston.Call(client.GetDeployment)(deploymentID)
 	if err != nil {
 		return err
 	}
+
+	deployment := deployments[0]
 
 	if deployment.AirflowVersion == "" || deployment.RuntimeVersion != "" {
 		return errDeploymentAlreadyOnRuntime
@@ -576,10 +586,12 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 
 // RuntimeMigrateCancel is to cancel migration operation for a deployment
 func RuntimeMigrateCancel(id string, client houston.ClientInterface, out io.Writer) error {
-	deployment, err := houston.Call(client.GetDeployment)(id)
+	deployments, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return err
 	}
+
+	deployment := deployments[0]
 
 	if deployment.RuntimeVersion == "" && deployment.DesiredRuntimeVersion != "" && deployment.AirflowVersion != "" {
 		vars := map[string]interface{}{"deploymentUuid": id}
