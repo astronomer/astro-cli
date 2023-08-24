@@ -331,7 +331,6 @@ func TestGetDeployment(t *testing.T) {
 		_, err := api.GetDeployment("deployment-id")
 		assert.Contains(t, err.Error(), "GetDeployment failed for id:")
 	})
-
 }
 
 func TestUpdateDeploymentAirflow(t *testing.T) {
