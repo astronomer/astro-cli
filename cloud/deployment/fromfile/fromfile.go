@@ -86,21 +86,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 		return err
 	}
 
-	if deployment.IsDeploymentHosted(formattedDeployment.Deployment.Configuration.DeploymentType) {
-		getSharedClusterParams := astrocore.GetSharedClusterParams{
-			Region:        formattedDeployment.Deployment.Configuration.Region,
-			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(formattedDeployment.Deployment.Configuration.CloudProvider),
-		}
-		response, err := coreClient.GetSharedClusterWithResponse(context.Background(), &getSharedClusterParams)
-		if err != nil {
-			return err
-		}
-		err = astrocore.NormalizeAPIError(response.HTTPResponse, response.Body)
-		if err != nil {
-			return err
-		}
-		clusterID = response.JSON200.Id
-	} else {
+	if !deployment.IsDeploymentHosted(formattedDeployment.Deployment.Configuration.DeploymentType) {
 		// map cluster name to id and collect node pools for cluster
 		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.OrganizationShortName, coreClient)
 		if err != nil {
@@ -114,6 +100,21 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 	}
 	switch action {
 	case createAction:
+		if deployment.IsDeploymentHosted(formattedDeployment.Deployment.Configuration.DeploymentType) {
+			getSharedClusterParams := astrocore.GetSharedClusterParams{
+				Region:        formattedDeployment.Deployment.Configuration.Region,
+				CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(formattedDeployment.Deployment.Configuration.CloudProvider),
+			}
+			response, err := coreClient.GetSharedClusterWithResponse(context.Background(), &getSharedClusterParams)
+			if err != nil {
+				return err
+			}
+			err = astrocore.NormalizeAPIError(response.HTTPResponse, response.Body)
+			if err != nil {
+				return err
+			}
+			clusterID = response.JSON200.Id
+		}
 		// map workspace name to id
 		workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, c.Organization, coreClient)
 		if err != nil {
