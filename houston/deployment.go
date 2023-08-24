@@ -1,6 +1,9 @@
 package houston
 
-import "time"
+import (
+	"time"
+	"fmt"
+)
 
 // ListDeploymentsRequest - filters to list deployments according to set values
 type ListDeploymentsRequest struct {
@@ -566,7 +569,7 @@ func (h ClientImplementation) UpdateDeployment(variables map[string]interface{})
 }
 
 // GetDeployment - get a deployment
-func (h ClientImplementation) GetDeployment(deploymentID string) ([]Deployment, error) {
+func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, error) {
 	reqQuery := DeploymentGetRequest.GreatestLowerBound(version)
 	req := Request{
 		Query:     reqQuery,
@@ -578,7 +581,10 @@ func (h ClientImplementation) GetDeployment(deploymentID string) ([]Deployment, 
 		return nil, handleAPIErr(err)
 	}
 
-	return res.Data.GetDeployment, nil
+	if len(res.Data.GetDeployment) > 0 {
+		return &res.Data.GetDeployment[0], nil
+	}
+	return nil, fmt.Errorf("deployment with id %s not found", deploymentID)
 }
 
 // UpdateDeploymentAirflow - update airflow on a deployment
