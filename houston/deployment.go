@@ -585,7 +585,7 @@ func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, e
 		return &res.Data.GetDeployment[0], nil
 	}
 
-	return nil, handleAPIErr (fmt.Errorf("GetDeployment failed for id: %s: %w", deploymentID, errDeploymentNotFound))
+	return nil, handleAPIErr(fmt.Errorf("GetDeployment failed for id: %s: %w", deploymentID, errDeploymentNotFound))
 }
 
 // UpdateDeploymentAirflow - update airflow on a deployment
