@@ -1,8 +1,8 @@
 package houston
 
 import (
-	"time"
 	"fmt"
+	"time"
 )
 
 // ListDeploymentsRequest - filters to list deployments according to set values
