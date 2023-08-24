@@ -166,6 +166,10 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
 		}
 
+		if deployment.IsDeploymentHosted(formattedDeployment.Deployment.Configuration.DeploymentType) {
+			clusterID = existingDeployment.Cluster.ID
+		}
+
 		// transform formattedDeployment to DeploymentUpdateInput
 		_, updateInput, err = getCreateOrUpdateInput(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, dagDeploy, client)
 		if err != nil {
