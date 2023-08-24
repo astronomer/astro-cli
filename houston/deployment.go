@@ -568,7 +568,7 @@ func (h ClientImplementation) UpdateDeployment(variables map[string]interface{})
 
 // GetDeployment - get a deployment
 func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, error) {
-	errNoDeploymentFound  := errors.New("error: deployment with id " + deploymentID + " not found")
+	errNoDeploymentFound := errors.New("error: deployment with id " + deploymentID + " not found")
 	reqQuery := DeploymentGetRequest.GreatestLowerBound(version)
 	req := Request{
 		Query:     reqQuery,
