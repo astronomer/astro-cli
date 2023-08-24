@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-var errDeploymentNotFound = "deployment with id %s not found"
+var errDeploymentNotFound = fmt.Errorf("deployment not found")
 
 // ListDeploymentsRequest - filters to list deployments according to set values
 type ListDeploymentsRequest struct {
@@ -585,7 +585,7 @@ func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, e
 		return &res.Data.GetDeployment[0], nil
 	}
 
-	return nil, handleAPIErr(fmt.Errorf(errDeploymentNotFound, deploymentID))
+	return nil, handleAPIErr (fmt.Errorf("GetDeployment failed for id: %s: %w", deploymentID, errDeploymentNotFound))
 }
 
 // UpdateDeploymentAirflow - update airflow on a deployment

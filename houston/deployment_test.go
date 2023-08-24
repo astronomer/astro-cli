@@ -293,7 +293,7 @@ func TestGetDeployment(t *testing.T) {
 
 		deployment, err := api.GetDeployment("deployment-id")
 		assert.NoError(t, err)
-		assert.Equal(t, deployment, &mockDeployment.Data.GetDeployment)
+		assert.Equal(t, deployment, &mockDeployment.Data.GetDeployment[0])
 	})
 
 	t.Run("error", func(t *testing.T) {
