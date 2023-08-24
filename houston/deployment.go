@@ -1,8 +1,8 @@
 package houston
 
 import (
+	"errors"
 	"time"
-	"fmt"
 )
 
 // ListDeploymentsRequest - filters to list deployments according to set values
@@ -568,6 +568,7 @@ func (h ClientImplementation) UpdateDeployment(variables map[string]interface{})
 
 // GetDeployment - get a deployment
 func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, error) {
+	errNoDeploymentFound  := errors.New("error: deployment with id " + deploymentID + " not found")
 	reqQuery := DeploymentGetRequest.GreatestLowerBound(version)
 	req := Request{
 		Query:     reqQuery,
@@ -582,7 +583,7 @@ func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, e
 	if len(res.Data.GetDeployment) > 0 {
 		return &res.Data.GetDeployment[0], nil
 	}
-	return nil, fmt.Errorf("deployment with id %s not found", deploymentID)
+	return nil, handleAPIErr(errNoDeploymentFound)
 }
 
 // UpdateDeploymentAirflow - update airflow on a deployment
