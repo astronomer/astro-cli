@@ -309,6 +309,29 @@ func TestGetDeployment(t *testing.T) {
 		_, err := api.GetDeployment("deployment-id")
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
+
+	mockDeployment = &Response{
+		Data: ResponseData{
+			GetDeployment: []Deployment{},
+		},
+	}
+	jsonResponse, err = json.Marshal(mockDeployment)
+	assert.NoError(t, err)
+
+	t.Run("successful query but empty result error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.GetDeployment("deployment-id")
+		assert.Contains(t, err.Error(), "GetDeployment failed for id:")
+	})
+
 }
 
 func TestUpdateDeploymentAirflow(t *testing.T) {
