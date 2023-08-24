@@ -308,6 +308,7 @@ var (
 		},
 	}
 
+
 	DeploymentGetRequest = queryList{
 		{
 			version: "0.25.0",
@@ -330,48 +331,29 @@ var (
 		},
 		{
 			version: "0.29.0",
-			query: `
-			query GetDeployment(
-				$id: String!
-			){
-				deployment(
-					where: {id: $id}
-				){
-					id
-					airflowVersion
-					desiredAirflowVersion
-					runtimeVersion
-					desiredRuntimeVersion
-					runtimeAirflowVersion
-					urls {
-						type
-						url
-					}
-				}
-			}`,
+			query: generateGetDeploymentQuery("id"),
 		},
 		{
 			version: "0.30.8",
-			query: `
-			query GetDeployment(
-				$id: String!
-			){
-				deployment(
-					where: {deploymentId: $id}
-				){
-					id
-					airflowVersion
-					desiredAirflowVersion
-					runtimeVersion
-					desiredRuntimeVersion
-					runtimeAirflowVersion
-					urls {
-						type
-						url
-					}
-				}
-			}`,
+			query: generateGetDeploymentQuery("deploymentId"),
 		},
+		{
+			version: "0.32.0",
+			query: generateGetDeploymentQuery("id"),
+		},
+		{
+			version: "0.32.3",
+			query: generateGetDeploymentQuery("deploymentId"),
+		},
+		{
+			version: "0.33.0",
+			query: generateGetDeploymentQuery("id"),
+		},
+		{
+			version: "0.33.1",
+			query: generateGetDeploymentQuery("deploymentId"),
+		},
+
 	}
 
 	DeploymentDeleteRequest = `
@@ -485,6 +467,29 @@ var (
 		}
 	}`
 )
+
+// GenerateQuery generates the deployment query based on the given version and query parameter
+func generateGetDeploymentQuery(queryParam string) string {
+	return `
+		query GetDeployment(
+			$id: String!
+		) {
+			deployment(
+				where: {` + queryParam + `: $id}
+			) {
+				id
+				airflowVersion
+				desiredAirflowVersion
+				runtimeVersion
+				desiredRuntimeVersion
+				runtimeAirflowVersion
+				urls {
+					type
+					url
+				}
+			}
+		}`
+}
 
 // CreateDeployment - create a deployment
 func (h ClientImplementation) CreateDeployment(vars map[string]interface{}) (*Deployment, error) {
