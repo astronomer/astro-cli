@@ -308,7 +308,6 @@ var (
 		},
 	}
 
-
 	DeploymentGetRequest = queryList{
 		{
 			version: "0.25.0",
@@ -331,29 +330,28 @@ var (
 		},
 		{
 			version: "0.29.0",
-			query: generateGetDeploymentQuery("id"),
+			query:   generateGetDeploymentQuery("id"),
 		},
 		{
 			version: "0.30.8",
-			query: generateGetDeploymentQuery("deploymentId"),
+			query:   generateGetDeploymentQuery("deploymentId"),
 		},
 		{
 			version: "0.32.0",
-			query: generateGetDeploymentQuery("id"),
+			query:   generateGetDeploymentQuery("id"),
 		},
 		{
 			version: "0.32.3",
-			query: generateGetDeploymentQuery("deploymentId"),
+			query:   generateGetDeploymentQuery("deploymentId"),
 		},
 		{
 			version: "0.33.0",
-			query: generateGetDeploymentQuery("id"),
+			query:   generateGetDeploymentQuery("id"),
 		},
 		{
 			version: "0.33.1",
-			query: generateGetDeploymentQuery("deploymentId"),
+			query:   generateGetDeploymentQuery("deploymentId"),
 		},
-
 	}
 
 	DeploymentDeleteRequest = `
