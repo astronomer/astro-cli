@@ -255,25 +255,25 @@ func TestGetDeployment(t *testing.T) {
 
 	mockDeployment := &Response{
 		Data: ResponseData{
-			GetDeployment: Deployment{
-				ID:                    "deployment-test-id",
-				Type:                  "airflow",
-				Label:                 "test deployment",
-				ReleaseName:           "prehistoric-gravity-930",
-				Version:               "2.2.0",
-				AirflowVersion:        "2.2.0",
-				DesiredAirflowVersion: "2.2.0",
-				DeploymentInfo:        DeploymentInfo{},
-				Workspace: Workspace{
-					ID: "test-workspace-id",
-				},
-				Urls: []DeploymentURL{
-					{Type: "airflow", URL: "http://airflow.com"},
-					{Type: "flower", URL: "http://flower.com"},
-				},
-				CreatedAt: time.Time{},
-				UpdatedAt: time.Time{},
-			},
+			GetDeployment: []byte(`
+				{
+					"id":                    "deployment-test-id",
+					"type":                  "airflow",
+					"label":                 "test deployment",
+					"releaseName":           "prehistoric-gravity-930",
+					"version":               "2.2.0",
+					"airflowVersion":        "2.2.0",
+					"desiredAirflowVersion": "2.2.0",
+					"deploymentInfo":        {},
+					"workspace": {
+						"id": "test-workspace-id"
+					},
+					"urls": [
+						{"type": "airflow", "url": "http://airflow.com"},
+						{"type": "flower", "url": "http://flower.com"}
+					]
+				}
+			`),
 		},
 	}
 	jsonResponse, err := json.Marshal(mockDeployment)
@@ -291,7 +291,7 @@ func TestGetDeployment(t *testing.T) {
 
 		deployment, err := api.GetDeployment("deployment-id")
 		assert.NoError(t, err)
-		assert.Equal(t, deployment, &mockDeployment.Data.GetDeployment)
+		assert.Equal(t, deployment.ID, "deployment-test-id")
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -306,6 +306,28 @@ func TestGetDeployment(t *testing.T) {
 
 		_, err := api.GetDeployment("deployment-id")
 		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+
+	mockDeployment = &Response{
+		Data: ResponseData{
+			GetDeployment: []byte(`[]`),
+		},
+	}
+	jsonResponse, err = json.Marshal(mockDeployment)
+	assert.NoError(t, err)
+
+	t.Run("successful query but empty result error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.GetDeployment("deployment-id")
+		assert.Contains(t, err.Error(), "GetDeployment failed for id:")
 	})
 }
 
