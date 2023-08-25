@@ -257,7 +257,7 @@ func TestWorkspaceUserList(t *testing.T) {
 }
 
 func TestWorkspacUserUpdate(t *testing.T) {
-	expectedHelp := "astro workspace user update [email] --role [WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
+	expectedHelp := "astro workspace user update [email] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints update help", func(t *testing.T) {
@@ -334,7 +334,7 @@ func TestWorkspacUserUpdate(t *testing.T) {
 }
 
 func TestWorkspaceUserAdd(t *testing.T) {
-	expectedHelp := "astro workspace user add [email] --role [WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
+	expectedHelp := "astro workspace user add [email] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints add help", func(t *testing.T) {
@@ -776,7 +776,7 @@ func TestWorkspaceTeamList(t *testing.T) {
 }
 
 func TestWorkspaceTeamUpdate(t *testing.T) {
-	expectedHelp := "astro workspace team update [id] --role [WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
+	expectedHelp := "astro workspace team update [id] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints update help", func(t *testing.T) {
@@ -854,7 +854,7 @@ func TestWorkspaceTeamUpdate(t *testing.T) {
 }
 
 func TestWorkspaceTeamAdd(t *testing.T) {
-	expectedHelp := "astro workspace team add [id] --role [WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
+	expectedHelp := "astro workspace team add [id] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints add help", func(t *testing.T) {
