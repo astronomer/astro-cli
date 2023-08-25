@@ -1,6 +1,7 @@
 package houston
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -581,8 +582,21 @@ func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, e
 		return nil, handleAPIErr(err)
 	}
 
-	if len(res.Data.GetDeployment) > 0 {
-		return &res.Data.GetDeployment[0], nil
+	var deploymentSlice []Deployment
+	var deployment Deployment
+
+	err = json.Unmarshal(res.Data.GetDeployment, &deployment)
+	if err == nil {
+		return &deployment, nil
+	}
+
+	err = json.Unmarshal(res.Data.GetDeployment, &deploymentSlice)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+
+	if len(deploymentSlice) > 0 {
+		return &deploymentSlice[0], nil
 	}
 
 	return nil, handleAPIErr(fmt.Errorf("GetDeployment failed for id: %s: %w", deploymentID, errDeploymentNotFound))
