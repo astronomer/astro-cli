@@ -300,9 +300,9 @@ http_copy() {
 github_release() {
   owner_repo=$1
   version=$2
-  if [[ $version = "" ]]; then
+  if [ -z $version ]; then
     version=$(curl https://api.github.com/repos/${owner_repo}/releases/latest -s | tr -s '\n' ' ' | sed 's/.*"tag_name": "//' | sed 's/".*//')
-  elif [[ "$version" =~ ^v[0-9]+\.[0-9]+$ ]]; then
+  elif [ $version = ^v[0-9]+\.[0-9]+$ ]; then
     escaped_version=$(echo $version | sed -e 's/[]\/$*.^[]/\\&/g') # escape the version string
     version=$(curl https://api.github.com/repos/${owner_repo}/releases -s | grep ''\"$escaped_version'\.[0-9]"' -m1 | sed 's/.*"tag_name": "//' | sed 's/".*//')
   else
