@@ -398,7 +398,7 @@ func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace st
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"FULLNAME", "EMAIL", "ID", "WORKSPACE ROLE", "IDP MANAGED", "CREATE DATE"},
+		Header:         []string{"FULLNAME", "EMAIL", "ID", "WORKSPACE ROLE", "CREATE DATE"},
 	}
 	users, err := GetWorkspaceUsers(client, workspace, userPagnationLimit)
 	if err != nil {
@@ -406,17 +406,11 @@ func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace st
 	}
 
 	for i := range users {
-		orgUserRelationIsIdpManaged := ""
-		orgUserRelationIsIdpManagedPointer := users[i].OrgUserRelationIsIdpManaged
-		if orgUserRelationIsIdpManagedPointer != nil {
-			orgUserRelationIsIdpManaged = strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged)
-		}
 		table.AddRow([]string{
 			users[i].FullName,
 			users[i].Username,
 			users[i].Id,
 			*users[i].WorkspaceRole,
-			orgUserRelationIsIdpManaged,
 			users[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}
