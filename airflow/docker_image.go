@@ -97,7 +97,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		return "", err
 	}
 	args := []string{
-		"run",
+		"create",
 		"-i",
 		"--name",
 		"astro-pytest",
@@ -120,12 +120,26 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		stdout = nil
 		stderr = nil
 	}
-	// run pytest
+	// create pytest container
 	docErr := cmdExec(dockerCommand, stdout, stderr, args...)
 	if docErr != nil {
-		log.Debug(docErr)
+		return "", docErr
 	}
-
+	// cp DAGs folder
+	args = []string{
+		"cp",
+		airflowHome + "/dags",
+		"astro-pytest:/usr/local/airflow/",
+	}
+	docErr = cmdExec(dockerCommand, stdout, stderr, args...)
+	if docErr != nil {
+		return "", docErr
+	}
+	// start pytest container
+	docErr = cmdExec(dockerCommand, stdout, stderr, []string{"start", "astro-pytest", "-a"}...)
+	if docErr != nil {
+		return "", docErr
+	}
 	// get exit code
 	args = []string{
 		"inspect",
