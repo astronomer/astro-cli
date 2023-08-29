@@ -228,12 +228,17 @@ func ListOrgUsers(out io.Writer, client astrocore.CoreClient) error {
 	}
 
 	for i := range users {
+		orgUserRelationIsIdpManaged := "false"
+		orgUserRelationIsIdpManagedPointer := users[i].OrgUserRelationIsIdpManaged
+		if orgUserRelationIsIdpManagedPointer != nil {
+			orgUserRelationIsIdpManaged = strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged)
+		}
 		table.AddRow([]string{
 			users[i].FullName,
 			users[i].Username,
 			users[i].Id,
 			*users[i].OrgRole,
-			strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged),
+			orgUserRelationIsIdpManaged,
 			users[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}
@@ -401,12 +406,17 @@ func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace st
 	}
 
 	for i := range users {
+		orgUserRelationIsIdpManaged := "false"
+		orgUserRelationIsIdpManagedPointer := users[i].OrgUserRelationIsIdpManaged
+		if orgUserRelationIsIdpManagedPointer != nil {
+			orgUserRelationIsIdpManaged = strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged)
+		}
 		table.AddRow([]string{
 			users[i].FullName,
 			users[i].Username,
 			users[i].Id,
 			*users[i].WorkspaceRole,
-			strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged),
+			orgUserRelationIsIdpManaged,
 			users[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}
