@@ -1,12 +1,6 @@
 package houston
 
-import (
-	"encoding/json"
-	"fmt"
-	"time"
-)
-
-var errDeploymentNotFound = fmt.Errorf("deployment not found")
+import "time"
 
 // ListDeploymentsRequest - filters to list deployments according to set values
 type ListDeploymentsRequest struct {
@@ -336,27 +330,25 @@ var (
 		},
 		{
 			version: "0.29.0",
-			query:   generateGetDeploymentQuery("id"),
-		},
-		{
-			version: "0.30.8",
-			query:   generateGetDeploymentQuery("deploymentId"),
-		},
-		{
-			version: "0.32.0",
-			query:   generateGetDeploymentQuery("id"),
-		},
-		{
-			version: "0.32.3",
-			query:   generateGetDeploymentQuery("deploymentId"),
-		},
-		{
-			version: "0.33.0",
-			query:   generateGetDeploymentQuery("id"),
-		},
-		{
-			version: "0.33.1",
-			query:   generateGetDeploymentQuery("deploymentId"),
+			query: `
+			query GetDeployment(
+				$id: String!
+			){
+				deployment(
+					where: {id: $id}
+				){
+					id
+					airflowVersion
+					desiredAirflowVersion
+					runtimeVersion
+					desiredRuntimeVersion
+					runtimeAirflowVersion
+					urls {
+						type
+						url
+					}
+				}
+			}`,
 		},
 	}
 
@@ -472,29 +464,6 @@ var (
 	}`
 )
 
-// GenerateQuery generates the deployment query based on the given version and query parameter
-func generateGetDeploymentQuery(queryParam string) string {
-	return `
-		query GetDeployment(
-			$id: String!
-		) {
-			deployment(
-				where: {` + queryParam + `: $id}
-			) {
-				id
-				airflowVersion
-				desiredAirflowVersion
-				runtimeVersion
-				desiredRuntimeVersion
-				runtimeAirflowVersion
-				urls {
-					type
-					url
-				}
-			}
-		}`
-}
-
 // CreateDeployment - create a deployment
 func (h ClientImplementation) CreateDeployment(vars map[string]interface{}) (*Deployment, error) {
 	reqQuery := DeploymentCreateRequest.GreatestLowerBound(version)
@@ -582,24 +551,7 @@ func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, e
 		return nil, handleAPIErr(err)
 	}
 
-	var deploymentSlice []Deployment
-	var deployment Deployment
-
-	err = json.Unmarshal(res.Data.GetDeployment, &deployment)
-	if err == nil {
-		return &deployment, nil
-	}
-
-	err = json.Unmarshal(res.Data.GetDeployment, &deploymentSlice)
-	if err != nil {
-		return nil, handleAPIErr(err)
-	}
-
-	if len(deploymentSlice) > 0 {
-		return &deploymentSlice[0], nil
-	}
-
-	return nil, handleAPIErr(fmt.Errorf("GetDeployment failed for id: %s: %w", deploymentID, errDeploymentNotFound))
+	return &res.Data.GetDeployment, nil
 }
 
 // UpdateDeploymentAirflow - update airflow on a deployment
