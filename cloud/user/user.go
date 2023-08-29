@@ -228,7 +228,7 @@ func ListOrgUsers(out io.Writer, client astrocore.CoreClient) error {
 	}
 
 	for i := range users {
-		orgUserRelationIsIdpManaged := "false"
+		orgUserRelationIsIdpManaged := ""
 		orgUserRelationIsIdpManagedPointer := users[i].OrgUserRelationIsIdpManaged
 		if orgUserRelationIsIdpManagedPointer != nil {
 			orgUserRelationIsIdpManaged = strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged)
@@ -406,7 +406,7 @@ func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace st
 	}
 
 	for i := range users {
-		orgUserRelationIsIdpManaged := "false"
+		orgUserRelationIsIdpManaged := ""
 		orgUserRelationIsIdpManagedPointer := users[i].OrgUserRelationIsIdpManaged
 		if orgUserRelationIsIdpManagedPointer != nil {
 			orgUserRelationIsIdpManaged = strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged)
