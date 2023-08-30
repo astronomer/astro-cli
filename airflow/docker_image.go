@@ -135,6 +135,19 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	if docErr != nil {
 		return "", docErr
 	}
+	// cp .astro folder
+	// on some machine .astro is being docker ignored, but not
+	// on every machine, hence to keep behaviour consistent
+	// copying the .astro folder explicitly
+	args = []string{
+		"cp",
+		airflowHome + "/.astro",
+		"astro-pytest:/usr/local/airflow/",
+	}
+	docErr = cmdExec(dockerCommand, stdout, stderr, args...)
+	if docErr != nil {
+		return "", docErr
+	}
 	// start pytest container
 	docErr = cmdExec(dockerCommand, stdout, stderr, []string{"start", "astro-pytest", "-a"}...)
 	if docErr != nil {
