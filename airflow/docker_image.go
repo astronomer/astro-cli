@@ -137,7 +137,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	}
 	// cp .astro folder
 	// on some machine .astro is being docker ignored, but not
-	// on every machine, hence to keep behaviour consistent
+	// on every machine, hence to keep behavior consistent
 	// copying the .astro folder explicitly
 	args = []string{
 		"cp",
