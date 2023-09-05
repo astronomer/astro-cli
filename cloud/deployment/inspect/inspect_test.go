@@ -418,7 +418,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, deploymentListParams).Return(mockCoreDeploymentResponse, nil).Once()
 		expectedCloudDomainURL := "cloud.astronomer.io/" + sourceDeployment.Workspace.ID +
-			"/deployments/" + sourceDeployment.ID + "/analytics"
+			"/deployments/" + sourceDeployment.ID + "/overview"
 		expectedDeploymentMetadata := deploymentMetadata{
 			DeploymentID:     &sourceDeployment.ID,
 			WorkspaceID:      &sourceDeployment.Workspace.ID,
@@ -443,7 +443,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		var actualDeploymentMeta deploymentMetadata
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedCloudDomainURL := "localhost:5000/" + sourceDeployment.Workspace.ID +
-			"/deployments/" + sourceDeployment.ID + "/analytics"
+			"/deployments/" + sourceDeployment.ID + "/overview"
 		expectedDeploymentMetadata := deploymentMetadata{
 			DeploymentID:     &sourceDeployment.ID,
 			WorkspaceID:      &sourceDeployment.Workspace.ID,
@@ -942,7 +942,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         status: UNHEALTHY
         created_at: 2022-11-17T13:25:55.275697-08:00
         updated_at: 2022-11-17T13:25:55.275697-08:00
-        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
         webserver_url: some-url
     alert_emails:
         - email1
@@ -1093,7 +1093,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url"
         },
         "alert_emails": [
