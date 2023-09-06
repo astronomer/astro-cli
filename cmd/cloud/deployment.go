@@ -347,6 +347,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
 	}
+
 	if organization.IsOrgHosted() && !(clusterType == standard || clusterType == dedicated) {
 		return errors.New("Invalid --cluster-type value")
 	}
