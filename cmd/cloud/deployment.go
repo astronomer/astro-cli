@@ -49,12 +49,12 @@ var (
 	executor                      string
 	inputFile                     string
 	cloudProvider                 string
-	clusterType                   string
 	region                        string
 	schedulerSize                 string
 	highAvailability              string
 	deploymentCreateEnforceCD     bool
 	deploymentUpdateEnforceCD     bool
+	clusterType                   = standard
 	deploymentVariableListExample = `
 		# List a deployment's variables
 		$ astro deployment variable list --deployment-id <deployment-id> --key FOO
@@ -153,10 +153,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
 	cmd.Flags().BoolVarP(&deploymentCreateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
-	fmt.Println("is org hosted:")
-	fmt.Println(organization.IsOrgHosted())
 	if organization.IsOrgHosted() {
-		fmt.Println("hosted org flags")
 		cmd.Flags().StringVarP(&clusterType, "cluster-type", "", standard, "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated.")
 		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "gcp", "The Cloud Provider to use for the Deployment. Possible values can be gcp, aws.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the Deployment.")
@@ -350,10 +347,8 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
 	}
-	fmt.Println("cluster type: " + clusterType)
-	fmt.Println(organization.IsOrgHosted())
 	if organization.IsOrgHosted() && !(clusterType == standard || clusterType == dedicated) {
-		return errors.New("Invalid --cluster-type value: " + clusterType)
+		return errors.New("Invalid --cluster-type value")
 	}
 
 	// request is to create from a file
