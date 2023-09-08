@@ -407,6 +407,7 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 			return addWorkspaceTeam(cmd, args, out)
 		},
 	}
+	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "The Workspace's unique identifier")
 	cmd.Flags().StringVarP(&addWorkspaceRole, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
 		"new team. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
 	return cmd
@@ -421,7 +422,7 @@ func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return team.AddWorkspaceTeam(id, addWorkspaceRole, "", out, astroCoreClient)
+	return team.AddWorkspaceTeam(id, addWorkspaceRole, workspaceID, out, astroCoreClient)
 }
 
 func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {

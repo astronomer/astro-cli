@@ -874,6 +874,20 @@ func TestWorkspaceTeamAdd(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
 	})
+
+	t.Run("can add team with workspace-id flag", func(t *testing.T) {
+		workspaceIdFromFlag := "mock-workspace-id"
+		expectedOut := fmt.Sprintf("The team %s was successfully added to the workspace with the role WORKSPACE_MEMBER\n", team1.Id)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, workspaceIdFromFlag, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "add", team1.Id, "--role", "WORKSPACE_MEMBER", "--workspace-id", workspaceIdFromFlag}
+		resp, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+
 	t.Run("valid email with invalid role returns an error and team is not added", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
