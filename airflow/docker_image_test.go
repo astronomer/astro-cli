@@ -131,12 +131,16 @@ func TestDockerImagePytest(t *testing.T) {
 			switch {
 			case args[0] == "start":
 				return errMock
+			case args[0] == "inspect":
+				stdout.Write([]byte(`exit code 1`)) // making sure exit code is captured properly
+				return nil
 			default:
 				return nil
 			}
 		}
-		_, err = handler.Pytest("", "", "", "", []string{}, true, options)
+		out, err := handler.Pytest("", "", "", "", []string{}, true, options)
 		assert.Error(t, err)
+		assert.Equal(t, out, "exit code 1")
 	})
 
 	t.Run("copy error", func(t *testing.T) {
