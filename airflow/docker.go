@@ -39,7 +39,6 @@ import (
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -781,7 +780,7 @@ func GetRegistryURL(domain string) string {
 	return registry
 }
 
-func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage string) error {
+func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage string) error { //nolint:gocognit
 	// Read the content of the old Dockerfile
 	content, err := os.ReadFile(oldDockerfilePath)
 	if err != nil {
@@ -802,7 +801,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/ap-airflow:") {
 				isRuntime, err := isRuntimeVersion(newTag)
 				if err != nil {
-					log.Debug(err)
+					logrus.Debug(err)
 				}
 				if isRuntime {
 					// Replace the tag on the matching line
