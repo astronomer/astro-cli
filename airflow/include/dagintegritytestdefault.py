@@ -96,6 +96,7 @@ def suppress_logging(namespace):
     finally:
         logger.disabled = old_value
 
+
 def get_import_errors():
     """
     Generate a tuple for import errors in the dag bag, and include DAGs without errors.
@@ -127,7 +128,7 @@ def get_import_errors():
 )
 def test_file_imports(rel_path, rv):
     """Test for import errors on a file"""
-    if rv != "No import errors":  
+    if rv != "No import errors":
         # If rv is not "No import errors," consider it a failed test
         raise Exception(f"{rel_path} failed to import with message \n {rv}")
     else:
