@@ -757,7 +757,7 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerF
 	// create html report
 	htmlReportArgs := "--html=dag-test-report.html --self-contained-html"
 	// compare pip freeze files
-	fmt.Println("\nRunning parse test")
+	fmt.Println("\nRunning DAG parse test with the new Airflow version")
 	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, testHomeDirectory, strings.Fields(htmlReportArgs), true, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
