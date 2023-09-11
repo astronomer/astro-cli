@@ -49,12 +49,12 @@ var (
 	executor                      string
 	inputFile                     string
 	cloudProvider                 string
-	clusterType                   string
 	region                        string
 	schedulerSize                 string
 	highAvailability              string
 	deploymentCreateEnforceCD     bool
 	deploymentUpdateEnforceCD     bool
+	clusterType                   = standard
 	deploymentVariableListExample = `
 		# List a deployment's variables
 		$ astro deployment variable list --deployment-id <deployment-id> --key FOO

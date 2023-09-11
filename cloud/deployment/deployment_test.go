@@ -2651,42 +2651,42 @@ func TestGetDeploymentURL(t *testing.T) {
 
 	t.Run("returns deploymentURL for dev environment", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudDevPlatform)
-		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/analytics"
+		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/overview"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedURL, actualURL)
 	})
 	t.Run("returns deploymentURL for stage environment", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudStagePlatform)
-		expectedURL := "cloud.astronomer-stage.io/workspace-id/deployments/deployment-id/analytics"
+		expectedURL := "cloud.astronomer-stage.io/workspace-id/deployments/deployment-id/overview"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedURL, actualURL)
 	})
 	t.Run("returns deploymentURL for perf environment", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPerfPlatform)
-		expectedURL := "cloud.astronomer-perf.io/workspace-id/deployments/deployment-id/analytics"
+		expectedURL := "cloud.astronomer-perf.io/workspace-id/deployments/deployment-id/overview"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedURL, actualURL)
 	})
 	t.Run("returns deploymentURL for cloud (prod) environment", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		expectedURL := "cloud.astronomer.io/workspace-id/deployments/deployment-id/analytics"
+		expectedURL := "cloud.astronomer.io/workspace-id/deployments/deployment-id/overview"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedURL, actualURL)
 	})
 	t.Run("returns deploymentURL for pr preview environment", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPrPreview)
-		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/analytics"
+		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/overview"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedURL, actualURL)
 	})
 	t.Run("returns deploymentURL for local environment", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		expectedURL := "localhost:5000/workspace-id/deployments/deployment-id/analytics"
+		expectedURL := "localhost:5000/workspace-id/deployments/deployment-id/overview"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedURL, actualURL)
