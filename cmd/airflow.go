@@ -552,22 +552,41 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error {
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
-		return errInvalidBothAirflowAndRuntimeVersions
+		return errInvalidBothAirflowAndRuntimeVersionsUpgrade
 	}
-	// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided)
-	var err error
-	defaultImageTag := runtimeVersion
-	if defaultImageTag == "" {
-		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
-		defaultImageTag = prepareDefaultAirflowImageTag(airflowVersion, httpClient)
+	// error if both custom image and deployment id is used
+	if deploymentID != "" && customImageName != "" {
+		return errInvalidBothDeploymentIDandCustomImage
+	}
+	if airflowVersion != "" && deploymentID != "" {
+		return errInvalidBothDeploymentIDandVersion
+	}
+	if runtimeVersion != "" && deploymentID != "" {
+		return errInvalidBothDeploymentIDandVersion
+	}
+	if runtimeVersion != "" && customImageName != "" {
+		return errInvalidBothCustomImageandVersion
+	}
+	if airflowVersion != "" && customImageName != "" {
+		return errInvalidBothCustomImageandVersion
 	}
 
 	defaultImageName := airflow.AstroRuntimeImageName
-	if useAstronomerCertified {
-		defaultImageName = airflow.AstronomerCertifiedImageName
-		fmt.Printf("Testing an upgrade to Astronomer Certified Airflow version %s\n\n", defaultImageTag)
+	defaultImageTag := runtimeVersion
+	if customImageName != "" {
+		fmt.Printf("Testing an upgrade to custom Airflow image: %s\n", customImageName)
 	} else {
-		fmt.Printf("Testing an upgrade to Astro Runtime %s\n", defaultImageTag)
+		// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided
+		if defaultImageTag == "" {
+			httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
+			defaultImageTag = prepareDefaultAirflowImageTag(airflowVersion, httpClient)
+		}
+		if useAstronomerCertified {
+			defaultImageName = airflow.AstronomerCertifiedImageName
+			fmt.Printf("Testing an upgrade to Astronomer Certified Airflow version %s\n\n", defaultImageTag)
+		} else {
+			fmt.Printf("Testing an upgrade to Astro Runtime %s\n", defaultImageTag)
+		}
 	}
 
 	// Silence Usage as we have now validated command input

@@ -39,6 +39,7 @@ import (
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -79,9 +80,10 @@ const (
 )
 
 var (
-	errNoFile                = errors.New("file specified does not exist")
-	errSettingsPath          = "error looking for settings.yaml"
-	errComposeProjectRunning = errors.New("project is up and running")
+	errNoFile                  = errors.New("file specified does not exist")
+	errSettingsPath            = "error looking for settings.yaml"
+	errComposeProjectRunning   = errors.New("project is up and running")
+	errCustomImageDoesNotExist = errors.New("The custom image provided either does not exist or Docker is unable to connect to the repository")
 
 	initSettings      = settings.ConfigSettings
 	exportSettings    = settings.Export
@@ -540,8 +542,16 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 		versionTest = true
 		dagTest = true
 	}
-	// if user supplies deployment id pull down current image
 	var deploymentImage string
+	// if custom image is used get new Airflow version
+	if customImage != "" {
+		err := d.imageHandler.DoesImageExist(customImage)
+		if err != nil {
+			return errCustomImageDoesNotExist
+		}
+		newAirflowVersion = strings.SplitN(customImage, ":", partsNum)[1]
+	}
+	// if user supplies deployment id pull down current image
 	if deploymentID != "" {
 		err := d.pullImageFromDeployment(deploymentID, client)
 		if err != nil {
@@ -789,6 +799,25 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 					line = parts[0] + ":" + newTag
 				}
 			}
+			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/ap-airflow:") {
+				isRuntime, err := isRuntimeVersion(newTag)
+				if err != nil {
+					log.Debug(err)
+				}
+				if isRuntime {
+					// Replace the tag on the matching line
+					parts := strings.SplitN(line, "/", partsNum)
+					if len(parts) >= partsNum {
+						line = parts[0] + "/astronomer/astro-runtime:" + newTag
+					}
+				} else {
+					// Replace the tag on the matching line
+					parts := strings.SplitN(line, ":", partsNum)
+					if len(parts) == partsNum {
+						line = parts[0] + ":" + newTag
+					}
+				}
+			}
 			newContent.WriteString(line + "\n") // Add a newline after each line
 		}
 	} else {
@@ -811,6 +840,20 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 	}
 
 	return nil
+}
+
+func isRuntimeVersion(versionStr string) (bool, error) {
+	// Parse the version string
+	v, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return false, err
+	}
+
+	// Create a reference version 4.0.0
+	referenceVersion := semver.MustParse("4.0.0")
+
+	// Compare the parsed version with the reference version
+	return v.Compare(referenceVersion) > 0, nil
 }
 
 func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
