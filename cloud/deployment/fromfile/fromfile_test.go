@@ -202,7 +202,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
 `
 			fileutil.WriteStringToFile(filePath, data)
@@ -260,7 +260,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -323,7 +323,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -388,7 +388,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -453,7 +453,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -518,7 +518,7 @@ deployment:
             "workloadIdentity": "astro-great-release-name@provider-account.iam.gserviceaccount.com",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -620,7 +620,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails: []
 `
@@ -727,7 +727,7 @@ deployment:
             "workloadIdentity": "astro-great-release-name@provider-account.iam.gserviceaccount.com",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -829,7 +829,7 @@ deployment:
             "workloadIdentity": "astro-great-release-name@provider-account.iam.gserviceaccount.com",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -921,7 +921,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1039,7 +1039,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1201,7 +1201,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -1331,7 +1331,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -1488,7 +1488,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1554,7 +1554,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1630,7 +1630,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1707,7 +1707,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -1806,7 +1806,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -1897,7 +1897,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -2035,7 +2035,7 @@ deployment:
     status: HEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -2205,7 +2205,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -2333,7 +2333,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -2473,7 +2473,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -2549,7 +2549,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -2652,7 +2652,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url"
         },
         "alert_emails": [

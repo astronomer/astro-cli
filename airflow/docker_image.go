@@ -151,7 +151,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	// start pytest container
 	docErr = cmdExec(dockerCommand, stdout, stderr, []string{"start", "astro-pytest", "-a"}...)
 	if docErr != nil {
-		return "", docErr
+		log.Debugf("Error starting pytest container: %s", docErr.Error())
 	}
 	// get exit code
 	args = []string{
