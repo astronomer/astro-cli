@@ -407,6 +407,18 @@ func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 	return label, nil
 }
 
+func (d *DockerImage) DoesImageExist(image string) error {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err := cmdExec(dockerCommand, stdout, stderr, "manifest", "inspect", image)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (d *DockerImage) ListLabels() (map[string]string, error) {
 	dockerCommand := config.CFG.DockerCommand.GetString()
 

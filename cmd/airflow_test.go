@@ -483,6 +483,66 @@ func TestAirflowUpgradeTest(t *testing.T) {
 		err := airflowUpgradeTest(cmd, nil)
 		assert.ErrorIs(t, err, errMock)
 	})
+
+	t.Run("Both airflow and runtime version used", func(t *testing.T) {
+		cmd := newAirflowUpgradeTestCmd(nil)
+
+		airflowVersion = "something"
+		runtimeVersion = "something"
+
+		err := airflowUpgradeTest(cmd, nil)
+		assert.ErrorIs(t, err, errInvalidBothAirflowAndRuntimeVersionsUpgrade)
+	})
+
+	t.Run("Both custom image and deployment id used", func(t *testing.T) {
+		cmd := newAirflowUpgradeTestCmd(nil)
+
+		deploymentID = "something"
+		customImageName = "something"
+
+		err := airflowUpgradeTest(cmd, nil)
+		assert.ErrorIs(t, err, errInvalidBothDeploymentIDandCustomImage)
+	})
+
+	t.Run("Both airflow version and deployment id used", func(t *testing.T) {
+		cmd := newAirflowUpgradeTestCmd(nil)
+
+		deploymentID = "something"
+		airflowVersion = "something"
+
+		err := airflowUpgradeTest(cmd, nil)
+		assert.ErrorIs(t, err, errInvalidBothDeploymentIDandVersion)
+	})
+
+	t.Run("Both runtime version and deployment id used", func(t *testing.T) {
+		cmd := newAirflowUpgradeTestCmd(nil)
+
+		deploymentID = "something"
+		runtimeVersion = "something"
+
+		err := airflowUpgradeTest(cmd, nil)
+		assert.ErrorIs(t, err, errInvalidBothDeploymentIDandVersion)
+	})
+
+	t.Run("Both runtime version and custom image used", func(t *testing.T) {
+		cmd := newAirflowUpgradeTestCmd(nil)
+
+		customImageName = "something"
+		runtimeVersion = "something"
+
+		err := airflowUpgradeTest(cmd, nil)
+		assert.ErrorIs(t, err, errInvalidBothCustomImageandVersion)
+	})
+
+	t.Run("Both airflow version and custom image used", func(t *testing.T) {
+		cmd := newAirflowUpgradeTestCmd(nil)
+
+		customImageName = "something"
+		airflowVersion = "something"
+
+		err := airflowUpgradeTest(cmd, nil)
+		assert.ErrorIs(t, err, errInvalidBothCustomImageandVersion)
+	})
 }
 
 func TestAirflowRun(t *testing.T) {
