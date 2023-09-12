@@ -7,7 +7,6 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -1986,7 +1985,7 @@ func TestUpgradeDockerfile(t *testing.T) {
 		// Create a temporary old Dockerfile
 		oldDockerfilePath := "test_old_Dockerfile"
 		oldContent := "FROM quay.io/astronomer/astro-runtime:old-tag\n"
-		err := ioutil.WriteFile(oldDockerfilePath, []byte(oldContent), 0644)
+		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0644)
 		assert.NoError(t, err)
 		defer os.Remove(oldDockerfilePath)
 
@@ -2002,7 +2001,7 @@ func TestUpgradeDockerfile(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Read the new Dockerfile and check its content
-		newContent, err := ioutil.ReadFile(newDockerfilePath)
+		newContent, err := os.ReadFile(newDockerfilePath)
 		assert.NoError(t, err)
 		assert.Contains(t, string(newContent), "FROM quay.io/astronomer/astro-runtime:new-tag")
 	})
@@ -2011,7 +2010,7 @@ func TestUpgradeDockerfile(t *testing.T) {
 		// Create a temporary old Dockerfile
 		oldDockerfilePath := "test_old_Dockerfile"
 		oldContent := "FROM quay.io/astronomer/astro-runtime:old-tag\n"
-		err := ioutil.WriteFile(oldDockerfilePath, []byte(oldContent), 0644)
+		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0644)
 		assert.NoError(t, err)
 		defer os.Remove(oldDockerfilePath)
 
@@ -2027,7 +2026,7 @@ func TestUpgradeDockerfile(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Read the new Dockerfile and check its content
-		newContent, err := ioutil.ReadFile(newDockerfilePath)
+		newContent, err := os.ReadFile(newDockerfilePath)
 		assert.NoError(t, err)
 		assert.Contains(t, string(newContent), "FROM new-image")
 	})
