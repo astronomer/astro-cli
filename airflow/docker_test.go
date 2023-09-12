@@ -2035,7 +2035,7 @@ func TestUpgradeDockerfile(t *testing.T) {
 		// Create a temporary old Dockerfile with a line matching the pattern
 		oldDockerfilePath := "test_old_Dockerfile"
 		oldContent := "FROM quay.io/astronomer/ap-airflow:old-tag"
-		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0644)
+		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0o644)
 		assert.NoError(t, err)
 		defer os.Remove(oldDockerfilePath)
 
@@ -2060,7 +2060,7 @@ func TestUpgradeDockerfile(t *testing.T) {
 		// Create a temporary old Dockerfile with a line matching the pattern
 		oldDockerfilePath := "test_old_Dockerfile"
 		oldContent := "FROM quay.io/astronomer/ap-airflow:old-tag\n"
-		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0644)
+		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0o644)
 		assert.NoError(t, err)
 		defer os.Remove(oldDockerfilePath)
 
