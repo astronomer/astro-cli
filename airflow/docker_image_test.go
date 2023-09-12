@@ -501,6 +501,36 @@ func TestDockerImageListLabel(t *testing.T) {
 	})
 }
 
+func TestDoesImageExist(t *testing.T) {
+	handler := DockerImage{
+		imageName: "testing",
+	}
+	testImage := "image"
+
+	previousCmdExec := cmdExec
+	defer func() { cmdExec = previousCmdExec }()
+
+	t.Run("success", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			assert.Contains(t, args, "inspect")
+			return nil
+		}
+
+		err := handler.DoesImageExist(testImage)
+		assert.NoError(t, err)
+	})
+
+	t.Run("cmdExec error", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			assert.Contains(t, args, "inspect")
+			return errMockDocker
+		}
+
+		err := handler.DoesImageExist(testImage)
+		assert.ErrorIs(t, err, errMockDocker)
+	})
+}
+
 func TestDockerTagLocalImage(t *testing.T) {
 	handler := DockerImage{
 		imageName: "testing",
