@@ -293,7 +293,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -592,7 +592,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
     webserver_url: some-url
   alert_emails:
     - test1@test.com

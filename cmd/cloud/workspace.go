@@ -155,13 +155,13 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 		Use:   "add [email]",
 		Short: "Add a user to an Astro Workspace with a specific role",
 		Long: "Add a user to an Astro Workspace with a specific role\n$astro workspace user add [email] --role [WORKSPACE_MEMBER, " +
-			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+			"WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addWorkspaceUser(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&addWorkspaceRole, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
-		"new user. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+		"new user. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
 	return cmd
 }
 
@@ -184,13 +184,13 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"up"},
 		Short:   "Update a the role of a user in an Astro Workspace",
 		Long: "Update the role of a user in an Astro Workspace\n$astro workspace user update [email] --role [WORKSPACE_MEMBER, " +
-			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+			"WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceUser(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&updateWorkspaceRole, "role", "r", "", "The new role for the "+
-		"user. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+		"user. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
 	return cmd
 }
 
@@ -281,7 +281,7 @@ func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cr"},
 		Short:   "Create an API token in an Astro Workspace",
 		Long: "Create an API token in an Astro Workspace\n$astro workspace token create --name [token name] --role [WORKSPACE_MEMBER, " +
-			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+			"WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createWorkspaceToken(cmd, out)
 		},
@@ -290,7 +290,7 @@ func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the "+
-		"token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER")
+		"token. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER")
 	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Expiration of the token in days. If the flag isn't used the token won't have an expiration. Must be between 1 and 3650 days. ")
 	return cmd
 }
@@ -302,7 +302,7 @@ func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"up"},
 		Short:   "Update a Workspace or Organaization API token",
 		Long: "Update a Workspace or Organaization API token that has a role in an Astro Workspace\n$astro workspace token update [TOKEN_ID] --name [new token name] --role [WORKSPACE_MEMBER, " +
-			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+			"WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceToken(cmd, args, out)
 		},
@@ -311,7 +311,7 @@ func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the "+
-		"token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+		"token. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
 	return cmd
 }
 
@@ -356,14 +356,14 @@ func newWorkspaceTokenAddCmd(out io.Writer) *cobra.Command {
 		Use:   "add [ORG_TOKEN_ID]",
 		Short: "Add an Organization API token to an Astro Workspace",
 		Long: "Add an Organization API token to an Astro Workspace\n$astro workspace token add [ORG_TOKEN_NAME] --name [new token name] --role [WORKSPACE_MEMBER, " +
-			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+			"WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addOrgTokenToWorkspace(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization API token you want to add to a Workspace. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Workspace role to grant to the "+
-		"Organization API token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+		"Organization API token. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
 	return cmd
 }
 
@@ -402,13 +402,14 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 		Use:   "add [id]",
 		Short: "Add a team to an Astro Workspace with a specific role",
 		Long: "Add a team to an Astro Workspace with a specific role\n$astro workspace team add [id] --role [WORKSPACE_MEMBER, " +
-			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+			"WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addWorkspaceTeam(cmd, args, out)
 		},
 	}
+	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "The Workspace's unique identifier")
 	cmd.Flags().StringVarP(&addWorkspaceRole, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
-		"new team. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+		"new team. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
 	return cmd
 }
 
@@ -421,7 +422,7 @@ func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return team.AddWorkspaceTeam(id, addWorkspaceRole, "", out, astroCoreClient)
+	return team.AddWorkspaceTeam(id, addWorkspaceRole, workspaceID, out, astroCoreClient)
 }
 
 func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -430,13 +431,13 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"up"},
 		Short:   "Update a the role of a team in an Astro Workspace",
 		Long: "Update the role of a team in an Astro Workspace\n$astro workspace team update [id] --role [WORKSPACE_MEMBER, " +
-			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+			"WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceTeam(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&updateWorkspaceRole, "role", "r", "", "The new role for the "+
-		"team. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+		"team. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
 	return cmd
 }
 
@@ -532,7 +533,7 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 
 	if updateWorkspaceRole == "" {
 		// no role was provided so ask the user for it
-		updateWorkspaceRole = input.Text("Enter a user Workspace role(WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER) to update user: ")
+		updateWorkspaceRole = input.Text("Enter a user Workspace role(WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER) to update user: ")
 	}
 
 	cmd.SilenceUsage = true
@@ -652,7 +653,7 @@ func selectWorkspaceRole() (string, error) {
 		DynamicPadding: true,
 		Header:         []string{"#", "ROLE"},
 	}
-	roles := []string{"WORKSPACE_MEMBER", "WORKSPACE_OPERATOR", "WORKSPACE_OWNER"}
+	roles := []string{"WORKSPACE_MEMBER", "WORKSPACE_AUTHOR", "WORKSPACE_OPERATOR", "WORKSPACE_OWNER"}
 	for i := range roles {
 		index := i + 1
 		tab.AddRow([]string{

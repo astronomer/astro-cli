@@ -20,7 +20,7 @@ import (
 var (
 	ErrNoShortName             = errors.New("cannot retrieve organization short name from context")
 	ErrInvalidRole             = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
-	ErrInvalidWorkspaceRole    = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+	ErrInvalidWorkspaceRole    = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
 	ErrInvalidOrganizationRole = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	ErrInvalidEmail            = errors.New("no email provided for the invite. Retry with a valid email address")
 	ErrInvalidUserKey          = errors.New("invalid User selected")
@@ -228,12 +228,17 @@ func ListOrgUsers(out io.Writer, client astrocore.CoreClient) error {
 	}
 
 	for i := range users {
+		orgUserRelationIsIdpManaged := ""
+		orgUserRelationIsIdpManagedPointer := users[i].OrgUserRelationIsIdpManaged
+		if orgUserRelationIsIdpManagedPointer != nil {
+			orgUserRelationIsIdpManaged = strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged)
+		}
 		table.AddRow([]string{
 			users[i].FullName,
 			users[i].Username,
 			users[i].Id,
 			*users[i].OrgRole,
-			strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged),
+			orgUserRelationIsIdpManaged,
 			users[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}
@@ -327,7 +332,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 // If the role is valid, it returns nil
 // error ErrInvalidWorkspaceRole is returned if the role is not valid
 func IsWorkspaceRoleValid(role string) error {
-	validRoles := []string{"WORKSPACE_MEMBER", "WORKSPACE_OPERATOR", "WORKSPACE_OWNER"}
+	validRoles := []string{"WORKSPACE_MEMBER", "WORKSPACE_AUTHOR", "WORKSPACE_OPERATOR", "WORKSPACE_OWNER"}
 	for _, validRole := range validRoles {
 		if role == validRole {
 			return nil
@@ -393,7 +398,7 @@ func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace st
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"FULLNAME", "EMAIL", "ID", "WORKSPACE ROLE", "IDP MANAGED", "CREATE DATE"},
+		Header:         []string{"FULLNAME", "EMAIL", "ID", "WORKSPACE ROLE", "CREATE DATE"},
 	}
 	users, err := GetWorkspaceUsers(client, workspace, userPagnationLimit)
 	if err != nil {
@@ -406,7 +411,6 @@ func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace st
 			users[i].Username,
 			users[i].Id,
 			*users[i].WorkspaceRole,
-			strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged),
 			users[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}

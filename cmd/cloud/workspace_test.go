@@ -257,7 +257,7 @@ func TestWorkspaceUserList(t *testing.T) {
 }
 
 func TestWorkspacUserUpdate(t *testing.T) {
-	expectedHelp := "astro workspace user update [email] --role [WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
+	expectedHelp := "astro workspace user update [email] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints update help", func(t *testing.T) {
@@ -334,7 +334,7 @@ func TestWorkspacUserUpdate(t *testing.T) {
 }
 
 func TestWorkspaceUserAdd(t *testing.T) {
-	expectedHelp := "astro workspace user add [email] --role [WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
+	expectedHelp := "astro workspace user add [email] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints add help", func(t *testing.T) {
@@ -776,7 +776,7 @@ func TestWorkspaceTeamList(t *testing.T) {
 }
 
 func TestWorkspaceTeamUpdate(t *testing.T) {
-	expectedHelp := "astro workspace team update [id] --role [WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
+	expectedHelp := "astro workspace team update [id] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints update help", func(t *testing.T) {
@@ -854,7 +854,7 @@ func TestWorkspaceTeamUpdate(t *testing.T) {
 }
 
 func TestWorkspaceTeamAdd(t *testing.T) {
-	expectedHelp := "astro workspace team add [id] --role [WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
+	expectedHelp := "astro workspace team add [id] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints add help", func(t *testing.T) {
@@ -874,6 +874,20 @@ func TestWorkspaceTeamAdd(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
 	})
+
+	t.Run("can add team with workspace-id flag", func(t *testing.T) {
+		workspaceIDFromFlag := "mock-workspace-id"
+		expectedOut := fmt.Sprintf("The team %s was successfully added to the workspace with the role WORKSPACE_MEMBER\n", team1.Id)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, workspaceIDFromFlag, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "add", team1.Id, "--role", "WORKSPACE_MEMBER", "--workspace-id", workspaceIDFromFlag}
+		resp, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+
 	t.Run("valid email with invalid role returns an error and team is not added", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()

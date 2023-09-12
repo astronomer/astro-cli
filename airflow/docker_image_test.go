@@ -113,6 +113,36 @@ func TestDockerImagePytest(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("create error", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			switch {
+			case args[0] == "create":
+				return errMock
+			default:
+				return nil
+			}
+		}
+		_, err = handler.Pytest("", "", "", "", []string{}, true, options)
+		assert.Error(t, err)
+	})
+
+	t.Run("start error", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			switch {
+			case args[0] == "start":
+				return errMock
+			case args[0] == "inspect":
+				stdout.Write([]byte(`exit code 1`)) // making sure exit code is captured properly
+				return nil
+			default:
+				return nil
+			}
+		}
+		out, err := handler.Pytest("", "", "", "", []string{}, true, options)
+		assert.Error(t, err)
+		assert.Equal(t, out, "exit code 1")
+	})
+
 	t.Run("copy error", func(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			switch {
