@@ -48,6 +48,7 @@ type ImageHandler interface {
 	Push(registry, username, token, remoteImage string) error
 	Pull(registry, username, token, remoteImage string) error
 	GetLabel(altImageName, labelName string) (string, error)
+	DoesImageExist(image string) error
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
 	Run(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error

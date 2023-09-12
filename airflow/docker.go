@@ -79,9 +79,10 @@ const (
 )
 
 var (
-	errNoFile                = errors.New("file specified does not exist")
-	errSettingsPath          = "error looking for settings.yaml"
-	errComposeProjectRunning = errors.New("project is up and running")
+	errNoFile                  = errors.New("file specified does not exist")
+	errSettingsPath            = "error looking for settings.yaml"
+	errComposeProjectRunning   = errors.New("project is up and running")
+	errCustomImageDoesNotExist = errors.New("The custom image provided either does not exist or Docker is unable to connect to the repository")
 
 	initSettings      = settings.ConfigSettings
 	exportSettings    = settings.Export
@@ -540,8 +541,16 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 		versionTest = true
 		dagTest = true
 	}
-	// if user supplies deployment id pull down current image
 	var deploymentImage string
+	// if custom image is used get new Airflow version
+	if customImage != "" {
+		err := d.imageHandler.DoesImageExist(customImage)
+		if err != nil {
+			return errCustomImageDoesNotExist
+		}
+		newAirflowVersion = strings.SplitN(customImage, ":", partsNum)[1]
+	}
+	// if user supplies deployment id pull down current image
 	if deploymentID != "" {
 		err := d.pullImageFromDeployment(deploymentID, client)
 		if err != nil {
@@ -747,7 +756,7 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerF
 	// create html report
 	htmlReportArgs := "--html=dag-test-report.html --self-contained-html"
 	// compare pip freeze files
-	fmt.Println("\nRunning parse test")
+	fmt.Println("\nRunning DAG parse test with the new Airflow version")
 	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, testHomeDirectory, strings.Fields(htmlReportArgs), true, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
@@ -771,7 +780,7 @@ func GetRegistryURL(domain string) string {
 	return registry
 }
 
-func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage string) error {
+func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage string) error { //nolint:gocognit
 	// Read the content of the old Dockerfile
 	content, err := os.ReadFile(oldDockerfilePath)
 	if err != nil {
@@ -787,6 +796,25 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 				parts := strings.SplitN(line, ":", partsNum)
 				if len(parts) == partsNum {
 					line = parts[0] + ":" + newTag
+				}
+			}
+			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/ap-airflow:") {
+				isRuntime, err := isRuntimeVersion(newTag)
+				if err != nil {
+					logrus.Debug(err)
+				}
+				if isRuntime {
+					// Replace the tag on the matching line
+					parts := strings.SplitN(line, "/", partsNum)
+					if len(parts) >= partsNum {
+						line = parts[0] + "/astronomer/astro-runtime:" + newTag
+					}
+				} else {
+					// Replace the tag on the matching line
+					parts := strings.SplitN(line, ":", partsNum)
+					if len(parts) == partsNum {
+						line = parts[0] + ":" + newTag
+					}
 				}
 			}
 			newContent.WriteString(line + "\n") // Add a newline after each line
@@ -811,6 +839,20 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 	}
 
 	return nil
+}
+
+func isRuntimeVersion(versionStr string) (bool, error) {
+	// Parse the version string
+	v, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return false, err
+	}
+
+	// Runtime versions start 4.0.0 to not get confused with Airflow versions that are currently in 2.X.X
+	referenceVersion := semver.MustParse("4.0.0")
+
+	// Compare the parsed version with the reference version
+	return v.Compare(referenceVersion) > 0, nil
 }
 
 func CreateVersionTestFile(beforeFile, afterFile, outputFile string) error {
