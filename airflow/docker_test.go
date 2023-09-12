@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -2029,6 +2030,56 @@ func TestUpgradeDockerfile(t *testing.T) {
 		newContent, err := os.ReadFile(newDockerfilePath)
 		assert.NoError(t, err)
 		assert.Contains(t, string(newContent), "FROM new-image")
+	})
+
+	t.Run("update Dockerfile for ap-airflow with runtime version", func(t *testing.T) {
+		// Create a temporary old Dockerfile with a line matching the pattern
+		oldDockerfilePath := "test_old_Dockerfile"
+		oldContent := "FROM quay.io/astronomer/ap-airflow:old-tag"
+		err := ioutil.WriteFile(oldDockerfilePath, []byte(oldContent), 0644)
+		assert.NoError(t, err)
+		defer os.Remove(oldDockerfilePath)
+
+		// Define test data
+		newDockerfilePath := "test_new_Dockerfile"
+		newTag := "5.0.0"
+
+		// Call the function
+		err = upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, "")
+		defer os.Remove(newDockerfilePath)
+
+		// Check for errors
+		assert.NoError(t, err)
+
+		// Read the new Dockerfile and check its content
+		newContent, err := ioutil.ReadFile(newDockerfilePath)
+		assert.NoError(t, err)
+		assert.Contains(t, string(newContent), "FROM quay.io/astronomer/astro-runtime:5.0.0\n")
+	})
+
+	t.Run("update Dockerfile for ap-airflow with non-runtime version", func(t *testing.T) {
+		// Create a temporary old Dockerfile with a line matching the pattern
+		oldDockerfilePath := "test_old_Dockerfile"
+		oldContent := "FROM quay.io/astronomer/ap-airflow:old-tag\n"
+		err := ioutil.WriteFile(oldDockerfilePath, []byte(oldContent), 0644)
+		assert.NoError(t, err)
+		defer os.Remove(oldDockerfilePath)
+
+		// Define test data
+		newDockerfilePath := "test_new_Dockerfile"
+		newTag := "new-tag"
+
+		// Call the function
+		err = upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, "")
+		defer os.Remove(newDockerfilePath)
+
+		// Check for errors
+		assert.NoError(t, err)
+
+		// Read the new Dockerfile and check its content
+		newContent, err := ioutil.ReadFile(newDockerfilePath)
+		assert.NoError(t, err)
+		assert.Contains(t, string(newContent), "FROM quay.io/astronomer/ap-airflow:new-tag")
 	})
 
 	t.Run("error reading old Dockerfile", func(t *testing.T) {
