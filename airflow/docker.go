@@ -848,7 +848,7 @@ func isRuntimeVersion(versionStr string) (bool, error) {
 		return false, err
 	}
 
-	// Create a reference version 4.0.0
+	// Runtime versions start 4.0.0 to not get confused with Airflow versions that are currently in 2.X.X
 	referenceVersion := semver.MustParse("4.0.0")
 
 	// Compare the parsed version with the reference version
