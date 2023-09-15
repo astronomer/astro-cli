@@ -358,7 +358,7 @@ func Login(domain, token string, client astro.Client, coreClient astrocore.CoreC
 			return err
 		}
 	} else {
-		fmt.Print("You are logging into Astro via an OAuth token\nThis token will expire in 24 hours and will not refresh\n\n")
+		fmt.Print("You are logging into Astro via an OAuth token\nThis token will expire in 1 hour and will not refresh\n\n")
 		res = Result{
 			AccessToken: token,
 			ExpiresIn:   86400, //nolint:gomnd
