@@ -300,12 +300,12 @@ http_copy() {
 github_release() {
   owner_repo=$1
   version=$2
-  if [ -z $version ]; then
-    version=$(curl https://api.github.com/repos/${owner_repo}/releases/latest -s | tr -s '\n' ' ' | sed 's/.*"tag_name": "//' | sed 's/".*//')
-  else
-    escaped_version=$(echo $version | sed -e 's/[]\/$*.^[]/\\&/g') # escape the version string
-    version=$(curl https://api.github.com/repos/${owner_repo}/releases -s | grep ''\"$escaped_version\.\*\"'' -m1 | sed 's/.*"tag_name": "//' | sed 's/".*//')
-  fi
+  test -z "$version" && version="latest"
+  giturl="https://github.com/${owner_repo}/releases/${version}"
+  json=$(http_copy "$giturl" "Accept:application/json")
+  log_info "Github Response" $json
+  test -z "$json" && return 1
+  version=$(echo "$json" | tr -s '\n' ' ' | sed 's/.*"tag_name":"//' | sed 's/".*//')
   test -z "$version" && return 1
   echo "$version"
 }
