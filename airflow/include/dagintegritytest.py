@@ -47,6 +47,10 @@ def get_dags():
     return [(k, v, strip_path_prefix(v.fileloc)) for k, v in dag_bag.dags.items()]
 
 
+@pytest.mark.skipif(
+    os.getenv("SKIP_FILE_IMPORTS_TEST").lower() == "true",
+    reason="skipping file imports test",
+)
 @pytest.mark.parametrize(
     "rel_path,rv", get_import_errors(), ids=[x[0] for x in get_import_errors()]
 )
@@ -59,6 +63,9 @@ def test_file_imports(rel_path, rv):
 APPROVED_TAGS = {}
 
 
+@pytest.mark.skipif(
+    os.getenv("SKIP_TEST_DAG_TAGS").lower() == "true", reason="skipping dag tags test"
+)
 @pytest.mark.parametrize(
     "dag_id,dag,fileloc", get_dags(), ids=[x[2] for x in get_dags()]
 )
@@ -71,6 +78,10 @@ def test_dag_tags(dag_id, dag, fileloc):
         assert not set(dag.tags) - APPROVED_TAGS
 
 
+@pytest.mark.skipif(
+    os.getenv("SKIP_DAG_RETRIES_TEST").lower() == "true",
+    reason="skipping dag retries test",
+)
 @pytest.mark.parametrize(
     "dag_id,dag, fileloc", get_dags(), ids=[x[2] for x in get_dags()]
 )
