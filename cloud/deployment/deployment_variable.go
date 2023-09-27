@@ -279,7 +279,7 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 		key := strings.SplitN(vars[i], "=", 2)[0]   //nolint:gomnd
 		value := strings.SplitN(vars[i], "=", 2)[1] //nolint:gomnd
 		if key == "" {
-			fmt.Printf("empty key! skipping creating variable with value: %s\n", value)
+			fmt.Printf("empty key! skipping creating variable with key: %s\n", key)
 			errVarBool = true
 			continue
 		}
@@ -296,7 +296,7 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 			continue
 		}
 
-		fmt.Printf("Cleaning quotes and whitespaces from variable value - %s", value)
+		fmt.Printf("Cleaning quotes and whitespaces from variable %s", key)
 		value = strings.Trim(value, `"`)
 		value = strings.Trim(value, `'`)
 		value = strings.TrimSpace(value)
