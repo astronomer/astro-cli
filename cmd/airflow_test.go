@@ -178,7 +178,7 @@ func cleanUpInitFiles(t *testing.T) {
 		"README.md",
 		".astro/config.yaml",
 		"./astro",
-		"tests/dags/test_dag_integrity.py",
+		"tests/dags/test_dag_example.py",
 		"tests/dags",
 		"tests",
 	}
