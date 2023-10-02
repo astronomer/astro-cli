@@ -545,6 +545,45 @@ func TestSelectRegion(t *testing.T) {
 		assert.Equal(t, region, resp)
 	})
 
+	t.Run("region via selection aws", func(t *testing.T) {
+		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderAws) //nolint
+		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
+			Provider: &provider,
+			Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
+		}
+
+		mockOKRegionResponse := &astrocore.GetClusterOptionsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &[]astrocore.ClusterOptions{
+				{Regions: []astrocore.ProviderRegion{{Name: region}}},
+			},
+		}
+
+		mockCoreClient.On("GetClusterOptionsWithResponse", mock.Anything, getSharedClusterOptionsParams).Return(mockOKRegionResponse, nil).Once()
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		resp, err := selectRegion("aws", "", mockCoreClient)
+		assert.NoError(t, err)
+		assert.Equal(t, region, resp)
+	})
+
 	t.Run("region invalid selection", func(t *testing.T) {
 		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
