@@ -917,7 +917,7 @@ func TestBuildImageFailure(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
-	_, err := buildImage("./testfiles/", "4.2.5", "", "", false, nil)
+	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", false, nil)
 	assert.ErrorIs(t, err, errMock)
 
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -928,15 +928,15 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// dockerfile parsing error
 	dockerfile = "Dockerfile.invalid"
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", false, nil)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", false, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
 	// failed to get runtime releases
 	dockerfile = "Dockerfile"
-	mockClient := new(astro_mocks.Client)
+	mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", false, mockClient)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", false, mockClient)
 	assert.ErrorIs(t, err, errMock)
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
