@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/config"
@@ -44,6 +45,16 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 		CreatedAt:        time.Now(),
 		DagDeployEnabled: false,
 	}
+	deployment := astrocore.Deployment{
+		RuntimeVersion:     "4.2.5",
+		ReleaseName:        "test-name",
+		WorkspaceId:        ws,
+		WebServerUrl:       "test-url",
+		IsDagDeployEnabled: false,
+	}
+	deploymentResponse := astrocore.GetDeploymentResponse{
+		JSON200: &deployment,
+	}
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "",
@@ -61,10 +72,14 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	mockClient := new(astro_mocks.Client)
 
 	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(4)
-	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}}}, nil).Once()
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(5)
-	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
-	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
+	// mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}}}, nil).Once()
+	mockCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+	// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(5)
+	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrocore.GetDeploymentOptionsResponse{}, nil).Times(5)
+	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(astrocore.CreateDeployResponse{}, nil).Times(5)
+	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(astrocore.UpdateDeployResponse{}, nil).Times(5)
+	// mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
+	// mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
