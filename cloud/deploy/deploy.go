@@ -704,21 +704,17 @@ func updateDeploy(deployID, deploymentID, organizationID, dagTarballVersion stri
 
 // create deploy
 func createDeploy(organizationID, deploymentID, description, tag string, dagDeploy bool, coreClient astrocore.CoreClient) (astrocore.CreateDeployResponse, error) {
-	CreateDeployRequest := astrocore.CreateDeployRequest{}
+	createDeployRequest := astrocore.CreateDeployRequest{
+		Description: &description,
+	}
 	if dagDeploy {
-		CreateDeployRequest = astrocore.CreateDeployRequest{
-			Description: &description,
-			Type:        astrocore.CreateDeployRequestTypeDAG,
-		}
+		createDeployRequest.Type = astrocore.CreateDeployRequestTypeDAG
 	} else {
-		CreateDeployRequest = astrocore.CreateDeployRequest{
-			Description: &description,
-			ImageTag:    &tag,
-			Type:        astrocore.CreateDeployRequestTypeIMAGE,
-		}
+		createDeployRequest.Type = astrocore.CreateDeployRequestTypeIMAGE
+		createDeployRequest.ImageTag = &tag
 	}
 
-	resp, err := coreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, CreateDeployRequest)
+	resp, err := coreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, createDeployRequest)
 	if err != nil {
 		return astrocore.CreateDeployResponse{}, err
 	}
