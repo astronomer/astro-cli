@@ -25,8 +25,8 @@ var (
 	//go:embed include/composeyml.yml
 	Composeyml string
 
-	//go:embed include/dagintegritytest.py
-	DagIntegrityTest string
+	//go:embed include/dagexampletest.py
+	DagExampleTest string
 
 	//go:embed include/dagintegritytestdefault.py
 	DagIntegrityTestDefault string
@@ -117,7 +117,7 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 		"dags/example_dag_advanced.py":         ExampleDagAdvanced,
 		"dags/.airflowignore":                  "",
 		"README.md":                            Readme,
-		"tests/dags/test_dag_integrity.py":     DagIntegrityTest,
+		"tests/dags/test_dag_example.py":       DagExampleTest,
 		".astro/test_dag_integrity_default.py": DagIntegrityTestDefault,
 	}
 
