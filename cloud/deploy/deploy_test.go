@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -45,15 +46,27 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	// 	CreatedAt:        time.Now(),
 	// 	DagDeployEnabled: false,
 	// }
-	deployment := astrocore.Deployment{
-		RuntimeVersion:     "4.2.5",
-		ReleaseName:        "test-name",
-		WorkspaceId:        ws,
-		WebServerUrl:       "test-url",
-		IsDagDeployEnabled: false,
-	}
 	deploymentResponse := astrocore.GetDeploymentResponse{
-		JSON200: &deployment,
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.Deployment{
+			RuntimeVersion:     "4.2.5",
+			ReleaseName:        "test-name",
+			WorkspaceId:        ws,
+			WebServerUrl:       "test-url",
+			IsDagDeployEnabled: false,
+		},
+	}
+	createDeployResponse := astrocore.CreateDeployResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+	}
+	updateDeployResponse := astrocore.UpdateDeployResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
 	}
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
@@ -76,8 +89,8 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}}}, nil).Once()
 	// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(5)
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrocore.GetDeploymentOptionsResponse{}, nil).Times(5)
-	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(astrocore.CreateDeployResponse{}, nil).Times(5)
-	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(astrocore.UpdateDeployResponse{}, nil).Times(5)
+	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(createDeployResponse, nil).Times(5)
+	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(updateDeployResponse, nil).Times(5)
 	// mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
 	// mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
 
