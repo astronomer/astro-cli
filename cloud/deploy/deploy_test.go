@@ -64,8 +64,8 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 		},
 		JSON200: &astrocore.DeploymentOptions{
 			RuntimeReleases: []astrocore.RuntimeRelease{
-				{Version: "version-1"},
-				{Version: "version-2"},
+				{Version: "4.0.0"},
+				{Version: "5.0.0"},
 			},
 		},
 	}
