@@ -400,6 +400,9 @@ func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
 		}
 	}
 	template.Deployment.EnvVars = newEnvVars
+	if template.Deployment.Configuration.Executor == deployment.KubeExecutor {
+		template.Deployment.WorkerQs = nil
+	}
 
 	return template
 }
