@@ -1161,20 +1161,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "cloud_provider": "",
             "region": ""
         },
-        "worker_queues": [
-            {
-                "name": "default",
-                "worker_type": "test-instance-type",
-                "pod_cpu": "smallCPU",
-                "pod_ram": "megsOfRam"
-            },
-            {
-                "name": "test-queue-1",
-                "worker_type": "test-instance-type-1",
-                "pod_cpu": "LotsOfCPU",
-                "pod_ram": "gigsOfRam"
-            }
-        ],
+        "worker_queues": null,
         "alert_emails": [
             "email1",
             "email2"
