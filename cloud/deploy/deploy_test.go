@@ -25,15 +25,12 @@ import (
 )
 
 var (
-	errMock                  = errors.New("mock error")
-	org                      = "test-org-id"
-	ws                       = "test-ws-id"
-	initiatedDagDeploymentID = "test-dag-deployment-id"
-	runtimeID                = "test-id"
-	dagURL                   = "http://fake-url.windows.core.net"
-	dagTarballVersion        = "test-version"
-	dagsUploadUrl            = "test-url"
-	createDeployResponse     = astrocore.CreateDeployResponse{
+	errMock              = errors.New("mock error")
+	org                  = "test-org-id"
+	ws                   = "test-ws-id"
+	dagTarballVersion    = "test-version"
+	dagsUploadURL        = "test-url"
+	createDeployResponse = astrocore.CreateDeployResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -41,7 +38,7 @@ var (
 			Id:                "test-id",
 			DagTarballVersion: &dagTarballVersion,
 			ImageRepository:   "test-repository",
-			DagsUploadUrl:     &dagsUploadUrl,
+			DagsUploadUrl:     &dagsUploadURL,
 		},
 	}
 	updateDeployResponse = astrocore.UpdateDeployResponse{
@@ -843,12 +840,10 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
-	// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(3)
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(4)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
-	// mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(4)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		_, err = os.Stat("./testfiles/dags/astronomer_monitoring_dag.py")
