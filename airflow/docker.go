@@ -18,6 +18,7 @@ import (
 	semver "github.com/Masterminds/semver/v3"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -203,7 +204,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 // Start starts a local airflow development cluster
 //
 //nolint:gocognit
-func (d *DockerCompose) Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration) error {
+func (d *DockerCompose) Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
 	// check if docker is up for macOS
 	if runtime.GOOS == "darwin" && config.CFG.DockerCommand.GetString() == dockerCmd {
 		err := startDocker()
@@ -300,7 +301,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile string, noCac
 		startupTimeout = 5 * time.Minute
 	}
 
-	err = checkWebserverHealth(settingsFile, project, d.composeService, airflowDockerVersion, noBrowser, startupTimeout)
+	err = checkWebserverHealth(settingsFile, envConns, project, d.composeService, airflowDockerVersion, noBrowser, startupTimeout)
 	if err != nil {
 		return err
 	}
@@ -1205,7 +1206,7 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 		return errNoFile
 	}
 
-	err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
+	err = initSettings(containerID, settingsFile, nil, airflowDockerVersion, connections, variables, pools)
 	if err != nil {
 		return err
 	}
@@ -1365,15 +1366,14 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 	return project, err
 }
 
-var checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+var checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
 	if config.CFG.DockerCommand.GetString() == podman {
-		err := printStatus(settingsFile, project, composeService, airflowDockerVersion, noBrowser)
+		err := printStatus(settingsFile, envConns, project, composeService, airflowDockerVersion, noBrowser)
 		if err != nil {
 			if !errors.Is(err, errComposeProjectRunning) {
 				return err
 			}
 		}
-
 	} else {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
@@ -1387,7 +1387,7 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 					return err
 				}
 				if string(marshal) == `{"action":"health_status: healthy"}` {
-					err := printStatus(settingsFile, project, composeService, airflowDockerVersion, noBrowser)
+					err := printStatus(settingsFile, envConns, project, composeService, airflowDockerVersion, noBrowser)
 					if err != nil {
 						return err
 					}
@@ -1409,7 +1409,7 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 	return nil
 }
 
-func printStatus(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
+func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
 	psInfo, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
 		All: true,
 	})
@@ -1426,7 +1426,7 @@ func printStatus(settingsFile string, project *types.Project, composeService api
 		for i := range psInfo {
 			if strings.Contains(psInfo[i].Name, project.Name) &&
 				strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
-				err = initSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, true, true, true)
+				err = initSettings(psInfo[i].ID, settingsFile, envConns, airflowDockerVersion, true, true, true)
 				if err != nil {
 					return err
 				}

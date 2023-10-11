@@ -10,6 +10,8 @@ import (
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/cloud/environment"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -103,7 +105,7 @@ astro dev init --airflow-version 2.2.3
 	errPytestArgs          = errors.New("")
 )
 
-func newDevRootCmd(astroClient astro.Client) *cobra.Command {
+func newDevRootCmd(astroClient astro.Client, astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -112,7 +114,7 @@ func newDevRootCmd(astroClient astro.Client) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newAirflowInitCmd(),
-		newAirflowStartCmd(),
+		newAirflowStartCmd(astroCoreClient),
 		newAirflowRunCmd(),
 		newAirflowPSCmd(),
 		newAirflowLogsCmd(),
@@ -120,7 +122,7 @@ func newDevRootCmd(astroClient astro.Client) *cobra.Command {
 		newAirflowKillCmd(),
 		newAirflowPytestCmd(),
 		newAirflowParseCmd(),
-		newAirflowRestartCmd(),
+		newAirflowRestartCmd(astroCoreClient),
 		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
@@ -210,7 +212,7 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 	return cmd
 }
 
-func newAirflowStartCmd() *cobra.Command {
+func newAirflowStartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start a local Airflow environment",
@@ -221,7 +223,9 @@ func newAirflowStartCmd() *cobra.Command {
 			return nil
 		},
 		PreRunE: utils.EnsureProjectDir,
-		RunE:    airflowStart,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return airflowStart(cmd, args, astroCoreClient)
+		},
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
@@ -230,6 +234,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
 	cmd.Flags().DurationVar(&waitTime, "wait", 1*time.Minute, "Duration to wait for webserver to get healthy. The default is 5 minutes on M1 architecture and 1 minute for everything else. Use --wait 2m to wait for 2 minutes.")
 	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Location of a custom compose file to use for starting Airflow")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve connections from")
 
 	return cmd
 }
@@ -314,7 +319,7 @@ func newAirflowKillCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowRestartCmd() *cobra.Command {
+func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restart",
 		Short: "Restart all locally running Airflow containers",
@@ -324,12 +329,15 @@ func newAirflowRestartCmd() *cobra.Command {
 			return nil
 		},
 		PreRunE: utils.EnsureProjectDir,
-		RunE:    airflowRestart,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return airflowRestart(cmd, args, astroCoreClient)
+		},
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve connections from")
 
 	return cmd
 }
@@ -614,7 +622,7 @@ func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error { //
 }
 
 // Start an airflow cluster
-func airflowStart(cmd *cobra.Command, args []string) error {
+func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.CoreClient) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -623,12 +631,17 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		envFile = args[0]
 	}
 
+	envConns, err := environment.ListConnections(deploymentID, astroCoreClient)
+	if err != nil {
+		return err
+	}
+
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {
 		return err
 	}
 
-	return containerHandler.Start(customImageName, settingsFile, composeFile, noCache, noBrowser, waitTime)
+	return containerHandler.Start(customImageName, settingsFile, composeFile, noCache, noBrowser, waitTime, envConns)
 }
 
 // airflowRun
@@ -717,7 +730,7 @@ func airflowStop(cmd *cobra.Command, args []string) error {
 }
 
 // Stop an airflow cluster
-func airflowRestart(cmd *cobra.Command, args []string) error {
+func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore.CoreClient) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -738,7 +751,12 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 	// don't startup browser on restart
 	noBrowser = true
 
-	return containerHandler.Start(customImageName, settingsFile, composeFile, noCache, noBrowser, waitTime)
+	envConns, err := environment.ListConnections(deploymentID, astroCoreClient)
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.Start(customImageName, settingsFile, composeFile, noCache, noBrowser, waitTime, envConns)
 }
 
 // run pytest on an airflow project
