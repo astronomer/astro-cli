@@ -631,6 +631,7 @@ func TestDeployFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("ListDeployments", org, ws).Return(mockDeplyResp, nil).Times(2)
+
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
 
 	mockImageHandler := new(mocks.ImageHandler)
