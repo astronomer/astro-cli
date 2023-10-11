@@ -597,7 +597,8 @@ func TestDagsDeployFailed(t *testing.T) {
 		Dags:           true,
 	}
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(3)
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(2)
+	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(2)
+	// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(2)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockClient, mockCoreClient)
@@ -676,7 +677,8 @@ func TestDeployFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("ListDeployments", org, ws).Return(mockDeplyResp, nil).Times(2)
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+	// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -965,6 +967,7 @@ func TestBuildImageFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	mockImageHandler := new(mocks.ImageHandler)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	// image build failure
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -988,11 +991,13 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// failed to get runtime releases
 	dockerfile = "Dockerfile"
-	mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", false, mockClient)
+	// mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
+	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", false, mockCoreClient)
 	assert.ErrorIs(t, err, errMock)
-	mockClient.AssertExpectations(t)
+	// mockClient.AssertExpectations(t)
+	mockCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 }
 
