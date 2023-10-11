@@ -47,6 +47,7 @@ const (
 	CeleryExecutor = "CeleryExecutor"
 	notApplicable  = "N/A"
 	gcpCloud       = "gcp"
+	awsCloud       = "aws"
 	standard       = "standard"
 )
 
@@ -413,6 +414,9 @@ func ListClusterOptions(cloudProvider string, coreClient astrocore.CoreClient) (
 	var provider astrocore.GetClusterOptionsParamsProvider
 	if cloudProvider == gcpCloud {
 		provider = astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
+	}
+	if cloudProvider == awsCloud {
+		provider = astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderAws) //nolint
 	}
 	optionsParams := &astrocore.GetClusterOptionsParams{
 		Provider: &provider,

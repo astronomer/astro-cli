@@ -171,7 +171,7 @@ If you encounter issues when installing the Astro CLI:
     │   ├── example_dag_basic.py
     ├── tests
     │   ├── dags
-    │       ├── test_dag_integrity.py
+    │       ├── test_dag_example.py
     ├── Dockerfile
     ├── include
     ├── packages.txt
