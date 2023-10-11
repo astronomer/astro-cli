@@ -31,22 +31,41 @@ var (
 	initiatedDagDeploymentID = "test-dag-deployment-id"
 	runtimeID                = "test-id"
 	dagURL                   = "http://fake-url.windows.core.net"
-)
-
-func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-	// mockDeplyResp := astro.Deployment{
-	// 	ID:             "test-id",
-	// 	ReleaseName:    "test-name",
-	// 	RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-	// 	Workspace:      astro.Workspace{ID: ws},
-	// 	DeploymentSpec: astro.DeploymentSpec{
-	// 		Webserver: astro.Webserver{URL: "test-url"},
-	// 	},
-	// 	CreatedAt:        time.Now(),
-	// 	DagDeployEnabled: false,
-	// }
-	deploymentResponse := astrocore.GetDeploymentResponse{
+	dagTarballVersion        = "test-version"
+	dagsUploadUrl            = "test-url"
+	createDeployResponse     = astrocore.CreateDeployResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.Deploy{
+			Id:                "test-id",
+			DagTarballVersion: &dagTarballVersion,
+			ImageRepository:   "test-repository",
+			DagsUploadUrl:     &dagsUploadUrl,
+		},
+	}
+	updateDeployResponse = astrocore.UpdateDeployResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.Deploy{
+			Id:                "test-id",
+			DagTarballVersion: &dagTarballVersion,
+			ImageTag:          "test-tag",
+		},
+	}
+	getDeploymentOptionsResponse = astrocore.GetDeploymentOptionsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.DeploymentOptions{
+			RuntimeReleases: []astrocore.RuntimeRelease{
+				{Version: "4.0.0"},
+				{Version: "5.0.0"},
+			},
+		},
+	}
+	deploymentResponse = astrocore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -58,38 +77,10 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 			IsDagDeployEnabled: false,
 		},
 	}
-	getDeploymentOptionsResponse := astrocore.GetDeploymentOptionsResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astrocore.DeploymentOptions{
-			RuntimeReleases: []astrocore.RuntimeRelease{
-				{Version: "4.0.0"},
-				{Version: "5.0.0"},
-			},
-		},
-	}
-	dagTarballVersion := "test-version"
-	createDeployResponse := astrocore.CreateDeployResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astrocore.Deploy{
-			Id:                "test-id",
-			DagTarballVersion: &dagTarballVersion,
-			ImageRepository:   "test-repository",
-		},
-	}
-	updateDeployResponse := astrocore.UpdateDeployResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astrocore.Deploy{
-			Id:                "test-id",
-			DagTarballVersion: &dagTarballVersion,
-			ImageTag:          "test-tag",
-		},
-	}
+)
+
+func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "",
@@ -235,17 +226,17 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	fileutil.WriteStringToFile(path, "testing")
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-	mockDeplyResp := astro.Deployment{
-		ID:             "test-id",
-		ReleaseName:    "test-name",
-		Workspace:      astro.Workspace{ID: ws},
-		RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-		DeploymentSpec: astro.DeploymentSpec{
-			Webserver: astro.Webserver{URL: "test-url"},
-		},
-		CreatedAt:        time.Now(),
-		DagDeployEnabled: true,
-	}
+	// mockDeplyResp := astro.Deployment{
+	// 	ID:             "test-id",
+	// 	ReleaseName:    "test-name",
+	// 	Workspace:      astro.Workspace{ID: ws},
+	// 	RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+	// 	DeploymentSpec: astro.DeploymentSpec{
+	// 		Webserver: astro.Webserver{URL: "test-url"},
+	// 	},
+	// 	CreatedAt:        time.Now(),
+	// 	DagDeployEnabled: true,
+	// }
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "",
@@ -262,26 +253,30 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
-	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(5)
+	mockCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(5)
+	// mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(5)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}, DagDeployEnabled: true}}, nil).Times(2)
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(7)
-	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(7)
-	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(7)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(6)
+	// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(7)
+	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(7)
+	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(8)
+	// mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(7)
+	// mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(7)
+	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(8)
+	// mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(6)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
 	}
 
-	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
-		InitiatedDagDeploymentID: initiatedDagDeploymentID,
-		RuntimeID:                runtimeID,
-		Action:                   "UPLOAD",
-		VersionID:                "version-id",
-		Status:                   "SUCCEEDED",
-		Message:                  "DAGs uploaded successfully",
-	}
-	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(6)
+	// reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
+	// 	InitiatedDagDeploymentID: initiatedDagDeploymentID,
+	// 	RuntimeID:                runtimeID,
+	// 	Action:                   "UPLOAD",
+	// 	VersionID:                "version-id",
+	// 	Status:                   "SUCCEEDED",
+	// 	Message:                  "DAGs uploaded successfully",
+	// }
+	// mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(6)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -429,23 +424,26 @@ func TestDagsDeploySuccess(t *testing.T) {
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(3)
+	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
+	// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(3)
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(5)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(5)
+	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)
+	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(5)
+	// mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(5)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
 	}
 
-	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
-		InitiatedDagDeploymentID: initiatedDagDeploymentID,
-		RuntimeID:                runtimeID,
-		Action:                   "UPLOAD",
-		VersionID:                "version-id",
-		Status:                   "SUCCEEDED",
-		Message:                  "DAGs uploaded successfully",
-	}
-	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(5)
+	// reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
+	// 	InitiatedDagDeploymentID: initiatedDagDeploymentID,
+	// 	RuntimeID:                runtimeID,
+	// 	Action:                   "UPLOAD",
+	// 	VersionID:                "version-id",
+	// 	Status:                   "SUCCEEDED",
+	// 	Message:                  "DAGs uploaded successfully",
+	// }
+	// mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(5)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockClient, mockCoreClient)
@@ -782,9 +780,12 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(3)
+	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
+	// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(3)
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(4)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(4)
+	// mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(4)
+	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
+	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		_, err = os.Stat("./testfiles/dags/astronomer_monitoring_dag.py")
@@ -792,15 +793,15 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 		return "version-id", nil
 	}
 
-	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
-		InitiatedDagDeploymentID: initiatedDagDeploymentID,
-		RuntimeID:                runtimeID,
-		Action:                   "UPLOAD",
-		VersionID:                "version-id",
-		Status:                   "SUCCEEDED",
-		Message:                  "DAGs uploaded successfully",
-	}
-	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(4)
+	// reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
+	// 	InitiatedDagDeploymentID: initiatedDagDeploymentID,
+	// 	RuntimeID:                runtimeID,
+	// 	Action:                   "UPLOAD",
+	// 	VersionID:                "version-id",
+	// 	Status:                   "SUCCEEDED",
+	// 	Message:                  "DAGs uploaded successfully",
+	// }
+	// mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(4)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy(deployInput, mockClient, mockCoreClient)
@@ -895,9 +896,12 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(3)
+	// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(3)
+	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(4)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(4)
+	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
+	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
+	// mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(4)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		_, err = os.Stat("./testfiles/dags/astronomer_monitoring_dag.py")
@@ -905,15 +909,15 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 		return "version-id", nil
 	}
 
-	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
-		InitiatedDagDeploymentID: initiatedDagDeploymentID,
-		RuntimeID:                runtimeID,
-		Action:                   "UPLOAD",
-		VersionID:                "version-id",
-		Status:                   "SUCCEEDED",
-		Message:                  "DAGs uploaded successfully",
-	}
-	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(4)
+	// reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
+	// 	InitiatedDagDeploymentID: initiatedDagDeploymentID,
+	// 	RuntimeID:                runtimeID,
+	// 	Action:                   "UPLOAD",
+	// 	VersionID:                "version-id",
+	// 	Status:                   "SUCCEEDED",
+	// 	Message:                  "DAGs uploaded successfully",
+	// }
+	// mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(4)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy(deployInput, mockClient, mockCoreClient)
