@@ -38,6 +38,7 @@ var (
 	exportComposeFile      string
 	pytestArgs             string
 	pytestFile             string
+	workspaceID            string
 	deploymentID           string
 	followLogs             bool
 	schedulerLogs          bool
@@ -234,7 +235,8 @@ func newAirflowStartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
 	cmd.Flags().DurationVar(&waitTime, "wait", 1*time.Minute, "Duration to wait for webserver to get healthy. The default is 5 minutes on M1 architecture and 1 minute for everything else. Use --wait 2m to wait for 2 minutes.")
 	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Location of a custom compose file to use for starting Airflow")
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve connections from")
+	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from. If not specified uses the current Workspace.")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
 
 	return cmd
 }
@@ -337,7 +339,8 @@ func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve connections from")
+	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from. If not specified uses the current Workspace.")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
 
 	return cmd
 }
@@ -631,9 +634,14 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 		envFile = args[0]
 	}
 
-	envConns, err := environment.ListConnections(deploymentID, astroCoreClient)
-	if err != nil {
-		return err
+	configExists := config.ProjectConfigExists()
+	if !configExists {
+		config.CreateProjectConfig(config.WorkingPath)
+	}
+
+	var envConns map[string]astrocore.EnvironmentObjectConnection
+	if !config.CFG.DisableEnvObjects.GetBool() {
+		envConns = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
 	}
 
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
@@ -751,9 +759,9 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 	// don't startup browser on restart
 	noBrowser = true
 
-	envConns, err := environment.ListConnections(deploymentID, astroCoreClient)
-	if err != nil {
-		return err
+	var envConns map[string]astrocore.EnvironmentObjectConnection
+	if !config.CFG.DisableEnvObjects.GetBool() {
+		envConns = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
 	}
 
 	return containerHandler.Start(customImageName, settingsFile, composeFile, noCache, noBrowser, waitTime, envConns)
