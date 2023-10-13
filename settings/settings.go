@@ -133,41 +133,8 @@ func AddVariables(id string, version uint64) {
 // AddConnections is a function to add Connections from settings.yaml
 func AddConnections(id string, version uint64, envConns map[string]astrocore.EnvironmentObjectConnection) {
 	connections := settings.Airflow.Connections
-	for envConnId, envConn := range envConns {
-		for _, conn := range connections {
-			if conn.ConnID == envConnId {
-				// if connection already exists in settings file, skip it because the file takes precedence
-				continue
-			}
-		}
-		conn := Connection{
-			ConnID:   envConnId,
-			ConnType: envConn.Type,
-		}
-		if envConn.Host != nil {
-			conn.ConnHost = *envConn.Host
-		}
-		if envConn.Port != nil {
-			conn.ConnPort = *envConn.Port
-		}
-		if envConn.Login != nil {
-			conn.ConnLogin = *envConn.Login
-		}
-		if envConn.Password != nil {
-			conn.ConnPassword = *envConn.Password
-		}
-		if envConn.Schema != nil {
-			conn.ConnSchema = *envConn.Schema
-		}
-		if envConn.Extra != nil {
-			extra := make(map[any]any)
-			for k, v := range *envConn.Extra {
-				extra[k] = v
-			}
-			conn.ConnExtra = extra
-		}
-		connections = append(connections, conn)
-	}
+	connections = AppendEnvironmentConnections(connections, envConns)
+
 	baseCmd := "airflow connections "
 	var baseAddCmd, baseRmCmd, baseListCmd, connIDArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
 	if version >= AirflowVersionTwo {
@@ -262,6 +229,45 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 		logrus.Debugf("Adding Connection logs:\n\n" + out)
 		fmt.Printf("Added Connection: %s\n", conn.ConnID)
 	}
+}
+
+func AppendEnvironmentConnections(connections Connections, envConnections map[string]astrocore.EnvironmentObjectConnection) Connections {
+	for envConnID, envConn := range envConnections {
+		for i := range connections {
+			if connections[i].ConnID == envConnID {
+				// if connection already exists in settings file, skip it because the file takes precedence
+				continue
+			}
+		}
+		conn := Connection{
+			ConnID:   envConnID,
+			ConnType: envConn.Type,
+		}
+		if envConn.Host != nil {
+			conn.ConnHost = *envConn.Host
+		}
+		if envConn.Port != nil {
+			conn.ConnPort = *envConn.Port
+		}
+		if envConn.Login != nil {
+			conn.ConnLogin = *envConn.Login
+		}
+		if envConn.Password != nil {
+			conn.ConnPassword = *envConn.Password
+		}
+		if envConn.Schema != nil {
+			conn.ConnSchema = *envConn.Schema
+		}
+		if envConn.Extra != nil {
+			extra := make(map[any]any)
+			for k, v := range *envConn.Extra {
+				extra[k] = v
+			}
+			conn.ConnExtra = extra
+		}
+		connections = append(connections, conn)
+	}
+	return connections
 }
 
 // AddPools  is a function to add Pools from settings.yaml
