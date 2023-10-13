@@ -11,13 +11,13 @@ import (
 
 func TestConfigSettings(t *testing.T) {
 	// config settings success
-	err := ConfigSettings("container-id", "", 2, false, false, false)
+	err := ConfigSettings("container-id", "", nil, 2, false, false, false)
 	assert.NoError(t, err)
 	// config setttings no id error
-	err = ConfigSettings("", "", 2, false, false, false)
+	err = ConfigSettings("", "", nil, 2, false, false, false)
 	assert.ErrorIs(t, err, errNoID)
 	// config settings settings file error
-	err = ConfigSettings("container-id", "testfiles/airflow_settings_invalid.yaml", 2, false, false, false)
+	err = ConfigSettings("container-id", "testfiles/airflow_settings_invalid.yaml", nil, 2, false, false, false)
 	assert.Contains(t, err.Error(), "unable to decode file")
 }
 
@@ -43,7 +43,7 @@ func TestAddConnectionsAirflowOne(t *testing.T) {
 		assert.Contains(t, []string{expectedAddCmd, expectedListCmd}, airflowCommand)
 		return ""
 	}
-	AddConnections("test-conn-id", 1)
+	AddConnections("test-conn-id", 1, nil)
 }
 
 func TestAddConnectionsAirflowTwo(t *testing.T) {
@@ -72,7 +72,7 @@ func TestAddConnectionsAirflowTwo(t *testing.T) {
 		}
 		return ""
 	}
-	AddConnections("test-conn-id", 2)
+	AddConnections("test-conn-id", 2, nil)
 }
 
 func TestAddConnectionsAirflowTwoURI(t *testing.T) {
@@ -91,7 +91,7 @@ func TestAddConnectionsAirflowTwoURI(t *testing.T) {
 		}
 		return ""
 	}
-	AddConnections("test-conn-id", 2)
+	AddConnections("test-conn-id", 2, nil)
 }
 
 func TestAddVariableAirflowOne(t *testing.T) {
