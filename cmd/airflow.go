@@ -759,6 +759,11 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 	// don't startup browser on restart
 	noBrowser = true
 
+	configExists := config.ProjectConfigExists()
+	if !configExists {
+		config.CreateProjectConfig(config.WorkingPath)
+	}
+
 	var envConns map[string]astrocore.EnvironmentObjectConnection
 	if !config.CFG.DisableEnvObjects.GetBool() {
 		envConns = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)

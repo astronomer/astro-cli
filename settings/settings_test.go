@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -73,6 +74,56 @@ func TestAddConnectionsAirflowTwo(t *testing.T) {
 		return ""
 	}
 	AddConnections("test-conn-id", 2, nil)
+}
+
+func ptr[T any](t T) *T {
+	return &t
+}
+
+func TestAddConnectionsAirflowTwoWithEnvConns(t *testing.T) {
+	var testExtra map[string]string
+
+	testConn := Connection{
+		ConnID:       "test-id",
+		ConnType:     "test-type",
+		ConnHost:     "test-host",
+		ConnSchema:   "test-schema",
+		ConnLogin:    "test-login",
+		ConnPassword: "test-password",
+		ConnPort:     1,
+		ConnURI:      "test-uri",
+		ConnExtra:    testExtra,
+	}
+	settings.Airflow.Connections = []Connection{testConn}
+
+	envConns := map[string]astrocore.EnvironmentObjectConnection{
+		"test-env-id": {
+			Type:     "test-env-type",
+			Host:     ptr("test-env-host"),
+			Port:     ptr(2),
+			Login:    ptr("test-env-login"),
+			Password: ptr("test-env-password"),
+			Schema:   ptr("test-env-schema"),
+			Extra: &map[string]any{
+				"test-extra-key": "test-extra-value",
+			},
+		},
+	}
+
+	expectedAddCmd := "airflow connections add   'test-id' --conn-type 'test-type' --conn-host 'test-host' --conn-login 'test-login' --conn-password 'test-password' --conn-schema 'test-schema' --conn-port 1"
+	expectedDelCmd := "airflow connections delete   \"test-id\""
+	expectedListCmd := "airflow connections list -o plain"
+
+	expectedEnvAddCmd := "airflow connections add   'test-env-id' --conn-type 'test-env-type' --conn-extra '{\"test-extra-key\": \"test-extra-value\"}' --conn-host 'test-env-host' --conn-login 'test-env-login' --conn-password 'test-env-password' --conn-schema 'test-env-schema' --conn-port 2"
+
+	execAirflowCommand = func(id, airflowCommand string) string {
+		assert.Contains(t, []string{expectedAddCmd, expectedEnvAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
+		if airflowCommand == expectedListCmd {
+			return "'test-id' 'test-type' 'test-host' 'test-uri'"
+		}
+		return ""
+	}
+	AddConnections("test-conn-id", 2, envConns)
 }
 
 func TestAddConnectionsAirflowTwoURI(t *testing.T) {

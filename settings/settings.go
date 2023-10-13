@@ -160,7 +160,11 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 			conn.ConnSchema = *envConn.Schema
 		}
 		if envConn.Extra != nil {
-			conn.ConnExtra = *envConn.Extra
+			extra := make(map[any]any)
+			for k, v := range *envConn.Extra {
+				extra[k] = v
+			}
+			conn.ConnExtra = extra
 		}
 		connections = append(connections, conn)
 	}
