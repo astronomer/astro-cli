@@ -21,6 +21,7 @@ type Client interface {
 	DeleteDeployment(input DeleteDeploymentInput) (Deployment, error)
 	GetDeploymentHistory(vars map[string]interface{}) (DeploymentHistory, error)
 	GetDeploymentConfig() (DeploymentConfig, error)
+	GetDeploymentConfigWithOrganization(organizationID string) (DeploymentConfig, error)
 	ModifyDeploymentVariable(input EnvironmentVariablesInput) ([]EnvironmentVariablesObject, error)
 	InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error)
 	ReportDagDeploymentStatus(input *ReportDagDeploymentStatusInput) (DagDeploymentStatus, error)
@@ -116,6 +117,19 @@ func (c *HTTPClient) GetDeploymentHistory(vars map[string]interface{}) (Deployme
 func (c *HTTPClient) GetDeploymentConfig() (DeploymentConfig, error) {
 	req := Request{
 		Query: GetDeploymentConfigOptions,
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return DeploymentConfig{}, err
+	}
+	return resp.Data.GetDeploymentConfig, nil
+}
+
+func (c *HTTPClient) GetDeploymentConfigWithOrganization(organizationID string) (DeploymentConfig, error) {
+	req := Request{
+		Query:     GetDeploymentConfigOptionsWithOrganization,
+		Variables: map[string]interface{}{"organizationId": organizationID},
 	}
 
 	resp, err := req.DoWithPublicClient(c)

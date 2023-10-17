@@ -383,7 +383,12 @@ func validateResources(schedulerAU, schedulerReplicas int, configOption astro.De
 }
 
 func validateRuntimeVersion(runtimeVersion string, client astro.Client) (bool, error) {
-	runtimeReleases, err := GetRuntimeReleases(client)
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return false, err
+	}
+
+	runtimeReleases, err := GetRuntimeReleases(c.Organization, client)
 	if err != nil {
 		return false, err
 	}
@@ -394,11 +399,11 @@ func validateRuntimeVersion(runtimeVersion string, client astro.Client) (bool, e
 	return true, nil
 }
 
-func GetRuntimeReleases(client astro.Client) ([]string, error) {
+func GetRuntimeReleases(organizationID string, client astro.Client) ([]string, error) {
 	// get deployment config options
 	runtimeReleases := []string{}
 
-	ConfigOptions, err := client.GetDeploymentConfig()
+	ConfigOptions, err := client.GetDeploymentConfigWithOrganization(organizationID)
 	if err != nil {
 		return runtimeReleases, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
