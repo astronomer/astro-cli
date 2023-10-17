@@ -29,6 +29,7 @@ func TestConfigGetCommandFailure(t *testing.T) {
 	assert.EqualError(t, err, errInvalidConfigPath.Error())
 
 	err = os.RemoveAll("./.astro")
+	assert.Error(t, err)
 	_, err = executeCommand("config", "get", "test")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "You are attempting to get [setting-name] a project config outside of a project directory")
