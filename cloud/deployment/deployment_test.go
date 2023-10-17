@@ -986,29 +986,6 @@ func TestCreate(t *testing.T) {
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", org)
 		ctx.SetContextKey("workspace", ws)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-			DefaultSchedulerSize: astro.MachineUnit{
-				Size: "small",
-			},
-		}, nil).Times(1)
 		mockClient.On("GetDeploymentConfigWithOrgnaiztion", mock.Anything).Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1031,7 +1008,7 @@ func TestCreate(t *testing.T) {
 			DefaultSchedulerSize: astro.MachineUnit{
 				Size: "small",
 			},
-		}, nil).Times(1)
+		}, nil).Times(2)
 		getSharedClusterParams := &astrocore.GetSharedClusterParams{
 			Region:        region,
 			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
