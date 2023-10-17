@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -38,56 +39,66 @@ var (
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
-func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error { //nolint
+func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer) error { //nolint
 	var (
-		requestedDeployment                  astro.Deployment
+		requestedDeployment                  astroplatformcore.Deployment
 		err                                  error
 		errHelp, succeededAction, nodePoolID string
-		astroMachine                         astro.Machine
-		queueToCreateOrUpdate                *astro.WorkerQueue
-		listToCreate, existingQueues         []astro.WorkerQueue
+		workerMachine                        astroplatformcore.WorkerMachine
+		queueToCreateOrUpdate                *astroplatformcore.WorkerQueue
+		listToCreate, existingQueues         []astroplatformcore.WorkerQueue
 		defaultOptions                       astro.WorkerQueueDefaultOptions
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, client, coreClient)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, client, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
 
-	if requestedDeployment.ID == "" {
+	if requestedDeployment.Id == "" {
 		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(ws))
 		return nil
 	}
 
-	if deployment.IsDeploymentHosted(requestedDeployment.Type) || deployment.IsDeploymentDedicated(requestedDeployment.Type) {
-		nodePoolID = requestedDeployment.Cluster.NodePools[0].ID
-		configOptions, err := client.GetDeploymentConfig()
+	if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
+		nodePoolID = *requestedDeployment.TaskPodNodePoolId
+		// configOptions, err := client.GetDeploymentConfig()
+		// if err != nil {
+		// 	return err
+		// }
+
+		// astroMachines := configOptions.AstroMachines
+		getDeploymentOptions := astroplatformcore.GetDeploymentOptionsParams{
+			DeploymentId: &requestedDeployment.Id,
+		}
+		DeploymentOptions, err := deployment.GetDeploymentOptions("", getDeploymentOptions, platformCoreClient)
 		if err != nil {
 			return err
 		}
-		astroMachines := configOptions.AstroMachines
+		WorkerMachines := DeploymentOptions.WorkerMachines
 		// get the machine to use
-		astroMachine, err = selectAstroMachine(workerType, astroMachines, out)
+		workerMachine, err = selectWorkerMachine(workerType, WorkerMachines, out)
 		if err != nil {
 			return err
 		}
 
 		if wQueueConcurrency == 0 && action == createAction {
-			wQueueConcurrency = astroMachine.ConcurrentTasks // This is set based on the machine type the user chooses if not explicitly passed by the user
+			wQueueConcurrency = int(workerMachine.Concurrency.Default) // This is set based on the machine type the user chooses if not explicitly passed by the user
 		}
 	} else {
 		// get the node poolID to use
-		nodePoolID, err = selectNodePool(workerType, requestedDeployment.Cluster.NodePools, out)
+		cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, platformCoreClient)
+		nodePoolID, err = selectNodePool(workerType, *cluster.NodePools, out)
 		if err != nil {
 			return err
 		}
 	}
 
-	queueToCreateOrUpdate = &astro.WorkerQueue{
+	queueToCreateOrUpdate = &astroplatformcore.WorkerQueue{
 		Name:              name,
 		IsDefault:         false, // cannot create a default queue
-		AstroMachine:      astroMachine.Type,
-		NodePoolID:        nodePoolID,
+		AstroMachine:      &workerMachine.Name,
+		NodePoolId:        &nodePoolID,
 		MinWorkerCount:    wQueueMin,         // use the value from the user input
 		MaxWorkerCount:    wQueueMax,         // use the value from the user input
 		WorkerConcurrency: wQueueConcurrency, // use the value from the user input
@@ -99,8 +110,8 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			return err
 		}
 	}
-	switch requestedDeployment.DeploymentSpec.Executor {
-	case deployment.CeleryExecutor:
+	switch *requestedDeployment.Executor {
+	case astroplatformcore.DeploymentExecutorCELERY:
 		// get defaults for min-count, max-count and concurrency from API
 		defaultOptions, err = GetWorkerQueueDefaultOptions(client)
 		if err != nil {
@@ -108,8 +119,8 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 
 		queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
-		if deployment.IsDeploymentHosted(requestedDeployment.Type) || deployment.IsDeploymentDedicated(requestedDeployment.Type) {
-			err = IsHostedCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &astroMachine)
+		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
+			err = IsHostedCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &workerMachine)
 			if err != nil {
 				return err
 			}
@@ -119,7 +130,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 				return err
 			}
 		}
-	case deployment.KubeExecutor:
+	case astroplatformcore.DeploymentExecutorKUBERNETES:
 		err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdate)
 		if err != nil {
 			return err
@@ -127,7 +138,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 
 	// sanitize all the existing queues based on executor
-	existingQueues = sanitizeExistingQueues(requestedDeployment.WorkerQueues, requestedDeployment.DeploymentSpec.Executor)
+	existingQueues = sanitizeExistingQueues(*requestedDeployment.WorkerQueues, *requestedDeployment.Executor)
 	switch action {
 	case createAction:
 		if QueueExists(existingQueues, queueToCreateOrUpdate) {
@@ -137,7 +148,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 		// queueToCreateOrUpdate does not exist
 		// user requested create, so we add queueToCreateOrUpdate to the list
-		listToCreate = append(requestedDeployment.WorkerQueues, *queueToCreateOrUpdate) //nolint
+		listToCreate = append(*requestedDeployment.WorkerQueues, *queueToCreateOrUpdate) //nolint
 	case updateAction:
 		if QueueExists(existingQueues, queueToCreateOrUpdate) {
 			if !force {
@@ -150,7 +161,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 				}
 			}
 			// user requested an update and queueToCreateOrUpdate exists
-			listToCreate = updateQueueList(existingQueues, queueToCreateOrUpdate, requestedDeployment.DeploymentSpec.Executor, wQueueMin, wQueueMax, wQueueConcurrency)
+			listToCreate = updateQueueList(existingQueues, queueToCreateOrUpdate, requestedDeployment.Executor, wQueueMin, wQueueMax, wQueueConcurrency)
 		} else {
 			// update does not allow creating new queues
 			errHelp = fmt.Sprintf("use worker queue create %s instead", queueToCreateOrUpdate.Name)
@@ -158,20 +169,36 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 	}
 
+	// tempory code
+	var astroListToCreate []astro.WorkerQueue
+	for i := range listToCreate {
+		var workerQueue astro.WorkerQueue
+		workerQueue.ID = listToCreate[i].Id
+		workerQueue.Name = listToCreate[i].Name
+		workerQueue.IsDefault = listToCreate[i].IsDefault
+		workerQueue.MaxWorkerCount = listToCreate[i].MaxWorkerCount
+		workerQueue.MinWorkerCount = listToCreate[i].MinWorkerCount
+		workerQueue.WorkerConcurrency = listToCreate[i].WorkerConcurrency
+		workerQueue.NodePoolID = *listToCreate[i].NodePoolId
+		workerQueue.PodCPU = listToCreate[i].PodCpu
+		workerQueue.PodRAM = listToCreate[i].PodMemory
+		astroListToCreate = append(astroListToCreate, workerQueue)
+	}
+
 	// update the deployment with the new list of worker queues
-	err = deployment.Update(requestedDeployment.ID, "", ws, "", "", "", "", "", "", 0, 0, listToCreate, true, nil, client)
+	err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", 0, 0, astroListToCreate, true, nil, client)
 	if err != nil {
 		return err
 	}
 	// change action to past tense
 	succeededAction = fmt.Sprintf("%sd", action)
 
-	fmt.Fprintf(out, "worker queue %s for %s in %s workspace %s\n", queueToCreateOrUpdate.Name, requestedDeployment.Label, ws, succeededAction)
+	fmt.Fprintf(out, "worker queue %s for %s in %s workspace %s\n", queueToCreateOrUpdate.Name, requestedDeployment.Name, ws, succeededAction)
 	return nil
 }
 
 // SetWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
-func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astro.WorkerQueue, workerQueueDefaultOptions astro.WorkerQueueDefaultOptions) *astro.WorkerQueue {
+func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astroplatformcore.WorkerQueue, workerQueueDefaultOptions astro.WorkerQueueDefaultOptions) *astroplatformcore.WorkerQueue {
 	// -1 is the CLI default to allow users to request wQueueMin=0
 	if wQueueMin == -1 {
 		// set default value as user input did not have it
@@ -209,7 +236,7 @@ func GetWorkerQueueDefaultOptions(client astro.Client) (astro.WorkerQueueDefault
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
 // ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions) error {
+func IsCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions) error {
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= defaultOptions.MinWorkerCount.Floor) ||
 		!(requestedWorkerQueue.MinWorkerCount <= defaultOptions.MinWorkerCount.Ceiling) {
@@ -226,10 +253,10 @@ func IsCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defa
 		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", defaultOptions.WorkerConcurrency.Floor, defaultOptions.WorkerConcurrency.Ceiling)
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
-	if requestedWorkerQueue.PodCPU != "" {
+	if requestedWorkerQueue.PodCpu != "" {
 		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
 	}
-	if requestedWorkerQueue.PodRAM != "" {
+	if requestedWorkerQueue.PodMemory != "" {
 		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
 	}
 	return nil
@@ -239,7 +266,7 @@ func IsCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defa
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
 // ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions, machineOptions *astro.Machine) error {
+func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions, machineOptions *astroplatformcore.WorkerMachine) error {
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= defaultOptions.MinWorkerCount.Floor) ||
 		!(requestedWorkerQueue.MinWorkerCount <= defaultOptions.MinWorkerCount.Ceiling) {
@@ -254,14 +281,14 @@ func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue
 	// The floor for worker concurrency for hosted deployments is always 1 for all astro machines
 	workerConcurrenyFloor := 1
 	if !(requestedWorkerQueue.WorkerConcurrency >= workerConcurrenyFloor) ||
-		!(requestedWorkerQueue.WorkerConcurrency <= machineOptions.ConcurrentTasksMax) {
-		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", workerConcurrenyFloor, machineOptions.ConcurrentTasksMax)
+		!(requestedWorkerQueue.WorkerConcurrency <= int(*machineOptions.Spec.Concurrency)) {
+		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", workerConcurrenyFloor, int(machineOptions.Concurrency.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
-	if requestedWorkerQueue.PodCPU != "" {
+	if requestedWorkerQueue.PodCpu != "" {
 		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
 	}
-	if requestedWorkerQueue.PodRAM != "" {
+	if requestedWorkerQueue.PodMemory != "" {
 		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
 	}
 	return nil
@@ -270,17 +297,17 @@ func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue
 // IsKubernetesWorkerQueueInputValid checks if the requestedQueue has all the necessary properties
 // required to create a worker queue for the KubernetesExecutor.
 // errNotSupported is returned for any invalid properties.
-func IsKubernetesWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue) error {
+func IsKubernetesWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.WorkerQueue) error {
 	var errorMessage string
 	if requestedWorkerQueue.Name != defaultQueueName {
 		errorMessage = "a non default worker queue in the request. Rename the queue to default"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
-	if requestedWorkerQueue.PodCPU != "" {
+	if requestedWorkerQueue.PodCpu != "" {
 		errorMessage = "pod cpu in the request. It will be calculated based on the requested worker type"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
-	if requestedWorkerQueue.PodRAM != "" {
+	if requestedWorkerQueue.PodMemory != "" {
 		errorMessage = "pod ram in the request. It will be calculated based on the requested worker type"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
@@ -303,9 +330,9 @@ func IsKubernetesWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue) 
 // QueueExists takes a []existingQueues and a queueToCreate as arguments
 // It returns true if queueToCreate exists in []existingQueues
 // It returns false if queueToCreate does not exist in []existingQueues
-func QueueExists(existingQueues []astro.WorkerQueue, queueToCreate *astro.WorkerQueue) bool {
+func QueueExists(existingQueues []astroplatformcore.WorkerQueue, queueToCreate *astroplatformcore.WorkerQueue) bool {
 	for _, queue := range existingQueues { //nolint
-		if queue.ID == queueToCreate.ID {
+		if queue.Id == queueToCreate.Id {
 			// queueToCreate exists
 			return true
 		}
@@ -317,10 +344,10 @@ func QueueExists(existingQueues []astro.WorkerQueue, queueToCreate *astro.Worker
 	return false
 }
 
-func selectAstroMachine(workerType string, astroMachines []astro.Machine, out io.Writer) (astro.Machine, error) {
+func selectWorkerMachine(workerType string, workerMachines []astroplatformcore.WorkerMachine, out io.Writer) (astroplatformcore.WorkerMachine, error) {
 	var (
-		machine     astro.Machine
-		errToReturn error
+		workerMachine astroplatformcore.WorkerMachine
+		errToReturn   error
 	)
 
 	switch workerType {
@@ -333,13 +360,13 @@ func selectAstroMachine(workerType string, astroMachines []astro.Machine, out io
 
 		fmt.Println("No worker type was specified. Select the worker type to use")
 
-		machineMap := map[string]astro.Machine{}
+		machineMap := map[string]astroplatformcore.WorkerMachine{}
 
-		for i := range astroMachines {
+		for i := range workerMachines {
 			index := i + 1
-			tab.AddRow([]string{strconv.Itoa(index), astroMachines[i].Type, astroMachines[i].CPU + " vCPU", astroMachines[i].Memory}, false)
+			tab.AddRow([]string{strconv.Itoa(index), workerMachines[i].Name, workerMachines[i].Spec.Cpu + " vCPU", workerMachines[i].Spec.Memory}, false)
 
-			machineMap[strconv.Itoa(index)] = astroMachines[i]
+			machineMap[strconv.Itoa(index)] = workerMachines[i]
 		}
 
 		tab.Print(out)
@@ -348,18 +375,18 @@ func selectAstroMachine(workerType string, astroMachines []astro.Machine, out io
 		if !ok {
 			// returning an error as choice was not in nodePoolMap
 			errToReturn = fmt.Errorf("%w: invalid worker type: %s selected", errInvalidAstroMachine, choice)
-			return astro.Machine{}, errToReturn
+			return astroplatformcore.WorkerMachine{}, errToReturn
 		}
 		return selectedPool, nil
 	default:
-		for _, machine = range astroMachines {
-			if machine.Type == workerType {
-				return machine, nil
+		for _, workerMachine = range workerMachines {
+			if workerMachine.Name == workerType {
+				return workerMachine, nil
 			}
 		}
 		// did not find a matching workerType in any node pool
 		errToReturn = fmt.Errorf("%w: workerType %s is not available for this deployment", errInvalidAstroMachine, workerType)
-		return astro.Machine{}, errToReturn
+		return astroplatformcore.WorkerMachine{}, errToReturn
 	}
 }
 
@@ -367,10 +394,10 @@ func selectAstroMachine(workerType string, astroMachines []astro.Machine, out io
 // If user requested a workerType, then the matching nodePoolID is returned
 // If user did not request a workerType, then it prompts the user to pick one
 // An errInvalidNodePool is returned if a user chooses an option not on the list
-func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer) (string, error) {
+func selectNodePool(workerType string, nodePools []astroplatformcore.NodePool, out io.Writer) (string, error) {
 	var (
 		nodePoolID, message string
-		pool                astro.NodePool
+		pool                astroplatformcore.NodePool
 		errToReturn         error
 	)
 
@@ -389,10 +416,10 @@ func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer
 			return nodePools[i].CreatedAt.Before(nodePools[j].CreatedAt)
 		})
 
-		nodePoolMap := map[string]astro.NodePool{}
+		nodePoolMap := map[string]astroplatformcore.NodePool{}
 		for i := range nodePools {
 			index := i + 1
-			tab.AddRow([]string{strconv.Itoa(index), nodePools[i].NodeInstanceType, strconv.FormatBool(nodePools[i].IsDefault), nodePools[i].ID}, false)
+			tab.AddRow([]string{strconv.Itoa(index), nodePools[i].NodeInstanceType, strconv.FormatBool(nodePools[i].IsDefault), nodePools[i].Id}, false)
 
 			nodePoolMap[strconv.Itoa(index)] = nodePools[i]
 		}
@@ -405,12 +432,12 @@ func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer
 			errToReturn = fmt.Errorf("%w: invalid worker type: %s selected", errInvalidNodePool, choice)
 			return nodePoolID, errToReturn
 		}
-		return selectedPool.ID, nil
+		return selectedPool.Id, nil
 	default:
 		// Get the nodePoolID for pool that matches workerType
 		for _, pool = range nodePools {
 			if pool.NodeInstanceType == workerType {
-				nodePoolID = pool.ID
+				nodePoolID = pool.Id
 				return nodePoolID, errToReturn
 			}
 		}
@@ -425,28 +452,28 @@ func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer
 // user gets prompted if no name for the queue to delete was specified
 // An errQueueDoesNotExist is returned if queue to delete does not exist
 // An errCannotDeleteDefaultQueue is returned if a user chooses the default queue
-func Delete(ws, deploymentID, deploymentName, name string, force bool, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func Delete(ws, deploymentID, deploymentName, name string, force bool, client astro.Client, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer) error {
 	var (
-		requestedDeployment          astro.Deployment
+		requestedDeployment          astroplatformcore.Deployment
 		err                          error
-		queueToDelete                *astro.WorkerQueue
-		listToDelete, existingQueues []astro.WorkerQueue
-		queue                        astro.WorkerQueue
+		queueToDelete                *astroplatformcore.WorkerQueue
+		listToDelete, existingQueues []astroplatformcore.WorkerQueue
+		queue                        astroplatformcore.WorkerQueue
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, client, coreClient)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, client, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
 
-	if requestedDeployment.ID == "" {
+	if requestedDeployment.Id == "" {
 		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(ws))
 		return nil
 	}
 
 	// prompt for queue name if one was not provided
 	if name == "" {
-		name, err = selectQueue(requestedDeployment.WorkerQueues, out)
+		name, err = selectQueue(*requestedDeployment.WorkerQueues, out)
 		if err != nil {
 			return err
 		}
@@ -455,13 +482,13 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 	if name == defaultQueueName {
 		return errCannotDeleteDefaultQueue
 	}
-	queueToDelete = &astro.WorkerQueue{
+	queueToDelete = &astroplatformcore.WorkerQueue{
 		Name:      name,
 		IsDefault: false, // cannot delete a default queue
 	}
 
 	// sanitize all the existing queues based on executor
-	existingQueues = sanitizeExistingQueues(requestedDeployment.WorkerQueues, requestedDeployment.DeploymentSpec.Executor)
+	existingQueues = sanitizeExistingQueues(*requestedDeployment.WorkerQueues, *requestedDeployment.Executor)
 
 	if QueueExists(existingQueues, queueToDelete) {
 		if !force {
@@ -480,12 +507,27 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 				listToDelete = append(listToDelete, queue)
 			}
 		}
+		// tempory code
+		var astroListToDelete []astro.WorkerQueue
+		for i := range listToDelete {
+			var workerQueue astro.WorkerQueue
+			workerQueue.ID = listToDelete[i].Id
+			workerQueue.Name = listToDelete[i].Name
+			workerQueue.IsDefault = listToDelete[i].IsDefault
+			workerQueue.MaxWorkerCount = listToDelete[i].MaxWorkerCount
+			workerQueue.MinWorkerCount = listToDelete[i].MinWorkerCount
+			workerQueue.WorkerConcurrency = listToDelete[i].WorkerConcurrency
+			workerQueue.NodePoolID = *listToDelete[i].NodePoolId
+			workerQueue.PodCPU = listToDelete[i].PodCpu
+			workerQueue.PodRAM = listToDelete[i].PodMemory
+			astroListToDelete = append(astroListToDelete, workerQueue)
+		}
 		// update the deployment with the new list
-		err = deployment.Update(requestedDeployment.ID, "", ws, "", "", "", "", "", "", 0, 0, listToDelete, true, nil, client)
+		err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", 0, 0, astroListToDelete, true, nil, client)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "worker queue %s for %s in %s workspace deleted\n", queueToDelete.Name, requestedDeployment.Label, ws)
+		fmt.Fprintf(out, "worker queue %s for %s in %s workspace deleted\n", queueToDelete.Name, requestedDeployment.Name, ws)
 		return nil
 	}
 	// can not delete a queue that does not exist
@@ -495,11 +537,11 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 // selectQueue takes []WorkerQueue and io.Writer as arguments
 // user can select a queue to delete from the list and the name of the selected queue is returned
 // An errInvalidQueue is returned if a user chooses a queue not on the list
-func selectQueue(queueList []astro.WorkerQueue, out io.Writer) (string, error) {
+func selectQueue(queueList []astroplatformcore.WorkerQueue, out io.Writer) (string, error) {
 	var (
 		errToReturn        error
 		queueName, message string
-		queueToDelete      astro.WorkerQueue
+		queueToDelete      astroplatformcore.WorkerQueue
 	)
 
 	tab := printutil.Table{
@@ -514,10 +556,10 @@ func selectQueue(queueList []astro.WorkerQueue, out io.Writer) (string, error) {
 		return queueList[i].Name < queueList[j].Name
 	})
 
-	queueMap := map[string]astro.WorkerQueue{}
+	queueMap := map[string]astroplatformcore.WorkerQueue{}
 	for i := range queueList {
 		index := i + 1
-		tab.AddRow([]string{strconv.Itoa(index), queueList[i].Name, strconv.FormatBool(queueList[i].IsDefault), queueList[i].ID}, false)
+		tab.AddRow([]string{strconv.Itoa(index), queueList[i].Name, strconv.FormatBool(queueList[i].IsDefault), queueList[i].Id}, false)
 
 		queueMap[strconv.Itoa(index)] = queueList[i]
 	}
@@ -536,15 +578,15 @@ func selectQueue(queueList []astro.WorkerQueue, out io.Writer) (string, error) {
 // updateQueueList is used to merge existingQueues with the queueToUpdate. Based on the executor for the deployment, it
 // sets the resources for CeleryExecutor and removes all resources for KubernetesExecutor as they get calculated based
 // on the worker type.
-func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.WorkerQueue, executor string, wQueueMin, wQueueMax, wQueueConcurrency int) []astro.WorkerQueue {
+func updateQueueList(existingQueues []astroplatformcore.WorkerQueue, queueToUpdate *astroplatformcore.WorkerQueue, executor *astroplatformcore.DeploymentExecutor, wQueueMin, wQueueMax, wQueueConcurrency int) []astroplatformcore.WorkerQueue {
 	for i, queue := range existingQueues { //nolint
 		if queue.Name != queueToUpdate.Name {
 			continue
 		}
 
-		queue.ID = existingQueues[i].ID               // we need IDs to update existing queues
+		queue.Id = existingQueues[i].Id               // we need IDs to update existing queues
 		queue.IsDefault = existingQueues[i].IsDefault // users can not change this
-		if executor == deployment.CeleryExecutor {
+		if *executor == astroplatformcore.DeploymentExecutorKUBERNETES {
 			if wQueueMin != -1 {
 				queue.MinWorkerCount = queueToUpdate.MinWorkerCount
 			}
@@ -554,15 +596,15 @@ func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.Wo
 			if wQueueConcurrency != 0 {
 				queue.WorkerConcurrency = queueToUpdate.WorkerConcurrency
 			}
-		} else if executor == deployment.KubeExecutor {
+		} else if *executor == astroplatformcore.DeploymentExecutorCELERY {
 			// KubernetesExecutor calculates resources automatically based on the worker type
 			queue.WorkerConcurrency = 0
 			queue.MinWorkerCount = 0
 			queue.MaxWorkerCount = 0
-			queue.PodRAM = ""
-			queue.PodCPU = ""
+			queue.PodMemory = ""
+			queue.PodCpu = ""
 		}
-		queue.NodePoolID = queueToUpdate.NodePoolID
+		queue.NodePoolId = queueToUpdate.NodePoolId
 		queue.AstroMachine = queueToUpdate.AstroMachine
 		existingQueues[i] = queue
 		return existingQueues
@@ -573,7 +615,7 @@ func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.Wo
 // getQueueName returns the name for a worker-queue. If action is to create, it prompts the user for a name to use.
 // If action is to update, it makes the user select a queue from a list of existing ones.
 // It returns errInvalidQueue if a user chooses a queue not on the list
-func getQueueName(name, action string, requestedDeployment *astro.Deployment, out io.Writer) (string, error) {
+func getQueueName(name, action string, requestedDeployment *astroplatformcore.Deployment, out io.Writer) (string, error) {
 	var (
 		queueName string
 		err       error
@@ -585,7 +627,7 @@ func getQueueName(name, action string, requestedDeployment *astro.Deployment, ou
 			queueName = input.Text("Enter a name for the worker queue\n> ")
 		case updateAction:
 			// user selects a queue as no name was provided
-			queueName, err = selectQueue(requestedDeployment.WorkerQueues, out)
+			queueName, err = selectQueue(*requestedDeployment.WorkerQueues, out)
 			if err != nil {
 				return "", err
 			}
@@ -598,22 +640,22 @@ func getQueueName(name, action string, requestedDeployment *astro.Deployment, ou
 // on the executor. For deployments with CeleryExecutor it returns a list of queues without PodCPU and PodRam.  For
 // deployments with KubernetesExecutor it returns a list of queues with no resources as they get calculated
 // based on the worker type.
-func sanitizeExistingQueues(existingQueues []astro.WorkerQueue, executor string) []astro.WorkerQueue {
+func sanitizeExistingQueues(existingQueues []astroplatformcore.WorkerQueue, executor astroplatformcore.DeploymentExecutor) []astroplatformcore.WorkerQueue {
 	// sort queues by name
 	sort.Slice(existingQueues, func(i, j int) bool {
 		return existingQueues[i].Name < existingQueues[j].Name
 	})
 	for i := range existingQueues {
-		if executor == deployment.CeleryExecutor {
-			existingQueues[i].PodRAM = ""
-			existingQueues[i].PodCPU = ""
-		} else if executor == deployment.KubeExecutor {
+		if executor == astroplatformcore.DeploymentExecutorCELERY {
+			existingQueues[i].PodMemory = ""
+			existingQueues[i].PodCpu = ""
+		} else if executor == astroplatformcore.DeploymentExecutorKUBERNETES {
 			// KubernetesExecutor calculates resources automatically based on the worker type
 			existingQueues[i].WorkerConcurrency = 0
 			existingQueues[i].MinWorkerCount = 0
 			existingQueues[i].MaxWorkerCount = 0
-			existingQueues[i].PodRAM = ""
-			existingQueues[i].PodCPU = ""
+			existingQueues[i].PodMemory = ""
+			existingQueues[i].PodCpu = ""
 		}
 	}
 	return existingQueues

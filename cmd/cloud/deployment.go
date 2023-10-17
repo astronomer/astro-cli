@@ -54,7 +54,7 @@ var (
 	highAvailability              string
 	deploymentCreateEnforceCD     bool
 	deploymentUpdateEnforceCD     bool
-	clusterType                   = standard
+	deploymentType                = standard
 	deploymentVariableListExample = `
 		# List a deployment's variables
 		$ astro deployment variable list --deployment-id <deployment-id> --key FOO
@@ -154,7 +154,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
 	cmd.Flags().BoolVarP(&deploymentCreateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
 	if organization.IsOrgHosted() {
-		cmd.Flags().StringVarP(&clusterType, "cluster-type", "", standard, "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated.")
+		cmd.Flags().StringVarP(&deploymentType, "cluster-type", "", standard, "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated.")
 		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "gcp", "The Cloud Provider to use for the Deployment. Possible values can be gcp, aws.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the Deployment.")
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of scheduler for the Deployment. Possible values can be small, medium, large")
@@ -348,7 +348,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		return errors.New("Invalid --high-availability value")
 	}
 
-	if organization.IsOrgHosted() && !(clusterType == standard || clusterType == dedicated) {
+	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated) {
 		return errors.New("Invalid --cluster-type value")
 	}
 
@@ -390,7 +390,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, clusterType, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus, &deploymentCreateEnforceCD)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, deploymentType, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus, &deploymentCreateEnforceCD)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {

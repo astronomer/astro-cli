@@ -19,6 +19,7 @@ import (
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -536,7 +537,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName, customImage string, conflictTest, versionTest, dagTest bool, client astro.Client) error {
+func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName, customImage string, conflictTest, versionTest, dagTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface, client astro.Client) error {
 	// figure out which tests to run
 	if !versionTest && !dagTest {
 		versionTest = true
@@ -553,7 +554,7 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 	}
 	// if user supplies deployment id pull down current image
 	if deploymentID != "" {
-		err := d.pullImageFromDeployment(deploymentID, client)
+		err := d.pullImageFromDeployment(deploymentID, astroPlatformCore, client)
 		if err != nil {
 			return err
 		}
@@ -620,7 +621,7 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 	return nil
 }
 
-func (d *DockerCompose) pullImageFromDeployment(deploymentID string, client astro.Client) error {
+func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCoreClient astroplatformcore.CoreClient, client astro.Client) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
@@ -632,11 +633,11 @@ func (d *DockerCompose) pullImageFromDeployment(deploymentID string, client astr
 	ws := c.Workspace
 	registry := GetRegistryURL(domain)
 	repository := registry + "/" + c.Organization + "/" + deploymentID
-	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, client, nil)
+	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, client, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}
-	currentImageTag := currentDeployment.DeploymentSpec.Image.Tag
+	currentImageTag := currentDeployment.ImageTag
 	deploymentImage := fmt.Sprintf("%s:%s", repository, currentImageTag)
 	token := c.Token
 	// Splitting out the Bearer part from the token
@@ -644,7 +645,7 @@ func (d *DockerCompose) pullImageFromDeployment(deploymentID string, client astr
 	if len(splittedToken) > 1 {
 		token = strings.Split(token, " ")[1]
 	}
-	fmt.Printf("\nPulling image from Astro Deployment %s\n\n", currentDeployment.Label)
+	fmt.Printf("\nPulling image from Astro Deployment %s\n\n", currentDeployment.Name)
 	err = d.imageHandler.Pull(registry, registryUsername, token, deploymentImage)
 	if err != nil {
 		return err

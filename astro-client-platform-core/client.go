@@ -1,4 +1,4 @@
-package astrocore
+package astroplatformcore
 
 import (
 	"bytes"
@@ -32,7 +32,7 @@ func requestEditor(ctx httpContext.Context, req *http.Request) error {
 	}
 	os := runtime.GOOS
 	arch := runtime.GOARCH
-	baseURL := currentCtx.GetPublicRESTAPIURL("v1alpha1")
+	baseURL := currentCtx.GetPublicRESTAPIURL("v1beta1")
 	requestURL, err := url.Parse(baseURL + req.URL.String())
 	if err != nil {
 		return fmt.Errorf("%w, %s", ErrorBaseURL, baseURL)
