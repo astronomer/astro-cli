@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -28,7 +27,6 @@ func TestConfigGetCommandFailure(t *testing.T) {
 	assert.Error(t, err)
 	assert.EqualError(t, err, errInvalidConfigPath.Error())
 
-	err = os.RemoveAll("./.astro")
 	assert.Error(t, err)
 	_, err = executeCommand("config", "get", "test")
 	assert.Error(t, err)
