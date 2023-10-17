@@ -172,7 +172,7 @@ func TestDeploymentCreate(t *testing.T) {
 				Version: "4.2.5",
 			},
 		},
-	}, nil).Times(14)
+	}, nil).Times(7)
 	mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
 		Components: astro.Components{
 			Scheduler: astro.SchedulerConfig{
@@ -192,7 +192,7 @@ func TestDeploymentCreate(t *testing.T) {
 				Version: "4.2.5",
 			},
 		},
-	}, nil).Times(14)
+	}, nil).Times(7)
 	mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(5)
 	mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(4)
 	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
