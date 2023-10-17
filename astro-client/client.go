@@ -65,7 +65,7 @@ func (c *HTTPClient) prepareRESTRequest(doOpts *httputil.DoOptions) error {
 	if cl.Token != "" {
 		doOpts.Headers["authorization"] = cl.Token
 	}
-	doOpts.Path = cl.GetPublicRESTAPIURL() + doOpts.Path
+	doOpts.Path = cl.GetPublicRESTAPIURL("") + doOpts.Path
 	doOpts.Headers["x-astro-client-identifier"] = "cli" //nolint: goconst
 	doOpts.Headers["x-astro-client-version"] = version.CurrVersion
 	return nil

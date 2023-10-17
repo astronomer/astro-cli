@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/types"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -35,7 +36,7 @@ type ContainerHandler interface {
 	ComposeExport(settingsFile, composeFile string) error
 	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string) (string, error)
 	Parse(customImageName, deployImageName string) error
-	UpgradeTest(runtimeVersion, deploymentID, newImageName, customImageName string, dependencyTest, versionTest, dagTest bool, client astro.Client) error
+	UpgradeTest(runtimeVersion, deploymentID, newImageName, customImageName string, dependencyTest, versionTest, dagTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface, client astro.Client) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry

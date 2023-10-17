@@ -12,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
@@ -45,7 +46,7 @@ const (
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
 // inputFile can be in yaml or json format
 // It returns an error if any required information is missing or incorrectly specified.
-func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error { //nolint
+func CreateOrUpdate(inputFile, action string, client astro.Client, astroPlatformCore astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer) error { //nolint
 	var (
 		err                                            error
 		errHelp, clusterID, workspaceID, outputFormat  string
@@ -85,8 +86,8 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 	if err != nil {
 		return err
 	}
-
-	if !deployment.IsDeploymentHosted(formattedDeployment.Deployment.Configuration.DeploymentType) {
+	deploymentType := transformDeploymentType(formattedDeployment.Deployment.Configuration.DeploymentType)
+	if !deployment.IsDeploymentStandard(deploymentType) {
 		// map cluster name to id and collect node pools for cluster
 		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.OrganizationShortName, coreClient)
 		if err != nil {
@@ -100,7 +101,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 	}
 	switch action {
 	case createAction:
-		if deployment.IsDeploymentHosted(formattedDeployment.Deployment.Configuration.DeploymentType) {
+		if deployment.IsDeploymentStandard(deploymentType) {
 			getSharedClusterParams := astrocore.GetSharedClusterParams{
 				Region:        formattedDeployment.Deployment.Configuration.Region,
 				CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(formattedDeployment.Deployment.Configuration.CloudProvider),
@@ -167,7 +168,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
 		}
 
-		if deployment.IsDeploymentHosted(formattedDeployment.Deployment.Configuration.DeploymentType) {
+		if deployment.IsDeploymentStandard(deploymentType) {
 			clusterID = existingDeployment.Cluster.ID
 		}
 
@@ -213,7 +214,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 	if jsonOutput {
 		outputFormat = jsonFormat
 	}
-	return inspect.Inspect(workspaceID, "", createdOrUpdatedDeployment.ID, outputFormat, client, coreClient, out, "", false)
+	return inspect.Inspect(workspaceID, "", createdOrUpdatedDeployment.ID, outputFormat, client, astroPlatformCore, coreClient, out, "", false)
 }
 
 // getCreateOrUpdateInput transforms an inspect.FormattedDeployment into astro.CreateDeploymentInput or
@@ -228,11 +229,12 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 		defaultOptions astro.WorkerQueueDefaultOptions
 		configOptions  astro.DeploymentConfig
 		listQueues     []astro.WorkerQueue
-		astroMachine   astro.Machine
+		astroMachine   astroplatformcore.WorkerMachine
 		createInput    astro.CreateDeploymentInput
 		updateInput    astro.UpdateDeploymentInput
 		err            error
 	)
+	deploymentType := transformDeploymentType(deploymentFromFile.Deployment.Configuration.DeploymentType)
 
 	// Add worker queues if they were requested
 	if hasQueues(deploymentFromFile) {
@@ -247,7 +249,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			if err != nil {
 				return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
 			}
-			if deployment.IsDeploymentHosted(deploymentFromFile.Deployment.Configuration.DeploymentType) || deployment.IsDeploymentDedicated(deploymentFromFile.Deployment.Configuration.DeploymentType) {
+			if deployment.IsDeploymentStandard(deploymentType) || deployment.IsDeploymentDedicated(deploymentType) {
 				configOptions, err = client.GetDeploymentConfig()
 				if err != nil {
 					return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
@@ -256,7 +258,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			for i := range listQueues {
 				// set default values if none were specified
 				a := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &listQueues[i], defaultOptions)
-				if deployment.IsDeploymentHosted(deploymentFromFile.Deployment.Configuration.DeploymentType) || deployment.IsDeploymentDedicated(deploymentFromFile.Deployment.Configuration.DeploymentType) {
+				if deployment.IsDeploymentStandard(deploymentType) || deployment.IsDeploymentDedicated(deploymentType) {
 					astroMachines := configOptions.AstroMachines
 					for j := range astroMachines {
 						if astroMachines[j].Type == listQueues[i].AstroMachine {
@@ -512,14 +514,14 @@ func createEnvVars(deploymentFromFile *inspect.FormattedDeployment, deploymentID
 
 // getQueues takes a deploymentFromFile as its arguments.
 // It returns a list of worker queues to be created or updated.
-func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astrocore.NodePool, existingQueues []astro.WorkerQueue) ([]astro.WorkerQueue, error) {
+func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astrocore.NodePool, existingQueues []astro.WorkerQueue) ([]astroplatformcore.WorkerQueue, error) {
 	var (
 		qList      []astro.WorkerQueue
 		nodePoolID string
 		err        error
 	)
 	requestedQueues := deploymentFromFile.Deployment.WorkerQs
-	deploymentType := deploymentFromFile.Deployment.Configuration.DeploymentType
+	deploymentType := transformDeploymentType(deploymentFromFile.Deployment.Configuration.DeploymentType)
 	// sort existing queues by name
 	if len(existingQueues) > 1 {
 		sort.Slice(existingQueues, func(i, j int) bool {
@@ -557,7 +559,7 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
 		qList[i].PodCPU = requestedQueues[i].PodCPU
 		qList[i].PodRAM = requestedQueues[i].PodRAM
-		if deployment.IsDeploymentDedicated(deploymentType) || deployment.IsDeploymentHosted(deploymentType) {
+		if deployment.IsDeploymentDedicated(deploymentType) || deployment.IsDeploymentStandard(deploymentType) {
 			qList[i].AstroMachine = requestedQueues[i].WorkerType
 		} else {
 			// map worker type to node pool id
@@ -656,4 +658,19 @@ func checkEnvVars(deploymentFromFile *inspect.FormattedDeployment, action string
 // isValidExecutor returns true for valid executor values and false if not.
 func isValidExecutor(executor string) bool {
 	return executor == deployment.CeleryExecutor || executor == deployment.KubeExecutor
+}
+
+// temporary code
+func transformDeploymentType(deploymentType string) astroplatformcore.DeploymentType {
+	var transformedDeploymentType astroplatformcore.DeploymentType
+	if deploymentType == "STANDARD" || deploymentType == "standard" {
+		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
+	}
+	if deploymentType == "DEDICATED" || deploymentType == "dedicated" {
+		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
+	}
+	if deploymentType == "HYBRID" || deploymentType == "hybrid" {
+		transformedDeploymentType = astroplatformcore.DeploymentTypeHYBRID
+	}
+	return transformedDeploymentType
 }

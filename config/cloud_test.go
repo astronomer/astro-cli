@@ -93,7 +93,7 @@ func TestContextGetPublicRESTAPIURL(t *testing.T) {
 			c := &Context{
 				Domain: tt.fields.Domain,
 			}
-			if got := c.GetPublicRESTAPIURL(); got != tt.want {
+			if got := c.GetPublicRESTAPIURL("v1alpha1"); got != tt.want {
 				t.Errorf("Context.GetPublicRESTAPIURL() = %v, want %v", got, tt.want)
 			}
 		})

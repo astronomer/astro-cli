@@ -15,6 +15,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
@@ -91,7 +92,7 @@ type deploymentInfo struct {
 	workspaceID      string
 	webserverURL     string
 	dagDeployEnabled bool
-	deploymentType   string
+	deploymentType   astroplatformcore.DeploymentType
 	cicdEnforcement  bool
 }
 
@@ -143,8 +144,8 @@ func removeDagsFromDockerIgnore(fullpath string) error {
 	return nil
 }
 
-func shouldIncludeMonitoringDag(deploymentType string) bool {
-	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentHosted(deploymentType)
+func shouldIncludeMonitoringDag(deploymentType astroplatformcore.DeploymentType) bool {
+	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
 }
 
 func deployDags(path, dagsPath, deploymentType, dagsUploadURL string) (string, error) {
@@ -194,7 +195,7 @@ func deployDags(path, dagsPath, deploymentType, dagsUploadURL string) (string, e
 }
 
 // Deploy pushes a new docker image
-func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.CoreClient) error { //nolint
+func Deploy(deployInput InputDeploy, client astro.Client, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error { //nolint
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -215,7 +216,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
-	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, client, coreClient)
+	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, client, corePlatformClient, coreClient)
 	if err != nil {
 		return err
 	}
@@ -295,7 +296,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 
 		if deployInput.WaitForStatus {
 			// Keeping wait timeout low since dag only deploy is faster
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, dagOnlyDeploySleepTime, tickNum, timeoutNum, coreClient)
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, dagOnlyDeploySleepTime, tickNum, timeoutNum, corePlatformClient)
 			if err != nil {
 				return err
 			}
@@ -378,7 +379,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		if deployInput.WaitForStatus {
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, timeoutNum, coreClient)
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, timeoutNum, corePlatformClient)
 			if err != nil {
 				return err
 			}
@@ -393,7 +394,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 	return nil
 }
 
-func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, client astro.Client, coreClient astrocore.CoreClient) (deploymentInfo, error) {
+func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, client astro.Client, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (deploymentInfo, error) {
 	// Use config deployment if provided
 	if deploymentID == "" {
 		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
@@ -408,22 +409,22 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, client, coreClient)
+		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, client, corePlatformClient, coreClient)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
 
 		return deploymentInfo{
-			currentDeployment.ID,
-			currentDeployment.ReleaseName,
-			airflow.ImageName(currentDeployment.ReleaseName, "latest"),
-			currentDeployment.RuntimeRelease.Version,
-			currentDeployment.Workspace.OrganizationID,
-			currentDeployment.Workspace.ID,
-			currentDeployment.DeploymentSpec.Webserver.URL,
+			currentDeployment.Id,
+			currentDeployment.Namespace,
+			airflow.ImageName(currentDeployment.Namespace, "latest"),
+			currentDeployment.RuntimeVersion,
+			currentDeployment.OrganizationId,
+			currentDeployment.WorkspaceId,
+			currentDeployment.WebServerUrl,
 			currentDeployment.DagDeployEnabled,
-			currentDeployment.Type,
-			currentDeployment.APIKeyOnlyDeployments,
+			*currentDeployment.Type,
+			*currentDeployment.IsHighAvailability,
 		}, nil
 	}
 	c, err := config.GetCurrentContext()
