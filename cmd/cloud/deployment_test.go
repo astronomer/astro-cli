@@ -173,6 +173,26 @@ func TestDeploymentCreate(t *testing.T) {
 			},
 		},
 	}, nil).Times(14)
+	mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
+		Components: astro.Components{
+			Scheduler: astro.SchedulerConfig{
+				AU: astro.AuConfig{
+					Default: 5,
+					Limit:   24,
+				},
+				Replicas: astro.ReplicasConfig{
+					Default: 1,
+					Minimum: 1,
+					Limit:   4,
+				},
+			},
+		},
+		RuntimeReleases: []astro.RuntimeRelease{
+			{
+				Version: "4.2.5",
+			},
+		},
+	}, nil).Times(14)
 	mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(5)
 	mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(4)
 	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
