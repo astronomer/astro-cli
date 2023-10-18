@@ -43,7 +43,7 @@ var (
 			Deployments: mockCoreDeploymentResponse,
 		},
 	}
-	clusterType       = []astrocore.ListClustersParamsTypes{astrocore.ListClustersParamsTypesBRINGYOUROWNCLOUD, astrocore.ListClustersParamsTypesHOSTED}
+	clusterType       = []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
 	clusterListParams = &astrocore.ListClustersParams{
 		Types: &clusterType,
 		Limit: &limit,

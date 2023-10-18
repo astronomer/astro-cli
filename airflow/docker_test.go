@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/sirupsen/logrus"
@@ -370,7 +371,7 @@ func TestDockerComposeStart(t *testing.T) {
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Twice()
 
 		orgCheckWebserverHealthFunc := checkWebserverHealth
-		checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
 			return nil
 		}
 		defer func() { checkWebserverHealth = orgCheckWebserverHealthFunc }()
@@ -378,10 +379,10 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime, nil)
 		assert.NoError(t, err)
 
-		err = mockDockerCompose.Start("custom-image", "", "", noCache, false, waitTime)
+		err = mockDockerCompose.Start("custom-image", "", "", noCache, false, waitTime, nil)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -405,7 +406,7 @@ func TestDockerComposeStart(t *testing.T) {
 		isM1 = mockIsM1
 
 		orgCheckWebserverHealthFunc := checkWebserverHealth
-		checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
 			assert.Equal(t, defaultTimeOut, timeout)
 			return nil
 		}
@@ -414,7 +415,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", noCache, false, defaultTimeOut)
+		err := mockDockerCompose.Start("", "", "", noCache, false, defaultTimeOut, nil)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -439,7 +440,7 @@ func TestDockerComposeStart(t *testing.T) {
 		isM1 = mockIsM1
 
 		orgCheckWebserverHealthFunc := checkWebserverHealth
-		checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
 			assert.Equal(t, expectedTimeout, timeout)
 			return nil
 		}
@@ -448,7 +449,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", noCache, false, defaultTimeOut)
+		err := mockDockerCompose.Start("", "", "", noCache, false, defaultTimeOut, nil)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -467,7 +468,7 @@ func TestDockerComposeStart(t *testing.T) {
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
 
 		orgCheckWebserverHealthFunc := checkWebserverHealth
-		checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
 			assert.Equal(t, userProvidedTimeOut, timeout)
 			return nil
 		}
@@ -476,7 +477,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", noCache, false, userProvidedTimeOut)
+		err := mockDockerCompose.Start("", "", "", noCache, false, userProvidedTimeOut, nil)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -495,7 +496,7 @@ func TestDockerComposeStart(t *testing.T) {
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Twice()
 
 		orgCheckWebserverHealthFunc := checkWebserverHealth
-		checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
 			return nil
 		}
 		defer func() { checkWebserverHealth = orgCheckWebserverHealthFunc }()
@@ -503,10 +504,10 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime, nil)
 		assert.NoError(t, err)
 
-		err = mockDockerCompose.Start("custom-image", "", "", noCache, false, waitTime)
+		err = mockDockerCompose.Start("custom-image", "", "", noCache, false, waitTime, nil)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -519,7 +520,7 @@ func TestDockerComposeStart(t *testing.T) {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.Start("", "", "", false, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", false, false, waitTime, nil)
 		assert.Contains(t, err.Error(), "cannot start, project already running")
 
 		composeMock.AssertExpectations(t)
@@ -531,7 +532,7 @@ func TestDockerComposeStart(t *testing.T) {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.Start("", "", "", false, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", false, false, waitTime, nil)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		composeMock.AssertExpectations(t)
@@ -546,7 +547,7 @@ func TestDockerComposeStart(t *testing.T) {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 
 		orgCheckWebserverHealthFunc := checkWebserverHealth
-		checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
 			return nil
 		}
 		defer func() { checkWebserverHealth = orgCheckWebserverHealthFunc }()
@@ -554,7 +555,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime, nil)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -571,7 +572,7 @@ func TestDockerComposeStart(t *testing.T) {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 
 		orgCheckWebserverHealthFunc := checkWebserverHealth
-		checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
 			return nil
 		}
 		defer func() { checkWebserverHealth = orgCheckWebserverHealthFunc }()
@@ -579,7 +580,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime, nil)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -597,7 +598,7 @@ func TestDockerComposeStart(t *testing.T) {
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(errMockDocker).Once()
 
 		orgCheckWebserverHealthFunc := checkWebserverHealth
-		checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
 			return nil
 		}
 		defer func() { checkWebserverHealth = orgCheckWebserverHealthFunc }()
@@ -605,7 +606,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime, nil)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -623,7 +624,7 @@ func TestDockerComposeStart(t *testing.T) {
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
 
 		orgCheckWebserverHealthFunc := checkWebserverHealth
-		checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
 			return errMockDocker
 		}
 		defer func() { checkWebserverHealth = orgCheckWebserverHealthFunc }()
@@ -631,7 +632,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
+		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime, nil)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -1432,7 +1433,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
 
-		initSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
+		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
 			return nil
 		}
 
@@ -1449,7 +1450,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running", Name: "test-webserver"}}, nil).Once()
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
-		initSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
+		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
 			return errMockSettings
 		}
 
@@ -1762,7 +1763,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 		}
 
 		orgInitSetting := initSettings
-		initSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
+		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
 			return nil
 		}
 		defer func() { initSettings = orgInitSetting }()
@@ -1772,7 +1773,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
+		err := checkWebserverHealth(settingsFile, nil, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
 		assert.NoError(t, err)
 
 		w.Close()
@@ -1790,7 +1791,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 		}
 
 		orgInitSetting := initSettings
-		initSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
+		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
 			return nil
 		}
 		defer func() { initSettings = orgInitSetting }()
@@ -1802,7 +1803,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 
 		// set config to podman
 		config.CFG.DockerCommand.SetHomeString("podman")
-		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
+		err := checkWebserverHealth(settingsFile, nil, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
 		assert.NoError(t, err)
 
 		w.Close()
@@ -1835,7 +1836,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 			return nil
 		}
 
-		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
+		err := checkWebserverHealth(settingsFile, nil, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
 		assert.ErrorIs(t, err, errMockDocker)
 	})
 
@@ -1864,7 +1865,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 		}
 		isM1 = mockIsM1
 
-		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
+		err := checkWebserverHealth(settingsFile, nil, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
 		assert.ErrorContains(t, err, "The webserver health check timed out after 1s")
 	})
 	t.Run("timeout waiting for webserver to get to healthy with long timeout", func(t *testing.T) {
@@ -1892,7 +1893,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 		}
 		isM1 = mockIsM1
 
-		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
+		err := checkWebserverHealth(settingsFile, nil, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
 		assert.ErrorContains(t, err, "The webserver health check timed out after 1s")
 	})
 }

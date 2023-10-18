@@ -100,7 +100,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newLoginCommand(astroClient, astroCoreClient, os.Stdout),
 		newLogoutCommand(os.Stdout),
 		newVersionCommand(),
-		newDevRootCmd(astroClient),
+		newDevRootCmd(astroClient, astroCoreClient),
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
