@@ -4,6 +4,8 @@ package mocks
 
 import (
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+
 	mock "github.com/stretchr/testify/mock"
 
 	time "time"
@@ -185,13 +187,13 @@ func (_m *ContainerHandler) RunDAG(dagID string, settingsFile string, dagFile st
 	return r0
 }
 
-// Start provides a mock function with given fields: imageName, settingsFile, composeFile, noCache, noBrowser, waitTime
-func (_m *ContainerHandler) Start(imageName string, settingsFile string, composeFile string, noCache bool, noBrowser bool, waitTime time.Duration) error {
-	ret := _m.Called(imageName, settingsFile, composeFile, noCache, noBrowser, waitTime)
+// Start provides a mock function with given fields: imageName, settingsFile, composeFile, noCache, noBrowser, waitTime, envConns
+func (_m *ContainerHandler) Start(imageName string, settingsFile string, composeFile string, noCache bool, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+	ret := _m.Called(imageName, settingsFile, composeFile, noCache, noBrowser, waitTime, envConns)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, bool, bool, time.Duration) error); ok {
-		r0 = rf(imageName, settingsFile, composeFile, noCache, noBrowser, waitTime)
+	if rf, ok := ret.Get(0).(func(string, string, string, bool, bool, time.Duration, map[string]astrocore.EnvironmentObjectConnection) error); ok {
+		r0 = rf(imageName, settingsFile, composeFile, noCache, noBrowser, waitTime, envConns)
 	} else {
 		r0 = ret.Error(0)
 	}

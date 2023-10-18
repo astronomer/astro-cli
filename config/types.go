@@ -44,6 +44,7 @@ type cfgs struct {
 	AuditLogs             cfg
 	UpgradeMessage        cfg
 	DisableAstroRun       cfg
+	DisableEnvObjects     cfg
 }
 
 // Creates a new cfg struct
