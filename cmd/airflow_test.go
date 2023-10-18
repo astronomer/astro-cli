@@ -181,6 +181,7 @@ func cleanUpInitFiles(t *testing.T) {
 		"plugins",
 		"README.md",
 		".astro/config.yaml",
+		".astro/test_dag_integrity.py",
 		"./astro",
 		"tests/dags/test_dag_example.py",
 		"tests/dags",
@@ -597,6 +598,8 @@ func TestAirflowUpgradeTest(t *testing.T) {
 		err := airflowUpgradeTest(cmd, nil)
 		assert.ErrorIs(t, err, errMock)
 		mockContainerHandler.AssertExpectations(t)
+		// Clean up init files after test
+		defer func() { cleanUpInitFiles(t) }()
 	})
 
 	t.Run("containerHandlerInit failure", func(t *testing.T) {
