@@ -1009,7 +1009,7 @@ func TestCreate(t *testing.T) {
 				Size: "small",
 			},
 		}, nil).Times(2)
-		mockClient.On("GetDeploymentConfigWithOrgnaiztion", mock.Anything).Return(astro.DeploymentConfig{
+		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
 					AU: astro.AuConfig{
@@ -1031,7 +1031,7 @@ func TestCreate(t *testing.T) {
 			DefaultSchedulerSize: astro.MachineUnit{
 				Size: "small",
 			},
-		}, nil).Times(3)
+		}, nil).Times(2)
 		getSharedClusterParams := &astrocore.GetSharedClusterParams{
 			Region:        region,
 			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
@@ -1113,7 +1113,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfigWithOrgnaiztion", mock.Anything).Return(astro.DeploymentConfig{
+		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
 					AU: astro.AuConfig{
@@ -1171,7 +1171,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(2)
-		mockClient.On("GetDeploymentConfigWithOrgnaiztion", mock.Anything).Return(astro.DeploymentConfig{
+		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
 					AU: astro.AuConfig{
@@ -1254,7 +1254,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfigWithOrgnaiztion", mock.Anything).Return(astro.DeploymentConfig{
+		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
 					AU: astro.AuConfig{
@@ -1317,7 +1317,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfigWithOrgnaiztion", mock.Anything).Return(astro.DeploymentConfig{
+		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
 					AU: astro.AuConfig{
