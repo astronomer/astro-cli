@@ -67,6 +67,7 @@ contexts:
     workspace: ck05r3bor07h40d02y2hw4n4v
     organization: test-org-id
     organization_short_name: test-org-short-name
+disable_env_objects: false
 `
 	switch platform {
 	case CloudPlatform:
