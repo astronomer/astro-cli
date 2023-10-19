@@ -1643,7 +1643,7 @@ func TestValidateResources(t *testing.T) {
 
 	t.Run("invalid runtime version", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 
 		resp, err := validateRuntimeVersion("4.2.4", mockClient)
 		assert.NoError(t, err)
