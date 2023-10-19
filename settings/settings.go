@@ -11,6 +11,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
@@ -57,7 +58,7 @@ var (
 )
 
 // ConfigSettings is the main builder of the settings package
-func ConfigSettings(id, settingsFile string, version uint64, connections, variables, pools bool) error {
+func ConfigSettings(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
 	if id == "" {
 		return errNoID
 	}
@@ -72,7 +73,7 @@ func ConfigSettings(id, settingsFile string, version uint64, connections, variab
 		AddVariables(id, version)
 	}
 	if connections {
-		AddConnections(id, version)
+		AddConnections(id, version, envConns)
 	}
 	return nil
 }
@@ -130,8 +131,10 @@ func AddVariables(id string, version uint64) {
 }
 
 // AddConnections is a function to add Connections from settings.yaml
-func AddConnections(id string, version uint64) {
+func AddConnections(id string, version uint64, envConns map[string]astrocore.EnvironmentObjectConnection) {
 	connections := settings.Airflow.Connections
+	connections = AppendEnvironmentConnections(connections, envConns)
+
 	baseCmd := "airflow connections "
 	var baseAddCmd, baseRmCmd, baseListCmd, connIDArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
 	if version >= AirflowVersionTwo {
@@ -226,6 +229,45 @@ func AddConnections(id string, version uint64) {
 		logrus.Debugf("Adding Connection logs:\n\n" + out)
 		fmt.Printf("Added Connection: %s\n", conn.ConnID)
 	}
+}
+
+func AppendEnvironmentConnections(connections Connections, envConnections map[string]astrocore.EnvironmentObjectConnection) Connections {
+	for envConnID, envConn := range envConnections {
+		for i := range connections {
+			if connections[i].ConnID == envConnID {
+				// if connection already exists in settings file, skip it because the file takes precedence
+				continue
+			}
+		}
+		conn := Connection{
+			ConnID:   envConnID,
+			ConnType: envConn.Type,
+		}
+		if envConn.Host != nil {
+			conn.ConnHost = *envConn.Host
+		}
+		if envConn.Port != nil {
+			conn.ConnPort = *envConn.Port
+		}
+		if envConn.Login != nil {
+			conn.ConnLogin = *envConn.Login
+		}
+		if envConn.Password != nil {
+			conn.ConnPassword = *envConn.Password
+		}
+		if envConn.Schema != nil {
+			conn.ConnSchema = *envConn.Schema
+		}
+		if envConn.Extra != nil {
+			extra := make(map[any]any)
+			for k, v := range *envConn.Extra {
+				extra[k] = v
+			}
+			conn.ConnExtra = extra
+		}
+		connections = append(connections, conn)
+	}
+	return connections
 }
 
 // AddPools  is a function to add Pools from settings.yaml

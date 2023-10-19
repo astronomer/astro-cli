@@ -94,13 +94,13 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 		}
 	}
 
-	apiTokenWorkspaceRole := astrocore.ApiTokenWorkspaceRole{
+	apiTokenWorkspaceRole := astrocore.ApiTokenWorkspaceRoleRequest{
 		EntityId: workspace,
 		Role:     role,
 	}
-	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRole{apiTokenWorkspaceRole}
+	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRoleRequest{apiTokenWorkspaceRole}
 
-	updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRoles{
+	updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRolesRequest{
 		Organization: orgRole,
 		Workspace:    &apiTokenWorkspaceRoles,
 	}
@@ -391,11 +391,11 @@ func UpdateToken(id, name, newName, description, role string, out io.Writer, cli
 	}
 
 	var currentOrgRole string
-	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRole{}
+	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRoleRequest{}
 
 	for i := range token.Roles {
 		if token.Roles[i].EntityType == workspaceEntity {
-			apiTokenWorkspaceRoles = append(apiTokenWorkspaceRoles, astrocore.ApiTokenWorkspaceRole{
+			apiTokenWorkspaceRoles = append(apiTokenWorkspaceRoles, astrocore.ApiTokenWorkspaceRoleRequest{
 				EntityId: token.Roles[i].EntityId,
 				Role:     token.Roles[i].Role,
 			})
@@ -406,7 +406,7 @@ func UpdateToken(id, name, newName, description, role string, out io.Writer, cli
 		}
 	}
 	if role == "" {
-		updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRoles{
+		updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRolesRequest{
 			Organization: currentOrgRole,
 			Workspace:    &apiTokenWorkspaceRoles,
 		}
@@ -417,7 +417,7 @@ func UpdateToken(id, name, newName, description, role string, out io.Writer, cli
 		if err != nil {
 			return err
 		}
-		updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRoles{
+		updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRolesRequest{
 			Organization: role,
 			Workspace:    &apiTokenWorkspaceRoles,
 		}

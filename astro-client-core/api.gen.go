@@ -23,12 +23,14 @@ const (
 
 // Defines values for ApiTokenType.
 const (
+	ApiTokenTypeDEPLOYMENT   ApiTokenType = "DEPLOYMENT"
 	ApiTokenTypeORGANIZATION ApiTokenType = "ORGANIZATION"
 	ApiTokenTypeWORKSPACE    ApiTokenType = "WORKSPACE"
 )
 
 // Defines values for ApiTokenRoleEntityType.
 const (
+	ApiTokenRoleEntityTypeDEPLOYMENT   ApiTokenRoleEntityType = "DEPLOYMENT"
 	ApiTokenRoleEntityTypeORGANIZATION ApiTokenRoleEntityType = "ORGANIZATION"
 	ApiTokenRoleEntityTypeWORKSPACE    ApiTokenRoleEntityType = "WORKSPACE"
 )
@@ -63,7 +65,6 @@ const (
 	ClusterTypeBRINGYOUROWNCLOUD ClusterType = "BRING_YOUR_OWN_CLOUD"
 	ClusterTypeHOSTED            ClusterType = "HOSTED"
 	ClusterTypeSHARED            ClusterType = "SHARED"
-	ClusterTypeVIRTUALRUNTIMES   ClusterType = "VIRTUAL_RUNTIMES"
 )
 
 // Defines values for ClusterDetailedCloudProvider.
@@ -90,7 +91,6 @@ const (
 	ClusterDetailedTypeBRINGYOUROWNCLOUD ClusterDetailedType = "BRING_YOUR_OWN_CLOUD"
 	ClusterDetailedTypeHOSTED            ClusterDetailedType = "HOSTED"
 	ClusterDetailedTypeSHARED            ClusterDetailedType = "SHARED"
-	ClusterDetailedTypeVIRTUALRUNTIMES   ClusterDetailedType = "VIRTUAL_RUNTIMES"
 )
 
 // Defines values for CreateAwsClusterRequestType.
@@ -98,7 +98,6 @@ const (
 	CreateAwsClusterRequestTypeBRINGYOUROWNCLOUD CreateAwsClusterRequestType = "BRING_YOUR_OWN_CLOUD"
 	CreateAwsClusterRequestTypeHOSTED            CreateAwsClusterRequestType = "HOSTED"
 	CreateAwsClusterRequestTypeSHARED            CreateAwsClusterRequestType = "SHARED"
-	CreateAwsClusterRequestTypeVIRTUALRUNTIMES   CreateAwsClusterRequestType = "VIRTUAL_RUNTIMES"
 )
 
 // Defines values for CreateAzureClusterRequestType.
@@ -106,7 +105,44 @@ const (
 	CreateAzureClusterRequestTypeBRINGYOUROWNCLOUD CreateAzureClusterRequestType = "BRING_YOUR_OWN_CLOUD"
 	CreateAzureClusterRequestTypeHOSTED            CreateAzureClusterRequestType = "HOSTED"
 	CreateAzureClusterRequestTypeSHARED            CreateAzureClusterRequestType = "SHARED"
-	CreateAzureClusterRequestTypeVIRTUALRUNTIMES   CreateAzureClusterRequestType = "VIRTUAL_RUNTIMES"
+)
+
+// Defines values for CreateDedicatedDeploymentRequestExecutor.
+const (
+	CreateDedicatedDeploymentRequestExecutorCELERY     CreateDedicatedDeploymentRequestExecutor = "CELERY"
+	CreateDedicatedDeploymentRequestExecutorKUBERNETES CreateDedicatedDeploymentRequestExecutor = "KUBERNETES"
+)
+
+// Defines values for CreateDedicatedDeploymentRequestSchedulerSize.
+const (
+	CreateDedicatedDeploymentRequestSchedulerSizeLARGE  CreateDedicatedDeploymentRequestSchedulerSize = "LARGE"
+	CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM CreateDedicatedDeploymentRequestSchedulerSize = "MEDIUM"
+	CreateDedicatedDeploymentRequestSchedulerSizeSMALL  CreateDedicatedDeploymentRequestSchedulerSize = "SMALL"
+)
+
+// Defines values for CreateDedicatedDeploymentRequestType.
+const (
+	CreateDedicatedDeploymentRequestTypeDEDICATED CreateDedicatedDeploymentRequestType = "DEDICATED"
+	CreateDedicatedDeploymentRequestTypeHYBRID    CreateDedicatedDeploymentRequestType = "HYBRID"
+	CreateDedicatedDeploymentRequestTypeSTANDARD  CreateDedicatedDeploymentRequestType = "STANDARD"
+)
+
+// Defines values for CreateEnvironmentObjectLinkRequestScope.
+const (
+	CreateEnvironmentObjectLinkRequestScopeDEPLOYMENT CreateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
+	CreateEnvironmentObjectLinkRequestScopePROJECT    CreateEnvironmentObjectLinkRequestScope = "PROJECT"
+)
+
+// Defines values for CreateEnvironmentObjectRequestObjectType.
+const (
+	CreateEnvironmentObjectRequestObjectTypeCONNECTION CreateEnvironmentObjectRequestObjectType = "CONNECTION"
+)
+
+// Defines values for CreateEnvironmentObjectRequestScope.
+const (
+	CreateEnvironmentObjectRequestScopeDEPLOYMENT CreateEnvironmentObjectRequestScope = "DEPLOYMENT"
+	CreateEnvironmentObjectRequestScopePROJECT    CreateEnvironmentObjectRequestScope = "PROJECT"
+	CreateEnvironmentObjectRequestScopeWORKSPACE  CreateEnvironmentObjectRequestScope = "WORKSPACE"
 )
 
 // Defines values for CreateGcpClusterRequestType.
@@ -114,15 +150,46 @@ const (
 	CreateGcpClusterRequestTypeBRINGYOUROWNCLOUD CreateGcpClusterRequestType = "BRING_YOUR_OWN_CLOUD"
 	CreateGcpClusterRequestTypeHOSTED            CreateGcpClusterRequestType = "HOSTED"
 	CreateGcpClusterRequestTypeSHARED            CreateGcpClusterRequestType = "SHARED"
-	CreateGcpClusterRequestTypeVIRTUALRUNTIMES   CreateGcpClusterRequestType = "VIRTUAL_RUNTIMES"
 )
 
-// Defines values for CreateManagedDomainRequestEnforcedLogins.
+// Defines values for CreateHybridDeploymentRequestExecutor.
 const (
-	CreateManagedDomainRequestEnforcedLoginsGithub   CreateManagedDomainRequestEnforcedLogins = "github"
-	CreateManagedDomainRequestEnforcedLoginsGoogle   CreateManagedDomainRequestEnforcedLogins = "google"
-	CreateManagedDomainRequestEnforcedLoginsPassword CreateManagedDomainRequestEnforcedLogins = "password"
-	CreateManagedDomainRequestEnforcedLoginsSso      CreateManagedDomainRequestEnforcedLogins = "sso"
+	CreateHybridDeploymentRequestExecutorCELERY     CreateHybridDeploymentRequestExecutor = "CELERY"
+	CreateHybridDeploymentRequestExecutorKUBERNETES CreateHybridDeploymentRequestExecutor = "KUBERNETES"
+)
+
+// Defines values for CreateHybridDeploymentRequestType.
+const (
+	CreateHybridDeploymentRequestTypeDEDICATED CreateHybridDeploymentRequestType = "DEDICATED"
+	CreateHybridDeploymentRequestTypeHYBRID    CreateHybridDeploymentRequestType = "HYBRID"
+	CreateHybridDeploymentRequestTypeSTANDARD  CreateHybridDeploymentRequestType = "STANDARD"
+)
+
+// Defines values for CreateStandardDeploymentRequestCloudProvider.
+const (
+	AWS   CreateStandardDeploymentRequestCloudProvider = "AWS"
+	AZURE CreateStandardDeploymentRequestCloudProvider = "AZURE"
+	GCP   CreateStandardDeploymentRequestCloudProvider = "GCP"
+)
+
+// Defines values for CreateStandardDeploymentRequestExecutor.
+const (
+	CreateStandardDeploymentRequestExecutorCELERY     CreateStandardDeploymentRequestExecutor = "CELERY"
+	CreateStandardDeploymentRequestExecutorKUBERNETES CreateStandardDeploymentRequestExecutor = "KUBERNETES"
+)
+
+// Defines values for CreateStandardDeploymentRequestSchedulerSize.
+const (
+	CreateStandardDeploymentRequestSchedulerSizeLARGE  CreateStandardDeploymentRequestSchedulerSize = "LARGE"
+	CreateStandardDeploymentRequestSchedulerSizeMEDIUM CreateStandardDeploymentRequestSchedulerSize = "MEDIUM"
+	CreateStandardDeploymentRequestSchedulerSizeSMALL  CreateStandardDeploymentRequestSchedulerSize = "SMALL"
+)
+
+// Defines values for CreateStandardDeploymentRequestType.
+const (
+	CreateStandardDeploymentRequestTypeDEDICATED CreateStandardDeploymentRequestType = "DEDICATED"
+	CreateStandardDeploymentRequestTypeHYBRID    CreateStandardDeploymentRequestType = "HYBRID"
+	CreateStandardDeploymentRequestTypeSTANDARD  CreateStandardDeploymentRequestType = "STANDARD"
 )
 
 // Defines values for DeploymentStatus.
@@ -136,9 +203,9 @@ const (
 
 // Defines values for DeploymentType.
 const (
-	DeploymentTypeHOSTEDDEDICATED DeploymentType = "HOSTED_DEDICATED"
-	DeploymentTypeHOSTEDSHARED    DeploymentType = "HOSTED_SHARED"
-	DeploymentTypeHYBRID          DeploymentType = "HYBRID"
+	Dedicated DeploymentType = "Dedicated"
+	Hybrid    DeploymentType = "Hybrid"
+	Standard  DeploymentType = "Standard"
 )
 
 // Defines values for DeploymentLogEntrySource.
@@ -158,10 +225,37 @@ const (
 	EntitlementRequiredTierTRIAL            EntitlementRequiredTier = "TRIAL"
 )
 
+// Defines values for EnvironmentObjectObjectType.
+const (
+	EnvironmentObjectObjectTypeCONNECTION EnvironmentObjectObjectType = "CONNECTION"
+)
+
+// Defines values for EnvironmentObjectScope.
+const (
+	EnvironmentObjectScopeDEPLOYMENT EnvironmentObjectScope = "DEPLOYMENT"
+	EnvironmentObjectScopePROJECT    EnvironmentObjectScope = "PROJECT"
+	EnvironmentObjectScopeWORKSPACE  EnvironmentObjectScope = "WORKSPACE"
+)
+
+// Defines values for EnvironmentObjectLinkScope.
+const (
+	EnvironmentObjectLinkScopeDEPLOYMENT EnvironmentObjectLinkScope = "DEPLOYMENT"
+	EnvironmentObjectLinkScopePROJECT    EnvironmentObjectLinkScope = "PROJECT"
+)
+
 // Defines values for ManagedDomainStatus.
 const (
 	PENDING  ManagedDomainStatus = "PENDING"
 	VERIFIED ManagedDomainStatus = "VERIFIED"
+)
+
+// Defines values for MutateWorkerQueueRequestAstroMachine.
+const (
+	A10 MutateWorkerQueueRequestAstroMachine = "A10"
+	A20 MutateWorkerQueueRequestAstroMachine = "A20"
+	A40 MutateWorkerQueueRequestAstroMachine = "A40"
+	A5  MutateWorkerQueueRequestAstroMachine = "A5"
+	A60 MutateWorkerQueueRequestAstroMachine = "A60"
 )
 
 // Defines values for OrganizationPaymentMethod.
@@ -197,71 +291,10 @@ const (
 	OrganizationSupportPlanTRIAL            OrganizationSupportPlan = "TRIAL"
 )
 
-// Defines values for PaymentMethodCardBrand.
+// Defines values for SelfSignupType.
 const (
-	PaymentMethodCardBrandAmex       PaymentMethodCardBrand = "amex"
-	PaymentMethodCardBrandDiners     PaymentMethodCardBrand = "diners"
-	PaymentMethodCardBrandDiscover   PaymentMethodCardBrand = "discover"
-	PaymentMethodCardBrandJcb        PaymentMethodCardBrand = "jcb"
-	PaymentMethodCardBrandMastercard PaymentMethodCardBrand = "mastercard"
-	PaymentMethodCardBrandUnionpay   PaymentMethodCardBrand = "unionpay"
-	PaymentMethodCardBrandUnknown    PaymentMethodCardBrand = "unknown"
-	PaymentMethodCardBrandVisa       PaymentMethodCardBrand = "visa"
-)
-
-// Defines values for PaymentMethodCardFunding.
-const (
-	PaymentMethodCardFundingCredit  PaymentMethodCardFunding = "credit"
-	PaymentMethodCardFundingDebit   PaymentMethodCardFunding = "debit"
-	PaymentMethodCardFundingPrepaid PaymentMethodCardFunding = "prepaid"
-	PaymentMethodCardFundingUnknown PaymentMethodCardFunding = "unknown"
-)
-
-// Defines values for PaymentMethodCardChecksAddressLine1Check.
-const (
-	PaymentMethodCardChecksAddressLine1CheckFailed      PaymentMethodCardChecksAddressLine1Check = "failed"
-	PaymentMethodCardChecksAddressLine1CheckPass        PaymentMethodCardChecksAddressLine1Check = "pass"
-	PaymentMethodCardChecksAddressLine1CheckUnavailable PaymentMethodCardChecksAddressLine1Check = "unavailable"
-	PaymentMethodCardChecksAddressLine1CheckUnchecked   PaymentMethodCardChecksAddressLine1Check = "unchecked"
-)
-
-// Defines values for PaymentMethodCardChecksAddressPostalCodeCheck.
-const (
-	PaymentMethodCardChecksAddressPostalCodeCheckFailed      PaymentMethodCardChecksAddressPostalCodeCheck = "failed"
-	PaymentMethodCardChecksAddressPostalCodeCheckPass        PaymentMethodCardChecksAddressPostalCodeCheck = "pass"
-	PaymentMethodCardChecksAddressPostalCodeCheckUnavailable PaymentMethodCardChecksAddressPostalCodeCheck = "unavailable"
-	PaymentMethodCardChecksAddressPostalCodeCheckUnchecked   PaymentMethodCardChecksAddressPostalCodeCheck = "unchecked"
-)
-
-// Defines values for PaymentMethodCardChecksCvcCheck.
-const (
-	PaymentMethodCardChecksCvcCheckFailed      PaymentMethodCardChecksCvcCheck = "failed"
-	PaymentMethodCardChecksCvcCheckPass        PaymentMethodCardChecksCvcCheck = "pass"
-	PaymentMethodCardChecksCvcCheckUnavailable PaymentMethodCardChecksCvcCheck = "unavailable"
-	PaymentMethodCardChecksCvcCheckUnchecked   PaymentMethodCardChecksCvcCheck = "unchecked"
-)
-
-// Defines values for PaymentMethodCardWalletType.
-const (
-	AmexExpressCheckout PaymentMethodCardWalletType = "amexExpressCheckout"
-	ApplePay            PaymentMethodCardWalletType = "applePay"
-	GooglePay           PaymentMethodCardWalletType = "googlePay"
-	Link                PaymentMethodCardWalletType = "link"
-	Masterpass          PaymentMethodCardWalletType = "masterpass"
-	SamsungPay          PaymentMethodCardWalletType = "samsungPay"
-	VisaCheckout        PaymentMethodCardWalletType = "visaCheckout"
-)
-
-// Defines values for PaymentMethodUSBankAccountAccountHolderType.
-const (
-	Company    PaymentMethodUSBankAccountAccountHolderType = "company"
-	Individual PaymentMethodUSBankAccountAccountHolderType = "individual"
-)
-
-// Defines values for PaymentMethodUSBankAccountAccountType.
-const (
-	Checking PaymentMethodUSBankAccountAccountType = "checking"
-	Savings  PaymentMethodUSBankAccountAccountType = "savings"
+	SelfSignupTypeRegular SelfSignupType = "Regular"
+	SelfSignupTypeTrial   SelfSignupType = "Trial"
 )
 
 // Defines values for SharedClusterCloudProvider.
@@ -283,27 +316,55 @@ const (
 	SharedClusterStatusUPDATING     SharedClusterStatus = "UPDATING"
 )
 
-// Defines values for SsoConnectionConfigStrategy.
+// Defines values for UpdateEnvironmentObjectLinkRequestScope.
 const (
-	Samlp SsoConnectionConfigStrategy = "samlp"
-	Waad  SsoConnectionConfigStrategy = "waad"
+	UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT UpdateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
+	UpdateEnvironmentObjectLinkRequestScopePROJECT    UpdateEnvironmentObjectLinkRequestScope = "PROJECT"
 )
 
-// Defines values for TaskInstanceState.
+// Defines values for UpdateEnvironmentObjectRequestObjectType.
 const (
-	TaskInstanceStateDeferred        TaskInstanceState = "deferred"
-	TaskInstanceStateFailed          TaskInstanceState = "failed"
-	TaskInstanceStateNone            TaskInstanceState = "none"
-	TaskInstanceStateQueued          TaskInstanceState = "queued"
-	TaskInstanceStateRemoved         TaskInstanceState = "removed"
-	TaskInstanceStateRestarting      TaskInstanceState = "restarting"
-	TaskInstanceStateRunning         TaskInstanceState = "running"
-	TaskInstanceStateScheduled       TaskInstanceState = "scheduled"
-	TaskInstanceStateSkipped         TaskInstanceState = "skipped"
-	TaskInstanceStateSuccess         TaskInstanceState = "success"
-	TaskInstanceStateUpForReschedule TaskInstanceState = "upForReschedule"
-	TaskInstanceStateUpForRetry      TaskInstanceState = "upForRetry"
-	TaskInstanceStateUpstreamFailed  TaskInstanceState = "upstreamFailed"
+	UpdateEnvironmentObjectRequestObjectTypeCONNECTION UpdateEnvironmentObjectRequestObjectType = "CONNECTION"
+)
+
+// Defines values for UpdateEnvironmentObjectRequestScope.
+const (
+	UpdateEnvironmentObjectRequestScopeDEPLOYMENT UpdateEnvironmentObjectRequestScope = "DEPLOYMENT"
+	UpdateEnvironmentObjectRequestScopePROJECT    UpdateEnvironmentObjectRequestScope = "PROJECT"
+	UpdateEnvironmentObjectRequestScopeWORKSPACE  UpdateEnvironmentObjectRequestScope = "WORKSPACE"
+)
+
+// Defines values for UpdateHostedDeploymentRequestExecutor.
+const (
+	UpdateHostedDeploymentRequestExecutorCELERY     UpdateHostedDeploymentRequestExecutor = "CELERY"
+	UpdateHostedDeploymentRequestExecutorKUBERNETES UpdateHostedDeploymentRequestExecutor = "KUBERNETES"
+)
+
+// Defines values for UpdateHostedDeploymentRequestSchedulerSize.
+const (
+	LARGE  UpdateHostedDeploymentRequestSchedulerSize = "LARGE"
+	MEDIUM UpdateHostedDeploymentRequestSchedulerSize = "MEDIUM"
+	SMALL  UpdateHostedDeploymentRequestSchedulerSize = "SMALL"
+)
+
+// Defines values for UpdateHostedDeploymentRequestType.
+const (
+	UpdateHostedDeploymentRequestTypeDEDICATED UpdateHostedDeploymentRequestType = "DEDICATED"
+	UpdateHostedDeploymentRequestTypeHYBRID    UpdateHostedDeploymentRequestType = "HYBRID"
+	UpdateHostedDeploymentRequestTypeSTANDARD  UpdateHostedDeploymentRequestType = "STANDARD"
+)
+
+// Defines values for UpdateHybridDeploymentRequestExecutor.
+const (
+	CELERY     UpdateHybridDeploymentRequestExecutor = "CELERY"
+	KUBERNETES UpdateHybridDeploymentRequestExecutor = "KUBERNETES"
+)
+
+// Defines values for UpdateHybridDeploymentRequestType.
+const (
+	UpdateHybridDeploymentRequestTypeDEDICATED UpdateHybridDeploymentRequestType = "DEDICATED"
+	UpdateHybridDeploymentRequestTypeHYBRID    UpdateHybridDeploymentRequestType = "HYBRID"
+	UpdateHybridDeploymentRequestTypeSTANDARD  UpdateHybridDeploymentRequestType = "STANDARD"
 )
 
 // Defines values for UpdateInviteRequestInviteStatus.
@@ -312,12 +373,10 @@ const (
 	Reject UpdateInviteRequestInviteStatus = "reject"
 )
 
-// Defines values for UpdateManagedDomainRequestEnforcedLogins.
+// Defines values for UserSignupType.
 const (
-	UpdateManagedDomainRequestEnforcedLoginsGithub   UpdateManagedDomainRequestEnforcedLogins = "github"
-	UpdateManagedDomainRequestEnforcedLoginsGoogle   UpdateManagedDomainRequestEnforcedLogins = "google"
-	UpdateManagedDomainRequestEnforcedLoginsPassword UpdateManagedDomainRequestEnforcedLogins = "password"
-	UpdateManagedDomainRequestEnforcedLoginsSso      UpdateManagedDomainRequestEnforcedLogins = "sso"
+	UserSignupTypeRegular UserSignupType = "Regular"
+	UserSignupTypeTrial   UserSignupType = "Trial"
 )
 
 // Defines values for GetSharedClusterParamsCloudProvider.
@@ -339,7 +398,6 @@ const (
 	GetClusterOptionsParamsTypeBRINGYOUROWNCLOUD GetClusterOptionsParamsType = "BRING_YOUR_OWN_CLOUD"
 	GetClusterOptionsParamsTypeHOSTED            GetClusterOptionsParamsType = "HOSTED"
 	GetClusterOptionsParamsTypeSHARED            GetClusterOptionsParamsType = "SHARED"
-	GetClusterOptionsParamsTypeVIRTUALRUNTIMES   GetClusterOptionsParamsType = "VIRTUAL_RUNTIMES"
 )
 
 // Defines values for ListOrganizationsParamsTrialStatus.
@@ -352,13 +410,13 @@ const (
 
 // Defines values for ListOrganizationsParamsSupportPlan.
 const (
-	BASIC            ListOrganizationsParamsSupportPlan = "BASIC"
-	BUSINESSCRITICAL ListOrganizationsParamsSupportPlan = "BUSINESS_CRITICAL"
-	INTERNAL         ListOrganizationsParamsSupportPlan = "INTERNAL"
-	POV              ListOrganizationsParamsSupportPlan = "POV"
-	PREMIUM          ListOrganizationsParamsSupportPlan = "PREMIUM"
-	STANDARD         ListOrganizationsParamsSupportPlan = "STANDARD"
-	TRIAL            ListOrganizationsParamsSupportPlan = "TRIAL"
+	ListOrganizationsParamsSupportPlanBASIC            ListOrganizationsParamsSupportPlan = "BASIC"
+	ListOrganizationsParamsSupportPlanBUSINESSCRITICAL ListOrganizationsParamsSupportPlan = "BUSINESS_CRITICAL"
+	ListOrganizationsParamsSupportPlanINTERNAL         ListOrganizationsParamsSupportPlan = "INTERNAL"
+	ListOrganizationsParamsSupportPlanPOV              ListOrganizationsParamsSupportPlan = "POV"
+	ListOrganizationsParamsSupportPlanPREMIUM          ListOrganizationsParamsSupportPlan = "PREMIUM"
+	ListOrganizationsParamsSupportPlanSTANDARD         ListOrganizationsParamsSupportPlan = "STANDARD"
+	ListOrganizationsParamsSupportPlanTRIAL            ListOrganizationsParamsSupportPlan = "TRIAL"
 )
 
 // Defines values for ListOrganizationsParamsProduct.
@@ -418,22 +476,21 @@ const (
 
 // Defines values for ListClustersParamsTypes.
 const (
-	ListClustersParamsTypesBRINGYOUROWNCLOUD ListClustersParamsTypes = "BRING_YOUR_OWN_CLOUD"
-	ListClustersParamsTypesHOSTED            ListClustersParamsTypes = "HOSTED"
-	ListClustersParamsTypesSHARED            ListClustersParamsTypes = "SHARED"
-	ListClustersParamsTypesVIRTUALRUNTIMES   ListClustersParamsTypes = "VIRTUAL_RUNTIMES"
+	BRINGYOUROWNCLOUD ListClustersParamsTypes = "BRING_YOUR_OWN_CLOUD"
+	HOSTED            ListClustersParamsTypes = "HOSTED"
+	SHARED            ListClustersParamsTypes = "SHARED"
 )
 
-// Defines values for ListClustersParamsStatus.
+// Defines values for ListClustersParamsStatuses.
 const (
-	CREATED      ListClustersParamsStatus = "CREATED"
-	CREATEFAILED ListClustersParamsStatus = "CREATE_FAILED"
-	CREATING     ListClustersParamsStatus = "CREATING"
-	DELETED      ListClustersParamsStatus = "DELETED"
-	DELETEFAILED ListClustersParamsStatus = "DELETE_FAILED"
-	DELETING     ListClustersParamsStatus = "DELETING"
-	FORCEDELETED ListClustersParamsStatus = "FORCE_DELETED"
-	UPDATING     ListClustersParamsStatus = "UPDATING"
+	CREATED      ListClustersParamsStatuses = "CREATED"
+	CREATEFAILED ListClustersParamsStatuses = "CREATE_FAILED"
+	CREATING     ListClustersParamsStatuses = "CREATING"
+	DELETED      ListClustersParamsStatuses = "DELETED"
+	DELETEFAILED ListClustersParamsStatuses = "DELETE_FAILED"
+	DELETING     ListClustersParamsStatuses = "DELETING"
+	FORCEDELETED ListClustersParamsStatuses = "FORCE_DELETED"
+	UPDATING     ListClustersParamsStatuses = "UPDATING"
 )
 
 // Defines values for ListClustersParamsSorts.
@@ -490,20 +547,26 @@ const (
 	ListDeploymentsParamsSortsWorkspaceIdDesc    ListDeploymentsParamsSorts = "workspaceId:desc"
 )
 
-// Defines values for GetDeploymentDagRunsParamsState.
+// Defines values for ListDeploymentApiTokensParamsSorts.
 const (
-	Failed  GetDeploymentDagRunsParamsState = "failed"
-	Queued  GetDeploymentDagRunsParamsState = "queued"
-	Running GetDeploymentDagRunsParamsState = "running"
-	Success GetDeploymentDagRunsParamsState = "success"
-)
-
-// Defines values for GetDeploymentDagRunsParamsRunTypeIn.
-const (
-	Backfill         GetDeploymentDagRunsParamsRunTypeIn = "backfill"
-	DatasetTriggered GetDeploymentDagRunsParamsRunTypeIn = "dataset_triggered"
-	Manual           GetDeploymentDagRunsParamsRunTypeIn = "manual"
-	Scheduled        GetDeploymentDagRunsParamsRunTypeIn = "scheduled"
+	ListDeploymentApiTokensParamsSortsCreatedAtAsc     ListDeploymentApiTokensParamsSorts = "createdAt:asc"
+	ListDeploymentApiTokensParamsSortsCreatedAtDesc    ListDeploymentApiTokensParamsSorts = "createdAt:desc"
+	ListDeploymentApiTokensParamsSortsCreatedByIdAsc   ListDeploymentApiTokensParamsSorts = "createdById:asc"
+	ListDeploymentApiTokensParamsSortsCreatedByIdDesc  ListDeploymentApiTokensParamsSorts = "createdById:desc"
+	ListDeploymentApiTokensParamsSortsDescriptionAsc   ListDeploymentApiTokensParamsSorts = "description:asc"
+	ListDeploymentApiTokensParamsSortsDescriptionDesc  ListDeploymentApiTokensParamsSorts = "description:desc"
+	ListDeploymentApiTokensParamsSortsIdAsc            ListDeploymentApiTokensParamsSorts = "id:asc"
+	ListDeploymentApiTokensParamsSortsIdDesc           ListDeploymentApiTokensParamsSorts = "id:desc"
+	ListDeploymentApiTokensParamsSortsNameAsc          ListDeploymentApiTokensParamsSorts = "name:asc"
+	ListDeploymentApiTokensParamsSortsNameDesc         ListDeploymentApiTokensParamsSorts = "name:desc"
+	ListDeploymentApiTokensParamsSortsShortTokenAsc    ListDeploymentApiTokensParamsSorts = "shortToken:asc"
+	ListDeploymentApiTokensParamsSortsShortTokenDesc   ListDeploymentApiTokensParamsSorts = "shortToken:desc"
+	ListDeploymentApiTokensParamsSortsTokenStartAtAsc  ListDeploymentApiTokensParamsSorts = "tokenStartAt:asc"
+	ListDeploymentApiTokensParamsSortsTokenStartAtDesc ListDeploymentApiTokensParamsSorts = "tokenStartAt:desc"
+	ListDeploymentApiTokensParamsSortsUpdatedAtAsc     ListDeploymentApiTokensParamsSorts = "updatedAt:asc"
+	ListDeploymentApiTokensParamsSortsUpdatedAtDesc    ListDeploymentApiTokensParamsSorts = "updatedAt:desc"
+	ListDeploymentApiTokensParamsSortsUpdatedByIdAsc   ListDeploymentApiTokensParamsSorts = "updatedById:asc"
+	ListDeploymentApiTokensParamsSortsUpdatedByIdDesc  ListDeploymentApiTokensParamsSorts = "updatedById:desc"
 )
 
 // Defines values for GetDeploymentLogsParamsSources.
@@ -514,15 +577,21 @@ const (
 	GetDeploymentLogsParamsSourcesWorker    GetDeploymentLogsParamsSources = "worker"
 )
 
-// Defines values for GetMetronomeDashboardParamsType.
+// Defines values for ListEnvironmentObjectsParamsSorts.
 const (
-	Invoices GetMetronomeDashboardParamsType = "invoices"
-	Usage    GetMetronomeDashboardParamsType = "usage"
+	ListEnvironmentObjectsParamsSortsCreatedAtAsc   ListEnvironmentObjectsParamsSorts = "createdAt:asc"
+	ListEnvironmentObjectsParamsSortsCreatedAtDesc  ListEnvironmentObjectsParamsSorts = "createdAt:desc"
+	ListEnvironmentObjectsParamsSortsObjectKeyAsc   ListEnvironmentObjectsParamsSorts = "objectKey:asc"
+	ListEnvironmentObjectsParamsSortsObjectKeyDesc  ListEnvironmentObjectsParamsSorts = "objectKey:desc"
+	ListEnvironmentObjectsParamsSortsObjectTypeAsc  ListEnvironmentObjectsParamsSorts = "objectType:asc"
+	ListEnvironmentObjectsParamsSortsObjectTypeDesc ListEnvironmentObjectsParamsSorts = "objectType:desc"
+	ListEnvironmentObjectsParamsSortsUpdatedAtAsc   ListEnvironmentObjectsParamsSorts = "updatedAt:asc"
+	ListEnvironmentObjectsParamsSortsUpdatedAtDesc  ListEnvironmentObjectsParamsSorts = "updatedAt:desc"
 )
 
-// Defines values for GetStripeClientSecretParamsType.
+// Defines values for ListEnvironmentObjectsParamsObjectType.
 const (
-	SetupIntent GetStripeClientSecretParamsType = "setup-intent"
+	ListEnvironmentObjectsParamsObjectTypeCONNECTION ListEnvironmentObjectsParamsObjectType = "CONNECTION"
 )
 
 // Defines values for ListOrganizationTeamsParamsSorts.
@@ -638,16 +707,6 @@ type AddTeamMembersRequest struct {
 	MemberIds []string `json:"memberIds"`
 }
 
-// Address defines model for Address.
-type Address struct {
-	City       string  `json:"city"`
-	Country    string  `json:"country"`
-	Line1      string  `json:"line1"`
-	Line2      *string `json:"line2,omitempty"`
-	PostalCode string  `json:"postalCode"`
-	State      string  `json:"state"`
-}
-
 // ApiToken defines model for ApiToken.
 type ApiToken struct {
 	CreatedAt          time.Time            `json:"createdAt"`
@@ -656,7 +715,7 @@ type ApiToken struct {
 	DeletedAt          *time.Time           `json:"deletedAt,omitempty"`
 	Description        string               `json:"description"`
 	EndAt              *time.Time           `json:"endAt,omitempty"`
-	ExpiryPeriodInDays int                  `json:"expiryPeriodInDays"`
+	ExpiryPeriodInDays *int                 `json:"expiryPeriodInDays,omitempty"`
 	Id                 string               `json:"id"`
 	LastUsedAt         *time.Time           `json:"lastUsedAt,omitempty"`
 	Name               string               `json:"name"`
@@ -683,23 +742,10 @@ type ApiTokenRole struct {
 // ApiTokenRoleEntityType defines model for ApiTokenRole.EntityType.
 type ApiTokenRoleEntityType string
 
-// ApiTokenWorkspaceRole defines model for ApiTokenWorkspaceRole.
-type ApiTokenWorkspaceRole struct {
+// ApiTokenWorkspaceRoleRequest defines model for ApiTokenWorkspaceRoleRequest.
+type ApiTokenWorkspaceRoleRequest struct {
 	EntityId string `json:"entityId"`
 	Role     string `json:"role"`
-}
-
-// AstroBaseUnit defines model for AstroBaseUnit.
-type AstroBaseUnit struct {
-	Cpu    int `json:"cpu"`
-	Memory int `json:"memory"`
-}
-
-// AuConfigs defines model for AuConfigs.
-type AuConfigs struct {
-	Default int  `json:"default"`
-	Limit   int  `json:"limit"`
-	Request *int `json:"request,omitempty"`
 }
 
 // BasicSubjectProfile defines model for BasicSubjectProfile.
@@ -723,6 +769,7 @@ type Cluster struct {
 	DbInstanceType         string               `json:"dbInstanceType"`
 	DeletedAt              *string              `json:"deletedAt,omitempty"`
 	Id                     string               `json:"id"`
+	IsCordoned             *bool                `json:"isCordoned,omitempty"`
 	IsDryRun               bool                 `json:"isDryRun"`
 	IsLimited              bool                 `json:"isLimited"`
 	K8sTags                []ClusterTag         `json:"k8sTags"`
@@ -764,6 +811,7 @@ type ClusterDetailed struct {
 	DbInstanceType         string                       `json:"dbInstanceType"`
 	DeletedAt              *string                      `json:"deletedAt,omitempty"`
 	Id                     string                       `json:"id"`
+	IsCordoned             *bool                        `json:"isCordoned,omitempty"`
 	IsDryRun               bool                         `json:"isDryRun"`
 	IsLimited              bool                         `json:"isLimited"`
 	K8sTags                []ClusterTag                 `json:"k8sTags"`
@@ -842,17 +890,6 @@ type ClustersPaginated struct {
 	TotalCount int       `json:"totalCount"`
 }
 
-// ComponentsOptions defines model for ComponentsOptions.
-type ComponentsOptions struct {
-	Scheduler ContainerOptions `json:"scheduler"`
-	Workers   ContainerOptions `json:"workers"`
-}
-
-// ContainerOptions defines model for ContainerOptions.
-type ContainerOptions struct {
-	Au AuConfigs `json:"au"`
-}
-
 // CreateAwsClusterRequest defines model for CreateAwsClusterRequest.
 type CreateAwsClusterRequest struct {
 	DbInstanceType  string                      `json:"dbInstanceType"`
@@ -888,6 +925,139 @@ type CreateAzureClusterRequest struct {
 // CreateAzureClusterRequestType defines model for CreateAzureClusterRequest.Type.
 type CreateAzureClusterRequestType string
 
+// CreateDedicatedDeploymentRequest defines model for CreateDedicatedDeploymentRequest.
+type CreateDedicatedDeploymentRequest struct {
+	// AstroRuntimeVersion Version of the astro runtime to use
+	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
+
+	// ClusterId Cluster where the deployment should be created on
+	ClusterId string `json:"clusterId"`
+
+	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores
+	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
+
+	// DefaultTaskPodMemory Must be valid kubernetes memory resource string, at least 0.5Gi in terms of Gibibytes (GiB)
+	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
+
+	// Description Optional description of the deployment
+	Description *string `json:"description,omitempty"`
+
+	// Executor Airflow executors, supported: CELERY, KUBERNETES
+	Executor CreateDedicatedDeploymentRequestExecutor `json:"executor"`
+
+	// IsCicdEnforced If true, deployment specifications can only be updated through API token, changes will not be allowed through UI. This option can be turned off by admin
+	IsCicdEnforced bool `json:"isCicdEnforced"`
+
+	// IsDagDeployEnabled If true, dags can be independently pushed through CLI
+	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
+
+	// IsHighAvailability If true, deployment will have backup components
+	IsHighAvailability bool `json:"isHighAvailability"`
+
+	// Name The deployment name
+	Name string `json:"name"`
+
+	// ResourceQuotaCpu Must be valid kubernetes cpu resource string, at least 1 in terms of cpu cores
+	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
+
+	// ResourceQuotaMemory Must be valid kubernetes memory resource string, at least 2Gi in terms of Gibibytes (GiB)
+	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+
+	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+	SchedulerSize CreateDedicatedDeploymentRequestSchedulerSize `json:"schedulerSize"`
+
+	// Type Types of the deployment, one of: DEDICATED, HYBRID, STANDARD
+	Type CreateDedicatedDeploymentRequestType `json:"type"`
+
+	// WorkerQueues Specification for worker queues, at least one is required
+	WorkerQueues []MutateWorkerQueueRequest `json:"workerQueues"`
+
+	// WorkspaceId Workspace Id
+	WorkspaceId string `json:"workspaceId"`
+}
+
+// CreateDedicatedDeploymentRequestExecutor Airflow executors, supported: CELERY, KUBERNETES
+type CreateDedicatedDeploymentRequestExecutor string
+
+// CreateDedicatedDeploymentRequestSchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+type CreateDedicatedDeploymentRequestSchedulerSize string
+
+// CreateDedicatedDeploymentRequestType Types of the deployment, one of: DEDICATED, HYBRID, STANDARD
+type CreateDedicatedDeploymentRequestType string
+
+// CreateDeploymentApiTokenRequest defines model for CreateDeploymentApiTokenRequest.
+type CreateDeploymentApiTokenRequest struct {
+	Description             *string `json:"description,omitempty"`
+	Name                    string  `json:"name"`
+	Role                    string  `json:"role"`
+	TokenExpiryPeriodInDays *int    `json:"tokenExpiryPeriodInDays,omitempty"`
+}
+
+// CreateDeploymentRequest defines model for CreateDeploymentRequest.
+type CreateDeploymentRequest struct {
+	union json.RawMessage
+}
+
+// CreateEnvironmentObject defines model for CreateEnvironmentObject.
+type CreateEnvironmentObject struct {
+	Id string `json:"id"`
+}
+
+// CreateEnvironmentObjectConnectionOverridesRequest defines model for CreateEnvironmentObjectConnectionOverridesRequest.
+type CreateEnvironmentObjectConnectionOverridesRequest struct {
+	Extra    *map[string]interface{} `json:"extra,omitempty"`
+	Host     *string                 `json:"host,omitempty"`
+	Login    *string                 `json:"login,omitempty"`
+	Password *string                 `json:"password,omitempty"`
+	Port     *int                    `json:"port,omitempty"`
+	Schema   *string                 `json:"schema,omitempty"`
+	Type     *string                 `json:"type,omitempty"`
+}
+
+// CreateEnvironmentObjectConnectionRequest defines model for CreateEnvironmentObjectConnectionRequest.
+type CreateEnvironmentObjectConnectionRequest struct {
+	Extra    *map[string]interface{} `json:"extra,omitempty"`
+	Host     *string                 `json:"host,omitempty"`
+	Login    *string                 `json:"login,omitempty"`
+	Password *string                 `json:"password,omitempty"`
+	Port     *int                    `json:"port,omitempty"`
+	Schema   *string                 `json:"schema,omitempty"`
+	Type     string                  `json:"type"`
+}
+
+// CreateEnvironmentObjectLinkRequest defines model for CreateEnvironmentObjectLinkRequest.
+type CreateEnvironmentObjectLinkRequest struct {
+	Overrides     *CreateEnvironmentObjectOverridesRequest `json:"overrides,omitempty"`
+	Scope         CreateEnvironmentObjectLinkRequestScope  `json:"scope"`
+	ScopeEntityId string                                   `json:"scopeEntityId"`
+}
+
+// CreateEnvironmentObjectLinkRequestScope defines model for CreateEnvironmentObjectLinkRequest.Scope.
+type CreateEnvironmentObjectLinkRequestScope string
+
+// CreateEnvironmentObjectOverridesRequest defines model for CreateEnvironmentObjectOverridesRequest.
+type CreateEnvironmentObjectOverridesRequest struct {
+	Connection *CreateEnvironmentObjectConnectionOverridesRequest `json:"connection,omitempty"`
+}
+
+// CreateEnvironmentObjectRequest defines model for CreateEnvironmentObjectRequest.
+type CreateEnvironmentObjectRequest struct {
+	AutoLinkDeployments *bool                                     `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                                     `json:"autoLinkProjects,omitempty"`
+	Connection          *CreateEnvironmentObjectConnectionRequest `json:"connection,omitempty"`
+	Links               *[]CreateEnvironmentObjectLinkRequest     `json:"links,omitempty"`
+	ObjectKey           string                                    `json:"objectKey"`
+	ObjectType          CreateEnvironmentObjectRequestObjectType  `json:"objectType"`
+	Scope               CreateEnvironmentObjectRequestScope       `json:"scope"`
+	ScopeEntityId       string                                    `json:"scopeEntityId"`
+}
+
+// CreateEnvironmentObjectRequestObjectType defines model for CreateEnvironmentObjectRequest.ObjectType.
+type CreateEnvironmentObjectRequestObjectType string
+
+// CreateEnvironmentObjectRequestScope defines model for CreateEnvironmentObjectRequest.Scope.
+type CreateEnvironmentObjectRequestScope string
+
 // CreateGcpClusterRequest defines model for CreateGcpClusterRequest.
 type CreateGcpClusterRequest struct {
 	DbInstanceType      string                      `json:"dbInstanceType"`
@@ -908,14 +1078,45 @@ type CreateGcpClusterRequest struct {
 // CreateGcpClusterRequestType defines model for CreateGcpClusterRequest.Type.
 type CreateGcpClusterRequestType string
 
-// CreateManagedDomainRequest defines model for CreateManagedDomainRequest.
-type CreateManagedDomainRequest struct {
-	EnforcedLogins *[]CreateManagedDomainRequestEnforcedLogins `json:"enforcedLogins,omitempty"`
-	Name           string                                      `json:"name"`
+// CreateHybridDeploymentRequest defines model for CreateHybridDeploymentRequest.
+type CreateHybridDeploymentRequest struct {
+	// AstroRuntimeVersion Version of the astro runtime to use
+	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
+
+	// ClusterId Cluster where the deployment should be created on
+	ClusterId string `json:"clusterId"`
+
+	// Description Optional description of the deployment
+	Description *string `json:"description,omitempty"`
+
+	// Executor Airflow executors, supported: CELERY, KUBERNETES
+	Executor CreateHybridDeploymentRequestExecutor `json:"executor"`
+
+	// IsCicdEnforced If true, deployment specifications can only be updated through API token, changes will not be allowed through UI. This option can be turned off by admin
+	IsCicdEnforced bool `json:"isCicdEnforced"`
+
+	// IsDagDeployEnabled If true, dags can be independently pushed through CLI
+	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
+
+	// Name The deployment name
+	Name      string                        `json:"name"`
+	Scheduler DeploymentInstanceSpecRequest `json:"scheduler"`
+
+	// Type Types of the deployment, one of: DEDICATED, HYBRID, STANDARD
+	Type CreateHybridDeploymentRequestType `json:"type"`
+
+	// WorkerQueues Specification for worker queues, at least one is required
+	WorkerQueues []MutateWorkerQueueRequest `json:"workerQueues"`
+
+	// WorkspaceId Workspace Id
+	WorkspaceId string `json:"workspaceId"`
 }
 
-// CreateManagedDomainRequestEnforcedLogins defines model for CreateManagedDomainRequest.EnforcedLogins.
-type CreateManagedDomainRequestEnforcedLogins string
+// CreateHybridDeploymentRequestExecutor Airflow executors, supported: CELERY, KUBERNETES
+type CreateHybridDeploymentRequestExecutor string
+
+// CreateHybridDeploymentRequestType Types of the deployment, one of: DEDICATED, HYBRID, STANDARD
+type CreateHybridDeploymentRequestType string
 
 // CreateNodePoolRequest defines model for CreateNodePoolRequest.
 type CreateNodePoolRequest struct {
@@ -939,14 +1140,74 @@ type CreateOrganizationRequest struct {
 	Name     string                  `json:"name"`
 }
 
-// CreateSsoConnectionRequest defines model for CreateSsoConnectionRequest.
-type CreateSsoConnectionRequest struct {
-	Auth0ConnectionName      string                       `json:"auth0ConnectionName"`
-	Configuration            SsoConnectionConfig          `json:"configuration"`
-	IdpInitiatedLoginEnabled *bool                        `json:"idpInitiatedLoginEnabled,omitempty"`
-	JitPolicy                *JitPolicy                   `json:"jitPolicy,omitempty"`
-	ManagedDomains           []SsoConnectionManagedDomain `json:"managedDomains"`
+// CreateStandardDeploymentRequest defines model for CreateStandardDeploymentRequest.
+type CreateStandardDeploymentRequest struct {
+	// AstroRuntimeVersion Version of the astro runtime to use
+	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
+
+	// CloudProvider Supported cloud providers are AWS, AZURE, GCP. Optional if cluster id is specified
+	CloudProvider *CreateStandardDeploymentRequestCloudProvider `json:"cloudProvider,omitempty"`
+
+	// ClusterId Optional if cloud provider and region is specified
+	ClusterId *string `json:"clusterId,omitempty"`
+
+	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores
+	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
+
+	// DefaultTaskPodMemory Must be valid kubernetes memory resource string, at least 0.5Gi in terms of Gibibytes (GiB)
+	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
+
+	// Description Optional description of the deployment
+	Description *string `json:"description,omitempty"`
+
+	// Executor Airflow executors, supported: CELERY, KUBERNETES
+	Executor CreateStandardDeploymentRequestExecutor `json:"executor"`
+
+	// IsCicdEnforced If true, deployment specifications can only be updated through API token, changes will not be allowed through UI. This option can be turned off by admin
+	IsCicdEnforced bool `json:"isCicdEnforced"`
+
+	// IsDagDeployEnabled If true, dags can be independently pushed through CLI
+	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
+
+	// IsHighAvailability If true, deployment will have backup components
+	IsHighAvailability bool `json:"isHighAvailability"`
+
+	// Name The deployment name
+	Name string `json:"name"`
+
+	// Region Cloud provider region. Optional if cluster id is specified
+	Region *string `json:"region,omitempty"`
+
+	// ResourceQuotaCpu Must be valid kubernetes cpu resource string, at least 1 in terms of cpu cores
+	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
+
+	// ResourceQuotaMemory Must be valid kubernetes memory resource string, at least 2Gi in terms of Gibibytes (GiB)
+	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+
+	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+	SchedulerSize CreateStandardDeploymentRequestSchedulerSize `json:"schedulerSize"`
+
+	// Type Types of the deployment, one of: DEDICATED, HYBRID, STANDARD
+	Type CreateStandardDeploymentRequestType `json:"type"`
+
+	// WorkerQueues At least one worker queue must be specified
+	WorkerQueues []MutateWorkerQueueRequest `json:"workerQueues"`
+
+	// WorkspaceId Workspace Id
+	WorkspaceId string `json:"workspaceId"`
 }
+
+// CreateStandardDeploymentRequestCloudProvider Supported cloud providers are AWS, AZURE, GCP. Optional if cluster id is specified
+type CreateStandardDeploymentRequestCloudProvider string
+
+// CreateStandardDeploymentRequestExecutor Airflow executors, supported: CELERY, KUBERNETES
+type CreateStandardDeploymentRequestExecutor string
+
+// CreateStandardDeploymentRequestSchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+type CreateStandardDeploymentRequestSchedulerSize string
+
+// CreateStandardDeploymentRequestType Types of the deployment, one of: DEDICATED, HYBRID, STANDARD
+type CreateStandardDeploymentRequestType string
 
 // CreateTeamRequest defines model for CreateTeamRequest.
 type CreateTeamRequest struct {
@@ -977,36 +1238,12 @@ type CreateWorkspaceRequest struct {
 	Name                         string  `json:"name"`
 }
 
-// CreditSummary defines model for CreditSummary.
-type CreditSummary struct {
-	TotalCreditsGrantedUSD   float32 `json:"totalCreditsGrantedUSD"`
-	TotalCreditsRemainingUSD float32 `json:"totalCreditsRemainingUSD"`
-}
-
-// CreditType defines model for CreditType.
-type CreditType struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
-}
-
 // DagFilters defines model for DagFilters.
 type DagFilters struct {
 	Deployments map[string]string `json:"deployments"`
 	Owners      []string          `json:"owners"`
 	Tags        []string          `json:"tags"`
 	Warnings    *[]string         `json:"warnings,omitempty"`
-}
-
-// DagRun defines model for DagRun.
-type DagRun struct {
-	DataIntervalEnd   *string `json:"dataIntervalEnd,omitempty"`
-	DataIntervalStart *string `json:"dataIntervalStart,omitempty"`
-	EndDate           *string `json:"endDate,omitempty"`
-	LogicalDate       *string `json:"logicalDate,omitempty"`
-	RunId             *string `json:"runId,omitempty"`
-	RunType           *string `json:"runType,omitempty"`
-	StartDate         *string `json:"startDate,omitempty"`
-	State             *string `json:"state,omitempty"`
 }
 
 // DagSchedule defines model for DagSchedule.
@@ -1018,55 +1255,60 @@ type DagSchedule struct {
 
 // Deployment defines model for Deployment.
 type Deployment struct {
-	AlertEmails              *[]string           `json:"alertEmails,omitempty"`
-	ApiKeyOnlyDeployments    bool                `json:"apiKeyOnlyDeployments"`
-	ClusterId                string              `json:"clusterId"`
-	CreatedAt                time.Time           `json:"createdAt"`
-	CurrentDagTarballVersion *string             `json:"currentDagTarballVersion,omitempty"`
-	CurrentImageVersion      *string             `json:"currentImageVersion,omitempty"`
-	DagDeployEnabled         bool                `json:"dagDeployEnabled"`
-	Description              *string             `json:"description,omitempty"`
-	DesiredDagTarballVersion *string             `json:"desiredDagTarballVersion,omitempty"`
-	EnvironmentVariables     *[]DeploymentEnvVar `json:"environmentVariables,omitempty"`
-	Executor                 *string             `json:"executor,omitempty"`
-	ExternalIPs              *[]string           `json:"externalIPs,omitempty"`
-	Id                       string              `json:"id"`
-	ImageId                  string              `json:"imageId"`
-	ImageRepository          string              `json:"imageRepository"`
-	ImageTag                 string              `json:"imageTag"`
-	IsHighAvailability       bool                `json:"isHighAvailability"`
-	Name                     string              `json:"name"`
+	AlertEmails              *[]string                        `json:"alertEmails,omitempty"`
+	ApiKeyOnlyDeployments    bool                             `json:"apiKeyOnlyDeployments"`
+	ClusterId                string                           `json:"clusterId"`
+	CreatedAt                time.Time                        `json:"createdAt"`
+	CurrentDagTarballVersion *string                          `json:"currentDagTarballVersion,omitempty"`
+	CurrentImageVersion      *string                          `json:"currentImageVersion,omitempty"`
+	DagDeployEnabled         bool                             `json:"dagDeployEnabled"`
+	DefaultTaskPodCpu        *string                          `json:"defaultTaskPodCpu,omitempty"`
+	DefaultTaskPodMemory     *string                          `json:"defaultTaskPodMemory,omitempty"`
+	Description              *string                          `json:"description,omitempty"`
+	DesiredDagTarballVersion *string                          `json:"desiredDagTarballVersion,omitempty"`
+	EnvironmentVariables     *[]DeploymentEnvironmentVariable `json:"environmentVariables,omitempty"`
+	Executor                 *string                          `json:"executor,omitempty"`
+	ExternalIPs              *[]string                        `json:"externalIPs,omitempty"`
+	Id                       string                           `json:"id"`
+	ImageId                  string                           `json:"imageId"`
+	ImageRepository          string                           `json:"imageRepository"`
+	ImageTag                 string                           `json:"imageTag"`
+	IsHighAvailability       bool                             `json:"isHighAvailability"`
+	LaminarHealthStatus      *map[string]interface{}          `json:"laminarHealthStatus,omitempty"`
+	Name                     string                           `json:"name"`
 
 	// OrgShortName Deprecated: orgShortName has been replaced with organizationShortName
-	OrgShortName             *string                  `json:"orgShortName,omitempty"`
-	OrganizationId           string                   `json:"organizationId"`
-	OrganizationName         string                   `json:"organizationName"`
-	OrganizationShortName    string                   `json:"organizationShortName"`
-	ReleaseName              string                   `json:"releaseName"`
-	RuntimeVersion           string                   `json:"runtimeVersion"`
-	SchedulerAu              int                      `json:"schedulerAu"`
-	SchedulerCpu             string                   `json:"schedulerCpu"`
-	SchedulerMemory          string                   `json:"schedulerMemory"`
-	SchedulerReplicas        int                      `json:"schedulerReplicas"`
-	SchedulerSize            *string                  `json:"schedulerSize,omitempty"`
-	SpecCreatedAt            time.Time                `json:"specCreatedAt"`
-	SpecUpdatedAt            time.Time                `json:"specUpdatedAt"`
-	Status                   DeploymentStatus         `json:"status"`
-	StatusReason             *string                  `json:"statusReason,omitempty"`
-	Type                     *DeploymentType          `json:"type,omitempty"`
-	UpdatedAt                time.Time                `json:"updatedAt"`
-	WebServerCpu             string                   `json:"webServerCpu"`
-	WebServerIngressHostname string                   `json:"webServerIngressHostname"`
-	WebServerMemory          string                   `json:"webServerMemory"`
-	WebServerReplicas        *int                     `json:"webServerReplicas,omitempty"`
-	WebServerUrl             string                   `json:"webServerUrl"`
-	WorkerCpu                string                   `json:"workerCpu"`
-	WorkerMemory             string                   `json:"workerMemory"`
-	WorkerQueues             *[]DeploymentWorkerQueue `json:"workerQueues,omitempty"`
-	WorkersAu                int                      `json:"workersAu"`
-	WorkersReplicas          *int                     `json:"workersReplicas,omitempty"`
-	WorkloadIdentity         *string                  `json:"workloadIdentity,omitempty"`
-	WorkspaceId              string                   `json:"workspaceId"`
+	OrgShortName             *string          `json:"orgShortName,omitempty"`
+	OrganizationId           string           `json:"organizationId"`
+	OrganizationName         string           `json:"organizationName"`
+	OrganizationShortName    string           `json:"organizationShortName"`
+	ReleaseName              string           `json:"releaseName"`
+	ResourceQuotaCpu         *string          `json:"resourceQuotaCpu,omitempty"`
+	ResourceQuotaMemory      *string          `json:"resourceQuotaMemory,omitempty"`
+	RuntimeVersion           string           `json:"runtimeVersion"`
+	SchedulerAu              int              `json:"schedulerAu"`
+	SchedulerCpu             string           `json:"schedulerCpu"`
+	SchedulerMemory          string           `json:"schedulerMemory"`
+	SchedulerReplicas        int              `json:"schedulerReplicas"`
+	SchedulerSize            *string          `json:"schedulerSize,omitempty"`
+	SpecCreatedAt            time.Time        `json:"specCreatedAt"`
+	SpecUpdatedAt            time.Time        `json:"specUpdatedAt"`
+	Status                   DeploymentStatus `json:"status"`
+	StatusReason             *string          `json:"statusReason,omitempty"`
+	Type                     *DeploymentType  `json:"type,omitempty"`
+	UpdatedAt                time.Time        `json:"updatedAt"`
+	WebServerCpu             string           `json:"webServerCpu"`
+	WebServerIngressHostname string           `json:"webServerIngressHostname"`
+	WebServerMemory          string           `json:"webServerMemory"`
+	WebServerReplicas        *int             `json:"webServerReplicas,omitempty"`
+	WebServerUrl             string           `json:"webServerUrl"`
+	WorkerCpu                string           `json:"workerCpu"`
+	WorkerMemory             string           `json:"workerMemory"`
+	WorkerQueues             *[]WorkerQueue   `json:"workerQueues,omitempty"`
+	WorkersAu                int              `json:"workersAu"`
+	WorkersReplicas          *int             `json:"workersReplicas,omitempty"`
+	WorkloadIdentity         *string          `json:"workloadIdentity,omitempty"`
+	WorkspaceId              string           `json:"workspaceId"`
 }
 
 // DeploymentStatus defines model for Deployment.Status.
@@ -1075,12 +1317,25 @@ type DeploymentStatus string
 // DeploymentType defines model for Deployment.Type.
 type DeploymentType string
 
-// DeploymentEnvVar defines model for DeploymentEnvVar.
-type DeploymentEnvVar struct {
-	IsSecret  *bool   `json:"isSecret,omitempty"`
-	Key       *string `json:"key,omitempty"`
-	UpdatedAt *string `json:"updatedAt,omitempty"`
+// DeploymentEnvironmentVariable defines model for DeploymentEnvironmentVariable.
+type DeploymentEnvironmentVariable struct {
+	IsSecret  bool    `json:"isSecret"`
+	Key       string  `json:"key"`
+	UpdatedAt string  `json:"updatedAt"`
 	Value     *string `json:"value,omitempty"`
+}
+
+// DeploymentEnvironmentVariableRequest defines model for DeploymentEnvironmentVariableRequest.
+type DeploymentEnvironmentVariableRequest struct {
+	IsSecret bool    `json:"isSecret"`
+	Key      string  `json:"key"`
+	Value    *string `json:"value,omitempty"`
+}
+
+// DeploymentInstanceSpecRequest defines model for DeploymentInstanceSpecRequest.
+type DeploymentInstanceSpecRequest struct {
+	Au       int `json:"au"`
+	Replicas int `json:"replicas"`
 }
 
 // DeploymentLog defines model for DeploymentLog.
@@ -1105,23 +1360,13 @@ type DeploymentLogEntrySource string
 
 // DeploymentOptions defines model for DeploymentOptions.
 type DeploymentOptions struct {
-	AstroUnit       AstroBaseUnit     `json:"astroUnit"`
-	Components      ComponentsOptions `json:"components"`
-	RuntimeReleases []RuntimeRelease  `json:"runtimeReleases"`
-}
-
-// DeploymentWorkerQueue defines model for DeploymentWorkerQueue.
-type DeploymentWorkerQueue struct {
-	Id                string `json:"id"`
-	IsDefault         bool   `json:"isDefault"`
-	MaxWorkerCount    int    `json:"maxWorkerCount"`
-	MinWorkerCount    int    `json:"minWorkerCount"`
-	Name              string `json:"name"`
-	NodePoolId        string `json:"nodePoolId"`
-	PodCpu            string `json:"podCpu"`
-	PodRam            string `json:"podRam"`
-	PodSize           string `json:"podSize"`
-	WorkerConcurrency int    `json:"workerConcurrency"`
+	Executors               []string                  `json:"executors"`
+	ResourceQuotas          ResourceQuotaOptions      `json:"resourceQuotas"`
+	RuntimeReleases         []RuntimeRelease          `json:"runtimeReleases"`
+	SchedulerMachines       []SchedulerMachine        `json:"schedulerMachines"`
+	WorkerMachines          []WorkerMachine           `json:"workerMachines"`
+	WorkerQueues            WorkerQueueOptions        `json:"workerQueues"`
+	WorkloadIdentityOptions *[]WorkloadIdentityOption `json:"workloadIdentityOptions,omitempty"`
 }
 
 // DeploymentsPaginated defines model for DeploymentsPaginated.
@@ -1141,6 +1386,68 @@ type Entitlement struct {
 // EntitlementRequiredTier defines model for Entitlement.RequiredTier.
 type EntitlementRequiredTier string
 
+// EnvironmentObject defines model for EnvironmentObject.
+type EnvironmentObject struct {
+	AutoLinkDeployments *bool                        `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                        `json:"autoLinkProjects,omitempty"`
+	Connection          *EnvironmentObjectConnection `json:"connection,omitempty"`
+	CreatedAt           *string                      `json:"createdAt,omitempty"`
+	Id                  *string                      `json:"id,omitempty"`
+	Links               *[]EnvironmentObjectLink     `json:"links,omitempty"`
+	ObjectKey           string                       `json:"objectKey"`
+	ObjectType          EnvironmentObjectObjectType  `json:"objectType"`
+	Scope               EnvironmentObjectScope       `json:"scope"`
+	ScopeEntityId       string                       `json:"scopeEntityId"`
+	UpdatedAt           *string                      `json:"updatedAt,omitempty"`
+}
+
+// EnvironmentObjectObjectType defines model for EnvironmentObject.ObjectType.
+type EnvironmentObjectObjectType string
+
+// EnvironmentObjectScope defines model for EnvironmentObject.Scope.
+type EnvironmentObjectScope string
+
+// EnvironmentObjectConnection defines model for EnvironmentObjectConnection.
+type EnvironmentObjectConnection struct {
+	Extra    *map[string]interface{} `json:"extra,omitempty"`
+	Host     *string                 `json:"host,omitempty"`
+	Login    *string                 `json:"login,omitempty"`
+	Password *string                 `json:"password,omitempty"`
+	Port     *int                    `json:"port,omitempty"`
+	Schema   *string                 `json:"schema,omitempty"`
+	Type     string                  `json:"type"`
+}
+
+// EnvironmentObjectConnectionOverrides defines model for EnvironmentObjectConnectionOverrides.
+type EnvironmentObjectConnectionOverrides struct {
+	Extra    *map[string]interface{} `json:"extra,omitempty"`
+	Host     *string                 `json:"host,omitempty"`
+	Login    *string                 `json:"login,omitempty"`
+	Password *string                 `json:"password,omitempty"`
+	Port     *int                    `json:"port,omitempty"`
+	Schema   *string                 `json:"schema,omitempty"`
+	Type     *string                 `json:"type,omitempty"`
+}
+
+// EnvironmentObjectLink defines model for EnvironmentObjectLink.
+type EnvironmentObjectLink struct {
+	ConnectionOverrides *EnvironmentObjectConnectionOverrides `json:"connectionOverrides,omitempty"`
+	Id                  string                                `json:"id"`
+	Scope               EnvironmentObjectLinkScope            `json:"scope"`
+	ScopeEntityId       string                                `json:"scopeEntityId"`
+}
+
+// EnvironmentObjectLinkScope defines model for EnvironmentObjectLink.Scope.
+type EnvironmentObjectLinkScope string
+
+// EnvironmentObjectsPaginated defines model for EnvironmentObjectsPaginated.
+type EnvironmentObjectsPaginated struct {
+	EnvironmentObjects []EnvironmentObject `json:"environmentObjects"`
+	Limit              int                 `json:"limit"`
+	Offset             int                 `json:"offset"`
+	TotalCount         int                 `json:"totalCount"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	Message    string `json:"message"`
@@ -1148,68 +1455,14 @@ type Error struct {
 	StatusCode int    `json:"statusCode"`
 }
 
-// EventClient defines model for EventClient.
-type EventClient struct {
-	ClientId *string                 `json:"client_id,omitempty"`
-	Metadata *map[string]interface{} `json:"metadata,omitempty"`
-	Name     *string                 `json:"name,omitempty"`
-}
-
-// EventConnection defines model for EventConnection.
-type EventConnection struct {
-	Id       *string      `json:"id,omitempty"`
-	Metadata *interface{} `json:"metadata,omitempty"`
-	Name     *string      `json:"name,omitempty"`
-	Strategy string       `json:"strategy"`
-}
-
-// EventOrganization defines model for EventOrganization.
-type EventOrganization struct {
-	DisplayName *string                 `json:"display_name,omitempty"`
-	Id          *string                 `json:"id,omitempty"`
-	Metadata    *map[string]interface{} `json:"metadata,omitempty"`
-	Name        *string                 `json:"name,omitempty"`
-}
-
-// EventRequest defines model for EventRequest.
-type EventRequest struct {
-	Body      *map[string]interface{} `json:"body,omitempty"`
-	Geoip     *interface{}            `json:"geoip,omitempty"`
-	Hostname  *string                 `json:"hostname,omitempty"`
-	Ip        *string                 `json:"ip,omitempty"`
-	Language  *string                 `json:"language,omitempty"`
-	Method    *string                 `json:"method,omitempty"`
-	Query     *map[string]interface{} `json:"query,omitempty"`
-	UserAgent *string                 `json:"user_agent,omitempty"`
-}
-
-// EventUser defines model for EventUser.
-type EventUser struct {
-	AppMetadata       *map[string]interface{} `json:"app_metadata,omitempty"`
-	CreatedAt         *string                 `json:"created_at,omitempty"`
-	Email             *string                 `json:"email,omitempty"`
-	EmailVerified     *bool                   `json:"email_verified,omitempty"`
-	FamilyName        *string                 `json:"family_name,omitempty"`
-	GivenName         *string                 `json:"given_name,omitempty"`
-	Identities        *[]interface{}          `json:"identities,omitempty"`
-	LastPasswordReset *string                 `json:"last_password_reset,omitempty"`
-	Multifactor       *[]string               `json:"multifactor,omitempty"`
-	Name              *string                 `json:"name,omitempty"`
-	Nickname          *string                 `json:"nickname,omitempty"`
-	PhoneNumber       *string                 `json:"phone_number,omitempty"`
-	PhoneVerified     *bool                   `json:"phone_verified,omitempty"`
-	Picture           *string                 `json:"picture,omitempty"`
-	UpdatedAt         *string                 `json:"updated_at,omitempty"`
-	UserId            *string                 `json:"user_id,omitempty"`
-	UserMetadata      *map[string]interface{} `json:"user_metadata,omitempty"`
-	Username          *string                 `json:"username,omitempty"`
-}
-
 // FeatureFlag defines model for FeatureFlag.
 type FeatureFlag struct {
 	Key   string `json:"key"`
 	Value bool   `json:"value"`
 }
+
+// GenericJSON defines model for GenericJSON.
+type GenericJSON map[string]interface{}
 
 // Invite defines model for Invite.
 type Invite struct {
@@ -1231,62 +1484,6 @@ type Invite struct {
 	UserId                *string `json:"userId,omitempty"`
 }
 
-// Invoice defines model for Invoice.
-type Invoice struct {
-	Adjustments []InvoiceAdjustment `json:"adjustments"`
-	CustomerId  string              `json:"customerId"`
-
-	// EndTimestamp End of the usage period this invoice covers (UTC)
-	EndTimestamp string            `json:"endTimestamp"`
-	Id           string            `json:"id"`
-	LineItems    []InvoiceLineItem `json:"lineItems"`
-	PlanId       *string           `json:"planId,omitempty"`
-	PlanName     *string           `json:"planName,omitempty"`
-
-	// StartTimestamp Beginning of the usage period this invoice covers (UTC)
-	StartTimestamp string  `json:"startTimestamp"`
-	Status         string  `json:"status"`
-	SubtotalUSD    float32 `json:"subtotalUSD"`
-	TotalUSD       float32 `json:"totalUSD"`
-}
-
-// InvoiceAdjustment defines model for InvoiceAdjustment.
-type InvoiceAdjustment struct {
-	Name     string  `json:"name"`
-	TotalUSD float32 `json:"totalUSD"`
-}
-
-// InvoiceLineItem defines model for InvoiceLineItem.
-type InvoiceLineItem struct {
-	CreditType   CreditType           `json:"creditType"`
-	CustomFields map[string]string    `json:"customFields"`
-	GroupKey     *string              `json:"groupKey,omitempty"`
-	GroupValue   *string              `json:"groupValue,omitempty"`
-	Name         string               `json:"name"`
-	ProductId    *string              `json:"productId,omitempty"`
-	Quantity     float32              `json:"quantity"`
-	SubLineItems []InvoiceSubLineItem `json:"subLineItems"`
-	Total        float32              `json:"total"`
-}
-
-// InvoiceSubLineItem defines model for InvoiceSubLineItem.
-type InvoiceSubLineItem struct {
-	ChargeId     *string           `json:"chargeId,omitempty"`
-	CustomFields map[string]string `json:"customFields"`
-	Name         string            `json:"name"`
-
-	// Price the unit price for this charge, present only if the charge is not tiered and the quantity is nonzero
-	Price    *float32 `json:"price,omitempty"`
-	Quantity float32  `json:"quantity"`
-	Subtotal float32  `json:"subtotal"`
-}
-
-// JitPolicy defines model for JitPolicy.
-type JitPolicy struct {
-	DefaultOrgRole        string           `json:"defaultOrgRole"`
-	DefaultWorkspaceRoles *[]WorkspaceRole `json:"defaultWorkspaceRoles,omitempty"`
-}
-
 // ListApiTokensPaginated defines model for ListApiTokensPaginated.
 type ListApiTokensPaginated struct {
 	ApiTokens  []ApiToken `json:"apiTokens"`
@@ -1304,6 +1501,20 @@ type ListWorkspaceDags struct {
 	Warnings       *[]string      `json:"warnings,omitempty"`
 }
 
+// MachineSpec defines model for MachineSpec.
+type MachineSpec struct {
+	Concurrency *float32 `json:"concurrency,omitempty"`
+
+	// Cpu A slice of CPU expressed in number of cores.
+	Cpu string `json:"cpu"`
+
+	// EphemeralStorage A slice of Ephemeral Storage expressed in Gibibytes (Gi).
+	EphemeralStorage *string `json:"ephemeralStorage,omitempty"`
+
+	// Memory A slice of Memory expressed in Gibibytes (Gi).
+	Memory string `json:"memory"`
+}
+
 // ManagedDomain defines model for ManagedDomain.
 type ManagedDomain struct {
 	CreatedAt      time.Time           `json:"createdAt"`
@@ -1318,11 +1529,6 @@ type ManagedDomain struct {
 // ManagedDomainStatus defines model for ManagedDomain.Status.
 type ManagedDomainStatus string
 
-// MetronomeDashboard defines model for MetronomeDashboard.
-type MetronomeDashboard struct {
-	Url string `json:"url"`
-}
-
 // MutateOrgTeamRoleRequest defines model for MutateOrgTeamRoleRequest.
 type MutateOrgTeamRoleRequest struct {
 	Role string `json:"role"`
@@ -1332,6 +1538,21 @@ type MutateOrgTeamRoleRequest struct {
 type MutateOrgUserRoleRequest struct {
 	Role string `json:"role"`
 }
+
+// MutateWorkerQueueRequest defines model for MutateWorkerQueueRequest.
+type MutateWorkerQueueRequest struct {
+	AstroMachine      *MutateWorkerQueueRequestAstroMachine `json:"astroMachine,omitempty"`
+	Id                *string                               `json:"id,omitempty"`
+	IsDefault         bool                                  `json:"isDefault"`
+	MaxWorkerCount    int                                   `json:"maxWorkerCount"`
+	MinWorkerCount    int                                   `json:"minWorkerCount"`
+	Name              string                                `json:"name"`
+	NodePoolId        *string                               `json:"nodePoolId,omitempty"`
+	WorkerConcurrency int                                   `json:"workerConcurrency"`
+}
+
+// MutateWorkerQueueRequestAstroMachine defines model for MutateWorkerQueueRequest.AstroMachine.
+type MutateWorkerQueueRequestAstroMachine string
 
 // MutateWorkspaceTeamRoleRequest defines model for MutateWorkspaceTeamRoleRequest.
 type MutateWorkspaceTeamRoleRequest struct {
@@ -1367,6 +1588,7 @@ type Organization struct {
 	Domains                 *[]string                  `json:"domains,omitempty"`
 	Entitlements            *map[string]Entitlement    `json:"entitlements,omitempty"`
 	Id                      string                     `json:"id"`
+	IsAzureManaged          *bool                      `json:"isAzureManaged,omitempty"`
 	IsScimEnabled           bool                       `json:"isScimEnabled"`
 	ManagedDomains          *[]ManagedDomain           `json:"managedDomains,omitempty"`
 	MetronomeId             *string                    `json:"metronomeId,omitempty"`
@@ -1399,120 +1621,6 @@ type OrganizationStatus string
 // OrganizationSupportPlan defines model for Organization.SupportPlan.
 type OrganizationSupportPlan string
 
-// PaymentMethod defines model for PaymentMethod.
-type PaymentMethod struct {
-	BillingDetails *PaymentMethodBillingDetails `json:"billingDetails,omitempty"`
-	Card           *PaymentMethodCard           `json:"card,omitempty"`
-	CreatedAt      string                       `json:"createdAt"`
-	Id             string                       `json:"id"`
-	Metadata       *map[string]string           `json:"metadata,omitempty"`
-	Type           string                       `json:"type"`
-	UsBankAccount  *PaymentMethodUSBankAccount  `json:"usBankAccount,omitempty"`
-}
-
-// PaymentMethodBillingDetails defines model for PaymentMethodBillingDetails.
-type PaymentMethodBillingDetails struct {
-	Address Address `json:"address"`
-	Email   *string `json:"email,omitempty"`
-	Name    *string `json:"name,omitempty"`
-	Phone   *string `json:"phone,omitempty"`
-}
-
-// PaymentMethodCard defines model for PaymentMethodCard.
-type PaymentMethodCard struct {
-	Brand             PaymentMethodCardBrand   `json:"brand"`
-	Checks            *PaymentMethodCardChecks `json:"checks,omitempty"`
-	Country           string                   `json:"country"`
-	ExpMonth          int                      `json:"expMonth"`
-	ExpYear           int                      `json:"expYear"`
-	Fingerprint       string                   `json:"fingerprint"`
-	Funding           PaymentMethodCardFunding `json:"funding"`
-	Last4             string                   `json:"last4"`
-	PreferredNetwork  string                   `json:"preferredNetwork"`
-	SupportedNetworks []string                 `json:"supportedNetworks"`
-	ThreeDSecureUsage *bool                    `json:"threeDSecureUsage,omitempty"`
-	Wallet            *PaymentMethodCardWallet `json:"wallet,omitempty"`
-}
-
-// PaymentMethodCardBrand defines model for PaymentMethodCard.Brand.
-type PaymentMethodCardBrand string
-
-// PaymentMethodCardFunding defines model for PaymentMethodCard.Funding.
-type PaymentMethodCardFunding string
-
-// PaymentMethodCardChecks defines model for PaymentMethodCardChecks.
-type PaymentMethodCardChecks struct {
-	AddressLine1Check      PaymentMethodCardChecksAddressLine1Check      `json:"addressLine1Check"`
-	AddressPostalCodeCheck PaymentMethodCardChecksAddressPostalCodeCheck `json:"addressPostalCodeCheck"`
-	CvcCheck               PaymentMethodCardChecksCvcCheck               `json:"cvcCheck"`
-}
-
-// PaymentMethodCardChecksAddressLine1Check defines model for PaymentMethodCardChecks.AddressLine1Check.
-type PaymentMethodCardChecksAddressLine1Check string
-
-// PaymentMethodCardChecksAddressPostalCodeCheck defines model for PaymentMethodCardChecks.AddressPostalCodeCheck.
-type PaymentMethodCardChecksAddressPostalCodeCheck string
-
-// PaymentMethodCardChecksCvcCheck defines model for PaymentMethodCardChecks.CvcCheck.
-type PaymentMethodCardChecksCvcCheck string
-
-// PaymentMethodCardWallet defines model for PaymentMethodCardWallet.
-type PaymentMethodCardWallet struct {
-	DynamicLast4 string                               `json:"dynamicLast4"`
-	Masterpass   *PaymentMethodCardWalletMasterpass   `json:"masterpass,omitempty"`
-	Type         PaymentMethodCardWalletType          `json:"type"`
-	VisaCheckout *PaymentMethodCardWalletVisaCheckout `json:"visaCheckout,omitempty"`
-}
-
-// PaymentMethodCardWalletType defines model for PaymentMethodCardWallet.Type.
-type PaymentMethodCardWalletType string
-
-// PaymentMethodCardWalletMasterpass defines model for PaymentMethodCardWalletMasterpass.
-type PaymentMethodCardWalletMasterpass struct {
-	BillingAddress  Address `json:"billingAddress"`
-	Email           *string `json:"email,omitempty"`
-	Name            *string `json:"name,omitempty"`
-	ShippingAddress Address `json:"shippingAddress"`
-}
-
-// PaymentMethodCardWalletVisaCheckout defines model for PaymentMethodCardWalletVisaCheckout.
-type PaymentMethodCardWalletVisaCheckout struct {
-	BillingAddress  *Address `json:"billingAddress,omitempty"`
-	Email           string   `json:"email"`
-	Name            string   `json:"name"`
-	ShippingAddress *Address `json:"shippingAddress,omitempty"`
-}
-
-// PaymentMethodUSBankAccount defines model for PaymentMethodUSBankAccount.
-type PaymentMethodUSBankAccount struct {
-	AccountHolderType           PaymentMethodUSBankAccountAccountHolderType `json:"accountHolderType"`
-	AccountType                 PaymentMethodUSBankAccountAccountType       `json:"accountType"`
-	BankName                    string                                      `json:"bankName"`
-	FinancialConnectionsAccount *string                                     `json:"financialConnectionsAccount,omitempty"`
-	Fingerprint                 string                                      `json:"fingerprint"`
-	Last4                       string                                      `json:"last4"`
-	PreferredNetwork            string                                      `json:"preferredNetwork"`
-	RoutingNumber               string                                      `json:"routingNumber"`
-	StatusDetails               *USBankAccountBlockedStatusDetails          `json:"statusDetails,omitempty"`
-	SupportedNetworks           []string                                    `json:"supportedNetworks"`
-}
-
-// PaymentMethodUSBankAccountAccountHolderType defines model for PaymentMethodUSBankAccount.AccountHolderType.
-type PaymentMethodUSBankAccountAccountHolderType string
-
-// PaymentMethodUSBankAccountAccountType defines model for PaymentMethodUSBankAccount.AccountType.
-type PaymentMethodUSBankAccountAccountType string
-
-// PostLoginEvent defines model for PostLoginEvent.
-type PostLoginEvent struct {
-	Client       *EventClient            `json:"client,omitempty"`
-	Connection   EventConnection         `json:"connection"`
-	Organization *EventOrganization      `json:"organization,omitempty"`
-	Request      *EventRequest           `json:"request,omitempty"`
-	Transaction  *map[string]interface{} `json:"transaction,omitempty"`
-	User         EventUser               `json:"user"`
-}
-
 // ProviderInstanceType defines model for ProviderInstanceType.
 type ProviderInstanceType struct {
 	Cpu  int    `json:"cpu"`
@@ -1527,16 +1635,30 @@ type ProviderRegion struct {
 	Name            string    `json:"name"`
 }
 
-// RunGroup defines model for RunGroup.
-type RunGroup struct {
-	Children          *[]RunGroup     `json:"children,omitempty"`
-	ExtraLinks        *[]string       `json:"extraLinks,omitempty"`
-	HasOutletDatasets *bool           `json:"hasOutletDatasets,omitempty"`
-	Id                *string         `json:"id,omitempty"`
-	IsMapped          *bool           `json:"isMapped,omitempty"`
-	Label             *string         `json:"label,omitempty"`
-	Operator          *string         `json:"operator,omitempty"`
-	TaskInstances     *[]TaskInstance `json:"taskInstances,omitempty"`
+// Range defines model for Range.
+type Range struct {
+	Ceiling float32 `json:"ceiling"`
+	Default float32 `json:"default"`
+	Floor   float32 `json:"floor"`
+}
+
+// ResourceOption defines model for ResourceOption.
+type ResourceOption struct {
+	Cpu    ResourceRange `json:"cpu"`
+	Memory ResourceRange `json:"memory"`
+}
+
+// ResourceQuotaOptions defines model for ResourceQuotaOptions.
+type ResourceQuotaOptions struct {
+	DefaultPodSize ResourceOption `json:"defaultPodSize"`
+	ResourceQuota  ResourceOption `json:"resourceQuota"`
+}
+
+// ResourceRange defines model for ResourceRange.
+type ResourceRange struct {
+	Ceiling string `json:"ceiling"`
+	Default string `json:"default"`
+	Floor   string `json:"floor"`
 }
 
 // RuntimeRelease defines model for RuntimeRelease.
@@ -1549,6 +1671,13 @@ type RuntimeRelease struct {
 	Version                  string `json:"version"`
 }
 
+// SchedulerMachine defines model for SchedulerMachine.
+type SchedulerMachine struct {
+	// Name The name of this machine.
+	Name string      `json:"name"`
+	Spec MachineSpec `json:"spec"`
+}
+
 // Scope defines model for Scope.
 type Scope struct {
 	EntityId string `json:"entityId"`
@@ -1557,21 +1686,25 @@ type Scope struct {
 
 // Self defines model for Self.
 type Self struct {
-	AvatarUrl           string         `json:"avatarUrl"`
-	ColorModePreference *string        `json:"colorModePreference,omitempty"`
-	CreatedAt           time.Time      `json:"createdAt"`
-	FeatureFlags        *[]FeatureFlag `json:"featureFlags,omitempty"`
-	FullName            string         `json:"fullName"`
-	Id                  string         `json:"id"`
-	IntercomUserHash    *string        `json:"intercomUserHash,omitempty"`
-	Invites             *[]Invite      `json:"invites,omitempty"`
-	OrganizationId      *string        `json:"organizationId,omitempty"`
-	Roles               *[]UserRole    `json:"roles,omitempty"`
-	Status              string         `json:"status"`
-	SystemRole          *string        `json:"systemRole,omitempty"`
-	UpdatedAt           time.Time      `json:"updatedAt"`
-	Username            string         `json:"username"`
+	AvatarUrl           string          `json:"avatarUrl"`
+	ColorModePreference *string         `json:"colorModePreference,omitempty"`
+	CreatedAt           time.Time       `json:"createdAt"`
+	FeatureFlags        *[]FeatureFlag  `json:"featureFlags,omitempty"`
+	FullName            string          `json:"fullName"`
+	Id                  string          `json:"id"`
+	IntercomUserHash    *string         `json:"intercomUserHash,omitempty"`
+	Invites             *[]Invite       `json:"invites,omitempty"`
+	OrganizationId      *string         `json:"organizationId,omitempty"`
+	Roles               *[]UserRole     `json:"roles,omitempty"`
+	SignupType          *SelfSignupType `json:"signupType,omitempty"`
+	Status              string          `json:"status"`
+	SystemRole          *string         `json:"systemRole,omitempty"`
+	UpdatedAt           time.Time       `json:"updatedAt"`
+	Username            string          `json:"username"`
 }
+
+// SelfSignupType defines model for Self.SignupType.
+type SelfSignupType string
 
 // SharedCluster defines model for SharedCluster.
 type SharedCluster struct {
@@ -1579,6 +1712,7 @@ type SharedCluster struct {
 	CreatedAt           time.Time                  `json:"createdAt"`
 	DbInstanceType      string                     `json:"dbInstanceType"`
 	Id                  string                     `json:"id"`
+	IsCordoned          *bool                      `json:"isCordoned,omitempty"`
 	IsDryRun            bool                       `json:"isDryRun"`
 	Metadata            ClusterMetadata            `json:"metadata"`
 	Name                string                     `json:"name"`
@@ -1598,106 +1732,11 @@ type SharedClusterCloudProvider string
 // SharedClusterStatus defines model for SharedCluster.Status.
 type SharedClusterStatus string
 
-// SsoBypassKey defines model for SsoBypassKey.
-type SsoBypassKey struct {
-	BypassKey *string `json:"bypassKey,omitempty"`
-	CreatedAt *string `json:"createdAt,omitempty"`
-	DeletedAt *string `json:"deletedAt,omitempty"`
-
-	// OrgShortName Deprecated: orgShortName has been replaced with organizationShortName
-	OrgShortName          *string `json:"orgShortName,omitempty"`
-	OrganizationId        string  `json:"organizationId"`
-	OrganizationShortName *string `json:"organizationShortName,omitempty"`
-	UpdatedAt             *string `json:"updatedAt,omitempty"`
-}
-
-// SsoConnection defines model for SsoConnection.
-type SsoConnection struct {
-	Auth0ConnectionId   string              `json:"auth0ConnectionId"`
-	Auth0ConnectionName string              `json:"auth0ConnectionName"`
-	Configuration       SsoConnectionConfig `json:"configuration"`
-	Enabled             bool                `json:"enabled"`
-	Id                  string              `json:"id"`
-	JitPolicy           *JitPolicy          `json:"jitPolicy,omitempty"`
-	ManagedDomains      []ManagedDomain     `json:"managedDomains"`
-	OrganizationId      string              `json:"organizationId"`
-}
-
-// SsoConnectionConfig defines model for SsoConnectionConfig.
-type SsoConnectionConfig struct {
-	AzureClientId     *string                     `json:"azureClientId,omitempty"`
-	AzureClientSecret *string                     `json:"azureClientSecret,omitempty"`
-	AzureDomainName   *string                     `json:"azureDomainName,omitempty"`
-	SamlSignInUrl     *string                     `json:"samlSignInUrl,omitempty"`
-	SamlSignOutUrl    *string                     `json:"samlSignOutUrl,omitempty"`
-	SamlSigningCert   *string                     `json:"samlSigningCert,omitempty"`
-	Strategy          SsoConnectionConfigStrategy `json:"strategy"`
-}
-
-// SsoConnectionConfigStrategy defines model for SsoConnectionConfig.Strategy.
-type SsoConnectionConfigStrategy string
-
-// SsoConnectionManagedDomain defines model for SsoConnectionManagedDomain.
-type SsoConnectionManagedDomain struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
-}
-
-// SsoLoginCallback defines model for SsoLoginCallback.
-type SsoLoginCallback struct {
-	AccessTokenClaims *map[string]string `json:"accessTokenClaims,omitempty"`
-	Deny              *SsoLoginDeny      `json:"deny,omitempty"`
-	IdTokenClaims     *map[string]string `json:"idTokenClaims,omitempty"`
-	UserMetaData      *interface{}       `json:"userMetaData,omitempty"`
-}
-
-// SsoLoginDeny defines model for SsoLoginDeny.
-type SsoLoginDeny struct {
-	Connections *[]string `json:"connections,omitempty"`
-	Message     string    `json:"message"`
-	Reason      string    `json:"reason"`
-}
-
-// StripeClientSecret defines model for StripeClientSecret.
-type StripeClientSecret struct {
-	ClientSecret string `json:"clientSecret"`
-}
-
 // Subject defines model for Subject.
 type Subject struct {
 	EntityId string `json:"entityId"`
 	Type     string `json:"type"`
 }
-
-// TaskInstance defines model for TaskInstance.
-type TaskInstance struct {
-	Duration       *float32                `json:"duration,omitempty"`
-	EndDate        *string                 `json:"endDate,omitempty"`
-	ExecutionDate  *string                 `json:"executionDate,omitempty"`
-	ExecutorConfig *string                 `json:"executorConfig,omitempty"`
-	Hostname       *string                 `json:"hostname,omitempty"`
-	MapIndex       *int                    `json:"mapIndex,omitempty"`
-	MaxTries       *int                    `json:"maxTries,omitempty"`
-	Note           *string                 `json:"note,omitempty"`
-	Operator       *string                 `json:"operator,omitempty"`
-	Pid            *int                    `json:"pid,omitempty"`
-	PipelineId     string                  `json:"pipelineId"`
-	PipelineRunId  string                  `json:"pipelineRunId"`
-	Pool           *string                 `json:"pool,omitempty"`
-	PoolSlots      *int                    `json:"poolSlots,omitempty"`
-	PriorityWeight *int                    `json:"priorityWeight,omitempty"`
-	Queue          *string                 `json:"queue,omitempty"`
-	QueuedWhen     *string                 `json:"queuedWhen,omitempty"`
-	RenderedFields *map[string]interface{} `json:"renderedFields,omitempty"`
-	StartDate      *string                 `json:"startDate,omitempty"`
-	State          *TaskInstanceState      `json:"state,omitempty"`
-	TaskId         string                  `json:"taskId"`
-	TryNumber      *int                    `json:"tryNumber,omitempty"`
-	Unixname       *string                 `json:"unixname,omitempty"`
-}
-
-// TaskInstanceState defines model for TaskInstance.State.
-type TaskInstanceState string
 
 // Team defines model for Team.
 type Team struct {
@@ -1747,10 +1786,10 @@ type TemplateVersion struct {
 	Version string  `json:"version"`
 }
 
-// USBankAccountBlockedStatusDetails defines model for USBankAccountBlockedStatusDetails.
-type USBankAccountBlockedStatusDetails struct {
-	NetworkCode string `json:"networkCode"`
-	Reason      string `json:"reason"`
+// TransferDeploymentRequest defines model for TransferDeploymentRequest.
+type TransferDeploymentRequest struct {
+	CurrentWorkspaceId string `json:"currentWorkspaceId"`
+	TargetWorkspaceId  string `json:"targetWorkspaceId"`
 }
 
 // UpdateAwsClusterRequest defines model for UpdateAwsClusterRequest.
@@ -1771,10 +1810,72 @@ type UpdateAzureClusterRequest struct {
 	TemplateVersion string                  `json:"templateVersion"`
 }
 
+// UpdateDeploymentApiTokenRequest defines model for UpdateDeploymentApiTokenRequest.
+type UpdateDeploymentApiTokenRequest struct {
+	Description string `json:"description"`
+	Name        string `json:"name"`
+	Role        string `json:"role"`
+}
+
 // UpdateDeploymentRequest defines model for UpdateDeploymentRequest.
 type UpdateDeploymentRequest struct {
-	WorkspaceIdTarget string `json:"workspaceIdTarget"`
+	union json.RawMessage
 }
+
+// UpdateEnvironmentObjectConnectionOverridesRequest defines model for UpdateEnvironmentObjectConnectionOverridesRequest.
+type UpdateEnvironmentObjectConnectionOverridesRequest struct {
+	Extra    *map[string]interface{} `json:"extra,omitempty"`
+	Host     *string                 `json:"host,omitempty"`
+	Login    *string                 `json:"login,omitempty"`
+	Password *string                 `json:"password,omitempty"`
+	Port     *int                    `json:"port,omitempty"`
+	Schema   *string                 `json:"schema,omitempty"`
+	Type     *string                 `json:"type,omitempty"`
+}
+
+// UpdateEnvironmentObjectConnectionRequest defines model for UpdateEnvironmentObjectConnectionRequest.
+type UpdateEnvironmentObjectConnectionRequest struct {
+	Extra    *map[string]interface{} `json:"extra,omitempty"`
+	Host     *string                 `json:"host,omitempty"`
+	Login    *string                 `json:"login,omitempty"`
+	Password *string                 `json:"password,omitempty"`
+	Port     *int                    `json:"port,omitempty"`
+	Schema   *string                 `json:"schema,omitempty"`
+	Type     string                  `json:"type"`
+}
+
+// UpdateEnvironmentObjectLinkRequest defines model for UpdateEnvironmentObjectLinkRequest.
+type UpdateEnvironmentObjectLinkRequest struct {
+	Overrides     *UpdateEnvironmentObjectOverridesRequest `json:"overrides,omitempty"`
+	Scope         UpdateEnvironmentObjectLinkRequestScope  `json:"scope"`
+	ScopeEntityId string                                   `json:"scopeEntityId"`
+}
+
+// UpdateEnvironmentObjectLinkRequestScope defines model for UpdateEnvironmentObjectLinkRequest.Scope.
+type UpdateEnvironmentObjectLinkRequestScope string
+
+// UpdateEnvironmentObjectOverridesRequest defines model for UpdateEnvironmentObjectOverridesRequest.
+type UpdateEnvironmentObjectOverridesRequest struct {
+	Connection *UpdateEnvironmentObjectConnectionOverridesRequest `json:"connection,omitempty"`
+}
+
+// UpdateEnvironmentObjectRequest defines model for UpdateEnvironmentObjectRequest.
+type UpdateEnvironmentObjectRequest struct {
+	AutoLinkDeployments *bool                                     `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                                     `json:"autoLinkProjects,omitempty"`
+	Connection          *UpdateEnvironmentObjectConnectionRequest `json:"connection,omitempty"`
+	Links               *[]UpdateEnvironmentObjectLinkRequest     `json:"links,omitempty"`
+	ObjectKey           string                                    `json:"objectKey"`
+	ObjectType          UpdateEnvironmentObjectRequestObjectType  `json:"objectType"`
+	Scope               UpdateEnvironmentObjectRequestScope       `json:"scope"`
+	ScopeEntityId       string                                    `json:"scopeEntityId"`
+}
+
+// UpdateEnvironmentObjectRequestObjectType defines model for UpdateEnvironmentObjectRequest.ObjectType.
+type UpdateEnvironmentObjectRequestObjectType string
+
+// UpdateEnvironmentObjectRequestScope defines model for UpdateEnvironmentObjectRequest.Scope.
+type UpdateEnvironmentObjectRequestScope string
 
 // UpdateGcpClusterRequest defines model for UpdateGcpClusterRequest.
 type UpdateGcpClusterRequest struct {
@@ -1785,6 +1886,78 @@ type UpdateGcpClusterRequest struct {
 	TemplateVersion string                  `json:"templateVersion"`
 }
 
+// UpdateHostedDeploymentRequest defines model for UpdateHostedDeploymentRequest.
+type UpdateHostedDeploymentRequest struct {
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
+
+	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores
+	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
+
+	// DefaultTaskPodMemory Must be valid kubernetes memory resource string, at least 0.5Gi in terms of Gibibytes (GiB)
+	DefaultTaskPodMemory string  `json:"defaultTaskPodMemory"`
+	Description          *string `json:"description,omitempty"`
+
+	// EnvironmentVariables List of deployment environment variables
+	EnvironmentVariables []DeploymentEnvironmentVariableRequest `json:"environmentVariables"`
+	Executor             UpdateHostedDeploymentRequestExecutor  `json:"executor"`
+	IsCicdEnforced       bool                                   `json:"isCicdEnforced"`
+	IsDagDeployEnabled   bool                                   `json:"isDagDeployEnabled"`
+
+	// IsHighAvailability If true, deployment will have backup components
+	IsHighAvailability bool   `json:"isHighAvailability"`
+	Name               string `json:"name"`
+
+	// ResourceQuotaCpu Must be valid kubernetes cpu resource string, at least 1 in terms of cpu cores
+	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
+
+	// ResourceQuotaMemory Must be valid kubernetes memory resource string, at least 2Gi in terms of Gibibytes (GiB)
+	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+
+	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+	SchedulerSize UpdateHostedDeploymentRequestSchedulerSize `json:"schedulerSize"`
+	Type          UpdateHostedDeploymentRequestType          `json:"type"`
+
+	// WorkerQueues At least one worker queue must be specified
+	WorkerQueues     []MutateWorkerQueueRequest `json:"workerQueues"`
+	WorkloadIdentity *string                    `json:"workloadIdentity,omitempty"`
+	WorkspaceId      string                     `json:"workspaceId"`
+}
+
+// UpdateHostedDeploymentRequestExecutor defines model for UpdateHostedDeploymentRequest.Executor.
+type UpdateHostedDeploymentRequestExecutor string
+
+// UpdateHostedDeploymentRequestSchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+type UpdateHostedDeploymentRequestSchedulerSize string
+
+// UpdateHostedDeploymentRequestType defines model for UpdateHostedDeploymentRequest.Type.
+type UpdateHostedDeploymentRequestType string
+
+// UpdateHybridDeploymentRequest defines model for UpdateHybridDeploymentRequest.
+type UpdateHybridDeploymentRequest struct {
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
+	Description   *string   `json:"description,omitempty"`
+
+	// EnvironmentVariables List of deployment environment variables
+	EnvironmentVariables []DeploymentEnvironmentVariableRequest `json:"environmentVariables"`
+	Executor             UpdateHybridDeploymentRequestExecutor  `json:"executor"`
+	IsCicdEnforced       bool                                   `json:"isCicdEnforced"`
+	IsDagDeployEnabled   bool                                   `json:"isDagDeployEnabled"`
+	Name                 string                                 `json:"name"`
+	Scheduler            DeploymentInstanceSpecRequest          `json:"scheduler"`
+	Type                 UpdateHybridDeploymentRequestType      `json:"type"`
+
+	// WorkerQueues At least one worker queue must be specified
+	WorkerQueues     []MutateWorkerQueueRequest `json:"workerQueues"`
+	WorkloadIdentity *string                    `json:"workloadIdentity,omitempty"`
+	WorkspaceId      string                     `json:"workspaceId"`
+}
+
+// UpdateHybridDeploymentRequestExecutor defines model for UpdateHybridDeploymentRequest.Executor.
+type UpdateHybridDeploymentRequestExecutor string
+
+// UpdateHybridDeploymentRequestType defines model for UpdateHybridDeploymentRequest.Type.
+type UpdateHybridDeploymentRequestType string
+
 // UpdateInviteRequest defines model for UpdateInviteRequest.
 type UpdateInviteRequest struct {
 	InviteStatus UpdateInviteRequestInviteStatus `json:"inviteStatus"`
@@ -1792,14 +1965,6 @@ type UpdateInviteRequest struct {
 
 // UpdateInviteRequestInviteStatus defines model for UpdateInviteRequest.InviteStatus.
 type UpdateInviteRequestInviteStatus string
-
-// UpdateManagedDomainRequest defines model for UpdateManagedDomainRequest.
-type UpdateManagedDomainRequest struct {
-	EnforcedLogins []UpdateManagedDomainRequestEnforcedLogins `json:"enforcedLogins"`
-}
-
-// UpdateManagedDomainRequestEnforcedLogins defines model for UpdateManagedDomainRequest.EnforcedLogins.
-type UpdateManagedDomainRequestEnforcedLogins string
 
 // UpdateNodePoolRequest defines model for UpdateNodePoolRequest.
 type UpdateNodePoolRequest struct {
@@ -1812,15 +1977,15 @@ type UpdateNodePoolRequest struct {
 
 // UpdateOrganizationApiTokenRequest defines model for UpdateOrganizationApiTokenRequest.
 type UpdateOrganizationApiTokenRequest struct {
-	Description string                          `json:"description"`
-	Name        string                          `json:"name"`
-	Roles       UpdateOrganizationApiTokenRoles `json:"roles"`
+	Description string                                 `json:"description"`
+	Name        string                                 `json:"name"`
+	Roles       UpdateOrganizationApiTokenRolesRequest `json:"roles"`
 }
 
-// UpdateOrganizationApiTokenRoles defines model for UpdateOrganizationApiTokenRoles.
-type UpdateOrganizationApiTokenRoles struct {
-	Organization string                   `json:"organization"`
-	Workspace    *[]ApiTokenWorkspaceRole `json:"workspace,omitempty"`
+// UpdateOrganizationApiTokenRolesRequest defines model for UpdateOrganizationApiTokenRolesRequest.
+type UpdateOrganizationApiTokenRolesRequest struct {
+	Organization string                          `json:"organization"`
+	Workspace    *[]ApiTokenWorkspaceRoleRequest `json:"workspace,omitempty"`
 }
 
 // UpdateOrganizationRequest defines model for UpdateOrganizationRequest.
@@ -1828,15 +1993,6 @@ type UpdateOrganizationRequest struct {
 	BillingEmail  string `json:"billingEmail"`
 	IsScimEnabled bool   `json:"isScimEnabled"`
 	Name          string `json:"name"`
-}
-
-// UpdateSsoConnectionRequest defines model for UpdateSsoConnectionRequest.
-type UpdateSsoConnectionRequest struct {
-	Configuration            SsoConnectionConfig          `json:"configuration"`
-	Enabled                  bool                         `json:"enabled"`
-	IdpInitiatedLoginEnabled bool                         `json:"idpInitiatedLoginEnabled"`
-	JitPolicy                *JitPolicy                   `json:"jitPolicy,omitempty"`
-	ManagedDomains           []SsoConnectionManagedDomain `json:"managedDomains"`
 }
 
 // UpdateTeamRequest defines model for UpdateTeamRequest.
@@ -1877,6 +2033,9 @@ type User struct {
 	// LastLoginConnectionType Only shown if admin listing users
 	LastLoginConnectionType *string `json:"lastLoginConnectionType,omitempty"`
 
+	// LoginsCount Only shown if admin listing users
+	LoginsCount *int `json:"loginsCount,omitempty"`
+
 	// OrgCount Only shown if admin listing users
 	OrgCount *int `json:"orgCount,omitempty"`
 
@@ -1887,8 +2046,9 @@ type User struct {
 	OrgUserRelationIsIdpManaged *bool `json:"orgUserRelationIsIdpManaged,omitempty"`
 
 	// Roles Only shown if admin listing users
-	Roles  *[]UserRole `json:"roles,omitempty"`
-	Status string      `json:"status"`
+	Roles      *[]UserRole     `json:"roles,omitempty"`
+	SignupType *UserSignupType `json:"signupType,omitempty"`
+	Status     string          `json:"status"`
 
 	// SystemRole Only shown if admin listing users
 	SystemRole *string   `json:"systemRole,omitempty"`
@@ -1901,6 +2061,9 @@ type User struct {
 	// WorkspaceRole Only shown if listing workspace users
 	WorkspaceRole *string `json:"workspaceRole,omitempty"`
 }
+
+// UserSignupType defines model for User.SignupType.
+type UserSignupType string
 
 // UserRole defines model for UserRole.
 type UserRole struct {
@@ -1917,20 +2080,43 @@ type UsersPaginated struct {
 	Users      []User `json:"users"`
 }
 
-// ValidateCreditCardPayment defines model for ValidateCreditCardPayment.
-type ValidateCreditCardPayment struct {
-	IsValid               bool    `json:"isValid"`
-	StripePaymentMethodId *string `json:"stripePaymentMethodId,omitempty"`
+// WorkerMachine defines model for WorkerMachine.
+type WorkerMachine struct {
+	Concurrency Range `json:"concurrency"`
+
+	// Name The name of this machine.
+	Name string      `json:"name"`
+	Spec MachineSpec `json:"spec"`
 }
 
-// ValidateCreditCardPaymentRequest defines model for ValidateCreditCardPaymentRequest.
-type ValidateCreditCardPaymentRequest struct {
-	StripePaymentMethodId string `json:"stripePaymentMethodId"`
+// WorkerQueue defines model for WorkerQueue.
+type WorkerQueue struct {
+	AstroMachine   *string `json:"astroMachine,omitempty"`
+	Id             string  `json:"id"`
+	IsDefault      bool    `json:"isDefault"`
+	MaxWorkerCount int     `json:"maxWorkerCount"`
+	MinWorkerCount int     `json:"minWorkerCount"`
+	Name           string  `json:"name"`
+	NodePoolId     string  `json:"nodePoolId"`
+	PodCpu         string  `json:"podCpu"`
+	PodRam         string  `json:"podRam"`
+
+	// PodSize todo: remove if there is no side effects after moving to use AstroMachine
+	PodSize           *string `json:"podSize,omitempty"`
+	WorkerConcurrency int     `json:"workerConcurrency"`
 }
 
-// ValidateSsoLoginRequest defines model for ValidateSsoLoginRequest.
-type ValidateSsoLoginRequest struct {
-	Event PostLoginEvent `json:"event"`
+// WorkerQueueOptions defines model for WorkerQueueOptions.
+type WorkerQueueOptions struct {
+	MaxWorkers        Range `json:"maxWorkers"`
+	MinWorkers        Range `json:"minWorkers"`
+	WorkerConcurrency Range `json:"workerConcurrency"`
+}
+
+// WorkloadIdentityOption defines model for WorkloadIdentityOption.
+type WorkloadIdentityOption struct {
+	Label string `json:"label"`
+	Role  string `json:"role"`
 }
 
 // Workspace defines model for Workspace.
@@ -1944,34 +2130,39 @@ type Workspace struct {
 	Name                         string               `json:"name"`
 
 	// OrgShortName Deprecated: orgShortName has been replaced with organizationShortName
-	OrgShortName           *string              `json:"orgShortName,omitempty"`
-	OrganizationId         string               `json:"organizationId"`
-	OrganizationName       *string              `json:"organizationName,omitempty"`
-	OrganizationShortName  *string              `json:"organizationShortName,omitempty"`
-	ServerlessRuntimeCount *int                 `json:"serverlessRuntimeCount,omitempty"`
-	UpdatedAt              time.Time            `json:"updatedAt"`
-	UpdatedBy              *BasicSubjectProfile `json:"updatedBy,omitempty"`
-	UserCount              *int                 `json:"userCount,omitempty"`
+	OrgShortName          *string              `json:"orgShortName,omitempty"`
+	OrganizationId        string               `json:"organizationId"`
+	OrganizationName      *string              `json:"organizationName,omitempty"`
+	OrganizationShortName *string              `json:"organizationShortName,omitempty"`
+	UpdatedAt             time.Time            `json:"updatedAt"`
+	UpdatedBy             *BasicSubjectProfile `json:"updatedBy,omitempty"`
+	UserCount             *int                 `json:"userCount,omitempty"`
 }
 
 // WorkspaceDag defines model for WorkspaceDag.
 type WorkspaceDag struct {
-	DagId                string       `json:"dagId"`
-	DeploymentId         string       `json:"deploymentId"`
-	IsActive             *bool        `json:"isActive,omitempty"`
-	IsPaused             bool         `json:"isPaused"`
-	NextRunAt            *string      `json:"nextRunAt,omitempty"`
-	Owners               *[]string    `json:"owners,omitempty"`
-	Runs                 *[]DagRun    `json:"runs,omitempty"`
-	Schedule             *DagSchedule `json:"schedule,omitempty"`
-	Tags                 *[]string    `json:"tags,omitempty"`
-	TimetableDescription *string      `json:"timetableDescription,omitempty"`
+	DagId                string             `json:"dagId"`
+	DeploymentId         string             `json:"deploymentId"`
+	IsActive             *bool              `json:"isActive,omitempty"`
+	IsPaused             bool               `json:"isPaused"`
+	NextRunAt            *string            `json:"nextRunAt,omitempty"`
+	Owners               *[]string          `json:"owners,omitempty"`
+	Runs                 *[]WorkspaceDagRun `json:"runs,omitempty"`
+	Schedule             *DagSchedule       `json:"schedule,omitempty"`
+	Tags                 *[]string          `json:"tags,omitempty"`
+	TimetableDescription *string            `json:"timetableDescription,omitempty"`
 }
 
-// WorkspaceRole defines model for WorkspaceRole.
-type WorkspaceRole struct {
-	WorkspaceId   string `json:"workspaceId"`
-	WorkspaceRole string `json:"workspaceRole"`
+// WorkspaceDagRun defines model for WorkspaceDagRun.
+type WorkspaceDagRun struct {
+	DataIntervalEnd   *string `json:"dataIntervalEnd,omitempty"`
+	DataIntervalStart *string `json:"dataIntervalStart,omitempty"`
+	EndDate           *string `json:"endDate,omitempty"`
+	LogicalDate       *string `json:"logicalDate,omitempty"`
+	RunId             *string `json:"runId,omitempty"`
+	RunType           *string `json:"runType,omitempty"`
+	StartDate         *string `json:"startDate,omitempty"`
+	State             *string `json:"state,omitempty"`
 }
 
 // WorkspacesPaginated defines model for WorkspacesPaginated.
@@ -1982,65 +2173,10 @@ type WorkspacesPaginated struct {
 	Workspaces []Workspace `json:"workspaces"`
 }
 
-// InternalDagRunWithTaskInstances defines model for internal_DagRunWithTaskInstances.
-type InternalDagRunWithTaskInstances struct {
-	DataIntervalEnd   *string                       `json:"dataIntervalEnd,omitempty"`
-	DataIntervalStart *string                       `json:"dataIntervalStart,omitempty"`
-	EndDate           *string                       `json:"endDate,omitempty"`
-	LogicalDate       *string                       `json:"logicalDate,omitempty"`
-	RunId             *string                       `json:"runId,omitempty"`
-	RunType           *string                       `json:"runType,omitempty"`
-	StartDate         *string                       `json:"startDate,omitempty"`
-	State             *string                       `json:"state,omitempty"`
-	TaskInstances     *[]InternalTaskInstancesInner `json:"taskInstances,omitempty"`
-}
-
-// InternalDagStructure defines model for internal_DagStructure.
-type InternalDagStructure struct {
-	Edges    *[]InternalEdge            `json:"edges,omitempty"`
-	Group    *InternalDagStructureGroup `json:"group,omitempty"`
-	Ordering *[]string                  `json:"ordering,omitempty"`
-}
-
-// InternalDagStructureGroup defines model for internal_DagStructureGroup.
-type InternalDagStructureGroup struct {
-	Children *[]InternalTaskGroupChildrenInner `json:"children,omitempty"`
-	Id       *string                           `json:"id,omitempty"`
-	IsMapped *bool                             `json:"isMapped,omitempty"`
-	Label    *string                           `json:"label,omitempty"`
-	Tooltip  *string                           `json:"tooltip,omitempty"`
-}
-
-// InternalEdge defines model for internal_Edge.
-type InternalEdge struct {
-	From  *string `json:"from,omitempty"`
-	Label *string `json:"label,omitempty"`
-	To    *string `json:"to,omitempty"`
-}
-
-// InternalMappedTaskInstanceSummary defines model for internal_MappedTaskInstanceSummary.
-type InternalMappedTaskInstanceSummary struct {
-	EndDate      *string         `json:"endDate,omitempty"`
-	OverallState *string         `json:"overallState,omitempty"`
-	StartDate    *string         `json:"startDate,omitempty"`
-	States       *map[string]int `json:"states,omitempty"`
-	TaskId       *string         `json:"taskId,omitempty"`
-	TryNumber    *int            `json:"tryNumber,omitempty"`
-}
-
-// InternalOutlet defines model for internal_Outlet.
-type InternalOutlet struct {
-	Extra *map[string]string `json:"extra,omitempty"`
-	Type  *string            `json:"type,omitempty"`
-	Uri   *string            `json:"uri,omitempty"`
-}
-
-// InternalPaginationResultDagRunWithTaskInstances defines model for internal_PaginationResultDagRunWithTaskInstances.
-type InternalPaginationResultDagRunWithTaskInstances struct {
-	Items      *[]InternalDagRunWithTaskInstances `json:"items,omitempty"`
-	NextCursor *string                            `json:"nextCursor,omitempty"`
-	PrevCursor *string                            `json:"prevCursor,omitempty"`
-	TotalCount *int                               `json:"totalCount,omitempty"`
+// InternalRelativeDeltaSchemaWeekday defines model for internal_RelativeDeltaSchemaWeekday.
+type InternalRelativeDeltaSchemaWeekday struct {
+	Int32         *int                   `json:"int32,omitempty"`
+	WeekdaySchema *InternalWeekdaySchema `json:"weekdaySchema,omitempty"`
 }
 
 // InternalScheduleIntervalCronExpression defines model for internal_ScheduleIntervalCronExpression.
@@ -2050,23 +2186,27 @@ type InternalScheduleIntervalCronExpression struct {
 
 // InternalScheduleIntervalRelativeDelta defines model for internal_ScheduleIntervalRelativeDelta.
 type InternalScheduleIntervalRelativeDelta struct {
-	Day          *int `json:"day,omitempty"`
-	Days         *int `json:"days,omitempty"`
-	Hour         *int `json:"hour,omitempty"`
-	Hours        *int `json:"hours,omitempty"`
-	Leapdays     *int `json:"leapdays,omitempty"`
-	Microsecond  *int `json:"microsecond,omitempty"`
-	Microseconds *int `json:"microseconds,omitempty"`
-	Minute       *int `json:"minute,omitempty"`
-	Minutes      *int `json:"minutes,omitempty"`
-	Month        *int `json:"month,omitempty"`
-	Months       *int `json:"months,omitempty"`
-	Second       *int `json:"second,omitempty"`
-	Seconds      *int `json:"seconds,omitempty"`
-	Week         *int `json:"week,omitempty"`
-	Weeks        *int `json:"weeks,omitempty"`
-	Year         *int `json:"year,omitempty"`
-	Years        *int `json:"years,omitempty"`
+	Day          *int                                `json:"day,omitempty"`
+	Days         *int                                `json:"days,omitempty"`
+	Dt1          *string                             `json:"dt1,omitempty"`
+	Dt2          *string                             `json:"dt2,omitempty"`
+	Hour         *int                                `json:"hour,omitempty"`
+	Hours        *int                                `json:"hours,omitempty"`
+	Leapdays     *int                                `json:"leapdays,omitempty"`
+	Microsecond  *int                                `json:"microsecond,omitempty"`
+	Microseconds *int                                `json:"microseconds,omitempty"`
+	Minute       *int                                `json:"minute,omitempty"`
+	Minutes      *int                                `json:"minutes,omitempty"`
+	Month        *int                                `json:"month,omitempty"`
+	Months       *int                                `json:"months,omitempty"`
+	Nlyearday    *int                                `json:"nlyearday,omitempty"`
+	Second       *int                                `json:"second,omitempty"`
+	Seconds      *int                                `json:"seconds,omitempty"`
+	Weekday      *InternalRelativeDeltaSchemaWeekday `json:"weekday,omitempty"`
+	Weeks        *int                                `json:"weeks,omitempty"`
+	Year         *int                                `json:"year,omitempty"`
+	Yearday      *int                                `json:"yearday,omitempty"`
+	Years        *int                                `json:"years,omitempty"`
 }
 
 // InternalScheduleIntervalTimeDelta defines model for internal_ScheduleIntervalTimeDelta.
@@ -2076,45 +2216,10 @@ type InternalScheduleIntervalTimeDelta struct {
 	Seconds      *int `json:"seconds,omitempty"`
 }
 
-// InternalTask defines model for internal_Task.
-type InternalTask struct {
-	ExtraLinks        *[]string         `json:"extraLinks,omitempty"`
-	HasOutletDatasets *bool             `json:"hasOutletDatasets,omitempty"`
-	Id                *string           `json:"id,omitempty"`
-	IsMapped          *bool             `json:"isMapped,omitempty"`
-	Label             *string           `json:"label,omitempty"`
-	Operator          *string           `json:"operator,omitempty"`
-	Outlets           *[]InternalOutlet `json:"outlets,omitempty"`
-}
-
-// InternalTaskGroup defines model for internal_TaskGroup.
-type InternalTaskGroup struct {
-	Children *[]InternalTaskGroupChildrenInner `json:"children,omitempty"`
-	Id       *string                           `json:"id,omitempty"`
-	IsMapped *bool                             `json:"isMapped,omitempty"`
-	Label    *string                           `json:"label,omitempty"`
-	Tooltip  *string                           `json:"tooltip,omitempty"`
-}
-
-// InternalTaskGroupChildrenInner defines model for internal_TaskGroupChildrenInner.
-type InternalTaskGroupChildrenInner struct {
-	Task      *InternalTask      `json:"task,omitempty"`
-	TaskGroup *InternalTaskGroup `json:"taskGroup,omitempty"`
-}
-
-// InternalTaskInstancesInner defines model for internal_TaskInstancesInner.
-type InternalTaskInstancesInner struct {
-	MappedTaskInstanceSummary *InternalMappedTaskInstanceSummary `json:"mappedTaskInstanceSummary,omitempty"`
-	UnmappedTaskInstance      *InternalUnmappedTaskInstance      `json:"unmappedTaskInstance,omitempty"`
-}
-
-// InternalUnmappedTaskInstance defines model for internal_UnmappedTaskInstance.
-type InternalUnmappedTaskInstance struct {
-	EndDate   *string `json:"endDate,omitempty"`
-	StartDate *string `json:"startDate,omitempty"`
-	State     *string `json:"state,omitempty"`
-	TaskId    *string `json:"taskId,omitempty"`
-	TryNumber *int    `json:"tryNumber,omitempty"`
+// InternalWeekdaySchema defines model for internal_WeekdaySchema.
+type InternalWeekdaySchema struct {
+	N       *int `json:"n,omitempty"`
+	Weekday *int `json:"weekday,omitempty"`
 }
 
 // GetSharedClusterParams defines parameters for GetSharedCluster.
@@ -2143,12 +2248,6 @@ type GetClusterOptionsParamsProvider string
 
 // GetClusterOptionsParamsType defines parameters for GetClusterOptions.
 type GetClusterOptionsParamsType string
-
-// ListOrganizationAuthIdsParams defines parameters for ListOrganizationAuthIds.
-type ListOrganizationAuthIdsParams struct {
-	// Email User email to retrieve organization auth IDs for
-	Email string `form:"email" json:"email"`
-}
 
 // ListOrganizationsParams defines parameters for ListOrganizations.
 type ListOrganizationsParams struct {
@@ -2215,8 +2314,8 @@ type ListClustersParams struct {
 	// Types type to filter clusters on
 	Types *[]ListClustersParamsTypes `form:"types,omitempty" json:"types,omitempty"`
 
-	// Status status to filter clusters on
-	Status *ListClustersParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+	// Statuses statuses to filter clusters on
+	Statuses *[]ListClustersParamsStatuses `form:"statuses,omitempty" json:"statuses,omitempty"`
 
 	// Search string to search for when listing clusters
 	Search *string `form:"search,omitempty" json:"search,omitempty"`
@@ -2237,11 +2336,17 @@ type ListClustersParamsProvider string
 // ListClustersParamsTypes defines parameters for ListClusters.
 type ListClustersParamsTypes string
 
-// ListClustersParamsStatus defines parameters for ListClusters.
-type ListClustersParamsStatus string
+// ListClustersParamsStatuses defines parameters for ListClusters.
+type ListClustersParamsStatuses string
 
 // ListClustersParamsSorts defines parameters for ListClusters.
 type ListClustersParamsSorts string
+
+// GetDeploymentOptionsParams defines parameters for GetDeploymentOptions.
+type GetDeploymentOptionsParams struct {
+	// DeploymentId deployment ID
+	DeploymentId *string `form:"deploymentId,omitempty" json:"deploymentId,omitempty"`
+}
 
 // ListDeploymentsParams defines parameters for ListDeployments.
 type ListDeploymentsParams struct {
@@ -2264,47 +2369,20 @@ type ListDeploymentsParams struct {
 // ListDeploymentsParamsSorts defines parameters for ListDeployments.
 type ListDeploymentsParamsSorts string
 
-// GetDeploymentDagRunsParams defines parameters for GetDeploymentDagRuns.
-type GetDeploymentDagRunsParams struct {
-	// PageSize page size, default of 20
-	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+// ListDeploymentApiTokensParams defines parameters for ListDeploymentApiTokens.
+type ListDeploymentApiTokensParams struct {
+	// Offset Offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
-	// Cursor pagination cursor
-	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	// Limit Limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 
-	// RunId filter by ID of the dags run
-	RunId *string `form:"runId,omitempty" json:"runId,omitempty"`
-
-	// LogicalDateLt filter by logical date (aka execution date)  of  the  dags  run  less     than  (RFC3339 format)
-	LogicalDateLt *time.Time `form:"logicalDate__lt,omitempty" json:"logicalDate__lt,omitempty"`
-
-	// LogicalDateGt filter by logical date (aka execution date)  of  the  dags  run  greater  than  (RFC3339 format)
-	LogicalDateGt *time.Time `form:"logicalDate__gt,omitempty" json:"logicalDate__gt,omitempty"`
-
-	// StartDateLt filter by start date of the dags run less than (RFC3339 format)
-	StartDateLt *time.Time `form:"startDate__lt,omitempty" json:"startDate__lt,omitempty"`
-
-	// StartDateGt filter by start date of the dags run greater than (RFC3339 format)
-	StartDateGt *time.Time `form:"startDate__gt,omitempty" json:"startDate__gt,omitempty"`
-
-	// EndDateLt filter by end date of the dags run less than (RFC3339 format)
-	EndDateLt *time.Time `form:"endDate__lt,omitempty" json:"endDate__lt,omitempty"`
-
-	// EndDateGt filter by end date of the dags run greater than (RFC3339 format)
-	EndDateGt *time.Time `form:"endDate__gt,omitempty" json:"endDate__gt,omitempty"`
-
-	// State filter by dags runs with any of these run states
-	State *[]GetDeploymentDagRunsParamsState `form:"state,omitempty" json:"state,omitempty"`
-
-	// RunTypeIn filter by dags runs with any of these run types
-	RunTypeIn *[]GetDeploymentDagRunsParamsRunTypeIn `form:"runType__in,omitempty" json:"runType__in,omitempty"`
+	// Sorts Sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListDeploymentApiTokensParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
 }
 
-// GetDeploymentDagRunsParamsState defines parameters for GetDeploymentDagRuns.
-type GetDeploymentDagRunsParamsState string
-
-// GetDeploymentDagRunsParamsRunTypeIn defines parameters for GetDeploymentDagRuns.
-type GetDeploymentDagRunsParamsRunTypeIn string
+// ListDeploymentApiTokensParamsSorts defines parameters for ListDeploymentApiTokens.
+type ListDeploymentApiTokensParamsSorts string
 
 // GetDeploymentLogsParams defines parameters for GetDeploymentLogs.
 type GetDeploymentLogsParams struct {
@@ -2333,20 +2411,44 @@ type GetDeploymentLogsParams struct {
 // GetDeploymentLogsParamsSources defines parameters for GetDeploymentLogs.
 type GetDeploymentLogsParamsSources string
 
-// GetMetronomeDashboardParams defines parameters for GetMetronomeDashboard.
-type GetMetronomeDashboardParams struct {
-	// ShowZeroUsageLineItems optional flag to show zero usage line items for invoice dashboards
-	ShowZeroUsageLineItems *bool `form:"showZeroUsageLineItems,omitempty" json:"showZeroUsageLineItems,omitempty"`
+// ListEnvironmentObjectsParams defines parameters for ListEnvironmentObjects.
+type ListEnvironmentObjectsParams struct {
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
-	// ColorOverrides optional list of colors ('gray_dark', 'gray_medium', 'gray_light', 'gray_extralight', 'white', 'primary_medium', or 'primary_light')  to  override  in  the  format  'color:#hex-color-value'  Eg.  'gray_dark:#ff0000'
-	ColorOverrides *[]string `form:"colorOverrides,omitempty" json:"colorOverrides,omitempty"`
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListEnvironmentObjectsParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+
+	// WorkspaceId workspace ID
+	WorkspaceId *string `form:"workspaceId,omitempty" json:"workspaceId,omitempty"`
+
+	// DeploymentId deployment ID
+	DeploymentId *string `form:"deploymentId,omitempty" json:"deploymentId,omitempty"`
+
+	// ProjectId project ID
+	ProjectId *string `form:"projectId,omitempty" json:"projectId,omitempty"`
+
+	// ObjectType object type
+	ObjectType *ListEnvironmentObjectsParamsObjectType `form:"objectType,omitempty" json:"objectType,omitempty"`
+
+	// ObjectKey object key
+	ObjectKey *string `form:"objectKey,omitempty" json:"objectKey,omitempty"`
+
+	// ShowSecrets show secrets in response
+	ShowSecrets *bool `form:"showSecrets,omitempty" json:"showSecrets,omitempty"`
+
+	// ResolveLinked resolve linked objects
+	ResolveLinked *bool `form:"resolveLinked,omitempty" json:"resolveLinked,omitempty"`
 }
 
-// GetMetronomeDashboardParamsType defines parameters for GetMetronomeDashboard.
-type GetMetronomeDashboardParamsType string
+// ListEnvironmentObjectsParamsSorts defines parameters for ListEnvironmentObjects.
+type ListEnvironmentObjectsParamsSorts string
 
-// GetStripeClientSecretParamsType defines parameters for GetStripeClientSecret.
-type GetStripeClientSecretParamsType string
+// ListEnvironmentObjectsParamsObjectType defines parameters for ListEnvironmentObjects.
+type ListEnvironmentObjectsParamsObjectType string
 
 // ListOrganizationTeamsParams defines parameters for ListOrganizationTeams.
 type ListOrganizationTeamsParams struct {
@@ -2510,9 +2612,6 @@ type GetSelfUserParams struct {
 	CreateIfNotExist *bool `form:"createIfNotExist,omitempty" json:"createIfNotExist,omitempty"`
 }
 
-// ValidateSsoLoginJSONRequestBody defines body for ValidateSsoLogin for application/json ContentType.
-type ValidateSsoLoginJSONRequestBody = ValidateSsoLoginRequest
-
 // CreateOrganizationJSONRequestBody defines body for CreateOrganization for application/json ContentType.
 type CreateOrganizationJSONRequestBody = CreateOrganizationRequest
 
@@ -2543,20 +2642,29 @@ type CreateGcpClusterJSONRequestBody = CreateGcpClusterRequest
 // UpdateGcpClusterJSONRequestBody defines body for UpdateGcpCluster for application/json ContentType.
 type UpdateGcpClusterJSONRequestBody = UpdateGcpClusterRequest
 
-// CreateManagedDomainJSONRequestBody defines body for CreateManagedDomain for application/json ContentType.
-type CreateManagedDomainJSONRequestBody = CreateManagedDomainRequest
+// CreateDeploymentJSONRequestBody defines body for CreateDeployment for application/json ContentType.
+type CreateDeploymentJSONRequestBody = CreateDeploymentRequest
 
-// UpdateManagedDomainJSONRequestBody defines body for UpdateManagedDomain for application/json ContentType.
-type UpdateManagedDomainJSONRequestBody = UpdateManagedDomainRequest
+// UpdateDeploymentJSONRequestBody defines body for UpdateDeployment for application/json ContentType.
+type UpdateDeploymentJSONRequestBody = UpdateDeploymentRequest
+
+// CreateDeploymentApiTokenJSONRequestBody defines body for CreateDeploymentApiToken for application/json ContentType.
+type CreateDeploymentApiTokenJSONRequestBody = CreateDeploymentApiTokenRequest
+
+// UpdateDeploymentApiTokenJSONRequestBody defines body for UpdateDeploymentApiToken for application/json ContentType.
+type UpdateDeploymentApiTokenJSONRequestBody = UpdateDeploymentApiTokenRequest
+
+// TransferDeploymentJSONRequestBody defines body for TransferDeployment for application/json ContentType.
+type TransferDeploymentJSONRequestBody = TransferDeploymentRequest
+
+// CreateEnvironmentObjectJSONRequestBody defines body for CreateEnvironmentObject for application/json ContentType.
+type CreateEnvironmentObjectJSONRequestBody = CreateEnvironmentObjectRequest
+
+// UpdateEnvironmentObjectJSONRequestBody defines body for UpdateEnvironmentObject for application/json ContentType.
+type UpdateEnvironmentObjectJSONRequestBody = UpdateEnvironmentObjectRequest
 
 // CreateUserInviteJSONRequestBody defines body for CreateUserInvite for application/json ContentType.
 type CreateUserInviteJSONRequestBody = CreateUserInviteRequest
-
-// CreateSsoConnectionJSONRequestBody defines body for CreateSsoConnection for application/json ContentType.
-type CreateSsoConnectionJSONRequestBody = CreateSsoConnectionRequest
-
-// UpdateSsoConnectionJSONRequestBody defines body for UpdateSsoConnection for application/json ContentType.
-type UpdateSsoConnectionJSONRequestBody = UpdateSsoConnectionRequest
 
 // CreateTeamJSONRequestBody defines body for CreateTeam for application/json ContentType.
 type CreateTeamJSONRequestBody = CreateTeamRequest
@@ -2573,9 +2681,6 @@ type MutateOrgTeamRoleJSONRequestBody = MutateOrgTeamRoleRequest
 // MutateOrgUserRoleJSONRequestBody defines body for MutateOrgUserRole for application/json ContentType.
 type MutateOrgUserRoleJSONRequestBody = MutateOrgUserRoleRequest
 
-// ValidateCreditCardPaymentJSONRequestBody defines body for ValidateCreditCardPayment for application/json ContentType.
-type ValidateCreditCardPaymentJSONRequestBody = ValidateCreditCardPaymentRequest
-
 // CreateWorkspaceJSONRequestBody defines body for CreateWorkspace for application/json ContentType.
 type CreateWorkspaceJSONRequestBody = CreateWorkspaceRequest
 
@@ -2588,9 +2693,6 @@ type CreateWorkspaceApiTokenJSONRequestBody = CreateWorkspaceApiTokenRequest
 // UpdateWorkspaceApiTokenJSONRequestBody defines body for UpdateWorkspaceApiToken for application/json ContentType.
 type UpdateWorkspaceApiTokenJSONRequestBody = UpdateWorkspaceApiTokenRequest
 
-// UpdateDeploymentJSONRequestBody defines body for UpdateDeployment for application/json ContentType.
-type UpdateDeploymentJSONRequestBody = UpdateDeploymentRequest
-
 // MutateWorkspaceTeamRoleJSONRequestBody defines body for MutateWorkspaceTeamRole for application/json ContentType.
 type MutateWorkspaceTeamRoleJSONRequestBody = MutateWorkspaceTeamRoleRequest
 
@@ -2599,6 +2701,156 @@ type MutateWorkspaceUserRoleJSONRequestBody = MutateWorkspaceUserRoleRequest
 
 // UpdateSelfUserInviteJSONRequestBody defines body for UpdateSelfUserInvite for application/json ContentType.
 type UpdateSelfUserInviteJSONRequestBody = UpdateInviteRequest
+
+// AsCreateDedicatedDeploymentRequest returns the union data inside the CreateDeploymentRequest as a CreateDedicatedDeploymentRequest
+func (t CreateDeploymentRequest) AsCreateDedicatedDeploymentRequest() (CreateDedicatedDeploymentRequest, error) {
+	var body CreateDedicatedDeploymentRequest
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCreateDedicatedDeploymentRequest overwrites any union data inside the CreateDeploymentRequest as the provided CreateDedicatedDeploymentRequest
+func (t *CreateDeploymentRequest) FromCreateDedicatedDeploymentRequest(v CreateDedicatedDeploymentRequest) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCreateDedicatedDeploymentRequest performs a merge with any union data inside the CreateDeploymentRequest, using the provided CreateDedicatedDeploymentRequest
+func (t *CreateDeploymentRequest) MergeCreateDedicatedDeploymentRequest(v CreateDedicatedDeploymentRequest) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCreateHybridDeploymentRequest returns the union data inside the CreateDeploymentRequest as a CreateHybridDeploymentRequest
+func (t CreateDeploymentRequest) AsCreateHybridDeploymentRequest() (CreateHybridDeploymentRequest, error) {
+	var body CreateHybridDeploymentRequest
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCreateHybridDeploymentRequest overwrites any union data inside the CreateDeploymentRequest as the provided CreateHybridDeploymentRequest
+func (t *CreateDeploymentRequest) FromCreateHybridDeploymentRequest(v CreateHybridDeploymentRequest) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCreateHybridDeploymentRequest performs a merge with any union data inside the CreateDeploymentRequest, using the provided CreateHybridDeploymentRequest
+func (t *CreateDeploymentRequest) MergeCreateHybridDeploymentRequest(v CreateHybridDeploymentRequest) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCreateStandardDeploymentRequest returns the union data inside the CreateDeploymentRequest as a CreateStandardDeploymentRequest
+func (t CreateDeploymentRequest) AsCreateStandardDeploymentRequest() (CreateStandardDeploymentRequest, error) {
+	var body CreateStandardDeploymentRequest
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCreateStandardDeploymentRequest overwrites any union data inside the CreateDeploymentRequest as the provided CreateStandardDeploymentRequest
+func (t *CreateDeploymentRequest) FromCreateStandardDeploymentRequest(v CreateStandardDeploymentRequest) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCreateStandardDeploymentRequest performs a merge with any union data inside the CreateDeploymentRequest, using the provided CreateStandardDeploymentRequest
+func (t *CreateDeploymentRequest) MergeCreateStandardDeploymentRequest(v CreateStandardDeploymentRequest) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t CreateDeploymentRequest) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *CreateDeploymentRequest) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsUpdateHostedDeploymentRequest returns the union data inside the UpdateDeploymentRequest as a UpdateHostedDeploymentRequest
+func (t UpdateDeploymentRequest) AsUpdateHostedDeploymentRequest() (UpdateHostedDeploymentRequest, error) {
+	var body UpdateHostedDeploymentRequest
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromUpdateHostedDeploymentRequest overwrites any union data inside the UpdateDeploymentRequest as the provided UpdateHostedDeploymentRequest
+func (t *UpdateDeploymentRequest) FromUpdateHostedDeploymentRequest(v UpdateHostedDeploymentRequest) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeUpdateHostedDeploymentRequest performs a merge with any union data inside the UpdateDeploymentRequest, using the provided UpdateHostedDeploymentRequest
+func (t *UpdateDeploymentRequest) MergeUpdateHostedDeploymentRequest(v UpdateHostedDeploymentRequest) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsUpdateHybridDeploymentRequest returns the union data inside the UpdateDeploymentRequest as a UpdateHybridDeploymentRequest
+func (t UpdateDeploymentRequest) AsUpdateHybridDeploymentRequest() (UpdateHybridDeploymentRequest, error) {
+	var body UpdateHybridDeploymentRequest
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromUpdateHybridDeploymentRequest overwrites any union data inside the UpdateDeploymentRequest as the provided UpdateHybridDeploymentRequest
+func (t *UpdateDeploymentRequest) FromUpdateHybridDeploymentRequest(v UpdateHybridDeploymentRequest) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeUpdateHybridDeploymentRequest performs a merge with any union data inside the UpdateDeploymentRequest, using the provided UpdateHybridDeploymentRequest
+func (t *UpdateDeploymentRequest) MergeUpdateHybridDeploymentRequest(v UpdateHybridDeploymentRequest) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t UpdateDeploymentRequest) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *UpdateDeploymentRequest) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -2676,22 +2928,11 @@ type ClientInterface interface {
 	// GetUserInvite request
 	GetUserInvite(ctx context.Context, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ValidateSsoLogin request with any body
-	ValidateSsoLoginWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	ValidateSsoLogin(ctx context.Context, body ValidateSsoLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// GetSharedCluster request
 	GetSharedCluster(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetClusterOptions request
 	GetClusterOptions(ctx context.Context, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetDeploymentOptions request
-	GetDeploymentOptions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ListOrganizationAuthIds request
-	ListOrganizationAuthIds(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListOrganizations request
 	ListOrganizations(ctx context.Context, params *ListOrganizationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2773,42 +3014,76 @@ type ClientInterface interface {
 	// GetCluster request
 	GetCluster(ctx context.Context, organizationId string, clusterId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetDeploymentOptions request
+	GetDeploymentOptions(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListDeployments request
 	ListDeployments(ctx context.Context, organizationId string, params *ListDeploymentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetDeploymentDagRuns request
-	GetDeploymentDagRuns(ctx context.Context, organizationId string, deploymentId string, dagId string, params *GetDeploymentDagRunsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// CreateDeployment request with any body
+	CreateDeploymentWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetDeploymentDagStructure request
-	GetDeploymentDagStructure(ctx context.Context, organizationId string, deploymentId string, dagId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateDeployment(ctx context.Context, organizationId string, body CreateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteDeployment request
+	DeleteDeployment(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDeployment request
+	GetDeployment(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateDeployment request with any body
+	UpdateDeploymentWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateDeployment(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDeploymentApiTokens request
+	ListDeploymentApiTokens(ctx context.Context, organizationId string, deploymentId string, params *ListDeploymentApiTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateDeploymentApiToken request with any body
+	CreateDeploymentApiTokenWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, body CreateDeploymentApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteDeploymentApiToken request
+	DeleteDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDeploymentApiToken request
+	GetDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateDeploymentApiToken request with any body
+	UpdateDeploymentApiTokenWithBody(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, body UpdateDeploymentApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateDeploymentApiToken request
+	RotateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDeploymentHealth request
+	GetDeploymentHealth(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetDeploymentLogs request
 	GetDeploymentLogs(ctx context.Context, organizationId string, deploymentId string, params *GetDeploymentLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListManagedDomains request
-	ListManagedDomains(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// TransferDeployment request with any body
+	TransferDeploymentWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateManagedDomain request with any body
-	CreateManagedDomainWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	TransferDeployment(ctx context.Context, organizationId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	CreateManagedDomain(ctx context.Context, organizationId string, body CreateManagedDomainJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// ListEnvironmentObjects request
+	ListEnvironmentObjects(ctx context.Context, organizationId string, params *ListEnvironmentObjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteManagedDomain request
-	DeleteManagedDomain(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// CreateEnvironmentObject request with any body
+	CreateEnvironmentObjectWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetManagedDomain request
-	GetManagedDomain(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateEnvironmentObject(ctx context.Context, organizationId string, body CreateEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateManagedDomain request with any body
-	UpdateManagedDomainWithBody(ctx context.Context, organizationId string, domainId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DeleteEnvironmentObject request
+	DeleteEnvironmentObject(ctx context.Context, organizationId string, environmentObjectId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	UpdateManagedDomain(ctx context.Context, organizationId string, domainId string, body UpdateManagedDomainJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// UpdateEnvironmentObject request with any body
+	UpdateEnvironmentObjectWithBody(ctx context.Context, organizationId string, environmentObjectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// VerifyManagedDomain request
-	VerifyManagedDomain(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetDraftInvoice request
-	GetDraftInvoice(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateEnvironmentObject(ctx context.Context, organizationId string, environmentObjectId string, body UpdateEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateUserInvite request with any body
 	CreateUserInviteWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2817,46 +3092,6 @@ type ClientInterface interface {
 
 	// DeleteUserInvite request
 	DeleteUserInvite(ctx context.Context, organizationId string, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetCreditSummary request
-	GetCreditSummary(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetMetronomeDashboard request
-	GetMetronomeDashboard(ctx context.Context, organizationId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetPaymentMethod request
-	GetPaymentMethod(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// DeleteSsoBypassKey request
-	DeleteSsoBypassKey(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetSsoBypassKey request
-	GetSsoBypassKey(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// UpsertSsoBypassKey request
-	UpsertSsoBypassKey(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ListSsoConnections request
-	ListSsoConnections(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CreateSsoConnection request with any body
-	CreateSsoConnectionWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	CreateSsoConnection(ctx context.Context, organizationId string, body CreateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// DeleteSsoConnection request
-	DeleteSsoConnection(ctx context.Context, organizationId string, connectionId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetSsoConnection request
-	GetSsoConnection(ctx context.Context, organizationId string, connectionId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// UpdateSsoConnection request with any body
-	UpdateSsoConnectionWithBody(ctx context.Context, organizationId string, connectionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	UpdateSsoConnection(ctx context.Context, organizationId string, connectionId string, body UpdateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetStripeClientSecret request
-	GetStripeClientSecret(ctx context.Context, organizationId string, pType GetStripeClientSecretParamsType, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListOrganizationTeams request
 	ListOrganizationTeams(ctx context.Context, organizationId string, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2903,11 +3138,6 @@ type ClientInterface interface {
 	MutateOrgUserRoleWithBody(ctx context.Context, organizationId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	MutateOrgUserRole(ctx context.Context, organizationId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ValidateCreditCardPayment request with any body
-	ValidateCreditCardPaymentWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	ValidateCreditCardPayment(ctx context.Context, organizationId string, body ValidateCreditCardPaymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaces request
 	ListWorkspaces(ctx context.Context, organizationId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2956,11 +3186,6 @@ type ClientInterface interface {
 	// ListWorkspaceDags request
 	ListWorkspaceDags(ctx context.Context, organizationId string, workspaceId string, params *ListWorkspaceDagsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateDeployment request with any body
-	UpdateDeploymentWithBody(ctx context.Context, organizationId string, workspaceId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	UpdateDeployment(ctx context.Context, organizationId string, workspaceId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// ListWorkspaceTeams request
 	ListWorkspaceTeams(ctx context.Context, organizationId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -3004,30 +3229,6 @@ func (c *Client) GetUserInvite(ctx context.Context, inviteId string, reqEditors 
 	return c.Client.Do(req)
 }
 
-func (c *Client) ValidateSsoLoginWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewValidateSsoLoginRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ValidateSsoLogin(ctx context.Context, body ValidateSsoLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewValidateSsoLoginRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 func (c *Client) GetSharedCluster(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSharedClusterRequest(c.Server, params)
 	if err != nil {
@@ -3042,30 +3243,6 @@ func (c *Client) GetSharedCluster(ctx context.Context, params *GetSharedClusterP
 
 func (c *Client) GetClusterOptions(ctx context.Context, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetClusterOptionsRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetDeploymentOptions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetDeploymentOptionsRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ListOrganizationAuthIds(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListOrganizationAuthIdsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3436,6 +3613,18 @@ func (c *Client) GetCluster(ctx context.Context, organizationId string, clusterI
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetDeploymentOptions(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeploymentOptionsRequest(c.Server, organizationId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListDeployments(ctx context.Context, organizationId string, params *ListDeploymentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListDeploymentsRequest(c.Server, organizationId, params)
 	if err != nil {
@@ -3448,8 +3637,8 @@ func (c *Client) ListDeployments(ctx context.Context, organizationId string, par
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetDeploymentDagRuns(ctx context.Context, organizationId string, deploymentId string, dagId string, params *GetDeploymentDagRunsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetDeploymentDagRunsRequest(c.Server, organizationId, deploymentId, dagId, params)
+func (c *Client) CreateDeploymentWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeploymentRequestWithBody(c.Server, organizationId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3460,8 +3649,164 @@ func (c *Client) GetDeploymentDagRuns(ctx context.Context, organizationId string
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetDeploymentDagStructure(ctx context.Context, organizationId string, deploymentId string, dagId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetDeploymentDagStructureRequest(c.Server, organizationId, deploymentId, dagId)
+func (c *Client) CreateDeployment(ctx context.Context, organizationId string, body CreateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeploymentRequest(c.Server, organizationId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteDeployment(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteDeploymentRequest(c.Server, organizationId, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetDeployment(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeploymentRequest(c.Server, organizationId, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeploymentWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeploymentRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeployment(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeploymentRequest(c.Server, organizationId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDeploymentApiTokens(ctx context.Context, organizationId string, deploymentId string, params *ListDeploymentApiTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDeploymentApiTokensRequest(c.Server, organizationId, deploymentId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateDeploymentApiTokenWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeploymentApiTokenRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, body CreateDeploymentApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeploymentApiTokenRequest(c.Server, organizationId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteDeploymentApiTokenRequest(c.Server, organizationId, deploymentId, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeploymentApiTokenRequest(c.Server, organizationId, deploymentId, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeploymentApiTokenWithBody(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeploymentApiTokenRequestWithBody(c.Server, organizationId, deploymentId, apiTokenId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, body UpdateDeploymentApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeploymentApiTokenRequest(c.Server, organizationId, deploymentId, apiTokenId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RotateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateDeploymentApiTokenRequest(c.Server, organizationId, deploymentId, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetDeploymentHealth(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeploymentHealthRequest(c.Server, organizationId, deploymentId)
 	if err != nil {
 		return nil, err
 	}
@@ -3484,8 +3829,8 @@ func (c *Client) GetDeploymentLogs(ctx context.Context, organizationId string, d
 	return c.Client.Do(req)
 }
 
-func (c *Client) ListManagedDomains(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListManagedDomainsRequest(c.Server, organizationId)
+func (c *Client) TransferDeploymentWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTransferDeploymentRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3496,8 +3841,8 @@ func (c *Client) ListManagedDomains(ctx context.Context, organizationId string, 
 	return c.Client.Do(req)
 }
 
-func (c *Client) CreateManagedDomainWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateManagedDomainRequestWithBody(c.Server, organizationId, contentType, body)
+func (c *Client) TransferDeployment(ctx context.Context, organizationId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTransferDeploymentRequest(c.Server, organizationId, deploymentId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3508,8 +3853,8 @@ func (c *Client) CreateManagedDomainWithBody(ctx context.Context, organizationId
 	return c.Client.Do(req)
 }
 
-func (c *Client) CreateManagedDomain(ctx context.Context, organizationId string, body CreateManagedDomainJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateManagedDomainRequest(c.Server, organizationId, body)
+func (c *Client) ListEnvironmentObjects(ctx context.Context, organizationId string, params *ListEnvironmentObjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListEnvironmentObjectsRequest(c.Server, organizationId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3520,8 +3865,8 @@ func (c *Client) CreateManagedDomain(ctx context.Context, organizationId string,
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteManagedDomain(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteManagedDomainRequest(c.Server, organizationId, domainId)
+func (c *Client) CreateEnvironmentObjectWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateEnvironmentObjectRequestWithBody(c.Server, organizationId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3532,8 +3877,8 @@ func (c *Client) DeleteManagedDomain(ctx context.Context, organizationId string,
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetManagedDomain(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetManagedDomainRequest(c.Server, organizationId, domainId)
+func (c *Client) CreateEnvironmentObject(ctx context.Context, organizationId string, body CreateEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateEnvironmentObjectRequest(c.Server, organizationId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3544,8 +3889,8 @@ func (c *Client) GetManagedDomain(ctx context.Context, organizationId string, do
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateManagedDomainWithBody(ctx context.Context, organizationId string, domainId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateManagedDomainRequestWithBody(c.Server, organizationId, domainId, contentType, body)
+func (c *Client) DeleteEnvironmentObject(ctx context.Context, organizationId string, environmentObjectId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteEnvironmentObjectRequest(c.Server, organizationId, environmentObjectId)
 	if err != nil {
 		return nil, err
 	}
@@ -3556,8 +3901,8 @@ func (c *Client) UpdateManagedDomainWithBody(ctx context.Context, organizationId
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateManagedDomain(ctx context.Context, organizationId string, domainId string, body UpdateManagedDomainJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateManagedDomainRequest(c.Server, organizationId, domainId, body)
+func (c *Client) UpdateEnvironmentObjectWithBody(ctx context.Context, organizationId string, environmentObjectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateEnvironmentObjectRequestWithBody(c.Server, organizationId, environmentObjectId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3568,20 +3913,8 @@ func (c *Client) UpdateManagedDomain(ctx context.Context, organizationId string,
 	return c.Client.Do(req)
 }
 
-func (c *Client) VerifyManagedDomain(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewVerifyManagedDomainRequest(c.Server, organizationId, domainId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetDraftInvoice(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetDraftInvoiceRequest(c.Server, organizationId)
+func (c *Client) UpdateEnvironmentObject(ctx context.Context, organizationId string, environmentObjectId string, body UpdateEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateEnvironmentObjectRequest(c.Server, organizationId, environmentObjectId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3618,174 +3951,6 @@ func (c *Client) CreateUserInvite(ctx context.Context, organizationId string, bo
 
 func (c *Client) DeleteUserInvite(ctx context.Context, organizationId string, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteUserInviteRequest(c.Server, organizationId, inviteId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetCreditSummary(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetCreditSummaryRequest(c.Server, organizationId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetMetronomeDashboard(ctx context.Context, organizationId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetMetronomeDashboardRequest(c.Server, organizationId, pType, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetPaymentMethod(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetPaymentMethodRequest(c.Server, organizationId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) DeleteSsoBypassKey(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteSsoBypassKeyRequest(c.Server, organizationId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetSsoBypassKey(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetSsoBypassKeyRequest(c.Server, organizationId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) UpsertSsoBypassKey(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpsertSsoBypassKeyRequest(c.Server, organizationId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ListSsoConnections(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListSsoConnectionsRequest(c.Server, organizationId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateSsoConnectionWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateSsoConnectionRequestWithBody(c.Server, organizationId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateSsoConnection(ctx context.Context, organizationId string, body CreateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateSsoConnectionRequest(c.Server, organizationId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) DeleteSsoConnection(ctx context.Context, organizationId string, connectionId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteSsoConnectionRequest(c.Server, organizationId, connectionId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetSsoConnection(ctx context.Context, organizationId string, connectionId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetSsoConnectionRequest(c.Server, organizationId, connectionId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) UpdateSsoConnectionWithBody(ctx context.Context, organizationId string, connectionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateSsoConnectionRequestWithBody(c.Server, organizationId, connectionId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) UpdateSsoConnection(ctx context.Context, organizationId string, connectionId string, body UpdateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateSsoConnectionRequest(c.Server, organizationId, connectionId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetStripeClientSecret(ctx context.Context, organizationId string, pType GetStripeClientSecretParamsType, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetStripeClientSecretRequest(c.Server, organizationId, pType)
 	if err != nil {
 		return nil, err
 	}
@@ -4000,30 +4165,6 @@ func (c *Client) MutateOrgUserRole(ctx context.Context, organizationId string, u
 	return c.Client.Do(req)
 }
 
-func (c *Client) ValidateCreditCardPaymentWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewValidateCreditCardPaymentRequestWithBody(c.Server, organizationId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ValidateCreditCardPayment(ctx context.Context, organizationId string, body ValidateCreditCardPaymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewValidateCreditCardPaymentRequest(c.Server, organizationId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 func (c *Client) ListWorkspaces(ctx context.Context, organizationId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListWorkspacesRequest(c.Server, organizationId, params)
 	if err != nil {
@@ -4228,30 +4369,6 @@ func (c *Client) ListWorkspaceDags(ctx context.Context, organizationId string, w
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateDeploymentWithBody(ctx context.Context, organizationId string, workspaceId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateDeploymentRequestWithBody(c.Server, organizationId, workspaceId, deploymentId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) UpdateDeployment(ctx context.Context, organizationId string, workspaceId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateDeploymentRequest(c.Server, organizationId, workspaceId, deploymentId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 func (c *Client) ListWorkspaceTeams(ctx context.Context, organizationId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListWorkspaceTeamsRequest(c.Server, organizationId, workspaceId, params)
 	if err != nil {
@@ -4418,46 +4535,6 @@ func NewGetUserInviteRequest(server string, inviteId string) (*http.Request, err
 	return req, nil
 }
 
-// NewValidateSsoLoginRequest calls the generic ValidateSsoLogin builder with application/json body
-func NewValidateSsoLoginRequest(server string, body ValidateSsoLoginJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewValidateSsoLoginRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewValidateSsoLoginRequestWithBody generates requests for ValidateSsoLogin with any type of body
-func NewValidateSsoLoginRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/auth/post-login-callback")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewGetSharedClusterRequest generates requests for GetSharedCluster
 func NewGetSharedClusterRequest(server string, params *GetSharedClusterParams) (*http.Request, error) {
 	var err error
@@ -4554,78 +4631,6 @@ func NewGetClusterOptionsRequest(server string, params *GetClusterOptionsParams)
 		}
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "type", runtime.ParamLocationQuery, params.Type); err != nil {
-			return nil, err
-		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-			return nil, err
-		} else {
-			for k, v := range parsed {
-				for _, v2 := range v {
-					queryValues.Add(k, v2)
-				}
-			}
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetDeploymentOptionsRequest generates requests for GetDeploymentOptions
-func NewGetDeploymentOptionsRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/options/deployment")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListOrganizationAuthIdsRequest generates requests for ListOrganizationAuthIds
-func NewListOrganizationAuthIdsRequest(server string, params *ListOrganizationAuthIdsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizationAuthIds")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "email", runtime.ParamLocationQuery, params.Email); err != nil {
 			return nil, err
 		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 			return nil, err
@@ -5333,9 +5338,9 @@ func NewListClustersRequest(server string, organizationId string, params *ListCl
 
 		}
 
-		if params.Status != nil {
+		if params.Statuses != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "status", runtime.ParamLocationQuery, *params.Status); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "statuses", runtime.ParamLocationQuery, *params.Statuses); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -5809,6 +5814,62 @@ func NewGetClusterRequest(server string, organizationId string, clusterId string
 	return req, nil
 }
 
+// NewGetDeploymentOptionsRequest generates requests for GetDeploymentOptions
+func NewGetDeploymentOptionsRequest(server string, organizationId string, params *GetDeploymentOptionsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployment-options", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.DeploymentId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deploymentId", runtime.ParamLocationQuery, *params.DeploymentId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListDeploymentsRequest generates requests for ListDeployments
 func NewListDeploymentsRequest(server string, organizationId string, params *ListDeploymentsParams) (*http.Request, error) {
 	var err error
@@ -5929,8 +5990,55 @@ func NewListDeploymentsRequest(server string, organizationId string, params *Lis
 	return req, nil
 }
 
-// NewGetDeploymentDagRunsRequest generates requests for GetDeploymentDagRuns
-func NewGetDeploymentDagRunsRequest(server string, organizationId string, deploymentId string, dagId string, params *GetDeploymentDagRunsParams) (*http.Request, error) {
+// NewCreateDeploymentRequest calls the generic CreateDeployment builder with application/json body
+func NewCreateDeploymentRequest(server string, organizationId string, body CreateDeploymentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateDeploymentRequestWithBody(server, organizationId, "application/json", bodyReader)
+}
+
+// NewCreateDeploymentRequestWithBody generates requests for CreateDeployment with any type of body
+func NewCreateDeploymentRequestWithBody(server string, organizationId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteDeploymentRequest generates requests for DeleteDeployment
+func NewDeleteDeploymentRequest(server string, organizationId string, deploymentId string) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -5947,9 +6055,43 @@ func NewGetDeploymentDagRunsRequest(server string, organizationId string, deploy
 		return nil, err
 	}
 
-	var pathParam2 string
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
 
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "dagId", runtime.ParamLocationPath, dagId)
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetDeploymentRequest generates requests for GetDeployment
+func NewGetDeploymentRequest(server string, organizationId string, deploymentId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
 	if err != nil {
 		return nil, err
 	}
@@ -5959,7 +6101,102 @@ func NewGetDeploymentDagRunsRequest(server string, organizationId string, deploy
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/dags/%s/runs", pathParam0, pathParam1, pathParam2)
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateDeploymentRequest calls the generic UpdateDeployment builder with application/json body
+func NewUpdateDeploymentRequest(server string, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateDeploymentRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
+}
+
+// NewUpdateDeploymentRequestWithBody generates requests for UpdateDeployment with any type of body
+func NewUpdateDeploymentRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListDeploymentApiTokensRequest generates requests for ListDeploymentApiTokens
+func NewListDeploymentApiTokensRequest(server string, organizationId string, deploymentId string, params *ListDeploymentApiTokensParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/api-tokens", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -5972,9 +6209,9 @@ func NewGetDeploymentDagRunsRequest(server string, organizationId string, deploy
 	if params != nil {
 		queryValues := queryURL.Query()
 
-		if params.PageSize != nil {
+		if params.Offset != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageSize", runtime.ParamLocationQuery, *params.PageSize); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -5988,9 +6225,9 @@ func NewGetDeploymentDagRunsRequest(server string, organizationId string, deploy
 
 		}
 
-		if params.Cursor != nil {
+		if params.Limit != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "cursor", runtime.ParamLocationQuery, *params.Cursor); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -6004,137 +6241,9 @@ func NewGetDeploymentDagRunsRequest(server string, organizationId string, deploy
 
 		}
 
-		if params.RunId != nil {
+		if params.Sorts != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "runId", runtime.ParamLocationQuery, *params.RunId); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.LogicalDateLt != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "logicalDate__lt", runtime.ParamLocationQuery, *params.LogicalDateLt); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.LogicalDateGt != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "logicalDate__gt", runtime.ParamLocationQuery, *params.LogicalDateGt); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.StartDateLt != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "startDate__lt", runtime.ParamLocationQuery, *params.StartDateLt); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.StartDateGt != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "startDate__gt", runtime.ParamLocationQuery, *params.StartDateGt); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.EndDateLt != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "endDate__lt", runtime.ParamLocationQuery, *params.EndDateLt); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.EndDateGt != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "endDate__gt", runtime.ParamLocationQuery, *params.EndDateGt); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.State != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "state", runtime.ParamLocationQuery, *params.State); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.RunTypeIn != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "runType__in", runtime.ParamLocationQuery, *params.RunTypeIn); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -6159,8 +6268,62 @@ func NewGetDeploymentDagRunsRequest(server string, organizationId string, deploy
 	return req, nil
 }
 
-// NewGetDeploymentDagStructureRequest generates requests for GetDeploymentDagStructure
-func NewGetDeploymentDagStructureRequest(server string, organizationId string, deploymentId string, dagId string) (*http.Request, error) {
+// NewCreateDeploymentApiTokenRequest calls the generic CreateDeploymentApiToken builder with application/json body
+func NewCreateDeploymentApiTokenRequest(server string, organizationId string, deploymentId string, body CreateDeploymentApiTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateDeploymentApiTokenRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
+}
+
+// NewCreateDeploymentApiTokenRequestWithBody generates requests for CreateDeploymentApiToken with any type of body
+func NewCreateDeploymentApiTokenRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/api-tokens", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteDeploymentApiTokenRequest generates requests for DeleteDeploymentApiToken
+func NewDeleteDeploymentApiTokenRequest(server string, organizationId string, deploymentId string, apiTokenId string) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -6179,7 +6342,7 @@ func NewGetDeploymentDagStructureRequest(server string, organizationId string, d
 
 	var pathParam2 string
 
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "dagId", runtime.ParamLocationPath, dagId)
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
 	if err != nil {
 		return nil, err
 	}
@@ -6189,7 +6352,205 @@ func NewGetDeploymentDagStructureRequest(server string, organizationId string, d
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/dags/%s/structure", pathParam0, pathParam1, pathParam2)
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/api-tokens/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetDeploymentApiTokenRequest generates requests for GetDeploymentApiToken
+func NewGetDeploymentApiTokenRequest(server string, organizationId string, deploymentId string, apiTokenId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/api-tokens/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateDeploymentApiTokenRequest calls the generic UpdateDeploymentApiToken builder with application/json body
+func NewUpdateDeploymentApiTokenRequest(server string, organizationId string, deploymentId string, apiTokenId string, body UpdateDeploymentApiTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateDeploymentApiTokenRequestWithBody(server, organizationId, deploymentId, apiTokenId, "application/json", bodyReader)
+}
+
+// NewUpdateDeploymentApiTokenRequestWithBody generates requests for UpdateDeploymentApiToken with any type of body
+func NewUpdateDeploymentApiTokenRequestWithBody(server string, organizationId string, deploymentId string, apiTokenId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/api-tokens/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRotateDeploymentApiTokenRequest generates requests for RotateDeploymentApiToken
+func NewRotateDeploymentApiTokenRequest(server string, organizationId string, deploymentId string, apiTokenId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/api-tokens/%s/rotate", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetDeploymentHealthRequest generates requests for GetDeploymentHealth
+func NewGetDeploymentHealthRequest(server string, organizationId string, deploymentId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/health", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -6362,53 +6723,19 @@ func NewGetDeploymentLogsRequest(server string, organizationId string, deploymen
 	return req, nil
 }
 
-// NewListManagedDomainsRequest generates requests for ListManagedDomains
-func NewListManagedDomainsRequest(server string, organizationId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/domains", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateManagedDomainRequest calls the generic CreateManagedDomain builder with application/json body
-func NewCreateManagedDomainRequest(server string, organizationId string, body CreateManagedDomainJSONRequestBody) (*http.Request, error) {
+// NewTransferDeploymentRequest calls the generic TransferDeployment builder with application/json body
+func NewTransferDeploymentRequest(server string, organizationId string, deploymentId string, body TransferDeploymentJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewCreateManagedDomainRequestWithBody(server, organizationId, "application/json", bodyReader)
+	return NewTransferDeploymentRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
 }
 
-// NewCreateManagedDomainRequestWithBody generates requests for CreateManagedDomain with any type of body
-func NewCreateManagedDomainRequestWithBody(server string, organizationId string, contentType string, body io.Reader) (*http.Request, error) {
+// NewTransferDeploymentRequestWithBody generates requests for TransferDeployment with any type of body
+func NewTransferDeploymentRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -6418,12 +6745,19 @@ func NewCreateManagedDomainRequestWithBody(server string, organizationId string,
 		return nil, err
 	}
 
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/organizations/%s/domains", pathParam0)
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/transfer", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -6443,8 +6777,255 @@ func NewCreateManagedDomainRequestWithBody(server string, organizationId string,
 	return req, nil
 }
 
-// NewDeleteManagedDomainRequest generates requests for DeleteManagedDomain
-func NewDeleteManagedDomainRequest(server string, organizationId string, domainId string) (*http.Request, error) {
+// NewListEnvironmentObjectsRequest generates requests for ListEnvironmentObjects
+func NewListEnvironmentObjectsRequest(server string, organizationId string, params *ListEnvironmentObjectsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/environment-objects", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sorts != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.WorkspaceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "workspaceId", runtime.ParamLocationQuery, *params.WorkspaceId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.DeploymentId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deploymentId", runtime.ParamLocationQuery, *params.DeploymentId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProjectId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "projectId", runtime.ParamLocationQuery, *params.ProjectId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ObjectType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "objectType", runtime.ParamLocationQuery, *params.ObjectType); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ObjectKey != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "objectKey", runtime.ParamLocationQuery, *params.ObjectKey); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ShowSecrets != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "showSecrets", runtime.ParamLocationQuery, *params.ShowSecrets); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ResolveLinked != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "resolveLinked", runtime.ParamLocationQuery, *params.ResolveLinked); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateEnvironmentObjectRequest calls the generic CreateEnvironmentObject builder with application/json body
+func NewCreateEnvironmentObjectRequest(server string, organizationId string, body CreateEnvironmentObjectJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateEnvironmentObjectRequestWithBody(server, organizationId, "application/json", bodyReader)
+}
+
+// NewCreateEnvironmentObjectRequestWithBody generates requests for CreateEnvironmentObject with any type of body
+func NewCreateEnvironmentObjectRequestWithBody(server string, organizationId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/environment-objects", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteEnvironmentObjectRequest generates requests for DeleteEnvironmentObject
+func NewDeleteEnvironmentObjectRequest(server string, organizationId string, environmentObjectId string) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -6456,7 +7037,7 @@ func NewDeleteManagedDomainRequest(server string, organizationId string, domainI
 
 	var pathParam1 string
 
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "domainId", runtime.ParamLocationPath, domainId)
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "environmentObjectId", runtime.ParamLocationPath, environmentObjectId)
 	if err != nil {
 		return nil, err
 	}
@@ -6466,7 +7047,7 @@ func NewDeleteManagedDomainRequest(server string, organizationId string, domainI
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/organizations/%s/domains/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/organizations/%s/environment-objects/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -6484,60 +7065,19 @@ func NewDeleteManagedDomainRequest(server string, organizationId string, domainI
 	return req, nil
 }
 
-// NewGetManagedDomainRequest generates requests for GetManagedDomain
-func NewGetManagedDomainRequest(server string, organizationId string, domainId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "domainId", runtime.ParamLocationPath, domainId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/domains/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateManagedDomainRequest calls the generic UpdateManagedDomain builder with application/json body
-func NewUpdateManagedDomainRequest(server string, organizationId string, domainId string, body UpdateManagedDomainJSONRequestBody) (*http.Request, error) {
+// NewUpdateEnvironmentObjectRequest calls the generic UpdateEnvironmentObject builder with application/json body
+func NewUpdateEnvironmentObjectRequest(server string, organizationId string, environmentObjectId string, body UpdateEnvironmentObjectJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpdateManagedDomainRequestWithBody(server, organizationId, domainId, "application/json", bodyReader)
+	return NewUpdateEnvironmentObjectRequestWithBody(server, organizationId, environmentObjectId, "application/json", bodyReader)
 }
 
-// NewUpdateManagedDomainRequestWithBody generates requests for UpdateManagedDomain with any type of body
-func NewUpdateManagedDomainRequestWithBody(server string, organizationId string, domainId string, contentType string, body io.Reader) (*http.Request, error) {
+// NewUpdateEnvironmentObjectRequestWithBody generates requests for UpdateEnvironmentObject with any type of body
+func NewUpdateEnvironmentObjectRequestWithBody(server string, organizationId string, environmentObjectId string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -6549,7 +7089,7 @@ func NewUpdateManagedDomainRequestWithBody(server string, organizationId string,
 
 	var pathParam1 string
 
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "domainId", runtime.ParamLocationPath, domainId)
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "environmentObjectId", runtime.ParamLocationPath, environmentObjectId)
 	if err != nil {
 		return nil, err
 	}
@@ -6559,7 +7099,7 @@ func NewUpdateManagedDomainRequestWithBody(server string, organizationId string,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/organizations/%s/domains/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/organizations/%s/environment-objects/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -6575,81 +7115,6 @@ func NewUpdateManagedDomainRequestWithBody(server string, organizationId string,
 	}
 
 	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewVerifyManagedDomainRequest generates requests for VerifyManagedDomain
-func NewVerifyManagedDomainRequest(server string, organizationId string, domainId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "domainId", runtime.ParamLocationPath, domainId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/domains/%s/verify", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetDraftInvoiceRequest generates requests for GetDraftInvoice
-func NewGetDraftInvoiceRequest(server string, organizationId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/draft-invoice", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
 
 	return req, nil
 }
@@ -6735,513 +7200,6 @@ func NewDeleteUserInviteRequest(server string, organizationId string, inviteId s
 	}
 
 	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetCreditSummaryRequest generates requests for GetCreditSummary
-func NewGetCreditSummaryRequest(server string, organizationId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/metronome/credit-summary", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetMetronomeDashboardRequest generates requests for GetMetronomeDashboard
-func NewGetMetronomeDashboardRequest(server string, organizationId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "type", runtime.ParamLocationPath, pType)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/metronome/dashboard/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.ShowZeroUsageLineItems != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "showZeroUsageLineItems", runtime.ParamLocationQuery, *params.ShowZeroUsageLineItems); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.ColorOverrides != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "colorOverrides", runtime.ParamLocationQuery, *params.ColorOverrides); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetPaymentMethodRequest generates requests for GetPaymentMethod
-func NewGetPaymentMethodRequest(server string, organizationId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/payment-method", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewDeleteSsoBypassKeyRequest generates requests for DeleteSsoBypassKey
-func NewDeleteSsoBypassKeyRequest(server string, organizationId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/sso-bypass-key", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetSsoBypassKeyRequest generates requests for GetSsoBypassKey
-func NewGetSsoBypassKeyRequest(server string, organizationId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/sso-bypass-key", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpsertSsoBypassKeyRequest generates requests for UpsertSsoBypassKey
-func NewUpsertSsoBypassKeyRequest(server string, organizationId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/sso-bypass-key", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListSsoConnectionsRequest generates requests for ListSsoConnections
-func NewListSsoConnectionsRequest(server string, organizationId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/sso-connections", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateSsoConnectionRequest calls the generic CreateSsoConnection builder with application/json body
-func NewCreateSsoConnectionRequest(server string, organizationId string, body CreateSsoConnectionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateSsoConnectionRequestWithBody(server, organizationId, "application/json", bodyReader)
-}
-
-// NewCreateSsoConnectionRequestWithBody generates requests for CreateSsoConnection with any type of body
-func NewCreateSsoConnectionRequestWithBody(server string, organizationId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/sso-connections", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewDeleteSsoConnectionRequest generates requests for DeleteSsoConnection
-func NewDeleteSsoConnectionRequest(server string, organizationId string, connectionId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "connectionId", runtime.ParamLocationPath, connectionId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/sso-connections/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetSsoConnectionRequest generates requests for GetSsoConnection
-func NewGetSsoConnectionRequest(server string, organizationId string, connectionId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "connectionId", runtime.ParamLocationPath, connectionId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/sso-connections/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateSsoConnectionRequest calls the generic UpdateSsoConnection builder with application/json body
-func NewUpdateSsoConnectionRequest(server string, organizationId string, connectionId string, body UpdateSsoConnectionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateSsoConnectionRequestWithBody(server, organizationId, connectionId, "application/json", bodyReader)
-}
-
-// NewUpdateSsoConnectionRequestWithBody generates requests for UpdateSsoConnection with any type of body
-func NewUpdateSsoConnectionRequestWithBody(server string, organizationId string, connectionId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "connectionId", runtime.ParamLocationPath, connectionId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/sso-connections/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetStripeClientSecretRequest generates requests for GetStripeClientSecret
-func NewGetStripeClientSecretRequest(server string, organizationId string, pType GetStripeClientSecretParamsType) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "type", runtime.ParamLocationPath, pType)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/stripe/client-secret/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -7929,53 +7887,6 @@ func NewMutateOrgUserRoleRequestWithBody(server string, organizationId string, u
 	}
 
 	operationPath := fmt.Sprintf("/organizations/%s/users/%s/role", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewValidateCreditCardPaymentRequest calls the generic ValidateCreditCardPayment builder with application/json body
-func NewValidateCreditCardPaymentRequest(server string, organizationId string, body ValidateCreditCardPaymentJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewValidateCreditCardPaymentRequestWithBody(server, organizationId, "application/json", bodyReader)
-}
-
-// NewValidateCreditCardPaymentRequestWithBody generates requests for ValidateCreditCardPayment with any type of body
-func NewValidateCreditCardPaymentRequestWithBody(server string, organizationId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/validate-credit-card-payment", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -8964,67 +8875,6 @@ func NewListWorkspaceDagsRequest(server string, organizationId string, workspace
 	return req, nil
 }
 
-// NewUpdateDeploymentRequest calls the generic UpdateDeployment builder with application/json body
-func NewUpdateDeploymentRequest(server string, organizationId string, workspaceId string, deploymentId string, body UpdateDeploymentJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateDeploymentRequestWithBody(server, organizationId, workspaceId, deploymentId, "application/json", bodyReader)
-}
-
-// NewUpdateDeploymentRequestWithBody generates requests for UpdateDeployment with any type of body
-func NewUpdateDeploymentRequestWithBody(server string, organizationId string, workspaceId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam2 string
-
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/deployments/%s", pathParam0, pathParam1, pathParam2)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewListWorkspaceTeamsRequest generates requests for ListWorkspaceTeams
 func NewListWorkspaceTeamsRequest(server string, organizationId string, workspaceId string, params *ListWorkspaceTeamsParams) (*http.Request, error) {
 	var err error
@@ -9607,22 +9457,11 @@ type ClientWithResponsesInterface interface {
 	// GetUserInvite request
 	GetUserInviteWithResponse(ctx context.Context, inviteId string, reqEditors ...RequestEditorFn) (*GetUserInviteResponse, error)
 
-	// ValidateSsoLogin request with any body
-	ValidateSsoLoginWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateSsoLoginResponse, error)
-
-	ValidateSsoLoginWithResponse(ctx context.Context, body ValidateSsoLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateSsoLoginResponse, error)
-
 	// GetSharedCluster request
 	GetSharedClusterWithResponse(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*GetSharedClusterResponse, error)
 
 	// GetClusterOptions request
 	GetClusterOptionsWithResponse(ctx context.Context, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*GetClusterOptionsResponse, error)
-
-	// GetDeploymentOptions request
-	GetDeploymentOptionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error)
-
-	// ListOrganizationAuthIds request
-	ListOrganizationAuthIdsWithResponse(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*ListOrganizationAuthIdsResponse, error)
 
 	// ListOrganizations request
 	ListOrganizationsWithResponse(ctx context.Context, params *ListOrganizationsParams, reqEditors ...RequestEditorFn) (*ListOrganizationsResponse, error)
@@ -9704,42 +9543,76 @@ type ClientWithResponsesInterface interface {
 	// GetCluster request
 	GetClusterWithResponse(ctx context.Context, organizationId string, clusterId string, reqEditors ...RequestEditorFn) (*GetClusterResponse, error)
 
+	// GetDeploymentOptions request
+	GetDeploymentOptionsWithResponse(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error)
+
 	// ListDeployments request
 	ListDeploymentsWithResponse(ctx context.Context, organizationId string, params *ListDeploymentsParams, reqEditors ...RequestEditorFn) (*ListDeploymentsResponse, error)
 
-	// GetDeploymentDagRuns request
-	GetDeploymentDagRunsWithResponse(ctx context.Context, organizationId string, deploymentId string, dagId string, params *GetDeploymentDagRunsParams, reqEditors ...RequestEditorFn) (*GetDeploymentDagRunsResponse, error)
+	// CreateDeployment request with any body
+	CreateDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeploymentResponse, error)
 
-	// GetDeploymentDagStructure request
-	GetDeploymentDagStructureWithResponse(ctx context.Context, organizationId string, deploymentId string, dagId string, reqEditors ...RequestEditorFn) (*GetDeploymentDagStructureResponse, error)
+	CreateDeploymentWithResponse(ctx context.Context, organizationId string, body CreateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeploymentResponse, error)
+
+	// DeleteDeployment request
+	DeleteDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentResponse, error)
+
+	// GetDeployment request
+	GetDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*GetDeploymentResponse, error)
+
+	// UpdateDeployment request with any body
+	UpdateDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error)
+
+	UpdateDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error)
+
+	// ListDeploymentApiTokens request
+	ListDeploymentApiTokensWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListDeploymentApiTokensParams, reqEditors ...RequestEditorFn) (*ListDeploymentApiTokensResponse, error)
+
+	// CreateDeploymentApiToken request with any body
+	CreateDeploymentApiTokenWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeploymentApiTokenResponse, error)
+
+	CreateDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, body CreateDeploymentApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeploymentApiTokenResponse, error)
+
+	// DeleteDeploymentApiToken request
+	DeleteDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentApiTokenResponse, error)
+
+	// GetDeploymentApiToken request
+	GetDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*GetDeploymentApiTokenResponse, error)
+
+	// UpdateDeploymentApiToken request with any body
+	UpdateDeploymentApiTokenWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentApiTokenResponse, error)
+
+	UpdateDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, body UpdateDeploymentApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentApiTokenResponse, error)
+
+	// RotateDeploymentApiToken request
+	RotateDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateDeploymentApiTokenResponse, error)
+
+	// GetDeploymentHealth request
+	GetDeploymentHealthWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*GetDeploymentHealthResponse, error)
 
 	// GetDeploymentLogs request
 	GetDeploymentLogsWithResponse(ctx context.Context, organizationId string, deploymentId string, params *GetDeploymentLogsParams, reqEditors ...RequestEditorFn) (*GetDeploymentLogsResponse, error)
 
-	// ListManagedDomains request
-	ListManagedDomainsWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*ListManagedDomainsResponse, error)
+	// TransferDeployment request with any body
+	TransferDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TransferDeploymentResponse, error)
 
-	// CreateManagedDomain request with any body
-	CreateManagedDomainWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateManagedDomainResponse, error)
+	TransferDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*TransferDeploymentResponse, error)
 
-	CreateManagedDomainWithResponse(ctx context.Context, organizationId string, body CreateManagedDomainJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateManagedDomainResponse, error)
+	// ListEnvironmentObjects request
+	ListEnvironmentObjectsWithResponse(ctx context.Context, organizationId string, params *ListEnvironmentObjectsParams, reqEditors ...RequestEditorFn) (*ListEnvironmentObjectsResponse, error)
 
-	// DeleteManagedDomain request
-	DeleteManagedDomainWithResponse(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*DeleteManagedDomainResponse, error)
+	// CreateEnvironmentObject request with any body
+	CreateEnvironmentObjectWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateEnvironmentObjectResponse, error)
 
-	// GetManagedDomain request
-	GetManagedDomainWithResponse(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*GetManagedDomainResponse, error)
+	CreateEnvironmentObjectWithResponse(ctx context.Context, organizationId string, body CreateEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateEnvironmentObjectResponse, error)
 
-	// UpdateManagedDomain request with any body
-	UpdateManagedDomainWithBodyWithResponse(ctx context.Context, organizationId string, domainId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateManagedDomainResponse, error)
+	// DeleteEnvironmentObject request
+	DeleteEnvironmentObjectWithResponse(ctx context.Context, organizationId string, environmentObjectId string, reqEditors ...RequestEditorFn) (*DeleteEnvironmentObjectResponse, error)
 
-	UpdateManagedDomainWithResponse(ctx context.Context, organizationId string, domainId string, body UpdateManagedDomainJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateManagedDomainResponse, error)
+	// UpdateEnvironmentObject request with any body
+	UpdateEnvironmentObjectWithBodyWithResponse(ctx context.Context, organizationId string, environmentObjectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateEnvironmentObjectResponse, error)
 
-	// VerifyManagedDomain request
-	VerifyManagedDomainWithResponse(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*VerifyManagedDomainResponse, error)
-
-	// GetDraftInvoice request
-	GetDraftInvoiceWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*GetDraftInvoiceResponse, error)
+	UpdateEnvironmentObjectWithResponse(ctx context.Context, organizationId string, environmentObjectId string, body UpdateEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateEnvironmentObjectResponse, error)
 
 	// CreateUserInvite request with any body
 	CreateUserInviteWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUserInviteResponse, error)
@@ -9748,46 +9621,6 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteUserInvite request
 	DeleteUserInviteWithResponse(ctx context.Context, organizationId string, inviteId string, reqEditors ...RequestEditorFn) (*DeleteUserInviteResponse, error)
-
-	// GetCreditSummary request
-	GetCreditSummaryWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*GetCreditSummaryResponse, error)
-
-	// GetMetronomeDashboard request
-	GetMetronomeDashboardWithResponse(ctx context.Context, organizationId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*GetMetronomeDashboardResponse, error)
-
-	// GetPaymentMethod request
-	GetPaymentMethodWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*GetPaymentMethodResponse, error)
-
-	// DeleteSsoBypassKey request
-	DeleteSsoBypassKeyWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*DeleteSsoBypassKeyResponse, error)
-
-	// GetSsoBypassKey request
-	GetSsoBypassKeyWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*GetSsoBypassKeyResponse, error)
-
-	// UpsertSsoBypassKey request
-	UpsertSsoBypassKeyWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*UpsertSsoBypassKeyResponse, error)
-
-	// ListSsoConnections request
-	ListSsoConnectionsWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*ListSsoConnectionsResponse, error)
-
-	// CreateSsoConnection request with any body
-	CreateSsoConnectionWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSsoConnectionResponse, error)
-
-	CreateSsoConnectionWithResponse(ctx context.Context, organizationId string, body CreateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSsoConnectionResponse, error)
-
-	// DeleteSsoConnection request
-	DeleteSsoConnectionWithResponse(ctx context.Context, organizationId string, connectionId string, reqEditors ...RequestEditorFn) (*DeleteSsoConnectionResponse, error)
-
-	// GetSsoConnection request
-	GetSsoConnectionWithResponse(ctx context.Context, organizationId string, connectionId string, reqEditors ...RequestEditorFn) (*GetSsoConnectionResponse, error)
-
-	// UpdateSsoConnection request with any body
-	UpdateSsoConnectionWithBodyWithResponse(ctx context.Context, organizationId string, connectionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSsoConnectionResponse, error)
-
-	UpdateSsoConnectionWithResponse(ctx context.Context, organizationId string, connectionId string, body UpdateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSsoConnectionResponse, error)
-
-	// GetStripeClientSecret request
-	GetStripeClientSecretWithResponse(ctx context.Context, organizationId string, pType GetStripeClientSecretParamsType, reqEditors ...RequestEditorFn) (*GetStripeClientSecretResponse, error)
 
 	// ListOrganizationTeams request
 	ListOrganizationTeamsWithResponse(ctx context.Context, organizationId string, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*ListOrganizationTeamsResponse, error)
@@ -9835,11 +9668,6 @@ type ClientWithResponsesInterface interface {
 
 	MutateOrgUserRoleWithResponse(ctx context.Context, organizationId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateOrgUserRoleResponse, error)
 
-	// ValidateCreditCardPayment request with any body
-	ValidateCreditCardPaymentWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateCreditCardPaymentResponse, error)
-
-	ValidateCreditCardPaymentWithResponse(ctx context.Context, organizationId string, body ValidateCreditCardPaymentJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateCreditCardPaymentResponse, error)
-
 	// ListWorkspaces request
 	ListWorkspacesWithResponse(ctx context.Context, organizationId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*ListWorkspacesResponse, error)
 
@@ -9886,11 +9714,6 @@ type ClientWithResponsesInterface interface {
 
 	// ListWorkspaceDags request
 	ListWorkspaceDagsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListWorkspaceDagsParams, reqEditors ...RequestEditorFn) (*ListWorkspaceDagsResponse, error)
-
-	// UpdateDeployment request with any body
-	UpdateDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error)
-
-	UpdateDeploymentWithResponse(ctx context.Context, organizationId string, workspaceId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error)
 
 	// ListWorkspaceTeams request
 	ListWorkspaceTeamsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*ListWorkspaceTeamsResponse, error)
@@ -9950,33 +9773,6 @@ func (r GetUserInviteResponse) StatusCode() int {
 	return 0
 }
 
-type ValidateSsoLoginResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *SsoLoginCallback
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r ValidateSsoLoginResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ValidateSsoLoginResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type GetSharedClusterResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -10025,58 +9821,6 @@ func (r GetClusterOptionsResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetClusterOptionsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetDeploymentOptionsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *DeploymentOptions
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetDeploymentOptionsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetDeploymentOptionsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type ListOrganizationAuthIdsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]string
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r ListOrganizationAuthIdsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListOrganizationAuthIdsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -10621,6 +10365,32 @@ func (r GetClusterResponse) StatusCode() int {
 	return 0
 }
 
+type GetDeploymentOptionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentOptions
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeploymentOptionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeploymentOptionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListDeploymentsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -10647,19 +10417,18 @@ func (r ListDeploymentsResponse) StatusCode() int {
 	return 0
 }
 
-type GetDeploymentDagRunsResponse struct {
+type CreateDeploymentResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *InternalPaginationResultDagRunWithTaskInstances
+	JSON200      *Deployment
 	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
-	JSON404      *Error
 	JSON500      *Error
 }
 
 // Status returns HTTPResponse.Status
-func (r GetDeploymentDagRunsResponse) Status() string {
+func (r CreateDeploymentResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -10667,17 +10436,16 @@ func (r GetDeploymentDagRunsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetDeploymentDagRunsResponse) StatusCode() int {
+func (r CreateDeploymentResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetDeploymentDagStructureResponse struct {
+type DeleteDeploymentResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *InternalDagStructure
 	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
@@ -10686,7 +10454,7 @@ type GetDeploymentDagStructureResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetDeploymentDagStructureResponse) Status() string {
+func (r DeleteDeploymentResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -10694,7 +10462,249 @@ func (r GetDeploymentDagStructureResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetDeploymentDagStructureResponse) StatusCode() int {
+func (r DeleteDeploymentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetDeploymentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deployment
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeploymentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeploymentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateDeploymentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deployment
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateDeploymentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateDeploymentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListDeploymentApiTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListApiTokensPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDeploymentApiTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDeploymentApiTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateDeploymentApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateDeploymentApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateDeploymentApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteDeploymentApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteDeploymentApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteDeploymentApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetDeploymentApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeploymentApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeploymentApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateDeploymentApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateDeploymentApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateDeploymentApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RotateDeploymentApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateDeploymentApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateDeploymentApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetDeploymentHealthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GenericJSON
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeploymentHealthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeploymentHealthResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -10727,10 +10737,10 @@ func (r GetDeploymentLogsResponse) StatusCode() int {
 	return 0
 }
 
-type ListManagedDomainsResponse struct {
+type TransferDeploymentResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *[]ManagedDomain
+	JSON200      *Deployment
 	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
@@ -10739,7 +10749,7 @@ type ListManagedDomainsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r ListManagedDomainsResponse) Status() string {
+func (r TransferDeploymentResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -10747,18 +10757,17 @@ func (r ListManagedDomainsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r ListManagedDomainsResponse) StatusCode() int {
+func (r TransferDeploymentResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type CreateManagedDomainResponse struct {
+type ListEnvironmentObjectsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *ManagedDomain
-	JSON400      *Error
+	JSON200      *EnvironmentObjectsPaginated
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
@@ -10766,7 +10775,7 @@ type CreateManagedDomainResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r CreateManagedDomainResponse) Status() string {
+func (r ListEnvironmentObjectsResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -10774,25 +10783,26 @@ func (r CreateManagedDomainResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r CreateManagedDomainResponse) StatusCode() int {
+func (r ListEnvironmentObjectsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type DeleteManagedDomainResponse struct {
+type CreateEnvironmentObjectResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON400      *Error
+	JSON200      *CreateEnvironmentObject
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
+	JSON409      *Error
 	JSON500      *Error
 }
 
 // Status returns HTTPResponse.Status
-func (r DeleteManagedDomainResponse) Status() string {
+func (r CreateEnvironmentObjectResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -10800,26 +10810,25 @@ func (r DeleteManagedDomainResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DeleteManagedDomainResponse) StatusCode() int {
+func (r CreateEnvironmentObjectResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetManagedDomainResponse struct {
+type DeleteEnvironmentObjectResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *ManagedDomain
-	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
+	JSON409      *Error
 	JSON500      *Error
 }
 
 // Status returns HTTPResponse.Status
-func (r GetManagedDomainResponse) Status() string {
+func (r DeleteEnvironmentObjectResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -10827,26 +10836,25 @@ func (r GetManagedDomainResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetManagedDomainResponse) StatusCode() int {
+func (r DeleteEnvironmentObjectResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type UpdateManagedDomainResponse struct {
+type UpdateEnvironmentObjectResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *ManagedDomain
-	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
+	JSON409      *Error
 	JSON500      *Error
 }
 
 // Status returns HTTPResponse.Status
-func (r UpdateManagedDomainResponse) Status() string {
+func (r UpdateEnvironmentObjectResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -10854,61 +10862,7 @@ func (r UpdateManagedDomainResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r UpdateManagedDomainResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type VerifyManagedDomainResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *ManagedDomain
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r VerifyManagedDomainResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r VerifyManagedDomainResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetDraftInvoiceResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *Invoice
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetDraftInvoiceResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetDraftInvoiceResponse) StatusCode() int {
+func (r UpdateEnvironmentObjectResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -10962,328 +10916,6 @@ func (r DeleteUserInviteResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r DeleteUserInviteResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetCreditSummaryResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *CreditSummary
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetCreditSummaryResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetCreditSummaryResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetMetronomeDashboardResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *MetronomeDashboard
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetMetronomeDashboardResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetMetronomeDashboardResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetPaymentMethodResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *PaymentMethod
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetPaymentMethodResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetPaymentMethodResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type DeleteSsoBypassKeyResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteSsoBypassKeyResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteSsoBypassKeyResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetSsoBypassKeyResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *SsoBypassKey
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetSsoBypassKeyResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetSsoBypassKeyResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type UpsertSsoBypassKeyResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *SsoBypassKey
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r UpsertSsoBypassKeyResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r UpsertSsoBypassKeyResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type ListSsoConnectionsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]SsoConnection
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r ListSsoConnectionsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListSsoConnectionsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type CreateSsoConnectionResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *SsoConnection
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateSsoConnectionResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateSsoConnectionResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type DeleteSsoConnectionResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteSsoConnectionResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteSsoConnectionResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetSsoConnectionResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *SsoConnection
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetSsoConnectionResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetSsoConnectionResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type UpdateSsoConnectionResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *SsoConnection
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r UpdateSsoConnectionResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r UpdateSsoConnectionResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetStripeClientSecretResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *StripeClientSecret
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetStripeClientSecretResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetStripeClientSecretResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -11603,33 +11235,6 @@ func (r MutateOrgUserRoleResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r MutateOrgUserRoleResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type ValidateCreditCardPaymentResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *ValidateCreditCardPayment
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r ValidateCreditCardPaymentResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ValidateCreditCardPaymentResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -11984,33 +11589,6 @@ func (r ListWorkspaceDagsResponse) StatusCode() int {
 	return 0
 }
 
-type UpdateDeploymentResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *Deployment
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r UpdateDeploymentResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r UpdateDeploymentResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type ListWorkspaceTeamsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -12233,23 +11811,6 @@ func (c *ClientWithResponses) GetUserInviteWithResponse(ctx context.Context, inv
 	return ParseGetUserInviteResponse(rsp)
 }
 
-// ValidateSsoLoginWithBodyWithResponse request with arbitrary body returning *ValidateSsoLoginResponse
-func (c *ClientWithResponses) ValidateSsoLoginWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateSsoLoginResponse, error) {
-	rsp, err := c.ValidateSsoLoginWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseValidateSsoLoginResponse(rsp)
-}
-
-func (c *ClientWithResponses) ValidateSsoLoginWithResponse(ctx context.Context, body ValidateSsoLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateSsoLoginResponse, error) {
-	rsp, err := c.ValidateSsoLogin(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseValidateSsoLoginResponse(rsp)
-}
-
 // GetSharedClusterWithResponse request returning *GetSharedClusterResponse
 func (c *ClientWithResponses) GetSharedClusterWithResponse(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*GetSharedClusterResponse, error) {
 	rsp, err := c.GetSharedCluster(ctx, params, reqEditors...)
@@ -12266,24 +11827,6 @@ func (c *ClientWithResponses) GetClusterOptionsWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseGetClusterOptionsResponse(rsp)
-}
-
-// GetDeploymentOptionsWithResponse request returning *GetDeploymentOptionsResponse
-func (c *ClientWithResponses) GetDeploymentOptionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error) {
-	rsp, err := c.GetDeploymentOptions(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetDeploymentOptionsResponse(rsp)
-}
-
-// ListOrganizationAuthIdsWithResponse request returning *ListOrganizationAuthIdsResponse
-func (c *ClientWithResponses) ListOrganizationAuthIdsWithResponse(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*ListOrganizationAuthIdsResponse, error) {
-	rsp, err := c.ListOrganizationAuthIds(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListOrganizationAuthIdsResponse(rsp)
 }
 
 // ListOrganizationsWithResponse request returning *ListOrganizationsResponse
@@ -12546,6 +12089,15 @@ func (c *ClientWithResponses) GetClusterWithResponse(ctx context.Context, organi
 	return ParseGetClusterResponse(rsp)
 }
 
+// GetDeploymentOptionsWithResponse request returning *GetDeploymentOptionsResponse
+func (c *ClientWithResponses) GetDeploymentOptionsWithResponse(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error) {
+	rsp, err := c.GetDeploymentOptions(ctx, organizationId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeploymentOptionsResponse(rsp)
+}
+
 // ListDeploymentsWithResponse request returning *ListDeploymentsResponse
 func (c *ClientWithResponses) ListDeploymentsWithResponse(ctx context.Context, organizationId string, params *ListDeploymentsParams, reqEditors ...RequestEditorFn) (*ListDeploymentsResponse, error) {
 	rsp, err := c.ListDeployments(ctx, organizationId, params, reqEditors...)
@@ -12555,22 +12107,135 @@ func (c *ClientWithResponses) ListDeploymentsWithResponse(ctx context.Context, o
 	return ParseListDeploymentsResponse(rsp)
 }
 
-// GetDeploymentDagRunsWithResponse request returning *GetDeploymentDagRunsResponse
-func (c *ClientWithResponses) GetDeploymentDagRunsWithResponse(ctx context.Context, organizationId string, deploymentId string, dagId string, params *GetDeploymentDagRunsParams, reqEditors ...RequestEditorFn) (*GetDeploymentDagRunsResponse, error) {
-	rsp, err := c.GetDeploymentDagRuns(ctx, organizationId, deploymentId, dagId, params, reqEditors...)
+// CreateDeploymentWithBodyWithResponse request with arbitrary body returning *CreateDeploymentResponse
+func (c *ClientWithResponses) CreateDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeploymentResponse, error) {
+	rsp, err := c.CreateDeploymentWithBody(ctx, organizationId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetDeploymentDagRunsResponse(rsp)
+	return ParseCreateDeploymentResponse(rsp)
 }
 
-// GetDeploymentDagStructureWithResponse request returning *GetDeploymentDagStructureResponse
-func (c *ClientWithResponses) GetDeploymentDagStructureWithResponse(ctx context.Context, organizationId string, deploymentId string, dagId string, reqEditors ...RequestEditorFn) (*GetDeploymentDagStructureResponse, error) {
-	rsp, err := c.GetDeploymentDagStructure(ctx, organizationId, deploymentId, dagId, reqEditors...)
+func (c *ClientWithResponses) CreateDeploymentWithResponse(ctx context.Context, organizationId string, body CreateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeploymentResponse, error) {
+	rsp, err := c.CreateDeployment(ctx, organizationId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetDeploymentDagStructureResponse(rsp)
+	return ParseCreateDeploymentResponse(rsp)
+}
+
+// DeleteDeploymentWithResponse request returning *DeleteDeploymentResponse
+func (c *ClientWithResponses) DeleteDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentResponse, error) {
+	rsp, err := c.DeleteDeployment(ctx, organizationId, deploymentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteDeploymentResponse(rsp)
+}
+
+// GetDeploymentWithResponse request returning *GetDeploymentResponse
+func (c *ClientWithResponses) GetDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*GetDeploymentResponse, error) {
+	rsp, err := c.GetDeployment(ctx, organizationId, deploymentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeploymentResponse(rsp)
+}
+
+// UpdateDeploymentWithBodyWithResponse request with arbitrary body returning *UpdateDeploymentResponse
+func (c *ClientWithResponses) UpdateDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error) {
+	rsp, err := c.UpdateDeploymentWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeploymentResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error) {
+	rsp, err := c.UpdateDeployment(ctx, organizationId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeploymentResponse(rsp)
+}
+
+// ListDeploymentApiTokensWithResponse request returning *ListDeploymentApiTokensResponse
+func (c *ClientWithResponses) ListDeploymentApiTokensWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListDeploymentApiTokensParams, reqEditors ...RequestEditorFn) (*ListDeploymentApiTokensResponse, error) {
+	rsp, err := c.ListDeploymentApiTokens(ctx, organizationId, deploymentId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDeploymentApiTokensResponse(rsp)
+}
+
+// CreateDeploymentApiTokenWithBodyWithResponse request with arbitrary body returning *CreateDeploymentApiTokenResponse
+func (c *ClientWithResponses) CreateDeploymentApiTokenWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeploymentApiTokenResponse, error) {
+	rsp, err := c.CreateDeploymentApiTokenWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDeploymentApiTokenResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, body CreateDeploymentApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeploymentApiTokenResponse, error) {
+	rsp, err := c.CreateDeploymentApiToken(ctx, organizationId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDeploymentApiTokenResponse(rsp)
+}
+
+// DeleteDeploymentApiTokenWithResponse request returning *DeleteDeploymentApiTokenResponse
+func (c *ClientWithResponses) DeleteDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentApiTokenResponse, error) {
+	rsp, err := c.DeleteDeploymentApiToken(ctx, organizationId, deploymentId, apiTokenId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteDeploymentApiTokenResponse(rsp)
+}
+
+// GetDeploymentApiTokenWithResponse request returning *GetDeploymentApiTokenResponse
+func (c *ClientWithResponses) GetDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*GetDeploymentApiTokenResponse, error) {
+	rsp, err := c.GetDeploymentApiToken(ctx, organizationId, deploymentId, apiTokenId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeploymentApiTokenResponse(rsp)
+}
+
+// UpdateDeploymentApiTokenWithBodyWithResponse request with arbitrary body returning *UpdateDeploymentApiTokenResponse
+func (c *ClientWithResponses) UpdateDeploymentApiTokenWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentApiTokenResponse, error) {
+	rsp, err := c.UpdateDeploymentApiTokenWithBody(ctx, organizationId, deploymentId, apiTokenId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeploymentApiTokenResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, body UpdateDeploymentApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentApiTokenResponse, error) {
+	rsp, err := c.UpdateDeploymentApiToken(ctx, organizationId, deploymentId, apiTokenId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeploymentApiTokenResponse(rsp)
+}
+
+// RotateDeploymentApiTokenWithResponse request returning *RotateDeploymentApiTokenResponse
+func (c *ClientWithResponses) RotateDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateDeploymentApiTokenResponse, error) {
+	rsp, err := c.RotateDeploymentApiToken(ctx, organizationId, deploymentId, apiTokenId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateDeploymentApiTokenResponse(rsp)
+}
+
+// GetDeploymentHealthWithResponse request returning *GetDeploymentHealthResponse
+func (c *ClientWithResponses) GetDeploymentHealthWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*GetDeploymentHealthResponse, error) {
+	rsp, err := c.GetDeploymentHealth(ctx, organizationId, deploymentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeploymentHealthResponse(rsp)
 }
 
 // GetDeploymentLogsWithResponse request returning *GetDeploymentLogsResponse
@@ -12582,83 +12247,73 @@ func (c *ClientWithResponses) GetDeploymentLogsWithResponse(ctx context.Context,
 	return ParseGetDeploymentLogsResponse(rsp)
 }
 
-// ListManagedDomainsWithResponse request returning *ListManagedDomainsResponse
-func (c *ClientWithResponses) ListManagedDomainsWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*ListManagedDomainsResponse, error) {
-	rsp, err := c.ListManagedDomains(ctx, organizationId, reqEditors...)
+// TransferDeploymentWithBodyWithResponse request with arbitrary body returning *TransferDeploymentResponse
+func (c *ClientWithResponses) TransferDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TransferDeploymentResponse, error) {
+	rsp, err := c.TransferDeploymentWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseListManagedDomainsResponse(rsp)
+	return ParseTransferDeploymentResponse(rsp)
 }
 
-// CreateManagedDomainWithBodyWithResponse request with arbitrary body returning *CreateManagedDomainResponse
-func (c *ClientWithResponses) CreateManagedDomainWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateManagedDomainResponse, error) {
-	rsp, err := c.CreateManagedDomainWithBody(ctx, organizationId, contentType, body, reqEditors...)
+func (c *ClientWithResponses) TransferDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*TransferDeploymentResponse, error) {
+	rsp, err := c.TransferDeployment(ctx, organizationId, deploymentId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateManagedDomainResponse(rsp)
+	return ParseTransferDeploymentResponse(rsp)
 }
 
-func (c *ClientWithResponses) CreateManagedDomainWithResponse(ctx context.Context, organizationId string, body CreateManagedDomainJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateManagedDomainResponse, error) {
-	rsp, err := c.CreateManagedDomain(ctx, organizationId, body, reqEditors...)
+// ListEnvironmentObjectsWithResponse request returning *ListEnvironmentObjectsResponse
+func (c *ClientWithResponses) ListEnvironmentObjectsWithResponse(ctx context.Context, organizationId string, params *ListEnvironmentObjectsParams, reqEditors ...RequestEditorFn) (*ListEnvironmentObjectsResponse, error) {
+	rsp, err := c.ListEnvironmentObjects(ctx, organizationId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateManagedDomainResponse(rsp)
+	return ParseListEnvironmentObjectsResponse(rsp)
 }
 
-// DeleteManagedDomainWithResponse request returning *DeleteManagedDomainResponse
-func (c *ClientWithResponses) DeleteManagedDomainWithResponse(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*DeleteManagedDomainResponse, error) {
-	rsp, err := c.DeleteManagedDomain(ctx, organizationId, domainId, reqEditors...)
+// CreateEnvironmentObjectWithBodyWithResponse request with arbitrary body returning *CreateEnvironmentObjectResponse
+func (c *ClientWithResponses) CreateEnvironmentObjectWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateEnvironmentObjectResponse, error) {
+	rsp, err := c.CreateEnvironmentObjectWithBody(ctx, organizationId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteManagedDomainResponse(rsp)
+	return ParseCreateEnvironmentObjectResponse(rsp)
 }
 
-// GetManagedDomainWithResponse request returning *GetManagedDomainResponse
-func (c *ClientWithResponses) GetManagedDomainWithResponse(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*GetManagedDomainResponse, error) {
-	rsp, err := c.GetManagedDomain(ctx, organizationId, domainId, reqEditors...)
+func (c *ClientWithResponses) CreateEnvironmentObjectWithResponse(ctx context.Context, organizationId string, body CreateEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateEnvironmentObjectResponse, error) {
+	rsp, err := c.CreateEnvironmentObject(ctx, organizationId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetManagedDomainResponse(rsp)
+	return ParseCreateEnvironmentObjectResponse(rsp)
 }
 
-// UpdateManagedDomainWithBodyWithResponse request with arbitrary body returning *UpdateManagedDomainResponse
-func (c *ClientWithResponses) UpdateManagedDomainWithBodyWithResponse(ctx context.Context, organizationId string, domainId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateManagedDomainResponse, error) {
-	rsp, err := c.UpdateManagedDomainWithBody(ctx, organizationId, domainId, contentType, body, reqEditors...)
+// DeleteEnvironmentObjectWithResponse request returning *DeleteEnvironmentObjectResponse
+func (c *ClientWithResponses) DeleteEnvironmentObjectWithResponse(ctx context.Context, organizationId string, environmentObjectId string, reqEditors ...RequestEditorFn) (*DeleteEnvironmentObjectResponse, error) {
+	rsp, err := c.DeleteEnvironmentObject(ctx, organizationId, environmentObjectId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpdateManagedDomainResponse(rsp)
+	return ParseDeleteEnvironmentObjectResponse(rsp)
 }
 
-func (c *ClientWithResponses) UpdateManagedDomainWithResponse(ctx context.Context, organizationId string, domainId string, body UpdateManagedDomainJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateManagedDomainResponse, error) {
-	rsp, err := c.UpdateManagedDomain(ctx, organizationId, domainId, body, reqEditors...)
+// UpdateEnvironmentObjectWithBodyWithResponse request with arbitrary body returning *UpdateEnvironmentObjectResponse
+func (c *ClientWithResponses) UpdateEnvironmentObjectWithBodyWithResponse(ctx context.Context, organizationId string, environmentObjectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateEnvironmentObjectResponse, error) {
+	rsp, err := c.UpdateEnvironmentObjectWithBody(ctx, organizationId, environmentObjectId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpdateManagedDomainResponse(rsp)
+	return ParseUpdateEnvironmentObjectResponse(rsp)
 }
 
-// VerifyManagedDomainWithResponse request returning *VerifyManagedDomainResponse
-func (c *ClientWithResponses) VerifyManagedDomainWithResponse(ctx context.Context, organizationId string, domainId string, reqEditors ...RequestEditorFn) (*VerifyManagedDomainResponse, error) {
-	rsp, err := c.VerifyManagedDomain(ctx, organizationId, domainId, reqEditors...)
+func (c *ClientWithResponses) UpdateEnvironmentObjectWithResponse(ctx context.Context, organizationId string, environmentObjectId string, body UpdateEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateEnvironmentObjectResponse, error) {
+	rsp, err := c.UpdateEnvironmentObject(ctx, organizationId, environmentObjectId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseVerifyManagedDomainResponse(rsp)
-}
-
-// GetDraftInvoiceWithResponse request returning *GetDraftInvoiceResponse
-func (c *ClientWithResponses) GetDraftInvoiceWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*GetDraftInvoiceResponse, error) {
-	rsp, err := c.GetDraftInvoice(ctx, organizationId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetDraftInvoiceResponse(rsp)
+	return ParseUpdateEnvironmentObjectResponse(rsp)
 }
 
 // CreateUserInviteWithBodyWithResponse request with arbitrary body returning *CreateUserInviteResponse
@@ -12685,130 +12340,6 @@ func (c *ClientWithResponses) DeleteUserInviteWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseDeleteUserInviteResponse(rsp)
-}
-
-// GetCreditSummaryWithResponse request returning *GetCreditSummaryResponse
-func (c *ClientWithResponses) GetCreditSummaryWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*GetCreditSummaryResponse, error) {
-	rsp, err := c.GetCreditSummary(ctx, organizationId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetCreditSummaryResponse(rsp)
-}
-
-// GetMetronomeDashboardWithResponse request returning *GetMetronomeDashboardResponse
-func (c *ClientWithResponses) GetMetronomeDashboardWithResponse(ctx context.Context, organizationId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*GetMetronomeDashboardResponse, error) {
-	rsp, err := c.GetMetronomeDashboard(ctx, organizationId, pType, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetMetronomeDashboardResponse(rsp)
-}
-
-// GetPaymentMethodWithResponse request returning *GetPaymentMethodResponse
-func (c *ClientWithResponses) GetPaymentMethodWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*GetPaymentMethodResponse, error) {
-	rsp, err := c.GetPaymentMethod(ctx, organizationId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetPaymentMethodResponse(rsp)
-}
-
-// DeleteSsoBypassKeyWithResponse request returning *DeleteSsoBypassKeyResponse
-func (c *ClientWithResponses) DeleteSsoBypassKeyWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*DeleteSsoBypassKeyResponse, error) {
-	rsp, err := c.DeleteSsoBypassKey(ctx, organizationId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteSsoBypassKeyResponse(rsp)
-}
-
-// GetSsoBypassKeyWithResponse request returning *GetSsoBypassKeyResponse
-func (c *ClientWithResponses) GetSsoBypassKeyWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*GetSsoBypassKeyResponse, error) {
-	rsp, err := c.GetSsoBypassKey(ctx, organizationId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetSsoBypassKeyResponse(rsp)
-}
-
-// UpsertSsoBypassKeyWithResponse request returning *UpsertSsoBypassKeyResponse
-func (c *ClientWithResponses) UpsertSsoBypassKeyWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*UpsertSsoBypassKeyResponse, error) {
-	rsp, err := c.UpsertSsoBypassKey(ctx, organizationId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpsertSsoBypassKeyResponse(rsp)
-}
-
-// ListSsoConnectionsWithResponse request returning *ListSsoConnectionsResponse
-func (c *ClientWithResponses) ListSsoConnectionsWithResponse(ctx context.Context, organizationId string, reqEditors ...RequestEditorFn) (*ListSsoConnectionsResponse, error) {
-	rsp, err := c.ListSsoConnections(ctx, organizationId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListSsoConnectionsResponse(rsp)
-}
-
-// CreateSsoConnectionWithBodyWithResponse request with arbitrary body returning *CreateSsoConnectionResponse
-func (c *ClientWithResponses) CreateSsoConnectionWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSsoConnectionResponse, error) {
-	rsp, err := c.CreateSsoConnectionWithBody(ctx, organizationId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateSsoConnectionResponse(rsp)
-}
-
-func (c *ClientWithResponses) CreateSsoConnectionWithResponse(ctx context.Context, organizationId string, body CreateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSsoConnectionResponse, error) {
-	rsp, err := c.CreateSsoConnection(ctx, organizationId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateSsoConnectionResponse(rsp)
-}
-
-// DeleteSsoConnectionWithResponse request returning *DeleteSsoConnectionResponse
-func (c *ClientWithResponses) DeleteSsoConnectionWithResponse(ctx context.Context, organizationId string, connectionId string, reqEditors ...RequestEditorFn) (*DeleteSsoConnectionResponse, error) {
-	rsp, err := c.DeleteSsoConnection(ctx, organizationId, connectionId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteSsoConnectionResponse(rsp)
-}
-
-// GetSsoConnectionWithResponse request returning *GetSsoConnectionResponse
-func (c *ClientWithResponses) GetSsoConnectionWithResponse(ctx context.Context, organizationId string, connectionId string, reqEditors ...RequestEditorFn) (*GetSsoConnectionResponse, error) {
-	rsp, err := c.GetSsoConnection(ctx, organizationId, connectionId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetSsoConnectionResponse(rsp)
-}
-
-// UpdateSsoConnectionWithBodyWithResponse request with arbitrary body returning *UpdateSsoConnectionResponse
-func (c *ClientWithResponses) UpdateSsoConnectionWithBodyWithResponse(ctx context.Context, organizationId string, connectionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSsoConnectionResponse, error) {
-	rsp, err := c.UpdateSsoConnectionWithBody(ctx, organizationId, connectionId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateSsoConnectionResponse(rsp)
-}
-
-func (c *ClientWithResponses) UpdateSsoConnectionWithResponse(ctx context.Context, organizationId string, connectionId string, body UpdateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSsoConnectionResponse, error) {
-	rsp, err := c.UpdateSsoConnection(ctx, organizationId, connectionId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateSsoConnectionResponse(rsp)
-}
-
-// GetStripeClientSecretWithResponse request returning *GetStripeClientSecretResponse
-func (c *ClientWithResponses) GetStripeClientSecretWithResponse(ctx context.Context, organizationId string, pType GetStripeClientSecretParamsType, reqEditors ...RequestEditorFn) (*GetStripeClientSecretResponse, error) {
-	rsp, err := c.GetStripeClientSecret(ctx, organizationId, pType, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetStripeClientSecretResponse(rsp)
 }
 
 // ListOrganizationTeamsWithResponse request returning *ListOrganizationTeamsResponse
@@ -12959,23 +12490,6 @@ func (c *ClientWithResponses) MutateOrgUserRoleWithResponse(ctx context.Context,
 	return ParseMutateOrgUserRoleResponse(rsp)
 }
 
-// ValidateCreditCardPaymentWithBodyWithResponse request with arbitrary body returning *ValidateCreditCardPaymentResponse
-func (c *ClientWithResponses) ValidateCreditCardPaymentWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateCreditCardPaymentResponse, error) {
-	rsp, err := c.ValidateCreditCardPaymentWithBody(ctx, organizationId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseValidateCreditCardPaymentResponse(rsp)
-}
-
-func (c *ClientWithResponses) ValidateCreditCardPaymentWithResponse(ctx context.Context, organizationId string, body ValidateCreditCardPaymentJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateCreditCardPaymentResponse, error) {
-	rsp, err := c.ValidateCreditCardPayment(ctx, organizationId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseValidateCreditCardPaymentResponse(rsp)
-}
-
 // ListWorkspacesWithResponse request returning *ListWorkspacesResponse
 func (c *ClientWithResponses) ListWorkspacesWithResponse(ctx context.Context, organizationId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*ListWorkspacesResponse, error) {
 	rsp, err := c.ListWorkspaces(ctx, organizationId, params, reqEditors...)
@@ -13123,23 +12637,6 @@ func (c *ClientWithResponses) ListWorkspaceDagsWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseListWorkspaceDagsResponse(rsp)
-}
-
-// UpdateDeploymentWithBodyWithResponse request with arbitrary body returning *UpdateDeploymentResponse
-func (c *ClientWithResponses) UpdateDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error) {
-	rsp, err := c.UpdateDeploymentWithBody(ctx, organizationId, workspaceId, deploymentId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateDeploymentResponse(rsp)
-}
-
-func (c *ClientWithResponses) UpdateDeploymentWithResponse(ctx context.Context, organizationId string, workspaceId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error) {
-	rsp, err := c.UpdateDeployment(ctx, organizationId, workspaceId, deploymentId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateDeploymentResponse(rsp)
 }
 
 // ListWorkspaceTeamsWithResponse request returning *ListWorkspaceTeamsResponse
@@ -13299,67 +12796,6 @@ func ParseGetUserInviteResponse(rsp *http.Response) (*GetUserInviteResponse, err
 	return response, nil
 }
 
-// ParseValidateSsoLoginResponse parses an HTTP response from a ValidateSsoLoginWithResponse call
-func ParseValidateSsoLoginResponse(rsp *http.Response) (*ValidateSsoLoginResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ValidateSsoLoginResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SsoLoginCallback
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
 // ParseGetSharedClusterResponse parses an HTTP response from a GetSharedClusterWithResponse call
 func ParseGetSharedClusterResponse(rsp *http.Response) (*GetSharedClusterResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -13469,114 +12905,6 @@ func ParseGetClusterOptionsResponse(rsp *http.Response) (*GetClusterOptionsRespo
 			return nil, err
 		}
 		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetDeploymentOptionsResponse parses an HTTP response from a GetDeploymentOptionsWithResponse call
-func ParseGetDeploymentOptionsResponse(rsp *http.Response) (*GetDeploymentOptionsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetDeploymentOptionsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest DeploymentOptions
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseListOrganizationAuthIdsResponse parses an HTTP response from a ListOrganizationAuthIdsWithResponse call
-func ParseListOrganizationAuthIdsResponse(rsp *http.Response) (*ListOrganizationAuthIdsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ListOrganizationAuthIdsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []string
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -14796,6 +14124,60 @@ func ParseGetClusterResponse(rsp *http.Response) (*GetClusterResponse, error) {
 	return response, nil
 }
 
+// ParseGetDeploymentOptionsResponse parses an HTTP response from a GetDeploymentOptionsWithResponse call
+func ParseGetDeploymentOptionsResponse(rsp *http.Response) (*GetDeploymentOptionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeploymentOptionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentOptions
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListDeploymentsResponse parses an HTTP response from a ListDeploymentsWithResponse call
 func ParseListDeploymentsResponse(rsp *http.Response) (*ListDeploymentsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -14850,22 +14232,130 @@ func ParseListDeploymentsResponse(rsp *http.Response) (*ListDeploymentsResponse,
 	return response, nil
 }
 
-// ParseGetDeploymentDagRunsResponse parses an HTTP response from a GetDeploymentDagRunsWithResponse call
-func ParseGetDeploymentDagRunsResponse(rsp *http.Response) (*GetDeploymentDagRunsResponse, error) {
+// ParseCreateDeploymentResponse parses an HTTP response from a CreateDeploymentWithResponse call
+func ParseCreateDeploymentResponse(rsp *http.Response) (*CreateDeploymentResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetDeploymentDagRunsResponse{
+	response := &CreateDeploymentResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest InternalPaginationResultDagRunWithTaskInstances
+		var dest Deployment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteDeploymentResponse parses an HTTP response from a DeleteDeploymentWithResponse call
+func ParseDeleteDeploymentResponse(rsp *http.Response) (*DeleteDeploymentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteDeploymentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDeploymentResponse parses an HTTP response from a GetDeploymentWithResponse call
+func ParseGetDeploymentResponse(rsp *http.Response) (*GetDeploymentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeploymentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deployment
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -14911,22 +14401,442 @@ func ParseGetDeploymentDagRunsResponse(rsp *http.Response) (*GetDeploymentDagRun
 	return response, nil
 }
 
-// ParseGetDeploymentDagStructureResponse parses an HTTP response from a GetDeploymentDagStructureWithResponse call
-func ParseGetDeploymentDagStructureResponse(rsp *http.Response) (*GetDeploymentDagStructureResponse, error) {
+// ParseUpdateDeploymentResponse parses an HTTP response from a UpdateDeploymentWithResponse call
+func ParseUpdateDeploymentResponse(rsp *http.Response) (*UpdateDeploymentResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetDeploymentDagStructureResponse{
+	response := &UpdateDeploymentResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest InternalDagStructure
+		var dest Deployment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDeploymentApiTokensResponse parses an HTTP response from a ListDeploymentApiTokensWithResponse call
+func ParseListDeploymentApiTokensResponse(rsp *http.Response) (*ListDeploymentApiTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDeploymentApiTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListApiTokensPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateDeploymentApiTokenResponse parses an HTTP response from a CreateDeploymentApiTokenWithResponse call
+func ParseCreateDeploymentApiTokenResponse(rsp *http.Response) (*CreateDeploymentApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateDeploymentApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteDeploymentApiTokenResponse parses an HTTP response from a DeleteDeploymentApiTokenWithResponse call
+func ParseDeleteDeploymentApiTokenResponse(rsp *http.Response) (*DeleteDeploymentApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteDeploymentApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDeploymentApiTokenResponse parses an HTTP response from a GetDeploymentApiTokenWithResponse call
+func ParseGetDeploymentApiTokenResponse(rsp *http.Response) (*GetDeploymentApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeploymentApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateDeploymentApiTokenResponse parses an HTTP response from a UpdateDeploymentApiTokenWithResponse call
+func ParseUpdateDeploymentApiTokenResponse(rsp *http.Response) (*UpdateDeploymentApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateDeploymentApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRotateDeploymentApiTokenResponse parses an HTTP response from a RotateDeploymentApiTokenWithResponse call
+func ParseRotateDeploymentApiTokenResponse(rsp *http.Response) (*RotateDeploymentApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateDeploymentApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDeploymentHealthResponse parses an HTTP response from a GetDeploymentHealthWithResponse call
+func ParseGetDeploymentHealthResponse(rsp *http.Response) (*GetDeploymentHealthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeploymentHealthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GenericJSON
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -15026,22 +14936,22 @@ func ParseGetDeploymentLogsResponse(rsp *http.Response) (*GetDeploymentLogsRespo
 	return response, nil
 }
 
-// ParseListManagedDomainsResponse parses an HTTP response from a ListManagedDomainsWithResponse call
-func ParseListManagedDomainsResponse(rsp *http.Response) (*ListManagedDomainsResponse, error) {
+// ParseTransferDeploymentResponse parses an HTTP response from a TransferDeploymentWithResponse call
+func ParseTransferDeploymentResponse(rsp *http.Response) (*TransferDeploymentResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &ListManagedDomainsResponse{
+	response := &TransferDeploymentResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []ManagedDomain
+		var dest Deployment
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -15087,33 +14997,26 @@ func ParseListManagedDomainsResponse(rsp *http.Response) (*ListManagedDomainsRes
 	return response, nil
 }
 
-// ParseCreateManagedDomainResponse parses an HTTP response from a CreateManagedDomainWithResponse call
-func ParseCreateManagedDomainResponse(rsp *http.Response) (*CreateManagedDomainResponse, error) {
+// ParseListEnvironmentObjectsResponse parses an HTTP response from a ListEnvironmentObjectsWithResponse call
+func ParseListEnvironmentObjectsResponse(rsp *http.Response) (*ListEnvironmentObjectsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &CreateManagedDomainResponse{
+	response := &ListEnvironmentObjectsResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ManagedDomain
+		var dest EnvironmentObjectsPaginated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
@@ -15148,26 +15051,26 @@ func ParseCreateManagedDomainResponse(rsp *http.Response) (*CreateManagedDomainR
 	return response, nil
 }
 
-// ParseDeleteManagedDomainResponse parses an HTTP response from a DeleteManagedDomainWithResponse call
-func ParseDeleteManagedDomainResponse(rsp *http.Response) (*DeleteManagedDomainResponse, error) {
+// ParseCreateEnvironmentObjectResponse parses an HTTP response from a CreateEnvironmentObjectWithResponse call
+func ParseCreateEnvironmentObjectResponse(rsp *http.Response) (*CreateEnvironmentObjectResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteManagedDomainResponse{
+	response := &CreateEnvironmentObjectResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreateEnvironmentObject
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
@@ -15189,6 +15092,13 @@ func ParseDeleteManagedDomainResponse(rsp *http.Response) (*DeleteManagedDomainR
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -15202,34 +15112,20 @@ func ParseDeleteManagedDomainResponse(rsp *http.Response) (*DeleteManagedDomainR
 	return response, nil
 }
 
-// ParseGetManagedDomainResponse parses an HTTP response from a GetManagedDomainWithResponse call
-func ParseGetManagedDomainResponse(rsp *http.Response) (*GetManagedDomainResponse, error) {
+// ParseDeleteEnvironmentObjectResponse parses an HTTP response from a DeleteEnvironmentObjectWithResponse call
+func ParseDeleteEnvironmentObjectResponse(rsp *http.Response) (*DeleteEnvironmentObjectResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetManagedDomainResponse{
+	response := &DeleteEnvironmentObjectResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ManagedDomain
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -15250,6 +15146,13 @@ func ParseGetManagedDomainResponse(rsp *http.Response) (*GetManagedDomainRespons
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -15263,34 +15166,20 @@ func ParseGetManagedDomainResponse(rsp *http.Response) (*GetManagedDomainRespons
 	return response, nil
 }
 
-// ParseUpdateManagedDomainResponse parses an HTTP response from a UpdateManagedDomainWithResponse call
-func ParseUpdateManagedDomainResponse(rsp *http.Response) (*UpdateManagedDomainResponse, error) {
+// ParseUpdateEnvironmentObjectResponse parses an HTTP response from a UpdateEnvironmentObjectWithResponse call
+func ParseUpdateEnvironmentObjectResponse(rsp *http.Response) (*UpdateEnvironmentObjectResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &UpdateManagedDomainResponse{
+	response := &UpdateEnvironmentObjectResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ManagedDomain
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -15312,127 +15201,12 @@ func ParseUpdateManagedDomainResponse(rsp *http.Response) (*UpdateManagedDomainR
 		}
 		response.JSON404 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseVerifyManagedDomainResponse parses an HTTP response from a VerifyManagedDomainWithResponse call
-func ParseVerifyManagedDomainResponse(rsp *http.Response) (*VerifyManagedDomainResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &VerifyManagedDomainResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ManagedDomain
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetDraftInvoiceResponse parses an HTTP response from a GetDraftInvoiceWithResponse call
-func ParseGetDraftInvoiceResponse(rsp *http.Response) (*GetDraftInvoiceResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetDraftInvoiceResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Invoice
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -15521,724 +15295,6 @@ func ParseDeleteUserInviteResponse(rsp *http.Response) (*DeleteUserInviteRespons
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetCreditSummaryResponse parses an HTTP response from a GetCreditSummaryWithResponse call
-func ParseGetCreditSummaryResponse(rsp *http.Response) (*GetCreditSummaryResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetCreditSummaryResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest CreditSummary
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetMetronomeDashboardResponse parses an HTTP response from a GetMetronomeDashboardWithResponse call
-func ParseGetMetronomeDashboardResponse(rsp *http.Response) (*GetMetronomeDashboardResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetMetronomeDashboardResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest MetronomeDashboard
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetPaymentMethodResponse parses an HTTP response from a GetPaymentMethodWithResponse call
-func ParseGetPaymentMethodResponse(rsp *http.Response) (*GetPaymentMethodResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetPaymentMethodResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest PaymentMethod
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseDeleteSsoBypassKeyResponse parses an HTTP response from a DeleteSsoBypassKeyWithResponse call
-func ParseDeleteSsoBypassKeyResponse(rsp *http.Response) (*DeleteSsoBypassKeyResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DeleteSsoBypassKeyResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetSsoBypassKeyResponse parses an HTTP response from a GetSsoBypassKeyWithResponse call
-func ParseGetSsoBypassKeyResponse(rsp *http.Response) (*GetSsoBypassKeyResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetSsoBypassKeyResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SsoBypassKey
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseUpsertSsoBypassKeyResponse parses an HTTP response from a UpsertSsoBypassKeyWithResponse call
-func ParseUpsertSsoBypassKeyResponse(rsp *http.Response) (*UpsertSsoBypassKeyResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &UpsertSsoBypassKeyResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SsoBypassKey
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseListSsoConnectionsResponse parses an HTTP response from a ListSsoConnectionsWithResponse call
-func ParseListSsoConnectionsResponse(rsp *http.Response) (*ListSsoConnectionsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ListSsoConnectionsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []SsoConnection
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseCreateSsoConnectionResponse parses an HTTP response from a CreateSsoConnectionWithResponse call
-func ParseCreateSsoConnectionResponse(rsp *http.Response) (*CreateSsoConnectionResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreateSsoConnectionResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SsoConnection
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseDeleteSsoConnectionResponse parses an HTTP response from a DeleteSsoConnectionWithResponse call
-func ParseDeleteSsoConnectionResponse(rsp *http.Response) (*DeleteSsoConnectionResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DeleteSsoConnectionResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetSsoConnectionResponse parses an HTTP response from a GetSsoConnectionWithResponse call
-func ParseGetSsoConnectionResponse(rsp *http.Response) (*GetSsoConnectionResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetSsoConnectionResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SsoConnection
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseUpdateSsoConnectionResponse parses an HTTP response from a UpdateSsoConnectionWithResponse call
-func ParseUpdateSsoConnectionResponse(rsp *http.Response) (*UpdateSsoConnectionResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &UpdateSsoConnectionResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SsoConnection
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetStripeClientSecretResponse parses an HTTP response from a GetStripeClientSecretWithResponse call
-func ParseGetStripeClientSecretResponse(rsp *http.Response) (*GetStripeClientSecretResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetStripeClientSecretResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest StripeClientSecret
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -16931,67 +15987,6 @@ func ParseMutateOrgUserRoleResponse(rsp *http.Response) (*MutateOrgUserRoleRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest UserRole
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseValidateCreditCardPaymentResponse parses an HTTP response from a ValidateCreditCardPaymentWithResponse call
-func ParseValidateCreditCardPaymentResponse(rsp *http.Response) (*ValidateCreditCardPaymentResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ValidateCreditCardPaymentResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ValidateCreditCardPayment
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -17764,67 +16759,6 @@ func ParseListWorkspaceDagsResponse(rsp *http.Response) (*ListWorkspaceDagsRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest ListWorkspaceDags
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseUpdateDeploymentResponse parses an HTTP response from a UpdateDeploymentWithResponse call
-func ParseUpdateDeploymentResponse(rsp *http.Response) (*UpdateDeploymentResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &UpdateDeploymentResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Deployment
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
