@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/types"
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -21,7 +22,7 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration) error
+	Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error
 	Stop(waitForExit bool) error
 	PS() error
 	Kill() error
