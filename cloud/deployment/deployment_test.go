@@ -1008,7 +1008,7 @@ func TestCreate(t *testing.T) {
 			DefaultSchedulerSize: astro.MachineUnit{
 				Size: "small",
 			},
-		}, nil).Times(2)
+		}, nil).Times(1)
 		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1031,7 +1031,7 @@ func TestCreate(t *testing.T) {
 			DefaultSchedulerSize: astro.MachineUnit{
 				Size: "small",
 			},
-		}, nil).Times(2)
+		}, nil).Times(1)
 		getSharedClusterParams := &astrocore.GetSharedClusterParams{
 			Region:        region,
 			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
