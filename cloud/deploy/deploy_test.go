@@ -25,18 +25,18 @@ import (
 )
 
 var (
-	errMock              = errors.New("mock error")
-	org                  = "test-org-id"
-	ws                   = "test-ws-id"
-	dagTarballVersion    = "test-version"
-	dagsUploadURL        = "test-url"
-	createDeployResponse = astrocore.CreateDeployResponse{
+	errMock               = errors.New("mock error")
+	org                   = "test-org-id"
+	ws                    = "test-ws-id"
+	dagTarballVersionTest = "test-version"
+	dagsUploadURL         = "test-url"
+	createDeployResponse  = astrocore.CreateDeployResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
 		JSON200: &astrocore.Deploy{
 			Id:                "test-id",
-			DagTarballVersion: &dagTarballVersion,
+			DagTarballVersion: &dagTarballVersionTest,
 			ImageRepository:   "test-repository",
 			DagsUploadUrl:     &dagsUploadURL,
 		},
@@ -47,7 +47,7 @@ var (
 		},
 		JSON200: &astrocore.Deploy{
 			Id:                "test-id",
-			DagTarballVersion: &dagTarballVersion,
+			DagTarballVersion: &dagTarballVersionTest,
 			ImageTag:          "test-tag",
 		},
 	}

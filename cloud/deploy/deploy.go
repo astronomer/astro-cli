@@ -65,6 +65,7 @@ var (
 	containerHandlerInit = airflow.ContainerHandlerInit
 	azureUploader        = azure.Upload
 	canCiCdDeploy        = deployment.CanCiCdDeploy
+	dagTarballVersion    = ""
 )
 
 var (
@@ -195,8 +196,14 @@ func deployDags(path, dagsPath, deploymentType, deploymentID, organizationID str
 		}
 	}()
 
+	if resp.JSON200.DagTarballVersion != nil {
+		dagTarballVersion = *resp.JSON200.DagTarballVersion
+	} else {
+		dagTarballVersion = ""
+	}
+
 	// Do image deploy
-	err = updateDeploy(resp.JSON200.Id, deploymentID, organizationID, *resp.JSON200.DagTarballVersion, dagDeploy, coreClient)
+	err = updateDeploy(resp.JSON200.Id, deploymentID, organizationID, dagTarballVersion, dagDeploy, coreClient)
 	if err != nil {
 		return "", err
 	}
@@ -342,7 +349,11 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			return err
 		}
 		deployID := resp.JSON200.Id
-		dagTarballVersion := *resp.JSON200.DagTarballVersion
+		if resp.JSON200.DagTarballVersion != nil {
+			dagTarballVersion = *resp.JSON200.DagTarballVersion
+		} else {
+			dagTarballVersion = ""
+		}
 		registry := airflow.GetRegistryURL(domain)
 		repository := resp.JSON200.ImageRepository
 		// TODO: Resolve the edge case where two people push the same nextTag at the same time
