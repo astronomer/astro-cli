@@ -11,6 +11,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/environment"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
@@ -106,7 +107,7 @@ astro dev init --airflow-version 2.2.3
 	errPytestArgs          = errors.New("")
 )
 
-func newDevRootCmd(astroClient astro.Client, astroCoreClient astrocore.CoreClient) *cobra.Command {
+func newDevRootCmd(astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -127,7 +128,7 @@ func newDevRootCmd(astroClient astro.Client, astroCoreClient astrocore.CoreClien
 		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
-		newAirflowUpgradeTestCmd(astroClient),
+		newAirflowUpgradeTestCmd(astroClient, platformCoreClient),
 	)
 	return cmd
 }
@@ -171,7 +172,7 @@ func newAirflowInitCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
+func newAirflowUpgradeTestCmd(astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade-test",
 		Short: "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test results.",
@@ -181,7 +182,7 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return airflowUpgradeTest(cmd, astroClient)
+			return airflowUpgradeTest(cmd, astroClient, platformCoreClient)
 		},
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The version of Airflow you want to upgrade to. The default is the latest available version. Tests are run against the equivalent Astro Runtime version. ")
@@ -564,7 +565,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error { //nolint:gocognit
+func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocognit
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersionsUpgrade
@@ -620,7 +621,7 @@ func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error { //
 		fmt.Printf("failed to add 'upgrade-test*' to .gitignore: %s", err.Error())
 	}
 
-	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, customImageName, conflictTest, versionTest, dagTest, astroClient)
+	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, customImageName, conflictTest, versionTest, dagTest, platformCoreClient, astroClient)
 	if err != nil {
 		return err
 	}

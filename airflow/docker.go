@@ -537,7 +537,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName, customImage string, conflictTest, versionTest, dagTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface, client astro.Client) error {
+func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName, customImage string, conflictTest, versionTest, dagTest bool, astroPlatformCore astroplatformcore.CoreClient, client astro.Client) error {
 	// figure out which tests to run
 	if !versionTest && !dagTest {
 		versionTest = true
