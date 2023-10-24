@@ -348,6 +348,57 @@ func TestGetDeploymentConfig(t *testing.T) {
 	})
 }
 
+func TestGetDeploymentConfigWithOrganization(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockResponse := &Response{
+		Data: ResponseData{
+			GetDeploymentConfig: DeploymentConfig{
+				AstronomerUnit: AstronomerUnit{CPU: 1, Memory: 1024},
+				RuntimeReleases: []RuntimeRelease{
+					{
+						Version:                  "4.2.5",
+						AirflowVersion:           "2.2.5",
+						Channel:                  "stable",
+						ReleaseDate:              "2020-06-25",
+						AirflowDatabaseMigration: true,
+					},
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		deploymentConfig, err := astroClient.GetDeploymentConfigWithOrganization("test-org-id")
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentConfig, mockResponse.Data.GetDeploymentConfig)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.GetDeploymentConfigWithOrganization("test-org-id")
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
 func TestModifyDeploymentVariable(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
