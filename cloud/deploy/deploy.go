@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
@@ -66,6 +65,8 @@ var (
 	azureUploader        = azure.Upload
 	canCiCdDeploy        = deployment.CanCiCdDeploy
 	dagTarballVersion    = ""
+	dagsUploadUrl        = ""
+	nextTag              = ""
 )
 
 var (
@@ -146,7 +147,7 @@ func shouldIncludeMonitoringDag(deploymentType string) bool {
 	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentHosted(deploymentType)
 }
 
-func deployDags(path, dagsPath, deploymentType, deploymentID, organizationID string, coreClient astrocore.CoreClient) (string, error) {
+func deployDags(path, dagsPath, deploymentType, deploymentID, organizationID, dagsUploadUrl string, coreClient astrocore.CoreClient) (string, error) {
 	// Check the dags directory
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
@@ -165,11 +166,11 @@ func deployDags(path, dagsPath, deploymentType, deploymentID, organizationID str
 	}
 
 	// create image deploy
-	dagDeploy := true
-	resp, err := createDeploy(organizationID, deploymentID, "", "", dagDeploy, coreClient)
-	if err != nil {
-		return "", err
-	}
+	// dagDeploy := true
+	// resp, err := createDeploy(organizationID, deploymentID, "", "", dagDeploy, coreClient)
+	// if err != nil {
+	// 	return "", err
+	// }
 
 	dagsFilePath := filepath.Join(path, "dags.tar")
 	dagFile, err := os.Open(dagsFilePath)
@@ -178,7 +179,7 @@ func deployDags(path, dagsPath, deploymentType, deploymentID, organizationID str
 	}
 	defer dagFile.Close()
 
-	versionID, err := azureUploader(*resp.JSON200.DagsUploadUrl, dagFile)
+	versionID, err := azureUploader(dagsUploadUrl, dagFile)
 	if err != nil {
 		return "", err
 	}
@@ -196,17 +197,17 @@ func deployDags(path, dagsPath, deploymentType, deploymentID, organizationID str
 		}
 	}()
 
-	if resp.JSON200.DagTarballVersion != nil {
-		dagTarballVersion = *resp.JSON200.DagTarballVersion
-	} else {
-		dagTarballVersion = ""
-	}
+	// if resp.JSON200.DagTarballVersion != nil {
+	// 	dagTarballVersion = *resp.JSON200.DagTarballVersion
+	// } else {
+	// 	dagTarballVersion = ""
+	// }
 
 	// Do image deploy
-	err = updateDeploy(resp.JSON200.Id, deploymentID, organizationID, dagTarballVersion, dagDeploy, coreClient)
-	if err != nil {
-		return "", err
-	}
+	// err = updateDeploy(resp.JSON200.Id, deploymentID, organizationID, dagTarballVersion, dagDeploy, coreClient)
+	// if err != nil {
+	// 	return "", err
+	// }
 
 	return versionID, nil
 }
@@ -253,6 +254,28 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 	if err != nil {
 		return err
 	}
+
+	resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, "", "", deployInput.Dags, coreClient)
+	if err != nil {
+		return err
+	}
+	deployID := resp.JSON200.Id
+	// if resp.JSON200.DagTarballVersion != nil {
+	// 	dagTarballVersion = *resp.JSON200.DagTarballVersion
+	// } else {
+	// 	dagTarballVersion = ""
+	// }
+	if resp.JSON200.DagsUploadUrl != nil {
+		dagsUploadUrl = *resp.JSON200.DagsUploadUrl
+	} else {
+		dagsUploadUrl = ""
+	}
+	if &resp.JSON200.ImageTag != nil {
+		nextTag = resp.JSON200.ImageTag
+	} else {
+		nextTag = ""
+	}
+
 	if deployInput.Dags {
 		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
 			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
@@ -279,12 +302,18 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		versionID, err := deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, deployInfo.organizationID, coreClient)
+		dagTarballVersion, err := deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, deployInfo.organizationID, dagsUploadUrl, coreClient)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 			}
 
+			return err
+		}
+
+		// finish deploy
+		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
+		if err != nil {
 			return err
 		}
 
@@ -295,7 +324,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 				return err
 			}
 
-			fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(versionID) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful." +
+			fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(dagTarballVersion) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful." +
 				"\n\n Access your Deployment: \n" +
 				fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
 				fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
@@ -303,7 +332,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			return nil
 		}
 
-		fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(versionID) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
+		fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(dagTarballVersion) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
 			"\n\n Access your Deployment: \n" +
 			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
 			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
@@ -340,20 +369,18 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			fmt.Println("No DAGs found. Skipping testing...")
 		}
 
-		nextTag := "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
+		// nextTag := "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
 
-		// create image deploy
-		dagDeploy := false
-		resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, "", nextTag, dagDeploy, coreClient)
-		if err != nil {
-			return err
-		}
-		deployID := resp.JSON200.Id
-		if resp.JSON200.DagTarballVersion != nil {
-			dagTarballVersion = *resp.JSON200.DagTarballVersion
-		} else {
-			dagTarballVersion = ""
-		}
+		// resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, "", nextTag, dagDeploy, coreClient)
+		// if err != nil {
+		// 	return err
+		// }
+		// deployID := resp.JSON200.Id
+		// if resp.JSON200.DagTarballVersion != nil {
+		// 	dagTarballVersion = *resp.JSON200.DagTarballVersion
+		// } else {
+		// 	dagTarballVersion = ""
+		// }
 		registry := airflow.GetRegistryURL(domain)
 		repository := resp.JSON200.ImageRepository
 		// TODO: Resolve the edge case where two people push the same nextTag at the same time
@@ -369,17 +396,17 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			return err
 		}
 
-		// Do image deploy
-		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, dagDeploy, coreClient)
-		if err != nil {
-			return err
-		}
-
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			_, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, deployInfo.organizationID, coreClient)
+			dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, deployInfo.organizationID, dagsUploadUrl, coreClient)
 			if err != nil {
 				return err
 			}
+		}
+		// finish deploy
+		fmt.Println(deployInfo.dagDeployEnabled)
+		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
+		if err != nil {
+			return err
 		}
 
 		if deployInput.WaitForStatus {
@@ -693,10 +720,12 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 // update deploy
 func updateDeploy(deployID, deploymentID, organizationID, dagTarballVersion string, dagDeploy bool, coreClient astrocore.CoreClient) error {
 	UpdateDeployRequest := astrocore.UpdateDeployRequest{}
+	fmt.Println(dagDeploy)
+	fmt.Println(dagTarballVersion)
 	if dagDeploy {
 		UpdateDeployRequest.DagTarballVersion = &dagTarballVersion
 	}
-
+	fmt.Println(UpdateDeployRequest)
 	resp, err := coreClient.UpdateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, deployID, UpdateDeployRequest)
 	if err != nil {
 		return err
@@ -705,9 +734,10 @@ func updateDeploy(deployID, deploymentID, organizationID, dagTarballVersion stri
 	if err != nil {
 		return err
 	}
-	if dagDeploy {
+	if resp.JSON200.DagTarballVersion != nil {
 		fmt.Println("Deployed DAG bundle: ", &resp.JSON200.DagTarballVersion)
-	} else {
+	}
+	if &resp.JSON200.ImageTag != nil {
 		fmt.Println("Deployed Image Tag: ", resp.JSON200.ImageTag)
 	}
 	return nil
@@ -722,7 +752,6 @@ func createDeploy(organizationID, deploymentID, description, tag string, dagDepl
 		createDeployRequest.Type = astrocore.CreateDeployRequestTypeDAG
 	} else {
 		createDeployRequest.Type = astrocore.CreateDeployRequestTypeIMAGE
-		createDeployRequest.ImageTag = &tag
 	}
 
 	resp, err := coreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, createDeployRequest)
