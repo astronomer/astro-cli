@@ -307,7 +307,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.List(ws, allDeployments, astroClient, out)
+	return deployment.List(ws, allDeployments, platformCoreClient, out)
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string) error {
@@ -360,7 +360,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 			return errFlag
 		}
 
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, astroCoreClient, out)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, platformCoreClient, astroCoreClient, out)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
@@ -390,7 +390,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, deploymentType, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus, &deploymentCreateEnforceCD)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, deploymentType, schedulerAU, schedulerReplicas, astroClient, platformCoreClient, astroCoreClient, waitForStatus, &deploymentCreateEnforceCD)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -417,7 +417,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 			// other flags were requested
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, astroCoreClient, out)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, platformCoreClient, astroCoreClient, out)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value")

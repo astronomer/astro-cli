@@ -228,7 +228,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 	var (
 		defaultOptions astro.WorkerQueueDefaultOptions
 		configOptions  astro.DeploymentConfig
-		listQueues     []astro.WorkerQueue
+		listQueues     []astroplatformcore.WorkerQueue
 		astroMachine   astroplatformcore.WorkerMachine
 		createInput    astro.CreateDeploymentInput
 		updateInput    astro.UpdateDeploymentInput
@@ -261,8 +261,15 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 				if deployment.IsDeploymentStandard(deploymentType) || deployment.IsDeploymentDedicated(deploymentType) {
 					astroMachines := configOptions.AstroMachines
 					for j := range astroMachines {
-						if astroMachines[j].Type == listQueues[i].AstroMachine {
-							astroMachine = astroMachines[j]
+						if astroMachines[j].Type == *listQueues[i].AstroMachine {
+
+							astroMachine.Name = astroMachines[j].Type
+							astroMachine.Spec.Cpu = astroMachines[j].CPU
+							astroMachine.Spec.Memory = astroMachines[j].Memory
+							astroMachine.Concurrency.Ceiling = float32(astroMachines[j].ConcurrentTasksMax)
+							astroMachine.Concurrency.Default = float32(astroMachines[j].ConcurrentTasks)
+							concurrency := float32(astroMachines[j].ConcurrentTasks)
+							astroMachine.Spec.Concurrency = &concurrency
 						}
 					}
 					// check if queue is valid
@@ -296,6 +303,21 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			}
 		}
 	}
+	// tempory code
+	var astroListQueues []astro.WorkerQueue
+	for i := range listQueues {
+		var workerQueue astro.WorkerQueue
+		workerQueue.ID = listQueues[i].Id
+		workerQueue.Name = listQueues[i].Name
+		workerQueue.IsDefault = listQueues[i].IsDefault
+		workerQueue.MaxWorkerCount = listQueues[i].MaxWorkerCount
+		workerQueue.MinWorkerCount = listQueues[i].MinWorkerCount
+		workerQueue.WorkerConcurrency = listQueues[i].WorkerConcurrency
+		workerQueue.NodePoolID = *listQueues[i].NodePoolId
+		workerQueue.PodCPU = listQueues[i].PodCpu
+		workerQueue.PodRAM = listQueues[i].PodMemory
+		astroListQueues = append(astroListQueues, workerQueue)
+	}
 	switch action {
 	case createAction:
 		createInput = astro.CreateDeploymentInput{
@@ -315,7 +337,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
 				},
 			},
-			WorkerQueues: listQueues,
+			WorkerQueues: astroListQueues,
 		}
 	case updateAction:
 		// check if cluster is being changed
@@ -339,7 +361,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
 				},
 			},
-			WorkerQueues: listQueues,
+			WorkerQueues: astroListQueues,
 		}
 	}
 	return createInput, updateInput, nil
@@ -516,7 +538,7 @@ func createEnvVars(deploymentFromFile *inspect.FormattedDeployment, deploymentID
 // It returns a list of worker queues to be created or updated.
 func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astrocore.NodePool, existingQueues []astro.WorkerQueue) ([]astroplatformcore.WorkerQueue, error) {
 	var (
-		qList      []astro.WorkerQueue
+		qList      []astroplatformcore.WorkerQueue
 		nodePoolID string
 		err        error
 	)
@@ -534,7 +556,7 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 			return requestedQueues[i].Name < requestedQueues[j].Name
 		})
 	}
-	qList = make([]astro.WorkerQueue, len(requestedQueues))
+	qList = make([]astroplatformcore.WorkerQueue, len(requestedQueues))
 	for i := range requestedQueues {
 		// check if requested queue exists
 		if i < len(existingQueues) {
@@ -544,7 +566,7 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 				qList[i].Name = existingQueues[i].Name
 				if deploymentFromFile.Deployment.Configuration.Executor != deployment.KubeExecutor {
 					// only add id when executor is Celery
-					qList[i].ID = existingQueues[i].ID
+					qList[i].Id = existingQueues[i].ID
 				}
 			}
 		}
@@ -557,17 +579,17 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 		qList[i].MaxWorkerCount = requestedQueues[i].MaxWorkerCount
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
-		qList[i].PodCPU = requestedQueues[i].PodCPU
-		qList[i].PodRAM = requestedQueues[i].PodRAM
+		qList[i].PodCpu = requestedQueues[i].PodCPU
+		qList[i].PodMemory = requestedQueues[i].PodRAM
 		if deployment.IsDeploymentDedicated(deploymentType) || deployment.IsDeploymentStandard(deploymentType) {
-			qList[i].AstroMachine = requestedQueues[i].WorkerType
+			qList[i].AstroMachine = &requestedQueues[i].WorkerType
 		} else {
 			// map worker type to node pool id
 			nodePoolID, err = getNodePoolIDFromWorkerType(requestedQueues[i].WorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
 			if err != nil {
 				return nil, err
 			}
-			qList[i].NodePoolID = nodePoolID
+			qList[i].NodePoolId = &nodePoolID
 		}
 	}
 	return qList, nil
