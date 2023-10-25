@@ -29,7 +29,7 @@ var (
 	org                   = "test-org-id"
 	ws                    = "test-ws-id"
 	dagTarballVersionTest = "test-version"
-	dagsUploadURL         = "test-url"
+	dagsUploadTestURL     = "test-url"
 	createDeployResponse  = astrocore.CreateDeployResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -38,7 +38,7 @@ var (
 			Id:                "test-id",
 			DagTarballVersion: &dagTarballVersionTest,
 			ImageRepository:   "test-repository",
-			DagsUploadUrl:     &dagsUploadURL,
+			DagsUploadUrl:     &dagsUploadTestURL,
 		},
 	}
 	updateDeployResponse = astrocore.UpdateDeployResponse{

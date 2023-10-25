@@ -65,7 +65,7 @@ var (
 	azureUploader        = azure.Upload
 	canCiCdDeploy        = deployment.CanCiCdDeploy
 	dagTarballVersion    = ""
-	dagsUploadUrl        = ""
+	dagsUploadURL        = ""
 	nextTag              = ""
 )
 
@@ -147,7 +147,7 @@ func shouldIncludeMonitoringDag(deploymentType string) bool {
 	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentHosted(deploymentType)
 }
 
-func deployDags(path, dagsPath, deploymentType, deploymentID, organizationID, dagsUploadUrl string, coreClient astrocore.CoreClient) (string, error) {
+func deployDags(path, dagsPath, deploymentType, deploymentID, organizationID, dagsUploadURL string, coreClient astrocore.CoreClient) (string, error) {
 	// Check the dags directory
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
@@ -172,7 +172,7 @@ func deployDags(path, dagsPath, deploymentType, deploymentID, organizationID, da
 	}
 	defer dagFile.Close()
 
-	versionID, err := azureUploader(dagsUploadUrl, dagFile)
+	versionID, err := azureUploader(dagsUploadURL, dagFile)
 	if err != nil {
 		return "", err
 	}
@@ -242,11 +242,11 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 	}
 	deployID := resp.JSON200.Id
 	if resp.JSON200.DagsUploadUrl != nil {
-		dagsUploadUrl = *resp.JSON200.DagsUploadUrl
+		dagsUploadURL = *resp.JSON200.DagsUploadUrl
 	} else {
-		dagsUploadUrl = ""
+		dagsUploadURL = ""
 	}
-	if &resp.JSON200.ImageTag != nil {
+	if resp.JSON200.ImageTag != "" {
 		nextTag = resp.JSON200.ImageTag
 	} else {
 		nextTag = ""
@@ -278,7 +278,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		dagTarballVersion, err := deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, deployInfo.organizationID, dagsUploadUrl, coreClient)
+		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, deployInfo.organizationID, dagsUploadURL, coreClient)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -361,7 +361,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, deployInfo.organizationID, dagsUploadUrl, coreClient)
+			dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, deployInfo.deploymentID, deployInfo.organizationID, dagsUploadURL, coreClient)
 			if err != nil {
 				return err
 			}
@@ -701,7 +701,7 @@ func updateDeploy(deployID, deploymentID, organizationID, dagTarballVersion stri
 	if resp.JSON200.DagTarballVersion != nil {
 		fmt.Println("Deployed DAG bundle: ", &resp.JSON200.DagTarballVersion)
 	}
-	if &resp.JSON200.ImageTag != nil {
+	if resp.JSON200.ImageTag != "" {
 		fmt.Println("Deployed Image Tag: ", resp.JSON200.ImageTag)
 	}
 	return nil
@@ -716,6 +716,9 @@ func createDeploy(organizationID, deploymentID, description, tag string, dagDepl
 		createDeployRequest.Type = astrocore.CreateDeployRequestTypeDAG
 	} else {
 		createDeployRequest.Type = astrocore.CreateDeployRequestTypeIMAGE
+	}
+	if tag != "" {
+		createDeployRequest.ImageTag = &tag
 	}
 
 	resp, err := coreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, createDeployRequest)
