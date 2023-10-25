@@ -165,13 +165,6 @@ func deployDags(path, dagsPath, deploymentType, deploymentID, organizationID, da
 		return "", err
 	}
 
-	// create image deploy
-	// dagDeploy := true
-	// resp, err := createDeploy(organizationID, deploymentID, "", "", dagDeploy, coreClient)
-	// if err != nil {
-	// 	return "", err
-	// }
-
 	dagsFilePath := filepath.Join(path, "dags.tar")
 	dagFile, err := os.Open(dagsFilePath)
 	if err != nil {
@@ -196,18 +189,6 @@ func deployDags(path, dagsPath, deploymentType, deploymentID, organizationID, da
 			fmt.Println("\nPlease delete the dags tar file manually from path: " + dagFile.Name())
 		}
 	}()
-
-	// if resp.JSON200.DagTarballVersion != nil {
-	// 	dagTarballVersion = *resp.JSON200.DagTarballVersion
-	// } else {
-	// 	dagTarballVersion = ""
-	// }
-
-	// Do image deploy
-	// err = updateDeploy(resp.JSON200.Id, deploymentID, organizationID, dagTarballVersion, dagDeploy, coreClient)
-	// if err != nil {
-	// 	return "", err
-	// }
 
 	return versionID, nil
 }
@@ -260,11 +241,6 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		return err
 	}
 	deployID := resp.JSON200.Id
-	// if resp.JSON200.DagTarballVersion != nil {
-	// 	dagTarballVersion = *resp.JSON200.DagTarballVersion
-	// } else {
-	// 	dagTarballVersion = ""
-	// }
 	if resp.JSON200.DagsUploadUrl != nil {
 		dagsUploadUrl = *resp.JSON200.DagsUploadUrl
 	} else {
@@ -369,18 +345,6 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			fmt.Println("No DAGs found. Skipping testing...")
 		}
 
-		// nextTag := "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
-
-		// resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, "", nextTag, dagDeploy, coreClient)
-		// if err != nil {
-		// 	return err
-		// }
-		// deployID := resp.JSON200.Id
-		// if resp.JSON200.DagTarballVersion != nil {
-		// 	dagTarballVersion = *resp.JSON200.DagTarballVersion
-		// } else {
-		// 	dagTarballVersion = ""
-		// }
 		registry := airflow.GetRegistryURL(domain)
 		repository := resp.JSON200.ImageRepository
 		// TODO: Resolve the edge case where two people push the same nextTag at the same time

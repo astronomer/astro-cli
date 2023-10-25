@@ -488,6 +488,7 @@ func TestNoDagsDeploy(t *testing.T) {
 	}
 
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
+	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(1)
 
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
