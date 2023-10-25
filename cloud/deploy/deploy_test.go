@@ -554,6 +554,7 @@ func TestDagsDeployFailed(t *testing.T) {
 	}
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(3)
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(2)
+	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(3)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockClient, mockCoreClient)
