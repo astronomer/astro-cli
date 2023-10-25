@@ -255,7 +255,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		return err
 	}
 
-	resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, "", "", deployInput.Dags, coreClient)
+	resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, deployInput.Description, "", deployInput.Dags, coreClient)
 	if err != nil {
 		return err
 	}
