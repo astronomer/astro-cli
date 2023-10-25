@@ -367,7 +367,6 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			}
 		}
 		// finish deploy
-		fmt.Println(deployInfo.dagDeployEnabled)
 		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
 		if err != nil {
 			return err
@@ -684,12 +683,9 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 // update deploy
 func updateDeploy(deployID, deploymentID, organizationID, dagTarballVersion string, dagDeploy bool, coreClient astrocore.CoreClient) error {
 	UpdateDeployRequest := astrocore.UpdateDeployRequest{}
-	fmt.Println(dagDeploy)
-	fmt.Println(dagTarballVersion)
 	if dagDeploy {
 		UpdateDeployRequest.DagTarballVersion = &dagTarballVersion
 	}
-	fmt.Println(UpdateDeployRequest)
 	resp, err := coreClient.UpdateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, deployID, UpdateDeployRequest)
 	if err != nil {
 		return err
