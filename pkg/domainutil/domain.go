@@ -55,7 +55,7 @@ func GetURLToEndpoint(protocol, domain, endpoint string) string {
 }
 
 func TransformToCoreAPIEndpoint(addr string) string {
-	if strings.Contains(addr, "v1alpha1") {
+	if strings.Contains(addr, "v1alpha1") || strings.Contains(addr, "v1beta1") {
 		addr = strings.Replace(addr, "/hub", "", 1)
 		addr = strings.Replace(addr, "localhost:8871", "localhost:8888", 1)
 	}

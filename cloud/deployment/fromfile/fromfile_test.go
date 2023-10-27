@@ -126,7 +126,7 @@ func TestCreateOrUpdate(t *testing.T) {
 
 	t.Run("common across create or update", func(t *testing.T) {
 		t.Run("returns an error if file does not exist", func(t *testing.T) {
-			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil, nil)
 			assert.ErrorContains(t, err, "open deployment.yaml: no such file or directory")
 		})
 		t.Run("returns an error if file exists but user provides incorrect path", func(t *testing.T) {
@@ -135,7 +135,7 @@ func TestCreateOrUpdate(t *testing.T) {
 			err = fileutil.WriteStringToFile(filePath, data)
 			assert.NoError(t, err)
 			defer afero.NewOsFs().RemoveAll("./2")
-			err = CreateOrUpdate("1/deployment.yaml", "create", nil, nil, nil)
+			err = CreateOrUpdate("1/deployment.yaml", "create", nil, nil, nil, nil)
 			assert.ErrorContains(t, err, "open 1/deployment.yaml: no such file or directory")
 		})
 		t.Run("returns an error if file is empty", func(t *testing.T) {
@@ -143,7 +143,7 @@ func TestCreateOrUpdate(t *testing.T) {
 			data = ""
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil, nil)
 			assert.ErrorIs(t, err, errEmptyFile)
 			assert.ErrorContains(t, err, "deployment.yaml has no content")
 		})
@@ -152,7 +152,7 @@ func TestCreateOrUpdate(t *testing.T) {
 			data = "test"
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil, nil)
 			assert.ErrorContains(t, err, "error unmarshaling JSON:")
 		})
 		t.Run("returns an error if required fields are missing", func(t *testing.T) {
@@ -207,7 +207,7 @@ deployment:
 `
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil, nil)
 			assert.ErrorContains(t, err, "missing required field: deployment.configuration.name")
 		})
 		t.Run("returns an error if getting context fails", func(t *testing.T) {

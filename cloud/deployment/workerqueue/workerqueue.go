@@ -6,6 +6,7 @@ import (
 	"io"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
 
@@ -61,7 +62,11 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 
 	if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-		nodePoolID = *requestedDeployment.TaskPodNodePoolId
+		hubDeployment, err := client.GetDeployment(requestedDeployment.Id)
+		if err != nil {
+			return err
+		}
+		nodePoolID = hubDeployment.Cluster.NodePools[0].ID
 		// configOptions, err := client.GetDeploymentConfig()
 		// if err != nil {
 		// 	return err
@@ -93,7 +98,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			return err
 		}
 	}
-
+	// temporay code to go from CORE to astrohub
 	queueToCreateOrUpdate = &astroplatformcore.WorkerQueue{
 		Name:              name,
 		IsDefault:         false, // cannot create a default queue
@@ -179,17 +184,23 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		workerQueue.MaxWorkerCount = listToCreate[i].MaxWorkerCount
 		workerQueue.MinWorkerCount = listToCreate[i].MinWorkerCount
 		workerQueue.WorkerConcurrency = listToCreate[i].WorkerConcurrency
-		workerQueue.NodePoolID = *listToCreate[i].NodePoolId
+		if listToCreate[i].NodePoolId != nil {
+			workerQueue.NodePoolID = *listToCreate[i].NodePoolId
+		}
 		workerQueue.PodCPU = listToCreate[i].PodCpu
 		workerQueue.PodRAM = listToCreate[i].PodMemory
+		workerQueue.AstroMachine = strings.ToLower(*listToCreate[i].AstroMachine)
 		astroListToCreate = append(astroListToCreate, workerQueue)
 	}
-
+	fmt.Println("made it to 196")
 	// update the deployment with the new list of worker queues
-	err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", 0, 0, astroListToCreate, true, nil, client)
+	err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", 0, 0, astroListToCreate, true, nil, platformCoreClient, client)
+	fmt.Println("made it to 199")
 	if err != nil {
+		fmt.Println("made it to 201")
 		return err
 	}
+	fmt.Println("made it to 204")
 	// change action to past tense
 	succeededAction = fmt.Sprintf("%sd", action)
 
@@ -281,7 +292,7 @@ func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore
 	// The floor for worker concurrency for hosted deployments is always 1 for all astro machines
 	workerConcurrenyFloor := 1
 	if !(requestedWorkerQueue.WorkerConcurrency >= workerConcurrenyFloor) ||
-		!(requestedWorkerQueue.WorkerConcurrency <= int(*machineOptions.Spec.Concurrency)) {
+		!(requestedWorkerQueue.WorkerConcurrency <= int(machineOptions.Concurrency.Ceiling)) {
 		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", workerConcurrenyFloor, int(machineOptions.Concurrency.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
@@ -517,13 +528,16 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 			workerQueue.MaxWorkerCount = listToDelete[i].MaxWorkerCount
 			workerQueue.MinWorkerCount = listToDelete[i].MinWorkerCount
 			workerQueue.WorkerConcurrency = listToDelete[i].WorkerConcurrency
-			workerQueue.NodePoolID = *listToDelete[i].NodePoolId
+			if listToDelete[i].NodePoolId != nil {
+				workerQueue.NodePoolID = *listToDelete[i].NodePoolId
+			}
 			workerQueue.PodCPU = listToDelete[i].PodCpu
 			workerQueue.PodRAM = listToDelete[i].PodMemory
+			workerQueue.AstroMachine = strings.ToLower(*listToDelete[i].AstroMachine)
 			astroListToDelete = append(astroListToDelete, workerQueue)
 		}
 		// update the deployment with the new list
-		err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", 0, 0, astroListToDelete, true, nil, client)
+		err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", 0, 0, astroListToDelete, true, nil, platformCoreClient, client)
 		if err != nil {
 			return err
 		}
