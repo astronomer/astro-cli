@@ -321,7 +321,7 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid Workspace")
 	}
 
-	return deployment.Logs(deploymentID, ws, deploymentName, warnLogs, errorLogs, infoLogs, logCount, astroClient)
+	return deployment.Logs(deploymentID, ws, deploymentName, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroClient)
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit
@@ -433,10 +433,10 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	if !cmd.Flags().Changed("enforce-cicd") {
-		return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, nil, astroClient)
+		return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, nil, platformCoreClient, astroClient)
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, &deploymentUpdateEnforceCD, astroClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, &deploymentUpdateEnforceCD, platformCoreClient, astroClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
@@ -453,7 +453,7 @@ func deploymentDelete(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Delete(deploymentID, ws, deploymentName, forceDelete, astroClient)
+	return deployment.Delete(deploymentID, ws, deploymentName, forceDelete, platformCoreClient, astroClient)
 }
 
 func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -465,7 +465,7 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, astroClient, out)
+	return deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, platformCoreClient, astroClient, out)
 }
 
 func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -479,7 +479,7 @@ func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, false, astroClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, false, platformCoreClient, astroClient, out)
 }
 
 func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -493,7 +493,7 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, platformCoreClient, astroClient, out)
 }
 
 func isValidExecutor(executor string) bool {

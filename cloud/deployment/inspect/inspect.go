@@ -125,11 +125,15 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 	// create a map for deployment.configuration
 	deploymentConfigMap = getDeploymentConfig(requestedDeployment)
 	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.astronomer_variables
-	cluster, err := deployment.CoreGetCluster("", requestedDeployment.Id, platformCoreClient)
+	cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, platformCoreClient)
 	if err != nil {
 		return err
 	}
-	additionalMap = getAdditional(requestedDeployment, *cluster.NodePools)
+	var nodePools = []astroplatformcore.NodePool{}
+	if cluster.NodePools != nil {
+		nodePools = *cluster.NodePools
+	}
+	additionalMap = getAdditional(requestedDeployment, nodePools)
 	// create a map for the entire deployment
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 	// get specific field if requested
@@ -247,11 +251,15 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astr
 	// create a map for deployment.configuration
 	deploymentConfigMap = getDeploymentConfig(requestedDeployment)
 	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.astronomer_variables
-	cluster, err := deployment.CoreGetCluster("", requestedDeployment.Id, astroPlatformCore)
+	cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, astroPlatformCore)
 	if err != nil {
 		return nil, err
 	}
-	additionalMap = getAdditional(requestedDeployment, *cluster.NodePools)
+	var nodePools = []astroplatformcore.NodePool{}
+	if cluster.NodePools != nil {
+		nodePools = *cluster.NodePools
+	}
+	additionalMap = getAdditional(requestedDeployment, nodePools)
 	// create a map for the entire deployment
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 

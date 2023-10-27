@@ -462,8 +462,8 @@ type Cluster struct {
 	// VpcSubnetRange The VPC subnet range.
 	VpcSubnetRange string `json:"vpcSubnetRange"`
 
-	// Workspaces The list of Workspaces that are authorized to the cluster.
-	Workspaces *[]string `json:"workspaces,omitempty"`
+	// WorkspaceIds The list of Workspaces that are authorized to the cluster.
+	WorkspaceIds *[]string `json:"workspaceIds,omitempty"`
 }
 
 // ClusterCloudProvider The name of the cluster's cloud provider.
@@ -575,6 +575,9 @@ type CreateAwsClusterRequest struct {
 
 	// VpcSubnetRange The VPC subnet range.
 	VpcSubnetRange string `json:"vpcSubnetRange"`
+
+	// WorkspaceIds The list of Workspaces that are authorized to the cluster.
+	WorkspaceIds *[]string `json:"workspaceIds,omitempty"`
 }
 
 // CreateAwsClusterRequestCloudProvider The cluster's cloud provider.
@@ -614,6 +617,9 @@ type CreateAzureClusterRequest struct {
 
 	// VpcSubnetRange The VPC subnet range.
 	VpcSubnetRange string `json:"vpcSubnetRange"`
+
+	// WorkspaceIds The list of Workspaces that are authorized to the cluster.
+	WorkspaceIds *[]string `json:"workspaceIds,omitempty"`
 }
 
 // CreateAzureClusterRequestCloudProvider The cluster's cloud provider.
@@ -729,6 +735,9 @@ type CreateGcpClusterRequest struct {
 
 	// VpcSubnetRange The VPC subnet range.
 	VpcSubnetRange string `json:"vpcSubnetRange"`
+
+	// WorkspaceIds The list of Workspaces that are authorized to the cluster.
+	WorkspaceIds *[]string `json:"workspaceIds,omitempty"`
 }
 
 // CreateGcpClusterRequestCloudProvider The cluster's cloud provider.
@@ -878,8 +887,17 @@ type CreateWorkspaceRequest struct {
 
 // Deployment defines model for Deployment.
 type Deployment struct {
+	// AirflowVersion The Deployment's Astro Runtime version.
+	AirflowVersion string `json:"airflowVersion"`
+
+	// CloudProvider The cloud provider of the cluster. Only for Standard Deployment.
+	CloudProvider *string `json:"cloudProvider,omitempty"`
+
 	// ClusterId The ID of the cluster where the Deployment is hosted.
 	ClusterId *string `json:"clusterId,omitempty"`
+
+	// ClusterName The name of the cluster where the Deployment is hosted. Only for Dedicated and Hybrid Deployments.
+	ClusterName *string `json:"clusterName,omitempty"`
 
 	// ContactEmails The list of contact emails for the Deployment.
 	ContactEmails *[]string `json:"contactEmails,omitempty"`
@@ -939,6 +957,9 @@ type Deployment struct {
 	// OrganizationId The ID of the Organization to which the Deployment belongs.
 	OrganizationId string `json:"organizationId"`
 
+	// Region The region of the cluster. Only for Dedicated and Hybrid Deployments.
+	Region *string `json:"region,omitempty"`
+
 	// ResourceQuotaCpu The CPU quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current CPU usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in number of CPU cores.
 	ResourceQuotaCpu *string `json:"resourceQuotaCpu,omitempty"`
 
@@ -979,6 +1000,9 @@ type Deployment struct {
 	UpdatedAt time.Time           `json:"updatedAt"`
 	UpdatedBy BasicSubjectProfile `json:"updatedBy"`
 
+	// WebServerAirflowApiUrl The Deployment's webserver's base url to directly access the Airflow api.
+	WebServerAirflowApiUrl string `json:"webServerAirflowApiUrl"`
+
 	// WebServerCpu The CPU limit for the Deployment's webserver. Units are in number of CPU cores.
 	WebServerCpu string `json:"webServerCpu"`
 
@@ -1002,6 +1026,9 @@ type Deployment struct {
 
 	// WorkspaceId The ID of the Workspace to which the Deployment belongs.
 	WorkspaceId string `json:"workspaceId"`
+
+	// WorkspaceName The name of the Workspace to which the Deployment belongs.
+	WorkspaceName *string `json:"workspaceName,omitempty"`
 }
 
 // DeploymentExecutor The Deployment's executor type.
@@ -1365,6 +1392,9 @@ type UpdateClusterRequest struct {
 
 	// NodePools A list of node pools to add to the cluster. For Hybrid clusters only.
 	NodePools *[]UpdateNodePoolRequest `json:"nodePools,omitempty"`
+
+	// WorkspaceIds The list of Workspaces that are authorized to the cluster. If this value is not provided, the existing list of Workspaces remains. If this value is '[]' then all workspace cluster mappings are removed.
+	WorkspaceIds *[]string `json:"workspaceIds,omitempty"`
 }
 
 // UpdateDedicatedDeploymentRequest defines model for UpdateDedicatedDeploymentRequest.

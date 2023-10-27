@@ -15,11 +15,12 @@ import (
 )
 
 var (
-	errVarBool         = false
-	errVarCreateUpdate = errors.New("there was an error while creating or updating one or more of the environment variables. Check the logs above for more information")
+	errVarBool                  = false
+	errVarCreateUpdate          = errors.New("there was an error while creating or updating one or more of the environment variables. Check the logs above for more information")
+	environmentVariablesObjects = []astroplatformcore.DeploymentEnvironmentVariable{}
 )
 
-func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string, useEnvFile bool, client astro.Client, out io.Writer) error {
+func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string, useEnvFile bool, platformCoreClient astroplatformcore.CoreClient, client astro.Client, out io.Writer) error {
 	varTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
@@ -27,12 +28,14 @@ func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string,
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, client, nil, nil)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, client, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}
 
-	environmentVariablesObjects := *currentDeployment.EnvironmentVariables
+	if currentDeployment.EnvironmentVariables != nil {
+		environmentVariablesObjects = *currentDeployment.EnvironmentVariables
+	}
 
 	// open env file
 	if useEnvFile {
@@ -65,7 +68,7 @@ func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string,
 
 // this function modifies a deployment's environment variable object
 // it is used to create and update deployment's environment variables
-func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName string, variableList []string, useEnvFile, makeSecret, updateVars bool, client astro.Client, out io.Writer) error {
+func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName string, variableList []string, useEnvFile, makeSecret, updateVars bool, platformCoreClient astroplatformcore.CoreClient, client astro.Client, out io.Writer) error {
 	varTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
@@ -73,13 +76,16 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, client, nil, nil)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, client, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}
 
 	// build query input
-	oldEnvironmentVariables := *currentDeployment.EnvironmentVariables
+	var oldEnvironmentVariables = []astroplatformcore.DeploymentEnvironmentVariable{}
+	if currentDeployment.EnvironmentVariables != nil {
+		oldEnvironmentVariables = *currentDeployment.EnvironmentVariables
+	}
 
 	newEnvironmentVariables := make([]astro.EnvironmentVariable, 0)
 	oldKeyList := make([]string, 0)

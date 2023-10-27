@@ -15,6 +15,7 @@ import (
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/sirupsen/logrus"
@@ -1110,7 +1111,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil)
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil, nil)
 
 		assert.NoError(t, err)
 		imageHandler.AssertExpectations(t)
@@ -1119,7 +1120,9 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 	t.Run("success with deployment id", func(t *testing.T) {
 		imageHandler := new(mocks.ImageHandler)
 		mockClient := new(astro_mocks.Client)
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything).Return().Once()
 		imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		imageHandler.On("Build", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Times(2)
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
@@ -1130,7 +1133,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", true, false, false, mockClient)
+		err := mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", true, false, false, mockPlatformCoreClient, mockClient)
 
 		assert.NoError(t, err)
 		imageHandler.AssertExpectations(t)
@@ -1142,7 +1145,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil, nil)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1154,7 +1157,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil, nil)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1166,7 +1169,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil, nil)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1179,7 +1182,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil, nil)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1193,7 +1196,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil, nil)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1208,7 +1211,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil, nil)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1224,7 +1227,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil, nil)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1240,7 +1243,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil, nil)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1248,11 +1251,13 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 	t.Run("get deployments failure", func(t *testing.T) {
 		imageHandler := new(mocks.ImageHandler)
 		mockClient := new(astro_mocks.Client)
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything).Return().Once()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", true, false, false, mockClient)
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", true, false, false, mockPlatformCoreClient, mockClient)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1260,12 +1265,14 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 	t.Run("image pull failure", func(t *testing.T) {
 		imageHandler := new(mocks.ImageHandler)
 		mockClient := new(astro_mocks.Client)
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything).Return().Once()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "deployment-id"}}, nil).Once()
 		imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker)
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", true, false, false, mockClient)
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", true, false, false, mockPlatformCoreClient, mockClient)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1280,7 +1287,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, nil, nil)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
@@ -1289,7 +1296,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 		err := config.ResetCurrentContext()
 		assert.NoError(t, err)
 
-		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, nil, nil)
 		assert.Error(t, err)
 	})
 }

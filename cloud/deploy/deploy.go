@@ -148,7 +148,7 @@ func shouldIncludeMonitoringDag(deploymentType astroplatformcore.DeploymentType)
 	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
 }
 
-func deployDags(path, dagsPath, deploymentType, dagsUploadURL string) (string, error) {
+func deployDags(path, dagsPath, dagsUploadURL string, deploymentType astroplatformcore.DeploymentType) (string, error) {
 	// Check the dags directory
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
@@ -279,7 +279,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, corePlatformClient ast
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, dagsUploadURL)
+		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.deploymentType)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -367,7 +367,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, corePlatformClient ast
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, dagsUploadURL)
+			dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.deploymentType)
 			if err != nil {
 				return err
 			}
