@@ -639,8 +639,12 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 	}
 
 	var envConns map[string]astrocore.EnvironmentObjectConnection
-	if !config.CFG.DisableEnvObjects.GetBool() {
-		envConns = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+	if !config.CFG.DisableEnvObjects.GetBool() && (workspaceID != "" || deploymentID != "") {
+		var err error
+		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+		if err != nil {
+			return err
+		}
 	}
 
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
@@ -759,8 +763,12 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 	noBrowser = true
 
 	var envConns map[string]astrocore.EnvironmentObjectConnection
-	if !config.CFG.DisableEnvObjects.GetBool() {
-		envConns = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+	if !config.CFG.DisableEnvObjects.GetBool() && (workspaceID != "" || deploymentID != "") {
+		var err error
+		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+		if err != nil {
+			return err
+		}
 	}
 
 	return containerHandler.Start(customImageName, settingsFile, composeFile, noCache, noBrowser, waitTime, envConns)
