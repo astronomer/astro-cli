@@ -141,7 +141,8 @@ const (
 
 // Defines values for CreateEnvironmentObjectRequestObjectType.
 const (
-	CreateEnvironmentObjectRequestObjectTypeCONNECTION CreateEnvironmentObjectRequestObjectType = "CONNECTION"
+	CreateEnvironmentObjectRequestObjectTypeAIRFLOWVARIABLE CreateEnvironmentObjectRequestObjectType = "AIRFLOW_VARIABLE"
+	CreateEnvironmentObjectRequestObjectTypeCONNECTION      CreateEnvironmentObjectRequestObjectType = "CONNECTION"
 )
 
 // Defines values for CreateEnvironmentObjectRequestScope.
@@ -237,7 +238,6 @@ const (
 	DeploymentStatusDEPLOYING DeploymentStatus = "DEPLOYING"
 	DeploymentStatusHEALTHY   DeploymentStatus = "HEALTHY"
 	DeploymentStatusUNHEALTHY DeploymentStatus = "UNHEALTHY"
-	DeploymentStatusUNKNOWN   DeploymentStatus = "UNKNOWN"
 )
 
 // Defines values for DeploymentType.
@@ -266,7 +266,8 @@ const (
 
 // Defines values for EnvironmentObjectObjectType.
 const (
-	EnvironmentObjectObjectTypeCONNECTION EnvironmentObjectObjectType = "CONNECTION"
+	EnvironmentObjectObjectTypeAIRFLOWVARIABLE EnvironmentObjectObjectType = "AIRFLOW_VARIABLE"
+	EnvironmentObjectObjectTypeCONNECTION      EnvironmentObjectObjectType = "CONNECTION"
 )
 
 // Defines values for EnvironmentObjectScope.
@@ -321,13 +322,14 @@ const (
 
 // Defines values for OrganizationSupportPlan.
 const (
-	OrganizationSupportPlanBASIC            OrganizationSupportPlan = "BASIC"
-	OrganizationSupportPlanBUSINESSCRITICAL OrganizationSupportPlan = "BUSINESS_CRITICAL"
-	OrganizationSupportPlanINTERNAL         OrganizationSupportPlan = "INTERNAL"
-	OrganizationSupportPlanPOV              OrganizationSupportPlan = "POV"
-	OrganizationSupportPlanPREMIUM          OrganizationSupportPlan = "PREMIUM"
-	OrganizationSupportPlanSTANDARD         OrganizationSupportPlan = "STANDARD"
-	OrganizationSupportPlanTRIAL            OrganizationSupportPlan = "TRIAL"
+	OrganizationSupportPlanAZUREMANAGEDPREVIEW OrganizationSupportPlan = "AZURE_MANAGED_PREVIEW"
+	OrganizationSupportPlanBASIC               OrganizationSupportPlan = "BASIC"
+	OrganizationSupportPlanBUSINESSCRITICAL    OrganizationSupportPlan = "BUSINESS_CRITICAL"
+	OrganizationSupportPlanINTERNAL            OrganizationSupportPlan = "INTERNAL"
+	OrganizationSupportPlanPOV                 OrganizationSupportPlan = "POV"
+	OrganizationSupportPlanPREMIUM             OrganizationSupportPlan = "PREMIUM"
+	OrganizationSupportPlanSTANDARD            OrganizationSupportPlan = "STANDARD"
+	OrganizationSupportPlanTRIAL               OrganizationSupportPlan = "TRIAL"
 )
 
 // Defines values for SelfSignupType.
@@ -363,7 +365,8 @@ const (
 
 // Defines values for UpdateEnvironmentObjectRequestObjectType.
 const (
-	UpdateEnvironmentObjectRequestObjectTypeCONNECTION UpdateEnvironmentObjectRequestObjectType = "CONNECTION"
+	UpdateEnvironmentObjectRequestObjectTypeAIRFLOWVARIABLE UpdateEnvironmentObjectRequestObjectType = "AIRFLOW_VARIABLE"
+	UpdateEnvironmentObjectRequestObjectTypeCONNECTION      UpdateEnvironmentObjectRequestObjectType = "CONNECTION"
 )
 
 // Defines values for UpdateEnvironmentObjectRequestScope.
@@ -644,7 +647,8 @@ const (
 
 // Defines values for ListEnvironmentObjectsParamsObjectType.
 const (
-	ListEnvironmentObjectsParamsObjectTypeCONNECTION ListEnvironmentObjectsParamsObjectType = "CONNECTION"
+	ListEnvironmentObjectsParamsObjectTypeAIRFLOWVARIABLE ListEnvironmentObjectsParamsObjectType = "AIRFLOW_VARIABLE"
+	ListEnvironmentObjectsParamsObjectTypeCONNECTION      ListEnvironmentObjectsParamsObjectType = "CONNECTION"
 )
 
 // Defines values for ListOrganizationTeamsParamsSorts.
@@ -772,6 +776,8 @@ type ApiToken struct {
 	Id                 string               `json:"id"`
 	LastUsedAt         *time.Time           `json:"lastUsedAt,omitempty"`
 	Name               string               `json:"name"`
+	OrganizationId     *string              `json:"organizationId,omitempty"`
+	OrganizationName   *string              `json:"organizationName,omitempty"`
 	Roles              []ApiTokenRole       `json:"roles"`
 	ShortToken         string               `json:"shortToken"`
 	StartAt            time.Time            `json:"startAt"`
@@ -943,6 +949,31 @@ type ClustersPaginated struct {
 	TotalCount int       `json:"totalCount"`
 }
 
+// ConnectionAuthType defines model for ConnectionAuthType.
+type ConnectionAuthType struct {
+	AirflowType         string                        `json:"airflowType"`
+	AuthMethodName      string                        `json:"authMethodName"`
+	Description         string                        `json:"description"`
+	GuidePath           *string                       `json:"guidePath,omitempty"`
+	Id                  string                        `json:"id"`
+	Name                string                        `json:"name"`
+	Parameters          []ConnectionAuthTypeParameter `json:"parameters"`
+	ProviderLogo        *string                       `json:"providerLogo,omitempty"`
+	ProviderPackageName string                        `json:"providerPackageName"`
+}
+
+// ConnectionAuthTypeParameter defines model for ConnectionAuthTypeParameter.
+type ConnectionAuthTypeParameter struct {
+	AirflowParamName string  `json:"airflowParamName"`
+	DataType         string  `json:"dataType"`
+	Description      string  `json:"description"`
+	Example          *string `json:"example,omitempty"`
+	FriendlyName     string  `json:"friendlyName"`
+	IsInExtra        bool    `json:"isInExtra"`
+	IsRequired       bool    `json:"isRequired"`
+	IsSecret         bool    `json:"isSecret"`
+}
+
 // CreateAwsClusterRequest defines model for CreateAwsClusterRequest.
 type CreateAwsClusterRequest struct {
 	DbInstanceType  string                      `json:"dbInstanceType"`
@@ -1066,6 +1097,17 @@ type CreateEnvironmentObject struct {
 	Id string `json:"id"`
 }
 
+// CreateEnvironmentObjectAirflowVariableOverridesRequest defines model for CreateEnvironmentObjectAirflowVariableOverridesRequest.
+type CreateEnvironmentObjectAirflowVariableOverridesRequest struct {
+	Value *string `json:"value,omitempty"`
+}
+
+// CreateEnvironmentObjectAirflowVariableRequest defines model for CreateEnvironmentObjectAirflowVariableRequest.
+type CreateEnvironmentObjectAirflowVariableRequest struct {
+	IsSecret *bool   `json:"isSecret,omitempty"`
+	Value    *string `json:"value,omitempty"`
+}
+
 // CreateEnvironmentObjectConnectionOverridesRequest defines model for CreateEnvironmentObjectConnectionOverridesRequest.
 type CreateEnvironmentObjectConnectionOverridesRequest struct {
 	Extra    *map[string]interface{} `json:"extra,omitempty"`
@@ -1079,13 +1121,14 @@ type CreateEnvironmentObjectConnectionOverridesRequest struct {
 
 // CreateEnvironmentObjectConnectionRequest defines model for CreateEnvironmentObjectConnectionRequest.
 type CreateEnvironmentObjectConnectionRequest struct {
-	Extra    *map[string]interface{} `json:"extra,omitempty"`
-	Host     *string                 `json:"host,omitempty"`
-	Login    *string                 `json:"login,omitempty"`
-	Password *string                 `json:"password,omitempty"`
-	Port     *int                    `json:"port,omitempty"`
-	Schema   *string                 `json:"schema,omitempty"`
-	Type     string                  `json:"type"`
+	AuthTypeId *string                 `json:"authTypeId,omitempty"`
+	Extra      *map[string]interface{} `json:"extra,omitempty"`
+	Host       *string                 `json:"host,omitempty"`
+	Login      *string                 `json:"login,omitempty"`
+	Password   *string                 `json:"password,omitempty"`
+	Port       *int                    `json:"port,omitempty"`
+	Schema     *string                 `json:"schema,omitempty"`
+	Type       string                  `json:"type"`
 }
 
 // CreateEnvironmentObjectLinkRequest defines model for CreateEnvironmentObjectLinkRequest.
@@ -1100,19 +1143,21 @@ type CreateEnvironmentObjectLinkRequestScope string
 
 // CreateEnvironmentObjectOverridesRequest defines model for CreateEnvironmentObjectOverridesRequest.
 type CreateEnvironmentObjectOverridesRequest struct {
-	Connection *CreateEnvironmentObjectConnectionOverridesRequest `json:"connection,omitempty"`
+	AirflowVariable *CreateEnvironmentObjectAirflowVariableOverridesRequest `json:"airflowVariable,omitempty"`
+	Connection      *CreateEnvironmentObjectConnectionOverridesRequest      `json:"connection,omitempty"`
 }
 
 // CreateEnvironmentObjectRequest defines model for CreateEnvironmentObjectRequest.
 type CreateEnvironmentObjectRequest struct {
-	AutoLinkDeployments *bool                                     `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                                     `json:"autoLinkProjects,omitempty"`
-	Connection          *CreateEnvironmentObjectConnectionRequest `json:"connection,omitempty"`
-	Links               *[]CreateEnvironmentObjectLinkRequest     `json:"links,omitempty"`
-	ObjectKey           string                                    `json:"objectKey"`
-	ObjectType          CreateEnvironmentObjectRequestObjectType  `json:"objectType"`
-	Scope               CreateEnvironmentObjectRequestScope       `json:"scope"`
-	ScopeEntityId       string                                    `json:"scopeEntityId"`
+	AirflowVariable     *CreateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
+	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                                          `json:"autoLinkProjects,omitempty"`
+	Connection          *CreateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
+	Links               *[]CreateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
+	ObjectKey           string                                         `json:"objectKey"`
+	ObjectType          CreateEnvironmentObjectRequestObjectType       `json:"objectType"`
+	Scope               CreateEnvironmentObjectRequestScope            `json:"scope"`
+	ScopeEntityId       string                                         `json:"scopeEntityId"`
 }
 
 // CreateEnvironmentObjectRequestObjectType defines model for CreateEnvironmentObjectRequest.ObjectType.
@@ -1317,8 +1362,15 @@ type DagSchedule struct {
 	TimeDelta      *InternalScheduleIntervalTimeDelta      `json:"TimeDelta,omitempty"`
 }
 
+// DefaultValueOptions defines model for DefaultValueOptions.
+type DefaultValueOptions struct {
+	SchedulerSize     string `json:"schedulerSize"`
+	WorkerMachineName string `json:"workerMachineName"`
+}
+
 // Deploy defines model for Deploy.
 type Deploy struct {
+	AirflowVersion     *string              `json:"airflowVersion,omitempty"`
 	CreatedAt          time.Time            `json:"createdAt"`
 	CreatedBySubject   *BasicSubjectProfile `json:"createdBySubject,omitempty"`
 	DagTarballVersion  *string              `json:"dagTarballVersion,omitempty"`
@@ -1329,6 +1381,7 @@ type Deploy struct {
 	ImageRepository    string               `json:"imageRepository"`
 	ImageTag           string               `json:"imageTag"`
 	IsDagDeployEnabled bool                 `json:"isDagDeployEnabled"`
+	RollbackFromId     *string              `json:"rollbackFromId,omitempty"`
 	RuntimeVersion     *string              `json:"runtimeVersion,omitempty"`
 	Status             DeployStatus         `json:"status"`
 	Type               DeployType           `json:"type"`
@@ -1342,8 +1395,15 @@ type DeployStatus string
 // DeployType defines model for Deploy.Type.
 type DeployType string
 
+// DeployRollbackRequest defines model for DeployRollbackRequest.
+type DeployRollbackRequest struct {
+	DeployId    string  `json:"deployId"`
+	Description *string `json:"description,omitempty"`
+}
+
 // Deployment defines model for Deployment.
 type Deployment struct {
+	AirflowVersion           string                           `json:"airflowVersion"`
 	AlertEmails              *[]string                        `json:"alertEmails,omitempty"`
 	ApiKeyOnlyDeployments    bool                             `json:"apiKeyOnlyDeployments"`
 	ClusterCloudProvider     *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
@@ -1356,6 +1416,7 @@ type Deployment struct {
 	CurrentImageVersion      *string                          `json:"currentImageVersion,omitempty"`
 	DefaultTaskPodCpu        *string                          `json:"defaultTaskPodCpu,omitempty"`
 	DefaultTaskPodMemory     *string                          `json:"defaultTaskPodMemory,omitempty"`
+	DeployId                 string                           `json:"deployId"`
 	Description              *string                          `json:"description,omitempty"`
 	DesiredDagTarballVersion *string                          `json:"desiredDagTarballVersion,omitempty"`
 	EnvironmentVariables     *[]DeploymentEnvironmentVariable `json:"environmentVariables,omitempty"`
@@ -1367,7 +1428,7 @@ type Deployment struct {
 	ImageTag                 string                           `json:"imageTag"`
 	IsDagDeployEnabled       bool                             `json:"isDagDeployEnabled"`
 	IsHighAvailability       *bool                            `json:"isHighAvailability,omitempty"`
-	LaminarHealthStatus      *SharedLaminarHealthStatus       `json:"laminarHealthStatus,omitempty"`
+	LaminarHealthStatus      *LaminarHealthStatus             `json:"laminarHealthStatus,omitempty"`
 	Name                     string                           `json:"name"`
 	OrganizationId           string                           `json:"organizationId"`
 	OrganizationName         string                           `json:"organizationName"`
@@ -1387,15 +1448,18 @@ type Deployment struct {
 	Type                     *DeploymentType                  `json:"type,omitempty"`
 	UpdatedAt                time.Time                        `json:"updatedAt"`
 	UpdatedBy                BasicSubjectProfile              `json:"updatedBy"`
-	WebServerCpu             string                           `json:"webServerCpu"`
-	WebServerIngressHostname string                           `json:"webServerIngressHostname"`
-	WebServerMemory          string                           `json:"webServerMemory"`
-	WebServerReplicas        *int                             `json:"webServerReplicas,omitempty"`
-	WebServerUrl             string                           `json:"webServerUrl"`
-	WorkerQueues             *[]WorkerQueue                   `json:"workerQueues,omitempty"`
-	WorkloadIdentity         *string                          `json:"workloadIdentity,omitempty"`
-	WorkspaceId              string                           `json:"workspaceId"`
-	WorkspaceName            string                           `json:"workspaceName"`
+
+	// WebServerAirflowApiUrl The Deployment's webserver's base url to directly access the Airflow api.
+	WebServerAirflowApiUrl   string         `json:"webServerAirflowApiUrl"`
+	WebServerCpu             string         `json:"webServerCpu"`
+	WebServerIngressHostname string         `json:"webServerIngressHostname"`
+	WebServerMemory          string         `json:"webServerMemory"`
+	WebServerReplicas        *int           `json:"webServerReplicas,omitempty"`
+	WebServerUrl             string         `json:"webServerUrl"`
+	WorkerQueues             *[]WorkerQueue `json:"workerQueues,omitempty"`
+	WorkloadIdentity         *string        `json:"workloadIdentity,omitempty"`
+	WorkspaceId              string         `json:"workspaceId"`
+	WorkspaceName            string         `json:"workspaceName"`
 }
 
 // DeploymentClusterCloudProvider defines model for Deployment.ClusterCloudProvider.
@@ -1456,7 +1520,9 @@ type DeploymentLogEntrySource string
 
 // DeploymentOptions defines model for DeploymentOptions.
 type DeploymentOptions struct {
+	DefaultValues           DefaultValueOptions       `json:"defaultValues"`
 	Executors               []string                  `json:"executors"`
+	LegacyAstro             LegacyAstroOptions        `json:"legacyAstro"`
 	ResourceQuotas          ResourceQuotaOptions      `json:"resourceQuotas"`
 	RuntimeReleases         []RuntimeRelease          `json:"runtimeReleases"`
 	SchedulerMachines       []SchedulerMachine        `json:"schedulerMachines"`
@@ -1492,17 +1558,18 @@ type EntitlementRequiredTier string
 
 // EnvironmentObject defines model for EnvironmentObject.
 type EnvironmentObject struct {
-	AutoLinkDeployments *bool                        `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                        `json:"autoLinkProjects,omitempty"`
-	Connection          *EnvironmentObjectConnection `json:"connection,omitempty"`
-	CreatedAt           *string                      `json:"createdAt,omitempty"`
-	Id                  *string                      `json:"id,omitempty"`
-	Links               *[]EnvironmentObjectLink     `json:"links,omitempty"`
-	ObjectKey           string                       `json:"objectKey"`
-	ObjectType          EnvironmentObjectObjectType  `json:"objectType"`
-	Scope               EnvironmentObjectScope       `json:"scope"`
-	ScopeEntityId       string                       `json:"scopeEntityId"`
-	UpdatedAt           *string                      `json:"updatedAt,omitempty"`
+	AirflowVariable     *EnvironmentObjectAirflowVariable `json:"airflowVariable,omitempty"`
+	AutoLinkDeployments *bool                             `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                             `json:"autoLinkProjects,omitempty"`
+	Connection          *EnvironmentObjectConnection      `json:"connection,omitempty"`
+	CreatedAt           *string                           `json:"createdAt,omitempty"`
+	Id                  *string                           `json:"id,omitempty"`
+	Links               *[]EnvironmentObjectLink          `json:"links,omitempty"`
+	ObjectKey           string                            `json:"objectKey"`
+	ObjectType          EnvironmentObjectObjectType       `json:"objectType"`
+	Scope               EnvironmentObjectScope            `json:"scope"`
+	ScopeEntityId       string                            `json:"scopeEntityId"`
+	UpdatedAt           *string                           `json:"updatedAt,omitempty"`
 }
 
 // EnvironmentObjectObjectType defines model for EnvironmentObject.ObjectType.
@@ -1511,15 +1578,27 @@ type EnvironmentObjectObjectType string
 // EnvironmentObjectScope defines model for EnvironmentObject.Scope.
 type EnvironmentObjectScope string
 
+// EnvironmentObjectAirflowVariable defines model for EnvironmentObjectAirflowVariable.
+type EnvironmentObjectAirflowVariable struct {
+	IsSecret bool   `json:"isSecret"`
+	Value    string `json:"value"`
+}
+
+// EnvironmentObjectAirflowVariableOverrides defines model for EnvironmentObjectAirflowVariableOverrides.
+type EnvironmentObjectAirflowVariableOverrides struct {
+	Value string `json:"value"`
+}
+
 // EnvironmentObjectConnection defines model for EnvironmentObjectConnection.
 type EnvironmentObjectConnection struct {
-	Extra    *map[string]interface{} `json:"extra,omitempty"`
-	Host     *string                 `json:"host,omitempty"`
-	Login    *string                 `json:"login,omitempty"`
-	Password *string                 `json:"password,omitempty"`
-	Port     *int                    `json:"port,omitempty"`
-	Schema   *string                 `json:"schema,omitempty"`
-	Type     string                  `json:"type"`
+	ConnectionAuthType *ConnectionAuthType     `json:"connectionAuthType,omitempty"`
+	Extra              *map[string]interface{} `json:"extra,omitempty"`
+	Host               *string                 `json:"host,omitempty"`
+	Login              *string                 `json:"login,omitempty"`
+	Password           *string                 `json:"password,omitempty"`
+	Port               *int                    `json:"port,omitempty"`
+	Schema             *string                 `json:"schema,omitempty"`
+	Type               string                  `json:"type"`
 }
 
 // EnvironmentObjectConnectionOverrides defines model for EnvironmentObjectConnectionOverrides.
@@ -1535,9 +1614,10 @@ type EnvironmentObjectConnectionOverrides struct {
 
 // EnvironmentObjectLink defines model for EnvironmentObjectLink.
 type EnvironmentObjectLink struct {
-	ConnectionOverrides *EnvironmentObjectConnectionOverrides `json:"connectionOverrides,omitempty"`
-	Scope               EnvironmentObjectLinkScope            `json:"scope"`
-	ScopeEntityId       string                                `json:"scopeEntityId"`
+	AirflowVariableOverrides *EnvironmentObjectAirflowVariableOverrides `json:"airflowVariableOverrides,omitempty"`
+	ConnectionOverrides      *EnvironmentObjectConnectionOverrides      `json:"connectionOverrides,omitempty"`
+	Scope                    EnvironmentObjectLinkScope                 `json:"scope"`
+	ScopeEntityId            string                                     `json:"scopeEntityId"`
 }
 
 // EnvironmentObjectLinkScope defines model for EnvironmentObjectLink.Scope.
@@ -1585,6 +1665,21 @@ type Invite struct {
 	OrganizationShortName *string `json:"organizationShortName,omitempty"`
 	TicketId              *string `json:"ticketId,omitempty"`
 	UserId                *string `json:"userId,omitempty"`
+}
+
+// LaminarHealthStatus defines model for LaminarHealthStatus.
+type LaminarHealthStatus struct {
+	Incidents  *[]map[string]interface{} `json:"incidents,omitempty"`
+	Info       *map[string]interface{}   `json:"info,omitempty"`
+	Operations *map[string]interface{}   `json:"operations,omitempty"`
+}
+
+// LegacyAstroOptions defines model for LegacyAstroOptions.
+type LegacyAstroOptions struct {
+	AstroUnitCpuMilli       float32 `json:"astroUnitCpuMilli"`
+	AstroUnitMemoryMiB      float32 `json:"astroUnitMemoryMiB"`
+	SchedulerAstroUnitRange Range   `json:"schedulerAstroUnitRange"`
+	SchedulerReplicaRange   Range   `json:"schedulerReplicaRange"`
 }
 
 // ListApiTokensPaginated defines model for ListApiTokensPaginated.
@@ -1683,33 +1778,36 @@ type NodePool struct {
 
 // Organization defines model for Organization.
 type Organization struct {
-	AuthServiceId           string                     `json:"authServiceId"`
-	BillingEmail            *string                    `json:"billingEmail,omitempty"`
-	CreatedAt               time.Time                  `json:"createdAt"`
-	CreatedBy               *string                    `json:"createdBy,omitempty"`
-	CreatedBySubject        *BasicSubjectProfile       `json:"createdBySubject,omitempty"`
-	Domains                 *[]string                  `json:"domains,omitempty"`
-	Entitlements            *map[string]Entitlement    `json:"entitlements,omitempty"`
-	Id                      string                     `json:"id"`
-	IsAzureManaged          *bool                      `json:"isAzureManaged,omitempty"`
-	IsScimEnabled           bool                       `json:"isScimEnabled"`
-	ManagedDomains          *[]ManagedDomain           `json:"managedDomains,omitempty"`
-	MetronomeId             *string                    `json:"metronomeId,omitempty"`
-	MetronomePlanId         *string                    `json:"metronomePlanId,omitempty"`
-	Name                    string                     `json:"name"`
-	PaymentMethod           *OrganizationPaymentMethod `json:"paymentMethod,omitempty"`
-	Product                 *OrganizationProduct       `json:"product,omitempty"`
-	SalesforceId            *string                    `json:"salesforceId,omitempty"`
-	ShortName               string                     `json:"shortName"`
-	Status                  *OrganizationStatus        `json:"status,omitempty"`
-	StripeId                *string                    `json:"stripeId,omitempty"`
-	StripePaymentMethodId   *string                    `json:"stripePaymentMethodId,omitempty"`
-	SupportPlan             OrganizationSupportPlan    `json:"supportPlan"`
-	TrialExpiresAt          *time.Time                 `json:"trialExpiresAt,omitempty"`
-	UpdatedAt               time.Time                  `json:"updatedAt"`
-	UpdatedBy               *string                    `json:"updatedBy,omitempty"`
-	UpdatedBySubject        *BasicSubjectProfile       `json:"updatedBySubject,omitempty"`
-	UsesCustomMetronomePlan *bool                      `json:"usesCustomMetronomePlan,omitempty"`
+	AuthServiceId              string                     `json:"authServiceId"`
+	AzurePlanId                *string                    `json:"azurePlanId,omitempty"`
+	AzureSubscriptionId        *string                    `json:"azureSubscriptionId,omitempty"`
+	BillingEmail               *string                    `json:"billingEmail,omitempty"`
+	CreatedAt                  time.Time                  `json:"createdAt"`
+	CreatedBy                  *string                    `json:"createdBy,omitempty"`
+	CreatedBySubject           *BasicSubjectProfile       `json:"createdBySubject,omitempty"`
+	Domains                    *[]string                  `json:"domains,omitempty"`
+	Entitlements               *map[string]Entitlement    `json:"entitlements,omitempty"`
+	EnvironmentSecretsShowable bool                       `json:"environmentSecretsShowable"`
+	Id                         string                     `json:"id"`
+	IsAzureManaged             *bool                      `json:"isAzureManaged,omitempty"`
+	IsScimEnabled              bool                       `json:"isScimEnabled"`
+	ManagedDomains             *[]ManagedDomain           `json:"managedDomains,omitempty"`
+	MetronomeId                *string                    `json:"metronomeId,omitempty"`
+	MetronomePlanId            *string                    `json:"metronomePlanId,omitempty"`
+	Name                       string                     `json:"name"`
+	PaymentMethod              *OrganizationPaymentMethod `json:"paymentMethod,omitempty"`
+	Product                    *OrganizationProduct       `json:"product,omitempty"`
+	SalesforceId               *string                    `json:"salesforceId,omitempty"`
+	ShortName                  string                     `json:"shortName"`
+	Status                     *OrganizationStatus        `json:"status,omitempty"`
+	StripeId                   *string                    `json:"stripeId,omitempty"`
+	StripePaymentMethodId      *string                    `json:"stripePaymentMethodId,omitempty"`
+	SupportPlan                OrganizationSupportPlan    `json:"supportPlan"`
+	TrialExpiresAt             *time.Time                 `json:"trialExpiresAt,omitempty"`
+	UpdatedAt                  time.Time                  `json:"updatedAt"`
+	UpdatedBy                  *string                    `json:"updatedBy,omitempty"`
+	UpdatedBySubject           *BasicSubjectProfile       `json:"updatedBySubject,omitempty"`
+	UsesCustomMetronomePlan    *bool                      `json:"usesCustomMetronomePlan,omitempty"`
 }
 
 // OrganizationPaymentMethod defines model for Organization.PaymentMethod.
@@ -1933,6 +2031,16 @@ type UpdateDeploymentRequest struct {
 	union json.RawMessage
 }
 
+// UpdateEnvironmentObjectAirflowVariableOverridesRequest defines model for UpdateEnvironmentObjectAirflowVariableOverridesRequest.
+type UpdateEnvironmentObjectAirflowVariableOverridesRequest struct {
+	Value *string `json:"value,omitempty"`
+}
+
+// UpdateEnvironmentObjectAirflowVariableRequest defines model for UpdateEnvironmentObjectAirflowVariableRequest.
+type UpdateEnvironmentObjectAirflowVariableRequest struct {
+	Value *string `json:"value,omitempty"`
+}
+
 // UpdateEnvironmentObjectConnectionOverridesRequest defines model for UpdateEnvironmentObjectConnectionOverridesRequest.
 type UpdateEnvironmentObjectConnectionOverridesRequest struct {
 	Extra    *map[string]interface{} `json:"extra,omitempty"`
@@ -1946,13 +2054,14 @@ type UpdateEnvironmentObjectConnectionOverridesRequest struct {
 
 // UpdateEnvironmentObjectConnectionRequest defines model for UpdateEnvironmentObjectConnectionRequest.
 type UpdateEnvironmentObjectConnectionRequest struct {
-	Extra    *map[string]interface{} `json:"extra,omitempty"`
-	Host     *string                 `json:"host,omitempty"`
-	Login    *string                 `json:"login,omitempty"`
-	Password *string                 `json:"password,omitempty"`
-	Port     *int                    `json:"port,omitempty"`
-	Schema   *string                 `json:"schema,omitempty"`
-	Type     string                  `json:"type"`
+	AuthTypeId *string                 `json:"authTypeId,omitempty"`
+	Extra      *map[string]interface{} `json:"extra,omitempty"`
+	Host       *string                 `json:"host,omitempty"`
+	Login      *string                 `json:"login,omitempty"`
+	Password   *string                 `json:"password,omitempty"`
+	Port       *int                    `json:"port,omitempty"`
+	Schema     *string                 `json:"schema,omitempty"`
+	Type       string                  `json:"type"`
 }
 
 // UpdateEnvironmentObjectLinkRequest defines model for UpdateEnvironmentObjectLinkRequest.
@@ -1967,19 +2076,21 @@ type UpdateEnvironmentObjectLinkRequestScope string
 
 // UpdateEnvironmentObjectOverridesRequest defines model for UpdateEnvironmentObjectOverridesRequest.
 type UpdateEnvironmentObjectOverridesRequest struct {
-	Connection *UpdateEnvironmentObjectConnectionOverridesRequest `json:"connection,omitempty"`
+	AirflowVariable *UpdateEnvironmentObjectAirflowVariableOverridesRequest `json:"airflowVariable,omitempty"`
+	Connection      *UpdateEnvironmentObjectConnectionOverridesRequest      `json:"connection,omitempty"`
 }
 
 // UpdateEnvironmentObjectRequest defines model for UpdateEnvironmentObjectRequest.
 type UpdateEnvironmentObjectRequest struct {
-	AutoLinkDeployments *bool                                     `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                                     `json:"autoLinkProjects,omitempty"`
-	Connection          *UpdateEnvironmentObjectConnectionRequest `json:"connection,omitempty"`
-	Links               *[]UpdateEnvironmentObjectLinkRequest     `json:"links,omitempty"`
-	ObjectKey           string                                    `json:"objectKey"`
-	ObjectType          UpdateEnvironmentObjectRequestObjectType  `json:"objectType"`
-	Scope               UpdateEnvironmentObjectRequestScope       `json:"scope"`
-	ScopeEntityId       string                                    `json:"scopeEntityId"`
+	AirflowVariable     *UpdateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
+	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                                          `json:"autoLinkProjects,omitempty"`
+	Connection          *UpdateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
+	Links               *[]UpdateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
+	ObjectKey           string                                         `json:"objectKey"`
+	ObjectType          UpdateEnvironmentObjectRequestObjectType       `json:"objectType"`
+	Scope               UpdateEnvironmentObjectRequestScope            `json:"scope"`
+	ScopeEntityId       string                                         `json:"scopeEntityId"`
 }
 
 // UpdateEnvironmentObjectRequestObjectType defines model for UpdateEnvironmentObjectRequest.ObjectType.
@@ -2109,9 +2220,10 @@ type UpdateOrganizationApiTokenRolesRequest struct {
 
 // UpdateOrganizationRequest defines model for UpdateOrganizationRequest.
 type UpdateOrganizationRequest struct {
-	BillingEmail  string `json:"billingEmail"`
-	IsScimEnabled bool   `json:"isScimEnabled"`
-	Name          string `json:"name"`
+	BillingEmail               string `json:"billingEmail"`
+	EnvironmentSecretsShowable *bool  `json:"environmentSecretsShowable,omitempty"`
+	IsScimEnabled              bool   `json:"isScimEnabled"`
+	Name                       string `json:"name"`
 }
 
 // UpdateTeamRequest defines model for UpdateTeamRequest.
@@ -2336,13 +2448,6 @@ type InternalScheduleIntervalTimeDelta struct {
 type InternalWeekdaySchema struct {
 	N       *int `json:"n,omitempty"`
 	Weekday *int `json:"weekday,omitempty"`
-}
-
-// SharedLaminarHealthStatus defines model for shared.LaminarHealthStatus.
-type SharedLaminarHealthStatus struct {
-	Incidents  *[]map[string]interface{} `json:"incidents,omitempty"`
-	Info       *map[string]interface{}   `json:"info,omitempty"`
-	Operations *map[string]interface{}   `json:"operations,omitempty"`
 }
 
 // GetSharedClusterParams defines parameters for GetSharedCluster.
@@ -2804,6 +2909,9 @@ type CreateDeploymentApiTokenJSONRequestBody = CreateDeploymentApiTokenRequest
 // UpdateDeploymentApiTokenJSONRequestBody defines body for UpdateDeploymentApiToken for application/json ContentType.
 type UpdateDeploymentApiTokenJSONRequestBody = UpdateDeploymentApiTokenRequest
 
+// DeployRollbackJSONRequestBody defines body for DeployRollback for application/json ContentType.
+type DeployRollbackJSONRequestBody = DeployRollbackRequest
+
 // CreateDeployJSONRequestBody defines body for CreateDeploy for application/json ContentType.
 type CreateDeployJSONRequestBody = CreateDeployRequest
 
@@ -3213,6 +3321,11 @@ type ClientInterface interface {
 
 	// RotateDeploymentApiToken request
 	RotateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeployRollback request with any body
+	DeployRollbackWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DeployRollback(ctx context.Context, organizationId string, deploymentId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListDeploys request
 	ListDeploys(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3967,6 +4080,30 @@ func (c *Client) UpdateDeploymentApiToken(ctx context.Context, organizationId st
 
 func (c *Client) RotateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRotateDeploymentApiTokenRequest(c.Server, organizationId, deploymentId, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeployRollbackWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeployRollbackRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeployRollback(ctx context.Context, organizationId string, deploymentId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeployRollbackRequest(c.Server, organizationId, deploymentId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6779,6 +6916,60 @@ func NewRotateDeploymentApiTokenRequest(server string, organizationId string, de
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewDeployRollbackRequest calls the generic DeployRollback builder with application/json body
+func NewDeployRollbackRequest(server string, organizationId string, deploymentId string, body DeployRollbackJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeployRollbackRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
+}
+
+// NewDeployRollbackRequestWithBody generates requests for DeployRollback with any type of body
+func NewDeployRollbackRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploy-rollback", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -10088,6 +10279,11 @@ type ClientWithResponsesInterface interface {
 	// RotateDeploymentApiToken request
 	RotateDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateDeploymentApiTokenResponse, error)
 
+	// DeployRollback request with any body
+	DeployRollbackWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error)
+
+	DeployRollbackWithResponse(ctx context.Context, organizationId string, deploymentId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error)
+
 	// ListDeploys request
 	ListDeploysWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*ListDeploysResponse, error)
 
@@ -11201,6 +11397,32 @@ func (r RotateDeploymentApiTokenResponse) StatusCode() int {
 	return 0
 }
 
+type DeployRollbackResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeployRollbackResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeployRollbackResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListDeploysResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -11368,6 +11590,7 @@ type ListEnvironmentObjectsResponse struct {
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
+	JSON405      *Error
 	JSON500      *Error
 }
 
@@ -11394,6 +11617,7 @@ type CreateEnvironmentObjectResponse struct {
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
+	JSON405      *Error
 	JSON409      *Error
 	JSON500      *Error
 }
@@ -11420,6 +11644,7 @@ type DeleteEnvironmentObjectResponse struct {
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
+	JSON405      *Error
 	JSON409      *Error
 	JSON500      *Error
 }
@@ -11447,6 +11672,7 @@ type GetEnvironmentObjectResponse struct {
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
+	JSON405      *Error
 	JSON500      *Error
 }
 
@@ -11473,6 +11699,7 @@ type UpdateEnvironmentObjectResponse struct {
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
+	JSON405      *Error
 	JSON409      *Error
 	JSON500      *Error
 }
@@ -12851,6 +13078,23 @@ func (c *ClientWithResponses) RotateDeploymentApiTokenWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseRotateDeploymentApiTokenResponse(rsp)
+}
+
+// DeployRollbackWithBodyWithResponse request with arbitrary body returning *DeployRollbackResponse
+func (c *ClientWithResponses) DeployRollbackWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error) {
+	rsp, err := c.DeployRollbackWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeployRollbackResponse(rsp)
+}
+
+func (c *ClientWithResponses) DeployRollbackWithResponse(ctx context.Context, organizationId string, deploymentId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error) {
+	rsp, err := c.DeployRollback(ctx, organizationId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeployRollbackResponse(rsp)
 }
 
 // ListDeploysWithResponse request returning *ListDeploysResponse
@@ -15497,6 +15741,60 @@ func ParseRotateDeploymentApiTokenResponse(rsp *http.Response) (*RotateDeploymen
 	return response, nil
 }
 
+// ParseDeployRollbackResponse parses an HTTP response from a DeployRollbackWithResponse call
+func ParseDeployRollbackResponse(rsp *http.Response) (*DeployRollbackResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeployRollbackResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListDeploysResponse parses an HTTP response from a ListDeploysWithResponse call
 func ParseListDeploysResponse(rsp *http.Response) (*ListDeploysResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -15891,6 +16189,13 @@ func ParseListEnvironmentObjectsResponse(rsp *http.Response) (*ListEnvironmentOb
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -15945,6 +16250,13 @@ func ParseCreateEnvironmentObjectResponse(rsp *http.Response) (*CreateEnvironmen
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -15998,6 +16310,13 @@ func ParseDeleteEnvironmentObjectResponse(rsp *http.Response) (*DeleteEnvironmen
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Error
@@ -16060,6 +16379,13 @@ func ParseGetEnvironmentObjectResponse(rsp *http.Response) (*GetEnvironmentObjec
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -16113,6 +16439,13 @@ func ParseUpdateEnvironmentObjectResponse(rsp *http.Response) (*UpdateEnvironmen
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Error

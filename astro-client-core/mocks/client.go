@@ -1337,6 +1337,72 @@ func (_m *ClientWithResponsesInterface) DeleteWorkspaceWithResponse(ctx context.
 	return r0, r1
 }
 
+// DeployRollbackWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) DeployRollbackWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.DeployRollbackResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.DeployRollbackResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.DeployRollbackResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.DeployRollbackResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.DeployRollbackResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DeployRollbackWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, body, reqEditors
+func (_m *ClientWithResponsesInterface) DeployRollbackWithResponse(ctx context.Context, organizationId string, deploymentId string, body astrocore.DeployRollbackRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.DeployRollbackResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.DeployRollbackResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.DeployRollbackRequest, ...astrocore.RequestEditorFn) (*astrocore.DeployRollbackResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.DeployRollbackRequest, ...astrocore.RequestEditorFn) *astrocore.DeployRollbackResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.DeployRollbackResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, astrocore.DeployRollbackRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetClusterOptionsWithResponse provides a mock function with given fields: ctx, params, reqEditors
 func (_m *ClientWithResponsesInterface) GetClusterOptionsWithResponse(ctx context.Context, params *astrocore.GetClusterOptionsParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetClusterOptionsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
