@@ -539,7 +539,7 @@ func getImageName(cloudDomain, deploymentID, organizationID string, corePlatform
 	namespace := resp.JSON200.Namespace
 	workspaceID := resp.JSON200.WorkspaceId
 	webserverURL := resp.JSON200.WebServerUrl
-	dagDeployEnabled := resp.JSON200.DagDeployEnabled
+	dagDeployEnabled := resp.JSON200.IsDagDeployEnabled
 
 	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
 	deployImage := airflow.ImageName(namespace, "latest")
