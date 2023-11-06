@@ -141,7 +141,8 @@ const (
 
 // Defines values for CreateEnvironmentObjectRequestObjectType.
 const (
-	CreateEnvironmentObjectRequestObjectTypeCONNECTION CreateEnvironmentObjectRequestObjectType = "CONNECTION"
+	CreateEnvironmentObjectRequestObjectTypeAIRFLOWVARIABLE CreateEnvironmentObjectRequestObjectType = "AIRFLOW_VARIABLE"
+	CreateEnvironmentObjectRequestObjectTypeCONNECTION      CreateEnvironmentObjectRequestObjectType = "CONNECTION"
 )
 
 // Defines values for CreateEnvironmentObjectRequestScope.
@@ -265,7 +266,8 @@ const (
 
 // Defines values for EnvironmentObjectObjectType.
 const (
-	EnvironmentObjectObjectTypeCONNECTION EnvironmentObjectObjectType = "CONNECTION"
+	EnvironmentObjectObjectTypeAIRFLOWVARIABLE EnvironmentObjectObjectType = "AIRFLOW_VARIABLE"
+	EnvironmentObjectObjectTypeCONNECTION      EnvironmentObjectObjectType = "CONNECTION"
 )
 
 // Defines values for EnvironmentObjectScope.
@@ -363,7 +365,8 @@ const (
 
 // Defines values for UpdateEnvironmentObjectRequestObjectType.
 const (
-	UpdateEnvironmentObjectRequestObjectTypeCONNECTION UpdateEnvironmentObjectRequestObjectType = "CONNECTION"
+	UpdateEnvironmentObjectRequestObjectTypeAIRFLOWVARIABLE UpdateEnvironmentObjectRequestObjectType = "AIRFLOW_VARIABLE"
+	UpdateEnvironmentObjectRequestObjectTypeCONNECTION      UpdateEnvironmentObjectRequestObjectType = "CONNECTION"
 )
 
 // Defines values for UpdateEnvironmentObjectRequestScope.
@@ -644,7 +647,8 @@ const (
 
 // Defines values for ListEnvironmentObjectsParamsObjectType.
 const (
-	ListEnvironmentObjectsParamsObjectTypeCONNECTION ListEnvironmentObjectsParamsObjectType = "CONNECTION"
+	ListEnvironmentObjectsParamsObjectTypeAIRFLOWVARIABLE ListEnvironmentObjectsParamsObjectType = "AIRFLOW_VARIABLE"
+	ListEnvironmentObjectsParamsObjectTypeCONNECTION      ListEnvironmentObjectsParamsObjectType = "CONNECTION"
 )
 
 // Defines values for ListOrganizationTeamsParamsSorts.
@@ -1093,6 +1097,17 @@ type CreateEnvironmentObject struct {
 	Id string `json:"id"`
 }
 
+// CreateEnvironmentObjectAirflowVariableOverridesRequest defines model for CreateEnvironmentObjectAirflowVariableOverridesRequest.
+type CreateEnvironmentObjectAirflowVariableOverridesRequest struct {
+	Value *string `json:"value,omitempty"`
+}
+
+// CreateEnvironmentObjectAirflowVariableRequest defines model for CreateEnvironmentObjectAirflowVariableRequest.
+type CreateEnvironmentObjectAirflowVariableRequest struct {
+	IsSecret *bool   `json:"isSecret,omitempty"`
+	Value    *string `json:"value,omitempty"`
+}
+
 // CreateEnvironmentObjectConnectionOverridesRequest defines model for CreateEnvironmentObjectConnectionOverridesRequest.
 type CreateEnvironmentObjectConnectionOverridesRequest struct {
 	Extra    *map[string]interface{} `json:"extra,omitempty"`
@@ -1128,19 +1143,21 @@ type CreateEnvironmentObjectLinkRequestScope string
 
 // CreateEnvironmentObjectOverridesRequest defines model for CreateEnvironmentObjectOverridesRequest.
 type CreateEnvironmentObjectOverridesRequest struct {
-	Connection *CreateEnvironmentObjectConnectionOverridesRequest `json:"connection,omitempty"`
+	AirflowVariable *CreateEnvironmentObjectAirflowVariableOverridesRequest `json:"airflowVariable,omitempty"`
+	Connection      *CreateEnvironmentObjectConnectionOverridesRequest      `json:"connection,omitempty"`
 }
 
 // CreateEnvironmentObjectRequest defines model for CreateEnvironmentObjectRequest.
 type CreateEnvironmentObjectRequest struct {
-	AutoLinkDeployments *bool                                     `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                                     `json:"autoLinkProjects,omitempty"`
-	Connection          *CreateEnvironmentObjectConnectionRequest `json:"connection,omitempty"`
-	Links               *[]CreateEnvironmentObjectLinkRequest     `json:"links,omitempty"`
-	ObjectKey           string                                    `json:"objectKey"`
-	ObjectType          CreateEnvironmentObjectRequestObjectType  `json:"objectType"`
-	Scope               CreateEnvironmentObjectRequestScope       `json:"scope"`
-	ScopeEntityId       string                                    `json:"scopeEntityId"`
+	AirflowVariable     *CreateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
+	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                                          `json:"autoLinkProjects,omitempty"`
+	Connection          *CreateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
+	Links               *[]CreateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
+	ObjectKey           string                                         `json:"objectKey"`
+	ObjectType          CreateEnvironmentObjectRequestObjectType       `json:"objectType"`
+	Scope               CreateEnvironmentObjectRequestScope            `json:"scope"`
+	ScopeEntityId       string                                         `json:"scopeEntityId"`
 }
 
 // CreateEnvironmentObjectRequestObjectType defines model for CreateEnvironmentObjectRequest.ObjectType.
@@ -1541,17 +1558,18 @@ type EntitlementRequiredTier string
 
 // EnvironmentObject defines model for EnvironmentObject.
 type EnvironmentObject struct {
-	AutoLinkDeployments *bool                        `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                        `json:"autoLinkProjects,omitempty"`
-	Connection          *EnvironmentObjectConnection `json:"connection,omitempty"`
-	CreatedAt           *string                      `json:"createdAt,omitempty"`
-	Id                  *string                      `json:"id,omitempty"`
-	Links               *[]EnvironmentObjectLink     `json:"links,omitempty"`
-	ObjectKey           string                       `json:"objectKey"`
-	ObjectType          EnvironmentObjectObjectType  `json:"objectType"`
-	Scope               EnvironmentObjectScope       `json:"scope"`
-	ScopeEntityId       string                       `json:"scopeEntityId"`
-	UpdatedAt           *string                      `json:"updatedAt,omitempty"`
+	AirflowVariable     *EnvironmentObjectAirflowVariable `json:"airflowVariable,omitempty"`
+	AutoLinkDeployments *bool                             `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                             `json:"autoLinkProjects,omitempty"`
+	Connection          *EnvironmentObjectConnection      `json:"connection,omitempty"`
+	CreatedAt           *string                           `json:"createdAt,omitempty"`
+	Id                  *string                           `json:"id,omitempty"`
+	Links               *[]EnvironmentObjectLink          `json:"links,omitempty"`
+	ObjectKey           string                            `json:"objectKey"`
+	ObjectType          EnvironmentObjectObjectType       `json:"objectType"`
+	Scope               EnvironmentObjectScope            `json:"scope"`
+	ScopeEntityId       string                            `json:"scopeEntityId"`
+	UpdatedAt           *string                           `json:"updatedAt,omitempty"`
 }
 
 // EnvironmentObjectObjectType defines model for EnvironmentObject.ObjectType.
@@ -1559,6 +1577,17 @@ type EnvironmentObjectObjectType string
 
 // EnvironmentObjectScope defines model for EnvironmentObject.Scope.
 type EnvironmentObjectScope string
+
+// EnvironmentObjectAirflowVariable defines model for EnvironmentObjectAirflowVariable.
+type EnvironmentObjectAirflowVariable struct {
+	IsSecret bool   `json:"isSecret"`
+	Value    string `json:"value"`
+}
+
+// EnvironmentObjectAirflowVariableOverrides defines model for EnvironmentObjectAirflowVariableOverrides.
+type EnvironmentObjectAirflowVariableOverrides struct {
+	Value string `json:"value"`
+}
 
 // EnvironmentObjectConnection defines model for EnvironmentObjectConnection.
 type EnvironmentObjectConnection struct {
@@ -1585,9 +1614,10 @@ type EnvironmentObjectConnectionOverrides struct {
 
 // EnvironmentObjectLink defines model for EnvironmentObjectLink.
 type EnvironmentObjectLink struct {
-	ConnectionOverrides *EnvironmentObjectConnectionOverrides `json:"connectionOverrides,omitempty"`
-	Scope               EnvironmentObjectLinkScope            `json:"scope"`
-	ScopeEntityId       string                                `json:"scopeEntityId"`
+	AirflowVariableOverrides *EnvironmentObjectAirflowVariableOverrides `json:"airflowVariableOverrides,omitempty"`
+	ConnectionOverrides      *EnvironmentObjectConnectionOverrides      `json:"connectionOverrides,omitempty"`
+	Scope                    EnvironmentObjectLinkScope                 `json:"scope"`
+	ScopeEntityId            string                                     `json:"scopeEntityId"`
 }
 
 // EnvironmentObjectLinkScope defines model for EnvironmentObjectLink.Scope.
@@ -2001,6 +2031,16 @@ type UpdateDeploymentRequest struct {
 	union json.RawMessage
 }
 
+// UpdateEnvironmentObjectAirflowVariableOverridesRequest defines model for UpdateEnvironmentObjectAirflowVariableOverridesRequest.
+type UpdateEnvironmentObjectAirflowVariableOverridesRequest struct {
+	Value *string `json:"value,omitempty"`
+}
+
+// UpdateEnvironmentObjectAirflowVariableRequest defines model for UpdateEnvironmentObjectAirflowVariableRequest.
+type UpdateEnvironmentObjectAirflowVariableRequest struct {
+	Value *string `json:"value,omitempty"`
+}
+
 // UpdateEnvironmentObjectConnectionOverridesRequest defines model for UpdateEnvironmentObjectConnectionOverridesRequest.
 type UpdateEnvironmentObjectConnectionOverridesRequest struct {
 	Extra    *map[string]interface{} `json:"extra,omitempty"`
@@ -2036,19 +2076,21 @@ type UpdateEnvironmentObjectLinkRequestScope string
 
 // UpdateEnvironmentObjectOverridesRequest defines model for UpdateEnvironmentObjectOverridesRequest.
 type UpdateEnvironmentObjectOverridesRequest struct {
-	Connection *UpdateEnvironmentObjectConnectionOverridesRequest `json:"connection,omitempty"`
+	AirflowVariable *UpdateEnvironmentObjectAirflowVariableOverridesRequest `json:"airflowVariable,omitempty"`
+	Connection      *UpdateEnvironmentObjectConnectionOverridesRequest      `json:"connection,omitempty"`
 }
 
 // UpdateEnvironmentObjectRequest defines model for UpdateEnvironmentObjectRequest.
 type UpdateEnvironmentObjectRequest struct {
-	AutoLinkDeployments *bool                                     `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                                     `json:"autoLinkProjects,omitempty"`
-	Connection          *UpdateEnvironmentObjectConnectionRequest `json:"connection,omitempty"`
-	Links               *[]UpdateEnvironmentObjectLinkRequest     `json:"links,omitempty"`
-	ObjectKey           string                                    `json:"objectKey"`
-	ObjectType          UpdateEnvironmentObjectRequestObjectType  `json:"objectType"`
-	Scope               UpdateEnvironmentObjectRequestScope       `json:"scope"`
-	ScopeEntityId       string                                    `json:"scopeEntityId"`
+	AirflowVariable     *UpdateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
+	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                                          `json:"autoLinkProjects,omitempty"`
+	Connection          *UpdateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
+	Links               *[]UpdateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
+	ObjectKey           string                                         `json:"objectKey"`
+	ObjectType          UpdateEnvironmentObjectRequestObjectType       `json:"objectType"`
+	Scope               UpdateEnvironmentObjectRequestScope            `json:"scope"`
+	ScopeEntityId       string                                         `json:"scopeEntityId"`
 }
 
 // UpdateEnvironmentObjectRequestObjectType defines model for UpdateEnvironmentObjectRequest.ObjectType.

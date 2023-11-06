@@ -9,6 +9,7 @@ import (
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -198,14 +199,13 @@ func IsOrgHosted() bool {
 	return c.OrganizationProduct == "HOSTED"
 }
 
-func ListClusters(organizationShortName string, coreClient astrocore.CoreClient) ([]astrocore.Cluster, error) {
-	clusterTypes := []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
+func ListClusters(organizationID string, platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Cluster, error) {
+	// clusterTypes := []platformCoreClient.ListClustersParamsTypes{platformCoreClient.BRINGYOUROWNCLOUD, platformCoreClient.HOSTED}
 	limit := 1000
-	clusterListParams := &astrocore.ListClustersParams{
-		Types: &clusterTypes,
+	clusterListParams := &astroplatformcore.ListClustersParams{
 		Limit: &limit,
 	}
-	resp, err := coreClient.ListClustersWithResponse(http_context.Background(), organizationShortName, clusterListParams)
+	resp, err := platformCoreClient.ListClustersWithResponse(http_context.Background(), organizationID, clusterListParams)
 	if err != nil {
 		return nil, err
 	}
