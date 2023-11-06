@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow/types"
-	"github.com/astronomer/astro-cli/astro-client"
+	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
