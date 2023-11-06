@@ -55,7 +55,6 @@ func (d *DockerImage) Build(dockerfile string, buildConfig airflowTypes.ImageBui
 	}
 	args := []string{
 		"build",
-		"--pull",
 		"-t",
 		d.imageName,
 		"-f",
