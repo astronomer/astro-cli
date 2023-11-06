@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 
-	"github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -40,18 +40,19 @@ var (
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
-func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer) error { //nolint
+func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer) error { //nolint
 	var (
 		requestedDeployment                  astroplatformcore.Deployment
 		err                                  error
 		errHelp, succeededAction, nodePoolID string
 		workerMachine                        astroplatformcore.WorkerMachine
-		queueToCreateOrUpdate                *astroplatformcore.WorkerQueue
+		queueToCreateOrUpdate                *astroplatformcore.WorkerQueueRequest
+		queueToCreateOrUpdateHybrid          *astroplatformcore.HybridWorkerQueueRequest
 		listToCreate, existingQueues         []astroplatformcore.WorkerQueue
-		defaultOptions                       astro.WorkerQueueDefaultOptions
+		defaultOptions                       astrocore.WorkerQueueOptions
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, client, platformCoreClient, coreClient)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
@@ -62,21 +63,21 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 
 	if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-		hubDeployment, err := client.GetDeployment(requestedDeployment.Id)
-		if err != nil {
-			return err
-		}
-		nodePoolID = hubDeployment.Cluster.NodePools[0].ID
+		// hubDeployment, err := client.GetDeployment(requestedDeployment.Id)
+		// if err != nil {
+		// 	return err
+		// }
+		// nodePoolID = hubDeployment.Cluster.NodePools[0].ID
 		// configOptions, err := client.GetDeploymentConfig()
 		// if err != nil {
 		// 	return err
 		// }
 
 		// astroMachines := configOptions.AstroMachines
-		getDeploymentOptions := astroplatformcore.GetDeploymentOptionsParams{
+		getDeploymentOptions := astrocore.GetDeploymentOptionsParams{
 			DeploymentId: &requestedDeployment.Id,
 		}
-		DeploymentOptions, err := deployment.GetDeploymentOptions("", getDeploymentOptions, platformCoreClient)
+		DeploymentOptions, err := deployment.GetDeploymentOptions("", getDeploymentOptions, coreClient)
 		if err != nil {
 			return err
 		}
@@ -90,6 +91,14 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		if wQueueConcurrency == 0 && action == createAction {
 			wQueueConcurrency = int(workerMachine.Concurrency.Default) // This is set based on the machine type the user chooses if not explicitly passed by the user
 		}
+		queueToCreateOrUpdate = &astroplatformcore.WorkerQueueRequest{
+			Name:              name,
+			IsDefault:         false, // cannot create a default queue
+			AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(workerMachine.Name),
+			MinWorkerCount:    wQueueMin,         // use the value from the user input
+			MaxWorkerCount:    wQueueMax,         // use the value from the user input
+			WorkerConcurrency: wQueueConcurrency, // use the value from the user input
+		}
 	} else {
 		// get the node poolID to use
 		cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, platformCoreClient)
@@ -97,16 +106,14 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		if err != nil {
 			return err
 		}
-	}
-	// temporay code to go from CORE to astrohub
-	queueToCreateOrUpdate = &astroplatformcore.WorkerQueue{
-		Name:              name,
-		IsDefault:         false, // cannot create a default queue
-		AstroMachine:      &workerMachine.Name,
-		NodePoolId:        &nodePoolID,
-		MinWorkerCount:    wQueueMin,         // use the value from the user input
-		MaxWorkerCount:    wQueueMax,         // use the value from the user input
-		WorkerConcurrency: wQueueConcurrency, // use the value from the user input
+		queueToCreateOrUpdateHybrid = &astroplatformcore.HybridWorkerQueueRequest{
+			Name:              name,
+			IsDefault:         false, // cannot create a default queue
+			NodePoolId:        nodePoolID,
+			MinWorkerCount:    wQueueMin,         // use the value from the user input
+			MaxWorkerCount:    wQueueMax,         // use the value from the user input
+			WorkerConcurrency: wQueueConcurrency, // use the value from the user input
+		}
 	}
 
 	if name == "" {
@@ -118,10 +125,17 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	switch *requestedDeployment.Executor {
 	case astroplatformcore.DeploymentExecutorCELERY:
 		// get defaults for min-count, max-count and concurrency from API
-		defaultOptions, err = GetWorkerQueueDefaultOptions(client)
+		// defaultOptions, err = GetWorkerQueueDefaultOptions(client)
+		// if err != nil {
+		// 	return err
+		// }
+
+		configOption, err := deployment.GetDeploymentOptions("", astrocore.GetDeploymentOptionsParams{}, coreClient)
 		if err != nil {
 			return err
 		}
+
+		defaultOptions = configOption.WorkerQueues
 
 		queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
@@ -194,7 +208,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 	fmt.Println("made it to 196")
 	// update the deployment with the new list of worker queues
-	err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", 0, 0, astroListToCreate, true, nil, platformCoreClient, client)
+	err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", 0, 0, astroListToCreate, true, coreClient, platformCoreClient)
 	fmt.Println("made it to 199")
 	if err != nil {
 		fmt.Println("made it to 201")
@@ -277,16 +291,16 @@ func IsCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.Worke
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
 // ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions, machineOptions *astroplatformcore.WorkerMachine) error {
+func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.WorkerQueue, defaultOptions astrocore.WorkerQueueOptions, machineOptions *astroplatformcore.WorkerMachine) error {
 	var errorMessage string
-	if !(requestedWorkerQueue.MinWorkerCount >= defaultOptions.MinWorkerCount.Floor) ||
-		!(requestedWorkerQueue.MinWorkerCount <= defaultOptions.MinWorkerCount.Ceiling) {
-		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", defaultOptions.MinWorkerCount.Floor, defaultOptions.MinWorkerCount.Ceiling)
+	if !(requestedWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
+		!(requestedWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
+		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", defaultOptions.MaxWorkers.Floor, defaultOptions.MinWorkers.Ceiling)
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
-	if !(requestedWorkerQueue.MaxWorkerCount >= defaultOptions.MaxWorkerCount.Floor) ||
-		!(requestedWorkerQueue.MaxWorkerCount <= defaultOptions.MaxWorkerCount.Ceiling) {
-		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", defaultOptions.MaxWorkerCount.Floor, defaultOptions.MaxWorkerCount.Ceiling)
+	if !(requestedWorkerQueue.MaxWorkerCount >= int(defaultOptions.MaxWorkers.Floor)) ||
+		!(requestedWorkerQueue.MaxWorkerCount <= int(defaultOptions.MaxWorkers.Ceiling)) {
+		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", defaultOptions.MaxWorkers.Floor, defaultOptions.MaxWorkers.Ceiling)
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	// The floor for worker concurrency for hosted deployments is always 1 for all astro machines
