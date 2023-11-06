@@ -69,10 +69,12 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 		return nil
 	}
 
-	// If the user is using dev commands no need to go through auth setup.
-	if cmd.CalledAs() == "dev" && cmd.Parent().Use == topLvlCmd {
+	// If the user is using dev commands no need to go through auth setup,
+	// unless the workspace or deployment ID flag is set.
+	if cmd.CalledAs() == "dev" && cmd.Parent().Use == topLvlCmd && !workspaceOrDeploymentIDFlagSet(cmd) {
 		return nil
 	}
+
 	// If the user is using flow commands no need to go through auth setup.
 	if cmd.CalledAs() == "flow" && cmd.Parent().Use == topLvlCmd {
 		return nil
@@ -441,4 +443,10 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 		fmt.Println("no organization context set")
 	}
 	return true, nil
+}
+
+func workspaceOrDeploymentIDFlagSet(cmd *cobra.Command) bool {
+	wsID, _ := cmd.Flags().GetString("workspace-id")
+	depID, _ := cmd.Flags().GetString("deployment-id")
+	return wsID != "" || depID != ""
 }
