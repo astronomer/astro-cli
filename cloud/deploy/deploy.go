@@ -710,7 +710,7 @@ func updateDeploy(deployID, deploymentID, organizationID, dagTarballVersion stri
 		return err
 	}
 	if resp.JSON200.DagTarballVersion != nil {
-		fmt.Println("Deployed DAG bundle: ", resp.JSON200.DagTarballVersion)
+		fmt.Println("Deployed DAG bundle: ", *resp.JSON200.DagTarballVersion)
 	}
 	if resp.JSON200.ImageTag != "" {
 		fmt.Println("Deployed Image Tag: ", resp.JSON200.ImageTag)
