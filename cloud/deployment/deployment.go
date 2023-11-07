@@ -1339,6 +1339,30 @@ var GetDeploymentOptions = func(orgID string, deploymentOptionsParams astrocore.
 	return DeploymentOptions, nil
 }
 
+var GetPlatformDeploymentOptions = func(orgID string, deploymentOptionsParams astroplatformcore.GetDeploymentOptionsParams, coreClient astroplatformcore.CoreClient) (astroplatformcore.DeploymentOptions, error) {
+	if orgID == "" {
+		c, err := config.GetCurrentContext()
+		if err != nil {
+			return astroplatformcore.DeploymentOptions{}, err
+		}
+		orgID = c.Organization
+	}
+
+	resp, err := coreClient.GetDeploymentOptionsWithResponse(context.Background(), orgID, &deploymentOptionsParams)
+
+	DeploymentOptions := *resp.JSON200
+
+	if err != nil {
+		return astroplatformcore.DeploymentOptions{}, err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return astroplatformcore.DeploymentOptions{}, err
+	}
+
+	return DeploymentOptions, nil
+}
+
 var GetDeploymentLogs = func(orgID string, deploymentId string, getDeploymentLogsParams astrocore.GetDeploymentLogsParams, coreClient astrocore.CoreClient) (astrocore.DeploymentLog, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()

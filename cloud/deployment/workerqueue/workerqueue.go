@@ -49,7 +49,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		queueToCreateOrUpdate                *astroplatformcore.WorkerQueueRequest
 		queueToCreateOrUpdateHybrid          *astroplatformcore.HybridWorkerQueueRequest
 		listToCreate, existingQueues         []astroplatformcore.WorkerQueue
-		defaultOptions                       astrocore.WorkerQueueOptions
+		defaultOptions                       astroplatformcore.WorkerQueueOptions
 	)
 	// get or select the deployment
 	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, platformCoreClient, coreClient)
@@ -74,14 +74,14 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		// }
 
 		// astroMachines := configOptions.AstroMachines
-		getDeploymentOptions := astrocore.GetDeploymentOptionsParams{
+		getDeploymentOptions := astroplatformcore.GetDeploymentOptionsParams{
 			DeploymentId: &requestedDeployment.Id,
 		}
-		DeploymentOptions, err := deployment.GetDeploymentOptions("", getDeploymentOptions, coreClient)
+		deploymentOptions, err := deployment.GetPlatformDeploymentOptions("", getDeploymentOptions, platformCoreClient)
 		if err != nil {
 			return err
 		}
-		WorkerMachines := DeploymentOptions.WorkerMachines
+		WorkerMachines := deploymentOptions.WorkerMachines
 		// get the machine to use
 		workerMachine, err = selectWorkerMachine(workerType, WorkerMachines, out)
 		if err != nil {
@@ -130,12 +130,12 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		// 	return err
 		// }
 
-		configOption, err := deployment.GetDeploymentOptions("", astrocore.GetDeploymentOptionsParams{}, coreClient)
+		deploymentOptions, err := deployment.GetPlatformDeploymentOptions("", astroplatformcore.GetDeploymentOptionsParams{}, platformCoreClient)
 		if err != nil {
 			return err
 		}
 
-		defaultOptions = configOption.WorkerQueues
+		defaultOptions = deploymentOptions.WorkerQueues
 
 		queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
@@ -223,21 +223,21 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 }
 
 // SetWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
-func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astroplatformcore.WorkerQueue, workerQueueDefaultOptions astro.WorkerQueueDefaultOptions) *astroplatformcore.WorkerQueue {
+func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astroplatformcore.WorkerQueueRequest, workerQueueDefaultOptions astroplatformcore.WorkerQueueOptions) *astroplatformcore.WorkerQueueRequest {
 	// -1 is the CLI default to allow users to request wQueueMin=0
 	if wQueueMin == -1 {
 		// set default value as user input did not have it
-		workerQueueToCreate.MinWorkerCount = workerQueueDefaultOptions.MinWorkerCount.Default
+		workerQueueToCreate.MinWorkerCount = int(workerQueueDefaultOptions.MinWorkers.Default)
 	}
 
 	if wQueueMax == 0 {
 		// set default value as user input did not have it
-		workerQueueToCreate.MaxWorkerCount = workerQueueDefaultOptions.MaxWorkerCount.Default
+		workerQueueToCreate.MaxWorkerCount = int(workerQueueDefaultOptions.MaxWorkers.Default)
 	}
 
 	if wQueueConcurrency == 0 {
 		// set default value as user input did not have it
-		workerQueueToCreate.WorkerConcurrency = workerQueueDefaultOptions.WorkerConcurrency.Default
+		workerQueueToCreate.WorkerConcurrency = int(workerQueueDefaultOptions.WorkerConcurrency.Default)
 	}
 	return workerQueueToCreate
 }
@@ -261,29 +261,29 @@ func GetWorkerQueueDefaultOptions(client astro.Client) (astro.WorkerQueueDefault
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
 // ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions) error {
+func IsCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.WorkerQueueRequest, defaultOptions astroplatformcore.WorkerQueueOptions) error {
 	var errorMessage string
-	if !(requestedWorkerQueue.MinWorkerCount >= defaultOptions.MinWorkerCount.Floor) ||
-		!(requestedWorkerQueue.MinWorkerCount <= defaultOptions.MinWorkerCount.Ceiling) {
-		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", defaultOptions.MinWorkerCount.Floor, defaultOptions.MinWorkerCount.Ceiling)
+	if !(requestedWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
+		!(requestedWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
+		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", defaultOptions.MinWorkers.Floor, defaultOptions.MinWorkers.Ceiling)
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
-	if !(requestedWorkerQueue.MaxWorkerCount >= defaultOptions.MaxWorkerCount.Floor) ||
-		!(requestedWorkerQueue.MaxWorkerCount <= defaultOptions.MaxWorkerCount.Ceiling) {
-		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", defaultOptions.MaxWorkerCount.Floor, defaultOptions.MaxWorkerCount.Ceiling)
+	if !(requestedWorkerQueue.MaxWorkerCount >= int(defaultOptions.MaxWorkers.Floor)) ||
+		!(requestedWorkerQueue.MaxWorkerCount <= int(defaultOptions.MaxWorkers.Ceiling)) {
+		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", defaultOptions.MaxWorkers.Floor, defaultOptions.MaxWorkers.Ceiling)
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
-	if !(requestedWorkerQueue.WorkerConcurrency >= defaultOptions.WorkerConcurrency.Floor) ||
-		!(requestedWorkerQueue.WorkerConcurrency <= defaultOptions.WorkerConcurrency.Ceiling) {
+	if !(requestedWorkerQueue.WorkerConcurrency >= int(defaultOptions.WorkerConcurrency.Floor)) ||
+		!(requestedWorkerQueue.WorkerConcurrency <= int(defaultOptions.WorkerConcurrency.Ceiling)) {
 		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", defaultOptions.WorkerConcurrency.Floor, defaultOptions.WorkerConcurrency.Ceiling)
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
-	if requestedWorkerQueue.PodCpu != "" {
-		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
-	}
-	if requestedWorkerQueue.PodMemory != "" {
-		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
-	}
+	// if requestedWorkerQueue.PodCpu != "" {
+	// 	return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
+	// }
+	// if requestedWorkerQueue.PodMemory != "" {
+	// 	return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
+	// }
 	return nil
 }
 
@@ -291,7 +291,7 @@ func IsCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.Worke
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
 // ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.WorkerQueue, defaultOptions astrocore.WorkerQueueOptions, machineOptions *astroplatformcore.WorkerMachine) error {
+func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.WorkerQueueRequest, defaultOptions astroplatformcore.WorkerQueueOptions, machineOptions *astroplatformcore.WorkerMachine) error {
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
 		!(requestedWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
@@ -310,12 +310,12 @@ func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore
 		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", workerConcurrenyFloor, int(machineOptions.Concurrency.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
-	if requestedWorkerQueue.PodCpu != "" {
-		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
-	}
-	if requestedWorkerQueue.PodMemory != "" {
-		return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
-	}
+	// if requestedWorkerQueue.PodCpu != "" {
+	// 	return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
+	// }
+	// if requestedWorkerQueue.PodMemory != "" {
+	// 	return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
+	// }
 	return nil
 }
 
