@@ -32,7 +32,6 @@ func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string,
 	}
 
 	environmentVariablesObjects := currentDeployment.DeploymentSpec.EnvironmentVariablesObjects
-
 	// open env file
 	if useEnvFile {
 		err = writeVarToFile(environmentVariablesObjects, variableKey, envFile)
