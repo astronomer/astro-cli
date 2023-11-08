@@ -100,6 +100,22 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			MaxWorkerCount:    wQueueMax,         // use the value from the user input
 			WorkerConcurrency: wQueueConcurrency, // use the value from the user input
 		}
+
+		// create listToCreate
+		for i := range *requestedDeployment.WorkerQueues {
+
+			queues := *requestedDeployment.WorkerQueues
+			existingQueueRequest := astroplatformcore.WorkerQueueRequest{
+				Name:              queues[i].Name,
+				Id:                &queues[i].Id,
+				IsDefault:         queues[i].IsDefault,
+				MaxWorkerCount:    queues[i].MaxWorkerCount,
+				MinWorkerCount:    queues[i].MinWorkerCount,
+				WorkerConcurrency: queues[i].WorkerConcurrency,
+				AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(*queues[i].AstroMachine),
+			}
+			listToCreate = append(listToCreate, existingQueueRequest)
+		}
 	} else {
 		// get the node poolID to use
 		cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, platformCoreClient)
@@ -114,6 +130,20 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			MinWorkerCount:    wQueueMin,         // use the value from the user input
 			MaxWorkerCount:    wQueueMax,         // use the value from the user input
 			WorkerConcurrency: wQueueConcurrency, // use the value from the user input
+		}
+		// create hybridListToCreate
+		for i := range *requestedDeployment.WorkerQueues {
+
+			queues := *requestedDeployment.WorkerQueues
+			existingHybridQueueRequest := astroplatformcore.HybridWorkerQueueRequest{
+				Name:              queues[i].Name,
+				Id:                &queues[i].Id,
+				IsDefault:         queues[i].IsDefault,
+				MaxWorkerCount:    queues[i].MaxWorkerCount,
+				MinWorkerCount:    queues[i].MinWorkerCount,
+				WorkerConcurrency: queues[i].WorkerConcurrency,
+			}
+			hybridListToCreate = append(hybridListToCreate, existingHybridQueueRequest)
 		}
 	}
 
@@ -164,24 +194,10 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 
 	// sanitize all the existing queues based on executor
 	existingQueues = sanitizeExistingQueues(*requestedDeployment.WorkerQueues, *requestedDeployment.Executor)
-	// listToCreate
-	for i := range *requestedDeployment.WorkerQueues {
-
-		queues := *requestedDeployment.WorkerQueues
-		existingQueueRequest := astroplatformcore.WorkerQueueRequest{
-			Name:              queues[i].Name,
-			Id:                &queues[i].Id,
-			IsDefault:         queues[i].IsDefault,
-			MaxWorkerCount:    queues[i].MaxWorkerCount,
-			MinWorkerCount:    queues[i].MinWorkerCount,
-			WorkerConcurrency: queues[i].WorkerConcurrency,
-			AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(*queues[i].AstroMachine),
-		}
-		listToCreate = append(listToCreate, existingQueueRequest)
-	}
+	// create listToCreate
 	switch action {
 	case createAction:
-		if QueueExists(existingQueues, queueToCreateOrUpdate) {
+		if QueueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
 			// create does not allow updating existing queues
 			errHelp = fmt.Sprintf("use worker queue update %s instead", queueToCreateOrUpdate.Name)
 			return fmt.Errorf("%w: %s", errCannotUpdateExistingQueue, errHelp)
@@ -190,8 +206,9 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		// user requested create, so we add queueToCreateOrUpdate to the list
 
 		listToCreate = append(listToCreate, *queueToCreateOrUpdate) //nolint
+		hybridListToCreate = append(hybridListToCreate, *queueToCreateOrUpdateHybrid)
 	case updateAction:
-		if QueueExists(existingQueues, queueToCreateOrUpdate) {
+		if QueueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
 			if !force {
 				i, _ := input.Confirm(
 					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.Bold(queueToCreateOrUpdate.Name)))
@@ -366,13 +383,13 @@ func IsKubernetesWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.W
 // QueueExists takes a []existingQueues and a queueToCreate as arguments
 // It returns true if queueToCreate exists in []existingQueues
 // It returns false if queueToCreate does not exist in []existingQueues
-func QueueExists(existingQueues []astroplatformcore.WorkerQueue, queueToCreate *astroplatformcore.WorkerQueueRequest) bool {
+func QueueExists(existingQueues []astroplatformcore.WorkerQueue, queueToCreate *astroplatformcore.WorkerQueueRequest, queueToCreateOrUpdateHybrid *astroplatformcore.HybridWorkerQueueRequest) bool {
 	for _, queue := range existingQueues { //nolint
-		if queue.Id == *queueToCreate.Id {
+		if queue.Id == *queueToCreate.Id || queue.Id == *queueToCreateOrUpdateHybrid.Id {
 			// queueToCreate exists
 			return true
 		}
-		if queue.Name == queueToCreate.Name {
+		if queue.Name == queueToCreate.Name || queue.Name == queueToCreateOrUpdateHybrid.Name {
 			// queueToCreate exists
 			return true
 		}
@@ -528,7 +545,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 	// sanitize all the existing queues based on executor
 	existingQueues = sanitizeExistingQueues(*requestedDeployment.WorkerQueues, *requestedDeployment.Executor)
 
-	if QueueExists(existingQueues, queueToDelete) {
+	if QueueExists(existingQueues, queueToDelete, queueToDeleteHybrid) {
 		if !force {
 			i, _ := input.Confirm(
 				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.Bold(queueToDelete.Name)))
