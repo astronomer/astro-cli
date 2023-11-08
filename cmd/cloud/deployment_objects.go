@@ -336,8 +336,8 @@ func deploymentConnectionList(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
 
-	airlfowURL := fmt.Sprintf("%v", value)
-	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
+	airflowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airflowURL, "?")[0]
 
 	return deployment.ConnectionList(splitAirflowURL, airflowAPIClient, out)
 }
@@ -358,8 +358,8 @@ func deploymentConnectionCreate(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
 
-	airlfowURL := fmt.Sprintf("%v", value)
-	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
+	airflowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airflowURL, "?")[0]
 
 	// check connID and connType
 	if connID == "" {
@@ -389,8 +389,8 @@ func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
 
-	airlfowURL := fmt.Sprintf("%v", value)
-	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
+	airflowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airflowURL, "?")[0]
 
 	// check connID and connType
 	if connID == "" {
@@ -420,8 +420,8 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find the source Deployment Airflow webserver URL")
 	}
 
-	fromAirlfowURL := fmt.Sprintf("%v", fromValue)
-	splitFromAirflowURL := strings.Split(fromAirlfowURL, "?")[0]
+	fromairflowURL := fmt.Sprintf("%v", fromValue)
+	splitFromAirflowURL := strings.Split(fromairflowURL, "?")[0]
 
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which Deployment should receive the connections?")
@@ -431,8 +431,8 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
 
-	toAirlfowURL := fmt.Sprintf("%v", value)
-	splitToAirflowURL := strings.Split(toAirlfowURL, "?")[0]
+	toairflowURL := fmt.Sprintf("%v", value)
+	splitToAirflowURL := strings.Split(toairflowURL, "?")[0]
 
 	fmt.Println(warningConnectionCopyCMD)
 	return deployment.CopyConnection(splitFromAirflowURL, splitToAirflowURL, airflowAPIClient, out)
@@ -454,8 +454,8 @@ func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
 
-	airlfowURL := fmt.Sprintf("%v", value)
-	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
+	airflowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airflowURL, "?")[0]
 
 	return deployment.AirflowVariableList(splitAirflowURL, airflowAPIClient, out)
 }
@@ -476,8 +476,8 @@ func deploymentAirflowVariableCreate(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
 
-	airlfowURL := fmt.Sprintf("%v", value)
-	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
+	airflowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airflowURL, "?")[0]
 
 	// check key and varValue
 	if key == "" {
@@ -507,8 +507,8 @@ func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error { 
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
 
-	airlfowURL := fmt.Sprintf("%v", value)
-	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
+	airflowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airflowURL, "?")[0]
 
 	// check key
 	if key == "" {
@@ -538,8 +538,8 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find the source deployments airflow webserver URL")
 	}
 
-	fromAirlfowURL := fmt.Sprintf("%v", fromValue)
-	splitFromAirflowURL := strings.Split(fromAirlfowURL, "?")[0]
+	fromairflowURL := fmt.Sprintf("%v", fromValue)
+	splitFromAirflowURL := strings.Split(fromairflowURL, "?")[0]
 
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which deployment should airflow variables be pasted to?")
@@ -549,8 +549,8 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
 
-	toAirlfowURL := fmt.Sprintf("%v", value)
-	splitToAirflowURL := strings.Split(toAirlfowURL, "?")[0]
+	toairflowURL := fmt.Sprintf("%v", value)
+	splitToAirflowURL := strings.Split(toairflowURL, "?")[0]
 
 	fmt.Println(warningVariableCopyCMD)
 	return deployment.CopyVariable(splitFromAirflowURL, splitToAirflowURL, airflowAPIClient, out)
@@ -572,8 +572,8 @@ func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
 
-	airlfowURL := fmt.Sprintf("%v", value)
-	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
+	airflowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airflowURL, "?")[0]
 
 	return deployment.PoolList(splitAirflowURL, airflowAPIClient, out)
 }
@@ -594,8 +594,8 @@ func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error { //nolint
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
 
-	airlfowURL := fmt.Sprintf("%v", value)
-	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
+	airflowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airflowURL, "?")[0]
 
 	// check name
 	if name == "" {
@@ -621,8 +621,8 @@ func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error { //nolint
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
 
-	airlfowURL := fmt.Sprintf("%v", value)
-	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
+	airflowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airflowURL, "?")[0]
 
 	// check key
 	if name == "" {
@@ -652,8 +652,8 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find the source deployments airflow webserver URL")
 	}
 
-	fromAirlfowURL := fmt.Sprintf("%v", fromValue)
-	splitFromAirflowURL := strings.Split(fromAirlfowURL, "?")[0]
+	fromairflowURL := fmt.Sprintf("%v", fromValue)
+	splitFromAirflowURL := strings.Split(fromairflowURL, "?")[0]
 
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which deployment should pools be pasted to?")
@@ -663,8 +663,8 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
 
-	toAirlfowURL := fmt.Sprintf("%v", value)
-	splitToAirflowURL := strings.Split(toAirlfowURL, "?")[0]
+	toairflowURL := fmt.Sprintf("%v", value)
+	splitToAirflowURL := strings.Split(toairflowURL, "?")[0]
 
 	return deployment.CopyPool(splitFromAirflowURL, splitToAirflowURL, airflowAPIClient, out)
 }
