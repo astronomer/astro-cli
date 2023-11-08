@@ -3,6 +3,7 @@ package cloud
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
@@ -336,8 +337,9 @@ func deploymentConnectionList(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
 
-	return deployment.ConnectionList(airlfowURL, airflowAPIClient, out)
+	return deployment.ConnectionList(splitAirflowURL, airflowAPIClient, out)
 }
 
 func deploymentConnectionCreate(cmd *cobra.Command, out io.Writer) error {
@@ -357,6 +359,7 @@ func deploymentConnectionCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
 
 	// check connID and connType
 	if connID == "" {
@@ -367,7 +370,7 @@ func deploymentConnectionCreate(cmd *cobra.Command, out io.Writer) error {
 		return errors.New("a connection type is needed to create a connection. Please use the '--conn-type' flag to specify a connection type")
 	}
 
-	return deployment.ConnectionCreate(airlfowURL, connID, connType, description, host, login, password, schema, extra, port, airflowAPIClient, out)
+	return deployment.ConnectionCreate(splitAirflowURL, connID, connType, description, host, login, password, schema, extra, port, airflowAPIClient, out)
 }
 
 func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
@@ -387,13 +390,14 @@ func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
 
 	// check connID and connType
 	if connID == "" {
 		return errors.New("a connection ID is needed to create a connection. Please use the '--conn-id' flag to specify a connection ID")
 	}
 
-	return deployment.ConnectionUpdate(airlfowURL, connID, connType, description, host, login, password, schema, extra, port, airflowAPIClient, out)
+	return deployment.ConnectionUpdate(splitAirflowURL, connID, connType, description, host, login, password, schema, extra, port, airflowAPIClient, out)
 }
 
 //nolint:dupl
@@ -417,6 +421,8 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	fromAirlfowURL := fmt.Sprintf("%v", fromValue)
+	splitFromAirflowURL := strings.Split(fromAirlfowURL, "?")[0]
+
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which Deployment should receive the connections?")
 	}
@@ -426,8 +432,10 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	toAirlfowURL := fmt.Sprintf("%v", value)
+	splitToAirflowURL := strings.Split(toAirlfowURL, "?")[0]
+
 	fmt.Println(warningConnectionCopyCMD)
-	return deployment.CopyConnection(fromAirlfowURL, toAirlfowURL, airflowAPIClient, out)
+	return deployment.CopyConnection(splitFromAirflowURL, splitToAirflowURL, airflowAPIClient, out)
 }
 
 func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
@@ -447,8 +455,9 @@ func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
 
-	return deployment.AirflowVariableList(airlfowURL, airflowAPIClient, out)
+	return deployment.AirflowVariableList(splitAirflowURL, airflowAPIClient, out)
 }
 
 func deploymentAirflowVariableCreate(cmd *cobra.Command, out io.Writer) error {
@@ -468,6 +477,7 @@ func deploymentAirflowVariableCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
 
 	// check key and varValue
 	if key == "" {
@@ -478,7 +488,7 @@ func deploymentAirflowVariableCreate(cmd *cobra.Command, out io.Writer) error {
 		return errors.New("a variable value is needed to create an airflow variable. Please use the '--value' flag to specify a value")
 	}
 
-	return deployment.VariableCreate(airlfowURL, varValue, key, description, airflowAPIClient, out)
+	return deployment.VariableCreate(splitAirflowURL, varValue, key, description, airflowAPIClient, out)
 }
 
 func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error {
@@ -498,13 +508,14 @@ func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
 
 	// check key
 	if key == "" {
 		return errors.New("a variable key is needed to create an airflow variable. Please use the '--key' flag to specify a key")
 	}
 
-	return deployment.VariableUpdate(airlfowURL, varValue, key, description, airflowAPIClient, out)
+	return deployment.VariableUpdate(splitAirflowURL, varValue, key, description, airflowAPIClient, out)
 }
 
 //nolint:dupl
@@ -528,6 +539,8 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	fromAirlfowURL := fmt.Sprintf("%v", fromValue)
+	splitFromAirflowURL := strings.Split(fromAirlfowURL, "?")[0]
+
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which deployment should airflow variables be pasted to?")
 	}
@@ -537,9 +550,10 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	toAirlfowURL := fmt.Sprintf("%v", value)
+	splitToAirflowURL := strings.Split(toAirlfowURL, "?")[0]
 
 	fmt.Println(warningVariableCopyCMD)
-	return deployment.CopyVariable(fromAirlfowURL, toAirlfowURL, airflowAPIClient, out)
+	return deployment.CopyVariable(splitFromAirflowURL, splitToAirflowURL, airflowAPIClient, out)
 }
 
 func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
@@ -559,8 +573,9 @@ func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
 
-	return deployment.PoolList(airlfowURL, airflowAPIClient, out)
+	return deployment.PoolList(splitAirflowURL, airflowAPIClient, out)
 }
 
 func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error {
@@ -580,13 +595,14 @@ func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
 
 	// check name
 	if name == "" {
 		return errors.New("a pool name is needed to create a pool. Please use the '--name' flag to specify a name")
 	}
 
-	return deployment.PoolCreate(airlfowURL, name, description, slots, airflowAPIClient, out)
+	return deployment.PoolCreate(splitAirflowURL, name, description, slots, airflowAPIClient, out)
 }
 
 func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error {
@@ -606,13 +622,14 @@ func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
+	splitAirflowURL := strings.Split(airlfowURL, "?")[0]
 
 	// check key
 	if name == "" {
 		return errors.New("a pool name is needed to update a pool. Please use the '--name' flag to specify a name")
 	}
 
-	return deployment.PoolUpdate(airlfowURL, name, description, slots, airflowAPIClient, out)
+	return deployment.PoolUpdate(splitAirflowURL, name, description, slots, airflowAPIClient, out)
 }
 
 //nolint:dupl
@@ -636,6 +653,8 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	fromAirlfowURL := fmt.Sprintf("%v", fromValue)
+	splitFromAirflowURL := strings.Split(fromAirlfowURL, "?")[0]
+
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which deployment should pools be pasted to?")
 	}
@@ -645,6 +664,7 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	toAirlfowURL := fmt.Sprintf("%v", value)
+	splitToAirflowURL := strings.Split(toAirlfowURL, "?")[0]
 
-	return deployment.CopyPool(fromAirlfowURL, toAirlfowURL, airflowAPIClient, out)
+	return deployment.CopyPool(splitFromAirflowURL, splitToAirflowURL, airflowAPIClient, out)
 }
