@@ -535,6 +535,11 @@ func getImageName(cloudDomain, deploymentID, organizationID string, corePlatform
 		return deploymentInfo{}, err
 	}
 
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return deploymentInfo{}, err
+	}
+
 	currentVersion := resp.JSON200.RuntimeVersion
 	namespace := resp.JSON200.Namespace
 	workspaceID := resp.JSON200.WorkspaceId
