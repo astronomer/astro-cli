@@ -18,7 +18,7 @@ var (
 			{ConnID: "conn2", ConnType: "type2"},
 		},
 	}
-	testAirflowURL  = "http://airflow-url"
+	testAirflowURL  = "http://airflow-url?orgID=orgId"
 	testConnID      = "test-conn"
 	testConnType    = "test-type"
 	testDescription = "test-description"
@@ -93,8 +93,8 @@ func TestConnectionUpdate(t *testing.T) {
 }
 
 var (
-	fromAirflowURL = "from_airflow_url"
-	toAirflowURL   = "to_airflow_url"
+	fromAirflowURL = "from_airflow_url?orgID=orgId"
+	toAirflowURL   = "to_airflow_url?orgID=orgId"
 
 	fromConnections = []airflowclient.Connection{
 		{ConnID: "conn1", ConnType: "type1", Description: "desc1"},
