@@ -491,7 +491,7 @@ func deploymentAirflowVariableCreate(cmd *cobra.Command, out io.Writer) error {
 	return deployment.VariableCreate(splitAirflowURL, varValue, key, description, airflowAPIClient, out)
 }
 
-func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error {
+func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error { //nolint
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -578,7 +578,7 @@ func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
 	return deployment.PoolList(splitAirflowURL, airflowAPIClient, out)
 }
 
-func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error {
+func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error { //nolint
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -605,7 +605,7 @@ func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error {
 	return deployment.PoolCreate(splitAirflowURL, name, description, slots, airflowAPIClient, out)
 }
 
-func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error {
+func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error { //nolint
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
