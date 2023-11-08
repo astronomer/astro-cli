@@ -18,7 +18,7 @@ var (
 			{ConnID: "conn2", ConnType: "type2"},
 		},
 	}
-	testAirflowURL  = "http://airflow-url"
+	testAirflowURL  = "http://airflow-url?orgID=orgId"
 	testConnID      = "test-conn"
 	testConnType    = "test-type"
 	testDescription = "test-description"
