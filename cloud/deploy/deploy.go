@@ -105,6 +105,7 @@ type InputDeploy struct {
 	DeploymentName string
 	Prompt         bool
 	Dags           bool
+	Image          bool
 	WaitForStatus  bool
 	DagsPath       string
 	Description    string
@@ -326,7 +327,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
 		}
 
-		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
+		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && deployInput.Image == false {
 			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
 
 			if !i {
@@ -366,9 +367,13 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, dagsUploadURL)
-			if err != nil {
-				return err
+			if deployInput.Image == false {
+				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, dagsUploadURL)
+				if err != nil {
+					return err
+				}
+			} else {
+				fmt.Println("No DAGs found. Skipping testing...")
 			}
 		}
 		// finish deploy
