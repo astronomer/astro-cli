@@ -57,6 +57,10 @@ var (
 	timeoutNum = 180
 )
 
+// type CreateDeploymentInput{
+
+// }
+
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
@@ -196,7 +200,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool, enforceCD *bool) error { //nolint
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
 	var dagDeployEnabled bool
@@ -222,6 +226,17 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			organizationID = ws[i].OrganizationId
 			currentWorkspace = ws[i]
 		}
+	}
+
+	var isCicdEnforced bool
+	if cicdEnforcement == "" {
+		isCicdEnforced = false
+	}
+	if cicdEnforcement == "disable" {
+		isCicdEnforced = false
+	}
+	if cicdEnforcement == "enable" {
+		isCicdEnforced = true
 	}
 
 	if organizationID == "" {
@@ -328,7 +343,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				Description:          &description,
 				Name:                 name,
 				Executor:             requestedExecutor,
-				IsCicdEnforced:       *enforceCD,
+				IsCicdEnforced:       isCicdEnforced,
 				Region:               &region,
 				IsDagDeployEnabled:   dagDeployEnabled,
 				IsHighAvailability:   highAvailabilityValue,
@@ -375,7 +390,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				Description:          &description,
 				Name:                 name,
 				Executor:             requestedExecutor,
-				IsCicdEnforced:       *enforceCD,
+				IsCicdEnforced:       isCicdEnforced,
 				IsDagDeployEnabled:   dagDeployEnabled,
 				IsHighAvailability:   highAvailabilityValue,
 				ClusterId:            clusterID,
@@ -438,7 +453,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			Description:         &description,
 			Name:                name,
 			Executor:            requestedExecutor,
-			IsCicdEnforced:      *enforceCD,
+			IsCicdEnforced:      isCicdEnforced,
 			IsDagDeployEnabled:  dagDeployEnabled,
 			ClusterId:           clusterID,
 			WorkspaceId:         workspaceID,
@@ -1084,7 +1099,6 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	// update deployment
 	d, err := CoreUpdateDeployment(c.Organization, deploymentID, updateDeploymentRequest, platformCoreClient)
 	if err != nil {
-		fmt.Println("made it to 790")
 		return err
 	}
 
@@ -1508,9 +1522,9 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 
 		// schedulerAU := configOption.Components.Scheduler.AU.Default
 		// schedulerReplicas := configOption.Components.Scheduler.Replicas.Default
-		cicdEnforcement := false
+		cicdEnforcement := "disable"
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", "", "", "", "", "", 0, 0, corePlatformClient, coreClient, false, &cicdEnforcement)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", "", cicdEnforcement, "", "", "", "", 0, 0, corePlatformClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}

@@ -142,6 +142,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 				MaxWorkerCount:    queues[i].MaxWorkerCount,
 				MinWorkerCount:    queues[i].MinWorkerCount,
 				WorkerConcurrency: queues[i].WorkerConcurrency,
+				NodePoolId:        *queues[i].NodePoolId,
 			}
 			hybridListToCreate = append(hybridListToCreate, existingHybridQueueRequest)
 		}
@@ -159,12 +160,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 	switch *requestedDeployment.Executor {
 	case astroplatformcore.DeploymentExecutorCELERY:
-		// get defaults for min-count, max-count and concurrency from API
-		// defaultOptions, err = GetWorkerQueueDefaultOptions(client)
-		// if err != nil {
-		// 	return err
-		// }
-
 		deploymentOptions, err := deployment.GetPlatformDeploymentOptions("", astroplatformcore.GetDeploymentOptionsParams{}, platformCoreClient)
 		if err != nil {
 			return err
@@ -278,21 +273,6 @@ func SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency int, wor
 	return workerQueueToCreate
 }
 
-// GetWorkerQueueDefaultOptions calls the workerqueues query
-// It returns WorkerQueueDefaultOptions if the query succeeds
-// An error is returned if it fails
-func GetWorkerQueueDefaultOptions(client astro.Client) (astro.WorkerQueueDefaultOptions, error) {
-	var (
-		workerQueueDefaultOptions astro.WorkerQueueDefaultOptions
-		err                       error
-	)
-	workerQueueDefaultOptions, err = client.GetWorkerQueueOptions()
-	if err != nil {
-		return astro.WorkerQueueDefaultOptions{}, fmt.Errorf("%w: %s", errWorkerQueueDefaultOptions, err.Error())
-	}
-	return workerQueueDefaultOptions, nil
-}
-
 // IsCeleryWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions.
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
@@ -301,17 +281,17 @@ func IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue *astroplatformcore
 	var errorMessage string
 	if !(requestedHybridWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
 		!(requestedHybridWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
-		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", defaultOptions.MinWorkers.Floor, defaultOptions.MinWorkers.Ceiling)
+		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", int(defaultOptions.MinWorkers.Floor), int(defaultOptions.MinWorkers.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	if !(requestedHybridWorkerQueue.MaxWorkerCount >= int(defaultOptions.MaxWorkers.Floor)) ||
 		!(requestedHybridWorkerQueue.MaxWorkerCount <= int(defaultOptions.MaxWorkers.Ceiling)) {
-		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", defaultOptions.MaxWorkers.Floor, defaultOptions.MaxWorkers.Ceiling)
+		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", int(defaultOptions.MaxWorkers.Floor), int(defaultOptions.MaxWorkers.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	if !(requestedHybridWorkerQueue.WorkerConcurrency >= int(defaultOptions.WorkerConcurrency.Floor)) ||
 		!(requestedHybridWorkerQueue.WorkerConcurrency <= int(defaultOptions.WorkerConcurrency.Ceiling)) {
-		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", defaultOptions.WorkerConcurrency.Floor, defaultOptions.WorkerConcurrency.Ceiling)
+		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", int(defaultOptions.WorkerConcurrency.Floor), int(defaultOptions.WorkerConcurrency.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	// if requestedWorkerQueue.PodCpu != "" {
@@ -331,12 +311,12 @@ func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
 		!(requestedWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
-		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", defaultOptions.MaxWorkers.Floor, defaultOptions.MinWorkers.Ceiling)
+		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", int(defaultOptions.MaxWorkers.Floor), int(defaultOptions.MinWorkers.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	if !(requestedWorkerQueue.MaxWorkerCount >= int(defaultOptions.MaxWorkers.Floor)) ||
 		!(requestedWorkerQueue.MaxWorkerCount <= int(defaultOptions.MaxWorkers.Ceiling)) {
-		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", defaultOptions.MaxWorkers.Floor, defaultOptions.MaxWorkers.Ceiling)
+		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", int(defaultOptions.MaxWorkers.Floor), int(defaultOptions.MaxWorkers.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	// The floor for worker concurrency for hosted deployments is always 1 for all astro machines
@@ -510,9 +490,9 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 		requestedDeployment astroplatformcore.Deployment
 		err                 error
 		queueToDelete       *astroplatformcore.WorkerQueueRequest
+		queueToDeleteHybrid *astroplatformcore.HybridWorkerQueueRequest
 		existingQueues      []astroplatformcore.WorkerQueue
 		listToDelete        []astroplatformcore.WorkerQueueRequest
-		queue               astroplatformcore.WorkerQueue
 		hybridListToDelete  []astroplatformcore.HybridWorkerQueueRequest
 	)
 	// get or select the deployment
@@ -541,6 +521,10 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 		Name:      name,
 		IsDefault: false, // cannot delete a default queue
 	}
+	queueToDeleteHybrid = &astroplatformcore.HybridWorkerQueueRequest{
+		Name:      name,
+		IsDefault: false, // cannot delete a default queue
+	}
 
 	// sanitize all the existing queues based on executor
 	existingQueues = sanitizeExistingQueues(*requestedDeployment.WorkerQueues, *requestedDeployment.Executor)
@@ -555,46 +539,52 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 				return nil
 			}
 		}
+		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
 
-		// create a new listToDelete without queueToDelete in it
-		for _, queue = range existingQueues { //nolint
-			if queue.Name != queueToDelete.Name {
-				existingQueueRequest := astroplatformcore.WorkerQueueRequest{
-					Name:              queue.Name,
-					Id:                &queue.Id,
-					IsDefault:         queue.IsDefault,
-					MaxWorkerCount:    queue.MaxWorkerCount,
-					MinWorkerCount:    queue.MinWorkerCount,
-					WorkerConcurrency: queue.WorkerConcurrency,
-					AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(*queue.AstroMachine),
+			// create a new listToDelete without queueToDelete in it
+			for i := range existingQueues { //nolint
+				if existingQueues[i].Name != queueToDelete.Name {
+					existingQueueRequest := astroplatformcore.WorkerQueueRequest{
+						Name:              existingQueues[i].Name,
+						Id:                &existingQueues[i].Id,
+						IsDefault:         existingQueues[i].IsDefault,
+						MaxWorkerCount:    existingQueues[i].MaxWorkerCount,
+						MinWorkerCount:    existingQueues[i].MinWorkerCount,
+						WorkerConcurrency: existingQueues[i].WorkerConcurrency,
+						AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(*existingQueues[i].AstroMachine),
+					}
+					listToDelete = append(listToDelete, existingQueueRequest)
 				}
-				listToDelete = append(listToDelete, existingQueueRequest)
 			}
+			// update the deployment with the new list
+			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToDelete, hybridListToDelete, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "worker queue %s for %s in %s workspace deleted\n", queueToDelete.Name, requestedDeployment.Name, ws)
+		} else {
+			// create a new listToDeleteHybrid without queueToDeleteHybrid in it
+			for i := range existingQueues { //nolint
+				if existingQueues[i].Name != queueToDeleteHybrid.Name {
+					existingQueueRequest := astroplatformcore.HybridWorkerQueueRequest{
+						Name:              existingQueues[i].Name,
+						Id:                &existingQueues[i].Id,
+						IsDefault:         existingQueues[i].IsDefault,
+						MaxWorkerCount:    existingQueues[i].MaxWorkerCount,
+						MinWorkerCount:    existingQueues[i].MinWorkerCount,
+						WorkerConcurrency: existingQueues[i].WorkerConcurrency,
+						NodePoolId:        *existingQueues[i].NodePoolId,
+					}
+					hybridListToDelete = append(hybridListToDelete, existingQueueRequest)
+				}
+			}
+			// update the deployment with the new list
+			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToDelete, hybridListToDelete, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "worker queue %s for %s in %s workspace deleted\n", queueToDelete.Name, requestedDeployment.Name, ws)
 		}
-		// tempory code
-		// var astroListToDelete []astro.WorkerQueue
-		// for i := range listToDelete {
-		// 	var workerQueue astro.WorkerQueue
-		// 	workerQueue.ID = listToDelete[i].Id
-		// 	workerQueue.Name = listToDelete[i].Name
-		// 	workerQueue.IsDefault = listToDelete[i].IsDefault
-		// 	workerQueue.MaxWorkerCount = listToDelete[i].MaxWorkerCount
-		// 	workerQueue.MinWorkerCount = listToDelete[i].MinWorkerCount
-		// 	workerQueue.WorkerConcurrency = listToDelete[i].WorkerConcurrency
-		// 	if listToDelete[i].NodePoolId != nil {
-		// 		workerQueue.NodePoolID = *listToDelete[i].NodePoolId
-		// 	}
-		// 	workerQueue.PodCPU = listToDelete[i].PodCpu
-		// 	workerQueue.PodRAM = listToDelete[i].PodMemory
-		// 	workerQueue.AstroMachine = strings.ToLower(*listToDelete[i].AstroMachine)
-		// 	astroListToDelete = append(astroListToDelete, workerQueue)
-		// }
-		// update the deployment with the new list
-		err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToDelete, hybridListToDelete, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(out, "worker queue %s for %s in %s workspace deleted\n", queueToDelete.Name, requestedDeployment.Name, ws)
 		return nil
 	}
 	// can not delete a queue that does not exist

@@ -106,7 +106,7 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 		return errZeroConcurrency
 	}
 
-	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroClient, platformCoreClient, astroCoreClient, out)
+	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, platformCoreClient, astroCoreClient, out)
 }
 
 func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) error {

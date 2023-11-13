@@ -621,7 +621,7 @@ func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client, platformCo
 		fmt.Printf("failed to add 'upgrade-test*' to .gitignore: %s", err.Error())
 	}
 
-	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, customImageName, conflictTest, versionTest, dagTest, platformCoreClient, astroClient)
+	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, customImageName, conflictTest, versionTest, dagTest, platformCoreClient)
 	if err != nil {
 		return err
 	}

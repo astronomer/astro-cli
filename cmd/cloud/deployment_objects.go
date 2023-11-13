@@ -330,7 +330,7 @@ func deploymentConnectionList(cmd *cobra.Command, out io.Writer) error {
 
 	requestedField = requestString
 	// get Airflow URl
-	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
@@ -351,7 +351,7 @@ func deploymentConnectionCreate(cmd *cobra.Command, out io.Writer) error {
 
 	requestedField = requestString
 	// get Airflow URl
-	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
@@ -381,7 +381,7 @@ func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
 
 	requestedField = requestString
 	// get Airflow URl
-	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
@@ -411,7 +411,7 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	if fromDeploymentName == "" && fromDeploymentID == "" {
 		fmt.Println("Which Deployment should connections be copied from?")
 	}
-	fromValue, err := inspect.ReturnSpecifiedValue(ws, fromDeploymentName, fromDeploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	fromValue, err := inspect.ReturnSpecifiedValue(ws, fromDeploymentName, fromDeploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the source Deployment Airflow webserver URL")
 	}
@@ -420,7 +420,7 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which Deployment should receive the connections?")
 	}
-	value, err := inspect.ReturnSpecifiedValue(ws, toDeploymentName, toDeploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, toDeploymentName, toDeploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
@@ -441,7 +441,7 @@ func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
 
 	requestedField = requestString
 	// get Airflow URl
-	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
@@ -462,7 +462,7 @@ func deploymentAirflowVariableCreate(cmd *cobra.Command, out io.Writer) error {
 
 	requestedField = requestString
 	// get Airflow URl
-	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
@@ -492,7 +492,7 @@ func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error {
 
 	requestedField = requestString
 	// get Airflow URl
-	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
@@ -522,7 +522,7 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	if fromDeploymentName == "" && fromDeploymentID == "" {
 		fmt.Println("Which deployment should airflow variables be copied from?")
 	}
-	fromValue, err := inspect.ReturnSpecifiedValue(ws, fromDeploymentName, fromDeploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	fromValue, err := inspect.ReturnSpecifiedValue(ws, fromDeploymentName, fromDeploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the source deployments airflow webserver URL")
 	}
@@ -531,7 +531,7 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which deployment should airflow variables be pasted to?")
 	}
-	value, err := inspect.ReturnSpecifiedValue(ws, toDeploymentName, toDeploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, toDeploymentName, toDeploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
@@ -553,7 +553,7 @@ func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
 
 	requestedField = requestString
 	// get Airflow URl
-	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
@@ -574,7 +574,7 @@ func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error {
 
 	requestedField = requestString
 	// get Airflow URl
-	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
@@ -600,7 +600,7 @@ func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error {
 
 	requestedField = requestString
 	// get Airflow URl
-	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
@@ -630,7 +630,7 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	if fromDeploymentName == "" && fromDeploymentID == "" {
 		fmt.Println("Which deployment should pools be copied from?")
 	}
-	fromValue, err := inspect.ReturnSpecifiedValue(ws, fromDeploymentName, fromDeploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	fromValue, err := inspect.ReturnSpecifiedValue(ws, fromDeploymentName, fromDeploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the source deployments airflow webserver URL")
 	}
@@ -639,7 +639,7 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which deployment should pools be pasted to?")
 	}
-	value, err := inspect.ReturnSpecifiedValue(ws, toDeploymentName, toDeploymentID, astroClient, platformCoreClient, astroCoreClient, requestedField)
+	value, err := inspect.ReturnSpecifiedValue(ws, toDeploymentName, toDeploymentID, platformCoreClient, astroCoreClient, requestedField)
 	if err != nil {
 		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}
