@@ -17,7 +17,6 @@ import (
 
 	semver "github.com/Masterminds/semver/v3"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -537,7 +536,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName, customImage string, conflictTest, versionTest, dagTest bool, astroPlatformCore astroplatformcore.CoreClient, client astro.Client) error {
+func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName, customImage string, conflictTest, versionTest, dagTest bool, astroPlatformCore astroplatformcore.CoreClient) error {
 	// figure out which tests to run
 	if !versionTest && !dagTest {
 		versionTest = true
@@ -554,7 +553,7 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 	}
 	// if user supplies deployment id pull down current image
 	if deploymentID != "" {
-		err := d.pullImageFromDeployment(deploymentID, astroPlatformCore, client)
+		err := d.pullImageFromDeployment(deploymentID, astroPlatformCore)
 		if err != nil {
 			return err
 		}
@@ -621,7 +620,7 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 	return nil
 }
 
-func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCoreClient astroplatformcore.CoreClient, client astro.Client) error {
+func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCoreClient astroplatformcore.CoreClient) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
@@ -633,7 +632,7 @@ func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCor
 	ws := c.Workspace
 	registry := GetRegistryURL(domain)
 	repository := registry + "/" + c.Organization + "/" + deploymentID
-	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, client, platformCoreClient, nil)
+	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/yaml.v3"
 
-	"github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -50,6 +49,10 @@ type deploymentConfig struct {
 	DeploymentType        string `mapstructure:"deployment_type" yaml:"deployment_type" json:"deployment_type"`
 	CloudProvider         string `mapstructure:"cloud_provider" yaml:"cloud_provider" json:"cloud_provider"`
 	Region                string `mapstructure:"region" yaml:"region" json:"region"`
+	DefaultTaskPodCpu     string `mapstructure:"default_task_pod_cpu" yaml:"default_task_pod_cpu" json:"default_task_pod_cpu"`
+	DefaultTaskPodMemory  string `mapstructure:"default_task_pod_memory" yaml:"default_task_pod_memory" json:"default_task_pod_memory"`
+	ResourceQuotaCpu      string `mapstructure:"resource_quota_cpu" yaml:"resource_quota_cpu" json:"resource_quota_cpu"`
+	ResourceQuotaMemory   string `mapstructure:"resource_quota_memory" yaml:"resource_quota_memory" json:"resource_quota_memory"`
 }
 
 type Workerq struct {
@@ -93,7 +96,7 @@ const (
 	notApplicable = "N/A"
 )
 
-func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer, requestedField string, template bool) error {
+func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer, requestedField string, template bool) error {
 	var (
 		requestedDeployment                                                        astroplatformcore.Deployment
 		err                                                                        error
@@ -101,7 +104,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, true, client, platformCoreClient, coreClient)
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, true, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
@@ -226,13 +229,13 @@ func getAdditional(coreDeployment astroplatformcore.Deployment, NodePools []astr
 	}
 }
 
-func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astro.Client, astroPlatformCore astroplatformcore.CoreClient, coreClient astrocore.CoreClient, requestedField string) (value any, err error) {
+func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatformCore astroplatformcore.CoreClient, coreClient astrocore.CoreClient, requestedField string) (value any, err error) {
 	var (
 		requestedDeployment                                                        astroplatformcore.Deployment
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, false, client, astroPlatformCore, coreClient)
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, false, astroPlatformCore, coreClient)
 	if err != nil {
 		return nil, err
 	}
