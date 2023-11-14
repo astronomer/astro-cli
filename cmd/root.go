@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"net/http"
 	"os"
 	"time"
@@ -45,6 +46,7 @@ func NewRootCmd() *cobra.Command {
 	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
 	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
+	astroPlatformCoreClient := astroplatformcore.NewCoreClient(httputil.NewHTTPClient())
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
@@ -81,7 +83,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 				}
 			}
 			if isCloudCtx {
-				err = cloudCmd.Setup(cmd, astroClient, astroCoreClient)
+				err = cloudCmd.Setup(cmd, astroClient, astroCoreClient, astroPlatformCoreClient)
 				if err != nil {
 					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 				}
@@ -97,7 +99,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	}
 
 	rootCmd.AddCommand(
-		newLoginCommand(astroClient, astroCoreClient, os.Stdout),
+		newLoginCommand(astroClient, astroCoreClient, astroPlatformCoreClient, os.Stdout),
 		newLogoutCommand(os.Stdout),
 		newVersionCommand(),
 		newDevRootCmd(astroClient, astroCoreClient),

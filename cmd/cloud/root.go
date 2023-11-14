@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"io"
 
 	airflow "github.com/astronomer/astro-cli/airflow-client"
@@ -10,9 +11,10 @@ import (
 )
 
 var (
-	astroClient      astro.Client
-	astroCoreClient  astrocore.CoreClient
-	airflowAPIClient airflow.Client
+	astroClient             astro.Client
+	astroCoreClient         astrocore.CoreClient
+	astroPlatformCoreClient astroplatformcore.CoreClient
+	airflowAPIClient        airflow.Client
 )
 
 // AddCmds adds all the command initialized in this package for the cmd package to import

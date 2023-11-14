@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"io"
 	"net/http"
 	"os"
@@ -62,7 +63,7 @@ func TestOrganizationTeamRootCommand(t *testing.T) {
 }
 
 func TestOrganizationList(t *testing.T) {
-	orgList = func(out io.Writer, coreClient astrocore.CoreClient) error {
+	orgList = func(out io.Writer, platformCoreClient astroplatformcore.CoreClient) error {
 		return nil
 	}
 
@@ -72,7 +73,7 @@ func TestOrganizationList(t *testing.T) {
 }
 
 func TestOrganizationSwitch(t *testing.T) {
-	orgSwitch = func(orgName string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+	orgSwitch = func(orgName string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 		return nil
 	}
 
