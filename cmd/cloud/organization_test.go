@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
+	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
 	"io"
 	"net/http"
 	"os"
@@ -134,22 +135,22 @@ var (
 	errorBody, _ = json.Marshal(astrocore.Error{
 		Message: "failed to create invite: test-error",
 	})
-	createInviteResponseError = astrocore.CreateUserInviteResponse{
+	createInviteResponseError = astroiamcore.CreateUserInviteResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
 		Body:    errorBody,
 		JSON200: nil,
 	}
-	orgRole = "ORGANIZATION_MEMBER"
-	user1   = astrocore.User{
-		CreatedAt: time.Now(),
-		FullName:  "user 1",
-		Id:        "user1-id",
-		OrgRole:   &orgRole,
-		Username:  "user@1.com",
+	orgRole = astroiamcore.ORGANIZATIONMEMBER
+	user1   = astroiamcore.User{
+		CreatedAt:        time.Now(),
+		FullName:         "user 1",
+		Id:               "user1-id",
+		OrganizationRole: &orgRole,
+		Username:         "user@1.com",
 	}
-	users = []astrocore.User{
+	users = []astroiamcore.User{
 		user1,
 	}
 	teamMembers = []astrocore.TeamMember{{
@@ -167,7 +168,7 @@ var (
 	teams = []astrocore.Team{
 		team1,
 	}
-	GetUserWithResponseOK = astrocore.GetUserResponse{
+	GetUserWithResponseOK = astroiamcore.GetUserResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -179,11 +180,11 @@ var (
 		},
 		JSON200: &team1,
 	}
-	ListOrgUsersResponseOK = astrocore.ListOrgUsersResponse{
+	ListOrgUsersResponseOK = astroiamcore.ListUsersResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.UsersPaginated{
+		JSON200: &astroiamcore.UsersPaginated{
 			Limit:      1,
 			Offset:     0,
 			TotalCount: 1,
@@ -207,7 +208,7 @@ var (
 	teamRequestErrorBodyList, _ = json.Marshal(astrocore.Error{
 		Message: "failed to list teams",
 	})
-	ListOrgUsersResponseError = astrocore.ListOrgUsersResponse{
+	ListOrgUsersResponseError = astroiamcore.ListUsersResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
@@ -221,12 +222,13 @@ var (
 		Body:    teamRequestErrorBodyList,
 		JSON200: nil,
 	}
-	MutateOrgUserRoleResponseOK = astrocore.MutateOrgUserRoleResponse{
+	subjectOrgRole              = astroiamcore.SubjectRolesOrganizationRoleORGANIZATIONMEMBER
+	MutateOrgUserRoleResponseOK = astroiamcore.UpdateUserRolesResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.UserRole{
-			Role: "ORGANIZATION_MEMBER",
+		JSON200: &astroiamcore.SubjectRoles{
+			OrganizationRole: &subjectOrgRole,
 		},
 	}
 	UpdateTeamResponseOK = astrocore.UpdateTeamResponse{
@@ -242,7 +244,7 @@ var (
 	teamRequestErrorBodyUpdate, _ = json.Marshal(astrocore.Error{
 		Message: "failed to update team",
 	})
-	MutateOrgUserRoleResponseError = astrocore.MutateOrgUserRoleResponse{
+	MutateOrgUserRoleResponseError = astroiamcore.UpdateUserRolesResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
@@ -352,9 +354,9 @@ func TestUserInvite(t *testing.T) {
 	})
 	t.Run("valid email with no role creates an invite", func(t *testing.T) {
 		expectedOut := "invite for some@email.com with role ORGANIZATION_MEMBER created"
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
-		astroCoreClient = mockClient
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"user", "invite", "some@email.com"}
 		resp, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -363,26 +365,26 @@ func TestUserInvite(t *testing.T) {
 	})
 	t.Run("valid email with valid role creates an invite", func(t *testing.T) {
 		expectedOut := "invite for some@email.com with role ORGANIZATION_MEMBER created"
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
-		astroCoreClient = mockClient
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"user", "invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		resp, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
 	})
 	t.Run("valid email with invalid role returns an error and no invite gets created", func(t *testing.T) {
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
-		astroCoreClient = mockClient
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"user", "invite", "some@email.com", "--role", "invalid"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.ErrorIs(t, err, user.ErrInvalidRole)
 	})
 	t.Run("any errors from api are returned and no invite gets created", func(t *testing.T) {
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseError, nil).Once()
-		astroCoreClient = mockClient
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"user", "invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.EqualError(t, err, "failed to create invite: test-error")
@@ -390,9 +392,9 @@ func TestUserInvite(t *testing.T) {
 
 	t.Run("any context errors from api are returned and no invite gets created", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
-		astroCoreClient = mockClient
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"user", "invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.Error(t, err)
@@ -412,9 +414,9 @@ func TestUserInvite(t *testing.T) {
 		os.Stdin = r
 
 		expectedOut := "invite for test-email-input with role ORGANIZATION_MEMBER created"
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
-		astroCoreClient = mockClient
+		astroIamCoreClient = mockClient
 
 		cmdArgs := []string{"user", "invite"}
 		resp, err := execOrganizationCmd(cmdArgs...)
@@ -453,18 +455,18 @@ func TestUserList(t *testing.T) {
 		assert.Contains(t, resp, expectedHelp)
 	})
 	t.Run("any errors from api are returned and users are not listed", func(t *testing.T) {
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseError, nil).Once()
-		astroCoreClient = mockClient
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseError, nil).Once()
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"user", "list"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.EqualError(t, err, "failed to list users")
 	})
 	t.Run("any context errors from api are returned and users are not listed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseError, nil).Once()
-		astroCoreClient = mockClient
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseError, nil).Once()
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"user", "list"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.Error(t, err)
@@ -483,29 +485,29 @@ func TestUserUpdate(t *testing.T) {
 	})
 	t.Run("valid email with valid role updates user", func(t *testing.T) {
 		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
-		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
-		astroCoreClient = mockClient
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"user", "update", "user@1.com", "--role", "ORGANIZATION_MEMBER"}
 		resp, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
 	})
 	t.Run("valid email with invalid role returns an error and role is not update", func(t *testing.T) {
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
-		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
-		astroCoreClient = mockClient
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"user", "update", "user@1.com", "--role", "invalid"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.ErrorIs(t, err, user.ErrInvalidRole)
 	})
 	t.Run("any errors from api are returned and role is not updated", func(t *testing.T) {
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
-		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseError, nil).Once()
-		astroCoreClient = mockClient
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseError, nil).Once()
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"user", "update", "user@1.com", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.EqualError(t, err, "failed to update user")
@@ -513,10 +515,10 @@ func TestUserUpdate(t *testing.T) {
 
 	t.Run("any context errors from api are returned and role is not updated", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
-		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
-		astroCoreClient = mockClient
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"update", "user@1.com", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.Error(t, err)
@@ -524,8 +526,8 @@ func TestUserUpdate(t *testing.T) {
 	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
@@ -539,7 +541,7 @@ func TestUserUpdate(t *testing.T) {
 		os.Stdin = r
 
 		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"
-		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
+		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
 
 		cmdArgs := []string{"user", "update", "--role", "ORGANIZATION_MEMBER"}
 		resp, err := execOrganizationCmd(cmdArgs...)
@@ -841,10 +843,12 @@ func TestAddUser(t *testing.T) {
 	t.Run("valid team-id with valid user-id updates team membership", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro User %s was successfully added to team %s \n", user1.Id, team1.Name)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		mockIamClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 		astroCoreClient = mockClient
+		astroIamCoreClient = mockIamClient
 		cmdArgs := []string{"team", "user", "add", "--team-id", team1.Id, "--user-id", user1.Id}
 		resp, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -853,10 +857,12 @@ func TestAddUser(t *testing.T) {
 
 	t.Run("any errors from api are returned and membership is not added", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		mockIamClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseError, nil).Once()
 		astroCoreClient = mockClient
+		astroIamCoreClient = mockIamClient
 		cmdArgs := []string{"team", "user", "add", "--team-id", team1.Id, "--user-id", user1.Id}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.EqualError(t, err, "failed to update team membership")
@@ -865,10 +871,12 @@ func TestAddUser(t *testing.T) {
 	t.Run("any context errors from api are returned and membership is not added", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		mockIamClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 		astroCoreClient = mockClient
+		astroIamCoreClient = mockIamClient
 		cmdArgs := []string{"team", "user", "add", "--team-id", team1.Id, "--user-id", user1.Id}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.Error(t, err)
@@ -878,8 +886,9 @@ func TestAddUser(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
-		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		mockIamClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
@@ -895,6 +904,7 @@ func TestAddUser(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro User %s was successfully added to team %s \n", user1.Id, team1.Name)
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 		astroCoreClient = mockClient
+		astroIamCoreClient = mockIamClient
 
 		cmdArgs := []string{"team", "user", "add", "--user-id", user1.Id}
 		resp, err := execOrganizationCmd(cmdArgs...)
@@ -906,8 +916,9 @@ func TestAddUser(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
@@ -923,6 +934,7 @@ func TestAddUser(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro User %s was successfully added to team %s \n", user1.Id, team1.Name)
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 		astroCoreClient = mockClient
+		astroIamCoreClient = mockIamClient
 
 		cmdArgs := []string{"team", "user", "add", "--team-id", team1.Id}
 		resp, err := execOrganizationCmd(cmdArgs...)
@@ -945,7 +957,7 @@ func TestRemoveUser(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro User %s was successfully removed from team %s \n", user1.Id, team1.Name)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "user", "remove", "--team-id", team1.Id, "--user-id", user1.Id}
@@ -957,7 +969,7 @@ func TestRemoveUser(t *testing.T) {
 	t.Run("any errors from api are returned and membership is not removed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "user", "remove", "--team-id", team1.Id, "--user-id", user1.Id}
@@ -969,7 +981,7 @@ func TestRemoveUser(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "user", "remove", "--team-id", team1.Id, "--user-id", user1.Id}
@@ -981,7 +993,7 @@ func TestRemoveUser(t *testing.T) {
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
