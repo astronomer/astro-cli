@@ -239,12 +239,12 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.CreateInvite(email, role, out, astroCoreClient)
+	return user.CreateInvite(email, role, out, astroIamCoreClient)
 }
 
 func listUsers(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return user.ListOrgUsers(out, astroCoreClient)
+	return user.ListOrgUsers(out, astroIamCoreClient)
 }
 
 func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -262,7 +262,7 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.UpdateUserRole(email, updateRole, out, astroCoreClient)
+	return user.UpdateOrgRole(email, updateRole, out, astroIamCoreClient)
 }
 
 func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
@@ -440,7 +440,7 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 
 func addTeamUser(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return team.AddUser(teamID, userID, out, astroCoreClient)
+	return team.AddUser(teamID, userID, out, astroCoreClient, astroIamCoreClient)
 }
 
 func newTeamListUsersCmd(out io.Writer) *cobra.Command {

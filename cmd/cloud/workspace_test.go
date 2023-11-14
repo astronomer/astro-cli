@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
+	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
+	"github.com/lucsky/cuid"
 	"net/http"
 	"os"
 	"testing"
@@ -122,26 +125,27 @@ func TestWorkspaceUserRootCommand(t *testing.T) {
 }
 
 var (
-	workspaceRole  = "WORKSPACE_MEMBER"
-	workspaceUser1 = astrocore.User{
-		CreatedAt:     time.Now(),
-		FullName:      "user 1",
-		Id:            "user1-id",
-		WorkspaceRole: &workspaceRole,
-		Username:      "user@1.com",
+	workspaceId    = cuid.New()
+	workspaceRole  = astroiamcore.WORKSPACEMEMBER
+	workspaceUser1 = astroiamcore.User{
+		CreatedAt:      time.Now(),
+		FullName:       "user 1",
+		Id:             "user1-id",
+		WorkspaceRoles: &[]astroiamcore.WorkspaceRole{{WorkspaceId: workspaceId, Role: workspaceRole}},
+		Username:       "user@1.com",
 	}
-	workspaceUsers = []astrocore.User{
+	workspaceUsers = []astroiamcore.User{
 		workspaceUser1,
 	}
 
 	workspaceTeams = []astrocore.Team{
 		team1,
 	}
-	ListWorkspaceUsersResponseOK = astrocore.ListWorkspaceUsersResponse{
+	ListWorkspaceUsersResponseOK = astroiamcore.ListUsersResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.UsersPaginated{
+		JSON200: &astroiamcore.UsersPaginated{
 			Limit:      1,
 			Offset:     0,
 			TotalCount: 1,
@@ -422,10 +426,10 @@ func TestWorkspacUserRemove(t *testing.T) {
 	})
 	t.Run("valid email removes user", func(t *testing.T) {
 		expectedOut := "The user user@1.com was successfully removed from the workspace"
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
-		mockClient.On("DeleteWorkspaceUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseOK, nil).Once()
-		astroCoreClient = mockClient
+		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
+		mockClient.On("UpdateUserRoles", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseOK, nil).Once()
+		astroIamCoreClient = mockClient
 		cmdArgs := []string{"user", "remove", "user@1.com"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
 		assert.NoError(t, err)

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
+	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
 	"net/http"
 	"os"
 	"testing"
@@ -24,14 +26,14 @@ import (
 // org team variables
 var (
 	errorNetwork = errors.New("network error")
-	orgRole      = "ORGANIZATION_MEMBER"
+	orgRole      = astroiamcore.ORGANIZATIONMEMBER
 	description  = "mock description"
-	user1        = astrocore.User{
-		CreatedAt: time.Now(),
-		FullName:  "user 1",
-		Id:        "user1-id",
-		OrgRole:   &orgRole,
-		Username:  "user@1.com",
+	user1        = astroiamcore.User{
+		CreatedAt:        time.Now(),
+		FullName:         "user 1",
+		Id:               "user1-id",
+		OrganizationRole: &orgRole,
+		Username:         "user@1.com",
 	}
 	teamMembers = []astrocore.TeamMember{{
 		UserId:   user1.Id,
@@ -57,7 +59,7 @@ var (
 		team1,
 		team2,
 	}
-	GetUserWithResponseOK = astrocore.GetUserResponse{
+	GetUserWithResponseOK = astroiamcore.GetUserResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -262,28 +264,28 @@ var (
 		},
 		Body: errorBodyUpdate,
 	}
-	users = []astrocore.User{
+	users = []astroiamcore.User{
 		user1,
 	}
-	ListOrgUsersResponseOK = astrocore.ListOrgUsersResponse{
+	ListOrgUsersResponseOK = astroiamcore.ListUsersResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.UsersPaginated{
+		JSON200: &astroiamcore.UsersPaginated{
 			Limit:      1,
 			Offset:     0,
 			TotalCount: 1,
 			Users:      users,
 		},
 	}
-	ListOrgUsersResponseEmpty = astrocore.ListOrgUsersResponse{
+	ListOrgUsersResponseEmpty = astroiamcore.ListUsersResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.UsersPaginated{
+		JSON200: &astroiamcore.UsersPaginated{
 			Limit:      1,
 			Offset:     0,
-			TotalCount: 1,
+			TotalCount: 0,
 		},
 	}
 	errorBodyUpdateTeamMembership, _ = json.Marshal(astrocore.Error{
@@ -1091,10 +1093,11 @@ func TestAddUser(t *testing.T) {
 		expectedOutMessage := fmt.Sprintf("Astro User %s was successfully added to team %s \n", user1.Id, team1.Name)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		mockIamClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
-		err := AddUser(team1.Id, user1.Id, out, mockClient)
+		err := AddUser(team1.Id, user1.Id, out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -1103,11 +1106,12 @@ func TestAddUser(t *testing.T) {
 		expectedOutMessage := fmt.Sprintf("Astro User %s was successfully added to team %s \n", user1.Id, team2.Name)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Twice()
-		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		mockIamClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 		defer testUtil.MockUserInput(t, "y")()
-		err := AddUser(team2.Id, user1.Id, out, mockClient)
+		err := AddUser(team2.Id, user1.Id, out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -1115,11 +1119,12 @@ func TestAddUser(t *testing.T) {
 	t.Run("user reject AddUser", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Twice()
-		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		mockIamClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 		defer testUtil.MockUserInput(t, "n")()
-		err := AddUser(team2.Id, user1.Id, out, mockClient)
+		err := AddUser(team2.Id, user1.Id, out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, "", out.String())
 	})
@@ -1127,28 +1132,31 @@ func TestAddUser(t *testing.T) {
 	t.Run("error path no org teams found", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseEmpty, nil).Twice()
-		err := AddUser("", user1.Id, out, mockClient)
+		err := AddUser("", user1.Id, out, mockClient, mockIamClient)
 		assert.EqualError(t, err, "no teams found in your organization")
 	})
 
 	t.Run("error path when AddTeamMembersWithResponse return network error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		mockIamClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := AddUser(team1.Id, user1.Id, out, mockClient)
+		err := AddUser(team1.Id, user1.Id, out, mockClient, mockIamClient)
 		assert.EqualError(t, err, "network error")
 	})
 
 	t.Run("error path when AddTeamMembersWithResponse returns an error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		mockIamClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseError, nil).Once()
-		err := AddUser(team1.Id, user1.Id, out, mockClient)
+		err := AddUser(team1.Id, user1.Id, out, mockClient, mockIamClient)
 		assert.EqualError(t, err, "failed to update team membership")
 	})
 
@@ -1160,7 +1168,8 @@ func TestAddUser(t *testing.T) {
 		assert.NoError(t, err)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = AddUser(team1.Id, user1.Id, out, mockClient)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		err = AddUser(team1.Id, user1.Id, out, mockClient, mockIamClient)
 		assert.EqualError(t, err, "cannot retrieve organization short name from context")
 	})
 
@@ -1169,7 +1178,8 @@ func TestAddUser(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := AddUser(team1.Id, user1.Id, out, mockClient)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		err := AddUser(team1.Id, user1.Id, out, mockClient, mockIamClient)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -1179,8 +1189,11 @@ func TestAddUser(t *testing.T) {
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
-		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+
+		mockIamClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
 
 		// mock os.Stdin
 		expectedInput := []byte("1")
@@ -1200,17 +1213,17 @@ func TestAddUser(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro User %s was successfully added to team %s \n", user1.Id, team1.Name)
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 
-		err = AddUser("", user1.Id, out, mockClient)
+		err = AddUser("", user1.Id, out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOut, out.String())
 	})
 	t.Run("AddUser no user_id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 
 		// mock os.Stdin
 		expectedInput := []byte("1")
@@ -1230,17 +1243,17 @@ func TestAddUser(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro User %s was successfully added to team %s \n", user1.Id, team1.Name)
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 
-		err = AddUser(team1.Id, "", out, mockClient)
+		err = AddUser(team1.Id, "", out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOut, out.String())
 	})
 
 	t.Run("AddUser no user_id passed no org users found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseEmpty, nil).Twice()
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseEmpty, nil).Twice()
 
 		// mock os.Stdin
 		expectedInput := []byte("1")
@@ -1257,7 +1270,7 @@ func TestAddUser(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = AddUser(team1.Id, "", out, mockClient)
+		err = AddUser(team1.Id, "", out, mockClient, mockIamClient)
 		assert.EqualError(t, err, "no users found in your organization")
 	})
 }
@@ -1268,8 +1281,9 @@ func TestRemoveUser(t *testing.T) {
 		expectedOutMessage := fmt.Sprintf("Astro User %s was successfully removed from team %s \n", user1.Id, team1.Name)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
 		err := RemoveUser(team1.Id, user1.Id, out, mockClient)
 		assert.NoError(t, err)
@@ -1280,8 +1294,9 @@ func TestRemoveUser(t *testing.T) {
 		expectedOutMessage := fmt.Sprintf("Astro User %s was successfully removed from team %s \n", user1.Id, team2.Name)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
 		defer testUtil.MockUserInput(t, "y")()
 		err := RemoveUser(team2.Id, user1.Id, out, mockClient)
@@ -1292,8 +1307,9 @@ func TestRemoveUser(t *testing.T) {
 	t.Run("user reject RemoveUser with idp managed team", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
 		defer testUtil.MockUserInput(t, "n")()
 		err := RemoveUser(team2.Id, user1.Id, out, mockClient)
@@ -1320,8 +1336,9 @@ func TestRemoveUser(t *testing.T) {
 	t.Run("error path when RemoveTeamMemberWithResponse return network error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 		err := RemoveUser(team1.Id, user1.Id, out, mockClient)
 		assert.EqualError(t, err, "network error")
@@ -1330,8 +1347,9 @@ func TestRemoveUser(t *testing.T) {
 	t.Run("error path when RemoveTeamMemberWithResponse returns an error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseError, nil).Once()
 		err := RemoveUser(team1.Id, user1.Id, out, mockClient)
 		assert.EqualError(t, err, "failed to update team membership")
@@ -1364,8 +1382,9 @@ func TestRemoveUser(t *testing.T) {
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 
 		// mock os.Stdin
 		expectedInput := []byte("1")
@@ -1394,8 +1413,9 @@ func TestRemoveUser(t *testing.T) {
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 
 		// mock os.Stdin
 		expectedInput := []byte("1")

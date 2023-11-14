@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
 	"io"
 	"net/http"
 	"os"
@@ -121,11 +122,11 @@ func TestOrganizationExportAuditLogs(t *testing.T) {
 
 var (
 	inviteUserID           = "user_cuid"
-	createInviteResponseOK = astrocore.CreateUserInviteResponse{
+	createInviteResponseOK = astroiamcore.CreateUserInviteResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.Invite{
+		JSON200: &astroiamcore.Invite{
 			InviteId: "astro_invite_id",
 			UserId:   &inviteUserID,
 		},

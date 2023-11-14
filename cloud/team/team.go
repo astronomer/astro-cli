@@ -4,6 +4,7 @@ import (
 	httpContext "context"
 	"errors"
 	"fmt"
+	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
 	"io"
 	"os"
 	"strconv"
@@ -630,7 +631,7 @@ func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.Cor
 	return nil
 }
 
-func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) error {
+func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient, iamClient astroiamcore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -670,9 +671,9 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 	}
 	teamID = team.Id
 
-	var userSelection astrocore.User
+	var userSelection astroiamcore.User
 	if userID == "" {
-		users, err := user.GetOrgUsers(client)
+		users, err := user.GetOrgUsers(iamClient)
 		if err != nil {
 			return err
 		}
@@ -684,7 +685,7 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 			return err
 		}
 	} else {
-		userSelection, err = user.GetUser(client, userID)
+		userSelection, err = user.GetUser(iamClient, userID)
 		if err != nil {
 			return err
 		}

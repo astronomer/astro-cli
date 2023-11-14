@@ -38,9 +38,7 @@ build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
 
 core_api_gen:
-    ifeq (, $(shell which oapi-codegen))
-	go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest
-    endif
+	oapi-codegen --version | grep "v1.12.4" || go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4
 	oapi-codegen -include-tags=User,Organization,Invite,Workspace,Cluster,Options,Team,ApiToken,Deployment,Deploy,Environment -generate=types,client -package=astrocore "${CORE_OPENAPI_SPEC}" > ./astro-client-core/api.gen.go
 	make mock_astro_core
 

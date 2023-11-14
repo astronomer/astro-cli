@@ -136,7 +136,6 @@ const (
 // Defines values for CreateEnvironmentObjectLinkRequestScope.
 const (
 	CreateEnvironmentObjectLinkRequestScopeDEPLOYMENT CreateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
-	CreateEnvironmentObjectLinkRequestScopePROJECT    CreateEnvironmentObjectLinkRequestScope = "PROJECT"
 )
 
 // Defines values for CreateEnvironmentObjectRequestObjectType.
@@ -148,7 +147,6 @@ const (
 // Defines values for CreateEnvironmentObjectRequestScope.
 const (
 	CreateEnvironmentObjectRequestScopeDEPLOYMENT CreateEnvironmentObjectRequestScope = "DEPLOYMENT"
-	CreateEnvironmentObjectRequestScopePROJECT    CreateEnvironmentObjectRequestScope = "PROJECT"
 	CreateEnvironmentObjectRequestScopeWORKSPACE  CreateEnvironmentObjectRequestScope = "WORKSPACE"
 )
 
@@ -247,6 +245,12 @@ const (
 	DeploymentTypeSTANDARD  DeploymentType = "STANDARD"
 )
 
+// Defines values for DeploymentHibernationStatusNextEventType.
+const (
+	HIBERNATE DeploymentHibernationStatusNextEventType = "HIBERNATE"
+	WAKE      DeploymentHibernationStatusNextEventType = "WAKE"
+)
+
 // Defines values for DeploymentLogEntrySource.
 const (
 	DeploymentLogEntrySourceScheduler DeploymentLogEntrySource = "scheduler"
@@ -273,14 +277,12 @@ const (
 // Defines values for EnvironmentObjectScope.
 const (
 	EnvironmentObjectScopeDEPLOYMENT EnvironmentObjectScope = "DEPLOYMENT"
-	EnvironmentObjectScopePROJECT    EnvironmentObjectScope = "PROJECT"
 	EnvironmentObjectScopeWORKSPACE  EnvironmentObjectScope = "WORKSPACE"
 )
 
 // Defines values for EnvironmentObjectLinkScope.
 const (
 	EnvironmentObjectLinkScopeDEPLOYMENT EnvironmentObjectLinkScope = "DEPLOYMENT"
-	EnvironmentObjectLinkScopePROJECT    EnvironmentObjectLinkScope = "PROJECT"
 )
 
 // Defines values for ManagedDomainStatus.
@@ -360,7 +362,6 @@ const (
 // Defines values for UpdateEnvironmentObjectLinkRequestScope.
 const (
 	UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT UpdateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
-	UpdateEnvironmentObjectLinkRequestScopePROJECT    UpdateEnvironmentObjectLinkRequestScope = "PROJECT"
 )
 
 // Defines values for UpdateEnvironmentObjectRequestObjectType.
@@ -372,7 +373,6 @@ const (
 // Defines values for UpdateEnvironmentObjectRequestScope.
 const (
 	UpdateEnvironmentObjectRequestScopeDEPLOYMENT UpdateEnvironmentObjectRequestScope = "DEPLOYMENT"
-	UpdateEnvironmentObjectRequestScopePROJECT    UpdateEnvironmentObjectRequestScope = "PROJECT"
 	UpdateEnvironmentObjectRequestScopeWORKSPACE  UpdateEnvironmentObjectRequestScope = "WORKSPACE"
 )
 
@@ -838,6 +838,7 @@ type Cluster struct {
 	OrganizationId         string               `json:"organizationId"`
 	PodSubnetRange         string               `json:"podSubnetRange"`
 	ProviderAccount        string               `json:"providerAccount"`
+	RdsSnapshotIdentifier  *string              `json:"rdsSnapshotIdentifier,omitempty"`
 	Region                 string               `json:"region"`
 	ServicePeeringRange    string               `json:"servicePeeringRange"`
 	ServiceSubnetRange     string               `json:"serviceSubnetRange"`
@@ -887,6 +888,7 @@ type ClusterDetailed struct {
 	OrganizationTrialExpiresAt *string               `json:"organizationTrialExpiresAt,omitempty"`
 	PodSubnetRange             string                `json:"podSubnetRange"`
 	ProviderAccount            string                `json:"providerAccount"`
+	RdsSnapshotIdentifier      *string               `json:"rdsSnapshotIdentifier,omitempty"`
 	Region                     string                `json:"region"`
 	ServicePeeringRange        string                `json:"servicePeeringRange"`
 	ServiceSubnetRange         string                `json:"serviceSubnetRange"`
@@ -1045,7 +1047,8 @@ type CreateDedicatedDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory Must be valid kubernetes memory resource string, at least 2Gi in terms of Gibibytes (GiB)
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	ResourceQuotaMemory string                 `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpec `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
 	SchedulerSize CreateDedicatedDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -1151,7 +1154,6 @@ type CreateEnvironmentObjectOverridesRequest struct {
 type CreateEnvironmentObjectRequest struct {
 	AirflowVariable     *CreateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
 	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                                          `json:"autoLinkProjects,omitempty"`
 	Connection          *CreateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
 	Links               *[]CreateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
 	ObjectKey           string                                         `json:"objectKey"`
@@ -1291,7 +1293,8 @@ type CreateStandardDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory Must be valid kubernetes memory resource string, at least 2Gi in terms of Gibibytes (GiB)
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	ResourceQuotaMemory string                 `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpec `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
 	SchedulerSize CreateStandardDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -1403,51 +1406,56 @@ type DeployRollbackRequest struct {
 
 // Deployment defines model for Deployment.
 type Deployment struct {
-	AirflowVersion           string                           `json:"airflowVersion"`
-	AlertEmails              *[]string                        `json:"alertEmails,omitempty"`
-	ApiKeyOnlyDeployments    bool                             `json:"apiKeyOnlyDeployments"`
-	ClusterCloudProvider     *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
-	ClusterId                string                           `json:"clusterId"`
-	ClusterName              *string                          `json:"clusterName,omitempty"`
-	ClusterRegion            *string                          `json:"clusterRegion,omitempty"`
-	CreatedAt                time.Time                        `json:"createdAt"`
-	CreatedBy                BasicSubjectProfile              `json:"createdBy"`
-	CurrentDagTarballVersion *string                          `json:"currentDagTarballVersion,omitempty"`
-	CurrentImageVersion      *string                          `json:"currentImageVersion,omitempty"`
-	DefaultTaskPodCpu        *string                          `json:"defaultTaskPodCpu,omitempty"`
-	DefaultTaskPodMemory     *string                          `json:"defaultTaskPodMemory,omitempty"`
-	DeployId                 string                           `json:"deployId"`
-	Description              *string                          `json:"description,omitempty"`
-	DesiredDagTarballVersion *string                          `json:"desiredDagTarballVersion,omitempty"`
-	EnvironmentVariables     *[]DeploymentEnvironmentVariable `json:"environmentVariables,omitempty"`
-	Executor                 *DeploymentExecutor              `json:"executor,omitempty"`
-	ExternalIPs              *[]string                        `json:"externalIPs,omitempty"`
-	Id                       string                           `json:"id"`
-	ImageId                  string                           `json:"imageId"`
-	ImageRepository          string                           `json:"imageRepository"`
-	ImageTag                 string                           `json:"imageTag"`
-	IsDagDeployEnabled       bool                             `json:"isDagDeployEnabled"`
-	IsHighAvailability       *bool                            `json:"isHighAvailability,omitempty"`
-	LaminarHealthStatus      *LaminarHealthStatus             `json:"laminarHealthStatus,omitempty"`
-	Name                     string                           `json:"name"`
-	OrganizationId           string                           `json:"organizationId"`
-	OrganizationName         string                           `json:"organizationName"`
-	OrganizationShortName    string                           `json:"organizationShortName"`
-	ReleaseName              string                           `json:"releaseName"`
-	ResourceQuotaCpu         *string                          `json:"resourceQuotaCpu,omitempty"`
-	ResourceQuotaMemory      *string                          `json:"resourceQuotaMemory,omitempty"`
-	RuntimeVersion           string                           `json:"runtimeVersion"`
-	SchedulerAu              *int                             `json:"schedulerAu,omitempty"`
-	SchedulerCpu             string                           `json:"schedulerCpu"`
-	SchedulerMemory          string                           `json:"schedulerMemory"`
-	SchedulerReplicas        int                              `json:"schedulerReplicas"`
-	SchedulerSize            *DeploymentSchedulerSize         `json:"schedulerSize,omitempty"`
-	Status                   DeploymentStatus                 `json:"status"`
-	StatusReason             *string                          `json:"statusReason,omitempty"`
-	TaskPodNodePoolId        *string                          `json:"taskPodNodePoolId,omitempty"`
-	Type                     *DeploymentType                  `json:"type,omitempty"`
-	UpdatedAt                time.Time                        `json:"updatedAt"`
-	UpdatedBy                BasicSubjectProfile              `json:"updatedBy"`
+	AirflowVersion               string                           `json:"airflowVersion"`
+	AlertEmails                  *[]string                        `json:"alertEmails,omitempty"`
+	ClusterCloudProvider         *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
+	ClusterId                    string                           `json:"clusterId"`
+	ClusterName                  *string                          `json:"clusterName,omitempty"`
+	ClusterRegion                *string                          `json:"clusterRegion,omitempty"`
+	CreatedAt                    time.Time                        `json:"createdAt"`
+	CreatedBy                    BasicSubjectProfile              `json:"createdBy"`
+	CurrentDagTarballVersion     *string                          `json:"currentDagTarballVersion,omitempty"`
+	CurrentEnvironmentSignatures *EnvironmentSignatures           `json:"currentEnvironmentSignatures,omitempty"`
+	CurrentImageVersion          *string                          `json:"currentImageVersion,omitempty"`
+	DefaultTaskPodCpu            *string                          `json:"defaultTaskPodCpu,omitempty"`
+	DefaultTaskPodMemory         *string                          `json:"defaultTaskPodMemory,omitempty"`
+	DeployId                     string                           `json:"deployId"`
+	Description                  *string                          `json:"description,omitempty"`
+	DesiredDagTarballVersion     *string                          `json:"desiredDagTarballVersion,omitempty"`
+	DesiredEnvironmentSignatures *EnvironmentSignatures           `json:"desiredEnvironmentSignatures,omitempty"`
+	DesiredImageVersion          *string                          `json:"desiredImageVersion,omitempty"`
+	EnvironmentVariables         *[]DeploymentEnvironmentVariable `json:"environmentVariables,omitempty"`
+	Executor                     *DeploymentExecutor              `json:"executor,omitempty"`
+	ExternalIPs                  *[]string                        `json:"externalIPs,omitempty"`
+	Id                           string                           `json:"id"`
+	ImageId                      string                           `json:"imageId"`
+	ImageRepository              string                           `json:"imageRepository"`
+	ImageTag                     string                           `json:"imageTag"`
+	IsCicdEnforced               bool                             `json:"isCicdEnforced"`
+	IsDagDeployEnabled           bool                             `json:"isDagDeployEnabled"`
+	IsHighAvailability           *bool                            `json:"isHighAvailability,omitempty"`
+	LaminarHealthStatus          *LaminarHealthStatus             `json:"laminarHealthStatus,omitempty"`
+	Name                         string                           `json:"name"`
+	OrganizationId               string                           `json:"organizationId"`
+	OrganizationName             string                           `json:"organizationName"`
+	OrganizationShortName        string                           `json:"organizationShortName"`
+	ReleaseName                  string                           `json:"releaseName"`
+	ResourceQuotaCpu             *string                          `json:"resourceQuotaCpu,omitempty"`
+	ResourceQuotaMemory          *string                          `json:"resourceQuotaMemory,omitempty"`
+	RuntimeVersion               string                           `json:"runtimeVersion"`
+	ScalingSpec                  *DeploymentScalingSpec           `json:"scalingSpec,omitempty"`
+	ScalingStatus                *DeploymentScalingStatus         `json:"scalingStatus,omitempty"`
+	SchedulerAu                  *int                             `json:"schedulerAu,omitempty"`
+	SchedulerCpu                 string                           `json:"schedulerCpu"`
+	SchedulerMemory              string                           `json:"schedulerMemory"`
+	SchedulerReplicas            int                              `json:"schedulerReplicas"`
+	SchedulerSize                *DeploymentSchedulerSize         `json:"schedulerSize,omitempty"`
+	Status                       DeploymentStatus                 `json:"status"`
+	StatusReason                 *string                          `json:"statusReason,omitempty"`
+	TaskPodNodePoolId            *string                          `json:"taskPodNodePoolId,omitempty"`
+	Type                         *DeploymentType                  `json:"type,omitempty"`
+	UpdatedAt                    time.Time                        `json:"updatedAt"`
+	UpdatedBy                    BasicSubjectProfile              `json:"updatedBy"`
 
 	// WebServerAirflowApiUrl The Deployment's webserver's base url to directly access the Airflow api.
 	WebServerAirflowApiUrl   string         `json:"webServerAirflowApiUrl"`
@@ -1492,6 +1500,56 @@ type DeploymentEnvironmentVariableRequest struct {
 	Value    *string `json:"value,omitempty"`
 }
 
+// DeploymentHibernationOverride defines model for DeploymentHibernationOverride.
+type DeploymentHibernationOverride struct {
+	// Hibernate Whether to go into hibernation or not via the override rule
+	Hibernate bool `json:"hibernate"`
+
+	// OverrideUntil Timestamp till the override on the hibernation schedule is in effect
+	OverrideUntil *string `json:"overrideUntil,omitempty"`
+}
+
+// DeploymentHibernationSchedule defines model for DeploymentHibernationSchedule.
+type DeploymentHibernationSchedule struct {
+	// Description To add contextual information for the schedule
+	Description *string `json:"description,omitempty"`
+
+	// HibernateAtCron Cron expression representing the hibernation schedule
+	HibernateAtCron string `json:"hibernateAtCron"`
+
+	// IsEnabled It is set to true if the hibernate/wake schedule is enabled
+	IsEnabled bool `json:"isEnabled"`
+
+	// WakeAtCron Cron expression representing the wake up schedule
+	WakeAtCron string `json:"wakeAtCron"`
+}
+
+// DeploymentHibernationSpec defines model for DeploymentHibernationSpec.
+type DeploymentHibernationSpec struct {
+	Override *DeploymentHibernationOverride `json:"override,omitempty"`
+
+	// Schedules The list of schedules for the hibernation spec
+	Schedules *[]DeploymentHibernationSchedule `json:"schedules,omitempty"`
+}
+
+// DeploymentHibernationStatus defines model for DeploymentHibernationStatus.
+type DeploymentHibernationStatus struct {
+	// IsHibernating If the deployment is currently in hibernating state or not
+	IsHibernating *bool `json:"isHibernating,omitempty"`
+
+	// NextEvent Timestamp of the next schedule hibernation event for the deployment
+	NextEvent *string `json:"nextEvent,omitempty"`
+
+	// NextEventType Represents the type of the scheduled event for the deployment, one of HIBERNATE or WAKE
+	NextEventType *DeploymentHibernationStatusNextEventType `json:"nextEventType,omitempty"`
+
+	// Reason Reason indicating the current state of the deployment
+	Reason *string `json:"reason,omitempty"`
+}
+
+// DeploymentHibernationStatusNextEventType Represents the type of the scheduled event for the deployment, one of HIBERNATE or WAKE
+type DeploymentHibernationStatusNextEventType string
+
 // DeploymentInstanceSpecRequest defines model for DeploymentInstanceSpecRequest.
 type DeploymentInstanceSpecRequest struct {
 	Au       int `json:"au"`
@@ -1531,6 +1589,16 @@ type DeploymentOptions struct {
 	WorkloadIdentityOptions *[]WorkloadIdentityOption `json:"workloadIdentityOptions,omitempty"`
 }
 
+// DeploymentScalingSpec defines model for DeploymentScalingSpec.
+type DeploymentScalingSpec struct {
+	HibernationSpec *DeploymentHibernationSpec `json:"hibernationSpec,omitempty"`
+}
+
+// DeploymentScalingStatus defines model for DeploymentScalingStatus.
+type DeploymentScalingStatus struct {
+	HibernationStatus *DeploymentHibernationStatus `json:"hibernationStatus,omitempty"`
+}
+
 // DeploymentsPaginated defines model for DeploymentsPaginated.
 type DeploymentsPaginated struct {
 	Deployments []Deployment `json:"deployments"`
@@ -1560,9 +1628,9 @@ type EntitlementRequiredTier string
 type EnvironmentObject struct {
 	AirflowVariable     *EnvironmentObjectAirflowVariable `json:"airflowVariable,omitempty"`
 	AutoLinkDeployments *bool                             `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                             `json:"autoLinkProjects,omitempty"`
 	Connection          *EnvironmentObjectConnection      `json:"connection,omitempty"`
 	CreatedAt           *string                           `json:"createdAt,omitempty"`
+	CreatedBy           *BasicSubjectProfile              `json:"createdBy,omitempty"`
 	Id                  *string                           `json:"id,omitempty"`
 	Links               *[]EnvironmentObjectLink          `json:"links,omitempty"`
 	ObjectKey           string                            `json:"objectKey"`
@@ -1570,6 +1638,7 @@ type EnvironmentObject struct {
 	Scope               EnvironmentObjectScope            `json:"scope"`
 	ScopeEntityId       string                            `json:"scopeEntityId"`
 	UpdatedAt           *string                           `json:"updatedAt,omitempty"`
+	UpdatedBy           *BasicSubjectProfile              `json:"updatedBy,omitempty"`
 }
 
 // EnvironmentObjectObjectType defines model for EnvironmentObject.ObjectType.
@@ -1629,6 +1698,12 @@ type EnvironmentObjectsPaginated struct {
 	Limit              int                 `json:"limit"`
 	Offset             int                 `json:"offset"`
 	TotalCount         int                 `json:"totalCount"`
+}
+
+// EnvironmentSignatures defines model for EnvironmentSignatures.
+type EnvironmentSignatures struct {
+	AirflowVariables *string `json:"airflowVariables,omitempty"`
+	Connections      *string `json:"connections,omitempty"`
 }
 
 // Error defines model for Error.
@@ -1950,6 +2025,7 @@ type Team struct {
 	MembersCount     *int                 `json:"membersCount,omitempty"`
 	Name             string               `json:"name"`
 	OrganizationId   string               `json:"organizationId"`
+	OrganizationName *string              `json:"organizationName,omitempty"`
 	OrganizationRole string               `json:"organizationRole"`
 	Roles            *[]TeamRole          `json:"roles,omitempty"`
 	RolesCount       *int                 `json:"rolesCount,omitempty"`
@@ -2084,7 +2160,6 @@ type UpdateEnvironmentObjectOverridesRequest struct {
 type UpdateEnvironmentObjectRequest struct {
 	AirflowVariable     *UpdateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
 	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                                          `json:"autoLinkProjects,omitempty"`
 	Connection          *UpdateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
 	Links               *[]UpdateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
 	ObjectKey           string                                         `json:"objectKey"`
@@ -2136,7 +2211,8 @@ type UpdateHostedDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory Must be valid kubernetes memory resource string, at least 2Gi in terms of Gibibytes (GiB)
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	ResourceQuotaMemory string                 `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpec `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
 	SchedulerSize UpdateHostedDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -2683,9 +2759,6 @@ type ListEnvironmentObjectsParams struct {
 	// DeploymentId deployment ID
 	DeploymentId *string `form:"deploymentId,omitempty" json:"deploymentId,omitempty"`
 
-	// ProjectId project ID
-	ProjectId *string `form:"projectId,omitempty" json:"projectId,omitempty"`
-
 	// ObjectType object type
 	ObjectType *ListEnvironmentObjectsParamsObjectType `form:"objectType,omitempty" json:"objectType,omitempty"`
 
@@ -2707,6 +2780,15 @@ type ListEnvironmentObjectsParamsObjectType string
 
 // ListOrganizationTeamsParams defines parameters for ListOrganizationTeams.
 type ListOrganizationTeamsParams struct {
+	// IncludeMembers includes details about the teams members
+	IncludeMembers *bool `form:"includeMembers,omitempty" json:"includeMembers,omitempty"`
+
+	// IncludeRoles include details about the teams roles
+	IncludeRoles *bool `form:"includeRoles,omitempty" json:"includeRoles,omitempty"`
+
+	// IncludeSubjectInfo include details about who created or updated the team entry
+	IncludeSubjectInfo *bool `form:"includeSubjectInfo,omitempty" json:"includeSubjectInfo,omitempty"`
+
 	// Offset offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
@@ -7554,22 +7636,6 @@ func NewListEnvironmentObjectsRequest(server string, organizationId string, para
 
 	}
 
-	if params.ProjectId != nil {
-
-		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "projectId", runtime.ParamLocationQuery, *params.ProjectId); err != nil {
-			return nil, err
-		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-			return nil, err
-		} else {
-			for k, v := range parsed {
-				for _, v2 := range v {
-					queryValues.Add(k, v2)
-				}
-			}
-		}
-
-	}
-
 	if params.ObjectType != nil {
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "objectType", runtime.ParamLocationQuery, *params.ObjectType); err != nil {
@@ -7942,6 +8008,54 @@ func NewListOrganizationTeamsRequest(server string, organizationId string, param
 	}
 
 	queryValues := queryURL.Query()
+
+	if params.IncludeMembers != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeMembers", runtime.ParamLocationQuery, *params.IncludeMembers); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.IncludeRoles != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeRoles", runtime.ParamLocationQuery, *params.IncludeRoles); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.IncludeSubjectInfo != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeSubjectInfo", runtime.ParamLocationQuery, *params.IncludeSubjectInfo); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
 
 	if params.Offset != nil {
 

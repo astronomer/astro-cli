@@ -552,7 +552,7 @@ type CreateAwsClusterRequest struct {
 	// CloudProvider The cluster's cloud provider.
 	CloudProvider CreateAwsClusterRequestCloudProvider `json:"cloudProvider"`
 
-	// DbInstanceType The type of database instance that is used for the cluster. For Hybrid clusters only. Ignored for Dedicated clusters.
+	// DbInstanceType The type of database instance that is used for the cluster. Required for Hybrid clusters.
 	DbInstanceType *string `json:"dbInstanceType,omitempty"`
 
 	// K8sTags The Kubernetes tags in the cluster.
@@ -591,7 +591,7 @@ type CreateAzureClusterRequest struct {
 	// CloudProvider The cluster's cloud provider.
 	CloudProvider CreateAzureClusterRequestCloudProvider `json:"cloudProvider"`
 
-	// DbInstanceType The type of database instance that is used for the cluster. For Hybrid clusters only. Ignored for Dedicated clusters.
+	// DbInstanceType The type of database instance that is used for the cluster. Required for Hybrid clusters.
 	DbInstanceType *string `json:"dbInstanceType,omitempty"`
 
 	// K8sTags The Kubernetes tags in the cluster.
@@ -703,7 +703,7 @@ type CreateGcpClusterRequest struct {
 	// CloudProvider The cluster's cloud provider.
 	CloudProvider CreateGcpClusterRequestCloudProvider `json:"cloudProvider"`
 
-	// DbInstanceType The type of database instance that is used for the cluster. For Hybrid clusters only. Ignored for Dedicated clusters.
+	// DbInstanceType The type of database instance that is used for the cluster. Required for Hybrid clusters.
 	DbInstanceType *string `json:"dbInstanceType,omitempty"`
 
 	// K8sTags The Kubernetes tags in the cluster.
@@ -906,9 +906,6 @@ type Deployment struct {
 	CreatedAt time.Time           `json:"createdAt"`
 	CreatedBy BasicSubjectProfile `json:"createdBy"`
 
-	// DagDeployEnabled Whether the Deployment has DAG deploys enabled.
-	DagDeployEnabled bool `json:"dagDeployEnabled"`
-
 	// DagTarballVersion The Deployment's DAG tarball version. This is updated when DAG-only deploys are enabled a user triggers a deploy.
 	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
 
@@ -944,6 +941,9 @@ type Deployment struct {
 
 	// IsCicdEnforced Whether the Deployment requires that all deploys are made through CI/CD.
 	IsCicdEnforced bool `json:"isCicdEnforced"`
+
+	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
+	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
 
 	// IsHighAvailability Whether the Deployment has high availability (HA) enabled. If `true`, multiple scheduler Pods will run at once.
 	IsHighAvailability *bool `json:"isHighAvailability,omitempty"`
@@ -1381,7 +1381,7 @@ type SchedulerMachine struct {
 
 // UpdateClusterRequest defines model for UpdateClusterRequest.
 type UpdateClusterRequest struct {
-	// DbInstanceType The cluster's database instance type. For Hybrid clusters only. Ignored for Dedicated clusters.
+	// DbInstanceType The cluster's database instance type. Required for Hybrid clusters.
 	DbInstanceType *string `json:"dbInstanceType,omitempty"`
 
 	// K8sTags A list of Kubernetes tags to add to the cluster.
