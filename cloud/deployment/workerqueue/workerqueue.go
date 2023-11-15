@@ -119,6 +119,9 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	} else {
 		// get the node poolID to use
 		cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, platformCoreClient)
+		if err != nil {
+			return err
+		}
 		nodePoolID, err = selectNodePool(workerType, *cluster.NodePools, out)
 		if err != nil {
 			return err

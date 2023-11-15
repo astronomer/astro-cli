@@ -157,7 +157,8 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
 	if organization.IsOrgHosted() {
-		cmd.Flags().StringVarP(&deploymentType, "deployment-type", "cluster-type", standard, "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated.")
+		cmd.Flags().StringVarP(&deploymentType, "deployment-type", "", standard, "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated.")
+		cmd.Flags().StringVarP(&deploymentType, "cluster-type", "", standard, "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated.")
 		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "gcp", "The Cloud Provider to use for the Deployment. Possible values can be gcp, aws.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the Deployment.")
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of scheduler for the Deployment. Possible values can be small, medium, large")
@@ -350,7 +351,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
 	}
-
 	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated) {
 		return errors.New("Invalid --cluster-type value")
 	}
