@@ -236,7 +236,6 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 	if err != nil {
 		return err
 	}
-
 	resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, deployInput.Description, "", deployInput.Dags, coreClient)
 	if err != nil {
 		return err
@@ -373,11 +372,15 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 					return err
 				}
 			} else {
-				fmt.Println("No DAGs found. Skipping testing...")
+				fmt.Println("Image Deploy only. Skipping DAG deploy...")
 			}
 		}
 		// finish deploy
-		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
+		sendTarBall := deployInfo.dagDeployEnabled
+		if deployInput.Image {
+			sendTarBall = false
+		}
+		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, sendTarBall, coreClient)
 		if err != nil {
 			return err
 		}
