@@ -123,6 +123,39 @@ contexts:
 	assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", ctx.Workspace)
 }
 
+func TestGetCurrentContext_WithDomainOverride(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	configRaw := []byte(`cloud:
+  api:
+    port: "443"
+    protocol: https
+    ws_protocol: wss
+local:
+  enabled: true
+  host: http://example.com:8871/v1
+context: example_com
+contexts:
+  example_com:
+    domain: example.com
+    token: token
+    last_used_workspace: ck05r3bor07h40d02y2hw4n4v
+    workspace: ck05r3bor07h40d02y2hw4n4v
+  stage_example_com:
+    domain: stage.example.com
+    token: token
+    last_used_workspace: ck05r3bor07h40d02y2hw4n4w
+    workspace: ck05r3bor07h40d02y2hw4n4w
+`)
+	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	InitConfig(fs)
+	t.Setenv("ASTRO_DOMAIN", "stage.example.com")
+	ctx, err := GetCurrentContext()
+	assert.NoError(t, err)
+	assert.Equal(t, "stage.example.com", ctx.Domain)
+	assert.Equal(t, "token", ctx.Token)
+	assert.Equal(t, "ck05r3bor07h40d02y2hw4n4w", ctx.Workspace)
+}
+
 func TestDeleteContext(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`
