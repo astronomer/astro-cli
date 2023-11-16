@@ -376,11 +376,14 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			}
 		}
 		// finish deploy
-		sendTarBall := deployInfo.dagDeployEnabled
 		if deployInput.Image {
-			sendTarBall = false
+			coreDeployment, err := deployment.CoreGetDeployment(deployInfo.workspaceID, deployInfo.organizationID, deployInfo.deploymentID, coreClient)
+			if err != nil {
+				return err
+			}
+			dagTarballVersion = *coreDeployment.CurrentDagTarballVersion
 		}
-		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, sendTarBall, coreClient)
+		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
 		if err != nil {
 			return err
 		}
@@ -420,7 +423,6 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 		if err != nil {
 			return deploymentInfo{}, err
 		}
-
 		return deploymentInfo{
 			currentDeployment.ID,
 			currentDeployment.ReleaseName,
