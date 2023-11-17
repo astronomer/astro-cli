@@ -326,7 +326,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
 		}
 
-		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && deployInput.Image == false {
+		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Image {
 			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
 
 			if !i {
@@ -366,7 +366,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			if deployInput.Image == false {
+			if !deployInput.Image {
 				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, dagsUploadURL)
 				if err != nil {
 					return err
