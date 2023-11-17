@@ -367,12 +367,15 @@ func createOutput(workspaceID, clusterType string, d *astro.Deployment) error {
 }
 
 func validateResources(schedulerAU, schedulerReplicas int, configOption astro.DeploymentConfig) bool { //nolint:gocritic
+	fmt.Println(schedulerAU)
+	fmt.Println(configOption.Components.Scheduler.AU.Default)
+	fmt.Println(configOption.Components.Scheduler.AU.Limit)
 	schedulerAuMin := configOption.Components.Scheduler.AU.Default
 	schedulerAuMax := configOption.Components.Scheduler.AU.Limit
 	schedulerReplicasMin := configOption.Components.Scheduler.Replicas.Minimum
 	schedulerReplicasMax := configOption.Components.Scheduler.Replicas.Limit
 	if schedulerAU > schedulerAuMax || schedulerAU < schedulerAuMin {
-		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs", schedulerAuMax, schedulerAuMax)
+		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs", schedulerAuMin, schedulerAuMax)
 		return false
 	}
 	if schedulerReplicas > schedulerReplicasMax || schedulerReplicas < schedulerReplicasMin {
