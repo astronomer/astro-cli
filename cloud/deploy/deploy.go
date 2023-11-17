@@ -372,7 +372,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 					return err
 				}
 			} else {
-				fmt.Println("Image Deploy only. Skipping DAG deploy...")
+				fmt.Println("Image Deploy only. Skipping deploying DAG...")
 			}
 		}
 		// finish deploy
@@ -381,7 +381,11 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			if err != nil {
 				return err
 			}
-			dagTarballVersion = *coreDeployment.CurrentDagTarballVersion
+			if coreDeployment.CurrentDagTarballVersion != nil {
+				dagTarballVersion = *coreDeployment.CurrentDagTarballVersion
+			} else {
+				dagTarballVersion = ""
+			}
 		}
 		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
 		if err != nil {
