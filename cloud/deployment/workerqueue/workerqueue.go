@@ -119,11 +119,11 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 				return err
 			}
 		}
-	case deployment.KubeExecutor:
-		err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdate)
-		if err != nil {
-			return err
-		}
+		// case deployment.KubeExecutor:
+		// 	err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdate)
+		// 	if err != nil {
+		// 		return err
+		// 	}
 	}
 
 	// sanitize all the existing queues based on executor
