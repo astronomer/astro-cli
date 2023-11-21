@@ -134,7 +134,13 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 	if err != nil {
 		return err
 	}
-
+	deployment, err := CoreGetDeployment("", currentDeployment.Id, platformCoreClient)
+	if err != nil {
+		return err
+	}
+	if deployment.EnvironmentVariables != nil {
+		environmentVariablesObjects = *deployment.EnvironmentVariables
+	}
 	// make variables table
 	var index int
 	for i := range environmentVariablesObjects {
