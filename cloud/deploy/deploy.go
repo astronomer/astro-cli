@@ -395,6 +395,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, corePlatformClient ast
 }
 
 func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, client astro.Client, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (deploymentInfo, error) {
+
 	// Use config deployment if provided
 	if deploymentID == "" {
 		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
@@ -409,11 +410,18 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
+		var deploymentType astroplatformcore.DeploymentType
+		var isHighAvailability bool
 		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, corePlatformClient, coreClient)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
-
+		if currentDeployment.Type != nil {
+			deploymentType = *currentDeployment.Type
+		}
+		if currentDeployment.IsHighAvailability != nil {
+			isHighAvailability = *currentDeployment.IsHighAvailability
+		}
 		return deploymentInfo{
 			currentDeployment.Id,
 			currentDeployment.Namespace,
@@ -423,8 +431,8 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 			currentDeployment.WorkspaceId,
 			currentDeployment.WebServerUrl,
 			currentDeployment.DagDeployEnabled,
-			*currentDeployment.Type,
-			*currentDeployment.IsHighAvailability,
+			deploymentType,
+			isHighAvailability,
 		}, nil
 	}
 	c, err := config.GetCurrentContext()
