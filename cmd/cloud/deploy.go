@@ -142,5 +142,5 @@ func deploy(cmd *cobra.Command, args []string) error {
 		Description:    deployDescription,
 	}
 
-	return DeployImage(deployInput, astroClient, platformCoreClient, astroCoreClient)
+	return DeployImage(deployInput, platformCoreClient, astroCoreClient)
 }

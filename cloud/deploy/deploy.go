@@ -13,7 +13,6 @@ import (
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -195,7 +194,7 @@ func deployDags(path, dagsPath, dagsUploadURL string, deploymentType astroplatfo
 }
 
 // Deploy pushes a new docker image
-func Deploy(deployInput InputDeploy, client astro.Client, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error { //nolint
+func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error { //nolint
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -216,7 +215,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, corePlatformClient ast
 
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
-	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, client, corePlatformClient, coreClient)
+	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, corePlatformClient, coreClient)
 	if err != nil {
 		return err
 	}
@@ -394,7 +393,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, corePlatformClient ast
 	return nil
 }
 
-func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, client astro.Client, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (deploymentInfo, error) {
+func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (deploymentInfo, error) {
 
 	// Use config deployment if provided
 	if deploymentID == "" {

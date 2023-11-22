@@ -114,13 +114,6 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCo
 		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(wsID))
 		return nil
 	}
-
-	// // get core deployment
-	// coreDeployment, err := deployment.CoreGetDeployment(wsID, "", requestedDeployment.Id, platformCoreClient)
-	// if err != nil {
-	// 	return err
-	// }
-
 	// create a map for deployment.information
 	deploymentInfoMap, err = getDeploymentInfo(requestedDeployment)
 	if err != nil {
@@ -217,10 +210,10 @@ func getDeploymentConfig(coreDeployment astroplatformcore.Deployment, platformCo
 	return map[string]interface{}{
 		"name":                    coreDeployment.Name,
 		"description":             coreDeployment.Description,
-		"workspace_name":          coreDeployment.WorkspaceName, // coreDeployment.WorkspaceName, // undo once added to coreDeployment
+		"workspace_name":          coreDeployment.WorkspaceName,
 		"deployment_type":         coreDeployment.Type,
-		"cloud_provider":          coreDeployment.CloudProvider, // coreDeployment.Cluster.CloudProvider, // undo once added to coreDeployment
-		"region":                  coreDeployment.Region,        // sourceDeployment.Cluster.Region, // undo once added to coreDeployment
+		"cloud_provider":          coreDeployment.CloudProvider,
+		"region":                  coreDeployment.Region,
 		"cluster_name":            clusterName,
 		"runtime_version":         coreDeployment.RuntimeVersion,
 		"dag_deploy_enabled":      coreDeployment.DagDeployEnabled,

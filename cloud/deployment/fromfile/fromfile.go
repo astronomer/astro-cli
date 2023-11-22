@@ -52,14 +52,12 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		errHelp, clusterID, workspaceID, outputFormat string
 		dataBytes                                     []byte
 		formattedDeployment                           inspect.FormattedDeployment
-		// createInput                                    astro.CreateDeploymentInput
-		// updateInput                                    astro.UpdateDeploymentInput
-		existingDeployment  astroplatformcore.Deployment
-		existingDeployments []astroplatformcore.Deployment
-		nodePools           []astroplatformcore.NodePool
-		jsonOutput          bool
-		dagDeploy           bool
-		envVars             []astroplatformcore.DeploymentEnvironmentVariableRequest
+		existingDeployment                            astroplatformcore.Deployment
+		existingDeployments                           []astroplatformcore.Deployment
+		nodePools                                     []astroplatformcore.NodePool
+		jsonOutput                                    bool
+		dagDeploy                                     bool
+		envVars                                       []astroplatformcore.DeploymentEnvironmentVariableRequest
 	)
 
 	// get file contents as []byte
@@ -182,20 +180,6 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 			return err
 		}
 	}
-	// create environment variables
-	// if hasEnvVars(&formattedDeployment) || hasAlertEmails(&formattedDeployment) {
-	// 	_, err = createEnvVarsRequest(&formattedDeployment, client)
-	// 	if err != nil {
-	// 		return fmt.Errorf("%w \n failed to %s alert emails", err, action)
-	// 	}
-	// }
-	// // create alert emails
-	// if hasAlertEmails(&formattedDeployment) {
-	// 	_, err = createAlertEmails(&formattedDeployment, createdOrUpdatedDeployment.ID, client)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
 	// Get deployment created or updated
 	existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
 	if jsonOutput {
@@ -219,9 +203,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		astroMachine            astroplatformcore.WorkerMachine
 		listQueuesRequest       []astroplatformcore.WorkerQueueRequest
 		listHybridQueuesRequest []astroplatformcore.HybridWorkerQueueRequest
-		// createInput    deployment.CreateDeploymentInput
-		// updateInput    deployment.UpdateDeploymentInput
-		err error
+		err                     error
 	)
 	deploymentType := transformDeploymentType(deploymentFromFile.Deployment.Configuration.DeploymentType)
 
@@ -596,9 +578,6 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 	if deploymentFromFile.Deployment.Configuration.Name == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.name")
 	}
-	// if deploymentFromFile.Deployment.Configuration.ClusterName == "" {
-	// 	return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.cluster_name")
-	// }
 	if deploymentFromFile.Deployment.Configuration.Executor == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.executor")
 	}
@@ -732,34 +711,6 @@ func getNodePoolIDFromWorkerType(workerType, clusterName string, nodePools []ast
 	return "", err
 }
 
-// createEnvVars takes a deploymentFromFile, deploymentID and a client as its arguments.
-// It updates the deployment identified by deploymentID with requested environment variables.
-// It returns an error if it fails to modify the environment variables for a deployment.
-// func createEnvVars(deploymentFromFile *inspect.FormattedDeployment, deploymentID string, client astroplatformcore.Client) ([]astroplatformcore.DeploymentEnvironmentVariableRequest, error) {
-// 	var (
-// 		updateEnvVarsInput astro.EnvironmentVariablesInput
-// 		listOfVars         []astro.EnvironmentVariable
-// 		envVarObjects      []astro.EnvironmentVariablesObject
-// 		err                error
-// 	)
-// 	requestedVars := deploymentFromFile.Deployment.EnvVars
-// 	listOfVars = make([]astro.EnvironmentVariable, len(requestedVars))
-// 	for i, envVar := range requestedVars {
-// 		listOfVars[i].Key = envVar.Key
-// 		listOfVars[i].IsSecret = envVar.IsSecret
-// 		listOfVars[i].Value = envVar.Value
-// 	}
-// 	updateEnvVarsInput = astro.EnvironmentVariablesInput{
-// 		DeploymentID:         deploymentID,
-// 		EnvironmentVariables: listOfVars,
-// 	}
-// 	envVarObjects, err = client.ModifyDeploymentVariable(updateEnvVarsInput)
-// 	if err != nil {
-// 		return envVarObjects, err
-// 	}
-// 	return envVarObjects, nil
-// }
-
 // getQueues takes a deploymentFromFile as its arguments.
 // It returns a list of worker queues to be created or updated.
 func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astroplatformcore.NodePool, existingQueues []astroplatformcore.WorkerQueue) ([]astroplatformcore.WorkerQueue, error) {
@@ -805,8 +756,6 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 		qList[i].MaxWorkerCount = requestedQueues[i].MaxWorkerCount
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
-		// qList[i].PodCpu = requestedQueues[i].PodCPU
-		// qList[i].PodMemory = requestedQueues[i].PodRAM
 		if deployment.IsDeploymentDedicated(deploymentType) || deployment.IsDeploymentStandard(deploymentType) {
 			qList[i].AstroMachine = &requestedQueues[i].WorkerType
 		} else {

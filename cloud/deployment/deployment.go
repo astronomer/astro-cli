@@ -57,10 +57,6 @@ var (
 	timeoutNum = 180
 )
 
-// type CreateDeploymentInput{
-
-// }
-
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
@@ -124,19 +120,18 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 		// change to cluster name
 		var clusterName string
 		if !IsDeploymentStandard(*d.Type) {
-			clusterName = *d.ClusterName // *d.ClusterName
+			clusterName = *d.ClusterName
 		} else {
 			clusterName = notApplicable
 		}
-		runtimeVersionText := d.RuntimeVersion // + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
+		runtimeVersionText := " (based on Airflow " + d.RuntimeVersion + ")"
 		releaseName := d.Namespace
 		// change to workspace name
 		workspaceID := d.WorkspaceId
 		region := notApplicable
 		cloudProvider := notApplicable
 		if IsDeploymentStandard(*d.Type) || IsDeploymentDedicated(*d.Type) {
-			// region := d.Region
-			// cloudProvider := d.CloudProvider
+
 			region = *d.Region
 			cloudProvider = *d.CloudProvider
 		}
@@ -269,16 +264,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		if name == "" {
 			return errors.New("you must give your Deployment a name")
 		}
-		// deployments, err := CoreGetDeployments(workspaceID, organizationID, platformCoreClient)
-		// if err != nil {
-		// 	return errors.Wrap(err, errInvalidDeployment.Error())
-		// }
-
-		// for i := range deployments {
-		// 	if deployments[i].Name == name {
-		// 		return errors.New("A Deployment with that name already exists")
-		// 	}
-		// }
 	}
 
 	if region == "" && IsDeploymentStandard(deploymentType) {
@@ -544,11 +529,8 @@ func createOutput(workspaceID string, deploymentType astroplatformcore.Deploymen
 	runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
 	clusterName := notApplicable
 	releaseName := d.Namespace
-	// if !IsDeploymentStandard(deploymentType) {
-	// 	clusterName = *d.ClusterName
-	// }
 	cloudProvider := *d.CloudProvider
-	region := notApplicable // *d.Region
+	region := notApplicable
 	tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 	deploymentURL, err := GetDeploymentURL(d.Id, workspaceID)
 	if err != nil {
@@ -587,8 +569,6 @@ func validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQu
 	defaultTaskPodMemoryMax := configOption.ResourceQuotas.DefaultPodSize.Memory.Ceiling
 	resourceQuotaCpuMin := configOption.ResourceQuotas.ResourceQuota.Cpu.Floor
 	resourceQuotaCpuMax := configOption.ResourceQuotas.ResourceQuota.Cpu.Ceiling
-	// resourceQuotaMemoryMin := configOption.ResourceQuotas.ResourceQuota.Memory.Floor
-	// resourceQuotaMemoryMax := configOption.ResourceQuotas.ResourceQuota.Memory.Ceiling
 	if defaultTaskPodCpu > defaultTaskPodCpuMax || defaultTaskPodCpu < defaultTaskPodCpuMin {
 		fmt.Printf("\nDefault Task Pod CPU must be between a min of %s and a max of %s CPU cores", defaultTaskPodCpuMin, defaultTaskPodCpuMax)
 		return false
@@ -603,42 +583,8 @@ func validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQu
 		fmt.Printf("\nDefault Resource Quota CPU must be between a min of %s and a max of %s CPU cores", resourceQuotaCpuMin, resourceQuotaCpuMax)
 		return false
 	}
-
-	// if resourceQuotaMemory > resourceQuotaMemoryMax || resourceQuotaMemory < resourceQuotaMemoryMin {
-	// 	fmt.Printf("\nDefault Resource Quota Memory must be between a min of %s and a max of %s Gis", resourceQuotaMemoryMin, resourceQuotaMemoryMax)
-	// 	return false
-	// }
-
 	return true
 }
-
-// func validateRuntimeVersion(runtimeVersion string, client astro.Client) (bool, error) {
-// 	runtimeReleases, err := GetRuntimeReleases(client)
-// 	if err != nil {
-// 		return false, err
-// 	}
-// 	if !util.Contains(runtimeReleases, runtimeVersion) {
-// 		fmt.Printf("\nRuntime version not valid. Must be one of the following: %v\n", runtimeReleases)
-// 		return false, nil
-// 	}
-// 	return true, nil
-// }
-
-// func GetRuntimeReleases(client astro.Client) ([]string, error) {
-// 	// get deployment config options
-// 	runtimeReleases := []string{}
-
-// 	ConfigOptions, err := client.GetDeploymentConfig()
-// 	if err != nil {
-// 		return runtimeReleases, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-// 	}
-
-// 	for i := range ConfigOptions.RuntimeReleases {
-// 		runtimeReleases = append(runtimeReleases, ConfigOptions.RuntimeReleases[i].Version)
-// 	}
-
-// 	return runtimeReleases, nil
-// }
 
 func ListClusterOptions(cloudProvider string, coreClient astrocore.CoreClient) ([]astrocore.ClusterOptions, error) {
 	var provider astrocore.GetClusterOptionsParamsProvider
@@ -759,46 +705,6 @@ func selectCluster(clusterID, organizationID string, corePlatformClient astropla
 	}
 	return clusterID, nil
 }
-
-// useSharedCluster takes astrocore.SharedClusterCloudProvider and a region string as input.
-// It returns the clusterID of the cluster if one exists in the provider/region.
-// It returns a 404 if a cluster does not exist.
-// func useSharedCluster(cloudProvider astrocore.SharedClusterCloudProvider, region string, coreClient astrocore.CoreClient) (clusterID string, err error) {
-// 	// get shared cluster request
-// 	getSharedClusterParams := astrocore.GetSharedClusterParams{
-// 		Region:        region,
-// 		CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(cloudProvider),
-// 	}
-// 	response, err := coreClient.GetSharedClusterWithResponse(context.Background(), &getSharedClusterParams)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	err = astrocore.NormalizeAPIError(response.HTTPResponse, response.Body)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	return response.JSON200.Id, nil
-// }
-
-// useSharedClusterOrSelectDedicatedCluster decides how to derive the clusterID to use for a deployment.
-// if cloudProvider and region are provided, it uses a useSharedCluster to get the ClusterID.
-// if not, it uses selectCluster to get the ClusterID.
-// func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationShortName, clusterID, clusterType string, coreClient astrocore.CoreClient) (derivedClusterID string, err error) {
-// 	// if cloud provider and region are requested
-// 	// if clusterType == standard && cloudProvider != "" && region != "" {
-// 	// 	// use a shared cluster for the deployment
-// 	// 	derivedClusterID, err = useSharedCluster(astrocore.SharedClusterCloudProvider(cloudProvider), region, coreClient)
-// 	// 	if err != nil {
-// 	// 		return "", err
-// 	// 	}
-// 	// } else {
-// 	// select and validate cluster
-// 	derivedClusterID, err = selectCluster(clusterID, organizationShortName, coreClient)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	return derivedClusterID, nil
-// }
 
 func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, corePlatformClient astroplatformcore.CoreClient) error {
 	fmt.Printf("\nWaiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
@@ -1214,11 +1120,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
 		releaseName := d.Namespace
 		clusterName := notApplicable
-		// if !IsDeploymentStandard(deploymentType) {
-		// 	clusterName = *d.ClusterName
-		// }
 		cloudProvider := *d.CloudProvider
-		region := notApplicable // *d.Region
+		region := notApplicable // *d . Region
 		tabDeployment.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
@@ -1266,23 +1169,6 @@ func IsDeploymentStandard(deploymentType astroplatformcore.DeploymentType) bool 
 func IsDeploymentDedicated(deploymentType astroplatformcore.DeploymentType) bool {
 	return deploymentType == astroplatformcore.DeploymentTypeDEDICATED
 }
-
-// var GetDeployments = func(ws, org string, client astro.Client) ([]astro.Deployment, error) {
-// 	if org == "" {
-// 		c, err := config.GetCurrentContext()
-// 		if err != nil {
-// 			return []astro.Deployment{}, err
-// 		}
-// 		org = c.Organization
-// 	}
-
-// 	deployments, err := client.ListDeployments(org, ws)
-// 	if err != nil {
-// 		return deployments, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-// 	}
-
-// 	return deployments, nil
-// }
 
 var CoreGetDeployments = func(ws, orgID string, corePlatformClient astroplatformcore.CoreClient) ([]astroplatformcore.Deployment, error) {
 	if orgID == "" {
@@ -1609,21 +1495,12 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
-
-		// configOption, err := client.GetDeploymentConfig()
-		// if err != nil {
-		// 	return astroplatformcore.Deployment{}, err
-		// }
-
-		// schedulerAU := configOption.Components.Scheduler.AU.Default
-		// schedulerReplicas := configOption.Components.Scheduler.Replicas.Default
 		cicdEnforcement := "disable"
 		// walk user through creating a deployment
 		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", "", cicdEnforcement, "", "", "", "", 0, 0, corePlatformClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
-
 		// get a new deployment list
 		deployments, err = CoreGetDeployments(ws, "", corePlatformClient)
 		if err != nil {
@@ -1682,16 +1559,3 @@ func printWarning(executor string, existingQLength int) bool {
 	}
 	return printed
 }
-
-// mutateExecutor updates currentSpec.Executor if requestedExecutor is not "" and not the same value.
-// It prints a helpful message describing the change and returns a bool used to confirm the change with the user.
-// If a helpful message was not printed, it returns false.
-// func mutateExecutor(requestedExecutor string, currentSpec astro.DeploymentCreateSpec, existingQLength int) (bool, astro.DeploymentCreateSpec) {
-// 	var printed bool
-// 	if requestedExecutor != "" && currentSpec.Executor != requestedExecutor {
-// 		// print helpful message describing the change
-// 		printed = printWarning(requestedExecutor, existingQLength)
-// 		currentSpec.Executor = requestedExecutor
-// 	}
-// 	return printed, currentSpec
-// }

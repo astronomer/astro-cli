@@ -64,17 +64,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 
 	if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-		// hubDeployment, err := client.GetDeployment(requestedDeployment.Id)
-		// if err != nil {
-		// 	return err
-		// }
-		// nodePoolID = hubDeployment.Cluster.NodePools[0].ID
-		// configOptions, err := client.GetDeploymentConfig()
-		// if err != nil {
-		// 	return err
-		// }
-
-		// astroMachines := configOptions.AstroMachines
 		getDeploymentOptions := astroplatformcore.GetDeploymentOptionsParams{
 			DeploymentId: &requestedDeployment.Id,
 		}
@@ -318,12 +307,6 @@ func IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue *astroplatformcore
 		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", int(defaultOptions.WorkerConcurrency.Floor), int(defaultOptions.WorkerConcurrency.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
-	// if requestedWorkerQueue.PodCpu != "" {
-	// 	return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
-	// }
-	// if requestedWorkerQueue.PodMemory != "" {
-	// 	return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
-	// }
 	return nil
 }
 
@@ -350,12 +333,6 @@ func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore
 		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", workerConcurrenyFloor, int(machineOptions.Concurrency.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
-	// if requestedWorkerQueue.PodCpu != "" {
-	// 	return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podCPUErrorMessage)
-	// }
-	// if requestedWorkerQueue.PodMemory != "" {
-	// 	return fmt.Errorf("%s %w %s", deployment.CeleryExecutor, ErrNotSupported, podRAMErrorMessage)
-	// }
 	return nil
 }
 
@@ -386,50 +363,18 @@ func IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid *astroplatfor
 	return nil
 }
 
-func IsHostedKubernetesWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore.WorkerQueueRequest) error {
-	var errorMessage string
-	fmt.Println(requestedWorkerQueue)
-
-	if requestedWorkerQueue.Name != defaultQueueName {
-		errorMessage = "a non default worker queue in the request. Rename the queue to default"
-		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
-	}
-	if requestedWorkerQueue.MinWorkerCount != -1 {
-		errorMessage = "minimum worker count in the request. It can only be used with CeleryExecutor"
-		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
-	}
-	if requestedWorkerQueue.MaxWorkerCount != 0 {
-		errorMessage = "maximum worker count in the request. It can only be used with CeleryExecutor"
-		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
-	}
-	if requestedWorkerQueue.WorkerConcurrency != 0 {
-		errorMessage = "worker concurrency in the request. It can only be used with CeleryExecutor"
-		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
-	}
-
-	return nil
-}
-
 // QueueExists takes a []existingQueues and a queueToCreate as arguments
 // It returns true if queueToCreate exists in []existingQueues
 // It returns false if queueToCreate does not exist in []existingQueues
 func QueueExists(existingQueues []astroplatformcore.WorkerQueue, queueToCreate *astroplatformcore.WorkerQueueRequest, queueToCreateOrUpdateHybrid *astroplatformcore.HybridWorkerQueueRequest) bool {
 	for _, queue := range existingQueues { //nolint
 		if queueToCreateOrUpdateHybrid != nil {
-			// if queue.Id == *queueToCreateOrUpdateHybrid.Id {
-			// 	// queueToCreate exists
-			// 	return true
-			// }
 			if queue.Name == queueToCreateOrUpdateHybrid.Name {
 				// queueToCreate exists
 				return true
 			}
 		}
 		if queueToCreate != nil {
-			// if queue.Id == *queueToCreate.Id {
-			// 	// queueToCreate exists
-			// 	return true
-			// }
 			if queue.Name == queueToCreate.Name {
 				// queueToCreate exists
 				return true
@@ -722,11 +667,7 @@ func updateQueueList(existingQueues []astroplatformcore.WorkerQueueRequest, queu
 			queue.WorkerConcurrency = 0
 			queue.MinWorkerCount = 0
 			queue.MaxWorkerCount = 0
-			// queue.PodMemory = ""
-			// queue.PodCpu = ""
 		}
-		// queue.NodePoolId = queueToUpdate.NodePoolId
-		// astroMachine := string(queueToUpdate.AstroMachine)
 		queue.AstroMachine = queueToUpdate.AstroMachine
 		existingQueues[i] = queue
 		return existingQueues
@@ -757,11 +698,7 @@ func updateHybridQueueList(existingQueues []astroplatformcore.HybridWorkerQueueR
 			queue.WorkerConcurrency = 0
 			queue.MinWorkerCount = 0
 			queue.MaxWorkerCount = 0
-			// queue.PodMemory = ""
-			// queue.PodCpu = ""
 		}
-		// queue.NodePoolId = queueToUpdate.NodePoolId
-		// astroMachine := string(queueToUpdate.AstroMachine)
 		queue.NodePoolId = queueToUpdate.NodePoolId
 		existingQueues[i] = queue
 		return existingQueues
