@@ -10,8 +10,8 @@ import (
 func ListConnections(workspaceID, deploymentID string, coreClient astrocore.CoreClient) map[string]astrocore.EnvironmentObjectConnection {
 	envObjs := listEnvironmentObjects(workspaceID, deploymentID, astrocore.ListEnvironmentObjectsParamsObjectTypeCONNECTION, coreClient)
 	connections := make(map[string]astrocore.EnvironmentObjectConnection)
-	for _, envObj := range envObjs {
-		connections[envObj.ObjectKey] = *envObj.Connection
+	for i := range envObjs {
+		connections[envObjs[i].ObjectKey] = *envObjs[i].Connection
 	}
 
 	return connections
