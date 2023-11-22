@@ -122,14 +122,7 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 		newEnvironmentVariables = addVariablesFromFile(envFile, oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, updateVars, makeSecret)
 	}
 
-	// create variable input
-	// variablesCreateInput := astro.EnvironmentVariablesInput{
-	// 	DeploymentID:         currentDeployment.Id,
-	// 	EnvironmentVariables: newEnvironmentVariables,
-	// }
-
 	// update deployment
-	// environmentVariablesObjects, err := client.ModifyDeploymentVariable(variablesCreateInput)
 	err = Update(currentDeployment.Id, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, newEnvironmentVariables, false, coreClient, platformCoreClient)
 	if err != nil {
 		return err

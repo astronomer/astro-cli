@@ -355,7 +355,6 @@ func newAirflowPytestCmd() *cobra.Command {
 		Use:   "pytest [pytest file/directory]",
 		Short: "Run pytests in a local Airflow environment",
 		Long:  "This command spins up a local Python environment to run pytests against your DAGs. If a specific pytest file is not specified, all pytests in the tests directory will be run. To run pytests with a different environment file, specify that with the '--env' flag. ",
-		// Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
