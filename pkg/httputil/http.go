@@ -7,14 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"runtime"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/astronomer/astro-cli/version"
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/context/ctxhttp"
@@ -166,25 +162,4 @@ func RequestAndGetJSONBody(route string) map[string]interface{} {
 	}
 	logrus.Debugf("%s - GET %s %s", res.Status, route, string(body))
 	return bodyJSON
-}
-
-func CoreRequestEditor(ctx httpContext.Context, req *http.Request) error {
-	currentCtx, err := context.GetCurrentContext()
-	if err != nil {
-		return nil
-	}
-	os := runtime.GOOS
-	arch := runtime.GOARCH
-	baseURL := currentCtx.GetPublicRESTAPIURL("v1alpha1")
-	requestURL, err := url.Parse(baseURL + req.URL.String())
-	if err != nil {
-		return fmt.Errorf("%w, %s", ErrorBaseURL, baseURL)
-	}
-	req.URL = requestURL
-	req.Header.Add("authorization", currentCtx.Token)
-	req.Header.Add("x-astro-client-identifier", "cli")
-	req.Header.Add("x-astro-client-version", version.CurrVersion)
-	req.Header.Add("x-client-os-identifier", os+"-"+arch)
-	req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.CurrVersion))
-	return nil
 }

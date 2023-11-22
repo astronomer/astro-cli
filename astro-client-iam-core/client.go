@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
@@ -23,7 +24,7 @@ type CoreClient = ClientWithResponsesInterface
 // create api client for astro iam core services
 func NewIamCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
 	// we append base url in request editor, so set to an empty string here
-	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(httputil.CoreRequestEditor))
+	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(astrocore.CoreRequestEditor))
 	return cl
 }
 
