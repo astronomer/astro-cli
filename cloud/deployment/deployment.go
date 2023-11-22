@@ -372,11 +372,11 @@ func validateResources(schedulerAU, schedulerReplicas int, configOption astro.De
 	schedulerReplicasMin := configOption.Components.Scheduler.Replicas.Minimum
 	schedulerReplicasMax := configOption.Components.Scheduler.Replicas.Limit
 	if schedulerAU > schedulerAuMax || schedulerAU < schedulerAuMin {
-		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs", schedulerAuMax, schedulerAuMax)
+		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs\n", schedulerAuMin, schedulerAuMax)
 		return false
 	}
 	if schedulerReplicas > schedulerReplicasMax || schedulerReplicas < schedulerReplicasMin {
-		fmt.Printf("\nScheduler Replicas must between a min of %d and a max of %d Replicas", schedulerReplicasMin, schedulerReplicasMax)
+		fmt.Printf("\nScheduler Replicas must be between a min of %d and a max of %d Replicas\n", schedulerReplicasMin, schedulerReplicasMax)
 		return false
 	}
 	return true
