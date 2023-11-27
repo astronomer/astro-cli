@@ -142,7 +142,9 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 		}
 	}
 
-	return tab.Print(out)
+	tab.Print(out)
+
+	return nil
 }
 
 func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs bool, logCount int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {

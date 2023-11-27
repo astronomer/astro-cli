@@ -11,7 +11,7 @@ import (
 func TestAddCmds(t *testing.T) {
 	astroMock := new(astro_mocks.Client)
 	buf := new(bytes.Buffer)
-	cmds := AddCmds(astroMock, nil, nil, buf)
+	cmds := AddCmds(astroMock, nil, nil, nil, buf)
 	for cmdIdx := range cmds {
 		assert.Contains(t, []string{"deployment", "deploy DEPLOYMENT-ID", "workspace", "user", "organization"}, cmds[cmdIdx].Use)
 	}
