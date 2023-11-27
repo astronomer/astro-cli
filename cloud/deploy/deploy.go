@@ -214,12 +214,15 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 	}
 
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
+	fmt.Println("deployment id:")
+	fmt.Println(deployInput.RuntimeID)
 
 	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, corePlatformClient, coreClient)
 	if err != nil {
 		return err
 	}
-
+	fmt.Println("CI/CD enforcement:")
+	fmt.Println(deployInfo.cicdEnforcement)
 	if deployInfo.cicdEnforcement {
 		if !canCiCdDeploy(c.Token) {
 			return errCiCdEnforcementUpdate
@@ -262,7 +265,7 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 			}
 		}
 		if deployInput.Pytest != "" {
-			version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInfo.dagDeployEnabled, coreClient)
+			version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInfo.dagDeployEnabled, corePlatformClient)
 			if err != nil {
 				return err
 			}
@@ -274,6 +277,8 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 		}
 
 		if !deployInfo.dagDeployEnabled {
+			fmt.Println("deployment id:")
+			fmt.Println(deployInfo.deploymentID)
 			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 		}
 
@@ -281,6 +286,8 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.deploymentType)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
+				fmt.Println("deployment id:")
+				fmt.Println(deployInfo.deploymentID)
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 			}
 
@@ -336,7 +343,7 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 		}
 
 		// Build our image
-		version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInfo.dagDeployEnabled, coreClient)
+		version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInfo.dagDeployEnabled, corePlatformClient)
 		if err != nil {
 			return err
 		}
@@ -410,16 +417,12 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
 		var deploymentType astroplatformcore.DeploymentType
-		var isHighAvailability bool
 		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, corePlatformClient, coreClient)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
 		if currentDeployment.Type != nil {
 			deploymentType = *currentDeployment.Type
-		}
-		if currentDeployment.IsHighAvailability != nil {
-			isHighAvailability = *currentDeployment.IsHighAvailability
 		}
 		return deploymentInfo{
 			currentDeployment.Id,
@@ -431,14 +434,14 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 			currentDeployment.WebServerUrl,
 			currentDeployment.DagDeployEnabled,
 			deploymentType,
-			isHighAvailability,
+			currentDeployment.IsCicdEnforced,
 		}, nil
 	}
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return deploymentInfo{}, err
 	}
-	deployInfo, err := getImageName(cloudDomain, deploymentID, c.Organization, coreClient)
+	deployInfo, err := getImageName(cloudDomain, deploymentID, c.Organization, corePlatformClient)
 	if err != nil {
 		return deploymentInfo{}, err
 	}
@@ -521,23 +524,23 @@ func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerH
 	return err
 }
 
-func getImageName(cloudDomain, deploymentID, organizationID string, coreClient astrocore.CoreClient) (deploymentInfo, error) {
+func getImageName(cloudDomain, deploymentID, organizationID string, corePlatformClient astroplatformcore.CoreClient) (deploymentInfo, error) {
 	if cloudDomain == astroDomain {
 		fmt.Printf(deploymentHeaderMsg, "Astro")
 	} else {
 		fmt.Printf(deploymentHeaderMsg, cloudDomain)
 	}
 
-	resp, err := coreClient.GetDeploymentWithResponse(httpContext.Background(), organizationID, deploymentID)
+	resp, err := corePlatformClient.GetDeploymentWithResponse(httpContext.Background(), organizationID, deploymentID)
 	if err != nil {
 		return deploymentInfo{}, err
 	}
 
 	currentVersion := resp.JSON200.RuntimeVersion
-	namespace := resp.JSON200.ReleaseName
+	namespace := resp.JSON200.Namespace
 	workspaceID := resp.JSON200.WorkspaceId
 	webserverURL := resp.JSON200.WebServerUrl
-	dagDeployEnabled := resp.JSON200.IsDagDeployEnabled
+	dagDeployEnabled := resp.JSON200.DagDeployEnabled
 
 	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
 	deployImage := airflow.ImageName(namespace, "latest")
@@ -607,7 +610,7 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	return nil
 }
 
-func buildImage(path, currentVersion, deployImage, imageName, organizationID string, dagDeployEnabled bool, coreClient astrocore.CoreClient) (version string, err error) {
+func buildImage(path, currentVersion, deployImage, imageName, organizationID string, dagDeployEnabled bool, corePlatformClient astroplatformcore.CoreClient) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
 
 	if imageName == "" {
@@ -657,7 +660,7 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 	if version == "" {
 		version = defaultRuntimeVersion
 	}
-	resp, err := coreClient.GetDeploymentOptionsWithResponse(httpContext.Background(), organizationID, &astrocore.GetDeploymentOptionsParams{})
+	resp, err := corePlatformClient.GetDeploymentOptionsWithResponse(httpContext.Background(), organizationID, &astroplatformcore.GetDeploymentOptionsParams{})
 	if err != nil {
 		return "", err
 	}

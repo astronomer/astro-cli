@@ -546,7 +546,7 @@ func TestAirflowStart(t *testing.T) {
 func TestAirflowUpgradeTest(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("success", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
@@ -554,13 +554,13 @@ func TestAirflowUpgradeTest(t *testing.T) {
 			return mockContainerHandler, nil
 		}
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		assert.NoError(t, err)
 		mockContainerHandler.AssertExpectations(t)
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
@@ -568,7 +568,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 			return mockContainerHandler, nil
 		}
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		assert.ErrorIs(t, err, errMock)
 		mockContainerHandler.AssertExpectations(t)
 		// Clean up init files after test
@@ -576,73 +576,73 @@ func TestAirflowUpgradeTest(t *testing.T) {
 	})
 
 	t.Run("containerHandlerInit failure", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			return nil, errMock
 		}
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		assert.ErrorIs(t, err, errMock)
 	})
 
 	t.Run("Both airflow and runtime version used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		airflowVersion = "something"
 		runtimeVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		assert.ErrorIs(t, err, errInvalidBothAirflowAndRuntimeVersionsUpgrade)
 	})
 
 	t.Run("Both custom image and deployment id used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		deploymentID = "something"
 		customImageName = "something"
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		assert.ErrorIs(t, err, errInvalidBothDeploymentIDandCustomImage)
 	})
 
 	t.Run("Both airflow version and deployment id used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		deploymentID = "something"
 		airflowVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		assert.ErrorIs(t, err, errInvalidBothDeploymentIDandVersion)
 	})
 
 	t.Run("Both runtime version and deployment id used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		deploymentID = "something"
 		runtimeVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		assert.ErrorIs(t, err, errInvalidBothDeploymentIDandVersion)
 	})
 
 	t.Run("Both runtime version and custom image used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		customImageName = "something"
 		runtimeVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		assert.ErrorIs(t, err, errInvalidBothCustomImageandVersion)
 	})
 
 	t.Run("Both airflow version and custom image used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		customImageName = "something"
 		airflowVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		assert.ErrorIs(t, err, errInvalidBothCustomImageandVersion)
 	})
 }
