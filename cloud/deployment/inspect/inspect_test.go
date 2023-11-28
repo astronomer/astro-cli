@@ -1161,7 +1161,12 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "cloud_provider": "",
             "region": ""
         },
-        "worker_queues": null,
+        "worker_queues": [
+            {
+                "name": "default",
+                "worker_type": "test-instance-type"
+            }
+        ],
         "alert_emails": [
             "email1",
             "email2"
