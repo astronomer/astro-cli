@@ -28,12 +28,14 @@ import (
 )
 
 var (
-	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
-	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
-	ErrInvalidRegionKey     = errors.New("invalid Region selected")
-	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
-	ErrWrongEnforceInput    = errors.New("the input to the `--enforce-cicd` flag")
-	ErrNoDeploymentExists   = errors.New("no deployment was found in this workspace")
+	errInvalidDeployment      = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
+	ErrInvalidDeploymentKey   = errors.New("invalid Deployment selected")
+	ErrInvalidClusterKey      = errors.New("invalid Cluster selected")
+	ErrInvalidRegionKey       = errors.New("invalid Region selected")
+	errTimedOut               = errors.New("timed out waiting for the deployment to become healthy")
+	ErrWrongEnforceInput      = errors.New("the input to the `--enforce-cicd` flag")
+	ErrNoDeploymentExists     = errors.New("no deployment was found in this workspace")
+	ErrInvalidResourceRequest = errors.New("invaild resource request")
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	canCiCdDeploy    = CanCiCdDeploy
@@ -192,6 +194,9 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	}
 
 	deploymentLogs, err := GetDeploymentLogs("", deploymentID, getDeploymentLogsParams, coreClient)
+	if err != nil {
+		return err
+	}
 
 	if len(deploymentLogs.Results) == 0 {
 		fmt.Println("No matching logs have been recorded in the past 24 hours for Deployment " + deployment.Name)
@@ -465,7 +470,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		// validate hybrid resources requests
 		resourcesValid := validateHybridResources(schedulerAU, schedulerReplicas, configOption)
 		if !resourcesValid {
-			return nil
+			return ErrInvalidResourceRequest
 		}
 		var requestedExecutor astroplatformcore.CreateHybridDeploymentRequestExecutor
 		if executor == "CeleryExecutor" {
@@ -580,7 +585,10 @@ func validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQu
 		fmt.Printf("\nDefault Task Pod Memory must be between a min of %s and a max of %s Gis", defaultTaskPodMemoryMin, defaultTaskPodMemoryMax)
 		return false
 	}
-
+	fmt.Println(resourceQuotaCpu)
+	fmt.Println(resourceQuotaCpuMax)
+	fmt.Println(resourceQuotaCpu > resourceQuotaCpuMax)
+	fmt.Println(resourceQuotaCpu < resourceQuotaCpuMin)
 	if resourceQuotaCpu > resourceQuotaCpuMax || resourceQuotaCpu < resourceQuotaCpuMin {
 		fmt.Printf("\nDefault Resource Quota CPU must be between a min of %s and a max of %s CPU cores", resourceQuotaCpuMin, resourceQuotaCpuMax)
 		return false
@@ -689,7 +697,7 @@ func selectCluster(clusterID, organizationID string, corePlatformClient astropla
 		choice := input.Text("\n> ")
 		selected, ok := clusterMap[choice]
 		if !ok {
-			return "", ErrInvalidDeploymentKey
+			return "", ErrInvalidClusterKey
 		}
 
 		clusterID = selected.Id

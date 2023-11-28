@@ -256,12 +256,6 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatfo
 		return nil, err
 	}
 
-	// get core deployment
-	// coreDeployment, err := deployment.CoreGetDeployment(wsID, "", requestedDeployment.Id, coreClient)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	// create a map for deployment.information
 	deploymentInfoMap, err = getDeploymentInfo(requestedDeployment)
 	if err != nil {
