@@ -372,6 +372,9 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 					return err
 				}
 			} else {
+				if !deployInfo.dagDeployEnabled {
+					return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
+				}
 				fmt.Println("Image Deploy only. Skipping deploying DAG...")
 			}
 		}

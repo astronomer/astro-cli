@@ -106,6 +106,10 @@ func deploy(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if dags && image {
+		return errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
+	}
+
 	// Save deploymentId in config if specified
 	if len(deploymentID) > 0 && saveDeployConfig {
 		err := config.CFG.ProjectDeployment.SetProjectString(deploymentID)
