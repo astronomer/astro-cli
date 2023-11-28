@@ -105,6 +105,7 @@ type InputDeploy struct {
 	DeploymentName string
 	Prompt         bool
 	Dags           bool
+	Image          bool
 	WaitForStatus  bool
 	DagsPath       string
 	Description    string
@@ -238,7 +239,6 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 	if err != nil {
 		return err
 	}
-
 	resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, deployInput.Description, "", deployInput.Dags, coreClient)
 	if err != nil {
 		return err
@@ -333,7 +333,7 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
 		}
 
-		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
+		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Image {
 			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
 
 			if !i {
@@ -373,12 +373,30 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.deploymentType)
-			if err != nil {
-				return err
+			if !deployInput.Image {
+				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, dagsUploadURL)
+				if err != nil {
+					return err
+				}
+			} else {
+				if !deployInfo.dagDeployEnabled {
+					return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
+				}
+				fmt.Println("Image Deploy only. Skipping deploying DAG...")
 			}
 		}
 		// finish deploy
+		if deployInput.Image {
+			coreDeployment, err := deployment.CoreGetDeployment(deployInfo.workspaceID, deployInfo.organizationID, deployInfo.deploymentID, coreClient)
+			if err != nil {
+				return err
+			}
+			if coreDeployment.CurrentDagTarballVersion != nil {
+				dagTarballVersion = *coreDeployment.CurrentDagTarballVersion
+			} else {
+				dagTarballVersion = ""
+			}
+		}
 		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
 		if err != nil {
 			return err
