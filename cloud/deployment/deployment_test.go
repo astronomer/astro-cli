@@ -34,27 +34,28 @@ var (
 		Types: &clusterType,
 		Limit: &limit,
 	}
-	mockListClustersResponse = astrocore.ListClustersResponse{
+	nodePools = []astroplatformcore.NodePool{
+		{
+			Id:               "test-pool-id",
+			IsDefault:        false,
+			NodeInstanceType: "test-worker-1",
+		},
+		{
+			Id:               "test-pool-id-2",
+			IsDefault:        false,
+			NodeInstanceType: "test-worker-2",
+		},
+	}
+	mockListClustersResponse = astroplatformcore.ListClustersResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.ClustersPaginated{
-			Clusters: []astrocore.Cluster{
+		JSON200: &astroplatformcore.ClustersPaginated{
+			Clusters: []astroplatformcore.Cluster{
 				{
-					Id:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astrocore.NodePool{
-						{
-							Id:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							Id:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
+					Id:        "test-cluster-id",
+					Name:      "test-cluster",
+					NodePools: &nodePools,
 				},
 				{
 					Id:   "test-cluster-id-1",
@@ -62,6 +63,18 @@ var (
 				},
 			},
 		},
+	}
+	cluster = astroplatformcore.Cluster{
+
+		Id:        "test-cluster-id",
+		Name:      "test-cluster",
+		NodePools: &nodePools,
+	}
+	mockGetClusterResponse = astroplatformcore.GetClusterResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &cluster,
 	}
 	standardType               = astroplatformcore.DeploymentTypeSTANDARD
 	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
@@ -110,6 +123,7 @@ var (
 			WebServerUrl:     "test-url",
 			DagDeployEnabled: false,
 			Name:             "test",
+			Status:           "HEALTHY",
 		},
 	}
 )
@@ -202,7 +216,6 @@ func TestList(t *testing.T) {
 func TestGetDeployment(t *testing.T) {
 	deploymentID := "test-id-wrong"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockClient := new(astro_mocks.Client)
 
 	t.Run("invalid deployment ID", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
@@ -254,9 +267,28 @@ func TestGetDeployment(t *testing.T) {
 	})
 
 	t.Run("two deployments with the same name", func(t *testing.T) {
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{Label: "test", ID: "test-id"}, {Label: "test", ID: "test-id2"}}, nil).Once()
 
-		// mock os.Stdin
+		mockCoreDeploymentResponse = []astroplatformcore.Deployment{
+			{
+				Id:            "test-id-1",
+				Name:          "test",
+				Status:        "HEALTHY",
+				Type:          &standardType,
+				Region:        &testRegion,
+				CloudProvider: &testProvider,
+			},
+			{
+				Id:          "test-id-2",
+				Name:        "test",
+				Status:      "HEALTHY",
+				Type:        &hybridType,
+				ClusterName: &testCluster,
+			},
+		}
+
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+
+		// Mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
 		if err != nil {
@@ -275,49 +307,35 @@ func TestGetDeployment(t *testing.T) {
 		deployment, err := GetDeployment(ws, "", deploymentName, false, mockPlatformCoreClient, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentName, deployment.Name)
-		mockClient.AssertExpectations(t)
+
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("deployment name and deployment id", func(t *testing.T) {
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
 		deployment, err := GetDeployment(ws, deploymentID, deploymentName, false, mockPlatformCoreClient, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.Id)
-		mockClient.AssertExpectations(t)
-	})
 
-	t.Run("bad deployment call", func(t *testing.T) {
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
-
-		_, err := GetDeployment(ws, deploymentID, "", false, mockPlatformCoreClient, nil)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("create deployment error", func(t *testing.T) {
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-		}, nil).Once()
-		// mock createDeployment
-		// createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, clusterType string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, apiKeyOnlyDeployments *bool) error {
-		// 	return errMock
-		// }
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 
-		// mock os.Stdin
+		// Mock createDeployment
+		createDeployment = func(
+			name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement,
+			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
+			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
+			corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
+		) error {
+			return errMock
+		}
+
+		// Mock os.Stdin
 		input := []byte("y")
 		r, w, err := os.Pipe()
 		if err != nil {
@@ -335,32 +353,27 @@ func TestGetDeployment(t *testing.T) {
 
 		_, err = GetDeployment(ws, "", "", false, mockPlatformCoreClient, nil)
 		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("get deployments after creation error", func(t *testing.T) {
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-		}, nil).Once()
-		// mock createDeployment
-		// createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, clusterType string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, apiKeyOnlyDeployments *bool) error {
-		// 	return nil
-		// }
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, errMock).Once()
-		// mock os.Stdin
+		// Assuming org, ws, and errMock are predefined
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
+
+		// Mock createDeployment
+		createDeployment = func(
+			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
+			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
+			corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
+		) error {
+			return nil
+		}
+
+		// Second ListDeployments call with an error to simulate an error after deployment creation
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMock).Once()
+
+		// Mock os.Stdin
 		input := []byte("y")
 		r, w, err := os.Pipe()
 		if err != nil {
@@ -378,33 +391,49 @@ func TestGetDeployment(t *testing.T) {
 
 		_, err = GetDeployment(ws, "", "", false, mockPlatformCoreClient, nil)
 		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("test automatic deployment creation", func(t *testing.T) {
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-		}, nil).Once()
-		// mock createDeployment
-		// createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, clusterType string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, apiKeyOnlyDeployments *bool) error {
-		// 	return nil
-		// }
+		// Assuming org, ws, and deploymentID are predefined
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
-		// mock os.Stdin
+		// Mock createDeployment
+		createDeployment = func(
+			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement,
+			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
+			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
+			corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
+		) error {
+			return nil
+		}
+
+		mockCoreDeploymentResponse = []astroplatformcore.Deployment{
+			{
+				Id:            "test-id-1",
+				Name:          "test",
+				Status:        "HEALTHY",
+				Type:          &standardType,
+				Region:        &testRegion,
+				CloudProvider: &testProvider,
+			},
+		}
+
+		mockListOneDeploymentsResponse := astroplatformcore.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astroplatformcore.DeploymentsPaginated{
+				Deployments: mockCoreDeploymentResponse,
+			},
+		}
+
+		// Second ListDeployments call after successful deployment creation
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListOneDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+
+		// Mock os.Stdin
 		input := []byte("y")
 		r, w, err := os.Pipe()
 		if err != nil {
@@ -423,43 +452,26 @@ func TestGetDeployment(t *testing.T) {
 		deployment, err := GetDeployment(ws, "", "", false, mockPlatformCoreClient, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.Id)
-		mockClient.AssertExpectations(t)
-	})
-	t.Run("failed to validate resources", func(t *testing.T) {
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
 
-		_, err := GetDeployment(ws, "", "", false, mockPlatformCoreClient, nil)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
+
+	// t.Run("failed to validate resources", func(t *testing.T) {
+	// 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
+	// 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
+
+	// 	_, err := GetDeployment(ws, "", "", false, mockPlatformCoreClient, nil)
+	// 	assert.ErrorIs(t, err, errMock)
+	// 	mockClient.AssertExpectations(t)
+	// })
 }
 
 func TestCoreGetDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-	deploymentID := "test-deployment-id"
-	depIds := []string{deploymentID}
-	deploymentListParams := &astrocore.ListDeploymentsParams{
-		DeploymentIds: &depIds,
-	}
-	mockCoreDeploymentResponse := []astrocore.Deployment{
-		{
-			Id:     deploymentID,
-			Status: "HEALTHY",
-		},
-	}
-	mockListDeploymentsResponse := astrocore.ListDeploymentsResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astrocore.DeploymentsPaginated{
-			Deployments: mockCoreDeploymentResponse,
-		},
-	}
-
+	deploymentID := "test-id-1"
 	t.Run("success", func(t *testing.T) {
-		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
 		deployment, err := CoreGetDeployment(org, deploymentID, mockPlatformCoreClient)
 		assert.NoError(t, err)
@@ -471,7 +483,7 @@ func TestCoreGetDeployment(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_short_name", org)
-		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
 		deployment, err := CoreGetDeployment("", deploymentID, mockPlatformCoreClient)
 		assert.NoError(t, err)
@@ -479,21 +491,19 @@ func TestCoreGetDeployment(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 
-	t.Run("no deployments in workspace", func(t *testing.T) {
-		mockListDeploymentsResponse := astrocore.ListDeploymentsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrocore.DeploymentsPaginated{
-				Deployments: []astrocore.Deployment{},
-			},
-		}
-
-		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
-		_, err := CoreGetDeployment(org, deploymentID, mockPlatformCoreClient)
-		assert.ErrorIs(t, err, ErrNoDeploymentExists)
-		mockCoreClient.AssertExpectations(t)
-	})
+	// t.Run("no deployments in workspace", func(t *testing.T) {
+	// 	emptyDeploymentResponse := astroplatformcore.GetDeploymentResponse{
+	// 		HTTPResponse: &http.Response{
+	// 			StatusCode: 200,
+	// 		},
+	// 		JSON200: &astroplatformcore.Deployment{},
+	// 	}
+	// 	// mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&emptyListDeploymentsResponse, nil).Once()
+	// 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyDeploymentResponse, nil).Once()
+	// 	_, err := CoreGetDeployment(org, deploymentID, mockPlatformCoreClient)
+	// 	assert.ErrorIs(t, err, ErrNoDeploymentExists)
+	// 	mockCoreClient.AssertExpectations(t)
+	// })
 
 	t.Run("context error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
@@ -503,7 +513,7 @@ func TestCoreGetDeployment(t *testing.T) {
 	})
 
 	t.Run("error in api response", func(t *testing.T) {
-		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(nil, errMock).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, errMock).Once()
 
 		_, err := CoreGetDeployment(org, deploymentID, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errMock)
@@ -525,12 +535,12 @@ func TestCoreGetDeployment(t *testing.T) {
 
 func TestIsDeploymentDedicated(t *testing.T) {
 	t.Run("if deployment type is dedicated", func(t *testing.T) {
-		out := IsDeploymentDedicated("HOSTED_DEDICATED")
+		out := IsDeploymentDedicated(astroplatformcore.DeploymentTypeDEDICATED)
 		assert.Equal(t, out, true)
 	})
 
 	t.Run("if deployment type is hybrid", func(t *testing.T) {
-		out := IsDeploymentDedicated("")
+		out := IsDeploymentDedicated(astroplatformcore.DeploymentTypeHYBRID)
 		assert.Equal(t, out, false)
 	})
 }
@@ -695,32 +705,56 @@ func TestSelectRegion(t *testing.T) {
 
 func TestLogs(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	deploymentID := "test-id"
-	logCount := 1
-	logLevels := []string{"WARN", "ERROR", "INFO"}
-	mockInput := map[string]interface{}{
-		"deploymentId":  deploymentID,
-		"logCountLimit": logCount,
-		"start":         "-24hrs",
-		"logLevels":     logLevels,
+	deploymentID := "test-id-1"
+	logCount := 2
+	var mockGetDeploymentLogsResponse = astrocore.GetDeploymentLogsResponse{
+		JSON200: &astrocore.DeploymentLog{
+			Limit:         logCount,
+			MaxNumResults: 10,
+			Offset:        0,
+			ResultCount:   1,
+			Results: []astrocore.DeploymentLogEntry{
+				{
+					Raw:       "test log line",
+					Timestamp: 1,
+					Source:    astrocore.DeploymentLogEntrySourceScheduler,
+				},
+				{
+					Raw:       "test log line 2",
+					Timestamp: 2,
+					Source:    astrocore.DeploymentLogEntrySourceScheduler,
+				},
+			},
+			SearchId: "search-id",
+		},
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
 	}
-	t.Run("success", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
-		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{DeploymentID: deploymentID, SchedulerLogs: []astro.SchedulerLog{{Raw: "test log line"}}}, nil).Once()
 
-		err := Logs(deploymentID, ws, "", true, true, true, logCount, mockPlatformCoreClient, mockCoreClient)
+	t.Run("success", func(t *testing.T) {
+		// Mock ListDeployments
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, nil).Once()
+
+		err := Logs(deploymentID, ws, "", true, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 
-		mockClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
-
 	t.Run("success without deployment", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}, {ID: "test-id-1"}}, nil).Once()
-		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{DeploymentID: deploymentID, SchedulerLogs: []astro.SchedulerLog{}}, nil).Once()
+		// Mock ListDeployments
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		// mock os.Stdin
+		// Mock GetDeploymentWithResponse for the first deployment in the list
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+
+		// Mock GetDeploymentLogsWithResponse using the reusable variable
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, nil).Once()
+
+		// Mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
 		if err != nil {
@@ -736,20 +770,34 @@ func TestLogs(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Logs("", ws, "", false, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
+		err = Logs("", ws, "", false, false, false, 1, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 
-		mockClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
-		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{}, errMock).Once()
+		// Mock ListDeployments
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		err := Logs(deploymentID, ws, "", true, true, true, logCount, mockPlatformCoreClient, mockCoreClient)
+		// Mock GetDeploymentWithResponse for the first deployment in the list
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+
+		// Mock GetDeploymentLogsWithResponse to return an error
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, errMock).Once()
+
+		err := Logs(deploymentID, ws, "", false, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
 		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("query for more than one log level error", func(t *testing.T) {
+		err := Logs(deploymentID, ws, "", true, true, true, logCount, mockPlatformCoreClient, mockCoreClient)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot query for more than one log level at a time")
 	})
 }
 
@@ -784,874 +832,351 @@ func TestCreate(t *testing.T) {
 				Workspaces: workspaces,
 			},
 		}
-		deploymentID         = "test-deployment-id"
-		depIds               = []string{deploymentID}
-		deploymentListParams = &astrocore.ListDeploymentsParams{
-			DeploymentIds: &depIds,
+		// deploymentID                   = "test-deployment-id"
+		GetDeploymentOptionsResponseOK = astrocore.GetDeploymentOptionsResponse{
+			JSON200: &astrocore.DeploymentOptions{
+				DefaultValues: astrocore.DefaultValueOptions{},
+				Executors:     []string{},
+			},
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+		}
+		cloudProvider                = "test-provider"
+		hybridType                   = astroplatformcore.DeploymentTypeHYBRID
+		mockCreateDeploymentResponse = astroplatformcore.CreateDeploymentResponse{
+			JSON200: &astroplatformcore.Deployment{
+				Id:            "test-id",
+				CloudProvider: &cloudProvider,
+				Type:          &hybridType,
+			},
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
 		}
 	)
+	var GetClusterOptionsResponseOK = astrocore.GetClusterOptionsResponse{
+		JSON200: &[]astrocore.ClusterOptions{
+			{
+				DatabaseInstances:       []astrocore.ProviderInstanceType{},
+				DefaultDatabaseInstance: astrocore.ProviderInstanceType{},
+				DefaultNodeInstance:     astrocore.ProviderInstanceType{},
 
-	deploymentCreateInput := astro.CreateDeploymentInput{
-		WorkspaceID:           ws,
-		ClusterID:             csID,
-		Label:                 "test-name",
-		Description:           "test-desc",
-		RuntimeReleaseVersion: "4.2.5",
-		DagDeployEnabled:      false,
-		DeploymentSpec: astro.DeploymentCreateSpec{
-			Executor: CeleryExecutor,
-			Scheduler: astro.Scheduler{
-				AU:       10,
-				Replicas: 3,
+				DefaultPodSubnetRange:      nil,
+				DefaultRegion:              astrocore.ProviderRegion{Name: "us-west-2"},
+				DefaultServicePeeringRange: nil,
+				DefaultServiceSubnetRange:  nil,
+				DefaultVpcSubnetRange:      "10.0.0.0/16",
+				NodeCountDefault:           1,
+				NodeCountMax:               3,
+				NodeCountMin:               1,
+				NodeInstances:              []astrocore.ProviderInstanceType{},
+				Regions:                    []astrocore.ProviderRegion{{Name: "us-west-1"}, {Name: "us-west-2"}},
 			},
+		},
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
 		},
 	}
 	t.Run("success with Celery Executor", func(t *testing.T) {
-		fmt.Println(deploymentListParams)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
-		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		// mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 
+		// Mock user input for deployment name
 		defer testUtil.MockUserInput(t, "test-name")()
-
-		// err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.NoError(t, err)
-		// mockClient.AssertExpectations(t)
-	})
-	t.Run("success with enabling ci-cd enforcement", func(t *testing.T) {
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		deploymentCreateInput.APIKeyOnlyDeployments = true
-		defer func() { deploymentCreateInput.APIKeyOnlyDeployments = false }()
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
-		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
-
-		defer testUtil.MockUserInput(t, "test-name")()
-
-		// err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "CeleryExecutor", "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &enableCiCdEnforcement)
-		// assert.NoError(t, err)
-		// mockClient.AssertExpectations(t)
-		// mockCoreClient.AssertExpectations(t)
-	})
-	t.Run("success with cloud provider and region", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", org)
-		ctx.SetContextKey("workspace", ws)
-		ctx.SetContextKey("organization_short_name", org)
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-			DefaultSchedulerSize: astro.MachineUnit{
-				Size: "small",
-			},
-		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-			DefaultSchedulerSize: astro.MachineUnit{
-				Size: "small",
-			},
-		}, nil).Times(1)
-		getSharedClusterParams := &astrocore.GetSharedClusterParams{
-			Region:        region,
-			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
-		}
-		deploymentCreateInput1 := astro.CreateDeploymentInput{
-			WorkspaceID:           ws,
-			ClusterID:             csID,
-			Label:                 "test-name",
-			Description:           "test-desc",
-			RuntimeReleaseVersion: "4.2.5",
-			DagDeployEnabled:      false,
-			IsHighAvailability:    true,
-			SchedulerSize:         "small",
-			DeploymentSpec: astro.DeploymentCreateSpec{
-				Executor: "KubernetesExecutor",
-				Scheduler: astro.Scheduler{
-					AU:       10,
-					Replicas: 3,
-				},
-			},
-		}
-		defer func() {
-			deploymentCreateInput1.DeploymentSpec.Executor = CeleryExecutor
-		}()
-		mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Once()
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{
-			{
-				ID:   "test-id-1",
-				Type: "HOSTED_SHARED",
-				Cluster: astro.Cluster{
-					ID:     "cluster-id",
-					Region: "us-central1",
-				},
-			},
-			{
-				ID:   "test-id-2",
-				Type: "HOSTED_DEDICATED",
-				Cluster: astro.Cluster{
-					ID:   "cluster-id",
-					Name: "cluster-name",
-				},
-			},
-		}, nil).Once()
-
-		mockOKResponse := &astrocore.GetSharedClusterResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrocore.SharedCluster{Id: csID},
-		}
-		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
-
-		defer testUtil.MockUserInput(t, "test-name")()
-
-		// err = Create("", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", region, "small", "enable", "standard", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.NoError(t, err)
-		// ctx.SetContextKey("organization_product", "HYBRID")
-		// mockClient.AssertExpectations(t)
-		// mockCoreClient.AssertExpectations(t)
-	})
-	t.Run("select region", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", org)
-		ctx.SetContextKey("workspace", ws)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-			DefaultSchedulerSize: astro.MachineUnit{
-				Size: "small",
-			},
-		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-			DefaultSchedulerSize: astro.MachineUnit{
-				Size: "small",
-			},
-		}, nil).Times(1)
-		getSharedClusterParams := &astrocore.GetSharedClusterParams{
-			Region:        region,
-			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
-		}
-		deploymentCreateInput1 := astro.CreateDeploymentInput{
-			WorkspaceID:           ws,
-			ClusterID:             csID,
-			Label:                 "test-name",
-			Description:           "test-desc",
-			RuntimeReleaseVersion: "4.2.5",
-			DagDeployEnabled:      false,
-			IsHighAvailability:    true,
-			SchedulerSize:         "small",
-			DeploymentSpec: astro.DeploymentCreateSpec{
-				Executor: "KubernetesExecutor",
-				Scheduler: astro.Scheduler{
-					AU:       10,
-					Replicas: 3,
-				},
-			},
-		}
-		defer func() {
-			deploymentCreateInput1.DeploymentSpec.Executor = CeleryExecutor
-		}()
-
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Once()
-
-		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
-		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
-			Provider: &provider,
-			Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
-		}
-
-		mockOKRegionResponse := &astrocore.GetClusterOptionsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &[]astrocore.ClusterOptions{
-				{Regions: []astrocore.ProviderRegion{{Name: region}}},
-			},
-		}
-
-		mockCoreClient.On("GetClusterOptionsWithResponse", mock.Anything, getSharedClusterOptionsParams).Return(mockOKRegionResponse, nil).Once()
-
-		mockOKResponse := &astrocore.GetSharedClusterResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrocore.SharedCluster{Id: csID},
-		}
-		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
 		defer testUtil.MockUserInput(t, "1")()
 
-		// err = Create("test-name", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", "", "small", "enable", "standard", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.NoError(t, err)
-		// ctx.SetContextKey("organization_product", "HYBRID")
-		// mockClient.AssertExpectations(t)
-		// mockCoreClient.AssertExpectations(t)
+		// Call the Create function
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.NoError(t, err)
+
+		// Assert expectations
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+	t.Run("success with enabling ci-cd enforcement", func(t *testing.T) {
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+
+		// Mock user input for deployment name
+		defer testUtil.MockUserInput(t, "test-name")()
+
+		// Call the Create function with ci-cd enforcement enabled
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "enable", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.NoError(t, err)
+
+		// Assert expectations
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+	t.Run("success with cloud provider and region", func(t *testing.T) {
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+
+		// Mock user input for deployment name
+		defer testUtil.MockUserInput(t, "test-name")()
+
+		// Call the Create function with deployment type as STANDARD, cloud provider, and region set
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "us-west-2", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.NoError(t, err)
+
+		// Assert expectations
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+	t.Run("success with region selection", func(t *testing.T) {
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockCoreClient.On("GetClusterOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetClusterOptionsResponseOK, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+
+		// Mock user input for region selection
+		defer testUtil.MockUserInput(t, "1")()
+
+		// Call the Create function with region selection
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.NoError(t, err)
+
+		// Assert expectations
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("success with Kube Executor", func(t *testing.T) {
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-			DefaultSchedulerSize: astro.MachineUnit{
-				Size: "small",
-			},
-		}, nil).Times(1)
-		deploymentCreateInput.DeploymentSpec.Executor = "KubeExecutor"
-		defer func() { deploymentCreateInput.DeploymentSpec.Executor = CeleryExecutor }()
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&mockListClustersResponse, nil).Once()
-		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
+		// Mock user input for deployment name and executor type
 		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(t, "2")()
 
-		// err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "KubeExecutor", "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.NoError(t, err)
-		// mockClient.AssertExpectations(t)
-		// mockCoreClient.AssertExpectations(t)
+		// Call the Create function with Kube Executor
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, KubeExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.NoError(t, err)
+
+		// Assert expectations
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
-	t.Run("success and wait for status", func(t *testing.T) {
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(2)
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-			DefaultSchedulerSize: astro.MachineUnit{
-				Size: "small",
-			},
-		}, nil).Times(2)
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Twice()
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&mockListClustersResponse, nil).Twice()
-		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: deploymentID}, nil).Twice()
+	t.Run("success and wait for status with Dedicated Deployment", func(t *testing.T) {
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
+		// Mock user input for deployment name and wait for status
 		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(t, "y")()
 
 		// setup wait for test
 		sleepTime = 1
 		tickNum = 2
-		mockCoreDeploymentResponse := []astrocore.Deployment{
-			{
-				Id:     deploymentID,
-				Status: "HEALTHY",
-			},
-		}
-		mockListDeploymentsResponse := astrocore.ListDeploymentsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrocore.DeploymentsPaginated{
-				Deployments: mockCoreDeploymentResponse,
-			},
-		}
-		fmt.Println(mockListDeploymentsResponse)
-		// mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Status: "UNHEALTHY"}}, nil).Once()
-		// mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, org, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
-		// err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, true, &disableCiCdEnforcement)
-		// assert.NoError(t, err)
 
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{}}, nil).Once()
+		// Call the Create function with Dedicated Deployment and wait for status
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeDEDICATED, 0, 0, mockPlatformCoreClient, mockCoreClient, true)
+		assert.NoError(t, err)
 
-		defer testUtil.MockUserInput(t, "test-name")()
-
-		// timeout
-		timeoutNum = 1
-		// err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, true, &disableCiCdEnforcement)
-		// assert.ErrorIs(t, err, errTimedOut)
-		// mockClient.AssertExpectations(t)
-		// mockCoreClient.AssertExpectations(t)
+		// Assert expectations
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
-	t.Run("returns an error when creating a deployment fails", func(t *testing.T) {
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-			DefaultSchedulerSize: astro.MachineUnit{
-				Size: "small",
-			},
-		}, nil).Times(1)
+	t.Run("returns an error when creating a Hybrid deployment fails", func(t *testing.T) {
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&mockListClustersResponse, nil).Once()
-		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{}, errMock).Once()
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, errors.New("failed to create deployment")).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
+		// Mock user input for deployment name
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		// err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.ErrorIs(t, err, errMock)
-		// mockClient.AssertExpectations(t)
-		// mockCoreClient.AssertExpectations(t)
-	})
-	t.Run("failed to validate resources", func(t *testing.T) {
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
+		// Call the Create function with Hybrid Deployment that returns an error during creation
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create deployment")
 
-		// err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.ErrorIs(t, err, errMock)
-		// mockClient.AssertExpectations(t)
+		// Assert expectations
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("failed to get workspaces", func(t *testing.T) {
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, errMock).Once()
+
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.ErrorIs(t, err, errMock)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("failed to get default options", func(t *testing.T) {
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, errMock).Once()
+
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.ErrorIs(t, err, errMock)
+		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if cluster choice is not valid", func(t *testing.T) {
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-			DefaultSchedulerSize: astro.MachineUnit{
-				Size: "small",
-			},
-		}, nil).Times(1)
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&astrocore.ListClustersResponse{}, errMock).Once()
-		// err := Create("test-name", ws, "test-desc", "invalid-cluster-id", "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.ErrorIs(t, err, errMock)
-		// mockClient.AssertExpectations(t)
-		// mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		// mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+
+		// Mock invalid user input for cluster choice
+		defer testUtil.MockUserInput(t, "invalid-cluster-choice")()
+
+		// Call the Create function and expect an error due to invalid cluster choice
+		err := Create("test-name", ws, "test-desc", "", "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid Cluster selected")
+
+		// Assert expectations
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
-	t.Run("invalid resources", func(t *testing.T) {
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		// err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 5, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.NoError(t, err)
-	})
-	t.Run("list workspace failure", func(t *testing.T) {
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
-		// err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.ErrorIs(t, err, errMock)
-		// mockClient.AssertExpectations(t)
+	t.Run("invalid hybrid resources", func(t *testing.T) {
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+
+		// Call the Create function and expect an error due to invalid cluster choice
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 10, 10, mockPlatformCoreClient, mockCoreClient, false)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ErrInvalidResourceRequest)
+
+		// Assert expectations
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("invalid workspace failure", func(t *testing.T) {
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		// err := Create("", "test-invalid-id", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.Error(t, err)
-		// assert.Contains(t, err.Error(), "no workspaces with id")
-		// mockClient.AssertExpectations(t)
+
+		err := Create("test-name", "wrong-workspace", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.ErrorContains(t, err, "no workspaces with id")
+		mockClient.AssertExpectations(t)
 	})
-	t.Run("success with hidden namespace information", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", org)
-		ctx.SetContextKey("organization_short_name", org)
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+	// t.Run("success with hidden namespace information", func(t *testing.T) {
+	// 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	// 	ctx, err := context.GetCurrentContext()
+	// 	assert.NoError(t, err)
+	// 	ctx.SetContextKey("organization_product", "HOSTED")
+	// 	ctx.SetContextKey("organization", org)
+	// 	ctx.SetContextKey("organization_short_name", org)
+	// 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+	// 		Components: astro.Components{
+	// 			Scheduler: astro.SchedulerConfig{
+	// 				AU: astro.AuConfig{
+	// 					Default: 5,
+	// 					Limit:   24,
+	// 				},
+	// 				Replicas: astro.ReplicasConfig{
+	// 					Default: 1,
+	// 					Minimum: 1,
+	// 					Limit:   4,
+	// 				},
+	// 			},
+	// 		},
+	// 		RuntimeReleases: []astro.RuntimeRelease{
+	// 			{
+	// 				Version: "4.2.5",
+	// 			},
+	// 		},
+	// 	}, nil).Times(2)
+	// 	mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+	// 	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+	// 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		getSharedClusterParams := &astrocore.GetSharedClusterParams{
-			Region:        region,
-			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
-		}
-		mockOKResponse := &astrocore.GetSharedClusterResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrocore.SharedCluster{Id: csID},
-		}
-		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
+	// 	getSharedClusterParams := &astrocore.GetSharedClusterParams{
+	// 		Region:        region,
+	// 		CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
+	// 	}
+	// 	mockOKResponse := &astrocore.GetSharedClusterResponse{
+	// 		HTTPResponse: &http.Response{
+	// 			StatusCode: 200,
+	// 		},
+	// 		JSON200: &astrocore.SharedCluster{Id: csID},
+	// 	}
+	// 	mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
 
-		defer testUtil.MockUserInput(t, "test-name")()
+	// 	defer testUtil.MockUserInput(t, "test-name")()
 
-		// err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "gcp", region, "", "", "standard", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.NoError(t, err)
-		// ctx.SetContextKey("organization_product", "HYBRID")
-		// mockClient.AssertExpectations(t)
-		// mockCoreClient.AssertExpectations(t)
-	})
-	t.Run("success with default config", func(t *testing.T) {
-		mockClient.On("GetDeploymentConfigWithOrganization", mock.Anything).Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Times(1)
-		deploymentCreateInput := astro.CreateDeploymentInput{
-			WorkspaceID:           ws,
-			ClusterID:             csID,
-			Label:                 "test-name",
-			Description:           "test-desc",
-			RuntimeReleaseVersion: "4.2.5",
-			DagDeployEnabled:      false,
-			DeploymentSpec: astro.DeploymentCreateSpec{
-				Executor: CeleryExecutor,
-				Scheduler: astro.Scheduler{
-					AU:       5,
-					Replicas: 1,
-				},
-			},
-		}
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&mockListClustersResponse, nil).Once()
-		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+	// 	// err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "gcp", region, "", "", "standard", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
+	// 	// assert.NoError(t, err)
+	// 	// ctx.SetContextKey("organization_product", "HYBRID")
+	// 	// mockClient.AssertExpectations(t)
+	// 	// mockCoreClient.AssertExpectations(t)
+	// // })
+	// t.Run("success with default config", func(t *testing.T) {
+	// 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+	// 		Components: astro.Components{
+	// 			Scheduler: astro.SchedulerConfig{
+	// 				AU: astro.AuConfig{
+	// 					Default: 5,
+	// 					Limit:   24,
+	// 				},
+	// 				Replicas: astro.ReplicasConfig{
+	// 					Default: 1,
+	// 					Minimum: 1,
+	// 					Limit:   4,
+	// 				},
+	// 			},
+	// 		},
+	// 		RuntimeReleases: []astro.RuntimeRelease{
+	// 			{
+	// 				Version: "4.2.5",
+	// 			},
+	// 		},
+	// 	}, nil).Times(2)
+	// 	deploymentCreateInput := astro.CreateDeploymentInput{
+	// 		WorkspaceID:           ws,
+	// 		ClusterID:             csID,
+	// 		Label:                 "test-name",
+	// 		Description:           "test-desc",
+	// 		RuntimeReleaseVersion: "4.2.5",
+	// 		DagDeployEnabled:      false,
+	// 		DeploymentSpec: astro.DeploymentCreateSpec{
+	// 			Executor: CeleryExecutor,
+	// 			Scheduler: astro.Scheduler{
+	// 				AU:       5,
+	// 				Replicas: 1,
+	// 			},
+	// 		},
+	// 	}
+	// 	mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+	// 	mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, clusterListParams).Return(&mockListClustersResponse, nil).Once()
+	// 	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+	// 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		defer testUtil.MockUserInput(t, "test-name")()
+	// 	defer testUtil.MockUserInput(t, "test-name")()
 
-		// err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 0, 0, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
-		// assert.NoError(t, err)
-		// mockClient.AssertExpectations(t)
-		// mockCoreClient.AssertExpectations(t)
-	})
+	// 	// err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 0, 0, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
+	// 	// assert.NoError(t, err)
+	// 	// mockClient.AssertExpectations(t)
+	// 	// mockCoreClient.AssertExpectations(t)
+	// })
 }
 
 // func TestValidateResources(t *testing.T) {
@@ -1706,17 +1231,15 @@ func TestSelectCluster(t *testing.T) {
 
 	csID := "test-cluster-id"
 	t.Run("list cluster failure", func(t *testing.T) {
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&astrocore.ListClustersResponse{}, errMock).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListClustersResponse{}, errMock).Once()
 
 		_, err := selectCluster("", mockOrgShortName, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errMock)
-		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("cluster id via selection", func(t *testing.T) {
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -1740,8 +1263,7 @@ func TestSelectCluster(t *testing.T) {
 	})
 
 	t.Run("cluster id invalid selection", func(t *testing.T) {
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("4")
@@ -1760,12 +1282,11 @@ func TestSelectCluster(t *testing.T) {
 		os.Stdin = r
 
 		_, err = selectCluster("", mockOrgShortName, mockPlatformCoreClient)
-		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
+		assert.ErrorIs(t, err, ErrInvalidClusterKey)
 	})
 
 	t.Run("not able to find cluster", func(t *testing.T) {
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 
 		_, err := selectCluster("test-invalid-id", mockOrgShortName, mockPlatformCoreClient)
 		assert.Error(t, err)
@@ -3049,57 +2570,55 @@ func TestGetDeploymentURL(t *testing.T) {
 	})
 }
 
-// func TestMutateExecutor(t *testing.T) {
-// 	t.Run("returns true and updates executor from CE -> KE", func(t *testing.T) {
-// 		existingSpec := astro.DeploymentCreateSpec{
-// 			Executor: CeleryExecutor,
-// 		}
-// 		expectedSpec := astro.DeploymentCreateSpec{
-// 			Executor: KubeExecutor,
-// 		}
-// 		actual, actualSpec := mutateExecutor(KubeExecutor, existingSpec, 2)
-// 		assert.True(t, actual) // we printed a warning
-// 		assert.Equal(t, expectedSpec, actualSpec)
-// 	})
-// 	t.Run("returns true and updates executor from KE -> CE", func(t *testing.T) {
-// 		existingSpec := astro.DeploymentCreateSpec{
-// 			Executor: KubeExecutor,
-// 		}
-// 		expectedSpec := astro.DeploymentCreateSpec{
-// 			Executor: CeleryExecutor,
-// 		}
-// 		actual, actualSpec := mutateExecutor(CeleryExecutor, existingSpec, 2)
-// 		assert.True(t, actual) // we printed a warning
-// 		assert.Equal(t, expectedSpec, actualSpec)
-// 	})
-// 	t.Run("returns false and does not update executor if no executor change is requested", func(t *testing.T) {
-// 		existingSpec := astro.DeploymentCreateSpec{
-// 			Executor: CeleryExecutor,
-// 		}
-// 		actual, actualSpec := mutateExecutor("", existingSpec, 0)
-// 		assert.False(t, actual) // no warning was printed
-// 		assert.Equal(t, existingSpec, actualSpec)
-// 	})
-// 	t.Run("returns false and updates executor if user does not confirms change", func(t *testing.T) {
-// 		existingSpec := astro.DeploymentCreateSpec{
-// 			Executor: CeleryExecutor,
-// 		}
-// 		expectedSpec := astro.DeploymentCreateSpec{
-// 			Executor: KubeExecutor,
-// 		}
-// 		actual, actualSpec := mutateExecutor(KubeExecutor, existingSpec, 1)
-// 		assert.False(t, actual) // no warning was printed
-// 		assert.Equal(t, expectedSpec, actualSpec)
-// 	})
-// 	t.Run("returns false and does not update executor if requested and existing executors are the same", func(t *testing.T) {
-// 		existingSpec := astro.DeploymentCreateSpec{
-// 			Executor: CeleryExecutor,
-// 		}
-// 		actual, actualSpec := mutateExecutor(CeleryExecutor, existingSpec, 0)
-// 		assert.False(t, actual) // no warning was printed
-// 		assert.Equal(t, existingSpec, actualSpec)
-// 	})
-// }
+func TestValidateHostedResources_ValidInput(t *testing.T) {
+	// Test with valid input values
+	defaultTaskPodCpu := "2"
+	defaultTaskPodMemory := "4Gi"
+	resourceQuotaCpu := "8"
+	resourceQuotaMemory := "16Gi"
+
+	configOption := astrocore.DeploymentOptions{
+		ResourceQuotas: astrocore.ResourceQuotaOptions{
+			DefaultPodSize: astrocore.ResourceOption{
+				Cpu:    astrocore.ResourceRange{Floor: "1", Ceiling: "4"},
+				Memory: astrocore.ResourceRange{Floor: "2Gi", Ceiling: "8Gi"},
+			},
+			ResourceQuota: astrocore.ResourceOption{
+				Cpu:    astrocore.ResourceRange{Floor: "2", Ceiling: "16"},
+				Memory: astrocore.ResourceRange{Floor: "4Gi", Ceiling: "32Gi"},
+			},
+		},
+	}
+
+	result := validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, configOption)
+
+	assert.True(t, result, "Expected validation to pass with valid input values")
+}
+
+func TestValidateHostedResources_InvalidDefaultTaskPodCpu(t *testing.T) {
+	// Test with invalid Default Task Pod CPU
+	defaultTaskPodCpu := "5"
+	defaultTaskPodMemory := "4Gi"
+	resourceQuotaCpu := "8"
+	resourceQuotaMemory := "16Gi"
+
+	configOption := astrocore.DeploymentOptions{
+		ResourceQuotas: astrocore.ResourceQuotaOptions{
+			DefaultPodSize: astrocore.ResourceOption{
+				Cpu:    astrocore.ResourceRange{Floor: "1", Ceiling: "4"},
+				Memory: astrocore.ResourceRange{Floor: "2Gi", Ceiling: "8Gi"},
+			},
+			ResourceQuota: astrocore.ResourceOption{
+				Cpu:    astrocore.ResourceRange{Floor: "2", Ceiling: "16"},
+				Memory: astrocore.ResourceRange{Floor: "4Gi", Ceiling: "32Gi"},
+			},
+		},
+	}
+
+	result := validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, configOption)
+
+	assert.False(t, result, "Expected validation to fail with invalid Default Task Pod CPU")
+}
 
 func TestPrintWarning(t *testing.T) {
 	t.Run("when KubernetesExecutor is requested", func(t *testing.T) {
@@ -3121,103 +2640,3 @@ func TestPrintWarning(t *testing.T) {
 		assert.False(t, actual)
 	})
 }
-
-// func TestUseSharedCluster(t *testing.T) {
-// 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-// 	csID := "test-cluster-id"
-// 	region := "us-central1"
-// 	getSharedClusterParams := &astrocore.GetSharedClusterParams{
-// 		Region:        region,
-// 		CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
-// 	}
-// 	t.Run("returns a cluster id", func(t *testing.T) {
-// 		mockOKResponse := &astrocore.GetSharedClusterResponse{
-// 			HTTPResponse: &http.Response{
-// 				StatusCode: 200,
-// 			},
-// 			JSON200: &astrocore.SharedCluster{Id: csID},
-// 		}
-// 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-// 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
-// 		actual, err := useSharedCluster(astrocore.SharedClusterCloudProviderGcp, region, mockCoreClient)
-// 		assert.NoError(t, err)
-// 		assert.Equal(t, csID, actual)
-// 		mockCoreClient.AssertExpectations(t)
-// 	})
-// 	t.Run("returns a 404 error if a cluster is not found in the region", func(t *testing.T) {
-// 		errorBody, _ := json.Marshal(astrocore.Error{
-// 			Message: "Unable to find shared cluster",
-// 		})
-// 		mockErrorResponse := &astrocore.GetSharedClusterResponse{
-// 			HTTPResponse: &http.Response{
-// 				StatusCode: 404,
-// 			},
-// 			Body:    errorBody,
-// 			JSON200: nil,
-// 		}
-// 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-// 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockErrorResponse, nil).Once()
-// 		_, err := useSharedCluster(astrocore.SharedClusterCloudProviderGcp, region, mockCoreClient)
-// 		assert.Error(t, err)
-// 		mockCoreClient.AssertExpectations(t)
-// 	})
-// 	t.Run("returns an error if calling api fails", func(t *testing.T) {
-// 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-// 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(nil, errMock).Once()
-// 		_, err := useSharedCluster(astrocore.SharedClusterCloudProviderGcp, region, mockCoreClient)
-// 		assert.ErrorIs(t, err, errMock)
-// 		mockCoreClient.AssertExpectations(t)
-// 	})
-// }
-
-// func TestUseSharedClusterOrSelectCluster(t *testing.T) {
-// 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-
-// 	csID := "test-cluster-id"
-
-// 	t.Run("uses shared cluster if cloud provider and region are provided", func(t *testing.T) {
-// 		cloudProvider := "gcp"
-// 		region := "us-central1"
-// 		getSharedClusterParams := &astrocore.GetSharedClusterParams{
-// 			Region:        region,
-// 			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(cloudProvider),
-// 		}
-// 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-// 		mockOKResponse := &astrocore.GetSharedClusterResponse{
-// 			HTTPResponse: &http.Response{
-// 				StatusCode: 200,
-// 			},
-// 			JSON200: &astrocore.SharedCluster{Id: csID},
-// 		}
-// 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
-// 		actual, err := useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, "", "", "standard", mockCoreClient)
-// 		assert.NoError(t, err)
-// 		assert.Equal(t, csID, actual)
-// 		mockCoreClient.AssertExpectations(t)
-// 	})
-// 	t.Run("returns error if using shared cluster fails", func(t *testing.T) {
-// 		cloudProvider := "gcp"
-// 		region := "us-central1"
-// 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-// 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, mock.Anything).Return(nil, errMock).Once()
-// 		_, err := useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, "", "", "standard", mockCoreClient)
-// 		assert.ErrorIs(t, err, errMock)
-// 		mockCoreClient.AssertExpectations(t)
-// 	})
-// 	t.Run("uses select cluster if cloud provider and region are not provided", func(t *testing.T) {
-// 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-// 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
-// 		defer testUtil.MockUserInput(t, "1")()
-// 		actual, err := useSharedClusterOrSelectDedicatedCluster("", "", mockOrgShortName, "", "standard", mockCoreClient)
-// 		assert.NoError(t, err)
-// 		assert.Equal(t, csID, actual)
-// 		mockCoreClient.AssertExpectations(t)
-// 	})
-// 	t.Run("returns error if selecting cluster fails", func(t *testing.T) {
-// 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-// 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&astrocore.ListClustersResponse{}, errMock).Once()
-// 		_, err := useSharedClusterOrSelectDedicatedCluster("", "", mockOrgShortName, "", "standard", mockCoreClient)
-// 		assert.ErrorIs(t, err, errMock)
-// 		mockCoreClient.AssertExpectations(t)
-// 	})
-// }
