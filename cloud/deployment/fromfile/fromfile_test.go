@@ -3220,6 +3220,64 @@ func TestGetQueues(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
 		_, err = getQueues(&deploymentFromFile, existingPools, existingWQList)
 		assert.NoError(t, err)
+	t.Run("when the executor is kubernetes", func(t *testing.T) {
+		t.Run("returns one default queue regardless of any existing queues", func(t *testing.T) {
+			existingWQList = []astro.WorkerQueue{
+				{
+					ID:                "q-id",
+					Name:              "default",
+					IsDefault:         true,
+					MaxWorkerCount:    16,
+					MinWorkerCount:    3,
+					WorkerConcurrency: 20,
+					NodePoolID:        "test-pool-id",
+				},
+				{
+					Name:              "test-q-2",
+					IsDefault:         false,
+					MaxWorkerCount:    16,
+					MinWorkerCount:    3,
+					WorkerConcurrency: 20,
+					NodePoolID:        "test-pool-id-2",
+				},
+			}
+			expectedWQList := []astro.WorkerQueue{
+				{
+					Name:           "default",
+					IsDefault:      true,
+					PodCPU:         "0.1",
+					PodRAM:         "0.25Gi",
+					MinWorkerCount: -1,
+					NodePoolID:     "test-pool-id",
+				},
+			}
+			qList := []inspect.Workerq{
+				{
+					Name:       "default",
+					PodCPU:     "0.1",
+					PodRAM:     "0.25Gi",
+					WorkerType: "test-worker-1",
+				},
+			}
+			existingPools = []astrocore.NodePool{
+				{
+					Id:               "test-pool-id",
+					IsDefault:        true,
+					NodeInstanceType: "test-worker-1",
+				},
+				{
+					Id:               "test-pool-id-2",
+					IsDefault:        false,
+					NodeInstanceType: "test-worker-2",
+				},
+			}
+			deploymentFromFile = inspect.FormattedDeployment{}
+			deploymentFromFile.Deployment.WorkerQs = qList
+			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+			actualWQList, err = getQueues(&deploymentFromFile, existingPools, existingWQList)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedWQList, actualWQList)
+		})
 	})
 	t.Run("returns an error if unable to determine nodepool id", func(t *testing.T) {
 		minCount := 3

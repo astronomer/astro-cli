@@ -443,7 +443,15 @@ func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
 	}
 	template.Deployment.EnvVars = newEnvVars
 	if template.Deployment.Configuration.Executor == deployment.KubeExecutor {
-		template.Deployment.WorkerQs = nil
+		var newWorkerQs []Workerq
+		for i := range template.Deployment.WorkerQs {
+			if template.Deployment.WorkerQs[i].Name == "default" {
+				template.Deployment.WorkerQs[i].PodCPU = ""
+				template.Deployment.WorkerQs[i].PodRAM = ""
+				newWorkerQs = append(newWorkerQs, template.Deployment.WorkerQs[i])
+			}
+		}
+		template.Deployment.WorkerQs = newWorkerQs
 	}
 
 	return template
