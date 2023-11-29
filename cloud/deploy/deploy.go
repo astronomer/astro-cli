@@ -388,15 +388,7 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 		// finish deploy
 		if deployInput.Image {
-			coreDeployment, err := deployment.CoreGetDeployment(deployInfo.workspaceID, deployInfo.organizationID, deployInfo.deploymentID, coreClient)
-			if err != nil {
-				return err
-			}
-			if coreDeployment.DesiredDagTarballVersion != nil {
-				dagTarballVersion = *coreDeployment.DesiredDagTarballVersion
-			} else {
-				dagTarballVersion = ""
-			}
+			dagTarballVersion = deployInfo.desiredDagTarballVersion
 		}
 		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
 		if err != nil {
