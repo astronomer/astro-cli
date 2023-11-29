@@ -696,6 +696,10 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		}
 	}
 
+	// determine dagDeploy enabled/disabled
+	if dagDeploy == "" {
+		deploymentUpdate.DagDeployEnabled = currentDeployment.DagDeployEnabled
+	}
 	if dagDeploy == "enable" {
 		if currentDeployment.DagDeployEnabled {
 			fmt.Println("\nDAG deploys are already enabled for this Deployment. Your DAGs will continue to run as scheduled.")

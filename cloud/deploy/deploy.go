@@ -70,9 +70,10 @@ var (
 )
 
 var (
-	errDagsParseFailed       = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	envFileMissing           = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
-	errCiCdEnforcementUpdate = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
+	errDagsParseFailed        = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	envFileMissing            = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+	errCiCdEnforcementUpdate  = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
+	errImageDeployNoPriorDags = errors.New("cannot do image deploy with no prior DAGs deployed. Please deploy DAGs to your Deployment first")
 )
 
 var (
@@ -83,16 +84,17 @@ var (
 )
 
 type deploymentInfo struct {
-	deploymentID     string
-	namespace        string
-	deployImage      string
-	currentVersion   string
-	organizationID   string
-	workspaceID      string
-	webserverURL     string
-	dagDeployEnabled bool
-	deploymentType   string
-	cicdEnforcement  bool
+	deploymentID             string
+	namespace                string
+	deployImage              string
+	currentVersion           string
+	organizationID           string
+	workspaceID              string
+	webserverURL             string
+	deploymentType           string
+	desiredDagTarballVersion string
+	dagDeployEnabled         bool
+	cicdEnforcement          bool
 }
 
 type InputDeploy struct {
@@ -230,6 +232,15 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 	if deployInput.WsID != deployInfo.workspaceID {
 		fmt.Printf(invalidWorkspaceID, deployInput.WsID)
 		return nil
+	}
+
+	if deployInput.Image {
+		if !deployInfo.dagDeployEnabled {
+			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
+		}
+		if deployInfo.desiredDagTarballVersion == "" {
+			return errImageDeployNoPriorDags
+		}
 	}
 
 	deploymentURL, err := deployment.GetDeploymentURL(deployInfo.deploymentID, deployInfo.workspaceID)
@@ -372,9 +383,6 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 					return err
 				}
 			} else {
-				if !deployInfo.dagDeployEnabled {
-					return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
-				}
 				fmt.Println("Image Deploy only. Skipping deploying DAG...")
 			}
 		}
@@ -384,8 +392,8 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			if err != nil {
 				return err
 			}
-			if coreDeployment.CurrentDagTarballVersion != nil {
-				dagTarballVersion = *coreDeployment.CurrentDagTarballVersion
+			if coreDeployment.DesiredDagTarballVersion != nil {
+				dagTarballVersion = *coreDeployment.DesiredDagTarballVersion
 			} else {
 				dagTarballVersion = ""
 			}
@@ -430,6 +438,17 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 		if err != nil {
 			return deploymentInfo{}, err
 		}
+		coreDeployment, err := deployment.CoreGetDeployment(currentDeployment.Workspace.ID, currentDeployment.Workspace.OrganizationID, currentDeployment.ID, coreClient)
+		if err != nil {
+			return deploymentInfo{}, err
+		}
+		var desiredDagTarballVersion string
+		if coreDeployment.DesiredDagTarballVersion != nil {
+			desiredDagTarballVersion = *coreDeployment.DesiredDagTarballVersion
+		} else {
+			desiredDagTarballVersion = ""
+		}
+
 		return deploymentInfo{
 			currentDeployment.ID,
 			currentDeployment.ReleaseName,
@@ -438,8 +457,9 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 			currentDeployment.Workspace.OrganizationID,
 			currentDeployment.Workspace.ID,
 			currentDeployment.DeploymentSpec.Webserver.URL,
-			currentDeployment.DagDeployEnabled,
 			currentDeployment.Type,
+			desiredDagTarballVersion,
+			currentDeployment.DagDeployEnabled,
 			currentDeployment.APIKeyOnlyDeployments,
 		}, nil
 	}
