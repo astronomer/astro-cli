@@ -132,6 +132,20 @@ var (
 			IsCicdEnforced:   false,
 		},
 	}
+	mockCoreDeploymentResponse = []astrocore.Deployment{
+		{
+			Id:     deploymentID,
+			Status: "HEALTHY",
+		},
+	}
+	mockListDeploymentsResponse = astrocore.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.DeploymentsPaginated{
+			Deployments: mockCoreDeploymentResponse,
+		},
+	}
 )
 
 func TestDeployWithoutDagsDeploySuccess(t *testing.T) {

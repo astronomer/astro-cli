@@ -70,9 +70,10 @@ var (
 )
 
 var (
-	errDagsParseFailed       = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	envFileMissing           = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
-	errCiCdEnforcementUpdate = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
+	errDagsParseFailed        = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	envFileMissing            = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+	errCiCdEnforcementUpdate  = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
+	errImageDeployNoPriorDags = errors.New("cannot do image only deploy with no prior DAGs deployed. Please deploy DAGs to your deployment first")
 )
 
 var (
@@ -83,16 +84,17 @@ var (
 )
 
 type deploymentInfo struct {
-	deploymentID     string
-	namespace        string
-	deployImage      string
-	currentVersion   string
-	organizationID   string
-	workspaceID      string
-	webserverURL     string
-	dagDeployEnabled bool
-	deploymentType   astroplatformcore.DeploymentType
-	cicdEnforcement  bool
+	deploymentID             string
+	namespace                string
+	deployImage              string
+	currentVersion           string
+	organizationID           string
+	workspaceID              string
+	webserverURL             string
+	deploymentType           string
+	desiredDagTarballVersion string
+	dagDeployEnabled         bool
+	cicdEnforcement          bool
 }
 
 type InputDeploy struct {
@@ -233,6 +235,15 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 	if deployInput.WsID != deployInfo.workspaceID {
 		fmt.Printf(invalidWorkspaceID, deployInput.WsID)
 		return nil
+	}
+
+	if deployInput.Image {
+		if !deployInfo.dagDeployEnabled {
+			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
+		}
+		if deployInfo.desiredDagTarballVersion == "" {
+			return errImageDeployNoPriorDags
+		}
 	}
 
 	deploymentURL, err := deployment.GetDeploymentURL(deployInfo.deploymentID, deployInfo.workspaceID)
@@ -379,23 +390,12 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 					return err
 				}
 			} else {
-				if !deployInfo.dagDeployEnabled {
-					return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
-				}
 				fmt.Println("Image Deploy only. Skipping deploying DAG...")
 			}
 		}
 		// finish deploy
 		if deployInput.Image {
-			coreDeployment, err := deployment.CoreGetDeployment(deployInfo.workspaceID, deployInfo.organizationID, deployInfo.deploymentID, coreClient)
-			if err != nil {
-				return err
-			}
-			if coreDeployment.CurrentDagTarballVersion != nil {
-				dagTarballVersion = *coreDeployment.CurrentDagTarballVersion
-			} else {
-				dagTarballVersion = ""
-			}
+			dagTarballVersion = deployInfo.desiredDagTarballVersion
 		}
 		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
 		if err != nil {
@@ -438,20 +438,29 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 		if err != nil {
 			return deploymentInfo{}, err
 		}
-		if currentDeployment.Type != nil {
-			deploymentType = *currentDeployment.Type
+		coreDeployment, err := deployment.CoreGetDeployment(currentDeployment.Workspace.ID, currentDeployment.Workspace.OrganizationID, currentDeployment.ID, coreClient)
+		if err != nil {
+			return deploymentInfo{}, err
 		}
+		var desiredDagTarballVersion string
+		if coreDeployment.DesiredDagTarballVersion != nil {
+			desiredDagTarballVersion = *coreDeployment.DesiredDagTarballVersion
+		} else {
+			desiredDagTarballVersion = ""
+		}
+
 		return deploymentInfo{
-			currentDeployment.Id,
-			currentDeployment.Namespace,
-			airflow.ImageName(currentDeployment.Namespace, "latest"),
-			currentDeployment.RuntimeVersion,
-			currentDeployment.OrganizationId,
-			currentDeployment.WorkspaceId,
-			currentDeployment.WebServerUrl,
+			currentDeployment.ID,
+			currentDeployment.ReleaseName,
+			airflow.ImageName(currentDeployment.ReleaseName, "latest"),
+			currentDeployment.RuntimeRelease.Version,
+			currentDeployment.Workspace.OrganizationID,
+			currentDeployment.Workspace.ID,
+			currentDeployment.DeploymentSpec.Webserver.URL,
+			currentDeployment.Type,
+			desiredDagTarballVersion,
 			currentDeployment.DagDeployEnabled,
-			deploymentType,
-			currentDeployment.IsCicdEnforced,
+			currentDeployment.APIKeyOnlyDeployments,
 		}, nil
 	}
 	c, err := config.GetCurrentContext()
