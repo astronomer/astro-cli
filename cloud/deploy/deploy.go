@@ -73,7 +73,7 @@ var (
 	errDagsParseFailed        = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
 	envFileMissing            = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
 	errCiCdEnforcementUpdate  = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
-	errImageDeployNoPriorDags = errors.New("cannot do image deploy with no prior DAGs deployed. Please deploy DAGs to your Deployment first")
+	errImageDeployNoPriorDags = errors.New("cannot do image only deploy with no prior DAGs deployed. Please deploy DAGs to your deployment first")
 )
 
 var (
