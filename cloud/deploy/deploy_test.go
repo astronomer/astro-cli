@@ -77,6 +77,18 @@ var (
 			DesiredDagTarballVersion: &DesiredDagTarballVersion,
 		},
 	}
+	deploymentResponse2 = astrocore.GetDeploymentResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.Deployment{
+			RuntimeVersion:     "4.2.5",
+			ReleaseName:        "test-name",
+			WorkspaceId:        ws,
+			WebServerUrl:       "test-url",
+			IsDagDeployEnabled: false,
+		},
+	}
 	mockCoreDeploymentResponse = []astrocore.Deployment{
 		{
 			Id:     deploymentID,
@@ -111,7 +123,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
-	mockCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(4)
+	mockCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse2, nil).Times(4)
 	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}}}, nil).Once()
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(5)
