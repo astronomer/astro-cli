@@ -254,7 +254,10 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		// set context
-		domain := defaultDomain
+		var domain string
+		if domain = os.Getenv("ASTRO_DOMAIN"); domain == "" {
+			domain = defaultDomain
+		}
 		if !context.Exists(domain) {
 			err := context.SetContext(domain)
 			if err != nil {
@@ -369,7 +372,10 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		// set context
-		domain := defaultDomain
+		var domain string
+		if domain = os.Getenv("ASTRO_DOMAIN"); domain == "" {
+			domain = defaultDomain
+		}
 		if !context.Exists(domain) {
 			err := context.SetContext(domain)
 			if err != nil {
