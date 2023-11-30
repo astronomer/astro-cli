@@ -572,11 +572,28 @@ func getImageName(cloudDomain, deploymentID, organizationID string, corePlatform
 	workspaceID := resp.JSON200.WorkspaceId
 	webserverURL := resp.JSON200.WebServerUrl
 	dagDeployEnabled := resp.JSON200.IsDagDeployEnabled
+	cicdEnforcement := resp.JSON200.ApiKeyOnlyDeployments
+	var desiredDagTarballVersion string
+	if resp.JSON200.DesiredDagTarballVersion != nil {
+		desiredDagTarballVersion = *resp.JSON200.DesiredDagTarballVersion
+	} else {
+		desiredDagTarballVersion = ""
+	}
 
 	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
 	deployImage := airflow.ImageName(namespace, "latest")
 
-	return deploymentInfo{namespace: namespace, deployImage: deployImage, currentVersion: currentVersion, organizationID: organizationID, workspaceID: workspaceID, webserverURL: webserverURL, dagDeployEnabled: dagDeployEnabled}, nil
+	return deploymentInfo{
+		namespace:                namespace,
+		deployImage:              deployImage,
+		currentVersion:           currentVersion,
+		organizationID:           organizationID,
+		workspaceID:              workspaceID,
+		webserverURL:             webserverURL,
+		dagDeployEnabled:         dagDeployEnabled,
+		desiredDagTarballVersion: desiredDagTarballVersion,
+		cicdEnforcement:          cicdEnforcement,
+	}, nil
 }
 
 func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error {
