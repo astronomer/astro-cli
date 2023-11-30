@@ -63,16 +63,18 @@ var (
 			},
 		},
 	}
-	deploymentResponse = astrocore.GetDeploymentResponse{
+	DesiredDagTarballVersion = "desired-dag-tar-ball-version"
+	deploymentResponse       = astrocore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
 		JSON200: &astrocore.Deployment{
-			RuntimeVersion:     "4.2.5",
-			ReleaseName:        "test-name",
-			WorkspaceId:        ws,
-			WebServerUrl:       "test-url",
-			IsDagDeployEnabled: false,
+			RuntimeVersion:           "4.2.5",
+			ReleaseName:              "test-name",
+			WorkspaceId:              ws,
+			WebServerUrl:             "test-url",
+			IsDagDeployEnabled:       false,
+			DesiredDagTarballVersion: &DesiredDagTarballVersion,
 		},
 	}
 	mockCoreDeploymentResponse = []astrocore.Deployment{
