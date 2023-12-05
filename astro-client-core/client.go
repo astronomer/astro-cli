@@ -25,7 +25,26 @@ var (
 // a shorter alias
 type CoreClient = ClientWithResponsesInterface
 
-func requestEditor(ctx httpContext.Context, req *http.Request) error {
+// create api client for astro core services
+func NewCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
+	// we append base url in request editor, so set to an empty string here
+	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(CoreRequestEditor))
+	return cl
+}
+
+func NormalizeAPIError(httpResp *http.Response, body []byte) error {
+	if httpResp.StatusCode != HTTPStatus200 && httpResp.StatusCode != HTTPStatus204 {
+		decode := Error{}
+		err := json.NewDecoder(bytes.NewReader(body)).Decode(&decode)
+		if err != nil {
+			return fmt.Errorf("%w, status %d", ErrorRequest, httpResp.StatusCode)
+		}
+		return errors.New(decode.Message) //nolint:goerr113
+	}
+	return nil
+}
+
+func CoreRequestEditor(ctx httpContext.Context, req *http.Request) error {
 	currentCtx, err := context.GetCurrentContext()
 	if err != nil {
 		return nil
@@ -43,24 +62,5 @@ func requestEditor(ctx httpContext.Context, req *http.Request) error {
 	req.Header.Add("x-astro-client-version", version.CurrVersion)
 	req.Header.Add("x-client-os-identifier", os+"-"+arch)
 	req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.CurrVersion))
-	return nil
-}
-
-// create api client for astro core services
-func NewCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
-	// we append base url in request editor, so set to an empty string here
-	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(requestEditor))
-	return cl
-}
-
-func NormalizeAPIError(httpResp *http.Response, body []byte) error {
-	if httpResp.StatusCode != HTTPStatus200 && httpResp.StatusCode != HTTPStatus204 {
-		decode := Error{}
-		err := json.NewDecoder(bytes.NewReader(body)).Decode(&decode)
-		if err != nil {
-			return fmt.Errorf("%w, status %d", ErrorRequest, httpResp.StatusCode)
-		}
-		return errors.New(decode.Message) //nolint:goerr113
-	}
 	return nil
 }
