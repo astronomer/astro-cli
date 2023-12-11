@@ -93,6 +93,16 @@ const (
 	ClusterDetailedTypeSHARED            ClusterDetailedType = "SHARED"
 )
 
+// Defines values for ClusterRouteSource.
+const (
+	ClusterRouteSourceMANUAL ClusterRouteSource = "MANUAL"
+)
+
+// Defines values for ClusterRouteTargetType.
+const (
+	ClusterRouteTargetTypeAWSPCX ClusterRouteTargetType = "AWS_PCX"
+)
+
 // Defines values for CreateAwsClusterRequestType.
 const (
 	CreateAwsClusterRequestTypeBRINGYOUROWNCLOUD CreateAwsClusterRequestType = "BRING_YOUR_OWN_CLOUD"
@@ -105,6 +115,16 @@ const (
 	CreateAzureClusterRequestTypeBRINGYOUROWNCLOUD CreateAzureClusterRequestType = "BRING_YOUR_OWN_CLOUD"
 	CreateAzureClusterRequestTypeHOSTED            CreateAzureClusterRequestType = "HOSTED"
 	CreateAzureClusterRequestTypeSHARED            CreateAzureClusterRequestType = "SHARED"
+)
+
+// Defines values for CreateClusterRouteRequestSource.
+const (
+	CreateClusterRouteRequestSourceMANUAL CreateClusterRouteRequestSource = "MANUAL"
+)
+
+// Defines values for CreateClusterRouteRequestTargetType.
+const (
+	CreateClusterRouteRequestTargetTypeAWSPCX CreateClusterRouteRequestTargetType = "AWS_PCX"
 )
 
 // Defines values for CreateDedicatedDeploymentRequestExecutor.
@@ -232,10 +252,11 @@ const (
 
 // Defines values for DeploymentStatus.
 const (
-	DeploymentStatusCREATING  DeploymentStatus = "CREATING"
-	DeploymentStatusDEPLOYING DeploymentStatus = "DEPLOYING"
-	DeploymentStatusHEALTHY   DeploymentStatus = "HEALTHY"
-	DeploymentStatusUNHEALTHY DeploymentStatus = "UNHEALTHY"
+	DeploymentStatusCREATING    DeploymentStatus = "CREATING"
+	DeploymentStatusDEPLOYING   DeploymentStatus = "DEPLOYING"
+	DeploymentStatusHEALTHY     DeploymentStatus = "HEALTHY"
+	DeploymentStatusHIBERNATING DeploymentStatus = "HIBERNATING"
+	DeploymentStatusUNHEALTHY   DeploymentStatus = "UNHEALTHY"
 )
 
 // Defines values for DeploymentType.
@@ -293,11 +314,11 @@ const (
 
 // Defines values for MutateWorkerQueueRequestAstroMachine.
 const (
-	A10 MutateWorkerQueueRequestAstroMachine = "A10"
-	A20 MutateWorkerQueueRequestAstroMachine = "A20"
-	A40 MutateWorkerQueueRequestAstroMachine = "A40"
-	A5  MutateWorkerQueueRequestAstroMachine = "A5"
-	A60 MutateWorkerQueueRequestAstroMachine = "A60"
+	MutateWorkerQueueRequestAstroMachineA10 MutateWorkerQueueRequestAstroMachine = "A10"
+	MutateWorkerQueueRequestAstroMachineA20 MutateWorkerQueueRequestAstroMachine = "A20"
+	MutateWorkerQueueRequestAstroMachineA40 MutateWorkerQueueRequestAstroMachine = "A40"
+	MutateWorkerQueueRequestAstroMachineA5  MutateWorkerQueueRequestAstroMachine = "A5"
+	MutateWorkerQueueRequestAstroMachineA60 MutateWorkerQueueRequestAstroMachine = "A60"
 )
 
 // Defines values for OrganizationPaymentMethod.
@@ -332,6 +353,13 @@ const (
 	OrganizationSupportPlanPREMIUM             OrganizationSupportPlan = "PREMIUM"
 	OrganizationSupportPlanSTANDARD            OrganizationSupportPlan = "STANDARD"
 	OrganizationSupportPlanTRIAL               OrganizationSupportPlan = "TRIAL"
+)
+
+// Defines values for SchedulerMachineName.
+const (
+	SchedulerMachineNameLARGE  SchedulerMachineName = "LARGE"
+	SchedulerMachineNameMEDIUM SchedulerMachineName = "MEDIUM"
+	SchedulerMachineNameSMALL  SchedulerMachineName = "SMALL"
 )
 
 // Defines values for SelfSignupType.
@@ -384,9 +412,9 @@ const (
 
 // Defines values for UpdateHostedDeploymentRequestSchedulerSize.
 const (
-	UpdateHostedDeploymentRequestSchedulerSizeLARGE  UpdateHostedDeploymentRequestSchedulerSize = "LARGE"
-	UpdateHostedDeploymentRequestSchedulerSizeMEDIUM UpdateHostedDeploymentRequestSchedulerSize = "MEDIUM"
-	UpdateHostedDeploymentRequestSchedulerSizeSMALL  UpdateHostedDeploymentRequestSchedulerSize = "SMALL"
+	LARGE  UpdateHostedDeploymentRequestSchedulerSize = "LARGE"
+	MEDIUM UpdateHostedDeploymentRequestSchedulerSize = "MEDIUM"
+	SMALL  UpdateHostedDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for UpdateHostedDeploymentRequestType.
@@ -419,6 +447,15 @@ const (
 const (
 	UserSignupTypeRegular UserSignupType = "Regular"
 	UserSignupTypeTrial   UserSignupType = "Trial"
+)
+
+// Defines values for WorkerMachineName.
+const (
+	WorkerMachineNameA10 WorkerMachineName = "A10"
+	WorkerMachineNameA20 WorkerMachineName = "A20"
+	WorkerMachineNameA40 WorkerMachineName = "A40"
+	WorkerMachineNameA5  WorkerMachineName = "A5"
+	WorkerMachineNameA60 WorkerMachineName = "A60"
 )
 
 // Defines values for GetSharedClusterParamsCloudProvider.
@@ -567,11 +604,29 @@ const (
 	ListClustersParamsSortsVpcSubnetRangeDesc      ListClustersParamsSorts = "vpcSubnetRange:desc"
 )
 
+// Defines values for ListClusterRoutesParamsSorts.
+const (
+	ListClusterRoutesParamsSortsCreatedAtAsc    ListClusterRoutesParamsSorts = "createdAt:asc"
+	ListClusterRoutesParamsSortsCreatedAtDesc   ListClusterRoutesParamsSorts = "createdAt:desc"
+	ListClusterRoutesParamsSortsDescriptionAsc  ListClusterRoutesParamsSorts = "description:asc"
+	ListClusterRoutesParamsSortsDescriptionDesc ListClusterRoutesParamsSorts = "description:desc"
+	ListClusterRoutesParamsSortsIdAsc           ListClusterRoutesParamsSorts = "id:asc"
+	ListClusterRoutesParamsSortsIdDesc          ListClusterRoutesParamsSorts = "id:desc"
+	ListClusterRoutesParamsSortsNameAsc         ListClusterRoutesParamsSorts = "name:asc"
+	ListClusterRoutesParamsSortsNameDesc        ListClusterRoutesParamsSorts = "name:desc"
+)
+
 // Defines values for GetDeploymentOptionsParamsDeploymentType.
 const (
 	GetDeploymentOptionsParamsDeploymentTypeDEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
 	GetDeploymentOptionsParamsDeploymentTypeHYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
 	GetDeploymentOptionsParamsDeploymentTypeSTANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
+)
+
+// Defines values for GetDeploymentOptionsParamsExecutor.
+const (
+	CELERY     GetDeploymentOptionsParamsExecutor = "CELERY"
+	KUBERNETES GetDeploymentOptionsParamsExecutor = "KUBERNETES"
 )
 
 // Defines values for GetDeploymentOptionsParamsCloudProvider.
@@ -743,20 +798,20 @@ const (
 
 // Defines values for ListWorkspaceUsersParamsSorts.
 const (
-	ListWorkspaceUsersParamsSortsCreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
-	ListWorkspaceUsersParamsSortsCreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
-	ListWorkspaceUsersParamsSortsFullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
-	ListWorkspaceUsersParamsSortsFullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
-	ListWorkspaceUsersParamsSortsIdAsc             ListWorkspaceUsersParamsSorts = "id:asc"
-	ListWorkspaceUsersParamsSortsIdDesc            ListWorkspaceUsersParamsSorts = "id:desc"
-	ListWorkspaceUsersParamsSortsStatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
-	ListWorkspaceUsersParamsSortsStatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
-	ListWorkspaceUsersParamsSortsUpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
-	ListWorkspaceUsersParamsSortsUpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
-	ListWorkspaceUsersParamsSortsUsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
-	ListWorkspaceUsersParamsSortsUsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
-	ListWorkspaceUsersParamsSortsWorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
-	ListWorkspaceUsersParamsSortsWorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
+	CreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
+	CreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
+	FullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
+	FullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
+	IdAsc             ListWorkspaceUsersParamsSorts = "id:asc"
+	IdDesc            ListWorkspaceUsersParamsSorts = "id:desc"
+	StatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
+	StatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
+	UpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
+	UpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
+	UsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
+	UsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
+	WorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
+	WorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
 )
 
 // AddTeamMembersRequest defines model for AddTeamMembersRequest.
@@ -915,7 +970,8 @@ type ClusterDetailedType string
 
 // ClusterMetadata defines model for ClusterMetadata.
 type ClusterMetadata struct {
-	ExternalIPs *[]string `json:"externalIPs,omitempty"`
+	ExternalIPs   *[]string `json:"externalIPs,omitempty"`
+	OidcIssuerUrl *string   `json:"oidcIssuerUrl,omitempty"`
 }
 
 // ClusterOptions defines model for ClusterOptions.
@@ -935,6 +991,33 @@ type ClusterOptions struct {
 	Provider                   string                 `json:"provider"`
 	Regions                    []ProviderRegion       `json:"regions"`
 	TemplateVersions           []TemplateVersion      `json:"templateVersions"`
+}
+
+// ClusterRoute defines model for ClusterRoute.
+type ClusterRoute struct {
+	CreatedAt       time.Time              `json:"createdAt"`
+	CreatedById     string                 `json:"createdById"`
+	Description     *string                `json:"description,omitempty"`
+	DestinationCidr string                 `json:"destinationCidr"`
+	Id              string                 `json:"id"`
+	Name            string                 `json:"name"`
+	Source          ClusterRouteSource     `json:"source"`
+	Target          string                 `json:"target"`
+	TargetType      ClusterRouteTargetType `json:"targetType"`
+}
+
+// ClusterRouteSource defines model for ClusterRoute.Source.
+type ClusterRouteSource string
+
+// ClusterRouteTargetType defines model for ClusterRoute.TargetType.
+type ClusterRouteTargetType string
+
+// ClusterRoutesPaginated defines model for ClusterRoutesPaginated.
+type ClusterRoutesPaginated struct {
+	ClusterRoutes []ClusterRoute `json:"clusterRoutes"`
+	Limit         int            `json:"limit"`
+	Offset        int            `json:"offset"`
+	TotalCount    int            `json:"totalCount"`
 }
 
 // ClusterTag defines model for ClusterTag.
@@ -1011,13 +1094,30 @@ type CreateAzureClusterRequest struct {
 // CreateAzureClusterRequestType defines model for CreateAzureClusterRequest.Type.
 type CreateAzureClusterRequestType string
 
+// CreateClusterRouteRequest defines model for CreateClusterRouteRequest.
+type CreateClusterRouteRequest struct {
+	Description     *string                             `json:"description,omitempty"`
+	DestinationCidr string                              `json:"destinationCidr"`
+	Name            string                              `json:"name"`
+	Source          CreateClusterRouteRequestSource     `json:"source"`
+	Target          string                              `json:"target"`
+	TargetType      CreateClusterRouteRequestTargetType `json:"targetType"`
+}
+
+// CreateClusterRouteRequestSource defines model for CreateClusterRouteRequest.Source.
+type CreateClusterRouteRequestSource string
+
+// CreateClusterRouteRequestTargetType defines model for CreateClusterRouteRequest.TargetType.
+type CreateClusterRouteRequestTargetType string
+
 // CreateDedicatedDeploymentRequest defines model for CreateDedicatedDeploymentRequest.
 type CreateDedicatedDeploymentRequest struct {
 	// AstroRuntimeVersion Version of the astro runtime to use
 	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
 
 	// ClusterId Cluster where the deployment should be created on
-	ClusterId string `json:"clusterId"`
+	ClusterId     string    `json:"clusterId"`
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
 
 	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
@@ -1036,6 +1136,9 @@ type CreateDedicatedDeploymentRequest struct {
 
 	// IsDagDeployEnabled If true, dags can be independently pushed through CLI
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
+
+	// IsDevelopmentOnly If true, deployment will be able to use development-only features, such as hibernation, but will not have guaranteed uptime SLAs
+	IsDevelopmentOnly bool `json:"isDevelopmentOnly"`
 
 	// IsHighAvailability If true, deployment will have backup components
 	IsHighAvailability bool `json:"isHighAvailability"`
@@ -1194,7 +1297,8 @@ type CreateHybridDeploymentRequest struct {
 	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
 
 	// ClusterId Cluster where the deployment should be created on
-	ClusterId string `json:"clusterId"`
+	ClusterId     string    `json:"clusterId"`
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
 
 	// Description Optional description of the deployment
 	Description *string `json:"description,omitempty"`
@@ -1260,7 +1364,8 @@ type CreateStandardDeploymentRequest struct {
 	CloudProvider *CreateStandardDeploymentRequestCloudProvider `json:"cloudProvider,omitempty"`
 
 	// ClusterId Optional if cloud provider and region is specified
-	ClusterId *string `json:"clusterId,omitempty"`
+	ClusterId     *string   `json:"clusterId,omitempty"`
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
 
 	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
@@ -1279,6 +1384,9 @@ type CreateStandardDeploymentRequest struct {
 
 	// IsDagDeployEnabled If true, dags can be independently pushed through CLI
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
+
+	// IsDevelopmentOnly If true, deployment will be able to use development-only features, such as hibernation, but will not have guaranteed uptime SLAs
+	IsDevelopmentOnly bool `json:"isDevelopmentOnly"`
 
 	// IsHighAvailability If true, deployment will have backup components
 	IsHighAvailability bool `json:"isHighAvailability"`
@@ -1407,11 +1515,11 @@ type DeployRollbackRequest struct {
 // Deployment defines model for Deployment.
 type Deployment struct {
 	AirflowVersion               string                           `json:"airflowVersion"`
-	AlertEmails                  *[]string                        `json:"alertEmails,omitempty"`
 	ClusterCloudProvider         *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
 	ClusterId                    string                           `json:"clusterId"`
 	ClusterName                  *string                          `json:"clusterName,omitempty"`
 	ClusterRegion                *string                          `json:"clusterRegion,omitempty"`
+	ContactEmails                []string                         `json:"contactEmails"`
 	CreatedAt                    time.Time                        `json:"createdAt"`
 	CreatedBy                    BasicSubjectProfile              `json:"createdBy"`
 	CurrentDagTarballVersion     *string                          `json:"currentDagTarballVersion,omitempty"`
@@ -1433,9 +1541,11 @@ type Deployment struct {
 	ImageTag                     string                           `json:"imageTag"`
 	IsCicdEnforced               bool                             `json:"isCicdEnforced"`
 	IsDagDeployEnabled           bool                             `json:"isDagDeployEnabled"`
+	IsDevelopmentOnly            bool                             `json:"isDevelopmentOnly"`
 	IsHighAvailability           *bool                            `json:"isHighAvailability,omitempty"`
 	LaminarHealthStatus          *LaminarHealthStatus             `json:"laminarHealthStatus,omitempty"`
 	Name                         string                           `json:"name"`
+	OidcIssuerUrl                *string                          `json:"oidcIssuerUrl,omitempty"`
 	OrganizationId               string                           `json:"organizationId"`
 	OrganizationName             string                           `json:"organizationName"`
 	OrganizationShortName        string                           `json:"organizationShortName"`
@@ -1520,7 +1630,7 @@ type DeploymentHibernationSchedule struct {
 	// IsEnabled It is set to true if the hibernate/wake schedule is enabled
 	IsEnabled bool `json:"isEnabled"`
 
-	// WakeAtCron Cron expression representing the wake up schedule
+	// WakeAtCron Cron expression representing the wake-up schedule
 	WakeAtCron string `json:"wakeAtCron"`
 }
 
@@ -1537,8 +1647,8 @@ type DeploymentHibernationStatus struct {
 	// IsHibernating If the deployment is currently in hibernating state or not
 	IsHibernating *bool `json:"isHibernating,omitempty"`
 
-	// NextEvent Timestamp of the next schedule hibernation event for the deployment
-	NextEvent *string `json:"nextEvent,omitempty"`
+	// NextEventAt Timestamp of the next schedule hibernation event for the deployment
+	NextEventAt *time.Time `json:"nextEventAt,omitempty"`
 
 	// NextEventType Represents the type of the scheduled event for the deployment, one of HIBERNATE or WAKE
 	NextEventType *DeploymentHibernationStatusNextEventType `json:"nextEventType,omitempty"`
@@ -1950,9 +2060,12 @@ type RuntimeRelease struct {
 // SchedulerMachine defines model for SchedulerMachine.
 type SchedulerMachine struct {
 	// Name The name of this machine.
-	Name string      `json:"name"`
-	Spec MachineSpec `json:"spec"`
+	Name SchedulerMachineName `json:"name"`
+	Spec MachineSpec          `json:"spec"`
 }
+
+// SchedulerMachineName The name of this machine.
+type SchedulerMachineName string
 
 // Scope defines model for Scope.
 type Scope struct {
@@ -2392,9 +2505,12 @@ type WorkerMachine struct {
 	Concurrency Range `json:"concurrency"`
 
 	// Name The name of this machine.
-	Name string      `json:"name"`
-	Spec MachineSpec `json:"spec"`
+	Name WorkerMachineName `json:"name"`
+	Spec MachineSpec       `json:"spec"`
 }
+
+// WorkerMachineName The name of this machine.
+type WorkerMachineName string
 
 // WorkerQueue defines model for WorkerQueue.
 type WorkerQueue struct {
@@ -2646,6 +2762,21 @@ type ListClustersParamsStatuses string
 // ListClustersParamsSorts defines parameters for ListClusters.
 type ListClustersParamsSorts string
 
+// ListClusterRoutesParams defines parameters for ListClusterRoutes.
+type ListClusterRoutesParams struct {
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListClusterRoutesParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+}
+
+// ListClusterRoutesParamsSorts defines parameters for ListClusterRoutes.
+type ListClusterRoutesParamsSorts string
+
 // GetDeploymentOptionsParams defines parameters for GetDeploymentOptions.
 type GetDeploymentOptionsParams struct {
 	// DeploymentId deployment ID
@@ -2654,12 +2785,18 @@ type GetDeploymentOptionsParams struct {
 	// DeploymentType The runtime type of the deployment.
 	DeploymentType *GetDeploymentOptionsParamsDeploymentType `form:"deploymentType,omitempty" json:"deploymentType,omitempty"`
 
+	// Executor The executor of the deployment.
+	Executor *GetDeploymentOptionsParamsExecutor `form:"executor,omitempty" json:"executor,omitempty"`
+
 	// CloudProvider The cloud provider of the cluster for the deployment.
 	CloudProvider *GetDeploymentOptionsParamsCloudProvider `form:"cloudProvider,omitempty" json:"cloudProvider,omitempty"`
 }
 
 // GetDeploymentOptionsParamsDeploymentType defines parameters for GetDeploymentOptions.
 type GetDeploymentOptionsParamsDeploymentType string
+
+// GetDeploymentOptionsParamsExecutor defines parameters for GetDeploymentOptions.
+type GetDeploymentOptionsParamsExecutor string
 
 // GetDeploymentOptionsParamsCloudProvider defines parameters for GetDeploymentOptions.
 type GetDeploymentOptionsParamsCloudProvider string
@@ -2978,6 +3115,9 @@ type CreateGcpClusterJSONRequestBody = CreateGcpClusterRequest
 
 // UpdateGcpClusterJSONRequestBody defines body for UpdateGcpCluster for application/json ContentType.
 type UpdateGcpClusterJSONRequestBody = UpdateGcpClusterRequest
+
+// CreateClusterRouteJSONRequestBody defines body for CreateClusterRoute for application/json ContentType.
+type CreateClusterRouteJSONRequestBody = CreateClusterRouteRequest
 
 // CreateDeploymentJSONRequestBody defines body for CreateDeployment for application/json ContentType.
 type CreateDeploymentJSONRequestBody = CreateDeploymentRequest
@@ -3359,6 +3499,17 @@ type ClientInterface interface {
 
 	// GetCluster request
 	GetCluster(ctx context.Context, organizationId string, clusterId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListClusterRoutes request
+	ListClusterRoutes(ctx context.Context, organizationId string, clusterId string, params *ListClusterRoutesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateClusterRoute request with any body
+	CreateClusterRouteWithBody(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateClusterRoute(ctx context.Context, organizationId string, clusterId string, body CreateClusterRouteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteClusterRoute request
+	DeleteClusterRoute(ctx context.Context, organizationId string, clusterId string, routeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetDeploymentOptions request
 	GetDeploymentOptions(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3970,6 +4121,54 @@ func (c *Client) DeleteCluster(ctx context.Context, organizationId string, clust
 
 func (c *Client) GetCluster(ctx context.Context, organizationId string, clusterId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetClusterRequest(c.Server, organizationId, clusterId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListClusterRoutes(ctx context.Context, organizationId string, clusterId string, params *ListClusterRoutesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListClusterRoutesRequest(c.Server, organizationId, clusterId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateClusterRouteWithBody(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateClusterRouteRequestWithBody(c.Server, organizationId, clusterId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateClusterRoute(ctx context.Context, organizationId string, clusterId string, body CreateClusterRouteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateClusterRouteRequest(c.Server, organizationId, clusterId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteClusterRoute(ctx context.Context, organizationId string, clusterId string, routeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteClusterRouteRequest(c.Server, organizationId, clusterId, routeId)
 	if err != nil {
 		return nil, err
 	}
@@ -6263,6 +6462,201 @@ func NewGetClusterRequest(server string, organizationId string, clusterId string
 	return req, nil
 }
 
+// NewListClusterRoutesRequest generates requests for ListClusterRoutes
+func NewListClusterRoutesRequest(server string, organizationId string, clusterId string, params *ListClusterRoutesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/%s/cluster-routes", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateClusterRouteRequest calls the generic CreateClusterRoute builder with application/json body
+func NewCreateClusterRouteRequest(server string, organizationId string, clusterId string, body CreateClusterRouteJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateClusterRouteRequestWithBody(server, organizationId, clusterId, "application/json", bodyReader)
+}
+
+// NewCreateClusterRouteRequestWithBody generates requests for CreateClusterRoute with any type of body
+func NewCreateClusterRouteRequestWithBody(server string, organizationId string, clusterId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/%s/cluster-routes", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteClusterRouteRequest generates requests for DeleteClusterRoute
+func NewDeleteClusterRouteRequest(server string, organizationId string, clusterId string, routeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "routeId", runtime.ParamLocationPath, routeId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/%s/cluster-routes/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetDeploymentOptionsRequest generates requests for GetDeploymentOptions
 func NewGetDeploymentOptionsRequest(server string, organizationId string, params *GetDeploymentOptionsParams) (*http.Request, error) {
 	var err error
@@ -6310,6 +6704,22 @@ func NewGetDeploymentOptionsRequest(server string, organizationId string, params
 	if params.DeploymentType != nil {
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deploymentType", runtime.ParamLocationQuery, *params.DeploymentType); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Executor != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "executor", runtime.ParamLocationQuery, *params.Executor); err != nil {
 			return nil, err
 		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 			return nil, err
@@ -10349,6 +10759,17 @@ type ClientWithResponsesInterface interface {
 	// GetCluster request
 	GetClusterWithResponse(ctx context.Context, organizationId string, clusterId string, reqEditors ...RequestEditorFn) (*GetClusterResponse, error)
 
+	// ListClusterRoutes request
+	ListClusterRoutesWithResponse(ctx context.Context, organizationId string, clusterId string, params *ListClusterRoutesParams, reqEditors ...RequestEditorFn) (*ListClusterRoutesResponse, error)
+
+	// CreateClusterRoute request with any body
+	CreateClusterRouteWithBodyWithResponse(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateClusterRouteResponse, error)
+
+	CreateClusterRouteWithResponse(ctx context.Context, organizationId string, clusterId string, body CreateClusterRouteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateClusterRouteResponse, error)
+
+	// DeleteClusterRoute request
+	DeleteClusterRouteWithResponse(ctx context.Context, organizationId string, clusterId string, routeId string, reqEditors ...RequestEditorFn) (*DeleteClusterRouteResponse, error)
+
 	// GetDeploymentOptions request
 	GetDeploymentOptionsWithResponse(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error)
 
@@ -11186,6 +11607,86 @@ func (r GetClusterResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetClusterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListClusterRoutesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ClusterRoutesPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListClusterRoutesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListClusterRoutesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateClusterRouteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ClusterRoute
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateClusterRouteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateClusterRouteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteClusterRouteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteClusterRouteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteClusterRouteResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -13052,6 +13553,41 @@ func (c *ClientWithResponses) GetClusterWithResponse(ctx context.Context, organi
 		return nil, err
 	}
 	return ParseGetClusterResponse(rsp)
+}
+
+// ListClusterRoutesWithResponse request returning *ListClusterRoutesResponse
+func (c *ClientWithResponses) ListClusterRoutesWithResponse(ctx context.Context, organizationId string, clusterId string, params *ListClusterRoutesParams, reqEditors ...RequestEditorFn) (*ListClusterRoutesResponse, error) {
+	rsp, err := c.ListClusterRoutes(ctx, organizationId, clusterId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListClusterRoutesResponse(rsp)
+}
+
+// CreateClusterRouteWithBodyWithResponse request with arbitrary body returning *CreateClusterRouteResponse
+func (c *ClientWithResponses) CreateClusterRouteWithBodyWithResponse(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateClusterRouteResponse, error) {
+	rsp, err := c.CreateClusterRouteWithBody(ctx, organizationId, clusterId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateClusterRouteResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateClusterRouteWithResponse(ctx context.Context, organizationId string, clusterId string, body CreateClusterRouteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateClusterRouteResponse, error) {
+	rsp, err := c.CreateClusterRoute(ctx, organizationId, clusterId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateClusterRouteResponse(rsp)
+}
+
+// DeleteClusterRouteWithResponse request returning *DeleteClusterRouteResponse
+func (c *ClientWithResponses) DeleteClusterRouteWithResponse(ctx context.Context, organizationId string, clusterId string, routeId string, reqEditors ...RequestEditorFn) (*DeleteClusterRouteResponse, error) {
+	rsp, err := c.DeleteClusterRoute(ctx, organizationId, clusterId, routeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteClusterRouteResponse(rsp)
 }
 
 // GetDeploymentOptionsWithResponse request returning *GetDeploymentOptionsResponse
@@ -15118,6 +15654,182 @@ func ParseGetClusterResponse(rsp *http.Response) (*GetClusterResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListClusterRoutesResponse parses an HTTP response from a ListClusterRoutesWithResponse call
+func ParseListClusterRoutesResponse(rsp *http.Response) (*ListClusterRoutesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListClusterRoutesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ClusterRoutesPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateClusterRouteResponse parses an HTTP response from a CreateClusterRouteWithResponse call
+func ParseCreateClusterRouteResponse(rsp *http.Response) (*CreateClusterRouteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateClusterRouteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ClusterRoute
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteClusterRouteResponse parses an HTTP response from a DeleteClusterRouteWithResponse call
+func ParseDeleteClusterRouteResponse(rsp *http.Response) (*DeleteClusterRouteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteClusterRouteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
