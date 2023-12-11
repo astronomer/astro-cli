@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCoreClient(t *testing.T) {
-	client := NewCoreClient(httputil.NewHTTPClient())
-	assert.NotNil(t, client, "Can't create new Astro Core client")
+func TestNewPlatformCoreClient(t *testing.T) {
+	client := NewPlatformCoreClient(httputil.NewHTTPClient())
+	assert.NotNil(t, client, "Can't create new Astro Platform Core client")
 }

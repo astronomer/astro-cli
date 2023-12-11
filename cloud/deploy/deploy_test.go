@@ -30,6 +30,7 @@ var (
 	ws                    = "test-ws-id"
 	dagTarballVersionTest = "test-version"
 	dagsUploadTestURL     = "test-url"
+	deploymentID          = "test-id"
 	createDeployResponse  = astrocore.CreateDeployResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -62,7 +63,21 @@ var (
 			},
 		},
 	}
-	deploymentResponse = astrocore.GetDeploymentResponse{
+	DesiredDagTarballVersion = "desired-dag-tar-ball-version"
+	deploymentResponse       = astrocore.GetDeploymentResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.Deployment{
+			RuntimeVersion:           "4.2.5",
+			ReleaseName:              "test-name",
+			WorkspaceId:              ws,
+			WebServerUrl:             "test-url",
+			IsDagDeployEnabled:       false,
+			DesiredDagTarballVersion: &DesiredDagTarballVersion,
+		},
+	}
+	deploymentResponse2 = astrocore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -72,6 +87,20 @@ var (
 			WorkspaceId:        ws,
 			WebServerUrl:       "test-url",
 			IsDagDeployEnabled: false,
+		},
+	}
+	mockCoreDeploymentResponse = []astrocore.Deployment{
+		{
+			Id:     deploymentID,
+			Status: "HEALTHY",
+		},
+	}
+	mockListDeploymentsResponse = astrocore.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.DeploymentsPaginated{
+			Deployments: mockCoreDeploymentResponse,
 		},
 	}
 )
@@ -94,7 +123,8 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
-	mockCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(4)
+	mockCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse2, nil).Times(4)
+	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}}}, nil).Once()
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(5)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)
@@ -201,7 +231,7 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 	canCiCdDeploy = func(astroAPIToken string) bool {
 		return false
 	}
-
+	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}, DagDeployEnabled: true, APIKeyOnlyDeployments: true}}, nil).Once()
 
 	err := Deploy(deployInput, mockClient, mockCoreClient)
@@ -237,6 +267,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 
 	mockCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(5)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}, DagDeployEnabled: true}}, nil).Times(2)
+	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(7)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(7)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(7)
@@ -393,6 +424,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(5)
+	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(5)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(5)
 
@@ -488,6 +520,7 @@ func TestNoDagsDeploy(t *testing.T) {
 	}
 
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
+	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(1)
 
 	deployInput := InputDeploy{
@@ -553,6 +586,7 @@ func TestDagsDeployFailed(t *testing.T) {
 		Dags:           true,
 	}
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(3)
+	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(2)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(3)
 
@@ -633,6 +667,7 @@ func TestDeployFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("ListDeployments", org, ws).Return(mockDeplyResp, nil).Times(2)
+	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(2)
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
 
@@ -740,6 +775,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(4)
+	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
 
@@ -844,6 +880,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 
 	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(4)
+	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
 
