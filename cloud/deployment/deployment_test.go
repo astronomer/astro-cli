@@ -2605,7 +2605,7 @@ func TestUpdate(t *testing.T) { //nolint
 			ClusterID:        "",
 			Label:            "",
 			Description:      "",
-			DagDeployEnabled: false,
+			DagDeployEnabled: true,
 			DeploymentSpec: astro.DeploymentCreateSpec{
 				Executor:  KubeExecutor,
 				Scheduler: astro.Scheduler{AU: 5, Replicas: 3},
@@ -2678,7 +2678,7 @@ func TestUpdate(t *testing.T) { //nolint
 			ClusterID:        "",
 			Label:            "",
 			Description:      "",
-			DagDeployEnabled: false,
+			DagDeployEnabled: true,
 			DeploymentSpec: astro.DeploymentCreateSpec{
 				Executor:  CeleryExecutor,
 				Scheduler: astro.Scheduler{AU: 5, Replicas: 3},

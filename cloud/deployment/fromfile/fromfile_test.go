@@ -4433,11 +4433,12 @@ func TestGetQueues(t *testing.T) {
 			}
 			expectedWQList := []astro.WorkerQueue{
 				{
-					Name:       "default",
-					IsDefault:  true,
-					PodCPU:     "0.1",
-					PodRAM:     "0.25Gi",
-					NodePoolID: "test-pool-id",
+					Name:           "default",
+					IsDefault:      true,
+					PodCPU:         "0.1",
+					PodRAM:         "0.25Gi",
+					MinWorkerCount: -1,
+					NodePoolID:     "test-pool-id",
 				},
 			}
 			qList := []inspect.Workerq{
