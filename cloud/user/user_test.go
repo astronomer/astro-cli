@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
-	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
-	"github.com/lucsky/cuid"
-	"github.com/samber/lo"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
+	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
+	"github.com/lucsky/cuid"
+	"github.com/samber/lo"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/stretchr/testify/mock"
@@ -94,12 +95,12 @@ var (
 
 // workspace users variables
 var (
-	workspaceId    = cuid.New()
+	workspaceID    = cuid.New()
 	workspaceUser1 = astroiamcore.User{
 		CreatedAt:        time.Now(),
 		FullName:         "user 1",
 		Id:               "user1-id",
-		WorkspaceRoles:   &[]astroiamcore.WorkspaceRole{{Role: astroiamcore.WORKSPACEMEMBER, WorkspaceId: workspaceId}},
+		WorkspaceRoles:   &[]astroiamcore.WorkspaceRole{{Role: astroiamcore.WORKSPACEMEMBER, WorkspaceId: workspaceID}},
 		OrganizationRole: &orgRole,
 		Username:         "user@1.com",
 	}
@@ -130,7 +131,7 @@ var (
 		},
 		JSON200: &astroiamcore.SubjectRoles{
 			OrganizationRole: lo.ToPtr(astroiamcore.SubjectRolesOrganizationRoleORGANIZATIONMEMBER),
-			WorkspaceRoles:   &[]astroiamcore.WorkspaceRole{{Role: astroiamcore.WORKSPACEMEMBER, WorkspaceId: workspaceId}},
+			WorkspaceRoles:   &[]astroiamcore.WorkspaceRole{{Role: astroiamcore.WORKSPACEMEMBER, WorkspaceId: workspaceID}},
 		},
 	}
 	MutateWorkspaceUserRoleResponseError = astroiamcore.UpdateUserRolesResponse{
@@ -247,7 +248,7 @@ func TestCreateInvite(t *testing.T) {
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
 		err = CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
-		assert.ErrorIs(t, err, ErrNoOrganizationId)
+		assert.ErrorIs(t, err, ErrNoOrganizationID)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -348,7 +349,7 @@ func TestUpdateOrgRole(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		err = UpdateOrgRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
-		assert.ErrorIs(t, err, ErrNoOrganizationId)
+		assert.ErrorIs(t, err, ErrNoOrganizationID)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -425,7 +426,7 @@ func TestListOrgUser(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		err = ListOrgUsers(out, mockClient)
-		assert.ErrorIs(t, err, ErrNoOrganizationId)
+		assert.ErrorIs(t, err, ErrNoOrganizationID)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -497,7 +498,7 @@ func TestListWorkspaceUser(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		err = ListWorkspaceUsers(out, mockClient, "")
-		assert.ErrorIs(t, err, ErrNoOrganizationId)
+		assert.ErrorIs(t, err, ErrNoOrganizationID)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -520,7 +521,7 @@ func TestUpdateWorkspaceUserRole(t *testing.T) {
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseOK, nil).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceUserWithResponseOK, nil).Once()
-		err := UpdateWorkspaceUserRole("user@1.com", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
+		err := UpdateWorkspaceUserRole("user@1.com", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -531,7 +532,7 @@ func TestUpdateWorkspaceUserRole(t *testing.T) {
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceUserWithResponseOK, nil).Once()
-		err := UpdateWorkspaceUserRole("user@1.com", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
+		err := UpdateWorkspaceUserRole("user@1.com", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
 		assert.EqualError(t, err, "network error")
 	})
 
@@ -541,14 +542,14 @@ func TestUpdateWorkspaceUserRole(t *testing.T) {
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseError, nil).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceUserWithResponseOK, nil).Once()
-		err := UpdateWorkspaceUserRole("user@1.com", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
+		err := UpdateWorkspaceUserRole("user@1.com", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
 		assert.EqualError(t, err, "failed to update user")
 	})
 	t.Run("error path when isValidRole returns an error", func(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
-		err := UpdateWorkspaceUserRole("user@1.com", "test-role", workspaceId, out, mockClient)
+		err := UpdateWorkspaceUserRole("user@1.com", "test-role", workspaceID, out, mockClient)
 		assert.ErrorIs(t, err, ErrInvalidWorkspaceRole)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -561,8 +562,8 @@ func TestUpdateWorkspaceUserRole(t *testing.T) {
 		assert.NoError(t, err)
 		out := new(bytes.Buffer)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
-		err = UpdateWorkspaceUserRole("user@1.com", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
-		assert.ErrorIs(t, err, ErrNoOrganizationId)
+		err = UpdateWorkspaceUserRole("user@1.com", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
+		assert.ErrorIs(t, err, ErrNoOrganizationID)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -570,7 +571,7 @@ func TestUpdateWorkspaceUserRole(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
-		err := UpdateWorkspaceUserRole("user@1.com", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
+		err := UpdateWorkspaceUserRole("user@1.com", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -597,7 +598,7 @@ func TestUpdateWorkspaceUserRole(t *testing.T) {
 		expectedOut := "The workspace user user@1.com role was successfully updated to WORKSPACE_MEMBER\n"
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseOK, nil).Once()
 
-		err = UpdateWorkspaceUserRole("", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
+		err = UpdateWorkspaceUserRole("", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOut, out.String())
 	})
@@ -612,7 +613,7 @@ func TestAddWorkspaceUser(t *testing.T) {
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseOK, nil).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Once()
-		err := AddWorkspaceUser("user@1.com", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
+		err := AddWorkspaceUser("user@1.com", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -623,7 +624,7 @@ func TestAddWorkspaceUser(t *testing.T) {
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Once()
-		err := AddWorkspaceUser("user@1.com", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
+		err := AddWorkspaceUser("user@1.com", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
 		assert.EqualError(t, err, "network error")
 	})
 
@@ -633,14 +634,14 @@ func TestAddWorkspaceUser(t *testing.T) {
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseError, nil).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Once()
-		err := AddWorkspaceUser("user@1.com", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
+		err := AddWorkspaceUser("user@1.com", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
 		assert.EqualError(t, err, "failed to update user")
 	})
 	t.Run("error path when isValidRole returns an error", func(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
-		err := AddWorkspaceUser("user@1.com", "test-role", workspaceId, out, mockClient)
+		err := AddWorkspaceUser("user@1.com", "test-role", workspaceID, out, mockClient)
 		assert.ErrorIs(t, err, ErrInvalidWorkspaceRole)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -653,8 +654,8 @@ func TestAddWorkspaceUser(t *testing.T) {
 		assert.NoError(t, err)
 		out := new(bytes.Buffer)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
-		err = AddWorkspaceUser("user@1.com", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
-		assert.ErrorIs(t, err, ErrNoOrganizationId)
+		err = AddWorkspaceUser("user@1.com", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
+		assert.ErrorIs(t, err, ErrNoOrganizationID)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -662,7 +663,7 @@ func TestAddWorkspaceUser(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
-		err := AddWorkspaceUser("user@1.com", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
+		err := AddWorkspaceUser("user@1.com", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -689,7 +690,7 @@ func TestAddWorkspaceUser(t *testing.T) {
 		expectedOut := "The user user@1.com was successfully added to the workspace with the role WORKSPACE_MEMBER\n"
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseOK, nil).Once()
 
-		err = AddWorkspaceUser("", "WORKSPACE_MEMBER", workspaceId, out, mockClient)
+		err = AddWorkspaceUser("", "WORKSPACE_MEMBER", workspaceID, out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOut, out.String())
 	})
@@ -704,7 +705,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseOK, nil).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceUserWithResponseOK, nil).Once()
-		err := RemoveWorkspaceUser("user@1.com", workspaceId, out, mockClient)
+		err := RemoveWorkspaceUser("user@1.com", workspaceID, out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -715,7 +716,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceUserWithResponseOK, nil).Once()
-		err := RemoveWorkspaceUser("user@1.com", workspaceId, out, mockClient)
+		err := RemoveWorkspaceUser("user@1.com", workspaceID, out, mockClient)
 		assert.EqualError(t, err, "network error")
 	})
 
@@ -725,7 +726,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseError, nil).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceUserWithResponseOK, nil).Once()
-		err := RemoveWorkspaceUser("user@1.com", workspaceId, out, mockClient)
+		err := RemoveWorkspaceUser("user@1.com", workspaceID, out, mockClient)
 		assert.EqualError(t, err, "failed to update user")
 	})
 
@@ -737,8 +738,8 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		assert.NoError(t, err)
 		out := new(bytes.Buffer)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
-		err = RemoveWorkspaceUser("user@1.com", workspaceId, out, mockClient)
-		assert.ErrorIs(t, err, ErrNoOrganizationId)
+		err = RemoveWorkspaceUser("user@1.com", workspaceID, out, mockClient)
+		assert.ErrorIs(t, err, ErrNoOrganizationID)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -746,7 +747,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
-		err := RemoveWorkspaceUser("user@1.com", workspaceId, out, mockClient)
+		err := RemoveWorkspaceUser("user@1.com", workspaceID, out, mockClient)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -773,7 +774,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		mockClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseOK, nil).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceUserWithResponseOK, nil).Once()
 
-		err = RemoveWorkspaceUser("", workspaceId, out, mockClient)
+		err = RemoveWorkspaceUser("", workspaceID, out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOut, out.String())
 	})
@@ -814,7 +815,7 @@ func TestGetUser(t *testing.T) {
 		assert.NoError(t, err)
 		mockClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
 		_, err = GetUser(mockClient, user1.Id)
-		assert.ErrorIs(t, err, ErrNoOrganizationId)
+		assert.ErrorIs(t, err, ErrNoOrganizationID)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {

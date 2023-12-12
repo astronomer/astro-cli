@@ -20,7 +20,7 @@ import (
 
 var (
 	ErrNoShortName              = errors.New("cannot retrieve organization short name from context")
-	ErrNoOrganizationId         = errors.New("cannot retrieve organizationId from context")
+	ErrNoOrganizationID         = errors.New("cannot retrieve organizationId from context")
 	ErrNoExistingWorkspaceRole  = errors.New("user does not have an existing role in the workspace")
 	ErrHasExistingWorkspaceRole = errors.New("user has an existing role in the workspace")
 	ErrInvalidRole              = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
@@ -50,7 +50,7 @@ func CreateInvite(email, role string, out io.Writer, client astroiamcore.CoreCli
 		return err
 	}
 	if ctx.Organization == "" {
-		return ErrNoOrganizationId
+		return ErrNoOrganizationID
 	}
 	userInviteInput = astroiamcore.CreateUserInviteJSONRequestBody{
 		InviteeEmail: email,
@@ -80,7 +80,7 @@ func UpdateOrgRole(email, role string, out io.Writer, client astroiamcore.CoreCl
 		return err
 	}
 	if ctx.Organization == "" {
-		return ErrNoOrganizationId
+		return ErrNoOrganizationID
 	}
 	// Get all org users
 	users, err := GetOrgUsers(client)
@@ -195,7 +195,7 @@ func GetOrgUsers(client astroiamcore.CoreClient) ([]astroiamcore.User, error) {
 		return nil, err
 	}
 	if ctx.Organization == "" {
-		return nil, ErrNoOrganizationId
+		return nil, ErrNoOrganizationID
 	}
 
 	for {
@@ -259,7 +259,7 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 		return err
 	}
 	if ctx.Organization == "" {
-		return ErrNoOrganizationId
+		return ErrNoOrganizationID
 	}
 	if workspace == "" {
 		workspace = ctx.Workspace
@@ -274,6 +274,9 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 		return err
 	}
 	user, err := GetUser(client, userID)
+	if err != nil {
+		return err
+	}
 	orgRole := astroiamcore.UpdateUserRolesRequestOrganizationRole(*user.OrganizationRole)
 	if user.WorkspaceRoles != nil {
 		_, _, found := lo.FindIndexOf(*user.WorkspaceRoles, func(role astroiamcore.WorkspaceRole) bool {
@@ -321,7 +324,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 		return err
 	}
 	if ctx.Organization == "" {
-		return ErrNoOrganizationId
+		return ErrNoOrganizationID
 	}
 	if workspace == "" {
 		workspace = ctx.Workspace
@@ -336,6 +339,9 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 		return err
 	}
 	user, err := GetUser(client, userID)
+	if err != nil {
+		return err
+	}
 	orgRole := astroiamcore.UpdateUserRolesRequestOrganizationRole(*user.OrganizationRole)
 	if user.WorkspaceRoles == nil {
 		return ErrNoExistingWorkspaceRole
@@ -403,7 +409,7 @@ func GetWorkspaceUsers(client astroiamcore.CoreClient, workspace string, limit i
 		return nil, err
 	}
 	if ctx.Organization == "" {
-		return nil, ErrNoOrganizationId
+		return nil, ErrNoOrganizationID
 	}
 	if workspace == "" {
 		workspace = ctx.Workspace
@@ -465,7 +471,7 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astroiam
 		return err
 	}
 	if ctx.Organization == "" {
-		return ErrNoOrganizationId
+		return ErrNoOrganizationID
 	}
 	if workspace == "" {
 		workspace = ctx.Workspace
@@ -480,6 +486,9 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astroiam
 		return err
 	}
 	user, err := GetUser(client, userID)
+	if err != nil {
+		return err
+	}
 	orgRole := astroiamcore.UpdateUserRolesRequestOrganizationRole(*user.OrganizationRole)
 	if user.WorkspaceRoles == nil {
 		return ErrNoExistingWorkspaceRole
@@ -533,7 +542,7 @@ func GetUser(client astroiamcore.CoreClient, userID string) (user astroiamcore.U
 		return user, err
 	}
 	if ctx.Organization == "" {
-		return user, ErrNoOrganizationId
+		return user, ErrNoOrganizationID
 	}
 
 	resp, err := client.GetUserWithResponse(httpContext.Background(), ctx.Organization, userID)
