@@ -3,12 +3,13 @@ package user
 import (
 	httpContext "context"
 	"fmt"
-	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
-	"github.com/samber/lo"
 	"io"
 	"os"
 	"strconv"
 	"time"
+
+	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
+	"github.com/samber/lo"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"

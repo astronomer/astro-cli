@@ -15,7 +15,7 @@ var (
 	astroClient             astro.Client
 	astroCoreClient         astrocore.CoreClient
 	astroIamCoreClient      astroiamcore.CoreClient
-	astroPlatformCoreClient astroplatformcore.CoreClient
+	astroPlatformCoreClient astroplatformcore.CoreClient //nolint:golint,unused
 	airflowAPIClient        airflow.Client
 )
 

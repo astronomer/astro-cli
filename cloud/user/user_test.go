@@ -11,14 +11,12 @@ import (
 
 	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
 	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
+	"github.com/astronomer/astro-cli/config"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/lucsky/cuid"
 	"github.com/samber/lo"
-
-	"github.com/astronomer/astro-cli/config"
-	"github.com/stretchr/testify/mock"
-
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 // org user variables
