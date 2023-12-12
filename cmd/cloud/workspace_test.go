@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/samber/lo"
 	"net/http"
 	"os"
 	"testing"
@@ -159,15 +160,16 @@ var (
 		Body:    errorBodyList,
 		JSON200: nil,
 	}
-	MutateWorkspaceUserRoleResponseOK = astrocore.MutateWorkspaceUserRoleResponse{
+	MutateWorkspaceUserRoleResponseOK = astroiamcore.UpdateUserRolesResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.UserRole{
-			Role: "WORKSPACE_MEMBER",
+		JSON200: &astroiamcore.SubjectRoles{
+			OrganizationRole: lo.ToPtr(astroiamcore.SubjectRolesOrganizationRoleORGANIZATIONMEMBER),
+			WorkspaceRoles:   &[]astroiamcore.WorkspaceRole{{WorkspaceId: testWorkspaceID, Role: workspaceRole}},
 		},
 	}
-	MutateWorkspaceUserRoleResponseError = astrocore.MutateWorkspaceUserRoleResponse{
+	MutateWorkspaceUserRoleResponseError = astroiamcore.UpdateUserRolesResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
@@ -272,10 +274,10 @@ func TestWorkspaceUserUpdate(t *testing.T) {
 	})
 	t.Run("valid email with valid role updates user", func(t *testing.T) {
 		expectedOut := "The workspace user user@1.com role was successfully updated to WORKSPACE_MEMBER"
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
-		mockClient.On("MutateWorkspaceUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseOK, nil).Once()
-		astroCoreClient = mockClient
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
+		mockIamClient.On("UpdateUserRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseOK, nil).Once()
+		astroIamCoreClient = mockIamClient
 		cmdArgs := []string{"user", "update", "user@1.com", "--role", "WORKSPACE_MEMBER"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
 		assert.NoError(t, err)
