@@ -125,13 +125,13 @@ func TestWorkspaceUserRootCommand(t *testing.T) {
 }
 
 var (
-	workspaceId    = cuid.New()
+	workspaceID    = cuid.New()
 	workspaceRole  = astroiamcore.WORKSPACEMEMBER
 	workspaceUser1 = astroiamcore.User{
 		CreatedAt:      time.Now(),
 		FullName:       "user 1",
 		Id:             "user1-id",
-		WorkspaceRoles: &[]astroiamcore.WorkspaceRole{{WorkspaceId: workspaceId, Role: workspaceRole}},
+		WorkspaceRoles: &[]astroiamcore.WorkspaceRole{{WorkspaceId: workspaceID, Role: workspaceRole}},
 		Username:       "user@1.com",
 	}
 	workspaceUsers = []astroiamcore.User{

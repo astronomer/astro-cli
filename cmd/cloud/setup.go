@@ -20,8 +20,6 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/util"
-	"github.com/golang-jwt/jwt/v4"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -419,7 +417,7 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 		permissionType := splitPermission[0]
 		id := splitPermission[1]
 		switch permissionType {
-		case "workspaceId":
+		case "workspaceID":
 			wsID = id
 		case "organizationId":
 			orgID = id
