@@ -20,7 +20,7 @@ import (
 
 var (
 	errInvalidWorkspaceRoleKey = errors.New("invalid workspace role selection")
-	workspaceID                string
+	workspaceID                string //nolint:typecheck
 	addWorkspaceRole           string
 	updateWorkspaceRole        string
 	workspaceName              string
