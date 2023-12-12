@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/util"
+	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
