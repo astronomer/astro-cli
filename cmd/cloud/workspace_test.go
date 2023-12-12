@@ -152,7 +152,7 @@ var (
 			Users:      workspaceUsers,
 		},
 	}
-	ListWorkspaceUsersResponseError = astrocore.ListWorkspaceUsersResponse{
+	ListWorkspaceUsersResponseError = astroiamcore.ListUsersResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
@@ -242,18 +242,18 @@ func TestWorkspaceUserList(t *testing.T) {
 		assert.Contains(t, resp, expectedHelp)
 	})
 	t.Run("any errors from api are returned and users are not listed", func(t *testing.T) {
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseError, nil).Once()
-		astroCoreClient = mockClient
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseError, nil).Once()
+		astroIamCoreClient = mockIamClient
 		cmdArgs := []string{"user", "list"}
 		_, err := execWorkspaceCmd(cmdArgs...)
 		assert.EqualError(t, err, "failed to list users")
 	})
 	t.Run("any context errors from api are returned and users are not listed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseError, nil).Once()
-		astroCoreClient = mockClient
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockIamClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseError, nil).Once()
+		astroIamCoreClient = mockIamClient
 		cmdArgs := []string{"user", "list"}
 		_, err := execWorkspaceCmd(cmdArgs...)
 		assert.Error(t, err)
