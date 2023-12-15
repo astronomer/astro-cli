@@ -109,7 +109,7 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, coreClient, platformCoreClient)
+	apiToken, err := checkAPIToken(isDeploymentFile, platformCoreClient)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	}
 
 	// run auth setup for any command that requires auth
-	apiKey, err := checkAPIKeys(client, coreClient, platformCoreClient, isDeploymentFile)
+	apiKey, err := checkAPIKeys(client, platformCoreClient, isDeploymentFile)
 	if err != nil {
 		return err
 	}
