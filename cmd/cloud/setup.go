@@ -240,7 +240,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, isDeploymentFile bool) (bool, error) {
+func checkAPIKeys(astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient, isDeploymentFile bool) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -360,7 +360,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, pla
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) (bool, error) {
+func checkAPIToken(isDeploymentFile bool, platformCoreClient astroplatformcore.CoreClient) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
