@@ -46,7 +46,7 @@ func NewRootCmd() *cobra.Command {
 	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
 	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
-	astroPlatformCoreClient := astroplatformcore.NewCoreClient(httputil.NewHTTPClient())
+	astroPlatformCoreClient := astroplatformcore.NewPlatformCoreClient(httputil.NewHTTPClient())
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
