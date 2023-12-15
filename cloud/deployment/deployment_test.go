@@ -323,6 +323,7 @@ func TestGetDeployment(t *testing.T) {
 	deploymentName = "test"
 	t.Run("correct deployment Name", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
 		deployment, err := GetDeployment(ws, "", deploymentName, false, mockPlatformCoreClient, nil)
 		assert.NoError(t, err)
@@ -352,6 +353,7 @@ func TestGetDeployment(t *testing.T) {
 		}
 
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
 		// Mock os.Stdin
 		input := []byte("1")
