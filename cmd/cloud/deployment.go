@@ -163,6 +163,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the Deployment.")
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of scheduler for the Deployment. Possible values can be small, medium, large")
 		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "disable", "Enables High Availability for the Deployment")
+		cmd.Flags().StringVarP(&resourceQuotaCpu, "resource-quota-cpu", "r", "", "The Deployment's CPU resource quota")
 	} else {
 		cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", 0, "The Deployment's scheduler resources in AUs")
 		cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", 0, "The number of scheduler replicas for the Deployment")
@@ -354,6 +355,9 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated) {
 		return errors.New("Invalid --cluster-type value")
 	}
+	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
+		return errors.New("Invalid --enforce-cicd value")
+	}
 	var coreDeploymentType astroplatformcore.DeploymentType
 	if deploymentType == standard {
 		coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
@@ -439,6 +443,10 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
+	}
+
+	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
+		return errors.New("Invalid --enforce-cicd value")
 	}
 
 	// Get release name from args, if passed

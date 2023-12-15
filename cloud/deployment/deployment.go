@@ -76,6 +76,7 @@ func newTableOutAll() *printutil.Table {
 }
 
 func CanCiCdDeploy(bearerToken string) bool {
+	fmt.Println(bearerToken)
 	token := strings.Split(bearerToken, " ")[1] // Stripping Bearer
 	// Parse the token to peek at the custom claims
 	claims, err := parseToken(token)
@@ -330,10 +331,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			resourceQuotaMemory = configOption.ResourceQuotas.ResourceQuota.Memory.Default
 		}
 		// validate hosted resources requests
-		resourcesValid := validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, configOption)
-		if !resourcesValid {
-			return nil
-		}
+		// resourcesValid := validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, configOption)
+		// if !resourcesValid {
+		// 	return ErrInvalidResourceRequest
+		// }
 		if IsDeploymentStandard(deploymentType) {
 			var requestedCloudProvider astroplatformcore.CreateStandardDeploymentRequestCloudProvider
 			if cloudProvider == "gcp" {
@@ -569,32 +570,102 @@ func validateHybridResources(schedulerAU, schedulerReplicas int, configOption as
 	return true
 }
 
-func validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, configOption astrocore.DeploymentOptions) bool { //nolint:gocritic
-	defaultTaskPodCpuMin := configOption.ResourceQuotas.DefaultPodSize.Cpu.Floor
-	defaultTaskPodCpuMax := configOption.ResourceQuotas.DefaultPodSize.Cpu.Ceiling
-	defaultTaskPodMemoryMin := configOption.ResourceQuotas.DefaultPodSize.Memory.Floor
-	defaultTaskPodMemoryMax := configOption.ResourceQuotas.DefaultPodSize.Memory.Ceiling
-	resourceQuotaCpuMin := configOption.ResourceQuotas.ResourceQuota.Cpu.Floor
-	resourceQuotaCpuMax := configOption.ResourceQuotas.ResourceQuota.Cpu.Ceiling
-	if defaultTaskPodCpu > defaultTaskPodCpuMax || defaultTaskPodCpu < defaultTaskPodCpuMin {
-		fmt.Printf("\nDefault Task Pod CPU must be between a min of %s and a max of %s CPU cores", defaultTaskPodCpuMin, defaultTaskPodCpuMax)
-		return false
-	}
+// func validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, configOption astrocore.DeploymentOptions) bool { //nolint:gocritic
+// 	var errConvert error
+// 	errConvert = nil
+// 	defaultTaskPodCpuInt, err := extractValue(defaultTaskPodCpu)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
+// 	defaultTaskPodMemoryInt, err := extractValue(defaultTaskPodMemory)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
+// 	resourceQuotaCpuInt, err := extractValue(resourceQuotaCpu)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
+// 	resourceQuotaMemoryInt, err := extractValue(resourceQuotaMemory)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
+// 	defaultTaskPodCpuMin, err := extractValue(configOption.ResourceQuotas.DefaultPodSize.Cpu.Floor)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
+// 	defaultTaskPodCpuMax, err := extractValue(configOption.ResourceQuotas.DefaultPodSize.Cpu.Ceiling)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
+// 	defaultTaskPodMemoryMin, err := extractValue(configOption.ResourceQuotas.DefaultPodSize.Memory.Floor)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
+// 	defaultTaskPodMemoryMax, err := extractValue(configOption.ResourceQuotas.DefaultPodSize.Memory.Ceiling)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
+// 	resourceQuotaCpuMin, err := extractValue(configOption.ResourceQuotas.ResourceQuota.Cpu.Floor)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
+// 	resourceQuotaCpuMax, err := extractValue(configOption.ResourceQuotas.ResourceQuota.Cpu.Ceiling)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
+// 	resourceQuotaMemoryMin, err := extractValue(configOption.ResourceQuotas.ResourceQuota.Memory.Floor)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
+// 	resourceQuotaMemoryMax, err := extractValue(configOption.ResourceQuotas.ResourceQuota.Memory.Ceiling)
+// 	if err != nil {
+// 		errConvert = err
+// 	}
 
-	if defaultTaskPodMemory > defaultTaskPodMemoryMax || defaultTaskPodMemory < defaultTaskPodMemoryMin {
-		fmt.Printf("\nDefault Task Pod Memory must be between a min of %s and a max of %s Gis", defaultTaskPodMemoryMin, defaultTaskPodMemoryMax)
-		return false
-	}
-	fmt.Println(resourceQuotaCpu)
-	fmt.Println(resourceQuotaCpuMax)
-	fmt.Println(resourceQuotaCpu > resourceQuotaCpuMax)
-	fmt.Println(resourceQuotaCpu < resourceQuotaCpuMin)
-	if resourceQuotaCpu > resourceQuotaCpuMax || resourceQuotaCpu < resourceQuotaCpuMin {
-		fmt.Printf("\nDefault Resource Quota CPU must be between a min of %s and a max of %s CPU cores", resourceQuotaCpuMin, resourceQuotaCpuMax)
-		return false
-	}
-	return true
-}
+// 	if errConvert != nil {
+// 		fmt.Println(errConvert)
+// 		return false
+// 	}
+
+// 	if defaultTaskPodCpuInt > defaultTaskPodCpuMax || defaultTaskPodCpuInt < defaultTaskPodCpuMin {
+// 		fmt.Printf("\nDefault Task Pod CPU must be between a min of %d and a max of %d CPU cores", defaultTaskPodCpuMin, defaultTaskPodCpuMax)
+// 		return false
+// 	}
+
+// 	if defaultTaskPodMemoryInt > defaultTaskPodMemoryMax || defaultTaskPodMemoryInt < defaultTaskPodMemoryMin {
+// 		fmt.Printf("\nDefault Task Pod Memory must be between a min of %d and a max of %d Gis", defaultTaskPodMemoryMin, defaultTaskPodMemoryMax)
+// 		return false
+// 	}
+// 	fmt.Println(resourceQuotaCpu)
+// 	fmt.Println(resourceQuotaCpuMax)
+// 	fmt.Println(resourceQuotaCpuInt > resourceQuotaCpuMax)
+// 	fmt.Println(resourceQuotaCpuInt < resourceQuotaCpuMin)
+// 	if resourceQuotaCpuInt > resourceQuotaCpuMax || resourceQuotaCpuInt < resourceQuotaCpuMin {
+// 		fmt.Printf("\nDefault Resource Quota CPU must be between a min of %d and a max of %d CPU cores", resourceQuotaCpuMin, resourceQuotaCpuMax)
+// 		return false
+// 	}
+
+// 	if resourceQuotaMemoryInt > resourceQuotaMemoryMax || resourceQuotaMemoryInt < resourceQuotaMemoryMin {
+// 		fmt.Printf("\nDefault Resource Quota Memory must be between a min of %d and a max of %d Gis cores", resourceQuotaMemoryMin, resourceQuotaMemoryMax)
+// 		return false
+// 	}
+// 	return true
+// }
+
+// // extractValueAndUnit extracts the numeric value and unit from a string
+// func extractValue(s string) (int, error) {
+// 	re := regexp.MustCompile(`^(\d+)([a-zA-Z]+)$`)
+// 	matches := re.FindStringSubmatch(s)
+// 	if len(matches) == 3 {
+// 		intVal1, err := strconv.Atoi(matches[1])
+// 		if err != nil {
+// 			return 0, err
+// 		}
+// 		return intVal1, nil
+// 	}
+// 	// Default to empty strings if the regex doesn't match
+// 	return 0, errors.New("unable to determine value")
+// }
 
 func ListClusterOptions(cloudProvider string, coreClient astrocore.CoreClient) ([]astrocore.ClusterOptions, error) {
 	var provider astrocore.GetClusterOptionsParamsProvider
@@ -903,10 +974,10 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			resourceQuotaMemory = *currentDeployment.ResourceQuotaMemory
 		}
 		// validate hosted resources requests
-		resourcesValid := validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, configOption)
-		if !resourcesValid {
-			return nil
-		}
+		// resourcesValid := validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, configOption)
+		// if !resourcesValid {
+		// 	return ErrInvalidResourceRequest
+		// }
 		if IsDeploymentStandard(*currentDeployment.Type) {
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
 			if executor == "" {
@@ -947,11 +1018,17 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
 			if standardDeploymentRequest.Executor == astroplatformcore.CELERY {
+				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES {
+					confirmWithUser = true
+				}
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES && workerQueuesRequest == nil {
 					standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
 				} else {
-					fmt.Println(workerQueuesRequest)
 					standardDeploymentRequest.WorkerQueues = &workerQueuesRequest
+				}
+			} else {
+				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
+					confirmWithUser = true
 				}
 			}
 			err := updateDeploymentRequest.FromUpdateStandardDeploymentRequest(standardDeploymentRequest)
@@ -1000,10 +1077,17 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
 			if dedicatedDeploymentRequest.Executor == astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY {
+				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES {
+					confirmWithUser = true
+				}
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES && workerQueuesRequest == nil {
 					dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
 				} else {
 					dedicatedDeploymentRequest.WorkerQueues = &workerQueuesRequest
+				}
+			} else {
+				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
+					confirmWithUser = true
 				}
 			}
 			err := updateDeploymentRequest.FromUpdateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
@@ -1044,7 +1128,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		// validate au resources requests
 		resourcesValid := validateHybridResources(schedulerAU, schedulerReplicas, configOption)
 		if !resourcesValid {
-			return nil
+			return ErrInvalidResourceRequest
 		}
 		var requestedExecutor astroplatformcore.UpdateHybridDeploymentRequestExecutor
 		if executor == "" {
@@ -1077,6 +1161,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		nodePools := *cluster.NodePools
 		if hybridDeploymentRequest.Executor == astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES {
 			if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
+				confirmWithUser = true
 				hybridDeploymentRequest.TaskPodNodePoolId = &nodePools[0].Id
 			} else {
 				hybridDeploymentRequest.TaskPodNodePoolId = currentDeployment.TaskPodNodePoolId
@@ -1094,6 +1179,9 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				hybridDeploymentRequest.WorkerQueues = &workerQueuesRequest
 			} else {
 				hybridDeploymentRequest.WorkerQueues = &workerQueuesRequest
+			}
+			if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES {
+				confirmWithUser = true
 			}
 		}
 		err = updateDeploymentRequest.FromUpdateHybridDeploymentRequest(hybridDeploymentRequest)
@@ -1458,12 +1546,16 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 		if len(stageDeployments) > 1 {
 			fmt.Printf("More than one Deployment with the name %s was found\n", deploymentName)
 		}
-		if len(stageDeployments) == 1 {
-			return stageDeployments[0], nil
-		}
 		if len(stageDeployments) < 1 {
 			fmt.Printf("No Deployment with the name %s was found\n", deploymentName)
 			return astroplatformcore.Deployment{}, errInvalidDeployment
+		}
+		currentDeployment, err := CoreGetDeployment("", stageDeployments[0].Id, corePlatformClient)
+		if err != nil {
+			return astroplatformcore.Deployment{}, err
+		}
+		if len(stageDeployments) == 1 {
+			return currentDeployment, nil
 		}
 	}
 
