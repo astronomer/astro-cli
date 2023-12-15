@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"bytes"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"io"
 	"os"
 	"testing"
+
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"

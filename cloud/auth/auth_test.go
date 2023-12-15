@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"io"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/context"

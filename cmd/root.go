@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"net/http"
 	"os"
 	"time"
+
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
 	"github.com/astronomer/astro-cli/cmd/registry"
 

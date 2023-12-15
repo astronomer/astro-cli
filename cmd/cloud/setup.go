@@ -4,7 +4,6 @@ import (
 	http_context "context"
 	"encoding/json"
 	"fmt"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"io"
 	"log"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"

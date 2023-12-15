@@ -1,8 +1,9 @@
 package cloud
 
 import (
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"io"
+
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
 	airflow "github.com/astronomer/astro-cli/airflow-client"
 	astro "github.com/astronomer/astro-cli/astro-client"
