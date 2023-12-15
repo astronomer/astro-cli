@@ -15,7 +15,6 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
-	"github.com/astronomer/astro-cli/cloud/organization"
 )
 
 type deploymentMetadata struct {
@@ -37,7 +36,7 @@ type deploymentConfig struct {
 	Name                  string `mapstructure:"name" yaml:"name" json:"name"`
 	Description           string `mapstructure:"description" yaml:"description" json:"description"`
 	RunTimeVersion        string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
-	DagDeployEnabled      *bool  `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
+	DagDeployEnabled      bool   `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
 	APIKeyOnlyDeployments bool   `mapstructure:"ci_cd_enforcement" yaml:"ci_cd_enforcement" json:"ci_cd_enforcement"`
 	SchedulerSize         string `mapstructure:"scheduler_size" yaml:"scheduler_size" json:"scheduler_size"`
 	IsHighAvailability    bool   `mapstructure:"is_high_availability" yaml:"is_high_availability" json:"is_high_availability"`
@@ -49,17 +48,17 @@ type deploymentConfig struct {
 	DeploymentType        string `mapstructure:"deployment_type" yaml:"deployment_type" json:"deployment_type"`
 	CloudProvider         string `mapstructure:"cloud_provider" yaml:"cloud_provider" json:"cloud_provider"`
 	Region                string `mapstructure:"region" yaml:"region" json:"region"`
-	DefaultTaskPodCpu     string `mapstructure:"default_task_pod_cpu" yaml:"default_task_pod_cpu" json:"default_task_pod_cpu"`
-	DefaultTaskPodMemory  string `mapstructure:"default_task_pod_memory" yaml:"default_task_pod_memory" json:"default_task_pod_memory"`
-	ResourceQuotaCpu      string `mapstructure:"resource_quota_cpu" yaml:"resource_quota_cpu" json:"resource_quota_cpu"`
-	ResourceQuotaMemory   string `mapstructure:"resource_quota_memory" yaml:"resource_quota_memory" json:"resource_quota_memory"`
-	DefaultWorkerType     string `mapstructure:"default_worker_type" yaml:"default_worker_type" json:"default_worker_type"`
+	DefaultTaskPodCpu     string `mapstructure:"default_task_pod_cpu,omitempty" yaml:"default_task_pod_cpu,omitempty" json:"default_task_pod_cpu,omitempty"`
+	DefaultTaskPodMemory  string `mapstructure:"default_task_pod_memory,omitempty" yaml:"default_task_pod_memory,omitempty" json:"default_task_pod_memory,omitempty"`
+	ResourceQuotaCpu      string `mapstructure:"resource_quota_cpu,omitempty" yaml:"resource_quota_cpu,omitempty" json:"resource_quota_cpu,omitempty"`
+	ResourceQuotaMemory   string `mapstructure:"resource_quota_memory,omitempty" yaml:"resource_quota_memory,omitempty" json:"resource_quota_memory,omitempty"`
+	DefaultWorkerType     string `mapstructure:"default_worker_type,omitempty" yaml:"default_worker_type,omitempty" json:"default_worker_type,omitempty"`
 }
 
 type Workerq struct {
 	Name              string `mapstructure:"name" yaml:"name" json:"name"`
 	MaxWorkerCount    int    `mapstructure:"max_worker_count,omitempty" yaml:"max_worker_count,omitempty" json:"max_worker_count,omitempty"`
-	MinWorkerCount    *int   `mapstructure:"min_worker_count,omitempty" yaml:"min_worker_count,omitempty" json:"min_worker_count,omitempty"`
+	MinWorkerCount    int    `mapstructure:"min_worker_count,omitempty" yaml:"min_worker_count,omitempty" json:"min_worker_count,omitempty"`
 	WorkerConcurrency int    `mapstructure:"worker_concurrency,omitempty" yaml:"worker_concurrency,omitempty" json:"worker_concurrency,omitempty"`
 	WorkerType        string `mapstructure:"worker_type" yaml:"worker_type" json:"worker_type"`
 	PodCPU            string `mapstructure:"pod_cpu,omitempty" yaml:"pod_cpu,omitempty" json:"pod_cpu,omitempty"`
@@ -169,11 +168,11 @@ func getDeploymentInfo(coreDeployment astroplatformcore.Deployment) (map[string]
 	}
 	clusterID := coreDeployment.ClusterId
 	releaseName := coreDeployment.Namespace
-	if organization.IsOrgHosted() {
+	if deployment.IsDeploymentStandard(*coreDeployment.Type) || deployment.IsDeploymentDedicated(*coreDeployment.Type) {
 		if deployment.IsDeploymentStandard(*coreDeployment.Type) {
 			clusterID = nil
 		}
-		// releaseName = notApplicable
+		releaseName = notApplicable
 	}
 	if coreDeployment.WorkloadIdentity != nil {
 		workloadIdentity = *coreDeployment.WorkloadIdentity
@@ -207,28 +206,35 @@ func getDeploymentConfig(coreDeployment astroplatformcore.Deployment, platformCo
 			}
 		}
 	}
-	return map[string]interface{}{
-		"name":                    coreDeployment.Name,
-		"description":             coreDeployment.Description,
-		"workspace_name":          coreDeployment.WorkspaceName,
-		"deployment_type":         coreDeployment.Type,
-		"cloud_provider":          coreDeployment.CloudProvider,
-		"region":                  coreDeployment.Region,
-		"cluster_name":            clusterName,
-		"runtime_version":         coreDeployment.RuntimeVersion,
-		"dag_deploy_enabled":      coreDeployment.DagDeployEnabled,
-		"ci_cd_enforcement":       coreDeployment.IsCicdEnforced,
-		"is_high_availability":    coreDeployment.IsHighAvailability,
-		"scheduler_au":            coreDeployment.SchedulerAu,
-		"scheduler_count":         coreDeployment.SchedulerReplicas,
-		"executor":                coreDeployment.Executor,
-		"default_task_pod_cpu":    coreDeployment.DefaultTaskPodCpu,
-		"default_task_pod_memory": coreDeployment.DefaultTaskPodMemory,
-		"resource_quota_cpu":      coreDeployment.ResourceQuotaCpu,
-		"resource_quota_memory":   coreDeployment.ResourceQuotaMemory,
-		"scheduler_size":          coreDeployment.SchedulerSize,
-		"default_worker_type":     defaultWorkerType,
-	}, nil
+
+	deploymentMap := map[string]interface{}{
+		"name":                 coreDeployment.Name,
+		"description":          coreDeployment.Description,
+		"workspace_name":       coreDeployment.WorkspaceName,
+		"deployment_type":      string(*coreDeployment.Type),
+		"cloud_provider":       coreDeployment.CloudProvider,
+		"region":               coreDeployment.Region,
+		"cluster_name":         clusterName,
+		"runtime_version":      coreDeployment.RuntimeVersion,
+		"dag_deploy_enabled":   coreDeployment.DagDeployEnabled,
+		"ci_cd_enforcement":    coreDeployment.IsCicdEnforced,
+		"is_high_availability": coreDeployment.IsHighAvailability,
+		"scheduler_au":         coreDeployment.SchedulerAu,
+		"scheduler_count":      coreDeployment.SchedulerReplicas,
+		"executor":             coreDeployment.Executor,
+		"scheduler_size":       coreDeployment.SchedulerSize,
+	}
+	if deployment.IsDeploymentStandard(*coreDeployment.Type) || deployment.IsDeploymentDedicated(*coreDeployment.Type) {
+		deploymentMap["default_task_pod_cpu"] = coreDeployment.DefaultTaskPodCpu
+		deploymentMap["default_task_pod_memory"] = coreDeployment.DefaultTaskPodMemory
+		deploymentMap["resource_quota_cpu"] = coreDeployment.ResourceQuotaCpu
+		deploymentMap["resource_quota_memory"] = coreDeployment.ResourceQuotaMemory
+	}
+	if !deployment.IsDeploymentStandard(*coreDeployment.Type) {
+		deploymentMap["default_worker_type"] = defaultWorkerType
+	}
+
+	return deploymentMap, nil
 }
 
 func getAdditional(coreDeployment astroplatformcore.Deployment, NodePools []astroplatformcore.NodePool) map[string]interface{} {

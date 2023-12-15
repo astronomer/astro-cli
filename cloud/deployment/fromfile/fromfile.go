@@ -1,7 +1,6 @@
 package fromfile
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +9,6 @@ import (
 	"os"
 	"sort"
 
-	"github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -99,35 +97,35 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		return err
 	}
 	if action == createAction {
-		if deployment.IsDeploymentStandard(deploymentType) {
-			getSharedClusterParams := astrocore.GetSharedClusterParams{
-				Region:        formattedDeployment.Deployment.Configuration.Region,
-				CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(formattedDeployment.Deployment.Configuration.CloudProvider),
-			}
-			response, err := coreClient.GetSharedClusterWithResponse(context.Background(), &getSharedClusterParams)
-			if err != nil {
-				return err
-			}
-			err = astrocore.NormalizeAPIError(response.HTTPResponse, response.Body)
-			if err != nil {
-				return err
-			}
-			clusterID = response.JSON200.Id
-		}
+		// if deployment.IsDeploymentStandard(deploymentType) {
+		// 	getSharedClusterParams := astrocore.GetSharedClusterParams{
+		// 		Region:        formattedDeployment.Deployment.Configuration.Region,
+		// 		CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(formattedDeployment.Deployment.Configuration.CloudProvider),
+		// 	}
+		// 	response, err := coreClient.GetSharedClusterWithResponse(context.Background(), &getSharedClusterParams)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	err = astrocore.NormalizeAPIError(response.HTTPResponse, response.Body)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	clusterID = response.JSON200.Id
+		// }
 		// map workspace name to id
 		workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, c.Organization, coreClient)
 		if err != nil {
 			return err
 		}
 		// get correct value for dag deploy
-		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil {
+		if &formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil {
 			if organization.IsOrgHosted() {
 				dagDeploy = true
 			} else {
 				dagDeploy = false
 			}
 		} else {
-			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
+			dagDeploy = formattedDeployment.Deployment.Configuration.DagDeployEnabled
 		}
 		// check if deployment exists
 		if deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
@@ -142,15 +140,18 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		if err != nil {
 			return err
 		}
+		if hasEnvVarsOrAlertEmails(&formattedDeployment) {
+			action = updateAction
+		}
 	}
 	// get new existing deployments list
 	existingDeployments, err = deployment.CoreGetDeployments(workspaceID, c.Organization, astroPlatformCore)
 	if err != nil {
 		return err
 	}
-	if action == updateAction || hasEnvVarsOrAlertEmails(&formattedDeployment) {
+	if action == updateAction {
 		// check if deployment does not exist
-		if !deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) && !hasEnvVarsOrAlertEmails(&formattedDeployment) {
+		if !deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
 			// update does not allow creating new deployments
 			errHelp = fmt.Sprintf("use deployment create --deployment-file %s instead", inputFile)
 			return fmt.Errorf("deployment: %s %w: %s", formattedDeployment.Deployment.Configuration.Name,
@@ -160,12 +161,11 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
 		workspaceID = existingDeployment.WorkspaceId
 		// determine dagDeploy
-		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil {
+		if &formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil {
 			dagDeploy = existingDeployment.DagDeployEnabled
 		} else {
-			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
+			dagDeploy = formattedDeployment.Deployment.Configuration.DagDeployEnabled
 		}
-
 		if !deployment.IsDeploymentStandard(deploymentType) {
 			clusterID = *existingDeployment.ClusterId
 		}
@@ -750,9 +750,7 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 		// add new queue or update existing queue properties to list of queues to return
 		qList[i].Name = requestedQueues[i].Name
 		qList[i].IsDefault = requestedQueues[i].Name == defaultQueue
-		if requestedQueues[i].MinWorkerCount != nil {
-			qList[i].MinWorkerCount = *requestedQueues[i].MinWorkerCount
-		}
+		qList[i].MinWorkerCount = requestedQueues[i].MinWorkerCount
 		qList[i].MaxWorkerCount = requestedQueues[i].MaxWorkerCount
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
@@ -797,29 +795,6 @@ func hasEnvVarsOrAlertEmails(deploymentFromFile *inspect.FormattedDeployment) bo
 		return hasAlertEmails(deploymentFromFile)
 	}
 	return false
-}
-
-// createAlertEmails takes a deploymentFromFile and deploymentID and a client as its arguments.
-// It creates or updates alert emails for the deployment identified by deploymentID.
-// It returns an error if it fails to update the alert emails for a deployment.
-func createAlertEmails(deploymentFromFile *inspect.FormattedDeployment, deploymentID string, client astro.Client) (astro.DeploymentAlerts, error) {
-	var (
-		alertsInput astro.UpdateDeploymentAlertsInput
-		alertEmails []string
-		alerts      astro.DeploymentAlerts
-		err         error
-	)
-
-	alertEmails = deploymentFromFile.Deployment.AlertEmails
-	alertsInput = astro.UpdateDeploymentAlertsInput{
-		DeploymentID: deploymentID,
-		AlertEmails:  alertEmails,
-	}
-	alerts, err = client.UpdateAlertEmails(alertsInput)
-	if err != nil {
-		return astro.DeploymentAlerts{}, err
-	}
-	return alerts, nil
 }
 
 // isJSON returns true if data is in JSON format.

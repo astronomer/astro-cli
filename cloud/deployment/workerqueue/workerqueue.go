@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -230,7 +229,12 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			}
 		} else {
 			// update does not allow creating new queues
-			errHelp = fmt.Sprintf("use worker queue create %s instead", queueToCreateOrUpdate.Name)
+			if queueToCreateOrUpdate != nil {
+				errHelp = fmt.Sprintf("use worker queue create %s instead", queueToCreateOrUpdate.Name)
+			}
+			if queueToCreateOrUpdateHybrid != nil {
+				errHelp = fmt.Sprintf("use worker queue create %s instead", queueToCreateOrUpdateHybrid.Name)
+			}
 			return fmt.Errorf("%w: %s", errCannotCreateNewQueue, errHelp)
 		}
 	}
@@ -318,7 +322,7 @@ func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
 		!(requestedWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
-		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", int(defaultOptions.MaxWorkers.Floor), int(defaultOptions.MinWorkers.Ceiling))
+		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", int(defaultOptions.MinWorkers.Floor), int(defaultOptions.MinWorkers.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	if !(requestedWorkerQueue.MaxWorkerCount >= int(defaultOptions.MaxWorkers.Floor)) ||
@@ -330,6 +334,7 @@ func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore
 	workerConcurrenyFloor := 1
 	if !(requestedWorkerQueue.WorkerConcurrency >= workerConcurrenyFloor) ||
 		!(requestedWorkerQueue.WorkerConcurrency <= int(machineOptions.Concurrency.Ceiling)) {
+		fmt.Println("hosted function called")
 		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", workerConcurrenyFloor, int(machineOptions.Concurrency.Ceiling))
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
@@ -373,11 +378,23 @@ func QueueExists(existingQueues []astroplatformcore.WorkerQueue, queueToCreate *
 				// queueToCreate exists
 				return true
 			}
+			if queueToCreateOrUpdateHybrid.Id != nil {
+				if queue.Id == *queueToCreateOrUpdateHybrid.Id {
+					// queueToCreate exists
+					return true
+				}
+			}
 		}
 		if queueToCreate != nil {
 			if queue.Name == queueToCreate.Name {
 				// queueToCreate exists
 				return true
+			}
+			if queueToCreate.Id != nil {
+				if queue.Id == *queueToCreate.Id {
+					// queueToCreate exists
+					return true
+				}
 			}
 		}
 	}
@@ -492,7 +509,7 @@ func selectNodePool(workerType string, nodePools []astroplatformcore.NodePool, o
 // user gets prompted if no name for the queue to delete was specified
 // An errQueueDoesNotExist is returned if queue to delete does not exist
 // An errCannotDeleteDefaultQueue is returned if a user chooses the default queue
-func Delete(ws, deploymentID, deploymentName, name string, force bool, client astro.Client, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer) error {
+func Delete(ws, deploymentID, deploymentName, name string, force bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer) error {
 	var (
 		requestedDeployment astroplatformcore.Deployment
 		err                 error

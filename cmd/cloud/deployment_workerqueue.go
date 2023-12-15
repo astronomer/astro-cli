@@ -116,5 +116,5 @@ func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	return workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroClient, platformCoreClient, astroCoreClient, out)
+	return workerqueue.Delete(ws, deploymentID, deploymentName, name, force, platformCoreClient, astroCoreClient, out)
 }

@@ -4,28 +4,34 @@ import (
 	"fmt"
 	"io"
 
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 var (
-	connID             string
-	connType           string
-	host               string
-	login              string
-	password           string
-	schema             string
-	extra              string
-	fromDeploymentID   string
-	fromDeploymentName string
-	toDeploymentID     string
-	toDeploymentName   string
-	port               int
-	varValue           string
-	key                string
-	slots              int
+	connID               string
+	connType             string
+	host                 string
+	login                string
+	password             string
+	schema               string
+	extra                string
+	fromDeploymentID     string
+	fromDeploymentName   string
+	toDeploymentID       string
+	toDeploymentName     string
+	port                 int
+	varValue             string
+	key                  string
+	slots                int
+	depIds               = []string{"test-deployment-id"}
+	deploymentListParams = &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds,
+	}
 )
 
 const (
