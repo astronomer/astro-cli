@@ -268,7 +268,6 @@ func TestCheckAPIKeys(t *testing.T) {
 		}
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", "test-org-id", "").Return(mockDeplyResp, nil).Once()
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
 
@@ -300,7 +299,7 @@ func TestCheckAPIKeys(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIKeys(mockClient, mockCoreClient, mockPlatformCoreClient, false)
+		_, err = checkAPIKeys(mockClient, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 	})
 }
@@ -338,7 +337,6 @@ func TestCheckToken(t *testing.T) {
 
 func TestCheckAPIToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
 		HTTPResponse: &http.Response{
@@ -379,7 +377,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIToken(true, mockCoreClient, mockPlatformCoreClient)
+		_, err = checkAPIToken(true, mockPlatformCoreClient)
 		assert.NoError(t, err)
 	})
 
@@ -407,7 +405,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIToken(true, mockCoreClient, mockPlatformCoreClient)
+		_, err = checkAPIToken(true, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 }
