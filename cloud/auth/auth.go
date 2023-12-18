@@ -19,6 +19,7 @@ import (
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -253,7 +254,7 @@ func switchToLastUsedWorkspace(c *config.Context, workspaces []astrocore.Workspa
 }
 
 // check client status after a successfully login
-func CheckUserSession(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func CheckUserSession(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	// fetch self user based on token
 	// we set CreateIfNotExist to true so we always create astro user when a successfully login
 	createIfNotExist := true
@@ -269,8 +270,8 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 	}
 	activeOrgID := c.Organization
 	// fetch all orgs that the user can access
-	organizationListParams := &astrocore.ListOrganizationsParams{}
-	orgsResp, err := coreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
+	organizationListParams := &astroplatformcore.ListOrganizationsParams{}
+	orgsResp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 	if err != nil {
 		return err
 	}
@@ -278,7 +279,8 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 	if err != nil {
 		return err
 	}
-	orgs := *orgsResp.JSON200
+	orgsPaginated := *orgsResp.JSON200
+	orgs := orgsPaginated.Organizations
 	if len(orgs) == 0 {
 		return ErrorNoOrganization
 	}
@@ -295,7 +297,7 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 	if activeOrg.Product != nil {
 		orgProduct = fmt.Sprintf("%s", *activeOrg.Product) //nolint
 	}
-	err = c.SetOrganizationContext(activeOrg.Id, activeOrg.ShortName, orgProduct)
+	err = c.SetOrganizationContext(activeOrg.Id, activeOrg.Name, orgProduct)
 	if err != nil {
 		return err
 	}
@@ -339,7 +341,7 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+func Login(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = domainutil.FormatDomain(domain)
 	authConfig, err := FetchDomainAuthConfig(domain)
@@ -393,7 +395,7 @@ func Login(domain, token string, client astro.Client, coreClient astrocore.CoreC
 
 	fmt.Printf("Logging in as %s\n", ansi.Green(res.UserEmail))
 
-	err = CheckUserSession(&c, client, coreClient, out)
+	err = CheckUserSession(&c, client, coreClient, platformCoreClient, out)
 	if err != nil {
 		return err
 	}

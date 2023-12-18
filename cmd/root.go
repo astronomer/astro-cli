@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+
 	"github.com/astronomer/astro-cli/cmd/registry"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
@@ -99,7 +101,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	}
 
 	rootCmd.AddCommand(
-		newLoginCommand(astroClient, astroCoreClient, os.Stdout),
+		newLoginCommand(astroClient, astroCoreClient, astroPlatformCoreClient, os.Stdout),
 		newLogoutCommand(os.Stdout),
 		newVersionCommand(),
 		newDevRootCmd(platformCoreClient, astroCoreClient),

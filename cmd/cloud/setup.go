@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -108,7 +110,7 @@ func Setup(cmd *cobra.Command, client astro.Client, platformCoreClient astroplat
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, coreClient)
+	apiToken, err := checkAPIToken(isDeploymentFile, platformCoreClient)
 	if err != nil {
 		return err
 	}
@@ -124,7 +126,7 @@ func Setup(cmd *cobra.Command, client astro.Client, platformCoreClient astroplat
 	if apiKey {
 		return nil
 	}
-	err = checkToken(client, coreClient, os.Stdout)
+	err = checkToken(client, coreClient, platformCoreClient, os.Stdout)
 	if err != nil {
 		return err
 	}
@@ -132,7 +134,7 @@ func Setup(cmd *cobra.Command, client astro.Client, platformCoreClient astroplat
 	return nil
 }
 
-func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func checkToken(client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		return err
@@ -141,7 +143,7 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 	// check if user is logged in
 	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
 		// guide the user through the login process if not logged in
-		err := authLogin(c.Domain, "", client, coreClient, out, false)
+		err := authLogin(c.Domain, "", client, coreClient, platformCoreClient, out, false)
 		if err != nil {
 			return err
 		}
@@ -155,7 +157,7 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 		res, err := refresh(c.RefreshToken, authConfig)
 		if err != nil {
 			// guide the user through the login process if refresh doesn't work
-			err := authLogin(c.Domain, "", client, coreClient, out, false)
+			err := authLogin(c.Domain, "", client, coreClient, platformCoreClient, out, false)
 			if err != nil {
 				return err
 			}
@@ -330,14 +332,14 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, coreClient as
 	if err != nil {
 		return false, err
 	}
-	orgs, err := organization.ListOrganizations(coreClient)
+	orgs, err := organization.ListOrganizations(platformCoreClient)
 	if err != nil {
 		return false, err
 	}
 
 	org := orgs[0]
 	orgID := org.Id
-	orgShortName := org.ShortName
+	orgName := org.Name
 	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
 	// get workspace ID
@@ -352,14 +354,14 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, coreClient as
 		fmt.Println("no workspace set")
 	}
 
-	err = c.SetOrganizationContext(orgID, orgShortName, orgProduct)
+	err = c.SetOrganizationContext(orgID, orgName, orgProduct)
 	if err != nil {
 		fmt.Println("no organization context set")
 	}
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool, error) {
+func checkAPIToken(isDeploymentFile bool, platformCoreClient astroplatformcore.CoreClient) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
@@ -429,7 +431,7 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 		}
 	}
 
-	orgs, err := organization.ListOrganizations(coreClient)
+	orgs, err := organization.ListOrganizations(platformCoreClient)
 	if err != nil {
 		return false, err
 	}

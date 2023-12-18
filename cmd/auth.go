@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
@@ -26,14 +28,14 @@ var (
 	softwareLogout = softwareAuth.Logout
 )
 
-func newLoginCommand(astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) *cobra.Command {
+func newLoginCommand(astroClient astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login [BASEDOMAIN]",
 		Short: "Log in to Astronomer",
 		Long:  "Authenticate to Astro or Astronomer Software",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return login(cmd, args, astroClient, coreClient, out)
+			return login(cmd, args, astroClient, coreClient, platformCoreClient, out)
 		},
 	}
 
@@ -56,7 +58,7 @@ func newLogoutCommand(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func login(cmd *cobra.Command, args []string, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func login(cmd *cobra.Command, args []string, astroClient astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -77,15 +79,15 @@ func login(cmd *cobra.Command, args []string, astroClient astro.Client, coreClie
 			}
 			return softwareLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
 		}
-		return cloudLogin(args[0], token, astroClient, coreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(args[0], token, astroClient, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
 	}
 	// Log back into the current context in case no domain is passed
 	ctx, err := context.GetCurrentContext()
 	if err != nil || ctx.Domain == "" {
 		// Default case when no domain is passed, and error getting current context
-		return cloudLogin(domainutil.DefaultDomain, token, astroClient, coreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(domainutil.DefaultDomain, token, astroClient, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
 	} else if context.IsCloudDomain(ctx.Domain) {
-		return cloudLogin(ctx.Domain, token, astroClient, coreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(ctx.Domain, token, astroClient, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
 	}
 	return softwareLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
 }
