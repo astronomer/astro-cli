@@ -380,6 +380,7 @@ func TestCreateHostedShared(t *testing.T) {
 	// hosted deployments
 	deploymentResponse.JSON200.Type = &standardType
 	t.Run("for hosted shared deployments", func(t *testing.T) {
+		deploymentResponse.JSON200.Type = &standardType
 		defer testUtil.MockUserInput(t, "test-worker-queue")()
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil).Times(2)
