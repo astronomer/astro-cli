@@ -142,36 +142,18 @@ var (
 		JSON200: &cluster,
 	}
 	sourceDeployment = astroplatformcore.Deployment{
-		Id:            deploymentID,
-		Name:          "test-deployment-label",
-		Description:   &description,
-		WorkspaceName: &workspaceName,
-		WorkspaceId:   "test-ws-id",
-		Namespace:     "great-release-name",
-		ClusterId:     &clusterId,
-		ClusterName:   &ClusterName,
-		ContactEmails: &contactEmails,
-		Type:          &hybridType,
-		Executor:      &executorCelery,
-		Region:        &region,
-		// Cluster: astro.Cluster{
-		// 	ID:   "cluster-id",
-		// 	Name: "test-cluster",
-		// 	NodePools: []astro.NodePool{
-		// 		{
-		// 			ID:               "test-pool-id",
-		// 			IsDefault:        false,
-		// 			NodeInstanceType: "test-instance-type",
-		// 			CreatedAt:        time.Now(),
-		// 		},
-		// 		{
-		// 			ID:               "test-pool-id-1",
-		// 			IsDefault:        true,
-		// 			NodeInstanceType: "test-instance-type-1",
-		// 			CreatedAt:        time.Now(),
-		// 		},
-		// 	},
-		// },
+		Id:                     deploymentID,
+		Name:                   "test-deployment-label",
+		Description:            &description,
+		WorkspaceName:          &workspaceName,
+		WorkspaceId:            "test-ws-id",
+		Namespace:              "great-release-name",
+		ClusterId:              &clusterId,
+		ClusterName:            &ClusterName,
+		ContactEmails:          &contactEmails,
+		Type:                   &hybridType,
+		Executor:               &executorCelery,
+		Region:                 &region,
 		RuntimeVersion:         "6.0.0",
 		AirflowVersion:         "2.4.0",
 		SchedulerAu:            &schedulerAU,
@@ -227,98 +209,6 @@ func TestInspect(t *testing.T) {
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	workspaceID := "test-ws-id"
 	deploymentName := "test-deployment-label"
-	// depIds := []string{deploymentID}
-	// deploymentListParams := &astrocore.ListDeploymentsParams{
-	// 	DeploymentIds: &depIds,
-	// }
-	// deploymentResponse := []astro.Deployment{
-	// 	{
-	// 		ID:          deploymentID,
-	// 		Label:       deploymentName,
-	// 		ReleaseName: "great-release-name",
-	// 		Workspace:   astro.Workspace{ID: workspaceID},
-	// 		Cluster: astro.Cluster{
-	// 			ID:     "cluster-id",
-	// 			Region: "us-central1",
-	// 			NodePools: []astro.NodePool{
-	// 				{
-	// 					ID:               "test-pool-id",
-	// 					IsDefault:        false,
-	// 					NodeInstanceType: "test-instance-type",
-	// 					CreatedAt:        time.Now(),
-	// 				},
-	// 				{
-	// 					ID:               "test-pool-id-1",
-	// 					IsDefault:        true,
-	// 					NodeInstanceType: "test-instance-type-1",
-	// 					CreatedAt:        time.Now(),
-	// 				},
-	// 			},
-	// 		},
-	// 		RuntimeRelease: astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
-	// 		DeploymentSpec: astro.DeploymentSpec{
-	// 			Executor: "CeleryExecutor",
-	// 			Scheduler: astro.Scheduler{
-	// 				AU:       5,
-	// 				Replicas: 3,
-	// 			},
-	// 			Webserver: astro.Webserver{URL: "some-url"},
-	// 		},
-	// 		WorkerQueues: []astro.WorkerQueue{
-	// 			{
-	// 				ID:                "test-wq-id",
-	// 				Name:              "default",
-	// 				IsDefault:         true,
-	// 				MaxWorkerCount:    130,
-	// 				MinWorkerCount:    12,
-	// 				WorkerConcurrency: 110,
-	// 				NodePoolID:        "test-pool-id",
-	// 			},
-	// 			{
-	// 				ID:                "test-wq-id-1",
-	// 				Name:              "test-queue-1",
-	// 				IsDefault:         false,
-	// 				MaxWorkerCount:    175,
-	// 				MinWorkerCount:    8,
-	// 				WorkerConcurrency: 150,
-	// 				NodePoolID:        "test-pool-id-1",
-	// 			},
-	// 		},
-	// 		UpdatedAt: time.Now(),
-	// 		Status:    "HEALTHY",
-	// 	},
-	// 	{
-	// 		ID:             "test-deployment-id-1",
-	// 		Label:          "test-deployment-label-1",
-	// 		RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-	// 		DeploymentSpec: astro.DeploymentSpec{
-	// 			Scheduler: astro.Scheduler{
-	// 				AU:       5,
-	// 				Replicas: 3,
-	// 			},
-	// 		},
-	// 		WorkerQueues: []astro.WorkerQueue{
-	// 			{
-	// 				ID:                "test-wq-id-2",
-	// 				Name:              "test-queue-2",
-	// 				IsDefault:         false,
-	// 				MaxWorkerCount:    130,
-	// 				MinWorkerCount:    12,
-	// 				WorkerConcurrency: 110,
-	// 				NodePoolID:        "test-nodepool-id-2",
-	// 			},
-	// 			{
-	// 				ID:                "test-wq-id-3",
-	// 				Name:              "test-queue-3",
-	// 				IsDefault:         true,
-	// 				MaxWorkerCount:    175,
-	// 				MinWorkerCount:    8,
-	// 				WorkerConcurrency: 150,
-	// 				NodePoolID:        "test-nodepool-id-3",
-	// 			},
-	// 		},
-	// 	},
-	// }
 	deploymentResponse := sourceDeployment
 	t.Run("prints a deployment in yaml format to stdout", func(t *testing.T) {
 		out := new(bytes.Buffer)
@@ -574,6 +464,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 
 func TestGetDeploymentConfig(t *testing.T) {
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
+		sourceDeployment.Type = &hybridType
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		expectedDeploymentConfig := deploymentConfig{
@@ -599,53 +490,6 @@ func TestGetDeploymentConfig(t *testing.T) {
 
 func TestGetPrintableDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	// sourceDeployment := astro.Deployment{
-	// 	DeploymentSpec: astro.DeploymentSpec{
-	// 		Executor: "CeleryExecutor",
-	// 		Scheduler: astro.Scheduler{
-	// 			AU:       5,
-	// 			Replicas: 3,
-	// 		},
-	// 		Webserver: astro.Webserver{URL: "some-url"},
-	// 		EnvironmentVariablesObjects: []astro.EnvironmentVariablesObject{
-	// 			{
-	// 				Key:       "foo",
-	// 				Value:     "bar",
-	// 				IsSecret:  false,
-	// 				UpdatedAt: "NOW",
-	// 			},
-	// 			{
-	// 				Key:       "bar",
-	// 				Value:     "baz",
-	// 				IsSecret:  true,
-	// 				UpdatedAt: "NOW+1",
-	// 			},
-	// 		},
-	// 	},
-	// 	WorkerQueues: []astro.WorkerQueue{
-	// 		{
-	// 			ID:                "test-wq-id",
-	// 			Name:              "default",
-	// 			IsDefault:         true,
-	// 			MaxWorkerCount:    130,
-	// 			MinWorkerCount:    12,
-	// 			WorkerConcurrency: 110,
-	// 			NodePoolID:        "test-pool-id",
-	// 		},
-	// 		{
-	// 			ID:                "test-wq-id-1",
-	// 			Name:              "test-queue-1",
-	// 			IsDefault:         false,
-	// 			MaxWorkerCount:    175,
-	// 			MinWorkerCount:    8,
-	// 			WorkerConcurrency: 150,
-	// 			NodePoolID:        "test-pool-id-1",
-	// 		},
-	// 	},
-	// 	CreatedAt: time.Now(),
-	// 	UpdatedAt: time.Now(),
-	// 	Status:    "UNHEALTHY",
-	// }
 	t.Run("returns a deployment map", func(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
@@ -666,80 +510,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 }
 
 func TestGetAdditional(t *testing.T) {
-	// sourceDeployment := astro.Deployment{
-	// 	ID:          "test-deployment-id",
-	// 	Label:       "test-deployment-label",
-	// 	Description: "description",
-	// 	Workspace:   astro.Workspace{ID: "test-ws-id"},
-	// 	ReleaseName: "great-release-name",
-	// 	AlertEmails: []string{"email1", "email2"},
-	// 	Cluster: astro.Cluster{
-	// 		ID: "cluster-id",
-	// 		NodePools: []astro.NodePool{
-	// 			{
-	// 				ID:               "test-pool-id",
-	// 				IsDefault:        false,
-	// 				NodeInstanceType: "test-instance-type",
-	// 				CreatedAt:        time.Now(),
-	// 			},
-	// 			{
-	// 				ID:               "test-pool-id-1",
-	// 				IsDefault:        true,
-	// 				NodeInstanceType: "test-instance-type-1",
-	// 				CreatedAt:        time.Now(),
-	// 			},
-	// 		},
-	// 	},
-	// 	RuntimeRelease: astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
-	// 	DeploymentSpec: astro.DeploymentSpec{
-	// 		Executor: "CeleryExecutor",
-	// 		Scheduler: astro.Scheduler{
-	// 			AU:       5,
-	// 			Replicas: 3,
-	// 		},
-	// 		Webserver: astro.Webserver{URL: "some-url"},
-	// 		EnvironmentVariablesObjects: []astro.EnvironmentVariablesObject{
-	// 			{
-	// 				Key:       "foo",
-	// 				Value:     "bar",
-	// 				IsSecret:  false,
-	// 				UpdatedAt: time.Now().String(),
-	// 			},
-	// 			{
-	// 				Key:       "bar",
-	// 				Value:     "baz",
-	// 				IsSecret:  true,
-	// 				UpdatedAt: time.Now().String(),
-	// 			},
-	// 		},
-	// 	},
-	// 	WorkerQueues: []astro.WorkerQueue{
-	// 		{
-	// 			ID:                "test-wq-id",
-	// 			Name:              "default",
-	// 			IsDefault:         true,
-	// 			MaxWorkerCount:    130,
-	// 			MinWorkerCount:    12,
-	// 			WorkerConcurrency: 110,
-	// 			NodePoolID:        "test-pool-id",
-	// 			PodCPU:            "SmallCPU",
-	// 			PodRAM:            "megsOfRam",
-	// 		},
-	// 		{
-	// 			ID:                "test-wq-id-1",
-	// 			Name:              "test-queue-1",
-	// 			IsDefault:         false,
-	// 			MaxWorkerCount:    175,
-	// 			MinWorkerCount:    8,
-	// 			WorkerConcurrency: 150,
-	// 			NodePoolID:        "test-pool-id-1",
-	// 			PodCPU:            "LotsOfCPU",
-	// 			PodRAM:            "gigsOfRam",
-	// 		},
-	// 	},
-	// 	UpdatedAt: time.Now(),
-	// 	Status:    "UNHEALTHY",
-	// }
+	sourceDeployment.Type = &hybridType
 	t.Run("returns alert emails, queues and variables for the requested deployment with CeleryExecutor", func(t *testing.T) {
 		var expectedAdditional, actualAdditional orderedPieces
 		qList := []map[string]interface{}{
@@ -805,85 +576,8 @@ func TestGetAdditional(t *testing.T) {
 
 func TestFormatPrintableDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	// sourceDeployment := astro.Deployment{
-	// 	ID:          "test-deployment-id",
-	// 	Label:       "test-deployment-label",
-	// 	Description: "description",
-	// 	Workspace:   astro.Workspace{ID: "test-ws-id", Label: "test-ws"},
-	// 	ReleaseName: "great-release-name",
-	// 	AlertEmails: []string{"email1", "email2"},
-	// 	Cluster: astro.Cluster{
-	// 		ID:   "cluster-id",
-	// 		Name: "test-cluster",
-	// 		NodePools: []astro.NodePool{
-	// 			{
-	// 				ID:               "test-pool-id",
-	// 				IsDefault:        false,
-	// 				NodeInstanceType: "test-instance-type",
-	// 				CreatedAt:        time.Now(),
-	// 			},
-	// 			{
-	// 				ID:               "test-pool-id-1",
-	// 				IsDefault:        true,
-	// 				NodeInstanceType: "test-instance-type-1",
-	// 				CreatedAt:        time.Now(),
-	// 			},
-	// 		},
-	// 	},
-	// 	DagDeployEnabled:      true,
-	// 	APIKeyOnlyDeployments: true,
-	// 	RuntimeRelease:        astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
-	// 	DeploymentSpec: astro.DeploymentSpec{
-	// 		Executor: "CeleryExecutor",
-	// 		Scheduler: astro.Scheduler{
-	// 			AU:       5,
-	// 			Replicas: 3,
-	// 		},
-	// 		Webserver: astro.Webserver{URL: "some-url"},
-	// 		EnvironmentVariablesObjects: []astro.EnvironmentVariablesObject{
-	// 			{
-	// 				Key:       "foo",
-	// 				Value:     "bar",
-	// 				IsSecret:  false,
-	// 				UpdatedAt: "NOW",
-	// 			},
-	// 			{
-	// 				Key:       "bar",
-	// 				Value:     "baz",
-	// 				IsSecret:  true,
-	// 				UpdatedAt: "NOW+1",
-	// 			},
-	// 		},
-	// 	},
-	// 	WorkerQueues: []astro.WorkerQueue{
-	// 		{
-	// 			ID:                "test-wq-id",
-	// 			Name:              "default",
-	// 			IsDefault:         true,
-	// 			MaxWorkerCount:    130,
-	// 			MinWorkerCount:    12,
-	// 			WorkerConcurrency: 110,
-	// 			NodePoolID:        "test-pool-id",
-	// 			PodCPU:            "smallCPU",
-	// 			PodRAM:            "megsOfRam",
-	// 		},
-	// 		{
-	// 			ID:                "test-wq-id-1",
-	// 			Name:              "test-queue-1",
-	// 			IsDefault:         false,
-	// 			MaxWorkerCount:    175,
-	// 			MinWorkerCount:    8,
-	// 			WorkerConcurrency: 150,
-	// 			NodePoolID:        "test-pool-id-1",
-	// 			PodCPU:            "LotsOfCPU",
-	// 			PodRAM:            "gigsOfRam",
-	// 		},
-	// 	},
-	// 	CreatedAt: time.Now(),
-	// 	UpdatedAt: time.Now(),
-	// 	Status:    "UNHEALTHY",
-	// }
 	var expectedPrintableDeployment []byte
+	sourceDeployment.Type = &hybridType
 	t.Run("returns a yaml formatted printable deployment", func(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
