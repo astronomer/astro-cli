@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/config"
@@ -27,7 +29,7 @@ func TestLogin(t *testing.T) {
 	cloudDomain := "astronomer.io"
 	softwareDomain := "astronomer_dev.com"
 
-	cloudLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+	cloudLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 		assert.Equal(t, cloudDomain, domain)
 		return nil
 	}
@@ -38,34 +40,34 @@ func TestLogin(t *testing.T) {
 	}
 
 	// cloud login success
-	login(&cobra.Command{}, []string{cloudDomain}, nil, nil, buf)
+	login(&cobra.Command{}, []string{cloudDomain}, nil, nil, nil, buf)
 
 	// software login success
 	testUtil.InitTestConfig(testUtil.Initial)
-	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, buf)
+	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, nil, buf)
 
 	// no domain, cloud login
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	login(&cobra.Command{}, []string{}, nil, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, nil, nil, buf)
 
 	// no domain, software login
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	login(&cobra.Command{}, []string{}, nil, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, nil, nil, buf)
 
 	// no domain, no current context set
 	config.ResetCurrentContext()
-	login(&cobra.Command{}, []string{}, nil, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, nil, nil, buf)
 
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	defer testUtil.MockUserInput(t, "n")()
-	login(&cobra.Command{}, []string{"fail.astronomer.io"}, nil, nil, buf)
+	login(&cobra.Command{}, []string{"fail.astronomer.io"}, nil, nil, nil, buf)
 	assert.Contains(t, buf.String(), "fail.astronomer.io is an invalid domain to login into Astro.\n")
 
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	softwareDomain = "software.astronomer.io"
 	buf = new(bytes.Buffer)
 	defer testUtil.MockUserInput(t, "y")()
-	login(&cobra.Command{}, []string{"software.astronomer.io"}, nil, nil, buf)
+	login(&cobra.Command{}, []string{"software.astronomer.io"}, nil, nil, nil, buf)
 	assert.Contains(t, buf.String(), "software.astronomer.io is an invalid domain to login into Astro.\n")
 }
 

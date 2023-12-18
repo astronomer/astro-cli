@@ -122,9 +122,9 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	}
 
 	// create pytest container
-	docErr := cmdExec(dockerCommand, stdout, stderr, args...)
-	if docErr != nil {
-		return "", docErr
+	err = cmdExec(dockerCommand, stdout, stderr, args...)
+	if err != nil {
+		return "", err
 	}
 
 	// cp DAGs folder
@@ -133,7 +133,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		airflowHome + "/dags",
 		"astro-pytest:/usr/local/airflow/",
 	}
-	docErr = cmdExec(dockerCommand, stdout, stderr, args...)
+	docErr := cmdExec(dockerCommand, stdout, stderr, args...)
 	if docErr != nil {
 		return "", docErr
 	}
@@ -153,7 +153,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	}
 
 	// start pytest container
-	docErr = cmdExec(dockerCommand, stdout, stderr, []string{"start", "astro-pytest", "-a"}...)
+	err = cmdExec(dockerCommand, stdout, stderr, []string{"start", "astro-pytest", "-a"}...)
 	if docErr != nil {
 		log.Debugf("Error starting pytest container: %s", docErr.Error())
 	}
@@ -190,7 +190,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		log.Debugf("Error removing the astro-pytest container: %s", docErr.Error())
 	}
 
-	return outb.String(), docErr
+	return outb.String(), err
 }
 
 func (d *DockerImage) ConflictTest(workingDirectory, testHomeDirectory string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {

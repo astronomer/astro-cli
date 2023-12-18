@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
@@ -63,7 +65,7 @@ type CustomClaims struct {
 }
 
 //nolint:gocognit
-func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreClient) error {
+func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil
@@ -107,7 +109,7 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, coreClient)
+	apiToken, err := checkAPIToken(isDeploymentFile, platformCoreClient)
 	if err != nil {
 		return err
 	}
@@ -116,14 +118,14 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	}
 
 	// run auth setup for any command that requires auth
-	apiKey, err := checkAPIKeys(client, coreClient, isDeploymentFile)
+	apiKey, err := checkAPIKeys(client, platformCoreClient, isDeploymentFile)
 	if err != nil {
 		return err
 	}
 	if apiKey {
 		return nil
 	}
-	err = checkToken(client, coreClient, os.Stdout)
+	err = checkToken(client, coreClient, platformCoreClient, os.Stdout)
 	if err != nil {
 		return err
 	}
@@ -131,7 +133,7 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	return nil
 }
 
-func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func checkToken(client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		return err
@@ -140,7 +142,7 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 	// check if user is logged in
 	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
 		// guide the user through the login process if not logged in
-		err := authLogin(c.Domain, "", client, coreClient, out, false)
+		err := authLogin(c.Domain, "", client, coreClient, platformCoreClient, out, false)
 		if err != nil {
 			return err
 		}
@@ -154,7 +156,7 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 		res, err := refresh(c.RefreshToken, authConfig)
 		if err != nil {
 			// guide the user through the login process if refresh doesn't work
-			err := authLogin(c.Domain, "", client, coreClient, out, false)
+			err := authLogin(c.Domain, "", client, coreClient, platformCoreClient, out, false)
 			if err != nil {
 				return err
 			}
@@ -238,7 +240,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isDeploymentFile bool) (bool, error) {
+func checkAPIKeys(astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient, isDeploymentFile bool) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -329,14 +331,14 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 	if err != nil {
 		return false, err
 	}
-	orgs, err := organization.ListOrganizations(coreClient)
+	orgs, err := organization.ListOrganizations(platformCoreClient)
 	if err != nil {
 		return false, err
 	}
 
 	org := orgs[0]
 	orgID := org.Id
-	orgShortName := org.ShortName
+	orgName := org.Name
 	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
 	// get workspace ID
@@ -351,14 +353,14 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 		fmt.Println("no workspace set")
 	}
 
-	err = c.SetOrganizationContext(orgID, orgShortName, orgProduct)
+	err = c.SetOrganizationContext(orgID, orgName, orgProduct)
 	if err != nil {
 		fmt.Println("no organization context set")
 	}
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool, error) {
+func checkAPIToken(isDeploymentFile bool, platformCoreClient astroplatformcore.CoreClient) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
@@ -428,7 +430,7 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 		}
 	}
 
-	orgs, err := organization.ListOrganizations(coreClient)
+	orgs, err := organization.ListOrganizations(platformCoreClient)
 	if err != nil {
 		return false, err
 	}

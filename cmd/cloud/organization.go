@@ -188,7 +188,7 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 func organizationList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return orgList(out, astroCoreClient)
+	return orgList(out, astroPlatformCoreClient)
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -201,7 +201,7 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationNameOrID = args[0]
 	}
 
-	return orgSwitch(organizationNameOrID, astroClient, astroCoreClient, out, shouldDisplayLoginLink)
+	return orgSwitch(organizationNameOrID, astroClient, astroCoreClient, astroPlatformCoreClient, out, shouldDisplayLoginLink)
 }
 
 func organizationExportAuditLogs(cmd *cobra.Command) error {
