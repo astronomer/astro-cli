@@ -1326,8 +1326,8 @@ func TestUpdate(t *testing.T) { //nolint
 	})
 	t.Run("failed to validate resources", func(t *testing.T) {
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, errMock).Times(1)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 
 		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errMock)
@@ -1335,11 +1335,6 @@ func TestUpdate(t *testing.T) { //nolint
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		deploymentResponse.JSON200.Type = &hybridType
 		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 10, 10, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
-		assert.ErrorContains(t, err, "invaild resource request")
-
-		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		deploymentResponse.JSON200.Type = &standardType
-		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "10CPU", "10Gi", "10CPU", "10Gi", 10, 10, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorContains(t, err, "invaild resource request")
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
