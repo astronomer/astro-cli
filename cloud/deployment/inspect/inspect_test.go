@@ -479,6 +479,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			Executor:         string(*sourceDeployment.Executor),
 			Region:           *sourceDeployment.Region,
 			DeploymentType:   string(*sourceDeployment.Type),
+			CloudProvider:    *sourceDeployment.CloudProvider,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
