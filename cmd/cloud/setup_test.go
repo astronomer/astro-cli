@@ -206,7 +206,7 @@ func TestSetup(t *testing.T) {
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
 
 		cmd := &cobra.Command{Use: "deploy"}
-		testUtil.SetupOSArgsForGinkgo()
+		// testUtil.SetupOSArgsForGinkgo()
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
 
