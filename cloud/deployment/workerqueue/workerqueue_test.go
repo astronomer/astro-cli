@@ -325,6 +325,7 @@ func TestCreate(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error when requested worker queue input is not valid", func(t *testing.T) {
+		deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{}
 		out := new(bytes.Buffer)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
@@ -462,6 +463,7 @@ func TestUpdate(t *testing.T) {
 	})
 	t.Run("cancels update if user does not confirm", func(t *testing.T) {
 		expectedOutMessage := "Canceling worker queue update\n"
+		deploymentResponse.JSON200.Type = &hybridType
 		out := new(bytes.Buffer)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
@@ -559,7 +561,7 @@ func TestUpdate(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 	deploymentResponse.JSON200.Executor = &executorCelery
-	t.Run("happy path update existing worker queue for a deployment", func(t *testing.T) {
+	t.Run("happy path update existing worker queue for a deployment Celery", func(t *testing.T) {
 		expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace updated\n"
 		out := new(bytes.Buffer)
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
@@ -588,6 +590,7 @@ func TestUpdate(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error when requested worker queue input is not valid", func(t *testing.T) {
+		deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{}
 		out := new(bytes.Buffer)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil).Times(3)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
@@ -606,16 +609,17 @@ func TestUpdate(t *testing.T) {
 	// kube executor
 	deploymentResponse.JSON200.Executor = &executorKubernetes
 	t.Run("happy path update existing worker queue for a deployment", func(t *testing.T) {
+
 		expectedOutMessage := "worker queue default for test-deployment-label in test-ws-id workspace updated\n"
 		out := new(bytes.Buffer)
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil).Times(1)
+		// mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
-		deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{{Name: expectedWorkerQueue.Name, NodePoolId: &testPoolID}}
-
+		deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{{Name: "default", NodePoolId: &testPoolID}}
+		deploymentResponse.JSON200.Type = &hybridType
 		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type", -1, 0, 0, true, mockPlatformCoreClient, mockCoreClient, out)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), expectedOutMessage)
