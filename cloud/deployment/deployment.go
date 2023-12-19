@@ -1319,7 +1319,7 @@ var CoreGetCluster = func(orgID, clusterID string, corePlatformClient astroplatf
 	return cluster, nil
 }
 
-var CoreGetDeployment = func(orgID, deploymentId string, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+var CoreGetDeployment = func(orgID, deploymentID string, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1328,7 +1328,7 @@ var CoreGetDeployment = func(orgID, deploymentId string, corePlatformClient astr
 		orgID = c.Organization
 	}
 
-	resp, err := corePlatformClient.GetDeploymentWithResponse(context.Background(), orgID, deploymentId)
+	resp, err := corePlatformClient.GetDeploymentWithResponse(context.Background(), orgID, deploymentID)
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
 	}
@@ -1455,7 +1455,7 @@ var GetPlatformDeploymentOptions = func(orgID string, deploymentOptionsParams as
 	return DeploymentOptions, nil
 }
 
-var GetDeploymentLogs = func(orgID string, deploymentId string, getDeploymentLogsParams astrocore.GetDeploymentLogsParams, coreClient astrocore.CoreClient) (astrocore.DeploymentLog, error) {
+var GetDeploymentLogs = func(orgID string, deploymentID string, getDeploymentLogsParams astrocore.GetDeploymentLogsParams, coreClient astrocore.CoreClient) (astrocore.DeploymentLog, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1464,7 +1464,7 @@ var GetDeploymentLogs = func(orgID string, deploymentId string, getDeploymentLog
 		orgID = c.Organization
 	}
 
-	resp, err := coreClient.GetDeploymentLogsWithResponse(context.Background(), orgID, deploymentId, &getDeploymentLogsParams)
+	resp, err := coreClient.GetDeploymentLogsWithResponse(context.Background(), orgID, deploymentID, &getDeploymentLogsParams)
 	if err != nil {
 		return astrocore.DeploymentLog{}, err
 	}
