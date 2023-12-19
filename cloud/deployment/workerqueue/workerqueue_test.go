@@ -378,7 +378,9 @@ func TestCreateHostedShared(t *testing.T) {
 	expectedOutMessage := "worker queue test-worker-queue for test-deployment-label in test-ws-id workspace created\n"
 	out := new(bytes.Buffer)
 	// hosted deployments
+	deploymentResponse.JSON200.Executor = &executorCelery
 	deploymentResponse.JSON200.Type = &standardType
+	deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{}
 	t.Run("for hosted shared deployments", func(t *testing.T) {
 		deploymentResponse.JSON200.Type = &standardType
 		defer testUtil.MockUserInput(t, "test-worker-queue")()
