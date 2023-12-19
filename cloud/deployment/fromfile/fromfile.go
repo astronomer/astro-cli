@@ -97,21 +97,6 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		return err
 	}
 	if action == createAction {
-		// if deployment.IsDeploymentStandard(deploymentType) {
-		// 	getSharedClusterParams := astrocore.GetSharedClusterParams{
-		// 		Region:        formattedDeployment.Deployment.Configuration.Region,
-		// 		CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(formattedDeployment.Deployment.Configuration.CloudProvider),
-		// 	}
-		// 	response, err := coreClient.GetSharedClusterWithResponse(context.Background(), &getSharedClusterParams)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	err = astrocore.NormalizeAPIError(response.HTTPResponse, response.Body)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	clusterID = response.JSON200.Id
-		// }
 		// map workspace name to id
 		workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, c.Organization, coreClient)
 		if err != nil {

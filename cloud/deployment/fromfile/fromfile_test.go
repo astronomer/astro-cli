@@ -292,7 +292,6 @@ func TestCreateOrUpdate(t *testing.T) {
 		filePath, data string
 	)
 
-	// t.Run("common across create or update", func(t *testing.T) {
 	t.Run("returns an error if file does not exist", func(t *testing.T) {
 		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
 		assert.ErrorContains(t, err, "open deployment.yaml: no such file or directory")
@@ -559,7 +558,6 @@ deployment:
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, errTest).Once()
-		// mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&astrocore.ListClustersResponse{}, errTest).Once()
 		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
 		assert.ErrorIs(t, err, errTest)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -688,7 +686,6 @@ deployment:
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
-		// mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
@@ -1675,20 +1672,12 @@ deployment:
 		defer afero.NewOsFs().Remove(filePath)
 		mockCoreDeploymentResponse[0].ClusterId = nil
 		mockCoreDeploymentCreateResponse[0].ClusterId = nil
-		// mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		// mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		// mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
-		// mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		// depIds := []string{createdDeployment.ID}
-		// deploymentListParams := &astrocore.ListDeploymentsParams{
-		// 	DeploymentIds: &depIds,
-		// }
-		// mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
+
 		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), "configuration:\n        name: test-deployment-label")
@@ -1759,11 +1748,8 @@ deployment:
 		mockCoreDeploymentCreateResponse[0].ClusterId = &clusterID
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		// mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		// mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		// mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
@@ -1848,13 +1834,10 @@ deployment:
 }`
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
-		// mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		// mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		// mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
@@ -2147,7 +2130,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.ErrorContains(t, err, "worker_type: test-worker-8 does not exist in cluster: test-cluster")
 	})
-	// t.Run("when executor is Celery", func(t *testing.T) {
 	t.Run("returns error if queue options are invalid", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
 		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2189,23 +2171,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				NodeInstanceType: "test-worker-2",
 			},
 		}
-		// mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
-		// 	MinWorkerCount: astro.WorkerQueueOption{
-		// 		Floor:   1,
-		// 		Ceiling: 20,
-		// 		Default: 5,
-		// 	},
-		// 	MaxWorkerCount: astro.WorkerQueueOption{
-		// 		Floor:   16,
-		// 		Ceiling: 200,
-		// 		Default: 125,
-		// 	},
-		// 	WorkerConcurrency: astro.WorkerQueueOption{
-		// 		Floor:   175,
-		// 		Ceiling: 275,
-		// 		Default: 180,
-		// 	},
-		// }
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.ErrorContains(t, err, "worker queue option is invalid: min worker count")
@@ -2313,48 +2278,12 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				NodePoolId:        &poolID2,
 			},
 		}
-		// mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
-		// 	MinWorkerCount: astro.WorkerQueueOption{
-		// 		Floor:   0,
-		// 		Ceiling: 20,
-		// 		Default: 5,
-		// 	},
-		// 	MaxWorkerCount: astro.WorkerQueueOption{
-		// 		Floor:   16,
-		// 		Ceiling: 200,
-		// 		Default: 125,
-		// 	},
-		// 	WorkerConcurrency: astro.WorkerQueueOption{
-		// 		Floor:   175,
-		// 		Ceiling: 275,
-		// 		Default: 180,
-		// 	},
-		// }
-
-		// expectedDeploymentInput = astro.CreateDeploymentInput{
-		// 	WorkspaceID:           workspaceID,
-		// 	ClusterID:             clusterID,
-		// 	Label:                 deploymentFromFile.Deployment.Configuration.Name,
-		// 	Description:           deploymentFromFile.Deployment.Configuration.Description,
-		// 	RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-		// 	DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
-		// 	DeploymentSpec: astro.DeploymentCreateSpec{
-		// 		Executor: deployment.CeleryExecutor,
-		// 		Scheduler: astro.Scheduler{
-		// 			AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
-		// 			Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
-		// 		},
-		// 	},
-		// 	WorkerQueues: expectedQList,
-		// }
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		// assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
-	// t.Run("when executor is Kubernetes", func(t *testing.T) {
 	t.Run("returns an error if more than one worker queue are requested", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
 		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2393,151 +2322,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		assert.ErrorContains(t, err, "Don't use 'worker_queues' to update default queue with KubernetesExecutor")
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
-	// t.Run("returns an error if Celery queue property min_worker_count is requested", func(t *testing.T) {
-	// 	deploymentFromFile = inspect.FormattedDeployment{}
-	// 	deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
-	// 	deploymentFromFile.Deployment.Configuration.Name = "test-deployment"
-	// 	deploymentFromFile.Deployment.Configuration.Description = "test-description"
-	// 	deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
-	// 	deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
-	// 	deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
-	// 	deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
-	// 	dagDeploy := true
-	// 	minCount := 10
-	// 	qList = []inspect.Workerq{
-	// 		{
-	// 			Name:           "default",
-	// 			WorkerType:     "test-worker-1",
-	// 			MinWorkerCount: minCount,
-	// 		},
-	// 	}
-	// 	deploymentFromFile.Deployment.WorkerQs = qList
-	// 	existingPools = []astroplatformcore.NodePool{
-	// 		{
-	// 			Id:               "test-pool-id",
-	// 			IsDefault:        false,
-	// 			NodeInstanceType: "test-worker-1",
-	// 		},
-	// 		{
-	// 			Id:               "test-pool-id-2",
-	// 			IsDefault:        false,
-	// 			NodeInstanceType: "test-worker-2",
-	// 		},
-	// 	}
-	// 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-
-	// 	err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
-	// 	assert.ErrorContains(t, err, "KubernetesExecutor does not support minimum worker count in the request. It can only be used with CeleryExecutor")
-	// 	mockPlatformCoreClient.AssertExpectations(t)
-	// })
-	// t.Run("returns an error if Celery queue property max_worker_count is requested", func(t *testing.T) {
-	// 	deploymentFromFile = inspect.FormattedDeployment{}
-	// 	deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
-	// 	deploymentFromFile.Deployment.Configuration.Name = "test-deployment"
-	// 	deploymentFromFile.Deployment.Configuration.Description = "test-description"
-	// 	deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
-	// 	deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
-	// 	deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
-	// 	deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
-	// 	dagDeploy := true
-	// 	minCount := -1
-	// 	qList = []inspect.Workerq{
-	// 		{
-	// 			Name:           "default",
-	// 			WorkerType:     "test-worker-1",
-	// 			MinWorkerCount: minCount,
-	// 			MaxWorkerCount: 10,
-	// 		},
-	// 	}
-	// 	deploymentFromFile.Deployment.WorkerQs = qList
-	// 	existingPools = []astroplatformcore.NodePool{
-	// 		{
-	// 			Id:               "test-pool-id",
-	// 			IsDefault:        false,
-	// 			NodeInstanceType: "test-worker-1",
-	// 		},
-	// 		{
-	// 			Id:               "test-pool-id-2",
-	// 			IsDefault:        false,
-	// 			NodeInstanceType: "test-worker-2",
-	// 		},
-	// 	}
-	// 	err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
-	// 	assert.ErrorContains(t, err, "KubernetesExecutor does not support maximum worker count in the request. It can only be used with CeleryExecutor")
-	// 	mockClient.AssertExpectations(t)
-	// })
-	// t.Run("returns an error if Celery queue property worker_concurrency is requested", func(t *testing.T) {
-	// 	deploymentFromFile = inspect.FormattedDeployment{}
-	// 	deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
-	// 	deploymentFromFile.Deployment.Configuration.Name = "test-deployment"
-	// 	deploymentFromFile.Deployment.Configuration.Description = "test-description"
-	// 	deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
-	// 	deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
-	// 	deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
-	// 	deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
-	// 	dagDeploy := true
-	// 	minCount := -1
-	// 	qList = []inspect.Workerq{
-	// 		{
-	// 			Name:              "default",
-	// 			WorkerType:        "test-worker-1",
-	// 			MinWorkerCount:    minCount,
-	// 			WorkerConcurrency: 10,
-	// 		},
-	// 	}
-	// 	deploymentFromFile.Deployment.WorkerQs = qList
-	// 	existingPools = []astroplatformcore.NodePool{
-	// 		{
-	// 			Id:               "test-pool-id",
-	// 			IsDefault:        false,
-	// 			NodeInstanceType: "test-worker-1",
-	// 		},
-	// 		{
-	// 			Id:               "test-pool-id-2",
-	// 			IsDefault:        false,
-	// 			NodeInstanceType: "test-worker-2",
-	// 		},
-	// 	}
-	// 	mockClient := new(astro_mocks.Client)
-	// 	err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
-	// 	assert.ErrorContains(t, err, "KubernetesExecutor does not support worker concurrency in the request. It can only be used with CeleryExecutor")
-	// 	mockClient.AssertExpectations(t)
-	// })
-	// t.Run("returns an error if invalid input is requested", func(t *testing.T) {
-	// 	deploymentFromFile = inspect.FormattedDeployment{}
-	// 	deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
-	// 	deploymentFromFile.Deployment.Configuration.Name = "test-deployment"
-	// 	deploymentFromFile.Deployment.Configuration.Description = "test-description"
-	// 	deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
-	// 	deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
-	// 	deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
-	// 	deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
-	// 	dagDeploy := true
-	// 	qList = []inspect.Workerq{
-	// 		{
-	// 			Name:       "default",
-	// 			WorkerType: "test-worker-1",
-	// 			PodRAM:     "lots",
-	// 		},
-	// 	}
-	// 	deploymentFromFile.Deployment.WorkerQs = qList
-	// 	existingPools = []astroplatformcore.NodePool{
-	// 		{
-	// 			Id:               "test-pool-id",
-	// 			IsDefault:        false,
-	// 			NodeInstanceType: "test-worker-1",
-	// 		},
-	// 		{
-	// 			Id:               "test-pool-id-2",
-	// 			IsDefault:        false,
-	// 			NodeInstanceType: "test-worker-2",
-	// 		},
-	// 	}
-	// 	mockClient := new(astro_mocks.Client)
-	// 	err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
-	// 	assert.ErrorContains(t, err, "KubernetesExecutor does not support pod ram in the request. It will be calculated based on the requested worker type")
-	// 	mockClient.AssertExpectations(t)
-	// })
 	t.Run("transforms formattedDeployment to CreateDeploymentInput if no queues were requested", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
 		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2550,23 +2334,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		dagDeploy := true
 		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
 
-		// expectedDeploymentInput = astro.CreateDeploymentInput{
-		// 	WorkspaceID:           workspaceID,
-		// 	ClusterID:             clusterID,
-		// 	Label:                 deploymentFromFile.Deployment.Configuration.Name,
-		// 	Description:           deploymentFromFile.Deployment.Configuration.Description,
-		// 	RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-		// 	DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
-		// 	DeploymentSpec: astro.DeploymentCreateSpec{
-		// 		Executor: deployment.CeleryExecutor,
-		// 		Scheduler: astro.Scheduler{
-		// 			AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
-		// 			Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
-		// 		},
-		// 	},
-		// 	WorkerQueues: nil,
-		// }
-		// mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, nil, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.NoError(t, err)
@@ -2583,23 +2350,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
 		dagDeploy := true
 		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
-		// minCount := -1
-		// qList = []inspect.Workerq{
-		// 	{
-		// 		Name:           "default",
-		// 		WorkerType:     "test-worker-1",
-		// 		MinWorkerCount: minCount,
-		// 	},
-		// }
-		// deploymentFromFile.Deployment.WorkerQs = qList
-		// expectedQList = []astroplatformcore.WorkerQueue{
-		// 	{
-		// 		Name:           "default",
-		// 		IsDefault:      true,
-		// 		NodePoolId:     &poolID,
-		// 		MinWorkerCount: minCount,
-		// 	},
-		// }
+
 		existingPools = []astroplatformcore.NodePool{
 			{
 				Id:               "test-pool-id",
@@ -2612,26 +2363,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				NodeInstanceType: "test-worker-2",
 			},
 		}
-		// expectedDeploymentInput = astro.CreateDeploymentInput{
-		// 	WorkspaceID:           workspaceID,
-		// 	ClusterID:             clusterID,
-		// 	Label:                 deploymentFromFile.Deployment.Configuration.Name,
-		// 	Description:           deploymentFromFile.Deployment.Configuration.Description,
-		// 	RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-		// 	DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
-		// 	DeploymentSpec: astro.DeploymentCreateSpec{
-		// 		Executor: deployment.KubeExecutor,
-		// 		Scheduler: astro.Scheduler{
-		// 			AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
-		// 			Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
-		// 		},
-		// 	},
-		// 	WorkerQueues: expectedQList,
-		// }
+
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		// assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns correct deployment input when multiple queues are requested", func(t *testing.T) {
@@ -2693,48 +2428,13 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				NodePoolId:        &poolID2,
 			},
 		}
-		// mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
-		// 	MinWorkerCount: astro.WorkerQueueOption{
-		// 		Floor:   1,
-		// 		Ceiling: 20,
-		// 		Default: 5,
-		// 	},
-		// 	MaxWorkerCount: astro.WorkerQueueOption{
-		// 		Floor:   16,
-		// 		Ceiling: 200,
-		// 		Default: 125,
-		// 	},
-		// 	WorkerConcurrency: astro.WorkerQueueOption{
-		// 		Floor:   175,
-		// 		Ceiling: 275,
-		// 		Default: 180,
-		// 	},
-		// }
 
-		// expectedDeploymentInput = astro.CreateDeploymentInput{
-		// 	WorkspaceID:           workspaceID,
-		// 	ClusterID:             clusterID,
-		// 	Label:                 deploymentFromFile.Deployment.Configuration.Name,
-		// 	Description:           deploymentFromFile.Deployment.Configuration.Description,
-		// 	RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-		// 	DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
-		// 	DeploymentSpec: astro.DeploymentCreateSpec{
-		// 		Executor: deployment.CeleryExecutor,
-		// 		Scheduler: astro.Scheduler{
-		// 			AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
-		// 			Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
-		// 		},
-		// 	},
-		// 	WorkerQueues: expectedQList,
-		// }
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		// assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
-	// t.Run("when action is to update", func(t *testing.T) {
 	t.Run("transforms formattedDeployment to UpdateDeploymentInput if no queues were requested", func(t *testing.T) {
 		deploymentID = "test-deployment-id"
 		deploymentFromFile = inspect.FormattedDeployment{}
@@ -2766,22 +2466,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			},
 		}
 
-		// expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{
-		// 	ID:               deploymentID,
-		// 	ClusterID:        clusterID,
-		// 	Label:            deploymentFromFile.Deployment.Configuration.Name,
-		// 	Description:      deploymentFromFile.Deployment.Configuration.Description,
-		// 	DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
-		// 	DeploymentSpec: astro.DeploymentCreateSpec{
-		// 		Executor: "CeleryExecutor",
-		// 		Scheduler: astro.Scheduler{
-		// 			AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
-		// 			Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
-		// 		},
-		// 	},
-		// 	WorkerQueues: nil,
-		// }
-		// mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.NoError(t, err)
@@ -2844,34 +2528,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			WorkerQueues: &expectedQList,
 		}
 
-		// existingDeployment = astro.Deployment{
-		// 	ID:    deploymentID,
-		// 	Label: "test-deployment",
-		// 	Cluster: astro.Cluster{
-		// 		ID:        "test-cluster-id",
-		// 		NodePools: existingPools,
-		// 	},
-		// 	DeploymentSpec: astro.DeploymentSpec{
-		// 		Executor: deployment.CeleryExecutor,
-		// 	},
-		// 	WorkerQueues: expectedQList,
-		// }
-
-		// expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{
-		// 	ID:               deploymentID,
-		// 	ClusterID:        clusterID,
-		// 	Label:            deploymentFromFile.Deployment.Configuration.Name,
-		// 	Description:      deploymentFromFile.Deployment.Configuration.Description,
-		// 	DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
-		// 	DeploymentSpec: astro.DeploymentCreateSpec{
-		// 		Executor: deploymentFromFile.Deployment.Configuration.Executor,
-		// 		Scheduler: astro.Scheduler{
-		// 			AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
-		// 			Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
-		// 		},
-		// 	},
-		// 	WorkerQueues: nil, // a default queue is created by the api
-		// }
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.NoError(t, err)
@@ -2890,23 +2546,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		dagDeploy := true
 		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
 		deploymentFromFile.Deployment.Configuration.DefaultWorkerType = "test-worker-1"
-		// minCount := -1
-		// qList = []inspect.Workerq{
-		// 	{
-		// 		Name:           "default",
-		// 		WorkerType:     "test-worker-1",
-		// 		MinWorkerCount: minCount,
-		// 	},
-		// }
-		// deploymentFromFile.Deployment.WorkerQs = qList
-		// expectedQList = []astroplatformcore.WorkerQueue{
-		// 	{
-		// 		Name:           "default",
-		// 		IsDefault:      true,
-		// 		NodePoolId:     &poolID,
-		// 		MinWorkerCount: minCount,
-		// 	},
-		// }
 		existingPools = []astroplatformcore.NodePool{
 			{
 				Id:               "test-pool-id",
@@ -2919,47 +2558,18 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				NodeInstanceType: "test-worker-2",
 			},
 		}
-		// existingPools1 := []astroplatformcore.NodePool{
-		// 	{
-		// 		Id:               "test-pool-id",
-		// 		IsDefault:        false,
-		// 		NodeInstanceType: "test-worker-1",
-		// 	},
-		// 	{
-		// 		Id:               "test-pool-id-2",
-		// 		IsDefault:        false,
-		// 		NodeInstanceType: "test-worker-2",
-		// 	},
-		// }
 		clusterId := "test-cluster-id"
 		clusterName := "test-cluster"
 		existingDeployment := astroplatformcore.Deployment{
-			Id:          deploymentID,
-			Name:        "test-deployment",
-			ClusterId:   &clusterId,
-			ClusterName: &clusterName,
-			// NodePools: existingPools1,
+			Id:           deploymentID,
+			Name:         "test-deployment",
+			ClusterId:    &clusterId,
+			ClusterName:  &clusterName,
 			Executor:     &executorCelery,
 			WorkerQueues: &expectedQList,
 		}
 
-		// expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{
-		// 	ID:               deploymentID,
-		// 	ClusterID:        clusterID,
-		// 	Label:            deploymentFromFile.Deployment.Configuration.Name,
-		// 	Description:      deploymentFromFile.Deployment.Configuration.Description,
-		// 	DagDeployEnabled: *deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
-		// 	DeploymentSpec: astro.DeploymentCreateSpec{
-		// 		Executor: deploymentFromFile.Deployment.Configuration.Executor,
-		// 		Scheduler: astro.Scheduler{
-		// 			AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
-		// 			Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
-		// 		},
-		// 	},
-		// 	WorkerQueues: expectedQList,
-		// }
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		// mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -3031,39 +2641,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			ClusterId:    &clusterId,
 			WorkerQueues: &expectedQList,
 		}
-		// mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
-		// 	MinWorkerCount: astro.WorkerQueueOption{
-		// 		Floor:   1,
-		// 		Ceiling: 20,
-		// 		Default: 5,
-		// 	},
-		// 	MaxWorkerCount: astro.WorkerQueueOption{
-		// 		Floor:   16,
-		// 		Ceiling: 200,
-		// 		Default: 125,
-		// 	},
-		// 	WorkerConcurrency: astro.WorkerQueueOption{
-		// 		Floor:   175,
-		// 		Ceiling: 275,
-		// 		Default: 180,
-		// 	},
-		// }
 
-		// expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{
-		// 	ID:               deploymentID,
-		// 	ClusterID:        clusterID,
-		// 	Label:            deploymentFromFile.Deployment.Configuration.Name,
-		// 	Description:      deploymentFromFile.Deployment.Configuration.Description,
-		// 	DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
-		// 	DeploymentSpec: astro.DeploymentCreateSpec{
-		// 		Executor: "CeleryExecutor",
-		// 		Scheduler: astro.Scheduler{
-		// 			AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
-		// 			Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
-		// 		},
-		// 	},
-		// 	WorkerQueues: expectedQList,
-		// }
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
@@ -3266,7 +2844,6 @@ func TestGetClusterFromName(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if cluster does not exist in organization", func(t *testing.T) {
-		// mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockListClustersResponse = astroplatformcore.ListClustersResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
@@ -3465,26 +3042,7 @@ func TestGetQueues(t *testing.T) {
 		existingPools      []astroplatformcore.NodePool
 		err                error
 	)
-	// t.Run("when the executor is celery", func(t *testing.T) {
 	t.Run("returns list of queues for the requested deployment", func(t *testing.T) {
-		// expectedWQList := []astroplatformcore.WorkerQueue{
-		// 	{
-		// 		Name:              "default",
-		// 		IsDefault:         true,
-		// 		MaxWorkerCount:    16,
-		// 		MinWorkerCount:    3,
-		// 		WorkerConcurrency: 20,
-		// 		NodePoolId:        &poolID,
-		// 	},
-		// 	{
-		// 		Name:              "test-q-2",
-		// 		IsDefault:         false,
-		// 		MaxWorkerCount:    16,
-		// 		MinWorkerCount:    3,
-		// 		WorkerConcurrency: 20,
-		// 		NodePoolId:        &poolID2,
-		// 	},
-		// }
 		minCount := 3
 		qList := []inspect.Workerq{
 			{
@@ -3519,7 +3077,6 @@ func TestGetQueues(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		_, err = getQueues(&deploymentFromFile, existingPools, []astroplatformcore.WorkerQueue(nil))
 		assert.NoError(t, err)
-		// assert.Equal(t, expectedWQList, actualWQList)
 	})
 	t.Run("returns updated list of existing and queues being added", func(t *testing.T) {
 		existingWQList = []astroplatformcore.WorkerQueue{
@@ -3533,25 +3090,6 @@ func TestGetQueues(t *testing.T) {
 				NodePoolId:        &poolID,
 			},
 		}
-		// expectedWQList := []astroplatformcore.WorkerQueue{
-		// 	{
-		// 		Id:                "q-id",
-		// 		Name:              "default",
-		// 		IsDefault:         true,
-		// 		MaxWorkerCount:    18,
-		// 		MinWorkerCount:    4,
-		// 		WorkerConcurrency: 25,
-		// 		NodePoolId:        &poolID,
-		// 	},
-		// 	{
-		// 		Name:              "test-q-2",
-		// 		IsDefault:         false,
-		// 		MaxWorkerCount:    16,
-		// 		MinWorkerCount:    3,
-		// 		WorkerConcurrency: 20,
-		// 		NodePoolId:        &poolID2,
-		// 	},
-		// }
 		minCountThree := 3
 		minCountFour := 4
 		qList := []inspect.Workerq{
@@ -3587,7 +3125,6 @@ func TestGetQueues(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		_, err = getQueues(&deploymentFromFile, existingPools, existingWQList)
 		assert.NoError(t, err)
-		// assert.Equal(t, expectedWQList, actualWQList)
 	})
 	t.Run("returns updated list when multiple queue operations are requested", func(t *testing.T) {
 		existingWQList = []astroplatformcore.WorkerQueue{
@@ -3610,25 +3147,6 @@ func TestGetQueues(t *testing.T) {
 				NodePoolId:        &poolID2,
 			},
 		}
-		// expectedWQList := []astroplatformcore.WorkerQueue{
-		// 	{
-		// 		Id:                "q-id",
-		// 		Name:              "default",
-		// 		IsDefault:         true,
-		// 		MaxWorkerCount:    18,
-		// 		MinWorkerCount:    4,
-		// 		WorkerConcurrency: 25,
-		// 		NodePoolId:        &poolID,
-		// 	},
-		// 	{
-		// 		Name:              "test-q-2",
-		// 		IsDefault:         false,
-		// 		MaxWorkerCount:    16,
-		// 		MinWorkerCount:    3,
-		// 		WorkerConcurrency: 20,
-		// 		NodePoolId:        &poolID2,
-		// 	},
-		// }
 		minCountThree := 3
 		minCountFour := 4
 		qList := []inspect.Workerq{
@@ -3664,9 +3182,7 @@ func TestGetQueues(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		_, err = getQueues(&deploymentFromFile, existingPools, existingWQList)
 		assert.NoError(t, err)
-		// assert.Equal(t, expectedWQList, actualWQList)
 	})
-	// t.Run("when the executor is kubernetes", func(t *testing.T) {
 	t.Run("returns one default queue regardless of any existing queues", func(t *testing.T) {
 		existingWQList = []astroplatformcore.WorkerQueue{
 			{
@@ -3687,15 +3203,6 @@ func TestGetQueues(t *testing.T) {
 				NodePoolId:        &poolID,
 			},
 		}
-		// expectedWQList := []astroplatformcore.WorkerQueue{
-		// 	{
-		// 		Name:      "default",
-		// 		IsDefault: true,
-		// 		PodCpu:    "0.1",
-		// 		PodMemory: "0.25Gi",
-		// 		// NodePoolId: &poolID,
-		// 	},
-		// }
 		qList := []inspect.Workerq{
 			{
 				Name:       "default",
@@ -3721,7 +3228,6 @@ func TestGetQueues(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
 		_, err = getQueues(&deploymentFromFile, existingPools, existingWQList)
 		assert.NoError(t, err)
-		// assert.Equal(t, expectedWQList, actualWQList)
 	})
 	t.Run("returns an error if unable to determine nodepool id", func(t *testing.T) {
 		minCount := 3
@@ -3759,7 +3265,6 @@ func TestGetQueues(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		_, err = getQueues(&deploymentFromFile, existingPools, []astroplatformcore.WorkerQueue(nil))
 		assert.ErrorContains(t, err, "worker_type: test-worker-4 does not exist in cluster: test-cluster")
-		// assert.Equal(t, []astroplatformcore.WorkerQueue(nil), actualWQList)
 	})
 }
 
