@@ -26,7 +26,6 @@ func TestAuthRootCommand(t *testing.T) {
 
 func TestLogin(t *testing.T) {
 	buf := new(bytes.Buffer)
-	localDomain := "localhost"
 	cloudDomain := "astronomer.io"
 	softwareDomain := "astronomer_dev.com"
 

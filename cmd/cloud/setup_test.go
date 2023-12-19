@@ -305,7 +305,7 @@ func TestCheckAPIKeys(t *testing.T) {
 }
 
 func TestCheckToken(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("test check token", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
