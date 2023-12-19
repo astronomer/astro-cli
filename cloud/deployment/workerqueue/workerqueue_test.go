@@ -452,6 +452,8 @@ func TestUpdate(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
+		deploymentResponse.JSON200.Type = &hybridType
+
 		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", -1, 20, 175, false, mockPlatformCoreClient, mockCoreClient, out)
 		assert.ErrorContains(t, err, "use worker queue create test-queue-1 instead")
 

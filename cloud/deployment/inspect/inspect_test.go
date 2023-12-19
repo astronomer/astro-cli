@@ -664,6 +664,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2 := sourceDeployment
 		sourceDeployment2.Type = &hybridType
 		sourceDeployment2.Executor = &executorCelery
+		description = "description"
 		sourceDeployment2.Description = &description
 		empty := ""
 		sourceDeployment2.CloudProvider = &empty
@@ -729,6 +730,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 	})
 	t.Run("returns a json formatted printable deployment", func(t *testing.T) {
 		sourceDeployment2 := sourceDeployment
+		description = "description"
 		sourceDeployment2.Description = &description
 		empty := ""
 		sourceDeployment2.CloudProvider = &empty
