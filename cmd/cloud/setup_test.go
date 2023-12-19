@@ -29,7 +29,7 @@ var (
 )
 
 func TestSetup(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("login cmd", func(t *testing.T) {
 		testUtil.SetupOSArgsForGinkgo()
@@ -248,7 +248,7 @@ func TestSetup(t *testing.T) {
 }
 
 func TestCheckAPIKeys(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("test context switch", func(t *testing.T) {
 		mockDeplyResp := []astro.Deployment{
 			{
@@ -305,7 +305,7 @@ func TestCheckAPIKeys(t *testing.T) {
 }
 
 func TestCheckToken(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("test check token", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -336,7 +336,7 @@ func TestCheckToken(t *testing.T) {
 }
 
 func TestCheckAPIToken(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
 		HTTPResponse: &http.Response{

@@ -161,7 +161,7 @@ func (t testWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestCreateInvite(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	inviteUserID := "user_cuid"
 	createInviteResponseOK := astrocore.CreateUserInviteResponse{
 		HTTPResponse: &http.Response{
@@ -231,7 +231,7 @@ func TestCreateInvite(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -263,7 +263,7 @@ func TestCreateInvite(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 	t.Run("error path when writing output returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseError, nil).Once()
 		err := CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", testWriter{Error: errorInvite}, mockClient)
@@ -330,7 +330,7 @@ func TestUpdateUserRole(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -352,7 +352,7 @@ func TestUpdateUserRole(t *testing.T) {
 	})
 
 	t.Run("UpdateUserRole no email passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -404,7 +404,7 @@ func TestListOrgUser(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -447,7 +447,7 @@ func TestIsWorkspaceRoleValid(t *testing.T) {
 }
 
 func TestListWorkspaceUser(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path TestListWorkspaceUser", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -473,7 +473,7 @@ func TestListWorkspaceUser(t *testing.T) {
 	})
 
 	t.Run("error path when no Workspaceanization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -496,7 +496,7 @@ func TestListWorkspaceUser(t *testing.T) {
 }
 
 func TestUpdateWorkspaceUserRole(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path UpdateWorkspaceUserRole", func(t *testing.T) {
 		expectedOutMessage := "The workspace user user@1.com role was successfully updated to WORKSPACE_MEMBER\n"
 		out := new(bytes.Buffer)
@@ -535,7 +535,7 @@ func TestUpdateWorkspaceUserRole(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -557,7 +557,7 @@ func TestUpdateWorkspaceUserRole(t *testing.T) {
 	})
 
 	t.Run("UpdateWorkspaceUserRole no email passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -584,7 +584,7 @@ func TestUpdateWorkspaceUserRole(t *testing.T) {
 }
 
 func TestAddWorkspaceUser(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path AddWorkspaceUser", func(t *testing.T) {
 		expectedOutMessage := "The user user@1.com was successfully added to the workspace with the role WORKSPACE_MEMBER\n"
 		out := new(bytes.Buffer)
@@ -623,7 +623,7 @@ func TestAddWorkspaceUser(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -645,7 +645,7 @@ func TestAddWorkspaceUser(t *testing.T) {
 	})
 
 	t.Run("AddWorkspaceUser no email passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -672,7 +672,7 @@ func TestAddWorkspaceUser(t *testing.T) {
 }
 
 func TestDeleteWorkspaceUser(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path DeleteWorkspaceUser", func(t *testing.T) {
 		expectedOutMessage := "The user user@1.com was successfully removed from the workspace\n"
 		out := new(bytes.Buffer)
@@ -703,7 +703,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -725,7 +725,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 	})
 
 	t.Run("DeleteWorkspaceUser no email passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -753,7 +753,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 
 func TestGetUser(t *testing.T) {
 	t.Run("happy path GetUser", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
 		_, err := GetUser(mockClient, user1.Id)
@@ -761,7 +761,7 @@ func TestGetUser(t *testing.T) {
 	})
 
 	t.Run("error path when GetUserWithResponse returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseError, nil).Twice()
 
@@ -770,7 +770,7 @@ func TestGetUser(t *testing.T) {
 	})
 
 	t.Run("error path when GetUserWithResponse returns a network error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
 
@@ -779,7 +779,7 @@ func TestGetUser(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")

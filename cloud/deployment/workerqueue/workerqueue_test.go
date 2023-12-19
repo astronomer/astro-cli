@@ -23,7 +23,7 @@ var (
 )
 
 func TestCreate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkerQueue := astro.WorkerQueue{
 		Name:              "test-worker-queue",
 		IsDefault:         false,
@@ -489,7 +489,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateHostedShared(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkerQueue := astro.WorkerQueue{
 		Name:              "test-worker-queue",
 		IsDefault:         false,
@@ -697,7 +697,7 @@ func TestCreateHostedShared(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkerQueue := astro.WorkerQueue{
 		Name:              "test-queue-1",
 		IsDefault:         false,
@@ -1138,7 +1138,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	deploymentRespWithQueues := []astro.Deployment{
 		{
@@ -1367,7 +1367,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestGetWorkerQueueDefaultOptions(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
 		MinWorkerCount: astro.WorkerQueueOption{
 			Floor:   1,
@@ -1403,7 +1403,7 @@ func TestGetWorkerQueueDefaultOptions(t *testing.T) {
 }
 
 func TestSetWorkerQueueValues(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
 		MinWorkerCount: astro.WorkerQueueOption{
 			Floor:   1,
@@ -1456,7 +1456,7 @@ func TestSetWorkerQueueValues(t *testing.T) {
 }
 
 func TestIsCeleryWorkerQueueInputValid(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
 		MinWorkerCount: astro.WorkerQueueOption{
 			Floor:   0,
@@ -1533,7 +1533,7 @@ func TestIsCeleryWorkerQueueInputValid(t *testing.T) {
 }
 
 func TestIsHostedCeleryWorkerQueueInputValid(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
 		MinWorkerCount: astro.WorkerQueueOption{
 			Floor:   0,
@@ -1616,7 +1616,7 @@ func TestIsHostedCeleryWorkerQueueInputValid(t *testing.T) {
 }
 
 func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	requestedWorkerQueue := &astro.WorkerQueue{
 		Name:              "default",
 		NodePoolID:        "test-pool-id",
@@ -1722,7 +1722,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 }
 
 func TestQueueExists(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	existingQueues := []astro.WorkerQueue{
 		{
 			ID:                "test-wq-id",

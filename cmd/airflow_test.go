@@ -32,7 +32,7 @@ func TestDevRootCommand(t *testing.T) {
 }
 
 func TestDevInitCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	output, err := executeCommand("dev", "init", "--help")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro dev", output)
@@ -544,7 +544,7 @@ func TestAirflowStart(t *testing.T) {
 }
 
 func TestAirflowUpgradeTest(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
 		cmd := newAirflowUpgradeTestCmd(nil)
 
@@ -890,7 +890,7 @@ func TestAirflowStop(t *testing.T) {
 }
 
 func TestAirflowRestart(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("success", func(t *testing.T) {
 		cmd := newAirflowRestartCmd(nil)
@@ -1028,7 +1028,7 @@ func TestAirflowRestart(t *testing.T) {
 
 func TestAirflowPytest(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
@@ -1046,7 +1046,7 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("exit code 1", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
@@ -1064,7 +1064,7 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("pytest file doesnot exists", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
@@ -1082,7 +1082,7 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
@@ -1100,7 +1100,7 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("containerHandlerInit failure", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}

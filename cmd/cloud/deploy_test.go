@@ -20,7 +20,7 @@ func execDeployCmd(args ...string) error {
 }
 
 func TestDeployImage(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil

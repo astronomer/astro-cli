@@ -66,7 +66,7 @@ func restoreYAMLMarshal(replace func(v interface{}) ([]byte, error)) {
 }
 
 func TestInspect(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	workspaceID := "test-ws-id"
 	deploymentID := "test-deployment-id"
@@ -282,7 +282,7 @@ func TestInspect(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("Display Cluster Region and hide Release Name if an org is hosted", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
@@ -415,7 +415,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 
 	t.Run("returns deployment metadata for the requested cloud deployment", func(t *testing.T) {
 		var actualDeploymentMeta deploymentMetadata
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, deploymentListParams).Return(mockCoreDeploymentResponse, nil).Once()
 		expectedCloudDomainURL := "cloud.astronomer.io/" + sourceDeployment.Workspace.ID +
 			"/deployments/" + sourceDeployment.ID + "/overview"
@@ -553,7 +553,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
 		var actualDeploymentConfig deploymentConfig
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedDeploymentConfig := deploymentConfig{
 			Name:             sourceDeployment.Label,
 			Description:      sourceDeployment.Description,
@@ -573,7 +573,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 }
 
 func TestGetPrintableDeployment(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	sourceDeployment := astro.Deployment{
 		ID:          "test-deployment-id",
 		Label:       "test-deployment-label",
@@ -758,7 +758,7 @@ func TestGetAdditional(t *testing.T) {
 				"worker_type":        "test-instance-type-1",
 			},
 		}
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		rawExpected := map[string]interface{}{
 			"alert_emails":          sourceDeployment.AlertEmails,
 			"worker_queues":         qList,
@@ -788,7 +788,7 @@ func TestGetAdditional(t *testing.T) {
 				"worker_type": "test-instance-type-1",
 			},
 		}
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		rawExpected := map[string]interface{}{
 			"alert_emails":          sourceDeployment.AlertEmails,
 			"worker_queues":         qList,
@@ -804,7 +804,7 @@ func TestGetAdditional(t *testing.T) {
 }
 
 func TestFormatPrintableDeployment(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	sourceDeployment := astro.Deployment{
 		ID:          "test-deployment-id",
 		Label:       "test-deployment-label",
@@ -1296,7 +1296,7 @@ func TestGetSpecificField(t *testing.T) {
 		UpdatedAt: time.Now(),
 		Status:    "UNHEALTHY",
 	}
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	info, _ := getDeploymentInfo(&sourceDeployment, mockCoreDeploymentResponse[0])
 	config := getDeploymentConfig(&sourceDeployment)
 	additional := getAdditional(&sourceDeployment)
@@ -1442,7 +1442,7 @@ func TestGetWorkerTypeFromNodePoolID(t *testing.T) {
 		expectedWorkerType, poolID, actualWorkerType string
 		existingPools                                []astro.NodePool
 	)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkerType = "worker-1"
 	poolID = "test-pool-id"
 	existingPools = []astro.NodePool{
@@ -1469,7 +1469,7 @@ func TestGetWorkerTypeFromNodePoolID(t *testing.T) {
 }
 
 func TestGetTemplate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	sourceDeployment := astro.Deployment{
 		ID:          "test-deployment-id",
 		Label:       "test-deployment-label",

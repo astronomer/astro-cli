@@ -1072,7 +1072,7 @@ func TestDockerComposePytest(t *testing.T) {
 }
 
 func TestDockerComposedUpgradeTest(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	cwd, err := os.Getwd()
 	assert.NoError(t, err)
 	mockDockerCompose := DockerCompose{projectName: "test", dockerfile: "Dockerfile", airflowHome: cwd}

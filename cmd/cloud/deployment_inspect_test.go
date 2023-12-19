@@ -124,7 +124,7 @@ var (
 
 func TestNewDeploymentInspectCmd(t *testing.T) {
 	expectedHelp := "Inspect an Astro Deployment."
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(astro_mocks.Client)
 	astroClient = mockClient
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)

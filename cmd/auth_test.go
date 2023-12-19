@@ -47,7 +47,7 @@ func TestLogin(t *testing.T) {
 	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, nil, buf)
 
 	// no domain, cloud login
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	login(&cobra.Command{}, []string{}, nil, nil, nil, buf)
 
 	// no domain, software login
@@ -58,12 +58,12 @@ func TestLogin(t *testing.T) {
 	config.ResetCurrentContext()
 	login(&cobra.Command{}, []string{}, nil, nil, nil, buf)
 
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	defer testUtil.MockUserInput(t, "n")()
 	login(&cobra.Command{}, []string{"fail.astronomer.io"}, nil, nil, nil, buf)
 	assert.Contains(t, buf.String(), "fail.astronomer.io is an invalid domain to login into Astro.\n")
 
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	softwareDomain = "software.astronomer.io"
 	buf = new(bytes.Buffer)
 	defer testUtil.MockUserInput(t, "y")()
@@ -91,7 +91,7 @@ func TestLogout(t *testing.T) {
 	assert.NoError(t, err)
 
 	// no domain, cloud logout
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	err = logout(&cobra.Command{}, []string{}, os.Stdout)
 	assert.NoError(t, err)
 
