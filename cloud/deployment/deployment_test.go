@@ -3,7 +3,6 @@ package deployment
 import (
 	"bytes"
 
-	// "encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -549,20 +548,6 @@ func TestCoreGetDeployment(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 
-	// t.Run("no deployments in workspace", func(t *testing.T) {
-	// 	emptyDeploymentResponse := astroplatformcore.GetDeploymentResponse{
-	// 		HTTPResponse: &http.Response{
-	// 			StatusCode: 200,
-	// 		},
-	// 		JSON200: &astroplatformcore.Deployment{},
-	// 	}
-	// 	// mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&emptyListDeploymentsResponse, nil).Once()
-	// 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyDeploymentResponse, nil).Once()
-	// 	_, err := CoreGetDeployment(org, deploymentID, mockPlatformCoreClient)
-	// 	assert.ErrorIs(t, err, ErrNoDeploymentExists)
-	// 	mockCoreClient.AssertExpectations(t)
-	// })
-
 	t.Run("context error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 
@@ -578,18 +563,6 @@ func TestCoreGetDeployment(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 }
-
-// func TestIsDeploymentHosted(t *testing.T) {
-// 	t.Run("if deployment type is hosted", func(t *testing.T) {
-// 		out := IsDeploymentHosted("HOSTED_SHARED")
-// 		assert.Equal(t, out, true)
-// 	})
-
-// 	t.Run("if deployment type is hybrid", func(t *testing.T) {
-// 		out := IsDeploymentHosted("")
-// 		assert.Equal(t, out, false)
-// 	})
-// }
 
 func TestIsDeploymentDedicated(t *testing.T) {
 	t.Run("if deployment type is dedicated", func(t *testing.T) {
@@ -866,7 +839,6 @@ func TestCreate(t *testing.T) {
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	var (
-		// deploymentID                   = "test-deployment-id"
 		cloudProvider                = "test-provider"
 		hybridType                   = astroplatformcore.DeploymentTypeHYBRID
 		mockCreateDeploymentResponse = astroplatformcore.CreateDeploymentResponse{
@@ -1652,56 +1624,6 @@ func TestGetDeploymentURL(t *testing.T) {
 		assert.Equal(t, expectedURL, actualURL)
 	})
 }
-
-// func TestValidateHostedResources_ValidInput(t *testing.T) {
-// 	// Test with valid input values
-// 	defaultTaskPodCpu := "2"
-// 	defaultTaskPodMemory := "4Gi"
-// 	resourceQuotaCpu := "8"
-// 	resourceQuotaMemory := "16Gi"
-
-// 	configOption := astrocore.DeploymentOptions{
-// 		ResourceQuotas: astrocore.ResourceQuotaOptions{
-// 			DefaultPodSize: astrocore.ResourceOption{
-// 				Cpu:    astrocore.ResourceRange{Floor: "1", Ceiling: "4"},
-// 				Memory: astrocore.ResourceRange{Floor: "2Gi", Ceiling: "8Gi"},
-// 			},
-// 			ResourceQuota: astrocore.ResourceOption{
-// 				Cpu:    astrocore.ResourceRange{Floor: "2", Ceiling: "16"},
-// 				Memory: astrocore.ResourceRange{Floor: "4Gi", Ceiling: "32Gi"},
-// 			},
-// 		},
-// 	}
-
-// 	result := validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, configOption)
-
-// 	assert.True(t, result, "Expected validation to pass with valid input values")
-// }
-
-// func TestValidateHostedResources_InvalidDefaultTaskPodCpu(t *testing.T) {
-// 	// Test with invalid Default Task Pod CPU
-// 	defaultTaskPodCpu := "5"
-// 	defaultTaskPodMemory := "4Gi"
-// 	resourceQuotaCpu := "8"
-// 	resourceQuotaMemory := "16Gi"
-
-// 	configOption := astrocore.DeploymentOptions{
-// 		ResourceQuotas: astrocore.ResourceQuotaOptions{
-// 			DefaultPodSize: astrocore.ResourceOption{
-// 				Cpu:    astrocore.ResourceRange{Floor: "1", Ceiling: "4"},
-// 				Memory: astrocore.ResourceRange{Floor: "2Gi", Ceiling: "8Gi"},
-// 			},
-// 			ResourceQuota: astrocore.ResourceOption{
-// 				Cpu:    astrocore.ResourceRange{Floor: "2", Ceiling: "16"},
-// 				Memory: astrocore.ResourceRange{Floor: "4Gi", Ceiling: "32Gi"},
-// 			},
-// 		},
-// 	}
-
-// 	result := validateHostedResources(defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, configOption)
-
-// 	assert.False(t, result, "Expected validation to fail with invalid Default Task Pod CPU")
-// }
 
 func TestPrintWarning(t *testing.T) {
 	t.Run("when KubernetesExecutor is requested", func(t *testing.T) {

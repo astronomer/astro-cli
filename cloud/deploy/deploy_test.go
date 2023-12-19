@@ -747,32 +747,6 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 }
 
 func TestDeployNoMonitoringDAGHosted(t *testing.T) {
-	// mockDeplyResp := []astro.Deployment{
-	// 	{
-	// 		ID:             "test-id",
-	// 		ReleaseName:    "test-name",
-	// 		Workspace:      astro.Workspace{ID: ws},
-	// 		RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-	// 		DeploymentSpec: astro.DeploymentSpec{
-	// 			Webserver: astro.Webserver{URL: "test-url"},
-	// 		},
-	// 		CreatedAt:        time.Now(),
-	// 		DagDeployEnabled: true,
-	// 		Type:             "HOSTED_SHARED",
-	// 	},
-	// 	{
-	// 		ID:             "test-id-2",
-	// 		ReleaseName:    "test-name-2",
-	// 		Workspace:      astro.Workspace{ID: ws},
-	// 		RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-	// 		DeploymentSpec: astro.DeploymentSpec{
-	// 			Webserver: astro.Webserver{URL: "test-url"},
-	// 		},
-	// 		CreatedAt:        time.Now(),
-	// 		DagDeployEnabled: true,
-	// 		Type:             "HOSTED_DEDICATED",
-	// 	},
-	// }
 
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
@@ -800,7 +774,6 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(4)
-	// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(4)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
 
