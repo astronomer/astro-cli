@@ -663,6 +663,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 	t.Run("returns a yaml formatted template deployment", func(t *testing.T) {
 		sourceDeployment.Type = &hybridType
 		sourceDeployment.Executor = &executorCelery
+
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
 		additional := getAdditional(sourceDeployment, nodePools)
