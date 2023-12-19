@@ -77,15 +77,12 @@ var (
 			StatusCode: 200,
 		},
 	}
-	// schedulerAU         = 0
-	// clusterID           = "cluster-id"
 	executorCelery       = astroplatformcore.DeploymentExecutorCELERY
 	executorKubernetes   = astroplatformcore.DeploymentExecutorKUBERNETES
 	highAvailabilityTest = true
-	// resourceQuotaCpu    = "1cpu"
-	ResourceQuotaMemory = "1"
-	schedulerTestSize   = astroplatformcore.DeploymentSchedulerSizeSMALL
-	deploymentResponse  = astroplatformcore.GetDeploymentResponse{
+	ResourceQuotaMemory  = "1"
+	schedulerTestSize    = astroplatformcore.DeploymentSchedulerSizeSMALL
+	deploymentResponse   = astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -441,7 +438,6 @@ func TestDeploymentCreate(t *testing.T) {
 		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
 	})
 	t.Run("creates a deployment from file", func(t *testing.T) {
-		// orgID := "test-org-id"
 		filePath := "./test-deployment.yaml"
 		data := `
 deployment:
@@ -533,15 +529,9 @@ deployment:
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("organization_short_name", "test-org")
 		ctx.SetContextKey("workspace", ws)
-		// mockOKResponse := &astrocore.GetSharedClusterResponse{
-		// 	HTTPResponse: &http.Response{
-		// 		StatusCode: 200,
-		// 	},
-		// 	JSON200: &astrocore.SharedCluster{Id: csID},
-		// }
+
 		astroCoreClient = mockCoreClient
 		platformCoreClient = mockPlatformCoreClient
-		// mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, mock.Anything).Return(mockOKResponse, nil).Once()
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
@@ -630,49 +620,6 @@ func TestDeploymentUpdate(t *testing.T) {
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	ws := "test-ws-id"
-	// deploymentResp := astro.Deployment{
-	// 	ID:             "test-id",
-	// 	Label:          "test-name",
-	// 	RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-	// 	DeploymentSpec: astro.DeploymentSpec{Executor: "CeleryExecutor", Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
-	// }
-	// deploymentUpdateInput := astro.UpdateDeploymentInput{
-	// 	ID:          "test-id",
-	// 	ClusterID:   "",
-	// 	Label:       "test-name",
-	// 	Description: "",
-	// 	DeploymentSpec: astro.DeploymentCreateSpec{
-	// 		Executor:  "CeleryExecutor",
-	// 		Scheduler: astro.Scheduler{AU: 5, Replicas: 3},
-	// 	},
-	// 	APIKeyOnlyDeployments: false,
-	// 	WorkerQueues:          nil,
-	// }
-
-	// mockClient := new(astro_mocks.Client)
-	// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-	// 	Components: astro.Components{
-	// 		Scheduler: astro.SchedulerConfig{
-	// 			AU: astro.AuConfig{
-	// 				Default: 5,
-	// 				Limit:   24,
-	// 			},
-	// 			Replicas: astro.ReplicasConfig{
-	// 				Default: 1,
-	// 				Minimum: 1,
-	// 				Limit:   4,
-	// 			},
-	// 		},
-	// 	},
-	// 	RuntimeReleases: []astro.RuntimeRelease{
-	// 		{
-	// 			Version: "4.2.5",
-	// 		},
-	// 	},
-	// }, nil).Times(3)
-	// mockClient.On("ListDeployments", mock.Anything, ws).Return([]astro.Deployment{deploymentResp}, nil).Times(3)
-	// mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Times(3)
-	// astroClient = mockClient
 
 	t.Run("updates the deployment successfully", func(t *testing.T) {
 		astroCoreClient = mockCoreClient
@@ -680,7 +627,6 @@ func TestDeploymentUpdate(t *testing.T) {
 
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		// mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
@@ -697,11 +643,9 @@ func TestDeploymentUpdate(t *testing.T) {
 
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		// mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		// deploymentUpdateInput.APIKeyOnlyDeployments = true
 		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--force", "--enforce-cicd", "enable"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -714,11 +658,9 @@ func TestDeploymentUpdate(t *testing.T) {
 
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		// mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		// deploymentUpdateInput.APIKeyOnlyDeployments = false
 		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--force", "--enforce-cicd", "disable"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -846,7 +788,6 @@ deployment:
 
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		// mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
@@ -879,16 +820,6 @@ func TestDeploymentDelete(t *testing.T) {
 			StatusCode: 200,
 		},
 	}
-	// deploymentResp := astro.Deployment{
-	// 	ID:             "test-id",
-	// 	RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-	// 	DeploymentSpec: astro.DeploymentSpec{Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
-	// }
-
-	// mockClient := new(astro_mocks.Client)
-	// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{deploymentResp}, nil).Once()
-	// mockClient.On("DeleteDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
-	// astroClient = mockClient
 
 	platformCoreClient = mockPlatformCoreClient
 
@@ -936,41 +867,6 @@ func TestDeploymentVariableModify(t *testing.T) {
 
 	platformCoreClient = mockPlatformCoreClient
 	astroCoreClient = mockCoreClient
-
-	// mockListResponse := []astro.Deployment{
-	// 	{
-	// 		ID: "test-id-1",
-	// 		DeploymentSpec: astro.DeploymentSpec{
-	// 			EnvironmentVariablesObjects: []astro.EnvironmentVariablesObject{{Key: "test-key-1", Value: "test-value-1"}},
-	// 		},
-	// 	},
-	// 	{
-	// 		ID: "test-id-2",
-	// 		DeploymentSpec: astro.DeploymentSpec{
-	// 			EnvironmentVariablesObjects: []astro.EnvironmentVariablesObject{},
-	// 		},
-	// 	},
-	// }
-
-	// mockCreateResponse := []astro.EnvironmentVariablesObject{
-	// 	{
-	// 		Key:   "test-key-1",
-	// 		Value: "test-value-1",
-	// 	},
-	// 	{
-	// 		Key:   "test-key-2",
-	// 		Value: "test-value-2",
-	// 	},
-	// 	{
-	// 		Key:   "test-key-3",
-	// 		Value: "test-value-3",
-	// 	},
-	// }
-
-	// mockClient := new(astro_mocks.Client)
-	// mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockListResponse, nil).Once()
-	// mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Once()
-	// astroClient = mockClient
 	value := "test-value-1"
 	value2 := "test-value-2"
 	deploymentResponse.JSON200.EnvironmentVariables = &[]astroplatformcore.DeploymentEnvironmentVariable{
@@ -1000,8 +896,6 @@ func TestDeploymentVariableModify(t *testing.T) {
 	assert.Contains(t, resp, "test-value-1")
 	assert.Contains(t, resp, "test-key-2")
 	assert.Contains(t, resp, "test-value-2")
-	// assert.Contains(t, resp, "test-key-3")
-	// assert.Contains(t, resp, "test-value-3")
 	mockPlatformCoreClient.AssertExpectations(t)
 	mockCoreClient.AssertExpectations(t)
 }

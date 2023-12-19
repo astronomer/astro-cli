@@ -387,65 +387,23 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 	sourceDeployment.CreatedAt = time.Now()
 	sourceDeployment.UpdatedAt = time.Now()
 	sourceDeployment.Status = "HEALTHY"
-	// Provider account?
-	// depIds := []string{sourceDeployment.Id}
-	// deploymentListParams := &astrocore.ListDeploymentsParams{
-	// 	DeploymentIds: &depIds,
-	// }
 
 	t.Run("returns deployment metadata for the requested cloud deployment", func(t *testing.T) {
 		var actualDeploymentMeta deploymentMetadata
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		// mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, deploymentListParams).Return(mockCoreDeploymentResponse, nil).Once()
-		// expectedCloudDomainURL := "cloud.astronomer.io/" + sourceDeployment.WorkspaceId +
-		// 	"/deployments/" + sourceDeployment.Id + "/overview"
-		// status := string(sourceDeployment.Status)
-		// expectedDeploymentMetadata := deploymentMetadata{
-		// 	DeploymentID:     &sourceDeployment.Id,
-		// 	WorkspaceID:      &sourceDeployment.WorkspaceId,
-		// 	ClusterID:        sourceDeployment.ClusterId,
-		// 	AirflowVersion:   &sourceDeployment.AirflowVersion,
-		// 	CurrentTag:       &sourceDeployment.ImageTag,
-		// 	ReleaseName:      &sourceDeployment.Namespace,
-		// 	DeploymentURL:    &expectedCloudDomainURL,
-		// 	WebserverURL:     &sourceDeployment.WebServerAirflowApiUrl,
-		// 	CreatedAt:        &sourceDeployment.CreatedAt,
-		// 	UpdatedAt:        &sourceDeployment.UpdatedAt,
-		// 	WorkloadIdentity: &workloadIdentity,
-		// 	Status:           &status,
-		// }
 		rawDeploymentInfo, err := getDeploymentInfo(sourceDeployment)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentMeta)
 		assert.NoError(t, err)
-		// assert.Equal(t, expectedDeploymentMetadata, actualDeploymentMeta)
 		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns deployment metadata for the requested local deployment", func(t *testing.T) {
 		var actualDeploymentMeta deploymentMetadata
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		// expectedCloudDomainURL := "localhost:5000/" + sourceDeployment.WorkspaceId +
-		// 	"/deployments/" + sourceDeployment.Id + "/overview"
-		// status := string(sourceDeployment.Status)
-		// expectedDeploymentMetadata := deploymentMetadata{
-		// 	DeploymentID:     &sourceDeployment.Id,
-		// 	WorkspaceID:      &sourceDeployment.WorkspaceId,
-		// 	ClusterID:        sourceDeployment.ClusterId,
-		// 	ReleaseName:      &sourceDeployment.Namespace,
-		// 	AirflowVersion:   &sourceDeployment.AirflowVersion,
-		// 	CurrentTag:       &sourceDeployment.ImageTag,
-		// 	Status:           &status,
-		// 	CreatedAt:        &sourceDeployment.CreatedAt,
-		// 	UpdatedAt:        &sourceDeployment.UpdatedAt,
-		// 	DeploymentURL:    &expectedCloudDomainURL,
-		// 	WorkloadIdentity: &workloadIdentity,
-		// 	WebserverURL:     &sourceDeployment.WebServerAirflowApiUrl,
-		// }
 		rawDeploymentInfo, err := getDeploymentInfo(sourceDeployment)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentMeta)
 		assert.NoError(t, err)
-		// assert.Equal(t, expectedDeploymentMetadata, actualDeploymentMeta)
 		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns error if getting context fails", func(t *testing.T) {
@@ -931,82 +889,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
 }
 
 func TestGetSpecificField(t *testing.T) {
-	// sourceDeployment := astro.Deployment{
-	// 	ID:          "test-deployment-id",
-	// 	Label:       "test-deployment-label",
-	// 	Description: "description",
-	// 	Workspace:   astro.Workspace{ID: "test-ws-id", Label: "test-workspace"},
-	// 	ReleaseName: "great-release-name",
-	// 	AlertEmails: []string{"email1", "email2"},
-	// 	Cluster: astro.Cluster{
-	// 		ID:   "cluster-id",
-	// 		Name: "test-cluster",
-	// 		NodePools: []astro.NodePool{
-	// 			{
-	// 				ID:               "test-pool-id",
-	// 				IsDefault:        false,
-	// 				NodeInstanceType: "test-instance-type",
-	// 				CreatedAt:        time.Now(),
-	// 			},
-	// 			{
-	// 				ID:               "test-pool-id-1",
-	// 				IsDefault:        true,
-	// 				NodeInstanceType: "test-instance-type-1",
-	// 				CreatedAt:        time.Now(),
-	// 			},
-	// 		},
-	// 	},
-	// 	RuntimeRelease: astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
-	// 	DeploymentSpec: astro.DeploymentSpec{
-	// 		Executor: "CeleryExecutor",
-	// 		Scheduler: astro.Scheduler{
-	// 			AU:       5,
-	// 			Replicas: 3,
-	// 		},
-	// 		Webserver: astro.Webserver{URL: "some-url"},
-	// 		EnvironmentVariablesObjects: []astro.EnvironmentVariablesObject{
-	// 			{
-	// 				Key:       "foo",
-	// 				Value:     "bar",
-	// 				IsSecret:  false,
-	// 				UpdatedAt: "NOW",
-	// 			},
-	// 			{
-	// 				Key:       "bar",
-	// 				Value:     "baz",
-	// 				IsSecret:  true,
-	// 				UpdatedAt: "NOW+1",
-	// 			},
-	// 		},
-	// 	},
-	// 	WorkerQueues: []astro.WorkerQueue{
-	// 		{
-	// 			ID:                "test-wq-id",
-	// 			Name:              "default",
-	// 			IsDefault:         true,
-	// 			MaxWorkerCount:    130,
-	// 			MinWorkerCount:    12,
-	// 			WorkerConcurrency: 110,
-	// 			NodePoolID:        "test-pool-id",
-	// 			PodCPU:            "SmallCPU",
-	// 			PodRAM:            "megsOfRam",
-	// 		},
-	// 		{
-	// 			ID:                "test-wq-id-1",
-	// 			Name:              "test-queue-1",
-	// 			IsDefault:         false,
-	// 			MaxWorkerCount:    175,
-	// 			MinWorkerCount:    8,
-	// 			WorkerConcurrency: 150,
-	// 			NodePoolID:        "test-pool-id-1",
-	// 			PodCPU:            "LotsOfCPU",
-	// 			PodRAM:            "gigsOfRam",
-	// 		},
-	// 	},
-	// 	CreatedAt: time.Now(),
-	// 	UpdatedAt: time.Now(),
-	// 	Status:    "UNHEALTHY",
-	// }
 	sourceDeployment.Status = "UNHEALTHY"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	info, _ := getDeploymentInfo(sourceDeployment)
@@ -1183,78 +1065,6 @@ func TestGetWorkerTypeFromNodePoolID(t *testing.T) {
 
 func TestGetTemplate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	// sourceDeployment := astro.Deployment{
-	// 	ID:          "test-deployment-id",
-	// 	Label:       "test-deployment-label",
-	// 	Description: "description",
-	// 	Workspace:   astro.Workspace{ID: "test-ws-id"},
-	// 	ReleaseName: "great-release-name",
-	// 	AlertEmails: []string{"email1", "email2"},
-	// 	Cluster: astro.Cluster{
-	// 		ID: "cluster-id",
-	// 		NodePools: []astro.NodePool{
-	// 			{
-	// 				ID:               "test-pool-id",
-	// 				IsDefault:        false,
-	// 				NodeInstanceType: "test-instance-type",
-	// 				CreatedAt:        time.Now(),
-	// 			},
-	// 			{
-	// 				ID:               "test-pool-id-1",
-	// 				IsDefault:        true,
-	// 				NodeInstanceType: "test-instance-type-1",
-	// 				CreatedAt:        time.Now(),
-	// 			},
-	// 		},
-	// 	},
-	// 	DagDeployEnabled: true,
-	// 	RuntimeRelease:   astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
-	// 	DeploymentSpec: astro.DeploymentSpec{
-	// 		Executor: "CeleryExecutor",
-	// 		Scheduler: astro.Scheduler{
-	// 			AU:       5,
-	// 			Replicas: 3,
-	// 		},
-	// 		Webserver: astro.Webserver{URL: "some-url"},
-	// 		EnvironmentVariablesObjects: []astro.EnvironmentVariablesObject{
-	// 			{
-	// 				Key:       "foo",
-	// 				Value:     "bar",
-	// 				IsSecret:  false,
-	// 				UpdatedAt: "NOW",
-	// 			},
-	// 			{
-	// 				Key:       "bar",
-	// 				Value:     "baz",
-	// 				IsSecret:  true,
-	// 				UpdatedAt: "NOW+1",
-	// 			},
-	// 		},
-	// 	},
-	// 	WorkerQueues: []astro.WorkerQueue{
-	// 		{
-	// 			ID:                "test-wq-id",
-	// 			Name:              "default",
-	// 			IsDefault:         true,
-	// 			MaxWorkerCount:    130,
-	// 			MinWorkerCount:    12,
-	// 			WorkerConcurrency: 110,
-	// 			NodePoolID:        "test-pool-id",
-	// 		},
-	// 		{
-	// 			ID:                "test-wq-id-1",
-	// 			Name:              "test-queue-1",
-	// 			IsDefault:         false,
-	// 			MaxWorkerCount:    175,
-	// 			MinWorkerCount:    8,
-	// 			WorkerConcurrency: 150,
-	// 			NodePoolID:        "test-pool-id-1",
-	// 		},
-	// 	},
-	// 	CreatedAt: time.Now(),
-	// 	UpdatedAt: time.Now(),
-	// 	Status:    "UNHEALTHY",
-	// }
 
 	info, _ := getDeploymentInfo(sourceDeployment)
 	config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
