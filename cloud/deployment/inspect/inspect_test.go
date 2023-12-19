@@ -663,6 +663,10 @@ func TestFormatPrintableDeployment(t *testing.T) {
 	t.Run("returns a yaml formatted template deployment", func(t *testing.T) {
 		sourceDeployment.Type = &hybridType
 		sourceDeployment.Executor = &executorCelery
+		sourceDeployment.Description = &description
+		empty := ""
+		sourceDeployment.CloudProvider = &empty
+		sourceDeployment.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
@@ -698,7 +702,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         workspace_name: test-ws
         deployment_type: HYBRID
         cloud_provider: ""
-        region: us-central1
+        region: ""
     worker_queues:
         - name: default
           max_worker_count: 130
@@ -723,6 +727,11 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		assert.Equal(t, expectedDeployment, string(actualPrintableDeployment), "tag and order should match")
 	})
 	t.Run("returns a json formatted printable deployment", func(t *testing.T) {
+		sourceDeployment.Description = &description
+		empty := ""
+		sourceDeployment.CloudProvider = &empty
+		sourceDeployment.Region = &empty
+
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
 		additional := getAdditional(sourceDeployment, nodePools)
