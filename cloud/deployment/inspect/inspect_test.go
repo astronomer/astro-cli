@@ -829,6 +829,10 @@ func TestFormatPrintableDeployment(t *testing.T) {
 	t.Run("returns a json formatted template deployment", func(t *testing.T) {
 		sourceDeployment.Executor = &executorKubernetes
 		sourceDeployment.WorkerQueues = nil
+		empty := ""
+		sourceDeployment.CloudProvider = &empty
+		sourceDeployment.Region = &empty
+
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
 		additional := getAdditional(sourceDeployment, nodePools)
@@ -867,7 +871,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "workspace_name": "test-ws",
             "deployment_type": "HYBRID",
             "cloud_provider": "",
-            "region": "us-central1"
+            "region": ""
         },
         "worker_queues": [],
         "alert_emails": [
