@@ -14,6 +14,7 @@ import (
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/organization"
@@ -63,7 +64,7 @@ type CustomClaims struct {
 }
 
 //nolint:gocognit
-func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreClient) error {
+func Setup(cmd *cobra.Command, client astro.Client, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil
@@ -114,7 +115,7 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	}
 
 	// run auth setup for any command that requires auth
-	apiKey, err := checkAPIKeys(client, coreClient, isDeploymentFile)
+	apiKey, err := checkAPIKeys(client, platformCoreClient, coreClient, isDeploymentFile)
 	if err != nil {
 		return err
 	}
@@ -236,7 +237,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isDeploymentFile bool) (bool, error) {
+func checkAPIKeys(astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, isDeploymentFile bool) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
