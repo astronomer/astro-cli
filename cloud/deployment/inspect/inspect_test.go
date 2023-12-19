@@ -661,16 +661,17 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		assert.NotEqual(t, string(unordered), string(actualPrintableDeployment), "order should not match")
 	})
 	t.Run("returns a yaml formatted template deployment", func(t *testing.T) {
-		sourceDeployment.Type = &hybridType
-		sourceDeployment.Executor = &executorCelery
-		sourceDeployment.Description = &description
+		sourceDeployment2 := sourceDeployment
+		sourceDeployment2.Type = &hybridType
+		sourceDeployment2.Executor = &executorCelery
+		sourceDeployment2.Description = &description
 		empty := ""
-		sourceDeployment.CloudProvider = &empty
-		sourceDeployment.Region = &empty
+		sourceDeployment2.CloudProvider = &empty
+		sourceDeployment2.Region = &empty
 
-		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
-		additional := getAdditional(sourceDeployment, nodePools)
+		info, _ := getDeploymentInfo(sourceDeployment2)
+		config, err := getDeploymentConfig(sourceDeployment2, mockPlatformCoreClient)
+		additional := getAdditional(sourceDeployment2, nodePools)
 
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
@@ -727,14 +728,15 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		assert.Equal(t, expectedDeployment, string(actualPrintableDeployment), "tag and order should match")
 	})
 	t.Run("returns a json formatted printable deployment", func(t *testing.T) {
-		sourceDeployment.Description = &description
+		sourceDeployment2 := sourceDeployment
+		sourceDeployment2.Description = &description
 		empty := ""
-		sourceDeployment.CloudProvider = &empty
-		sourceDeployment.Region = &empty
+		sourceDeployment2.CloudProvider = &empty
+		sourceDeployment2.Region = &empty
 
-		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
-		additional := getAdditional(sourceDeployment, nodePools)
+		info, _ := getDeploymentInfo(sourceDeployment2)
+		config, err := getDeploymentConfig(sourceDeployment2, mockPlatformCoreClient)
+		additional := getAdditional(sourceDeployment2, nodePools)
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
 				"metadata":              info,
