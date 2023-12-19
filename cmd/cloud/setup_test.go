@@ -29,7 +29,7 @@ var (
 )
 
 func TestSetup(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("login cmd", func(t *testing.T) {
 		testUtil.SetupOSArgsForGinkgo()

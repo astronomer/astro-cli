@@ -27,10 +27,11 @@ func TestAuthRootCommand(t *testing.T) {
 func TestLogin(t *testing.T) {
 	buf := new(bytes.Buffer)
 	localDomain := "localhost"
+	cloudDomain := "astronomer.io"
 	softwareDomain := "astronomer_dev.com"
 
 	cloudLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
-		assert.Equal(t, localDomain, domain)
+		assert.Equal(t, cloudDomain, domain)
 		return nil
 	}
 
@@ -40,14 +41,14 @@ func TestLogin(t *testing.T) {
 	}
 
 	// cloud login success
-	login(&cobra.Command{}, []string{localDomain}, nil, nil, nil, buf)
+	login(&cobra.Command{}, []string{cloudDomain}, nil, nil, nil, buf)
 
 	// software login success
 	testUtil.InitTestConfig(testUtil.Initial)
 	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, nil, buf)
 
 	// no domain, cloud login
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	login(&cobra.Command{}, []string{}, nil, nil, nil, buf)
 
 	// no domain, software login
