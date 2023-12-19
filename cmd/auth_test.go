@@ -26,11 +26,11 @@ func TestAuthRootCommand(t *testing.T) {
 
 func TestLogin(t *testing.T) {
 	buf := new(bytes.Buffer)
-	cloudDomain := "astronomer.io"
+	localDomain := "localhost"
 	softwareDomain := "astronomer_dev.com"
 
 	cloudLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
-		assert.Equal(t, cloudDomain, domain)
+		assert.Equal(t, localDomain, domain)
 		return nil
 	}
 
@@ -40,7 +40,7 @@ func TestLogin(t *testing.T) {
 	}
 
 	// cloud login success
-	login(&cobra.Command{}, []string{cloudDomain}, nil, nil, nil, buf)
+	login(&cobra.Command{}, []string{localDomain}, nil, nil, nil, buf)
 
 	// software login success
 	testUtil.InitTestConfig(testUtil.Initial)
@@ -72,18 +72,18 @@ func TestLogin(t *testing.T) {
 }
 
 func TestLogout(t *testing.T) {
-	cloudDomain := "astronomer.io"
+	localDomain := "localhost"
 	softwareDomain := "astronomer_dev.com"
 
 	cloudLogout = func(domain string, out io.Writer) {
-		assert.Equal(t, cloudDomain, domain)
+		assert.Equal(t, localDomain, domain)
 	}
 	softwareLogout = func(domain string) {
 		assert.Equal(t, softwareDomain, domain)
 	}
 
 	// cloud logout success
-	err := logout(&cobra.Command{}, []string{cloudDomain}, os.Stdout)
+	err := logout(&cobra.Command{}, []string{localDomain}, os.Stdout)
 	assert.NoError(t, err)
 
 	// software logout success

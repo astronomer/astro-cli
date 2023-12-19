@@ -417,7 +417,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		var actualDeploymentMeta deploymentMetadata
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, deploymentListParams).Return(mockCoreDeploymentResponse, nil).Once()
-		expectedCloudDomainURL := "cloud.astronomer.io/" + sourceDeployment.Workspace.ID +
+		expectedCloudDomainURL := "localhost:5000/" + sourceDeployment.Workspace.ID +
 			"/deployments/" + sourceDeployment.ID + "/overview"
 		expectedDeploymentMetadata := deploymentMetadata{
 			DeploymentID:     &sourceDeployment.ID,
