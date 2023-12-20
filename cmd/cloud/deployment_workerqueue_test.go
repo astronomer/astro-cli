@@ -23,7 +23,7 @@ var (
 
 func TestNewDeploymentWorkerQueueRootCmd(t *testing.T) {
 	expectedHelp := "Manage worker queues for an Astro Deployment."
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	buf := new(bytes.Buffer)
 
 	t.Run("worker-queue command runs", func(t *testing.T) {

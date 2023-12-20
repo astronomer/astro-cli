@@ -10,7 +10,7 @@ import (
 )
 
 func TestRegistryCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	buf := new(bytes.Buffer)
 	deplyCmd := newRegistryCmd(os.Stdout)
 	deplyCmd.SetOut(buf)

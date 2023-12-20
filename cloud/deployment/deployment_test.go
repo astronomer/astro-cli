@@ -196,7 +196,7 @@ var (
 )
 
 func TestList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("success", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
@@ -811,7 +811,8 @@ func TestLogs(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
 	csID := "test-cluster-id"
 	var (
 		cloudProvider                = "test-provider"
@@ -1050,7 +1051,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestSelectCluster(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	csID := "test-cluster-id"
 	t.Run("list cluster failure", func(t *testing.T) {
@@ -1466,7 +1467,7 @@ func TestUpdate(t *testing.T) { //nolint
 }
 
 func TestDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockDeleteDeploymentResponse := astroplatformcore.DeleteDeploymentResponse{
 		HTTPResponse: &http.Response{

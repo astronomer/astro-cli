@@ -132,7 +132,7 @@ var (
 
 func TestListTokens(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
@@ -141,7 +141,7 @@ func TestListTokens(t *testing.T) {
 	})
 
 	t.Run("with specified workspace", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
@@ -152,7 +152,7 @@ func TestListTokens(t *testing.T) {
 	})
 
 	t.Run("error path when ListWorkspaceApiTokensWithResponse returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseError, nil).Twice()
@@ -172,7 +172,7 @@ func TestListTokens(t *testing.T) {
 
 func TestCreateToken(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceAPITokenResponseOK, nil)
@@ -193,7 +193,7 @@ func TestCreateToken(t *testing.T) {
 	})
 
 	t.Run("invalid role", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
@@ -203,7 +203,7 @@ func TestCreateToken(t *testing.T) {
 	})
 
 	t.Run("empty name", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
@@ -215,7 +215,7 @@ func TestCreateToken(t *testing.T) {
 
 func TestUpdateToken(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceAPITokenResponseOK, nil).Twice()
@@ -225,7 +225,7 @@ func TestUpdateToken(t *testing.T) {
 	})
 
 	t.Run("happy path no id", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
@@ -246,7 +246,7 @@ func TestUpdateToken(t *testing.T) {
 	})
 
 	t.Run("happy path multiple name", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponse2O0, nil).Twice()
@@ -267,7 +267,7 @@ func TestUpdateToken(t *testing.T) {
 	})
 
 	t.Run("happy path", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceAPITokenResponseOK, nil).Twice()
@@ -277,7 +277,7 @@ func TestUpdateToken(t *testing.T) {
 	})
 
 	t.Run("error path when listWorkspaceTokens returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseError, nil)
@@ -286,7 +286,7 @@ func TestUpdateToken(t *testing.T) {
 	})
 
 	t.Run("error path when listWorkspaceToken returns an not found error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
@@ -295,7 +295,7 @@ func TestUpdateToken(t *testing.T) {
 	})
 
 	t.Run("error path when getWorkspaceToken returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceAPITokenResponseError, nil)
@@ -304,7 +304,7 @@ func TestUpdateToken(t *testing.T) {
 	})
 
 	t.Run("error path when UpdateWorkspaceApiTokenWithResponse returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceAPITokenResponseOK, nil)
@@ -322,7 +322,7 @@ func TestUpdateToken(t *testing.T) {
 	})
 
 	t.Run("error path when workspace role is invalid returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceAPITokenResponseOK, nil)
@@ -331,7 +331,7 @@ func TestUpdateToken(t *testing.T) {
 		assert.Equal(t, user.ErrInvalidWorkspaceRole.Error(), err.Error())
 	})
 	t.Run("Happy path when applying workspace role", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
@@ -343,7 +343,7 @@ func TestUpdateToken(t *testing.T) {
 
 func TestRotateToken(t *testing.T) {
 	t.Run("happy path - id provided", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceAPITokenResponseOK, nil)
@@ -353,7 +353,7 @@ func TestRotateToken(t *testing.T) {
 	})
 
 	t.Run("happy path name provided", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
@@ -363,7 +363,7 @@ func TestRotateToken(t *testing.T) {
 	})
 
 	t.Run("happy path with confirmation", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
@@ -381,7 +381,7 @@ func TestRotateToken(t *testing.T) {
 	})
 
 	t.Run("error path when listWorkspaceTokens returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseError, nil)
@@ -390,7 +390,7 @@ func TestRotateToken(t *testing.T) {
 	})
 
 	t.Run("error path when listWorkspaceToken returns an not found error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
@@ -399,7 +399,7 @@ func TestRotateToken(t *testing.T) {
 	})
 
 	t.Run("error path when getWorkspaceToken returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceAPITokenResponseError, nil)
@@ -408,7 +408,7 @@ func TestRotateToken(t *testing.T) {
 	})
 
 	t.Run("error path when RotateWorkspaceApiTokenWithResponse returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
@@ -420,7 +420,7 @@ func TestRotateToken(t *testing.T) {
 
 func TestDeleteToken(t *testing.T) {
 	t.Run("happy path - delete workspace token - by name", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
@@ -430,7 +430,7 @@ func TestDeleteToken(t *testing.T) {
 	})
 
 	t.Run("happy path - delete workspace token - by id", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceAPITokenResponseOK, nil).Twice()
@@ -440,7 +440,7 @@ func TestDeleteToken(t *testing.T) {
 	})
 
 	t.Run("happy path - remove organization token", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
@@ -458,7 +458,7 @@ func TestDeleteToken(t *testing.T) {
 	})
 
 	t.Run("error path when getWorkspaceToken returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetWorkspaceAPITokenResponseError, nil)
@@ -467,7 +467,7 @@ func TestDeleteToken(t *testing.T) {
 	})
 
 	t.Run("error path when listWorkspaceTokens returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseError, nil)
@@ -476,7 +476,7 @@ func TestDeleteToken(t *testing.T) {
 	})
 
 	t.Run("error path when listWorkspaceToken returns a not found error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
@@ -485,7 +485,7 @@ func TestDeleteToken(t *testing.T) {
 	})
 
 	t.Run("error path when DeleteWorkspaceApiTokenWithResponse returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)

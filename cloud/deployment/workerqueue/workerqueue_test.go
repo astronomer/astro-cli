@@ -651,7 +651,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	testID := "test-wq-id"
 	astroMachine := "A5"

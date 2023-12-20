@@ -62,7 +62,7 @@ var (
 
 func TestList(t *testing.T) {
 	// initialize empty config
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("organization list success", func(t *testing.T) {
 		mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -95,7 +95,7 @@ func TestList(t *testing.T) {
 
 func TestGetOrganizationSelection(t *testing.T) {
 	// initialize empty config
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("get organiation selection success", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)

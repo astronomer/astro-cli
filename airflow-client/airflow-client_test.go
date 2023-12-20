@@ -19,7 +19,7 @@ func TestNewAirflowClient(t *testing.T) {
 }
 
 func TestDoAirflowClient(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := "{\"connections\":[{\"connection_id\":\"\"}]}"
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -76,7 +76,7 @@ var mockVar = &Variable{
 }
 
 func TestGetConnections(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	jsonResponse, err := json.Marshal(mockConnResponse)
 	assert.NoError(t, err)
 
@@ -130,7 +130,7 @@ func TestGetConnections(t *testing.T) {
 }
 
 func TestUpdateConnection(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	connJSON, err := json.Marshal(mockConn)
 	assert.NoError(t, err)
 	jsonResponse, err := json.Marshal(mockConnResponse)
@@ -208,7 +208,7 @@ func TestUpdateConnection(t *testing.T) {
 }
 
 func TestCreateConnection(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	connJSON, err := json.Marshal(mockConn)
 	assert.NoError(t, err)
 	jsonResponse, err := json.Marshal(mockConnResponse)
@@ -286,7 +286,7 @@ func TestCreateConnection(t *testing.T) {
 }
 
 func TestCreateVariable(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedURL := "https://test-airflow-url/api/v1/variables"
 
 	t.Run("success", func(t *testing.T) {
@@ -348,7 +348,7 @@ func TestCreateVariable(t *testing.T) {
 }
 
 func TestGetVariables(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedURL := "https://test-airflow-url/api/v1/variables"
 
 	t.Run("success", func(t *testing.T) {
@@ -390,7 +390,7 @@ func TestGetVariables(t *testing.T) {
 }
 
 func TestUpdateVariable(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedURL := "https://test-airflow-url/api/v1/variables/test-key"
 
 	t.Run("success", func(t *testing.T) {
@@ -468,7 +468,7 @@ var mockPool = &Pool{
 }
 
 func TestCreatePool(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	poolJSON, err := json.Marshal(mockPool)
 	assert.NoError(t, err)
@@ -547,7 +547,7 @@ func TestCreatePool(t *testing.T) {
 }
 
 func TestUpdatePool(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPoolJSON, err := json.Marshal(mockPool)
 	assert.NoError(t, err)
 	jsonResponse, err := json.Marshal(mockPoolResponse)
@@ -625,7 +625,7 @@ func TestUpdatePool(t *testing.T) {
 }
 
 func TestGetPools(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPoolResponseJSON, err := json.Marshal(mockPoolResponse)
 	assert.NoError(t, err)
 

@@ -291,7 +291,7 @@ func TestParseExitCode(t *testing.T) {
 }
 
 func TestDockerCreatePipFreeze(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}
