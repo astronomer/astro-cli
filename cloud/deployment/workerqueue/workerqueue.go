@@ -178,7 +178,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			}
 		}
 	case astroplatformcore.DeploymentExecutorKUBERNETES:
-
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
 			return errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
 		} else {
@@ -454,7 +453,6 @@ func selectWorkerMachine(workerType string, workerMachines []astroplatformcore.W
 func selectNodePool(workerType string, nodePools []astroplatformcore.NodePool, out io.Writer) (string, error) {
 	var (
 		nodePoolID, message string
-		pool                astroplatformcore.NodePool
 		errToReturn         error
 	)
 
@@ -492,9 +490,9 @@ func selectNodePool(workerType string, nodePools []astroplatformcore.NodePool, o
 		return selectedPool.Id, nil
 	default:
 		// Get the nodePoolID for pool that matches workerType
-		for _, pool = range nodePools {
-			if pool.NodeInstanceType == workerType {
-				nodePoolID = pool.Id
+		for i := range nodePools {
+			if nodePools[i].NodeInstanceType == workerType {
+				nodePoolID = nodePools[i].Id
 				return nodePoolID, errToReturn
 			}
 		}
@@ -661,6 +659,8 @@ func selectQueue(queueListIndex *[]astroplatformcore.WorkerQueue, out io.Writer)
 // updateQueueList is used to merge existingQueues with the queueToUpdate. Based on the executor for the deployment, it
 // sets the resources for CeleryExecutor and removes all resources for KubernetesExecutor as they get calculated based
 // on the worker type.
+//
+//nolint:dupl
 func updateQueueList(existingQueues []astroplatformcore.WorkerQueueRequest, queueToUpdate *astroplatformcore.WorkerQueueRequest, executor *astroplatformcore.DeploymentExecutor, wQueueMin, wQueueMax, wQueueConcurrency int) []astroplatformcore.WorkerQueueRequest {
 	for i, queue := range existingQueues { //nolint
 		if queue.Name != queueToUpdate.Name {
@@ -692,6 +692,7 @@ func updateQueueList(existingQueues []astroplatformcore.WorkerQueueRequest, queu
 	return existingQueues
 }
 
+//nolint:dupl
 func updateHybridQueueList(existingQueues []astroplatformcore.HybridWorkerQueueRequest, queueToUpdate *astroplatformcore.HybridWorkerQueueRequest, executor *astroplatformcore.DeploymentExecutor, wQueueMin, wQueueMax, wQueueConcurrency int) []astroplatformcore.HybridWorkerQueueRequest {
 	for i, queue := range existingQueues { //nolint
 		if queue.Name != queueToUpdate.Name {

@@ -200,7 +200,6 @@ func IsOrgHosted() bool {
 }
 
 func ListClusters(organizationID string, platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Cluster, error) {
-	// clusterTypes := []platformCoreClient.ListClustersParamsTypes{platformCoreClient.BRINGYOUROWNCLOUD, platformCoreClient.HOSTED}
 	limit := 1000
 	clusterListParams := &astroplatformcore.ListClustersParams{
 		Limit: &limit,
