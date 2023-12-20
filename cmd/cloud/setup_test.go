@@ -248,7 +248,7 @@ func TestSetup(t *testing.T) {
 }
 
 func TestCheckAPIKeys(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("test context switch", func(t *testing.T) {
 		mockDeplyResp := []astro.Deployment{
 			{
@@ -336,7 +336,7 @@ func TestCheckToken(t *testing.T) {
 }
 
 func TestCheckAPIToken(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
 		HTTPResponse: &http.Response{

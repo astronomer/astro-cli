@@ -274,7 +274,7 @@ deployment:
 			mockClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if cluster does not exist", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -339,7 +339,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if listing cluster fails", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -404,7 +404,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if listing deployment fails", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -470,7 +470,7 @@ deployment:
 			mockClient.AssertExpectations(t)
 		})
 		t.Run("does not update environment variables if input is empty", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			out := new(bytes.Buffer)
@@ -570,7 +570,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("does not update alert emails if input is empty", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			out := new(bytes.Buffer)
@@ -667,7 +667,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error from the api if creating environment variables fails", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -769,7 +769,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error from the api if creating alert emails fails", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -873,7 +873,7 @@ deployment:
 	})
 	t.Run("when action is create", func(t *testing.T) {
 		t.Run("reads the yaml file and creates a deployment", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -988,7 +988,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("reads the yaml file and creates a hosted dedicated deployment", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1141,7 +1141,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("reads the json file and creates a deployment", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1271,7 +1271,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("reads the json file and creates a hosted standard deployment", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1440,7 +1440,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if workspace does not exist", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -1506,7 +1506,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if listing workspace fails", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -1572,7 +1572,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if deployment already exists", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			existingDeployments := []astro.Deployment{
 				{
@@ -1648,7 +1648,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if creating deployment input fails", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -1747,7 +1747,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error from the api if create deployment fails", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -1849,7 +1849,7 @@ deployment:
 	})
 	t.Run("when action is update", func(t *testing.T) {
 		t.Run("reads the yaml file and updates an existing deployment", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1986,7 +1986,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("reads the yaml file and updates an existing hosted standard deployment", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -2155,7 +2155,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("return an error when enabling dag deploy for ci-cd enforced deployment", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -2273,7 +2273,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("reads the json file and updates an existing deployment", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -2425,7 +2425,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if deployment does not exist", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -2490,7 +2490,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if creating update deployment input fails", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -2593,7 +2593,7 @@ deployment:
 			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error from the api if update deployment fails", func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			mockClient := new(astro_mocks.Client)
 			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
@@ -3927,7 +3927,7 @@ func TestGetClusterFromName(t *testing.T) {
 		actualNodePools                                 []astrocore.NodePool
 		err                                             error
 	)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedClusterID = "test-cluster-id"
 	clusterName = "test-cluster"
 	t.Run("returns a cluster id if cluster exists in organization", func(t *testing.T) {
@@ -3972,7 +3972,7 @@ func TestGetWorkspaceIDFromName(t *testing.T) {
 		workspaceName, expectedWorkspaceID, actualWorkspaceID, orgID string
 		err                                                          error
 	)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkspaceID = "test-ws-id"
 	workspaceName = "test-workspace"
 	orgID = "test-org-id"
@@ -4008,7 +4008,7 @@ func TestGetNodePoolIDFromName(t *testing.T) {
 		existingPools                                       []astrocore.NodePool
 		err                                                 error
 	)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedPoolID = "test-pool-id"
 	workerType = "worker-1"
 	clusterID = "test-cluster-id"

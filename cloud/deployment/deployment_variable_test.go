@@ -13,7 +13,7 @@ import (
 )
 
 func TestVariableList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockResponse := []astro.Deployment{
 		{
@@ -109,7 +109,7 @@ func TestVariableList(t *testing.T) {
 }
 
 func TestVariableModify(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockListResponse := []astro.Deployment{
 		{

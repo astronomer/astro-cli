@@ -14,7 +14,7 @@ import (
 )
 
 func TestListConnections(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	context, _ := config.GetCurrentContext()
 	organization := context.Organization

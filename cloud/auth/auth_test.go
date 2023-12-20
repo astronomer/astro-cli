@@ -186,7 +186,7 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 }
 
 func TestRequestUserInfo(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockUserInfo := UserInfo{
 		Email:      "test@astronomer.test",
 		Name:       "astro.crush",
@@ -241,7 +241,7 @@ func TestRequestUserInfo(t *testing.T) {
 }
 
 func TestRequestToken(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := postTokenResponse{
 		RefreshToken: "test-refresh-token",
 		AccessToken:  "test-access-token",
@@ -342,7 +342,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 }
 
 func TestAuthDeviceLogin(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success without login link", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
 		callbackHandler := func() (string, error) {
@@ -425,7 +425,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 
 func TestSwitchToLastUsedWorkspace(t *testing.T) {
 	t.Run("failure case", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		ctx := &config.Context{
 			LastUsedWorkspace: "test-id",
 		}
@@ -435,7 +435,7 @@ func TestSwitchToLastUsedWorkspace(t *testing.T) {
 		assert.Equal(t, astrocore.Workspace{}, resp)
 	})
 
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
 		ctx := &config.Context{
 			LastUsedWorkspace: "test-id",
@@ -459,7 +459,7 @@ func TestSwitchToLastUsedWorkspace(t *testing.T) {
 }
 
 func TestCheckUserSession(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -661,7 +661,7 @@ func TestCheckUserSession(t *testing.T) {
 }
 
 func TestLogin(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
 		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
@@ -869,7 +869,7 @@ func TestLogin(t *testing.T) {
 }
 
 func TestLogout(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		Logout("astronomer.io", buf)

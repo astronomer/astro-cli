@@ -315,7 +315,7 @@ var (
 
 func TestListOrgTeam(t *testing.T) {
 	t.Run("happy path TestListOrgTeam", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
@@ -324,7 +324,7 @@ func TestListOrgTeam(t *testing.T) {
 	})
 
 	t.Run("error path when ListOrganizationTeamsWithResponse return network error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
@@ -333,7 +333,7 @@ func TestListOrgTeam(t *testing.T) {
 	})
 
 	t.Run("error path when ListOrganizationTeamsWithResponse returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseError, nil).Twice()
@@ -342,7 +342,7 @@ func TestListOrgTeam(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -365,9 +365,9 @@ func TestListOrgTeam(t *testing.T) {
 }
 
 func TestListWorkspaceTeam(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path TestListWorkspaceTeam", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
@@ -376,7 +376,7 @@ func TestListWorkspaceTeam(t *testing.T) {
 	})
 
 	t.Run("error path when ListWorkspaceTeamsWithResponse return network error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
@@ -385,7 +385,7 @@ func TestListWorkspaceTeam(t *testing.T) {
 	})
 
 	t.Run("error path when ListWorkspaceTeamsWithResponse returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseError, nil).Twice()
@@ -394,7 +394,7 @@ func TestListWorkspaceTeam(t *testing.T) {
 	})
 
 	t.Run("error path when no Workspaceanization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -417,7 +417,7 @@ func TestListWorkspaceTeam(t *testing.T) {
 }
 
 func TestUpdateWorkspaceTeamRole(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path UpdateWorkspaceTeamRole", func(t *testing.T) {
 		expectedOutMessage := "The workspace team team1-id role was successfully updated to WORKSPACE_MEMBER\n"
 		out := new(bytes.Buffer)
@@ -472,7 +472,7 @@ func TestUpdateWorkspaceTeamRole(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -494,7 +494,7 @@ func TestUpdateWorkspaceTeamRole(t *testing.T) {
 	})
 
 	t.Run("UpdateWorkspaceTeamRole no id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -521,7 +521,7 @@ func TestUpdateWorkspaceTeamRole(t *testing.T) {
 }
 
 func TestAddWorkspaceTeam(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path AddWorkspaceTeam", func(t *testing.T) {
 		expectedOutMessage := "The team team1-id was successfully added to the workspace with the role WORKSPACE_MEMBER\n"
 		out := new(bytes.Buffer)
@@ -568,7 +568,7 @@ func TestAddWorkspaceTeam(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -590,7 +590,7 @@ func TestAddWorkspaceTeam(t *testing.T) {
 	})
 
 	t.Run("AddWorkspaceTeam no id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -617,7 +617,7 @@ func TestAddWorkspaceTeam(t *testing.T) {
 }
 
 func TestRemoveWorkspaceTeam(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path DeleteWorkspaceTeam", func(t *testing.T) {
 		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully removed from workspace %s\n", team1.Name, workspaceID)
 		out := new(bytes.Buffer)
@@ -656,7 +656,7 @@ func TestRemoveWorkspaceTeam(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -678,7 +678,7 @@ func TestRemoveWorkspaceTeam(t *testing.T) {
 	})
 
 	t.Run("RemoveWorkspaceTeam no id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -705,7 +705,7 @@ func TestRemoveWorkspaceTeam(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path Delete", func(t *testing.T) {
 		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully deleted\n", team1.Name)
 		out := new(bytes.Buffer)
@@ -775,7 +775,7 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -796,7 +796,7 @@ func TestDelete(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 	t.Run("DeleteTeam no id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -823,7 +823,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path Update", func(t *testing.T) {
 		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully updated\n", team1.Name)
 		out := new(bytes.Buffer)
@@ -960,7 +960,7 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -981,7 +981,7 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 	t.Run("UpdateTeam no id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1008,7 +1008,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path Update", func(t *testing.T) {
 		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully created\n", team1.Name)
 		out := new(bytes.Buffer)
@@ -1048,7 +1048,7 @@ func TestCreate(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -1069,7 +1069,7 @@ func TestCreate(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 	t.Run("error path no name passed in and user doesn't type one in when prompted", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		err := CreateTeam("", *team1.Description, "ORGANIZATION_MEMBER", out, mockClient)
@@ -1077,7 +1077,7 @@ func TestCreate(t *testing.T) {
 	})
 
 	t.Run("error path invalid org role", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		err := CreateTeam("", *team1.Description, "WORKSPACE_OWNER", out, mockClient)
@@ -1086,7 +1086,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestAddUser(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path AddUser", func(t *testing.T) {
 		expectedOutMessage := fmt.Sprintf("Astro User %s was successfully added to team %s \n", user1.Id, team1.Name)
 		out := new(bytes.Buffer)
@@ -1153,7 +1153,7 @@ func TestAddUser(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -1175,7 +1175,7 @@ func TestAddUser(t *testing.T) {
 	})
 
 	t.Run("AddUser no team-id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1205,7 +1205,7 @@ func TestAddUser(t *testing.T) {
 		assert.Equal(t, expectedOut, out.String())
 	})
 	t.Run("AddUser no user_id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1236,7 +1236,7 @@ func TestAddUser(t *testing.T) {
 	})
 
 	t.Run("AddUser no user_id passed no org users found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
@@ -1263,7 +1263,7 @@ func TestAddUser(t *testing.T) {
 }
 
 func TestRemoveUser(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path RemoveUser", func(t *testing.T) {
 		expectedOutMessage := fmt.Sprintf("Astro User %s was successfully removed from team %s \n", user1.Id, team1.Name)
 		out := new(bytes.Buffer)
@@ -1338,7 +1338,7 @@ func TestRemoveUser(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -1360,7 +1360,7 @@ func TestRemoveUser(t *testing.T) {
 	})
 
 	t.Run("RemoveUser no team-id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1390,7 +1390,7 @@ func TestRemoveUser(t *testing.T) {
 		assert.Equal(t, expectedOut, out.String())
 	})
 	t.Run("RemoveUser no user_id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1423,7 +1423,7 @@ func TestRemoveUser(t *testing.T) {
 
 func TestListTeamUsers(t *testing.T) {
 	t.Run("happy path ListTeamUsers", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
@@ -1432,7 +1432,7 @@ func TestListTeamUsers(t *testing.T) {
 	})
 
 	t.Run("happy path ListTeamUsers team with no membership", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseEmptyMembership, nil).Twice()
@@ -1441,7 +1441,7 @@ func TestListTeamUsers(t *testing.T) {
 	})
 
 	t.Run("error path when GetTeamWithResponse returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseError, nil).Twice()
@@ -1451,7 +1451,7 @@ func TestListTeamUsers(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -1473,7 +1473,7 @@ func TestListTeamUsers(t *testing.T) {
 	})
 
 	t.Run("ListTeamUsers no team-id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1501,7 +1501,7 @@ func TestListTeamUsers(t *testing.T) {
 
 func TestGetTeam(t *testing.T) {
 	t.Run("happy path GetTeam", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		_, err := GetTeam(mockClient, team1.Id)
@@ -1509,7 +1509,7 @@ func TestGetTeam(t *testing.T) {
 	})
 
 	t.Run("error path when GetTeamWithResponse returns a network error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
 
@@ -1518,7 +1518,7 @@ func TestGetTeam(t *testing.T) {
 	})
 
 	t.Run("error path when GetTeamWithResponse returns an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseError, nil).Twice()
 
@@ -1527,7 +1527,7 @@ func TestGetTeam(t *testing.T) {
 	})
 
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("organization_short_name", "")
@@ -1550,7 +1550,7 @@ func TestGetTeam(t *testing.T) {
 
 func TestGetWorkspaceTeams(t *testing.T) {
 	t.Run("happy path get WorkspaceTeams pulls workspace from context", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
 		_, err := GetWorkspaceTeams(mockClient, "", 10)

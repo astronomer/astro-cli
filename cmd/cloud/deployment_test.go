@@ -65,7 +65,7 @@ func execDeploymentCmd(args ...string) (string, error) {
 }
 
 func TestDeploymentRootCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	buf := new(bytes.Buffer)
 	deplyCmd := newDeploymentRootCmd(os.Stdout)
 	deplyCmd.SetOut(buf)
@@ -76,7 +76,7 @@ func TestDeploymentRootCommand(t *testing.T) {
 }
 
 func TestDeploymentList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("ListDeployments", mock.Anything, "").Return([]astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
@@ -91,7 +91,7 @@ func TestDeploymentList(t *testing.T) {
 }
 
 func TestDeploymentLogs(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	deploymentID := "test-id"
 	logLevels := []string{"WARN", "ERROR", "INFO"}
@@ -114,7 +114,7 @@ func TestDeploymentLogs(t *testing.T) {
 }
 
 func TestDeploymentCreate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	ws := "workspace-id"
 	csID := "test-cluster-id"
@@ -477,7 +477,7 @@ deployment:
 }
 
 func TestDeploymentUpdate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	ws := "test-ws-id"
 	deploymentResp := astro.Deployment{
@@ -552,13 +552,13 @@ func TestDeploymentUpdate(t *testing.T) {
 		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
 	})
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		ctx, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.Workspace = ""
 		err = ctx.SetContext()
 		assert.NoError(t, err)
-		defer testUtil.InitTestConfig(testUtil.CloudPlatform)
+		defer testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedOut := "Usage:\n"
 		cmdArgs := []string{"update", "-n", "doesnotexist"}
 		resp, err := execDeploymentCmd(cmdArgs...)
@@ -724,7 +724,7 @@ deployment:
 }
 
 func TestDeploymentDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	deploymentResp := astro.Deployment{
 		ID:             "test-id",
@@ -744,7 +744,7 @@ func TestDeploymentDelete(t *testing.T) {
 }
 
 func TestDeploymentVariableList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockResponse := []astro.Deployment{
 		{
@@ -774,7 +774,7 @@ func TestDeploymentVariableList(t *testing.T) {
 }
 
 func TestDeploymentVariableModify(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockListResponse := []astro.Deployment{
 		{
@@ -824,7 +824,7 @@ func TestDeploymentVariableModify(t *testing.T) {
 }
 
 func TestDeploymentVariableUpdate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockListResponse := []astro.Deployment{
 		{

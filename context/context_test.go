@@ -91,7 +91,7 @@ func TestIsCloudContext(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	err := Delete("astronomer.io", true)
 	assert.NoError(t, err)
 
@@ -100,7 +100,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestDeleteContext(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	err := DeleteContext(&cobra.Command{}, []string{"astronomer.io"}, false)
 	assert.NoError(t, err)
 }

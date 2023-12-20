@@ -70,7 +70,7 @@ const (
 )
 
 func TestList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
@@ -120,7 +120,7 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("success with hidden namespace information", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
@@ -160,7 +160,7 @@ func TestList(t *testing.T) {
 
 func TestGetDeployment(t *testing.T) {
 	deploymentID := "test-id-wrong"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(astro_mocks.Client)
 
 	t.Run("invalid deployment ID", func(t *testing.T) {
@@ -389,7 +389,7 @@ func TestGetDeployment(t *testing.T) {
 }
 
 func TestCoreGetDeployment(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	deploymentID := "test-deployment-id"
 	depIds := []string{deploymentID}
@@ -489,7 +489,7 @@ func TestIsDeploymentDedicated(t *testing.T) {
 }
 
 func TestSelectRegion(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	t.Run("list regions failure", func(t *testing.T) {
@@ -647,7 +647,7 @@ func TestSelectRegion(t *testing.T) {
 }
 
 func TestLogs(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	deploymentID := "test-id"
 	logCount := 1
 	logLevels := []string{"WARN", "ERROR", "INFO"}
@@ -707,7 +707,7 @@ func TestLogs(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	csID := "test-cluster-id"
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1465,7 +1465,7 @@ func TestCreate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("success with hidden namespace information", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
@@ -1653,7 +1653,7 @@ func TestValidateResources(t *testing.T) {
 }
 
 func TestSelectCluster(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	csID := "test-cluster-id"
 	t.Run("list cluster failure", func(t *testing.T) {
@@ -1761,7 +1761,7 @@ func TestCanCiCdDeploy(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) { //nolint
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(astro_mocks.Client)
 
 	deploymentResp := astro.Deployment{
@@ -2826,7 +2826,7 @@ func TestUpdate(t *testing.T) { //nolint
 }
 
 func TestDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	deploymentResp := astro.Deployment{
 		ID:             "test-id",
@@ -3071,7 +3071,7 @@ func TestPrintWarning(t *testing.T) {
 }
 
 func TestUseSharedCluster(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	csID := "test-cluster-id"
 	region := "us-central1"
 	getSharedClusterParams := &astrocore.GetSharedClusterParams{
@@ -3119,7 +3119,7 @@ func TestUseSharedCluster(t *testing.T) {
 }
 
 func TestUseSharedClusterOrSelectCluster(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	csID := "test-cluster-id"
 
