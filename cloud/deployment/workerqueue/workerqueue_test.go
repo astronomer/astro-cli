@@ -37,7 +37,7 @@ var (
 	executorCelery         = astroplatformcore.DeploymentExecutorCELERY
 	executorKubernetes     = astroplatformcore.DeploymentExecutorKUBERNETES
 	highAvailability       = true
-	resourceQuotaCpu       = "1cpu"
+	resourceQuotaCPU       = "1cpu"
 	ResourceQuotaMemory    = "1"
 	schedulerSize          = astroplatformcore.DeploymentSchedulerSizeSMALL
 	deploymentResponse     = astroplatformcore.GetDeploymentResponse{
@@ -58,7 +58,7 @@ var (
 			ClusterId:           &clusterID,
 			Executor:            &executorCelery,
 			IsHighAvailability:  &highAvailability,
-			ResourceQuotaCpu:    &resourceQuotaCpu,
+			ResourceQuotaCpu:    &resourceQuotaCPU,
 			ResourceQuotaMemory: &ResourceQuotaMemory,
 			SchedulerSize:       &schedulerSize,
 			WorkerQueues:        &[]astroplatformcore.WorkerQueue{},

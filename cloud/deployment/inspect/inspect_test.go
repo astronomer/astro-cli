@@ -439,7 +439,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			DeploymentType:   string(*sourceDeployment.Type),
 			CloudProvider:    *sourceDeployment.CloudProvider,
 		}
-		rawDeploymentConfig, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
+		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
@@ -451,7 +451,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("returns a deployment map", func(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		additional := getAdditional(sourceDeployment, nodePools)
 		expectedDeployment := map[string]interface{}{
@@ -539,7 +539,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 	sourceDeployment.Type = &hybridType
 	t.Run("returns a yaml formatted printable deployment", func(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		additional := getAdditional(sourceDeployment, nodePools)
 
 		printableDeployment := map[string]interface{}{
@@ -629,7 +629,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
-		config, err := getDeploymentConfig(sourceDeployment2, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
 		additional := getAdditional(sourceDeployment2, nodePools)
 
 		printableDeployment := map[string]interface{}{
@@ -695,7 +695,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
-		config, err := getDeploymentConfig(sourceDeployment2, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
 		additional := getAdditional(sourceDeployment2, nodePools)
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
@@ -796,7 +796,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		additional := getAdditional(sourceDeployment, nodePools)
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
@@ -855,7 +855,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		decodeToStruct = errorReturningDecode
 		defer restoreDecode(originalDecode)
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		additional := getAdditional(sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
 		actualPrintableDeployment, err := formatPrintableDeployment("", false, getPrintableDeployment(info, config, additional))
@@ -867,7 +867,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		yamlMarshal = errReturningYAMLMarshal
 		defer restoreYAMLMarshal(originalMarshal)
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		additional := getAdditional(sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
 		actualPrintableDeployment, err := formatPrintableDeployment("", false, getPrintableDeployment(info, config, additional))
@@ -879,7 +879,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		jsonMarshal = errReturningJSONMarshal
 		defer restoreJSONMarshal(originalMarshal)
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		additional := getAdditional(sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
 		actualPrintableDeployment, err := formatPrintableDeployment("json", false, getPrintableDeployment(info, config, additional))
@@ -892,7 +892,7 @@ func TestGetSpecificField(t *testing.T) {
 	sourceDeployment.Status = "UNHEALTHY"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	info, _ := getDeploymentInfo(sourceDeployment)
-	config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
+	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 	assert.NoError(t, err)
 	additional := getAdditional(sourceDeployment, nodePools)
 	t.Run("returns a value if key is found in deployment.metadata", func(t *testing.T) {
@@ -968,7 +968,7 @@ func TestGetSpecificField(t *testing.T) {
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
-		assert.Equal(t, getQMap(sourceDeployment, nodePools), actual)
+		assert.Equal(t, getQMap(&sourceDeployment, nodePools), actual)
 	})
 	t.Run("returns a value if key is metadata", func(t *testing.T) {
 		requestedField := "metadata"
@@ -1067,7 +1067,7 @@ func TestGetTemplate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	info, _ := getDeploymentInfo(sourceDeployment)
-	config, err := getDeploymentConfig(sourceDeployment, mockPlatformCoreClient)
+	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 	assert.NoError(t, err)
 	additional := getAdditional(sourceDeployment, nodePools)
 

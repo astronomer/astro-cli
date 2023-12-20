@@ -180,6 +180,8 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 // It returns an error if getting default options fail.
 // It returns an error if worker-queue options are not valid.
 // It returns an error if node pool id could not be found for the worker type.
+//
+//nolint:dupl
 func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool, dagDeploy bool, envVars []astroplatformcore.DeploymentEnvironmentVariableRequest, astroPlatformCore astroplatformcore.CoreClient) error { //nolint
 	var (
 		defaultOptions          astroplatformcore.WorkerQueueOptions
@@ -229,7 +231,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				// set default values if none were specified
 				a := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
 				// check if queue is valid
-				if deploymentFromFile.Deployment.Configuration.Executor == "KubernetesExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "KUBERNETES" {
+				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 					return errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
 				} else {
 					err = workerqueue.IsHostedCeleryWorkerQueueInputValid(a, defaultOptions, &astroMachine)
@@ -249,7 +251,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				workerQueue.WorkerConcurrency = listQueues[i].WorkerConcurrency
 				workerQueue.NodePoolId = *listQueues[i].NodePoolId
 				// check if queue is valid
-				if deploymentFromFile.Deployment.Configuration.Executor == "KubernetesExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "KUBERNETES" {
+				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 					return errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
 				} else {
 					// set default values if none were specified
@@ -280,20 +282,20 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAZURE
 			}
 			var requestedExecutor astroplatformcore.CreateStandardDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == "CeleryExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "CELERY" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorCELERY
 			}
-			if deploymentFromFile.Deployment.Configuration.Executor == "KubernetesExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "KUBERNETES" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
 			}
 			var schedulerSize astroplatformcore.CreateStandardDeploymentRequestSchedulerSize
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "small" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "SMALL" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SmallScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SMALL {
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeSMALL
 			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "medium" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "MEDIUM" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MediumScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MEDIUM {
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
 			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "large" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "LARGE" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LargeScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LARGE {
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
 			}
 			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
@@ -322,20 +324,20 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if deployment.IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.CreateDedicatedDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == "CeleryExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "CELERY" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorCELERY
 			}
-			if deploymentFromFile.Deployment.Configuration.Executor == "KubernetesExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "KUBERNETES" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
 			var schedulerSize astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "small" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "SMALL" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SmallScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SMALL {
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
 			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "medium" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "MEDIUM" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MediumScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MEDIUM {
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
 			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "large" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "LARGE" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LargeScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LARGE {
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
 			}
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
@@ -363,10 +365,10 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if !deployment.IsDeploymentStandard(deploymentType) && !deployment.IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.CreateHybridDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == "CeleryExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "CELERY" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
 				requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorCELERY
 			}
-			if deploymentFromFile.Deployment.Configuration.Executor == "KubernetesExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "KUBERNETES" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 				requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorKUBERNETES
 			}
 			hybridDeploymentRequest := astroplatformcore.CreateHybridDeploymentRequest{
@@ -415,20 +417,20 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if deployment.IsDeploymentStandard(deploymentType) {
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == "CeleryExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "CELERY" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
 				requestedExecutor = astroplatformcore.CELERY
 			}
-			if deploymentFromFile.Deployment.Configuration.Executor == "KubernetesExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "KUBERNETES" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 				requestedExecutor = astroplatformcore.KUBERNETES
 			}
 			var schedulerSize astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "small" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "SMALL" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SmallScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SMALL {
 				schedulerSize = astroplatformcore.SMALL
 			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "medium" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "MEDIUM" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MediumScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MEDIUM {
 				schedulerSize = astroplatformcore.MEDIUM
 			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "large" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "LARGE" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LargeScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LARGE {
 				schedulerSize = astroplatformcore.LARGE
 			}
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
@@ -456,20 +458,20 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if deployment.IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.UpdateDedicatedDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == "CeleryExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "CELERY" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY
 			}
-			if deploymentFromFile.Deployment.Configuration.Executor == "KubernetesExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "KUBERNETES" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
 			var schedulerSize astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "small" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "SMALL" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SmallScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SMALL {
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeSMALL
 			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "medium" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "MEDIUM" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MediumScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MEDIUM {
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
 			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == "large" || deploymentFromFile.Deployment.Configuration.SchedulerSize == "LARGE" {
+			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LargeScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LARGE {
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
 			}
 			dedicatedDeploymentRequest := astroplatformcore.UpdateDedicatedDeploymentRequest{
@@ -497,10 +499,10 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if !deployment.IsDeploymentStandard(deploymentType) && !deployment.IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.UpdateHybridDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == "CeleryExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "CELERY" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
 				requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorCELERY
 			}
-			if deploymentFromFile.Deployment.Configuration.Executor == "KubernetesExecutor" || deploymentFromFile.Deployment.Configuration.Executor == "KUBERNETES" {
+			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 				requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES
 			}
 			hybridDeploymentRequest := astroplatformcore.UpdateHybridDeploymentRequest{
@@ -680,19 +682,15 @@ func getWorkspaceIDFromName(workspaceName, organizationID string, client astroco
 // getNodePoolIDFromWorkerType maps the node pool id in nodePools to a worker type.
 // It returns an error if the node pool id does not exist in any node pool in nodePools.
 func getNodePoolIDFromWorkerType(workerType, clusterName string, nodePools []astroplatformcore.NodePool) (string, error) {
-	var (
-		pool astroplatformcore.NodePool
-		err  error
-	)
 	if workerType == "" {
 		return nodePools[0].Id, nil
 	}
-	for _, pool = range nodePools { //nolint
-		if pool.NodeInstanceType == workerType {
-			return pool.Id, nil
+	for i := range nodePools { //nolint
+		if nodePools[i].NodeInstanceType == workerType {
+			return nodePools[i].Id, nil
 		}
 	}
-	err = fmt.Errorf("worker_type: %s %w in cluster: %s", workerType, errNotFound, clusterName)
+	err := fmt.Errorf("worker_type: %s %w in cluster: %s", workerType, errNotFound, clusterName)
 	return "", err
 }
 
@@ -836,7 +834,7 @@ func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment) (envV
 
 // isValidExecutor returns true for valid executor values and false if not.
 func isValidExecutor(executor string) bool {
-	return executor == deployment.CeleryExecutor || executor == deployment.KubeExecutor || executor == "CELERY" || executor == "KUBERNETES"
+	return executor == deployment.CeleryExecutor || executor == deployment.KubeExecutor || executor == deployment.CELERY || executor == deployment.KUBERNETES
 }
 
 // temporary code
