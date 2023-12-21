@@ -31,8 +31,8 @@ var (
 	errNotFound                       = errors.New("does not exist")
 	errInvalidValue                   = errors.New("is not valid")
 	errNotPermitted                   = errors.New("is not permitted")
-	errNoUseWorkerQueues              = errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
-	errUseDefaultWokerType            = errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
+	errNoUseWorkerQueues              = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
+	errUseDefaultWokerType            = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
 
 	canCiCdDeploy = deployment.CanCiCdDeploy
 )
@@ -254,7 +254,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				workerQueue.NodePoolId = *listQueues[i].NodePoolId
 				// check if queue is valid
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
-					return errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
+					return errUseDefaultWokerType
 				}
 				// set default values if none were specified
 				a := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)

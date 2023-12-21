@@ -128,7 +128,7 @@ func newDevRootCmd(astroClient astro.Client, platformCoreClient astroplatformcor
 		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
-		newAirflowUpgradeTestCmd(astroClient, platformCoreClient),
+		newAirflowUpgradeTestCmd(platformCoreClient),
 	)
 	return cmd
 }
@@ -172,7 +172,7 @@ func newAirflowInitCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowUpgradeTestCmd(astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient) *cobra.Command {
+func newAirflowUpgradeTestCmd(platformCoreClient astroplatformcore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade-test",
 		Short: "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test results.",

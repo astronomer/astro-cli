@@ -100,7 +100,7 @@ var (
 			ClusterName:            &testCluster,
 			Executor:               &executorCelery,
 			IsHighAvailability:     &highAvailabilityTest,
-			ResourceQuotaCpu:       &resourceQuotaCpu,
+			ResourceQuotaCpu:       &resourceQuotaCPU,
 			ResourceQuotaMemory:    &ResourceQuotaMemory,
 			SchedulerSize:          &schedulerTestSize,
 			WebServerAirflowApiUrl: "airflow-url",

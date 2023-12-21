@@ -25,8 +25,7 @@ var (
 	workerQueueRequest      = []astroplatformcore.WorkerQueueRequest{}
 	newEnvironmentVariables = []astroplatformcore.DeploymentEnvironmentVariableRequest{}
 	errMock                 = errors.New("mock error")
-	limit                   = 1000
-	clusterType             = []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
+	errCreateFailed         = errors.New("failed to create deployment")
 	nodePools               = []astroplatformcore.NodePool{
 		{
 			Id:               "test-pool-id",
@@ -111,7 +110,7 @@ var (
 	executorCelery      = astroplatformcore.DeploymentExecutorCELERY
 	executorKubernetes  = astroplatformcore.DeploymentExecutorKUBERNETES
 	highAvailability    = true
-	resourceQuotaCpu    = "1cpu"
+	resourceQuotaCPU    = "1cpu"
 	ResourceQuotaMemory = "1"
 	schedulerSize       = astroplatformcore.DeploymentSchedulerSizeSMALL
 	deploymentResponse  = astroplatformcore.GetDeploymentResponse{
@@ -132,7 +131,7 @@ var (
 			ClusterId:           &clusterID,
 			Executor:            &executorCelery,
 			IsHighAvailability:  &highAvailability,
-			ResourceQuotaCpu:    &resourceQuotaCpu,
+			ResourceQuotaCpu:    &resourceQuotaCPU,
 			ResourceQuotaMemory: &ResourceQuotaMemory,
 			SchedulerSize:       &schedulerSize,
 			WorkerQueues:        &[]astroplatformcore.WorkerQueue{},
@@ -510,7 +509,6 @@ func TestGetDeployment(t *testing.T) {
 
 func TestCoreGetDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	deploymentID := "test-id-1"
 	t.Run("success", func(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
@@ -563,8 +561,6 @@ func TestIsDeploymentDedicated(t *testing.T) {
 
 func TestSelectRegion(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-
 	t.Run("list regions failure", func(t *testing.T) {
 		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
@@ -819,10 +815,7 @@ func TestLogs(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-
 	csID := "test-cluster-id"
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-
 	var (
 		cloudProvider                = "test-provider"
 		mockCreateDeploymentResponse = astroplatformcore.CreateDeploymentResponse{
@@ -979,7 +972,6 @@ func TestCreate(t *testing.T) {
 	})
 	t.Run("returns an error when creating a Hybrid deployment fails", func(t *testing.T) {
 		// Set up mock responses and expectations
-		errCreateFailed := errors.New("failed to create deployment")
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, errCreateFailed).Once()

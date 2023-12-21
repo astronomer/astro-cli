@@ -134,7 +134,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCo
 			nodePools = *cluster.NodePools
 		}
 	}
-	additionalMap = getAdditional(requestedDeployment, nodePools)
+	additionalMap = getAdditional(&requestedDeployment, nodePools)
 	// create a map for the entire deployment
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 	// get specific field if requested
@@ -238,8 +238,8 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	return deploymentMap, nil
 }
 
-func getAdditional(coreDeployment astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool) map[string]interface{} {
-	qList := getQMap(&coreDeployment, nodePools)
+func getAdditional(coreDeployment *astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool) map[string]interface{} {
+	qList := getQMap(coreDeployment, nodePools)
 	var envVarList []astroplatformcore.DeploymentEnvironmentVariable
 	if coreDeployment.EnvironmentVariables != nil {
 		envVarList = *coreDeployment.EnvironmentVariables
@@ -281,7 +281,7 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatfo
 	if cluster.NodePools != nil {
 		nodePools = *cluster.NodePools
 	}
-	additionalMap = getAdditional(requestedDeployment, nodePools)
+	additionalMap = getAdditional(&requestedDeployment, nodePools)
 	// create a map for the entire deployment
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 
