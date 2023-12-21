@@ -277,7 +277,7 @@ func TestCheckAPIKeys(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIKeys(mockPlatformCoreClient, mockCoreClient, false)
+		_, err = checkAPIKeys(mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 	})
 }
