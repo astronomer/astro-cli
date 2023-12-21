@@ -665,9 +665,7 @@ func TestDeployFailure(t *testing.T) {
 	mockContainerHandler.AssertExpectations(t)
 	mockPlatformCoreClient.AssertExpectations(t)
 }
-
 func TestDeployMonitoringDAGNonHosted(t *testing.T) {
-
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      deploymentID,

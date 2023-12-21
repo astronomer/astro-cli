@@ -27,7 +27,6 @@ var (
 	varValue           string
 	key                string
 	slots              int
-	depIds             = []string{"test-deployment-id"}
 )
 
 const (
