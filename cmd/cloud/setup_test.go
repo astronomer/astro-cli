@@ -3,6 +3,7 @@ package cloud
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -190,8 +191,8 @@ func TestSetup(t *testing.T) {
 				},
 			},
 		}
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+		// mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
@@ -223,7 +224,7 @@ func TestSetup(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-
+		fmt.Println(mockPlatformCoreClient)
 		err = Setup(cmd, nil, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -244,9 +245,9 @@ func TestCheckAPIKeys(t *testing.T) {
 				},
 			},
 		}
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		// mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		// mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {

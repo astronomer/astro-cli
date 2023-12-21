@@ -117,6 +117,7 @@ func Setup(cmd *cobra.Command, client astro.Client, platformCoreClient astroplat
 	}
 
 	// run auth setup for any command that requires auth
+	fmt.Println(platformCoreClient)
 	apiKey, err := checkAPIKeys(platformCoreClient, isDeploymentFile)
 	if err != nil {
 		return err
@@ -330,6 +331,7 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, isDeploymentF
 	if err != nil {
 		return false, err
 	}
+	fmt.Println(platformCoreClient)
 	orgs, err := organization.ListOrganizations(platformCoreClient)
 	if err != nil {
 		return false, err
