@@ -77,7 +77,6 @@ var (
 		},
 	}
 	cluster = astroplatformcore.Cluster{
-
 		Id:        "test-cluster-id",
 		Name:      "test-cluster",
 		NodePools: &nodePools,
@@ -410,7 +409,6 @@ func TestCreateHostedShared(t *testing.T) {
 		assert.Contains(t, out.String(), expectedOutMessage)
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
-
 	})
 	t.Run("failed to select astro machines for hosted shared deployments", func(t *testing.T) {
 		// mock os.Stdin
@@ -422,7 +420,6 @@ func TestCreateHostedShared(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidAstroMachine)
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
-
 	})
 	t.Run("failed to get deployment config options for hosted shared deployments", func(t *testing.T) {
 		defer testUtil.MockUserInput(t, "test-worker-queue")()
@@ -525,7 +522,6 @@ func TestUpdate(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidQueue)
 		assert.Contains(t, err.Error(), expectedOutMessage)
 		mockPlatformCoreClient.AssertExpectations(t)
-
 	})
 	t.Run("returns an error when listing deployments fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
@@ -610,7 +606,6 @@ func TestUpdate(t *testing.T) {
 	// kube executor
 	deploymentResponse.JSON200.Executor = &executorKubernetes
 	t.Run("happy path update existing worker queue for a deployment", func(t *testing.T) {
-
 		expectedOutMessage := "worker queue default for test-deployment-label in test-ws-id workspace updated\n"
 		out := new(bytes.Buffer)
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)

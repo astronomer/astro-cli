@@ -1000,7 +1000,6 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	if !(IsDeploymentStandard(*currentDeployment.Type) || IsDeploymentDedicated(*currentDeployment.Type)) {
 		var workerQueuesRequest []astroplatformcore.HybridWorkerQueueRequest
 		if currentDeployment.WorkerQueues != nil {
-
 			workerQueues := *currentDeployment.WorkerQueues
 			for i := range workerQueues {
 				var workerQueueRequest astroplatformcore.HybridWorkerQueueRequest

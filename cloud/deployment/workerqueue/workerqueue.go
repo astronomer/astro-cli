@@ -221,7 +221,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			}
 			if queueToCreateOrUpdateHybrid != nil {
 				hybridListToCreate = updateHybridQueueList(hybridListToCreate, queueToCreateOrUpdateHybrid, requestedDeployment.Executor, wQueueMin, wQueueMax, wQueueConcurrency)
-
 			}
 		} else {
 			// update does not allow creating new queues

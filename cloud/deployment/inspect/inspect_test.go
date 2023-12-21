@@ -129,7 +129,6 @@ var (
 		},
 	}
 	cluster = astroplatformcore.Cluster{
-
 		Id:        clusterID,
 		Name:      "test-cluster",
 		NodePools: &nodePools,

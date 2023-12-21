@@ -316,7 +316,6 @@ func TestGetDeployment(t *testing.T) {
 	})
 
 	t.Run("two deployments with the same name", func(t *testing.T) {
-
 		mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 			{
 				Id:            "test-id-1",
