@@ -1425,7 +1425,7 @@ var SelectDeployment = func(deployments []astroplatformcore.Deployment, message 
 	return selected, nil
 }
 
-func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bool, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) {
+func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bool, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) { //nolint:gocognit
 	deployments, err := CoreGetDeployments(ws, "", corePlatformClient)
 	if err != nil {
 		return astroplatformcore.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
