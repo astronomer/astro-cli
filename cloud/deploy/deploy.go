@@ -401,7 +401,6 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 }
 
 func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (deploymentInfo, error) {
-
 	// Use config deployment if provided
 	if deploymentID == "" {
 		deploymentID = config.CFG.ProjectDeployment.GetProjectString()

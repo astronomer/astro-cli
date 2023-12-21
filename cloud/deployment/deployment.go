@@ -996,7 +996,6 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				return err
 			}
 		}
-
 	}
 	if !(IsDeploymentStandard(*currentDeployment.Type) || IsDeploymentDedicated(*currentDeployment.Type)) {
 		var workerQueuesRequest []astroplatformcore.HybridWorkerQueueRequest

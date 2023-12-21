@@ -546,7 +546,7 @@ func TestAirflowStart(t *testing.T) {
 func TestAirflowUpgradeTest(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("success", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil, nil)
+		cmd := newAirflowUpgradeTestCmd(nil)
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
@@ -560,7 +560,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil, nil)
+		cmd := newAirflowUpgradeTestCmd(nil)
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
@@ -576,7 +576,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 	})
 
 	t.Run("containerHandlerInit failure", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil, nil)
+		cmd := newAirflowUpgradeTestCmd(nil)
 
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			return nil, errMock
@@ -587,7 +587,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 	})
 
 	t.Run("Both airflow and runtime version used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil, nil)
+		cmd := newAirflowUpgradeTestCmd(nil)
 
 		airflowVersion = "something"
 		runtimeVersion = "something"
@@ -597,7 +597,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 	})
 
 	t.Run("Both custom image and deployment id used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil, nil)
+		cmd := newAirflowUpgradeTestCmd(nil)
 
 		deploymentID = "something"
 		customImageName = "something"
@@ -607,7 +607,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 	})
 
 	t.Run("Both airflow version and deployment id used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil, nil)
+		cmd := newAirflowUpgradeTestCmd(nil)
 
 		deploymentID = "something"
 		airflowVersion = "something"
@@ -617,7 +617,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 	})
 
 	t.Run("Both runtime version and deployment id used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil, nil)
+		cmd := newAirflowUpgradeTestCmd(nil)
 
 		deploymentID = "something"
 		runtimeVersion = "something"
@@ -627,7 +627,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 	})
 
 	t.Run("Both runtime version and custom image used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil, nil)
+		cmd := newAirflowUpgradeTestCmd(nil)
 
 		customImageName = "something"
 		runtimeVersion = "something"
@@ -637,7 +637,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 	})
 
 	t.Run("Both airflow version and custom image used", func(t *testing.T) {
-		cmd := newAirflowUpgradeTestCmd(nil, nil)
+		cmd := newAirflowUpgradeTestCmd(nil)
 
 		customImageName = "something"
 		airflowVersion = "something"

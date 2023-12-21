@@ -35,7 +35,7 @@ var (
 	errInvalidQueue              = errors.New("worker queue selection failed")
 	errCannotDeleteDefaultQueue  = errors.New("default queue can not be deleted")
 	ErrNotSupported              = errors.New("does not support")
-	errNoUseWorkerQueues         = errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
+	errNoUseWorkerQueues         = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
@@ -93,7 +93,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		// create listToCreate
 		if requestedDeployment.WorkerQueues != nil {
 			for i := range *requestedDeployment.WorkerQueues {
-
 				queues := *requestedDeployment.WorkerQueues
 				existingQueueRequest := astroplatformcore.WorkerQueueRequest{
 					Name:              queues[i].Name,
@@ -135,7 +134,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 		// create hybridListToCreate
 		for i := range *requestedDeployment.WorkerQueues {
-
 			queues := *requestedDeployment.WorkerQueues
 			existingHybridQueueRequest := astroplatformcore.HybridWorkerQueueRequest{
 				Name:              queues[i].Name,
@@ -561,7 +559,6 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 			}
 		}
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-
 			// create a new listToDelete without queueToDelete in it
 			for i := range existingQueues { //nolint
 				if existingQueues[i].Name != queueToDelete.Name {

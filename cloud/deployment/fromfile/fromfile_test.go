@@ -28,7 +28,6 @@ var (
 	executorCelery         = astroplatformcore.DeploymentExecutorCELERY
 	mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	errTest                = errors.New("test error")
-	limit                  = 1000
 	poolID                 = "test-pool-id"
 	poolID2                = "test-pool-id-2"
 	workloadIdentity       = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
@@ -95,8 +94,7 @@ var (
 			Deployments: mockCoreDeploymentCreateResponse,
 		},
 	}
-	clusterType = []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
-	cluster     = astroplatformcore.Cluster{
+	cluster = astroplatformcore.Cluster{
 		Id:   "test-cluster-id",
 		Name: "test-cluster",
 		NodePools: &[]astroplatformcore.NodePool{
