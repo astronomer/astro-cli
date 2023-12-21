@@ -2463,7 +2463,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
-
 	})
 	t.Run("returns an error if the cluster is being changed", func(t *testing.T) {
 		deploymentID = "test-deployment-id"

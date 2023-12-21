@@ -744,9 +744,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	mockCoreClient.AssertExpectations(t)
 	mockPlatformCoreClient.AssertExpectations(t)
 }
-
 func TestDeployNoMonitoringDAGHosted(t *testing.T) {
-
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      deploymentID,
