@@ -329,7 +329,7 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 	return deployment.Logs(deploymentID, ws, deploymentName, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroCoreClient)
 }
 
-func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit nolint:gocyclo
+func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
