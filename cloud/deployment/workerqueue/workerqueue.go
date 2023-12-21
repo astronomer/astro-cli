@@ -35,6 +35,7 @@ var (
 	errInvalidQueue              = errors.New("worker queue selection failed")
 	errCannotDeleteDefaultQueue  = errors.New("default queue can not be deleted")
 	ErrNotSupported              = errors.New("does not support")
+	errNoUseWorkerQueues         = errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
@@ -155,7 +156,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			name = queueToCreateOrUpdateHybrid.Name
 		}
 		queueToCreateOrUpdateHybrid = SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdateHybrid, defaultOptions)
-
 	}
 	switch *requestedDeployment.Executor {
 	case astroplatformcore.DeploymentExecutorCELERY:
@@ -179,13 +179,12 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 	case astroplatformcore.DeploymentExecutorKUBERNETES:
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-			return errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
-		} else {
-			queueToCreateOrUpdateHybrid.MinWorkerCount = -1
-			err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid)
-			if err != nil {
-				return err
-			}
+			return errNoUseWorkerQueues
+		}
+		queueToCreateOrUpdateHybrid.MinWorkerCount = -1
+		err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid)
+		if err != nil {
+			return err
 		}
 	}
 

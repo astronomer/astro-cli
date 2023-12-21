@@ -78,7 +78,6 @@ var (
 		},
 	}
 	executorCelery       = astroplatformcore.DeploymentExecutorCELERY
-	executorKubernetes   = astroplatformcore.DeploymentExecutorKUBERNETES
 	highAvailabilityTest = true
 	ResourceQuotaMemory  = "1"
 	schedulerTestSize    = astroplatformcore.DeploymentSchedulerSizeSMALL
@@ -117,7 +116,6 @@ var (
 		},
 	}
 	standardType               = astroplatformcore.DeploymentTypeSTANDARD
-	dedicatedType              = astroplatformcore.DeploymentTypeDEDICATED
 	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
 	testRegion                 = "region"
 	testProvider               = "provider"

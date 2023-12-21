@@ -145,7 +145,6 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 		region := notApplicable
 		cloudProvider := notApplicable
 		if IsDeploymentStandard(*d.Type) || IsDeploymentDedicated(*d.Type) {
-
 			region = *d.Region
 			cloudProvider = *d.CloudProvider
 		}
@@ -155,9 +154,7 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 			tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 		}
 	}
-
 	tab.Print(out)
-
 	return nil
 }
 
@@ -167,15 +164,15 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	// log level
 	if warnLogs {
 		logLevel = "WARN"
-		i += 1
+		i++
 	}
 	if errorLogs {
 		logLevel = "ERROR"
-		i += 1
+		i++
 	}
 	if infoLogs {
 		logLevel = "INFO"
-		i += 1
+		i++
 	}
 	if i > 1 {
 		return errors.New("cannot query for more than one log level at a time")
@@ -470,10 +467,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			schedulerReplicas = int(configOption.LegacyAstro.SchedulerReplicaRange.Default)
 		}
 
-		if schedulerSize == "" {
-			schedulerSize = configOption.DefaultValues.SchedulerSize
-		}
-
 		// validate hybrid resources requests
 		resourcesValid := validateHybridResources(schedulerAU, schedulerReplicas, configOption)
 		if !resourcesValid {
@@ -521,7 +514,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	if waitForStatus {
 		err = HealthPoll(d.Id, workspaceID, sleepTime, tickNum, timeoutNum, corePlatformClient)
 		if err != nil {
-			errOutput := createOutput(workspaceID, deploymentType, &d)
+			errOutput := createOutput(workspaceID, &d)
 			if errOutput != nil {
 				return errOutput
 			}
@@ -529,7 +522,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 	}
 
-	err = createOutput(workspaceID, deploymentType, &d)
+	err = createOutput(workspaceID, &d)
 	if err != nil {
 		return err
 	}
@@ -537,7 +530,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	return nil
 }
 
-func createOutput(workspaceID string, deploymentType astroplatformcore.DeploymentType, d *astroplatformcore.Deployment) error {
+func createOutput(workspaceID string, d *astroplatformcore.Deployment) error {
 	tab := newTableOut()
 
 	runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
@@ -1252,7 +1245,7 @@ var CoreGetDeployment = func(orgID, deploymentID string, corePlatformClient astr
 	return deployment, nil
 }
 
-// create deployment with core API
+// CoreCreateDeployment creates a deployment with the core API
 var CoreCreateDeployment = func(orgID string, createDeploymentRequest astroplatformcore.CreateDeploymentJSONRequestBody, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
@@ -1276,7 +1269,7 @@ var CoreCreateDeployment = func(orgID string, createDeploymentRequest astroplatf
 	return deployment, nil
 }
 
-// update deployment with core API
+// CoreUpdateDeployment updates a deployment with the core API
 var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequest astroplatformcore.UpdateDeploymentJSONRequestBody, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
@@ -1298,7 +1291,7 @@ var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequ
 	return deployment, nil
 }
 
-// delete deployment with core API
+// CoreDeleteDeployment deletes a deployment with the core API
 var CoreDeleteDeployment = func(orgID, deploymentID string, corePlatformClient astroplatformcore.CoreClient) error {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()

@@ -26,7 +26,6 @@ import (
 
 var (
 	errMock                    = errors.New("mock error")
-	org                        = "test-org-id"
 	ws                         = "test-ws-id"
 	dagTarballVersionTest      = "test-version"
 	dagsUploadTestURL          = "test-url"
