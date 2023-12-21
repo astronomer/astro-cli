@@ -26,7 +26,7 @@ func execDagCmd(args ...string) (string, error) {
 }
 
 func TestDagAdd(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	defer os.Remove("dags/sagemaker-batch-inference.py")
 

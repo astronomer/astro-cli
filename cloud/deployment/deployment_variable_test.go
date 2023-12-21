@@ -19,7 +19,7 @@ var (
 )
 
 func TestVariableList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	variableValue := "test-value-1"
 	t.Run("success", func(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
@@ -91,7 +91,7 @@ func TestVariableList(t *testing.T) {
 }
 
 func TestVariableModify(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	cloudProvider := "test-provider"
 	mockUpdateDeploymentResponse := astroplatformcore.UpdateDeploymentResponse{
 		JSON200: &astroplatformcore.Deployment{

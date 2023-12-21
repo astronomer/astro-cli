@@ -2817,7 +2817,7 @@ func TestGetClusterFromName(t *testing.T) {
 		actualNodePools                                 []astroplatformcore.NodePool
 		err                                             error
 	)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedClusterID = "test-cluster-id"
 	clusterName = "test-cluster"
 	t.Run("returns a cluster id if cluster exists in organization", func(t *testing.T) {
@@ -2859,7 +2859,7 @@ func TestGetWorkspaceIDFromName(t *testing.T) {
 		workspaceName, expectedWorkspaceID, actualWorkspaceID, orgID string
 		err                                                          error
 	)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkspaceID = "test-ws-id"
 	workspaceName = "test-workspace"
 	orgID = "test-org-id"
@@ -2895,7 +2895,7 @@ func TestGetNodePoolIDFromName(t *testing.T) {
 		existingPools                                       []astroplatformcore.NodePool
 		err                                                 error
 	)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedPoolID = "test-pool-id"
 	workerType = "worker-1"
 	clusterID = "test-cluster-id"

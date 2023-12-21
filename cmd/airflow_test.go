@@ -32,7 +32,7 @@ func TestDevRootCommand(t *testing.T) {
 }
 
 func TestDevInitCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	output, err := executeCommand("dev", "init", "--help")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro dev", output)
@@ -410,36 +410,21 @@ func TestAirflowStart(t *testing.T) {
 		cmd := newAirflowStartCmd(nil)
 		args := []string{"test-env-file"}
 
-		envObj := astrocore.EnvironmentObject{
-			ObjectKey: "test-object-key",
-			Connection: &astrocore.EnvironmentObjectConnection{
-				Type: "test-conn-type",
-			},
-		}
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{
-				EnvironmentObjects: []astrocore.EnvironmentObject{envObj},
-			},
-		}, nil).Once()
-
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
-		err := airflowStart(cmd, args, mockCoreClient)
+		err := airflowStart(cmd, args, nil)
 		assert.NoError(t, err)
 		mockContainerHandler.AssertExpectations(t)
-		mockCoreClient.AssertExpectations(t)
 	})
 
-	t.Run("success with environment objects disabled", func(t *testing.T) {
+	t.Run("success with deployment id flag set but environment objects disabled", func(t *testing.T) {
 		cmd := newAirflowStartCmd(nil)
+		deploymentID = "test-deployment-id"
+		cmd.Flag("deployment-id").Value.Set(deploymentID)
 		args := []string{"test-env-file"}
 		config.CFG.DisableEnvObjects.SetHomeString("true")
 		defer config.CFG.DisableEnvObjects.SetHomeString("false")
@@ -534,19 +519,13 @@ func TestAirflowStart(t *testing.T) {
 		cmd := newAirflowStartCmd(nil)
 		args := []string{"test-env-file"}
 
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
-			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200:      &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{}},
-		}, nil).Once()
-
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{}).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
-		err := airflowStart(cmd, args, mockCoreClient)
+		err := airflowStart(cmd, args, nil)
 		assert.ErrorIs(t, err, errMock)
 		mockContainerHandler.AssertExpectations(t)
 	})
@@ -555,23 +534,17 @@ func TestAirflowStart(t *testing.T) {
 		cmd := newAirflowStartCmd(nil)
 		args := []string{}
 
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
-			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200:      &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{}},
-		}, nil).Once()
-
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			return nil, errMock
 		}
 
-		err := airflowStart(cmd, args, mockCoreClient)
+		err := airflowStart(cmd, args, nil)
 		assert.ErrorIs(t, err, errMock)
 	})
 }
 
 func TestAirflowUpgradeTest(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
 		cmd := newAirflowUpgradeTestCmd(nil)
 
@@ -917,35 +890,21 @@ func TestAirflowStop(t *testing.T) {
 }
 
 func TestAirflowRestart(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("success", func(t *testing.T) {
 		cmd := newAirflowRestartCmd(nil)
 		cmd.Flag("no-cache").Value.Set("true")
 		args := []string{"test-env-file"}
 
-		envObj := astrocore.EnvironmentObject{
-			ObjectKey:  "test-object-key",
-			Connection: &astrocore.EnvironmentObjectConnection{Type: "test-conn-type"},
-		}
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{
-				EnvironmentObjects: []astrocore.EnvironmentObject{envObj},
-			},
-		}, nil).Once()
-
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop", true).Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
-		err := airflowRestart(cmd, args, mockCoreClient)
+		err := airflowRestart(cmd, args, nil)
 		assert.NoError(t, err)
 		mockContainerHandler.AssertExpectations(t)
 	})
@@ -1025,19 +984,13 @@ func TestAirflowRestart(t *testing.T) {
 		cmd.Flag("no-cache").Value.Set("true")
 		args := []string{"test-env-file"}
 
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
-			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200:      &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{}},
-		}, nil).Once()
-
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop", true).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
-		err := airflowRestart(cmd, args, mockCoreClient)
+		err := airflowRestart(cmd, args, nil)
 		assert.ErrorIs(t, err, errMock)
 		mockContainerHandler.AssertExpectations(t)
 	})
@@ -1047,20 +1000,14 @@ func TestAirflowRestart(t *testing.T) {
 		cmd.Flag("no-cache").Value.Set("true")
 		args := []string{"test-env-file"}
 
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
-			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200:      &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{}},
-		}, nil).Once()
-
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop", true).Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{}).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
-		err := airflowRestart(cmd, args, mockCoreClient)
+		err := airflowRestart(cmd, args, nil)
 		assert.ErrorIs(t, err, errMock)
 		mockContainerHandler.AssertExpectations(t)
 	})
@@ -1070,24 +1017,18 @@ func TestAirflowRestart(t *testing.T) {
 		cmd.Flag("no-cache").Value.Set("true")
 		args := []string{"test-env-file"}
 
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
-			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200:      &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{}},
-		}, nil).Once()
-
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			return nil, errMock
 		}
 
-		err := airflowRestart(cmd, args, mockCoreClient)
+		err := airflowRestart(cmd, args, nil)
 		assert.ErrorIs(t, err, errMock)
 	})
 }
 
 func TestAirflowPytest(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
@@ -1105,7 +1046,7 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("exit code 1", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
@@ -1123,7 +1064,7 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("pytest file doesnot exists", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
@@ -1141,7 +1082,7 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
@@ -1159,7 +1100,7 @@ func TestAirflowPytest(t *testing.T) {
 	})
 
 	t.Run("containerHandlerInit failure", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}

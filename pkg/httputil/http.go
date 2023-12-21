@@ -2,7 +2,7 @@ package httputil
 
 import (
 	"bytes"
-	"context"
+	httpContext "context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +15,8 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context/ctxhttp"
 )
+
+var ErrorBaseURL = errors.New("invalid baseurl")
 
 const LastSuccessfulHTTPResponseCode = 299
 
@@ -32,7 +34,7 @@ type HTTPResponse struct {
 // DoOptions are options passed to the HTTPClient.Do function
 type DoOptions struct {
 	Data    []byte
-	Context context.Context
+	Context httpContext.Context
 	Headers map[string]string
 	Method  string
 	Path    string
@@ -52,8 +54,8 @@ func (c *HTTPClient) Do(doOptions *DoOptions) (*http.Response, error) {
 		body = bytes.NewBuffer(doOptions.Data)
 	}
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	ctx := httpContext.Background()
+	ctx, cancel := httpContext.WithCancel(ctx)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, doOptions.Method, doOptions.Path, body)
 	if err != nil {
@@ -69,7 +71,7 @@ func (c *HTTPClient) Do(doOptions *DoOptions) (*http.Response, error) {
 
 	doCtx := doOptions.Context
 	if doCtx == nil {
-		doCtx = context.Background()
+		doCtx = httpContext.Background()
 	}
 
 	resp, err := ctxhttp.Do(doCtx, c.HTTPClient, req)
@@ -83,7 +85,7 @@ func (c *HTTPClient) Do(doOptions *DoOptions) (*http.Response, error) {
 }
 
 // if error in context, return that instead of generic http error
-func chooseError(ctx context.Context, err error) error {
+func chooseError(ctx httpContext.Context, err error) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

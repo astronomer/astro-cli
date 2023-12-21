@@ -563,7 +563,7 @@ func validateHybridResources(schedulerAU, schedulerReplicas int, configOption as
 		return false
 	}
 	if schedulerReplicas > schedulerReplicasMax || schedulerReplicas < schedulerReplicasMin {
-		fmt.Printf("\nScheduler Replicas must between a min of %d and a max of %d Replicas", schedulerReplicasMin, schedulerReplicasMax)
+		fmt.Printf("\nScheduler Replicas must be between a min of %d and a max of %d Replicas\n", schedulerReplicasMin, schedulerReplicasMax)
 		return false
 	}
 	return true

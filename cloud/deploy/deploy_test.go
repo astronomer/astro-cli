@@ -148,7 +148,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 		WaitForStatus:  false,
 		Dags:           false,
 	}
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -253,7 +253,7 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 		WaitForStatus:  false,
 		Dags:           false,
 	}
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	canCiCdDeploy = func(astroAPIToken string) bool {
 		return false
@@ -289,7 +289,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		WaitForStatus:  false,
 		Dags:           false,
 	}
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
@@ -585,7 +585,7 @@ func TestDeployFailure(t *testing.T) {
 	defer os.RemoveAll("./testfiles/dags/")
 
 	// no context set failure
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	err := config.ResetCurrentContext()
 	assert.NoError(t, err)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -824,7 +824,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 }
 
 func TestBuildImageFailure(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)

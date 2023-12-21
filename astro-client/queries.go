@@ -208,6 +208,51 @@ var (
 	}
   `
 
+	GetDeploymentConfigOptionsWithOrganization = `
+	query deploymentConfigOptions($organizationId: Id!) {
+	  deploymentConfigOptions(organizationId: $organizationId) {
+		components
+		astroUnit {
+		  cpu
+		  memory
+		}
+		executors
+		runtimeReleases {
+			channel
+			version
+		}
+		astroMachines {
+			concurrentTasks
+			concurrentTasksMax
+			cpu
+			memory
+			nodePoolType
+			storageSize
+			type
+		}
+		defaultAstroMachine {
+			concurrentTasks
+			concurrentTasksMax
+			cpu
+			memory
+			nodePoolType
+			storageSize
+			type
+		}
+		defaultSchedulerSize {
+			cpu
+			memory
+			size
+		}
+		schedulerSizes {
+			cpu
+			memory
+			size
+		}
+	  }
+	}
+  `
+
 	GetWorkerQueueOptions = `
 	query workerQueueOptions {
 		workerQueueOptions {

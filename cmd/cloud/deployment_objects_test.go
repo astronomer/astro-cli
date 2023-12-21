@@ -26,7 +26,7 @@ var (
 )
 
 func TestDeploymentConnectionRootCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	buf := new(bytes.Buffer)
 	cmd := newDeploymentRootCmd(os.Stdout)
 	cmd.SetOut(buf)
@@ -37,7 +37,7 @@ func TestDeploymentConnectionRootCommand(t *testing.T) {
 
 func TestConnectionList(t *testing.T) {
 	expectedHelp := "list connections for an Astro Deployment"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -71,7 +71,7 @@ func TestConnectionList(t *testing.T) {
 
 func TestConnectionCreate(t *testing.T) {
 	expectedHelp := "Create Airflow connections for an Astro Deployment"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -101,7 +101,7 @@ func TestConnectionCreate(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("successful airflow variable create", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
@@ -115,7 +115,7 @@ func TestConnectionCreate(t *testing.T) {
 
 func TestConnectionUpdate(t *testing.T) {
 	expectedHelp := "Update existing Airflow connections for an Astro Deployment"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -149,7 +149,7 @@ func TestConnectionUpdate(t *testing.T) {
 	})
 
 	t.Run("successful connection update", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
@@ -163,7 +163,7 @@ func TestConnectionUpdate(t *testing.T) {
 
 func TestConnectionCopy(t *testing.T) {
 	expectedHelp := "Copy Airflow connections from one Astro Deployment to another"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -197,7 +197,7 @@ func TestConnectionCopy(t *testing.T) {
 	})
 
 	t.Run("successful connection copy", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient.On("GetConnections", mock.Anything).Return(mockResp, nil).Twice()
 		mockClient.On("UpdateConnection", mock.AnythingOfType("string"), mock.AnythingOfType("*airflowclient.Connection")).Return(nil).Twice()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
@@ -212,7 +212,7 @@ func TestConnectionCopy(t *testing.T) {
 
 func TestVariableList(t *testing.T) {
 	expectedHelp := "list Airflow variables stored in an Astro Deployment's metadata database"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -246,7 +246,7 @@ func TestVariableList(t *testing.T) {
 
 func TestVariableUpdate(t *testing.T) {
 	expectedHelp := "Update Airflow variables for an Astro Deployment"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -279,7 +279,7 @@ func TestVariableUpdate(t *testing.T) {
 	})
 
 	t.Run("successful airflow variable update", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
@@ -293,7 +293,7 @@ func TestVariableUpdate(t *testing.T) {
 
 func TestVaraibleCreate(t *testing.T) {
 	expectedHelp := "Create Airflow variables for an Astro Deployment"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -325,7 +325,7 @@ func TestVaraibleCreate(t *testing.T) {
 	})
 
 	t.Run("successful airflow variable create", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
@@ -339,7 +339,7 @@ func TestVaraibleCreate(t *testing.T) {
 
 func TestVariableCopy(t *testing.T) {
 	expectedHelp := "Copy Airflow variables from one Astro Deployment to another Astro Deployment."
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -373,7 +373,7 @@ func TestVariableCopy(t *testing.T) {
 	})
 
 	t.Run("successful variable copy", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient.On("GetVariables", mock.Anything).Return(mockResp, nil).Twice()
 		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Twice()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
@@ -388,7 +388,7 @@ func TestVariableCopy(t *testing.T) {
 
 func TestPoolList(t *testing.T) {
 	expectedHelp := "list Airflow pools for an Astro Deployment"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -422,7 +422,7 @@ func TestPoolList(t *testing.T) {
 
 func TestPoolUpdate(t *testing.T) {
 	expectedHelp := "Update Airflow pools for an Astro Deployment"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -456,7 +456,7 @@ func TestPoolUpdate(t *testing.T) {
 	})
 
 	t.Run("successful pool update", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
@@ -470,7 +470,7 @@ func TestPoolUpdate(t *testing.T) {
 
 func TestPoolCreate(t *testing.T) {
 	expectedHelp := "Create Airflow pools for an Astro Deployment"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -502,7 +502,7 @@ func TestPoolCreate(t *testing.T) {
 	})
 
 	t.Run("successful pool create", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
@@ -516,7 +516,7 @@ func TestPoolCreate(t *testing.T) {
 
 func TestPoolCopy(t *testing.T) {
 	expectedHelp := "Copy Airflow pools from one Astro Deployment to another Astro Deployment."
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
@@ -549,7 +549,7 @@ func TestPoolCopy(t *testing.T) {
 	})
 
 	t.Run("successful pool copy", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient.On("GetPools", mock.Anything).Return(mockResp, nil).Twice()
 		mockClient.On("UpdatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Twice()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)

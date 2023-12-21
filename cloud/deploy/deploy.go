@@ -70,9 +70,10 @@ var (
 )
 
 var (
-	errDagsParseFailed       = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	envFileMissing           = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
-	errCiCdEnforcementUpdate = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
+	errDagsParseFailed        = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	envFileMissing            = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+	errCiCdEnforcementUpdate  = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
+	errImageDeployNoPriorDags = errors.New("cannot do image only deploy with no prior DAGs deployed. Please deploy DAGs to your deployment first")
 )
 
 var (
@@ -83,16 +84,17 @@ var (
 )
 
 type deploymentInfo struct {
-	deploymentID     string
-	namespace        string
-	deployImage      string
-	currentVersion   string
-	organizationID   string
-	workspaceID      string
-	webserverURL     string
-	dagDeployEnabled bool
-	deploymentType   astroplatformcore.DeploymentType
-	cicdEnforcement  bool
+	deploymentID             string
+	namespace                string
+	deployImage              string
+	currentVersion           string
+	organizationID           string
+	workspaceID              string
+	webserverURL             string
+	deploymentType           string
+	desiredDagTarballVersion string
+	dagDeployEnabled         bool
+	cicdEnforcement          bool
 }
 
 type InputDeploy struct {
@@ -105,6 +107,7 @@ type InputDeploy struct {
 	DeploymentName string
 	Prompt         bool
 	Dags           bool
+	Image          bool
 	WaitForStatus  bool
 	DagsPath       string
 	Description    string
@@ -234,11 +237,19 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 		return nil
 	}
 
+	if deployInput.Image {
+		if !deployInfo.dagDeployEnabled {
+			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
+		}
+		if deployInfo.desiredDagTarballVersion == "" {
+			return errImageDeployNoPriorDags
+		}
+	}
+
 	deploymentURL, err := deployment.GetDeploymentURL(deployInfo.deploymentID, deployInfo.workspaceID)
 	if err != nil {
 		return err
 	}
-
 	resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, deployInput.Description, "", deployInput.Dags, coreClient)
 	if err != nil {
 		return err
@@ -283,7 +294,7 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.deploymentType)
+		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, astroplatformcore.DeploymentType(dagsUploadURL))
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				fmt.Println("deployment id:")
@@ -333,8 +344,13 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
 		}
 
-		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 {
-			fmt.Println("No DAGs found. Skipping DAG deploy.")
+		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Image {
+			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+
+			if !i {
+				fmt.Println("Canceling deploy...")
+				return nil
+			}
 		}
 
 		// Build our image
@@ -368,12 +384,19 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.deploymentType)
-			if err != nil {
-				return err
+			if !deployInput.Image {
+				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, astroplatformcore.DeploymentType(deployInfo.deploymentType))
+				if err != nil {
+					return err
+				}
+			} else {
+				fmt.Println("Image Deploy only. Skipping deploying DAG...")
 			}
 		}
 		// finish deploy
+		if deployInput.Image {
+			dagTarballVersion = deployInfo.desiredDagTarballVersion
+		}
 		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
 		if err != nil {
 			return err
@@ -410,14 +433,22 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		var deploymentType astroplatformcore.DeploymentType
+		// var deploymentType astroplatformcore.DeploymentType
 		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, corePlatformClient, coreClient)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
-		if currentDeployment.Type != nil {
-			deploymentType = *currentDeployment.Type
+		coreDeployment, err := deployment.CoreGetDeployment(currentDeployment.OrganizationId, currentDeployment.Id, corePlatformClient)
+		if err != nil {
+			return deploymentInfo{}, err
 		}
+		var desiredDagTarballVersion string
+		if coreDeployment.DagTarballVersion != nil {
+			desiredDagTarballVersion = *coreDeployment.DagTarballVersion
+		} else {
+			desiredDagTarballVersion = ""
+		}
+
 		return deploymentInfo{
 			currentDeployment.Id,
 			currentDeployment.Namespace,
@@ -425,9 +456,10 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 			currentDeployment.RuntimeVersion,
 			currentDeployment.OrganizationId,
 			currentDeployment.WorkspaceId,
-			currentDeployment.WebServerUrl,
+			currentDeployment.WebServerAirflowApiUrl,
+			string(*currentDeployment.Type),
+			desiredDagTarballVersion,
 			currentDeployment.DagDeployEnabled,
-			deploymentType,
 			currentDeployment.IsCicdEnforced,
 		}, nil
 	}
@@ -530,16 +562,38 @@ func getImageName(cloudDomain, deploymentID, organizationID string, corePlatform
 		return deploymentInfo{}, err
 	}
 
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return deploymentInfo{}, err
+	}
+
 	currentVersion := resp.JSON200.RuntimeVersion
 	namespace := resp.JSON200.Namespace
 	workspaceID := resp.JSON200.WorkspaceId
 	webserverURL := resp.JSON200.WebServerUrl
 	dagDeployEnabled := resp.JSON200.DagDeployEnabled
+	cicdEnforcement := resp.JSON200.IsCicdEnforced
+	var desiredDagTarballVersion string
+	if resp.JSON200.DagTarballVersion != nil {
+		desiredDagTarballVersion = *resp.JSON200.DagTarballVersion
+	} else {
+		desiredDagTarballVersion = ""
+	}
 
 	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
 	deployImage := airflow.ImageName(namespace, "latest")
 
-	return deploymentInfo{namespace: namespace, deployImage: deployImage, currentVersion: currentVersion, organizationID: organizationID, workspaceID: workspaceID, webserverURL: webserverURL, dagDeployEnabled: dagDeployEnabled}, nil
+	return deploymentInfo{
+		namespace:                namespace,
+		deployImage:              deployImage,
+		currentVersion:           currentVersion,
+		organizationID:           organizationID,
+		workspaceID:              workspaceID,
+		webserverURL:             webserverURL,
+		dagDeployEnabled:         dagDeployEnabled,
+		desiredDagTarballVersion: desiredDagTarballVersion,
+		cicdEnforcement:          cicdEnforcement,
+	}, nil
 }
 
 func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error {
@@ -705,7 +759,7 @@ func updateDeploy(deployID, deploymentID, organizationID, dagTarballVersion stri
 		return err
 	}
 	if resp.JSON200.DagTarballVersion != nil {
-		fmt.Println("Deployed DAG bundle: ", &resp.JSON200.DagTarballVersion)
+		fmt.Println("Deployed DAG bundle: ", *resp.JSON200.DagTarballVersion)
 	}
 	if resp.JSON200.ImageTag != "" {
 		fmt.Println("Deployed Image Tag: ", resp.JSON200.ImageTag)

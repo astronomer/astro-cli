@@ -13,6 +13,8 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/version"
+
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 )
 
 var (
@@ -46,10 +48,9 @@ func requestEditor(ctx httpContext.Context, req *http.Request) error {
 	return nil
 }
 
-// create api client for astro core services
-func NewCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
+func NewIamCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
 	// we append base url in request editor, so set to an empty string here
-	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(requestEditor))
+	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(astrocore.CoreRequestEditor))
 	return cl
 }
 

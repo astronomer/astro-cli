@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 )
@@ -39,14 +40,13 @@ type Context struct {
 // GetCurrentContext looks up current context and gets corresponding Context struct
 func GetCurrentContext() (Context, error) {
 	c := Context{}
-
-	domain := CFG.Context.GetHomeString()
-	if domain == "" {
-		return Context{}, ErrGetHomeString
+	var domain string
+	if domain = os.Getenv("ASTRO_DOMAIN"); domain == "" {
+		if domain = CFG.Context.GetHomeString(); domain == "" {
+			return Context{}, ErrGetHomeString
+		}
 	}
-
 	c.Domain = domain
-
 	return c.GetContext()
 }
 
