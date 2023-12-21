@@ -82,7 +82,7 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 	}
 
 	// build query input
-	var oldEnvironmentVariables = []astroplatformcore.DeploymentEnvironmentVariable{}
+	oldEnvironmentVariables := []astroplatformcore.DeploymentEnvironmentVariable{}
 	if currentDeployment.EnvironmentVariables != nil {
 		oldEnvironmentVariables = *currentDeployment.EnvironmentVariables
 	}

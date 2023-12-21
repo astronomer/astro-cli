@@ -2,7 +2,6 @@ package deployment
 
 import (
 	"bytes"
-
 	"errors"
 	"net/http"
 	"os"
@@ -57,7 +56,6 @@ var (
 		},
 	}
 	cluster = astroplatformcore.Cluster{
-
 		Id:        "test-cluster-id",
 		Name:      "test-cluster",
 		NodePools: &nodePools,
@@ -718,7 +716,7 @@ func TestLogs(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	deploymentID := "test-id-1"
 	logCount := 2
-	var mockGetDeploymentLogsResponse = astrocore.GetDeploymentLogsResponse{
+	mockGetDeploymentLogsResponse := astrocore.GetDeploymentLogsResponse{
 		JSON200: &astrocore.DeploymentLog{
 			Limit:         logCount,
 			MaxNumResults: 10,
@@ -828,7 +826,7 @@ func TestCreate(t *testing.T) {
 			},
 		}
 	)
-	var GetClusterOptionsResponseOK = astrocore.GetClusterOptionsResponse{
+	GetClusterOptionsResponseOK := astrocore.GetClusterOptionsResponse{
 		JSON200: &[]astrocore.ClusterOptions{
 			{
 				DatabaseInstances:       []astrocore.ProviderInstanceType{},
@@ -1227,9 +1225,7 @@ func TestUpdate(t *testing.T) { //nolint
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
-
 	t.Run("successfully update schedulerSize and highAvailability and CICDEnforement", func(t *testing.T) {
-
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(3)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
