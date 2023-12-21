@@ -662,6 +662,7 @@ func TestDeployFailure(t *testing.T) {
 
 	mockCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
+
 	mockContainerHandler.AssertExpectations(t)
 	mockPlatformCoreClient.AssertExpectations(t)
 }
