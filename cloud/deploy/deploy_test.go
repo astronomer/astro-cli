@@ -30,6 +30,7 @@ var (
 	dagTarballVersionTest      = "test-version"
 	dagsUploadTestURL          = "test-url"
 	deploymentID               = "test-deployment-id"
+	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 		{
 			Id:     deploymentID,
@@ -102,6 +103,7 @@ var (
 			WorkspaceId:      ws,
 			WebServerUrl:     "test-url",
 			DagDeployEnabled: false,
+			Type:             &hybridType,
 		},
 	}
 	deploymentResponseCICD = astroplatformcore.GetDeploymentResponse{
@@ -167,7 +169,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
-	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(5)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(5)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)

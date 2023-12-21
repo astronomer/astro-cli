@@ -2312,7 +2312,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		}
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
-		assert.ErrorContains(t, err, "Don't use 'worker_queues' to update default queue with KubernetesExecutor")
+		assert.ErrorContains(t, err, "don't use 'worker_queues' to update default queue with KubernetesExecutor")
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("transforms formattedDeployment to CreateDeploymentInput if no queues were requested", func(t *testing.T) {
