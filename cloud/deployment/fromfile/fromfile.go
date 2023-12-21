@@ -31,7 +31,10 @@ var (
 	errNotFound                       = errors.New("does not exist")
 	errInvalidValue                   = errors.New("is not valid")
 	errNotPermitted                   = errors.New("is not permitted")
-	canCiCdDeploy                     = deployment.CanCiCdDeploy
+	errNoUseWorkerQueues              = errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
+	errUseDefaultWokerType            = errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
+
+	canCiCdDeploy = deployment.CanCiCdDeploy
 )
 
 const (
@@ -232,12 +235,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				a := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
 				// check if queue is valid
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
-					return errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
-				} else {
-					err = workerqueue.IsHostedCeleryWorkerQueueInputValid(a, defaultOptions, &astroMachine)
-					if err != nil {
-						return err
-					}
+					return errNoUseWorkerQueues
+				}
+				err = workerqueue.IsHostedCeleryWorkerQueueInputValid(a, defaultOptions, &astroMachine)
+				if err != nil {
+					return err
 				}
 				// add it to the list of queues to be created
 				listQueuesRequest = append(listQueuesRequest, *a)
@@ -253,15 +255,14 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				// check if queue is valid
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 					return errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
-				} else {
-					// set default values if none were specified
-					a := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
-					err = workerqueue.IsCeleryWorkerQueueInputValid(a, defaultOptions)
-					if err != nil {
-						return err
-					}
-					workerQueue = *a
 				}
+				// set default values if none were specified
+				a := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
+				err = workerqueue.IsCeleryWorkerQueueInputValid(a, defaultOptions)
+				if err != nil {
+					return err
+				}
+				workerQueue = *a
 				// add it to the list of queues to be created
 				listHybridQueuesRequest = append(listHybridQueuesRequest, workerQueue)
 			}
@@ -310,9 +311,9 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				IsHighAvailability:   deploymentFromFile.Deployment.Configuration.IsHighAvailability,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.CreateStandardDeploymentRequestTypeSTANDARD,
-				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCpu,
+				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU,
 				DefaultTaskPodMemory: deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory,
-				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCpu,
+				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU,
 				ResourceQuotaMemory:  deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory,
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
@@ -351,9 +352,9 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				ClusterId:            clusterID,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.CreateDedicatedDeploymentRequestTypeDEDICATED,
-				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCpu,
+				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU,
 				DefaultTaskPodMemory: deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory,
-				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCpu,
+				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU,
 				ResourceQuotaMemory:  deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory,
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
@@ -389,11 +390,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 			if requestedExecutor == astroplatformcore.CreateHybridDeploymentRequestExecutorKUBERNETES {
 				// map worker type to node pool id
-				taskPodNodePoolId, err := getNodePoolIDFromWorkerType(deploymentFromFile.Deployment.Configuration.DefaultWorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
+				taskPodNodePoolID, err := getNodePoolIDFromWorkerType(deploymentFromFile.Deployment.Configuration.DefaultWorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
 				if err != nil {
 					return err
 				}
-				hybridDeploymentRequest.TaskPodNodePoolId = &taskPodNodePoolId
+				hybridDeploymentRequest.TaskPodNodePoolId = &taskPodNodePoolID
 			}
 			err := createDeploymentRequest.FromCreateHybridDeploymentRequest(hybridDeploymentRequest)
 			if err != nil {
@@ -442,9 +443,9 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				IsHighAvailability:   deploymentFromFile.Deployment.Configuration.IsHighAvailability,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.UpdateStandardDeploymentRequestTypeSTANDARD,
-				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCpu,
+				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU,
 				DefaultTaskPodMemory: deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory,
-				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCpu,
+				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU,
 				ResourceQuotaMemory:  deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory,
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
@@ -483,9 +484,9 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				IsHighAvailability:   deploymentFromFile.Deployment.Configuration.IsHighAvailability,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.UpdateDedicatedDeploymentRequestTypeDEDICATED,
-				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCpu,
+				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU,
 				DefaultTaskPodMemory: deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory,
-				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCpu,
+				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU,
 				ResourceQuotaMemory:  deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory,
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
@@ -522,11 +523,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				WorkerQueues:         &listHybridQueuesRequest,
 			}
 			if requestedExecutor == astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES {
-				taskPodNodePoolId, err := getNodePoolIDFromWorkerType(deploymentFromFile.Deployment.Configuration.DefaultWorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
+				taskPodNodePoolID, err := getNodePoolIDFromWorkerType(deploymentFromFile.Deployment.Configuration.DefaultWorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
 				if err != nil {
 					return err
 				}
-				hybridDeploymentRequest.TaskPodNodePoolId = &taskPodNodePoolId
+				hybridDeploymentRequest.TaskPodNodePoolId = &taskPodNodePoolID
 			}
 			err := updateDeploymentRequest.FromUpdateHybridDeploymentRequest(hybridDeploymentRequest)
 			if err != nil {
@@ -554,7 +555,6 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		if err != nil {
 			return err
 		}
-
 	}
 	return nil
 }
@@ -770,7 +770,6 @@ func hasAlertEmails(deploymentFromFile *inspect.FormattedDeployment) bool {
 }
 
 func hasEnvVarsOrAlertEmails(deploymentFromFile *inspect.FormattedDeployment) bool {
-
 	if hasEnvVars(deploymentFromFile) {
 		return hasEnvVars(deploymentFromFile)
 	}

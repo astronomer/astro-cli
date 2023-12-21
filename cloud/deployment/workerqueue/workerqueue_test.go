@@ -1407,7 +1407,6 @@ func TestSanitizeExistingQueues(t *testing.T) {
 		},
 	}
 	t.Run("updates existing queues for CeleryExecutor", func(t *testing.T) {
-		testWorker := "test-worker"
 		testWorker1 := "test-worker-1"
 		expectedQs := []astroplatformcore.WorkerQueue{
 			{

@@ -115,7 +115,7 @@ func Setup(cmd *cobra.Command, client astro.Client, platformCoreClient astroplat
 	}
 
 	// run auth setup for any command that requires auth
-	apiKey, err := checkAPIKeys(client, platformCoreClient, coreClient, isDeploymentFile)
+	apiKey, err := checkAPIKeys(platformCoreClient, coreClient, isDeploymentFile)
 	if err != nil {
 		return err
 	}
@@ -237,7 +237,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys(astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, isDeploymentFile bool) (bool, error) {
+func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, isDeploymentFile bool) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")

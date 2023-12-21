@@ -581,7 +581,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 			return mockContainerHandler, nil
 		}
 
-		err := airflowUpgradeTest(cmd, nil, nil)
+		err := airflowUpgradeTest(cmd, nil)
 		assert.NoError(t, err)
 		mockContainerHandler.AssertExpectations(t)
 	})
@@ -595,7 +595,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 			return mockContainerHandler, nil
 		}
 
-		err := airflowUpgradeTest(cmd, nil, nil)
+		err := airflowUpgradeTest(cmd, nil)
 		assert.ErrorIs(t, err, errMock)
 		mockContainerHandler.AssertExpectations(t)
 		// Clean up init files after test
@@ -609,7 +609,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 			return nil, errMock
 		}
 
-		err := airflowUpgradeTest(cmd, nil, nil)
+		err := airflowUpgradeTest(cmd, nil)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -619,7 +619,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 		airflowVersion = "something"
 		runtimeVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil, nil)
+		err := airflowUpgradeTest(cmd, nil)
 		assert.ErrorIs(t, err, errInvalidBothAirflowAndRuntimeVersionsUpgrade)
 	})
 
@@ -629,7 +629,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 		deploymentID = "something"
 		customImageName = "something"
 
-		err := airflowUpgradeTest(cmd, nil, nil)
+		err := airflowUpgradeTest(cmd, nil)
 		assert.ErrorIs(t, err, errInvalidBothDeploymentIDandCustomImage)
 	})
 
@@ -639,7 +639,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 		deploymentID = "something"
 		airflowVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil, nil)
+		err := airflowUpgradeTest(cmd, nil)
 		assert.ErrorIs(t, err, errInvalidBothDeploymentIDandVersion)
 	})
 
@@ -649,7 +649,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 		deploymentID = "something"
 		runtimeVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil, nil)
+		err := airflowUpgradeTest(cmd, nil)
 		assert.ErrorIs(t, err, errInvalidBothDeploymentIDandVersion)
 	})
 
@@ -659,7 +659,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 		customImageName = "something"
 		runtimeVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil, nil)
+		err := airflowUpgradeTest(cmd, nil)
 		assert.ErrorIs(t, err, errInvalidBothCustomImageandVersion)
 	})
 
@@ -669,7 +669,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 		customImageName = "something"
 		airflowVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil, nil)
+		err := airflowUpgradeTest(cmd, nil)
 		assert.ErrorIs(t, err, errInvalidBothCustomImageandVersion)
 	})
 }

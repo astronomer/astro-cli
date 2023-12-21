@@ -48,9 +48,9 @@ type deploymentConfig struct {
 	DeploymentType        string `mapstructure:"deployment_type" yaml:"deployment_type" json:"deployment_type"`
 	CloudProvider         string `mapstructure:"cloud_provider" yaml:"cloud_provider" json:"cloud_provider"`
 	Region                string `mapstructure:"region" yaml:"region" json:"region"`
-	DefaultTaskPodCpu     string `mapstructure:"default_task_pod_cpu,omitempty" yaml:"default_task_pod_cpu,omitempty" json:"default_task_pod_cpu,omitempty"`
+	DefaultTaskPodCPU     string `mapstructure:"default_task_pod_cpu,omitempty" yaml:"default_task_pod_cpu,omitempty" json:"default_task_pod_cpu,omitempty"`
 	DefaultTaskPodMemory  string `mapstructure:"default_task_pod_memory,omitempty" yaml:"default_task_pod_memory,omitempty" json:"default_task_pod_memory,omitempty"`
-	ResourceQuotaCpu      string `mapstructure:"resource_quota_cpu,omitempty" yaml:"resource_quota_cpu,omitempty" json:"resource_quota_cpu,omitempty"`
+	ResourceQuotaCPU      string `mapstructure:"resource_quota_cpu,omitempty" yaml:"resource_quota_cpu,omitempty" json:"resource_quota_cpu,omitempty"`
 	ResourceQuotaMemory   string `mapstructure:"resource_quota_memory,omitempty" yaml:"resource_quota_memory,omitempty" json:"resource_quota_memory,omitempty"`
 	DefaultWorkerType     string `mapstructure:"default_worker_type,omitempty" yaml:"default_worker_type,omitempty" json:"default_worker_type,omitempty"`
 }

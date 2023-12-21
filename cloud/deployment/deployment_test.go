@@ -13,7 +13,6 @@ import (
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -22,19 +21,13 @@ import (
 )
 
 var (
-	enableCiCdEnforcement   = true
-	disableCiCdEnforcement  = false
 	hybridQueueList         = []astroplatformcore.HybridWorkerQueueRequest{}
 	workerQueueRequest      = []astroplatformcore.WorkerQueueRequest{}
 	newEnvironmentVariables = []astroplatformcore.DeploymentEnvironmentVariableRequest{}
 	errMock                 = errors.New("mock error")
 	limit                   = 1000
 	clusterType             = []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
-	clusterListParams       = &astrocore.ListClustersParams{
-		Types: &clusterType,
-		Limit: &limit,
-	}
-	nodePools = []astroplatformcore.NodePool{
+	nodePools               = []astroplatformcore.NodePool{
 		{
 			Id:               "test-pool-id",
 			IsDefault:        false,
@@ -209,7 +202,6 @@ func TestList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("success", func(t *testing.T) {
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
@@ -222,8 +214,6 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("success with no deployments in a workspace", func(t *testing.T) {
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
@@ -234,8 +224,6 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("success with all true", func(t *testing.T) {
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
@@ -248,8 +236,6 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
 		buf := new(bytes.Buffer)
@@ -260,7 +246,6 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("success with hidden namespace information", func(t *testing.T) {
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
@@ -840,7 +825,6 @@ func TestCreate(t *testing.T) {
 
 	var (
 		cloudProvider                = "test-provider"
-		hybridType                   = astroplatformcore.DeploymentTypeHYBRID
 		mockCreateDeploymentResponse = astroplatformcore.CreateDeploymentResponse{
 			JSON200: &astroplatformcore.Deployment{
 				Id:            "test-id",
@@ -995,9 +979,10 @@ func TestCreate(t *testing.T) {
 	})
 	t.Run("returns an error when creating a Hybrid deployment fails", func(t *testing.T) {
 		// Set up mock responses and expectations
+		errCreateFailed := errors.New("failed to create deployment")
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, errors.New("failed to create deployment")).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, errCreateFailed).Once()
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
@@ -1253,9 +1238,6 @@ func TestUpdate(t *testing.T) { //nolint
 	})
 
 	t.Run("successfully update schedulerSize and highAvailability and CICDEnforement", func(t *testing.T) {
-		c, err := config.GetCurrentContext()
-		err = c.SetContextKey("Token", "Bearer some-token")
-		assert.NoError(t, err)
 
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(3)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(3)
@@ -1267,7 +1249,7 @@ func TestUpdate(t *testing.T) { //nolint
 		// Mock user input for deployment name
 
 		// success with hybrid type with id
-		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// change type to standard
