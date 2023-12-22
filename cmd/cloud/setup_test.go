@@ -31,7 +31,7 @@ var (
 )
 
 func TestSetup(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("login cmd", func(t *testing.T) {
 		cmd := &cobra.Command{Use: "login"}
@@ -281,6 +281,8 @@ func TestCheckAPIKeys(t *testing.T) {
 		// run CheckAPIKeys
 		_, err = checkAPIKeys(mockPlatformCoreClient, false)
 		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 
