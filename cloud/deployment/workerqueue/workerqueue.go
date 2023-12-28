@@ -35,6 +35,7 @@ var (
 	errInvalidQueue              = errors.New("worker queue selection failed")
 	errCannotDeleteDefaultQueue  = errors.New("default queue can not be deleted")
 	ErrNotSupported              = errors.New("does not support")
+	errNoUseWorkerQueues         = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
@@ -92,7 +93,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		// create listToCreate
 		if requestedDeployment.WorkerQueues != nil {
 			for i := range *requestedDeployment.WorkerQueues {
-
 				queues := *requestedDeployment.WorkerQueues
 				existingQueueRequest := astroplatformcore.WorkerQueueRequest{
 					Name:              queues[i].Name,
@@ -134,7 +134,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 		// create hybridListToCreate
 		for i := range *requestedDeployment.WorkerQueues {
-
 			queues := *requestedDeployment.WorkerQueues
 			existingHybridQueueRequest := astroplatformcore.HybridWorkerQueueRequest{
 				Name:              queues[i].Name,
@@ -155,7 +154,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			name = queueToCreateOrUpdateHybrid.Name
 		}
 		queueToCreateOrUpdateHybrid = SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdateHybrid, defaultOptions)
-
 	}
 	switch *requestedDeployment.Executor {
 	case astroplatformcore.DeploymentExecutorCELERY:
@@ -179,13 +177,12 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 	case astroplatformcore.DeploymentExecutorKUBERNETES:
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-			return errors.New("Don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
-		} else {
-			queueToCreateOrUpdateHybrid.MinWorkerCount = -1
-			err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid)
-			if err != nil {
-				return err
-			}
+			return errNoUseWorkerQueues
+		}
+		queueToCreateOrUpdateHybrid.MinWorkerCount = -1
+		err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -224,7 +221,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			}
 			if queueToCreateOrUpdateHybrid != nil {
 				hybridListToCreate = updateHybridQueueList(hybridListToCreate, queueToCreateOrUpdateHybrid, requestedDeployment.Executor, wQueueMin, wQueueMax, wQueueConcurrency)
-
 			}
 		} else {
 			// update does not allow creating new queues
@@ -507,7 +503,7 @@ func selectNodePool(workerType string, nodePools []astroplatformcore.NodePool, o
 // user gets prompted if no name for the queue to delete was specified
 // An errQueueDoesNotExist is returned if queue to delete does not exist
 // An errCannotDeleteDefaultQueue is returned if a user chooses the default queue
-func Delete(ws, deploymentID, deploymentName, name string, force bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer) error {
+func Delete(ws, deploymentID, deploymentName, name string, force bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer) error { //nolint:gocognit
 	var (
 		requestedDeployment astroplatformcore.Deployment
 		err                 error
@@ -562,7 +558,6 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 			}
 		}
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-
 			// create a new listToDelete without queueToDelete in it
 			for i := range existingQueues { //nolint
 				if existingQueues[i].Name != queueToDelete.Name {

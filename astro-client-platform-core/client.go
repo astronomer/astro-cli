@@ -25,6 +25,13 @@ var (
 // a shorter alias
 type CoreClient = ClientWithResponsesInterface
 
+// create api client for astro platform core services
+func NewPlatformCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
+	// we append base url in request editor, so set to an empty string here
+	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(requestEditor))
+	return cl
+}
+
 func requestEditor(ctx httpContext.Context, req *http.Request) error {
 	currentCtx, err := context.GetCurrentContext()
 	if err != nil {
@@ -44,13 +51,6 @@ func requestEditor(ctx httpContext.Context, req *http.Request) error {
 	req.Header.Add("x-client-os-identifier", os+"-"+arch)
 	req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.CurrVersion))
 	return nil
-}
-
-// create api client for astro core services
-func NewCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
-	// we append base url in request editor, so set to an empty string here
-	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(requestEditor))
-	return cl
 }
 
 func NormalizeAPIError(httpResp *http.Response, body []byte) error {

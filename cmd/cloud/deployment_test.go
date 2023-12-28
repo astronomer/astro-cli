@@ -78,7 +78,6 @@ var (
 		},
 	}
 	executorCelery       = astroplatformcore.DeploymentExecutorCELERY
-	executorKubernetes   = astroplatformcore.DeploymentExecutorKUBERNETES
 	highAvailabilityTest = true
 	ResourceQuotaMemory  = "1"
 	schedulerTestSize    = astroplatformcore.DeploymentSchedulerSizeSMALL
@@ -101,7 +100,7 @@ var (
 			ClusterName:            &testCluster,
 			Executor:               &executorCelery,
 			IsHighAvailability:     &highAvailabilityTest,
-			ResourceQuotaCpu:       &resourceQuotaCpu,
+			ResourceQuotaCpu:       &resourceQuotaCPU,
 			ResourceQuotaMemory:    &ResourceQuotaMemory,
 			SchedulerSize:          &schedulerTestSize,
 			WebServerAirflowApiUrl: "airflow-url",
@@ -117,7 +116,6 @@ var (
 		},
 	}
 	standardType               = astroplatformcore.DeploymentTypeSTANDARD
-	dedicatedType              = astroplatformcore.DeploymentTypeDEDICATED
 	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
 	testRegion                 = "region"
 	testProvider               = "provider"
@@ -265,7 +263,6 @@ var (
 		},
 	}
 	cluster = astroplatformcore.Cluster{
-
 		Id:        "test-cluster-id",
 		Name:      "test-cluster",
 		NodePools: &nodePools,
@@ -289,7 +286,7 @@ func execDeploymentCmd(args ...string) (string, error) {
 }
 
 func TestDeploymentRootCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	buf := new(bytes.Buffer)
 	deplyCmd := newDeploymentRootCmd(os.Stdout)
 	deplyCmd.SetOut(buf)
@@ -300,7 +297,7 @@ func TestDeploymentRootCommand(t *testing.T) {
 }
 
 func TestDeploymentList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
@@ -315,7 +312,7 @@ func TestDeploymentList(t *testing.T) {
 }
 
 func TestDeploymentLogs(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -341,7 +338,7 @@ func TestDeploymentLogs(t *testing.T) {
 }
 
 func TestDeploymentCreate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	ws := "workspace-id"
 	csID := "test-cluster-id"
@@ -616,7 +613,7 @@ deployment:
 }
 
 func TestDeploymentUpdate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	ws := "test-ws-id"
@@ -683,13 +680,13 @@ func TestDeploymentUpdate(t *testing.T) {
 		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
 	})
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		ctx, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.Workspace = ""
 		err = ctx.SetContext()
 		assert.NoError(t, err)
-		defer testUtil.InitTestConfig(testUtil.CloudPlatform)
+		defer testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedOut := "Usage:\n"
 		cmdArgs := []string{"update", "-n", "doesnotexist"}
 		resp, err := execDeploymentCmd(cmdArgs...)
@@ -811,7 +808,7 @@ deployment:
 }
 
 func TestDeploymentDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
@@ -834,7 +831,7 @@ func TestDeploymentDelete(t *testing.T) {
 }
 
 func TestDeploymentVariableList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
@@ -860,7 +857,7 @@ func TestDeploymentVariableList(t *testing.T) {
 }
 
 func TestDeploymentVariableModify(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -901,7 +898,7 @@ func TestDeploymentVariableModify(t *testing.T) {
 }
 
 func TestDeploymentVariableUpdate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)

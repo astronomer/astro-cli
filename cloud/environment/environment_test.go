@@ -14,7 +14,7 @@ import (
 )
 
 func TestListConnections(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	context, _ := config.GetCurrentContext()
 	organization := context.Organization
@@ -41,7 +41,8 @@ func TestListConnections(t *testing.T) {
 			}},
 		}, nil).Once()
 
-		conns := ListConnections("", deploymentID, mockClient)
+		conns, err := ListConnections("", deploymentID, mockClient)
+		assert.NoError(t, err)
 		assert.Len(t, conns, 1)
 		assert.Equal(t, "postgres", conns["conn1"].Type)
 
@@ -66,32 +67,8 @@ func TestListConnections(t *testing.T) {
 			}},
 		}, nil).Once()
 
-		conns := ListConnections(workspaceID, "", mockClient)
-		assert.Len(t, conns, 1)
-		assert.Equal(t, "postgres", conns["conn1"].Type)
-
-		mockClient.AssertExpectations(t)
-	})
-
-	t.Run("List connections with context workspace ID", func(t *testing.T) {
-		workspaceID := context.Workspace
-		listParams := &astrocore.ListEnvironmentObjectsParams{
-			WorkspaceId:   &workspaceID,
-			ObjectType:    &objectType,
-			ShowSecrets:   &showSecrets,
-			ResolveLinked: &resolvedLinked,
-			Limit:         &limit,
-		}
-
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, organization, listParams).Return(&astrocore.ListEnvironmentObjectsResponse{
-			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-				{ObjectKey: "conn1", Connection: &astrocore.EnvironmentObjectConnection{Type: "postgres"}},
-			}},
-		}, nil).Once()
-
-		conns := ListConnections("", "", mockClient)
+		conns, err := ListConnections(workspaceID, "", mockClient)
+		assert.NoError(t, err)
 		assert.Len(t, conns, 1)
 		assert.Equal(t, "postgres", conns["conn1"].Type)
 
@@ -106,8 +83,8 @@ func TestListConnections(t *testing.T) {
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-		conns := ListConnections("", "", mockClient)
-		assert.Len(t, conns, 0)
+		_, err := ListConnections("", "", mockClient)
+		assert.Error(t, err)
 
 		mockClient.AssertExpectations(t)
 	})
@@ -124,8 +101,8 @@ func TestListConnections(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, organization, listParams).Return(nil, assert.AnError).Once()
 
-		conns := ListConnections("", "", mockClient)
-		assert.Len(t, conns, 0)
+		_, err := ListConnections(context.Workspace, "", mockClient)
+		assert.Error(t, err)
 
 		mockClient.AssertExpectations(t)
 	})

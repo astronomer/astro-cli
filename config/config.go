@@ -83,7 +83,7 @@ var (
 		PageSize:              newCfg("page_size", "20"),
 		UpgradeMessage:        newCfg("upgrade_message", "true"),
 		DisableAstroRun:       newCfg("disable_astro_run", "false"),
-		DisableEnvObjects:     newCfg("disable_env_objects", "true"),
+		DisableEnvObjects:     newCfg("disable_env_objects", "false"),
 	}
 
 	// viperHome is the viper object in the users home directory

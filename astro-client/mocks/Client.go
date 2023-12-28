@@ -163,6 +163,30 @@ func (_m *Client) GetDeploymentConfig() (astro.DeploymentConfig, error) {
 	return r0, r1
 }
 
+// GetDeploymentConfigWithOrganization provides a mock function with given fields: organizationID
+func (_m *Client) GetDeploymentConfigWithOrganization(organizationID string) (astro.DeploymentConfig, error) {
+	ret := _m.Called(organizationID)
+
+	var r0 astro.DeploymentConfig
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) (astro.DeploymentConfig, error)); ok {
+		return rf(organizationID)
+	}
+	if rf, ok := ret.Get(0).(func(string) astro.DeploymentConfig); ok {
+		r0 = rf(organizationID)
+	} else {
+		r0 = ret.Get(0).(astro.DeploymentConfig)
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(organizationID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetDeploymentHistory provides a mock function with given fields: vars
 func (_m *Client) GetDeploymentHistory(vars map[string]interface{}) (astro.DeploymentHistory, error) {
 	ret := _m.Called(vars)

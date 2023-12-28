@@ -26,7 +26,7 @@ func execProviderCmd(args ...string) (string, error) {
 }
 
 func TestProviderAdd(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	defer os.Remove("requirements.txt")
 

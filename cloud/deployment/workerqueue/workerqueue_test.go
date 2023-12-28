@@ -77,7 +77,6 @@ var (
 		},
 	}
 	cluster = astroplatformcore.Cluster{
-
 		Id:        "test-cluster-id",
 		Name:      "test-cluster",
 		NodePools: &nodePools,
@@ -203,7 +202,7 @@ var (
 )
 
 func TestCreate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkerQueue := astroplatformcore.WorkerQueue{
 		Name:              "test-worker-queue",
 		IsDefault:         false,
@@ -375,7 +374,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateHostedShared(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedOutMessage := "worker queue test-worker-queue for test-deployment-label in test-ws-id workspace created\n"
 	out := new(bytes.Buffer)
 	// hosted deployments
@@ -410,7 +409,6 @@ func TestCreateHostedShared(t *testing.T) {
 		assert.Contains(t, out.String(), expectedOutMessage)
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
-
 	})
 	t.Run("failed to select astro machines for hosted shared deployments", func(t *testing.T) {
 		// mock os.Stdin
@@ -422,7 +420,6 @@ func TestCreateHostedShared(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidAstroMachine)
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
-
 	})
 	t.Run("failed to get deployment config options for hosted shared deployments", func(t *testing.T) {
 		defer testUtil.MockUserInput(t, "test-worker-queue")()
@@ -437,7 +434,7 @@ func TestCreateHostedShared(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkerQueue := astroplatformcore.WorkerQueue{
 		Name:              "test-queue-1",
 		IsDefault:         false,
@@ -525,7 +522,6 @@ func TestUpdate(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidQueue)
 		assert.Contains(t, err.Error(), expectedOutMessage)
 		mockPlatformCoreClient.AssertExpectations(t)
-
 	})
 	t.Run("returns an error when listing deployments fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
@@ -610,7 +606,6 @@ func TestUpdate(t *testing.T) {
 	// kube executor
 	deploymentResponse.JSON200.Executor = &executorKubernetes
 	t.Run("happy path update existing worker queue for a deployment", func(t *testing.T) {
-
 		expectedOutMessage := "worker queue default for test-deployment-label in test-ws-id workspace updated\n"
 		out := new(bytes.Buffer)
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
@@ -656,7 +651,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	testID := "test-wq-id"
 	astroMachine := "A5"
@@ -940,7 +935,7 @@ func TestIsCeleryWorkerQueueInputValid(t *testing.T) {
 }
 
 func TestIsHostedCeleryWorkerQueueInputValid(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockWorkerQueueDefaultOptions := astroplatformcore.WorkerQueueOptions{
 		MinWorkers: astroplatformcore.Range{
 			Floor:   0,
@@ -1005,7 +1000,7 @@ func TestIsHostedCeleryWorkerQueueInputValid(t *testing.T) {
 }
 
 func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	requestedWorkerQueue := &astroplatformcore.HybridWorkerQueueRequest{
 		Name:              "default",
 		MinWorkerCount:    -1,
@@ -1410,7 +1405,6 @@ func TestSanitizeExistingQueues(t *testing.T) {
 		},
 	}
 	t.Run("updates existing queues for CeleryExecutor", func(t *testing.T) {
-		testWorker := "test-worker"
 		testWorker1 := "test-worker-1"
 		expectedQs := []astroplatformcore.WorkerQueue{
 			{

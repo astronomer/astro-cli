@@ -40,7 +40,7 @@ func TestRootCommandLocal(t *testing.T) {
 }
 
 func TestRootCommandCloudContext(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	version.CurrVersion = "1.0.0"
 	output, err := executeCommand("help")
 	assert.NoError(t, err)

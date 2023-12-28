@@ -48,9 +48,9 @@ type deploymentConfig struct {
 	DeploymentType        string `mapstructure:"deployment_type" yaml:"deployment_type" json:"deployment_type"`
 	CloudProvider         string `mapstructure:"cloud_provider" yaml:"cloud_provider" json:"cloud_provider"`
 	Region                string `mapstructure:"region" yaml:"region" json:"region"`
-	DefaultTaskPodCpu     string `mapstructure:"default_task_pod_cpu,omitempty" yaml:"default_task_pod_cpu,omitempty" json:"default_task_pod_cpu,omitempty"`
+	DefaultTaskPodCPU     string `mapstructure:"default_task_pod_cpu,omitempty" yaml:"default_task_pod_cpu,omitempty" json:"default_task_pod_cpu,omitempty"`
 	DefaultTaskPodMemory  string `mapstructure:"default_task_pod_memory,omitempty" yaml:"default_task_pod_memory,omitempty" json:"default_task_pod_memory,omitempty"`
-	ResourceQuotaCpu      string `mapstructure:"resource_quota_cpu,omitempty" yaml:"resource_quota_cpu,omitempty" json:"resource_quota_cpu,omitempty"`
+	ResourceQuotaCPU      string `mapstructure:"resource_quota_cpu,omitempty" yaml:"resource_quota_cpu,omitempty" json:"resource_quota_cpu,omitempty"`
 	ResourceQuotaMemory   string `mapstructure:"resource_quota_memory,omitempty" yaml:"resource_quota_memory,omitempty" json:"resource_quota_memory,omitempty"`
 	DefaultWorkerType     string `mapstructure:"default_worker_type,omitempty" yaml:"default_worker_type,omitempty" json:"default_worker_type,omitempty"`
 }
@@ -134,7 +134,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCo
 			nodePools = *cluster.NodePools
 		}
 	}
-	additionalMap = getAdditional(requestedDeployment, nodePools)
+	additionalMap = getAdditional(&requestedDeployment, nodePools)
 	// create a map for the entire deployment
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 	// get specific field if requested
@@ -238,8 +238,8 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	return deploymentMap, nil
 }
 
-func getAdditional(coreDeployment astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool) map[string]interface{} {
-	qList := getQMap(&coreDeployment, nodePools)
+func getAdditional(coreDeployment *astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool) map[string]interface{} {
+	qList := getQMap(coreDeployment, nodePools)
 	var envVarList []astroplatformcore.DeploymentEnvironmentVariable
 	if coreDeployment.EnvironmentVariables != nil {
 		envVarList = *coreDeployment.EnvironmentVariables
@@ -281,7 +281,7 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatfo
 	if cluster.NodePools != nil {
 		nodePools = *cluster.NodePools
 	}
-	additionalMap = getAdditional(requestedDeployment, nodePools)
+	additionalMap = getAdditional(&requestedDeployment, nodePools)
 	// create a map for the entire deployment
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 
@@ -443,7 +443,15 @@ func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
 	}
 	template.Deployment.EnvVars = newEnvVars
 	if template.Deployment.Configuration.Executor == deployment.KubeExecutor {
-		template.Deployment.WorkerQs = nil
+		var newWorkerQs []Workerq
+		for i := range template.Deployment.WorkerQs {
+			if template.Deployment.WorkerQs[i].Name == "default" {
+				template.Deployment.WorkerQs[i].PodCPU = ""
+				template.Deployment.WorkerQs[i].PodRAM = ""
+				newWorkerQs = append(newWorkerQs, template.Deployment.WorkerQs[i])
+			}
+		}
+		template.Deployment.WorkerQs = newWorkerQs
 	}
 
 	return template

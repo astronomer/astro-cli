@@ -26,15 +26,16 @@ import (
 
 var (
 	errMock                    = errors.New("mock error")
-	org                        = "test-org-id"
 	ws                         = "test-ws-id"
 	dagTarballVersionTest      = "test-version"
 	dagsUploadTestURL          = "test-url"
 	deploymentID               = "test-deployment-id"
+	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 		{
 			Id:     deploymentID,
 			Status: "HEALTHY",
+			Type:   &hybridType,
 		},
 	}
 	mockCoreDeploymentResponseCICD = []astroplatformcore.Deployment{
@@ -42,6 +43,7 @@ var (
 			Id:             deploymentID,
 			Status:         "HEALTHY",
 			IsCicdEnforced: true,
+			Type:           &hybridType,
 		},
 	}
 	mockListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{
@@ -103,6 +105,7 @@ var (
 			WorkspaceId:      ws,
 			WebServerUrl:     "test-url",
 			DagDeployEnabled: false,
+			Type:             &hybridType,
 		},
 	}
 	deploymentResponseCICD = astroplatformcore.GetDeploymentResponse{
@@ -117,6 +120,7 @@ var (
 			WebServerUrl:     "test-url",
 			DagDeployEnabled: false,
 			IsCicdEnforced:   true,
+			Type:             &hybridType,
 		},
 	}
 	deploymentResponseDags = astroplatformcore.GetDeploymentResponse{
@@ -131,6 +135,7 @@ var (
 			WebServerUrl:     "test-url",
 			DagDeployEnabled: true,
 			IsCicdEnforced:   false,
+			Type:             &hybridType,
 		},
 	}
 )
@@ -149,12 +154,12 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 		WaitForStatus:  false,
 		Dags:           false,
 	}
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
-	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(5)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(5)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)
@@ -254,14 +259,14 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 		WaitForStatus:  false,
 		Dags:           false,
 	}
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	canCiCdDeploy = func(astroAPIToken string) bool {
 		return false
 	}
 
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseCICD, nil).Once()
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseCICD, nil).Twice()
 
 	err := Deploy(deployInput, mockPlatformCoreClient, nil)
 	assert.ErrorIs(t, err, errCiCdEnforcementUpdate)
@@ -290,12 +295,12 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		WaitForStatus:  false,
 		Dags:           false,
 	}
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
-	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(7)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(9)
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(7)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(7)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(7)
@@ -428,7 +433,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(5)
-	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(5)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(10)
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(5)
@@ -501,7 +506,7 @@ func TestNoDagsDeploy(t *testing.T) {
 	assert.NoError(t, err)
 
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(1)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(2)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(1)
 
 	deployInput := InputDeploy{
@@ -542,7 +547,7 @@ func TestDagsDeployFailed(t *testing.T) {
 		Dags:           true,
 	}
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
-	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(2)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(3)
 
@@ -586,7 +591,7 @@ func TestDeployFailure(t *testing.T) {
 	defer os.RemoveAll("./testfiles/dags/")
 
 	// no context set failure
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	err := config.ResetCurrentContext()
 	assert.NoError(t, err)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -611,7 +616,7 @@ func TestDeployFailure(t *testing.T) {
 
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
-	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(1)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(2)
 
@@ -663,12 +668,12 @@ func TestDeployFailure(t *testing.T) {
 
 	mockCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
+
 	mockContainerHandler.AssertExpectations(t)
 	mockPlatformCoreClient.AssertExpectations(t)
 }
 
 func TestDeployMonitoringDAGNonHosted(t *testing.T) {
-
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      deploymentID,
@@ -694,7 +699,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
-	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(4)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(8)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
 
@@ -747,7 +752,6 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 }
 
 func TestDeployNoMonitoringDAGHosted(t *testing.T) {
-
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      deploymentID,
@@ -773,7 +777,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
-	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(4)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(8)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
 
@@ -826,7 +830,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 }
 
 func TestBuildImageFailure(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)

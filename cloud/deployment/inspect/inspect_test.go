@@ -29,7 +29,6 @@ var (
 	workloadIdentity           = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
 	deploymentID               = "test-deployment-id"
 	standardType               = astroplatformcore.DeploymentTypeSTANDARD
-	dedicatedType              = astroplatformcore.DeploymentTypeDEDICATED
 	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
 	region                     = "us-central1"
 	astroMachine               = "a5"
@@ -66,7 +65,7 @@ var (
 	executorCelery                = astroplatformcore.DeploymentExecutorCELERY
 	description                   = "description"
 	workspaceName                 = "test-ws"
-	clusterId                     = "cluster-id"
+	clusterID                     = "cluster-id"
 	ClusterName                   = "test-cluster"
 	contactEmails                 = []string{"email1", "email2"}
 	schedulerAU                   = 5
@@ -130,8 +129,7 @@ var (
 		},
 	}
 	cluster = astroplatformcore.Cluster{
-
-		Id:        clusterId,
+		Id:        clusterID,
 		Name:      "test-cluster",
 		NodePools: &nodePools,
 	}
@@ -148,7 +146,7 @@ var (
 		WorkspaceName:          &workspaceName,
 		WorkspaceId:            "test-ws-id",
 		Namespace:              "great-release-name",
-		ClusterId:              &clusterId,
+		ClusterId:              &clusterID,
 		ClusterName:            &ClusterName,
 		ContactEmails:          &contactEmails,
 		Type:                   &hybridType,
@@ -205,7 +203,7 @@ func restoreYAMLMarshal(replace func(v interface{}) ([]byte, error)) {
 }
 
 func TestInspect(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	workspaceID := "test-ws-id"
 	deploymentName := "test-deployment-label"
@@ -346,7 +344,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("Display Cluster Region and hide Release Name if an org is hosted", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
@@ -424,7 +422,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
 		sourceDeployment.Type = &hybridType
 		var actualDeploymentConfig deploymentConfig
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedDeploymentConfig := deploymentConfig{
 			Name:             sourceDeployment.Name,
 			Description:      *sourceDeployment.Description,
@@ -453,7 +451,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		additional := getAdditional(sourceDeployment, nodePools)
+		additional := getAdditional(&sourceDeployment, nodePools)
 		expectedDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
 				"metadata":              info,
@@ -488,13 +486,13 @@ func TestGetAdditional(t *testing.T) {
 				"worker_type":        "test-instance-type-1",
 			},
 		}
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		rawExpected := map[string]interface{}{
 			"alert_emails":          sourceDeployment.ContactEmails,
 			"worker_queues":         qList,
 			"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
 		}
-		rawAdditional := getAdditional(sourceDeployment, nodePools)
+		rawAdditional := getAdditional(&sourceDeployment, nodePools)
 		err := decodeToStruct(rawAdditional, &actualAdditional)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawExpected, &expectedAdditional)
@@ -518,13 +516,13 @@ func TestGetAdditional(t *testing.T) {
 				"worker_type": "test-instance-type-1",
 			},
 		}
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		rawExpected := map[string]interface{}{
 			"alert_emails":          sourceDeployment.ContactEmails,
 			"worker_queues":         qList,
 			"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
 		}
-		rawAdditional := getAdditional(sourceDeployment, nodePools)
+		rawAdditional := getAdditional(&sourceDeployment, nodePools)
 		err := decodeToStruct(rawAdditional, &actualAdditional)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawExpected, &expectedAdditional)
@@ -540,7 +538,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 	t.Run("returns a yaml formatted printable deployment", func(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
-		additional := getAdditional(sourceDeployment, nodePools)
+		assert.NoError(t, err)
+		additional := getAdditional(&sourceDeployment, nodePools)
 
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
@@ -630,7 +629,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
 		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
-		additional := getAdditional(sourceDeployment2, nodePools)
+		assert.NoError(t, err)
+		additional := getAdditional(&sourceDeployment2, nodePools)
 
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
@@ -696,7 +696,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
 		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
-		additional := getAdditional(sourceDeployment2, nodePools)
+		assert.NoError(t, err)
+		additional := getAdditional(&sourceDeployment2, nodePools)
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
 				"metadata":              info,
@@ -797,7 +798,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
-		additional := getAdditional(sourceDeployment, nodePools)
+		assert.NoError(t, err)
+		additional := getAdditional(&sourceDeployment, nodePools)
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
 				"metadata":              info,
@@ -856,7 +858,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		defer restoreDecode(originalDecode)
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
-		additional := getAdditional(sourceDeployment, nodePools)
+		assert.NoError(t, err)
+		additional := getAdditional(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
 		actualPrintableDeployment, err := formatPrintableDeployment("", false, getPrintableDeployment(info, config, additional))
 		assert.ErrorIs(t, err, errMarshal)
@@ -868,7 +871,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		defer restoreYAMLMarshal(originalMarshal)
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
-		additional := getAdditional(sourceDeployment, nodePools)
+		assert.NoError(t, err)
+		additional := getAdditional(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
 		actualPrintableDeployment, err := formatPrintableDeployment("", false, getPrintableDeployment(info, config, additional))
 		assert.ErrorIs(t, err, errMarshal)
@@ -880,7 +884,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		defer restoreJSONMarshal(originalMarshal)
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
-		additional := getAdditional(sourceDeployment, nodePools)
+		assert.NoError(t, err)
+		additional := getAdditional(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
 		actualPrintableDeployment, err := formatPrintableDeployment("json", false, getPrintableDeployment(info, config, additional))
 		assert.ErrorIs(t, err, errMarshal)
@@ -894,7 +899,7 @@ func TestGetSpecificField(t *testing.T) {
 	info, _ := getDeploymentInfo(sourceDeployment)
 	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 	assert.NoError(t, err)
-	additional := getAdditional(sourceDeployment, nodePools)
+	additional := getAdditional(&sourceDeployment, nodePools)
 	t.Run("returns a value if key is found in deployment.metadata", func(t *testing.T) {
 		requestedField := "metadata.workspace_id"
 		printableDeployment := map[string]interface{}{
@@ -1037,7 +1042,7 @@ func TestGetWorkerTypeFromNodePoolID(t *testing.T) {
 		expectedWorkerType, poolID, actualWorkerType string
 		existingPools                                []astroplatformcore.NodePool
 	)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkerType = "worker-1"
 	poolID = "test-pool-id"
 	existingPools = []astroplatformcore.NodePool{
@@ -1069,7 +1074,7 @@ func TestGetTemplate(t *testing.T) {
 	info, _ := getDeploymentInfo(sourceDeployment)
 	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 	assert.NoError(t, err)
-	additional := getAdditional(sourceDeployment, nodePools)
+	additional := getAdditional(&sourceDeployment, nodePools)
 
 	t.Run("returns a formatted template", func(t *testing.T) {
 		printableDeployment := map[string]interface{}{

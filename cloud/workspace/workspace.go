@@ -379,7 +379,7 @@ func GetWorkspaces(client astrocore.CoreClient) ([]astrocore.Workspace, error) {
 		Sorts: &sorts,
 	}
 
-	resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceListParams)
+	resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.Organization, workspaceListParams)
 	if err != nil {
 		return []astrocore.Workspace{}, err
 	}

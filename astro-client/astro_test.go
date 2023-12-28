@@ -12,7 +12,7 @@ import (
 )
 
 func TestCreateDeployment(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
 			CreateDeployment: Deployment{
@@ -58,7 +58,7 @@ func TestCreateDeployment(t *testing.T) {
 }
 
 func TestUpdateDeployment(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
 			UpdateDeployment: Deployment{
@@ -104,7 +104,7 @@ func TestUpdateDeployment(t *testing.T) {
 }
 
 func TestListDeployments(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	org := "test-org-id"
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -153,7 +153,7 @@ func TestListDeployments(t *testing.T) {
 }
 
 func TestGetDeployment(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	deployment := "test-deployment-id"
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -202,7 +202,7 @@ func TestGetDeployment(t *testing.T) {
 }
 
 func TestDeleteDeployment(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
 			DeleteDeployment: Deployment{
@@ -248,7 +248,7 @@ func TestDeleteDeployment(t *testing.T) {
 }
 
 func TestGetDeploymentHistory(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
 			GetDeploymentHistory: DeploymentHistory{
@@ -298,7 +298,7 @@ func TestGetDeploymentHistory(t *testing.T) {
 }
 
 func TestGetDeploymentConfig(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
 			GetDeploymentConfig: DeploymentConfig{
@@ -348,8 +348,59 @@ func TestGetDeploymentConfig(t *testing.T) {
 	})
 }
 
+func TestGetDeploymentConfigWithOrganization(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	mockResponse := &Response{
+		Data: ResponseData{
+			GetDeploymentConfig: DeploymentConfig{
+				AstronomerUnit: AstronomerUnit{CPU: 1, Memory: 1024},
+				RuntimeReleases: []RuntimeRelease{
+					{
+						Version:                  "4.2.5",
+						AirflowVersion:           "2.2.5",
+						Channel:                  "stable",
+						ReleaseDate:              "2020-06-25",
+						AirflowDatabaseMigration: true,
+					},
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		deploymentConfig, err := astroClient.GetDeploymentConfigWithOrganization("test-org-id")
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentConfig, mockResponse.Data.GetDeploymentConfig)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.GetDeploymentConfigWithOrganization("test-org-id")
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
 func TestModifyDeploymentVariable(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
 			UpdateDeploymentVariables: []EnvironmentVariablesObject{
@@ -395,7 +446,7 @@ func TestModifyDeploymentVariable(t *testing.T) {
 }
 
 func TestInitiateDagDeployment(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
 			InitiateDagDeployment: InitiateDagDeployment{
@@ -438,7 +489,7 @@ func TestInitiateDagDeployment(t *testing.T) {
 }
 
 func TestReportDagDeploymentStatus(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
 			ReportDagDeploymentStatus: DagDeploymentStatus{
@@ -488,7 +539,7 @@ func TestReportDagDeploymentStatus(t *testing.T) {
 }
 
 func TestCreateImage(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
 			CreateImage: &Image{
@@ -535,7 +586,7 @@ func TestCreateImage(t *testing.T) {
 }
 
 func TestDeployImage(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
 			DeployImage: &Image{
@@ -582,7 +633,7 @@ func TestDeployImage(t *testing.T) {
 }
 
 func TestWorkerQueueOptions(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockResponse := Response{
 		Data: ResponseData{
 			GetWorkerQueueOptions: WorkerQueueDefaultOptions{
@@ -638,7 +689,7 @@ func TestWorkerQueueOptions(t *testing.T) {
 }
 
 func TestGetOrganizationAuditLogs(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("Can export organization audit logs", func(t *testing.T) {
 		mockResponse := "A lot of audit logs entries"
@@ -694,7 +745,7 @@ func TestGetOrganizationAuditLogs(t *testing.T) {
 }
 
 func TestUpdateAlertEmails(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("updates a deployments alert emails", func(t *testing.T) {
 		emails := []string{"test1@email.com", "test2@meail.com"}

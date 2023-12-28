@@ -9,7 +9,6 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/environment"
@@ -107,7 +106,7 @@ astro dev init --airflow-version 2.2.3
 	errPytestArgs          = errors.New("")
 )
 
-func newDevRootCmd(astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
+func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -128,7 +127,7 @@ func newDevRootCmd(astroClient astro.Client, platformCoreClient astroplatformcor
 		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
-		newAirflowUpgradeTestCmd(astroClient, platformCoreClient),
+		newAirflowUpgradeTestCmd(platformCoreClient),
 	)
 	return cmd
 }
@@ -172,7 +171,7 @@ func newAirflowInitCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowUpgradeTestCmd(astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient) *cobra.Command {
+func newAirflowUpgradeTestCmd(platformCoreClient astroplatformcore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade-test",
 		Short: "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test results.",
@@ -182,7 +181,7 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client, platformCoreClient astro
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return airflowUpgradeTest(cmd, astroClient, platformCoreClient)
+			return airflowUpgradeTest(cmd, platformCoreClient)
 		},
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The version of Airflow you want to upgrade to. The default is the latest available version. Tests are run against the equivalent Astro Runtime version. ")
@@ -564,7 +563,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocognit
+func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocognit
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersionsUpgrade
@@ -639,8 +638,12 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 	}
 
 	var envConns map[string]astrocore.EnvironmentObjectConnection
-	if !config.CFG.DisableEnvObjects.GetBool() {
-		envConns = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+	if !config.CFG.DisableEnvObjects.GetBool() && (workspaceID != "" || deploymentID != "") {
+		var err error
+		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+		if err != nil {
+			return err
+		}
 	}
 
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
@@ -759,8 +762,12 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 	noBrowser = true
 
 	var envConns map[string]astrocore.EnvironmentObjectConnection
-	if !config.CFG.DisableEnvObjects.GetBool() {
-		envConns = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+	if !config.CFG.DisableEnvObjects.GetBool() && (workspaceID != "" || deploymentID != "") {
+		var err error
+		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+		if err != nil {
+			return err
+		}
 	}
 
 	return containerHandler.Start(customImageName, settingsFile, composeFile, noCache, noBrowser, waitTime, envConns)

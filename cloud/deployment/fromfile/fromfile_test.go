@@ -27,9 +27,7 @@ const (
 var (
 	executorCelery         = astroplatformcore.DeploymentExecutorCELERY
 	mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	mockCoreClient         = new(astrocore_mocks.ClientWithResponsesInterface)
 	errTest                = errors.New("test error")
-	limit                  = 1000
 	poolID                 = "test-pool-id"
 	poolID2                = "test-pool-id-2"
 	workloadIdentity       = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
@@ -95,11 +93,6 @@ var (
 		JSON200: &astroplatformcore.DeploymentsPaginated{
 			Deployments: mockCoreDeploymentCreateResponse,
 		},
-	}
-	clusterType       = []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
-	clusterListParams = &astrocore.ListClustersParams{
-		Types: &clusterType,
-		Limit: &limit,
 	}
 	cluster = astroplatformcore.Cluster{
 		Id:   "test-cluster-id",
@@ -2319,7 +2312,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		}
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
-		assert.ErrorContains(t, err, "Don't use 'worker_queues' to update default queue with KubernetesExecutor")
+		assert.ErrorContains(t, err, "don't use 'worker_queues' to update default queue with KubernetesExecutor")
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("transforms formattedDeployment to CreateDeploymentInput if no queues were requested", func(t *testing.T) {
@@ -2447,11 +2440,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		dagDeploy := true
 		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
-		clusterId := "test-cluster-id"
+		clusterID := "test-cluster-id"
 		existingDeployment := astroplatformcore.Deployment{
 			Id:        deploymentID,
 			Name:      "test-deployment",
-			ClusterId: &clusterId,
+			ClusterId: &clusterID,
 		}
 		existingPools = []astroplatformcore.NodePool{
 			{
@@ -2470,7 +2463,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
-
 	})
 	t.Run("returns an error if the cluster is being changed", func(t *testing.T) {
 		deploymentID = "test-deployment-id"
@@ -2483,11 +2475,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		dagDeploy := true
-		clusterId := "test-cluster-id"
+		clusterID := "test-cluster-id"
 		existingDeployment := astroplatformcore.Deployment{
 			Id:        deploymentID,
 			Name:      "test-deployment",
-			ClusterId: &clusterId,
+			ClusterId: &clusterID,
 		}
 		err = createOrUpdateDeployment(&deploymentFromFile, "diff-cluster", workspaceID, "update", &existingDeployment, nil, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errNotPermitted)
@@ -2519,11 +2511,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				NodeInstanceType: "test-worker-2",
 			},
 		}
-		clusterId := "test-cluster-id"
+		clusterID := "test-cluster-id"
 		existingDeployment := astroplatformcore.Deployment{
 			Id:           deploymentID,
 			Name:         "test-deployment",
-			ClusterId:    &clusterId,
+			ClusterId:    &clusterID,
 			Executor:     &executorCelery,
 			WorkerQueues: &expectedQList,
 		}
@@ -2558,12 +2550,12 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				NodeInstanceType: "test-worker-2",
 			},
 		}
-		clusterId := "test-cluster-id"
+		clusterID := "test-cluster-id"
 		clusterName := "test-cluster"
 		existingDeployment := astroplatformcore.Deployment{
 			Id:           deploymentID,
 			Name:         "test-deployment",
-			ClusterId:    &clusterId,
+			ClusterId:    &clusterID,
 			ClusterName:  &clusterName,
 			Executor:     &executorCelery,
 			WorkerQueues: &expectedQList,
@@ -2634,11 +2626,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				NodePoolId:        &poolID2,
 			},
 		}
-		clusterId := "test-cluster-id"
+		clusterID := "test-cluster-id"
 		existingDeployment := astroplatformcore.Deployment{
 			Id:           deploymentID,
 			Name:         "test-deployment",
-			ClusterId:    &clusterId,
+			ClusterId:    &clusterID,
 			WorkerQueues: &expectedQList,
 		}
 
@@ -2825,7 +2817,7 @@ func TestGetClusterFromName(t *testing.T) {
 		actualNodePools                                 []astroplatformcore.NodePool
 		err                                             error
 	)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedClusterID = "test-cluster-id"
 	clusterName = "test-cluster"
 	t.Run("returns a cluster id if cluster exists in organization", func(t *testing.T) {
@@ -2867,7 +2859,7 @@ func TestGetWorkspaceIDFromName(t *testing.T) {
 		workspaceName, expectedWorkspaceID, actualWorkspaceID, orgID string
 		err                                                          error
 	)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkspaceID = "test-ws-id"
 	workspaceName = "test-workspace"
 	orgID = "test-org-id"
@@ -2903,7 +2895,7 @@ func TestGetNodePoolIDFromName(t *testing.T) {
 		existingPools                                       []astroplatformcore.NodePool
 		err                                                 error
 	)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedPoolID = "test-pool-id"
 	workerType = "worker-1"
 	clusterID = "test-cluster-id"
