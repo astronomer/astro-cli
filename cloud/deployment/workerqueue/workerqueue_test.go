@@ -682,14 +682,13 @@ func TestDelete(t *testing.T) {
 	deploymentResponse.JSON200.WorkerQueues = &workerQueueList
 	expectedOutMessage := "worker queue test-worker-queue-1 for test-deployment-label in test-ws-id workspace deleted\n"
 	t.Run("happy path worker queue gets deleted", func(t *testing.T) {
-		out := new(bytes.Buffer)
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(3)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(6)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		out = new(bytes.Buffer)
+		out := new(bytes.Buffer)
 		// standard type
 		deploymentResponse.JSON200.Type = &standardType
 		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockPlatformCoreClient, mockCoreClient, out)
