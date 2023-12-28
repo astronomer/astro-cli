@@ -1235,10 +1235,6 @@ func TestUpdate(t *testing.T) { //nolint
 		// mock os.Stdin
 		// Mock user input for deployment name
 
-		// success with hybrid type with id
-		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
-		assert.NoError(t, err)
-
 		// change type to standard
 		deploymentResponse.JSON200.Type = &standardType
 
@@ -1246,7 +1242,7 @@ func TestUpdate(t *testing.T) { //nolint
 		// Mock user input for deployment name
 		defer testUtil.MockUserInput(t, "1")()
 		// success with standard type with name
-		err = Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "", "", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "", "", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// change type to dedicatd
@@ -1258,8 +1254,13 @@ func TestUpdate(t *testing.T) { //nolint
 
 		// success with dedicated type
 		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "enable", "disable", "", "", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
-
 		assert.NoError(t, err)
+
+		// success with hybrid type with id
+		deploymentResponse.JSON200.Type = &hybridType
+		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		assert.NoError(t, err)
+
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
@@ -1375,6 +1376,7 @@ func TestUpdate(t *testing.T) { //nolint
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
 		err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
@@ -1423,17 +1425,12 @@ func TestUpdate(t *testing.T) { //nolint
 
 		deploymentResponse.JSON200.Executor = &executorKubernetes
 
-		defer testUtil.MockUserInput(t, "y")()
-
-		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
-		assert.NoError(t, err)
-
 		// change type to standard
 		deploymentResponse.JSON200.Type = &standardType
 
 		defer testUtil.MockUserInput(t, "y")()
 		// test update with standard type
-		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// change type to standard
@@ -1442,8 +1439,15 @@ func TestUpdate(t *testing.T) { //nolint
 		defer testUtil.MockUserInput(t, "y")()
 		// test update with standard type
 		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
-
 		assert.NoError(t, err)
+
+		defer testUtil.MockUserInput(t, "y")()
+
+		// test update with hybrid type
+		deploymentResponse.JSON200.Type = &hybridType
+		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		assert.NoError(t, err)
+
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
