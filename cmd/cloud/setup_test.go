@@ -3,7 +3,6 @@ package cloud
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -225,7 +224,6 @@ func TestSetup(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		fmt.Println(mockPlatformCoreClient)
 		err = Setup(cmd, nil, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
