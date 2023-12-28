@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -193,7 +192,6 @@ func TestSetup(t *testing.T) {
 		}
 		// mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		cmd := &cobra.Command{Use: "deploy"}
@@ -289,7 +287,6 @@ func TestCheckToken(t *testing.T) {
 	t.Run("test check token", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
@@ -301,7 +298,6 @@ func TestCheckToken(t *testing.T) {
 	t.Run("trigger login when no token is found", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return errorLogin
 		}
@@ -317,7 +313,6 @@ func TestCheckToken(t *testing.T) {
 
 func TestCheckAPIToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
