@@ -301,7 +301,6 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 	if err != nil {
 		return err
 	}
-
 	workspaces, err := workspace.GetWorkspaces(coreClient)
 	if err != nil {
 		return err
@@ -325,7 +324,6 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 		if err != nil {
 			return err
 		}
-
 		if !isSwitched {
 			// show switch menu with available workspace IDs
 			fmt.Println("\n" + cliChooseWorkspace)
