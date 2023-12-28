@@ -37,10 +37,6 @@ func newTableOut() *printutil.Table {
 
 func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Organization, error) {
 	organizationListParams := &astroplatformcore.ListOrganizationsParams{}
-	fmt.Println("list organization:")
-	fmt.Println(platformCoreClient)
-	fmt.Println(organizationListParams)
-	fmt.Println(http_context.Background())
 	resp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 	if err != nil {
 		return nil, err
