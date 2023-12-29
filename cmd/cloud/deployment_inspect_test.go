@@ -12,7 +12,7 @@ import (
 
 func TestNewDeploymentInspectCmd(t *testing.T) {
 	expectedHelp := "Inspect an Astro Deployment."
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
 
