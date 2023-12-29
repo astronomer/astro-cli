@@ -98,19 +98,20 @@ type deploymentInfo struct {
 }
 
 type InputDeploy struct {
-	Path           string
-	RuntimeID      string
-	WsID           string
-	Pytest         string
-	EnvFile        string
-	ImageName      string
-	DeploymentName string
-	Prompt         bool
-	Dags           bool
-	Image          bool
-	WaitForStatus  bool
-	DagsPath       string
-	Description    string
+	Path              string
+	RuntimeID         string
+	WsID              string
+	Pytest            string
+	EnvFile           string
+	ImageName         string
+	DeploymentName    string
+	Prompt            bool
+	Dags              bool
+	Image             bool
+	WaitForStatus     bool
+	DagsPath          string
+	Description       string
+	BuildSecretString string
 }
 
 func removeDagsFromDockerIgnore(fullpath string) error {
@@ -273,12 +274,12 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 			}
 		}
 		if deployInput.Pytest != "" {
-			version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInfo.dagDeployEnabled, coreClient)
+			version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, coreClient)
 			if err != nil {
 				return err
 			}
 
-			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
+			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
 			if err != nil {
 				return err
 			}
@@ -347,13 +348,13 @@ func Deploy(deployInput InputDeploy, client astro.Client, coreClient astrocore.C
 		}
 
 		// Build our image
-		version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInfo.dagDeployEnabled, coreClient)
+		version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, coreClient)
 		if err != nil {
 			return err
 		}
 
 		if len(dagFiles) > 0 {
-			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
+			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
 			if err != nil {
 				return err
 			}
@@ -467,7 +468,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 	return deployInfo, nil
 }
 
-func parseOrPytestDAG(pytest, version, envFile, deployImage, namespace string) error {
+func parseOrPytestDAG(pytest, version, envFile, deployImage, namespace, buildSecretString string) error {
 	dagParseVersionCheck := versions.GreaterThanOrEqualTo(version, dagParseAllowedVersion)
 	if !dagParseVersionCheck {
 		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip DAG parse...")
@@ -483,26 +484,26 @@ func parseOrPytestDAG(pytest, version, envFile, deployImage, namespace string) e
 	case pytest == parse && dagParseVersionCheck:
 		// parse dags
 		fmt.Println("Testing image...")
-		err := parseDAGs(deployImage, containerHandler)
+		err := parseDAGs(deployImage, buildSecretString, containerHandler)
 		if err != nil {
 			return err
 		}
 	case pytest != "" && pytest != parse && pytest != parseAndPytest:
 		// check pytests
 		fmt.Println("Testing image...")
-		err := checkPytest(pytest, deployImage, containerHandler)
+		err := checkPytest(pytest, deployImage, buildSecretString, containerHandler)
 		if err != nil {
 			return err
 		}
 	case pytest == parseAndPytest:
 		// parse dags and check pytests
 		fmt.Println("Testing image...")
-		err := parseDAGs(deployImage, containerHandler)
+		err := parseDAGs(deployImage, buildSecretString, containerHandler)
 		if err != nil {
 			return err
 		}
 
-		err = checkPytest(pytest, deployImage, containerHandler)
+		err = checkPytest(pytest, deployImage, buildSecretString, containerHandler)
 		if err != nil {
 			return err
 		}
@@ -510,9 +511,9 @@ func parseOrPytestDAG(pytest, version, envFile, deployImage, namespace string) e
 	return nil
 }
 
-func parseDAGs(deployImage string, containerHandler airflow.ContainerHandler) error {
+func parseDAGs(deployImage, buildSecretString string, containerHandler airflow.ContainerHandler) error {
 	if !config.CFG.SkipParse.GetBool() && !util.CheckEnvBool(os.Getenv("ASTRONOMER_SKIP_PARSE")) {
-		err := containerHandler.Parse("", deployImage)
+		err := containerHandler.Parse("", deployImage, buildSecretString)
 		if err != nil {
 			fmt.Println(err)
 			return errDagsParseFailed
@@ -525,12 +526,12 @@ func parseDAGs(deployImage string, containerHandler airflow.ContainerHandler) er
 }
 
 // Validate code with pytest
-func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerHandler) error {
+func checkPytest(pytest, deployImage, buildSecretString string, containerHandler airflow.ContainerHandler) error {
 	if pytest != allTests && pytest != parseAndPytest {
 		pytestFile = pytest
 	}
 
-	exitCode, err := containerHandler.Pytest(pytestFile, "", deployImage, "")
+	exitCode, err := containerHandler.Pytest(pytestFile, "", deployImage, "", buildSecretString)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
@@ -588,7 +589,7 @@ func getImageName(cloudDomain, deploymentID, organizationID string, coreClient a
 	}, nil
 }
 
-func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error {
+func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.ImageHandler) error {
 	// flag to determine if we are setting the dags folder in dockerignore
 	dagsIgnoreSet := false
 	// flag to determine if dockerignore file was created on runtime
@@ -634,7 +635,7 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 
 		dagsIgnoreSet = true
 	}
-	err = imageHandler.Build("", types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
+	err = imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
 	if err != nil {
 		return err
 	}
@@ -650,7 +651,7 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	return nil
 }
 
-func buildImage(path, currentVersion, deployImage, imageName, organizationID string, dagDeployEnabled bool, coreClient astrocore.CoreClient) (version string, err error) {
+func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled bool, coreClient astrocore.CoreClient) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
 
 	if imageName == "" {
@@ -658,12 +659,12 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 		fmt.Println(composeImageBuildingPromptMsg)
 
 		if dagDeployEnabled {
-			err := buildImageWithoutDags(path, imageHandler)
+			err := buildImageWithoutDags(path, buildSecretString, imageHandler)
 			if err != nil {
 				return "", err
 			}
 		} else {
-			err := imageHandler.Build("", types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
+			err := imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
 			if err != nil {
 				return "", err
 			}

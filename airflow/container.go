@@ -22,7 +22,7 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error
+	Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error
 	Stop(waitForExit bool) error
 	PS() error
 	Kill() error
@@ -33,9 +33,9 @@ type ContainerHandler interface {
 	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
 	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error
 	ComposeExport(settingsFile, composeFile string) error
-	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string) (string, error)
-	Parse(customImageName, deployImageName string) error
-	UpgradeTest(runtimeVersion, deploymentID, newImageName, customImageName string, dependencyTest, versionTest, dagTest bool, client astro.Client) error
+	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString string) (string, error)
+	Parse(customImageName, deployImageName, buildSecretString string) error
+	UpgradeTest(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString string, dependencyTest, versionTest, dagTest bool, client astro.Client) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -45,7 +45,7 @@ type RegistryHandler interface {
 
 // ImageHandler defines methods require to handle all operations on/for container images
 type ImageHandler interface {
-	Build(dockerfile string, config types.ImageBuildConfig) error
+	Build(dockerfile, buildSecretString string, config types.ImageBuildConfig) error
 	Push(registry, username, token, remoteImage string) error
 	Pull(registry, username, token, remoteImage string) error
 	GetLabel(altImageName, labelName string) (string, error)
