@@ -47,7 +47,7 @@ func NewRootCmd() *cobra.Command {
 	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
 	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
-	astroPlatformCoreClient := astroplatformcore.NewPlatformCoreClient(httputil.NewHTTPClient())
+	platformCoreClient := astroplatformcore.NewPlatformCoreClient(httputil.NewHTTPClient())
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
@@ -84,7 +84,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 				}
 			}
 			if isCloudCtx {
-				err = cloudCmd.Setup(cmd, astroClient, astroCoreClient, astroPlatformCoreClient)
+				err = cloudCmd.Setup(cmd, astroClient, astroCoreClient, platformCoreClient)
 				if err != nil {
 					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 				}
@@ -100,7 +100,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	}
 
 	rootCmd.AddCommand(
-		newLoginCommand(astroClient, astroCoreClient, astroPlatformCoreClient, os.Stdout),
+		newLoginCommand(astroClient, astroCoreClient, platformCoreClient, os.Stdout),
 		newLogoutCommand(os.Stdout),
 		newVersionCommand(),
 		newDevRootCmd(astroClient, astroCoreClient),

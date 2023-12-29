@@ -12,16 +12,17 @@ import (
 )
 
 var (
-	astroClient             astro.Client
-	astroCoreClient         astrocore.CoreClient
-	astroPlatformCoreClient astroplatformcore.CoreClient
-	airflowAPIClient        airflow.Client
+	astroClient        astro.Client
+	astroCoreClient    astrocore.CoreClient
+	platformCoreClient astroplatformcore.CoreClient
+	airflowAPIClient   airflow.Client
 )
 
 // AddCmds adds all the command initialized in this package for the cmd package to import
 func AddCmds(client astro.Client, coreClient astrocore.CoreClient, airflowClient airflow.Client, out io.Writer) []*cobra.Command {
 	astroClient = client
 	astroCoreClient = coreClient
+	platformCoreClient = astroPlatformCoreClient
 	airflowAPIClient = airflowClient
 	return []*cobra.Command{
 		NewDeployCmd(),
