@@ -111,7 +111,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			cloudCmd.AddCmds(astroClient, astroCoreClient, airflowClient, os.Stdout)...,
+			cloudCmd.AddCmds(astroClient, platformCoreClient, astroCoreClient, airflowClient, os.Stdout)...,
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(
