@@ -46,7 +46,7 @@ func TestDockerImageBuild(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
-		err = handler.Build("", options)
+		err = handler.Build("", "", options)
 		assert.NoError(t, err)
 	})
 
@@ -57,7 +57,7 @@ func TestDockerImageBuild(t *testing.T) {
 			assert.Contains(t, args, "--no-cache")
 			return nil
 		}
-		err = handler.Build("", options)
+		err = handler.Build("", "", options)
 		assert.NoError(t, err)
 	})
 
@@ -65,7 +65,7 @@ func TestDockerImageBuild(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
-		err = handler.Build("", options)
+		err = handler.Build("", "", options)
 		assert.Contains(t, err.Error(), errMock.Error())
 	})
 	t.Run("unable to read file error", func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestDockerImageBuild(t *testing.T) {
 			Output:          false,
 		}
 
-		err = handler.Build("", options)
+		err = handler.Build("", "", options)
 		assert.Error(t, err)
 	})
 

@@ -100,7 +100,7 @@ func TestBuildPushDockerImageSuccessWithTagWarning(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -131,7 +131,7 @@ func TestBuildPushDockerImageSuccessWithImageRepoWarning(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -162,7 +162,7 @@ func TestBuildPushDockerImageSuccessWithBYORegistry(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("", nil).Once()
 		mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("1.10.12", nil).Once()
@@ -209,7 +209,7 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(errSomeContainerIssue)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
 		return mockImageHandler
 	}
 
@@ -220,7 +220,7 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 
 	mockImageHandler = new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
 		return mockImageHandler
 	}
@@ -328,7 +328,7 @@ func TestAirflowSuccess(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return mockImageHandler
 	}
