@@ -1136,7 +1136,7 @@ func TestAirflowParse(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Parse", "", "").Return(nil).Once()
+			mockContainerHandler.On("Parse", "", "", "").Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1151,7 +1151,7 @@ func TestAirflowParse(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Parse", "", "").Return(errMock).Once()
+			mockContainerHandler.On("Parse", "", "", "").Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 

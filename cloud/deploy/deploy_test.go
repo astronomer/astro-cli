@@ -141,7 +141,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
 	}
@@ -287,8 +287,8 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
-		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
 	}
 
@@ -448,7 +448,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
 	}
@@ -603,7 +603,7 @@ func TestDagsDeployFailed(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(errMock)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(errMock)
 		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errMock)
 		return mockContainerHandler, nil
 	}
@@ -680,7 +680,7 @@ func TestDeployFailure(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(errMock)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(errMock)
 		return mockContainerHandler, nil
 	}
 
@@ -801,7 +801,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
 	}
@@ -906,7 +906,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
 	}
