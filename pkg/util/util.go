@@ -112,7 +112,6 @@ func ParseAPIToken(astroAPIToken string) (*CustomClaims, error) {
 }
 
 func GetbuildSecretString(buildSecret []string) (buildSecretString string) {
-
 	for i, secret := range buildSecret {
 		if i == 0 {
 			buildSecretString = secret
