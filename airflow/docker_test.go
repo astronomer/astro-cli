@@ -1186,7 +1186,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 	t.Run("Create old pip freeze failure", func(t *testing.T) {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
+		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(errMockDocker).Once()
