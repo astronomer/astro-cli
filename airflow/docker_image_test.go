@@ -46,7 +46,7 @@ func TestDockerImageBuild(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
-		err = handler.Build("", "", options)
+		err = handler.Build("", "secret", options)
 		assert.NoError(t, err)
 	})
 
