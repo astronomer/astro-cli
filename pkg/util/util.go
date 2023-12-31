@@ -119,8 +119,9 @@ func GetbuildSecretString(buildSecret []string) (buildSecretString string) {
 			buildSecretString = buildSecretString + "," + secret
 		}
 	}
-
-	if os.Getenv("BUILD_SECRET_INPUT") != "" && buildSecretString != "" {
+	fmt.Println(os.Getenv("BUILD_SECRET_INPUT"))
+	fmt.Println(buildSecretString)
+	if os.Getenv("BUILD_SECRET_INPUT") != "" && buildSecretString == "" {
 		buildSecretString = os.Getenv("BUILD_SECRET_INPUT")
 	}
 
