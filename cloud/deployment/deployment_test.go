@@ -1254,7 +1254,7 @@ func TestUpdate(t *testing.T) { //nolint
 			Value:    &varValue,
 		},
 	}
-	deploymentResponse.JSON200.Executor = &executorKubernetes
+	deploymentResponse.JSON200.Executor = &executorCelery
 	mockUpdateDeploymentResponse := astroplatformcore.UpdateDeploymentResponse{
 		JSON200: &astroplatformcore.Deployment{
 			Id:            "test-id",
