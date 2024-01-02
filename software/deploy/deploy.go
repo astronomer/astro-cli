@@ -28,11 +28,13 @@ var (
 )
 
 var (
-	errNoWorkspaceID             = errors.New("no workspace id provided")
-	errNoDomainSet               = errors.New("no domain set, re-authenticate")
-	errInvalidDeploymentID       = errors.New("please specify a valid deployment ID")
-	errDeploymentNotFound        = errors.New("no airflow deployments found")
-	errInvalidDeploymentSelected = errors.New("invalid deployment selection\n") //nolint
+	errNoWorkspaceID                        = errors.New("no workspace id provided")
+	errNoDomainSet                          = errors.New("no domain set, re-authenticate")
+	errInvalidDeploymentID                  = errors.New("please specify a valid deployment ID")
+	errDeploymentNotFound                   = errors.New("no airflow deployments found")
+	errInvalidDeploymentSelected            = errors.New("invalid deployment selection\n") //nolint
+	errDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in the Astronomer Platform")
+	errDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the deployment type to 'dag_only' via the UI or the API")
 )
 
 const (
@@ -288,4 +290,30 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 		}
 	}
 	return ""
+}
+func isDagOnlyDeploymentEnabled(appConfig *houston.AppConfig) bool {
+	return appConfig != nil && appConfig.Flags.DagOnlyDeployment
+}
+
+func isDagOnlyDeploymentEnabledForDeployment(deploymentInfo *houston.Deployment) bool {
+	return deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType
+}
+
+func DeployDagsOnly(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentId string) error {
+
+	// Throw error if the feature is disabled at Houston level
+	if !isDagOnlyDeploymentEnabled(appConfig) {
+		return errDagOnlyDeployDisabledInConfig
+	}
+
+	// Throw error if the feature is disabled at Deployment level
+	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentId)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment info: %w", err)
+	}
+	if !isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
+		return errDagOnlyDeployNotEnabledForDeployment
+	}
+
+	return nil
 }
