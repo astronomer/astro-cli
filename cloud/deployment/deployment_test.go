@@ -1260,6 +1260,7 @@ func TestUpdate(t *testing.T) { //nolint
 			CloudProvider: &cloudProvider,
 			Type:          &hybridType,
 		},
+
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},

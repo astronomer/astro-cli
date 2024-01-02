@@ -1336,7 +1336,7 @@ var GetDeploymentOptions = func(orgID string, deploymentOptionsParams astrocore.
 }
 
 //nolint:dupl
-var GetPlatformDeploymentOptions = func(orgID string, deploymentOptionsParams astroplatformcore.GetDeploymentOptionsParams, coreClient astroplatformcore.CoreClient) (astroplatformcore.DeploymentOptions, error) {
+func GetPlatformDeploymentOptions(orgID string, deploymentOptionsParams astroplatformcore.GetDeploymentOptionsParams, coreClient astroplatformcore.CoreClient) (astroplatformcore.DeploymentOptions, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
