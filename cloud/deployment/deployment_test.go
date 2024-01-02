@@ -1235,30 +1235,30 @@ func TestUpdate(t *testing.T) { //nolint
 	cloudProvider := "test-provider"
 	astroMachine := "test-machine"
 	varValue := "VALUE"
+	deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{
+		{
+			AstroMachine:      &astroMachine,
+			Id:                "queue-id",
+			IsDefault:         true,
+			MaxWorkerCount:    10,
+			MinWorkerCount:    1,
+			Name:              "worker-name",
+			WorkerConcurrency: 20,
+		},
+	}
+	deploymentResponse.JSON200.EnvironmentVariables = &[]astroplatformcore.DeploymentEnvironmentVariable{
+		{
+			IsSecret: false,
+			Key:      "KEY",
+			Value:    &varValue,
+		},
+	}
+	deploymentResponse.JSON200.Executor = &executorKubernetes
 	mockUpdateDeploymentResponse := astroplatformcore.UpdateDeploymentResponse{
 		JSON200: &astroplatformcore.Deployment{
 			Id:            "test-id",
 			CloudProvider: &cloudProvider,
 			Type:          &hybridType,
-			Executor:      &executorKubernetes,
-			EnvironmentVariables: &[]astroplatformcore.DeploymentEnvironmentVariable{
-				{
-					IsSecret: false,
-					Key:      "KEY",
-					Value:    &varValue,
-				},
-			},
-			WorkerQueues: &[]astroplatformcore.WorkerQueue{
-				{
-					AstroMachine:      &astroMachine,
-					Id:                "queue-id",
-					IsDefault:         true,
-					MaxWorkerCount:    10,
-					MinWorkerCount:    1,
-					Name:              "worker-name",
-					WorkerConcurrency: 20,
-				},
-			},
 		},
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
