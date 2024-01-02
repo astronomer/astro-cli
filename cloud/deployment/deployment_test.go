@@ -1233,7 +1233,7 @@ func TestUpdate(t *testing.T) { //nolint
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	cloudProvider := "test-provider"
 	astroMachine := "test-machine"
-	nodeId := "test-id"
+	nodeID := "test-id"
 	varValue := "VALUE"
 	deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{
 		{
@@ -1244,7 +1244,7 @@ func TestUpdate(t *testing.T) { //nolint
 			MinWorkerCount:    1,
 			Name:              "worker-name",
 			WorkerConcurrency: 20,
-			NodePoolId:        &nodeId,
+			NodePoolId:        &nodeID,
 		},
 	}
 	deploymentResponse.JSON200.EnvironmentVariables = &[]astroplatformcore.DeploymentEnvironmentVariable{
@@ -1717,5 +1717,22 @@ func TestPrintWarning(t *testing.T) {
 	t.Run("returns false for any other executor is requested", func(t *testing.T) {
 		actual := printWarning("non-existent", 2)
 		assert.False(t, actual)
+	})
+}
+
+func TestGetPlatformDeploymentOptions(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Run("test function", func(t *testing.T) {
+		GetDeploymentOptionsResponse := astroplatformcore.GetDeploymentOptionsResponse{
+			JSON200: &astroplatformcore.DeploymentOptions{},
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+		}
+
+		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponse, nil).Times(1)
+
+		_, err := GetPlatformDeploymentOptions("", astroplatformcore.GetDeploymentOptionsParams{}, mockPlatformCoreClient)
+		assert.NoError(t, err)
 	})
 }
