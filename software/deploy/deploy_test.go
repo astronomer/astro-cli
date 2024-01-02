@@ -354,7 +354,7 @@ func TestAirflowSuccess(t *testing.T) {
 
 func TestDeployDagsOnlyFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	deploymentId := "test-deployment-id"
+	deploymentID := "test-deployment-id"
 
 	t.Run("When config flag is set to false", func(t *testing.T) {
 		featureFlags := &houston.FeatureFlags{
@@ -366,7 +366,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		houstonMock := new(houston_mocks.ClientInterface)
 		houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
 
-		err := DeployDagsOnly(houstonMock, appConfig, deploymentId)
+		err := DeployDagsOnly(houstonMock, appConfig, deploymentID)
 		assert.ErrorIs(t, err, errDagOnlyDeployDisabledInConfig)
 	})
 
@@ -379,10 +379,10 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		}
 		houstonMock := new(houston_mocks.ClientInterface)
 		houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
-		houstonMock.On("GetDeployment", mock.Anything).Return(nil, errors.New("test_error")).Once()
+		houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
 
-		err := DeployDagsOnly(houstonMock, appConfig, deploymentId)
-		assert.ErrorContains(t, err, "failed to get deployment info: test_error")
+		err := DeployDagsOnly(houstonMock, appConfig, deploymentID)
+		assert.ErrorContains(t, err, "failed to get deployment info: some houston error")
 	})
 
 	t.Run("When config flag is set to true but it is disabled at the deployment level", func(t *testing.T) {
@@ -402,7 +402,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		}
 		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
 
-		err := DeployDagsOnly(houstonMock, appConfig, deploymentId)
+		err := DeployDagsOnly(houstonMock, appConfig, deploymentID)
 		assert.ErrorIs(t, err, errDagOnlyDeployNotEnabledForDeployment)
 	})
 
