@@ -1723,7 +1723,7 @@ func TestPrintWarning(t *testing.T) {
 
 func TestGetPlatformDeploymentOptions(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	t.Run("test function", func(t *testing.T) {
+	t.Run("function success", func(t *testing.T) {
 		GetDeploymentOptionsResponse := astroplatformcore.GetDeploymentOptionsResponse{
 			JSON200: &astroplatformcore.DeploymentOptions{},
 			HTTPResponse: &http.Response{
@@ -1735,5 +1735,19 @@ func TestGetPlatformDeploymentOptions(t *testing.T) {
 
 		_, err := GetPlatformDeploymentOptions("", astroplatformcore.GetDeploymentOptionsParams{}, mockPlatformCoreClient)
 		assert.NoError(t, err)
+	})
+
+	t.Run("function failure", func(t *testing.T) {
+		GetDeploymentOptionsResponse := astroplatformcore.GetDeploymentOptionsResponse{
+			JSON200: &astroplatformcore.DeploymentOptions{},
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+		}
+
+		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponse, errMock).Times(1)
+
+		_, err := GetPlatformDeploymentOptions("", astroplatformcore.GetDeploymentOptionsParams{}, mockPlatformCoreClient)
+		assert.ErrorIs(t, err, errMock)
 	})
 }
