@@ -1233,6 +1233,7 @@ func TestUpdate(t *testing.T) { //nolint
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	cloudProvider := "test-provider"
 	astroMachine := "test-machine"
+	nodeId := "test-id"
 	varValue := "VALUE"
 	deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{
 		{
@@ -1243,6 +1244,7 @@ func TestUpdate(t *testing.T) { //nolint
 			MinWorkerCount:    1,
 			Name:              "worker-name",
 			WorkerConcurrency: 20,
+			NodePoolId:        &nodeId,
 		},
 	}
 	deploymentResponse.JSON200.EnvironmentVariables = &[]astroplatformcore.DeploymentEnvironmentVariable{
@@ -1276,7 +1278,7 @@ func TestUpdate(t *testing.T) { //nolint
 		defer testUtil.MockUserInput(t, "1")()
 
 		// success with hybrid type
-		err := Update("", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, true, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// Mock user input for deployment name
@@ -1292,10 +1294,11 @@ func TestUpdate(t *testing.T) { //nolint
 
 		// mock os.Stdin
 		// Mock user input for deployment name
-		defer testUtil.MockUserInput(t, "1")()
+		// defer testUtil.MockUserInput(t, "1")()
+		defer testUtil.MockUserInput(t, "y")()
 
 		// success with standard type
-		err = Update("", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// Mock user input for deployment name
@@ -1309,10 +1312,10 @@ func TestUpdate(t *testing.T) { //nolint
 		deploymentResponse.JSON200.Type = &dedicatedType
 		// mock os.Stdin
 		// Mock user input for deployment name
-		defer testUtil.MockUserInput(t, "1")()
+		// defer testUtil.MockUserInput(t, "1")()
 
 		// success with dedicated type
-		err = Update("", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		// Mock user input for deployment name
 		defer testUtil.MockUserInput(t, "y")()
@@ -1348,7 +1351,7 @@ func TestUpdate(t *testing.T) { //nolint
 
 		// mock os.Stdin
 		// Mock user input for deployment name
-		// defer testUtil.MockUserInput(t, "1")()
+		defer testUtil.MockUserInput(t, "1")()
 
 		// success with dedicated type
 		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "enable", "disable", "", "", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
