@@ -351,3 +351,59 @@ func TestAirflowSuccess(t *testing.T) {
 	assert.Nil(t, err)
 	houstonMock.AssertExpectations(t)
 }
+
+func TestDeployDagsOnlyFailure(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	deploymentId := "test-deployment-id"
+
+	t.Run("When config flag is set to false", func(t *testing.T) {
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: false,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
+
+		err := DeployDagsOnly(houstonMock, appConfig, deploymentId)
+		assert.ErrorIs(t, err, errDagOnlyDeployDisabledInConfig)
+	})
+
+	t.Run("When config flag is set to true but an error occurs in the GetDeployment api call", func(t *testing.T) {
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
+		houstonMock.On("GetDeployment", mock.Anything).Return(nil, errors.New("test_error")).Once()
+
+		err := DeployDagsOnly(houstonMock, appConfig, deploymentId)
+		assert.ErrorContains(t, err, "failed to get deployment info: test_error")
+	})
+
+	t.Run("When config flag is set to true but it is disabled at the deployment level", func(t *testing.T) {
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.VolumeDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+
+		err := DeployDagsOnly(houstonMock, appConfig, deploymentId)
+		assert.ErrorIs(t, err, errDagOnlyDeployNotEnabledForDeployment)
+	})
+
+}

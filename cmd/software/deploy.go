@@ -20,16 +20,17 @@ var (
 
 	EnsureProjectDir   = utils.EnsureProjectDir
 	DeployAirflowImage = deploy.Airflow
+	isDagOnlyDeploy    bool
 )
 
 var deployExample = `
 Deployment you would like to deploy to Airflow cluster:
 
-  $ astro deploy <deployment-id>
+$ astro deploy <deployment-id>
 
 Menu will be presented if you do not specify a deployment name:
 
-  $ astro deploy
+$ astro deploy
 `
 
 const (
@@ -51,6 +52,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
 	cmd.Flags().BoolVarP(&ignoreCacheDeploy, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
+	cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dag-only", "", false, "Deploy only those dags which are present in the /dags folder")
 	return cmd
 }
 
@@ -90,5 +92,8 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		byoRegistryDomain = appConfig.BYORegistryDomain
 	}
 
+	if isDagOnlyDeploy {
+		return deploy.DeployDagsOnly(houstonClient, appConfig, deploymentID)
+	}
 	return DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
 }
