@@ -299,7 +299,7 @@ func isDagOnlyDeploymentEnabledForDeployment(deploymentInfo *houston.Deployment)
 	return deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType
 }
 
-func DeployDagsOnly(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentId string) error {
+func DeployDagsOnly(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID string) error {
 
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
@@ -307,7 +307,7 @@ func DeployDagsOnly(houstonClient houston.ClientInterface, appConfig *houston.Ap
 	}
 
 	// Throw error if the feature is disabled at Deployment level
-	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentId)
+	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info: %w", err)
 	}
