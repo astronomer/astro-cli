@@ -504,6 +504,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 
 func TestGetAdditional(t *testing.T) {
 	sourceDeployment.Type = &hybridType
+	sourceDeployment.TaskPodNodePoolId = nil
 	t.Run("returns alert emails, queues and variables for the requested deployment with CeleryExecutor", func(t *testing.T) {
 		var expectedAdditional, actualAdditional orderedPieces
 		qList := []map[string]interface{}{
