@@ -2224,7 +2224,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 		dagDeploy := true
-		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
+		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 
 		minCount := -1
@@ -2325,7 +2325,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		dagDeploy := true
-		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
+		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, nil, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
@@ -2342,7 +2342,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
 		dagDeploy := true
-		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
+		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 
 		existingPools = []astroplatformcore.NodePool{
 			{
@@ -2372,7 +2372,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		dagDeploy := true
-		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
+		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 		minCount := 3
 		qList = []inspect.Workerq{
 			{
@@ -2439,7 +2439,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		dagDeploy := true
-		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
+		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 		clusterID := "test-cluster-id"
 		existingDeployment := astroplatformcore.Deployment{
 			Id:        deploymentID,
@@ -2497,7 +2497,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
 		dagDeploy := true
-		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
+		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 
 		existingPools = []astroplatformcore.NodePool{
 			{
@@ -2536,7 +2536,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
 		dagDeploy := true
-		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
+		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 		deploymentFromFile.Deployment.Configuration.DefaultWorkerType = "test-worker-1"
 		existingPools = []astroplatformcore.NodePool{
 			{
@@ -2577,7 +2577,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		dagDeploy := true
-		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = dagDeploy
+		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 		minCount := 3
 		qList = []inspect.Workerq{
 			{
