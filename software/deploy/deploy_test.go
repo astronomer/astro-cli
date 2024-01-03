@@ -367,7 +367,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
 
 		err := DagsOnlyDeploy(houstonMock, appConfig, deploymentID)
-		assert.ErrorIs(t, err, errDagOnlyDeployDisabledInConfig)
+		assert.ErrorIs(t, err, ErrDagOnlyDeployDisabledInConfig)
 	})
 
 	t.Run("When config flag is set to true but an error occurs in the GetDeployment api call", func(t *testing.T) {
