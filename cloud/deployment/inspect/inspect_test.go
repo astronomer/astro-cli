@@ -443,6 +443,33 @@ func TestGetDeploymentConfig(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
 	})
+
+	t.Run("returns deployment config for the requested cloud standard deployment", func(t *testing.T) {
+		sourceDeployment.Type = &standardType
+		taskPodNodePoolId := "task_node_id"
+		sourceDeployment.TaskPodNodePoolId = &taskPodNodePoolId
+		var actualDeploymentConfig deploymentConfig
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		expectedDeploymentConfig := deploymentConfig{
+			Name:             sourceDeployment.Name,
+			Description:      *sourceDeployment.Description,
+			WorkspaceName:    *sourceDeployment.WorkspaceName,
+			ClusterName:      *sourceDeployment.ClusterName,
+			RunTimeVersion:   sourceDeployment.RuntimeVersion,
+			SchedulerAU:      *sourceDeployment.SchedulerAu,
+			SchedulerCount:   sourceDeployment.SchedulerReplicas,
+			DagDeployEnabled: sourceDeployment.DagDeployEnabled,
+			Executor:         string(*sourceDeployment.Executor),
+			Region:           *sourceDeployment.Region,
+			DeploymentType:   string(*sourceDeployment.Type),
+			CloudProvider:    *sourceDeployment.CloudProvider,
+		}
+		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
+		assert.NoError(t, err)
+		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
+	})
 }
 
 func TestGetPrintableDeployment(t *testing.T) {
@@ -1195,6 +1222,5 @@ func TestReturnSpecifiedValue(t *testing.T) {
 
 		_, err := ReturnSpecifiedValue(workspaceID, "", deploymentID, mockPlatformCoreClient, mockCoreClient, "configuration.name")
 		assert.ErrorIs(t, err, errMarshal)
-
 	})
 }
