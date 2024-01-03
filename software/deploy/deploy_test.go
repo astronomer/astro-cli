@@ -422,6 +422,6 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		}
 		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
 		err := DagsOnlyDeploy(houstonMock, appConfig, deploymentID)
-		assert.ErrorIs(t, err, nil)
+		assert.NoError(t, err)
 	})
 }
