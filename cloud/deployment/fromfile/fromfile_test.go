@@ -1802,6 +1802,8 @@ deployment:
 	t.Run("reads the yaml file and updates an existing hosted dedicated deployment", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
+		mockCoreDeploymentResponse[0].ClusterId = &clusterID
+		mockCoreDeploymentCreateResponse[0].ClusterId = &clusterID
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		filePath = "./deployment.yaml"
 		data = `
@@ -1823,7 +1825,7 @@ deployment:
     executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
-    cluster_name: clusterName
+    cluster_name: test-cluster
     cloud_provider: azure
     scheduler_size: medium
     workspace_name: test-workspace
@@ -1857,8 +1859,6 @@ deployment:
 `
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
-		mockCoreDeploymentResponse[0].ClusterId = nil
-		mockCoreDeploymentCreateResponse[0].ClusterId = nil
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
