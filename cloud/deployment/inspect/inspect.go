@@ -284,11 +284,12 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatfo
 	additionalMap = getAdditional(&requestedDeployment, nodePools)
 	// create a map for the entire deployment
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
-
+	fmt.Println(printableDeployment)
 	value, err = getSpecificField(printableDeployment, requestedField)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(value)
 	return value, nil
 }
 
