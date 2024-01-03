@@ -331,7 +331,6 @@ func TestCreate(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 		deploymentResponse.JSON200.Type = &hybridType
-
 	})
 	t.Run("returns an error when getting worker queue default options fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
