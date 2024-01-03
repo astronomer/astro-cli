@@ -89,9 +89,11 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			MaxWorkerCount:    wQueueMax,         // use the value from the user input
 			WorkerConcurrency: wQueueConcurrency, // use the value from the user input
 		}
-
+		fmt.Println(requestedDeployment)
 		// create listToCreate
 		if requestedDeployment.WorkerQueues != nil {
+			fmt.Println(requestedDeployment)
+			fmt.Println(requestedDeployment.WorkerQueues)
 			for i := range *requestedDeployment.WorkerQueues {
 				queues := *requestedDeployment.WorkerQueues
 				existingQueueRequest := astroplatformcore.WorkerQueueRequest{
