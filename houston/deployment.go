@@ -35,139 +35,139 @@ var (
 		{
 			version: "0.25.0",
 			query: `
-mutation CreateDeployment(
-$label: String!
-$type: String = "airflow"
-$releaseName: String
-$workspaceId: Uuid!
-$executor: ExecutorType!
-$airflowVersion: String
-$namespace: String
-$config: JSON
-$cloudRole: String
-$dagDeployment: DagDeployment
-) {
-createDeployment(
-label: $label
-type: $type
-workspaceUuid: $workspaceId
-releaseName: $releaseName
-executor: $executor
-airflowVersion: $airflowVersion
-namespace: $namespace
-config: $config
-cloudRole: $cloudRole
-dagDeployment: $dagDeployment
-) {
-id
-type
-label
-releaseName
-version
-airflowVersion
-urls {
-type
-url
-}
-createdAt
-updatedAt
-}
-}`,
+			mutation CreateDeployment(
+				$label: String!
+				$type: String = "airflow"
+				$releaseName: String
+				$workspaceId: Uuid!
+				$executor: ExecutorType!
+				$airflowVersion: String
+				$namespace: String
+				$config: JSON
+				$cloudRole: String
+				$dagDeployment: DagDeployment
+			) {
+				createDeployment(
+					label: $label
+					type: $type
+					workspaceUuid: $workspaceId
+					releaseName: $releaseName
+					executor: $executor
+						airflowVersion: $airflowVersion
+					namespace: $namespace
+					config: $config
+					cloudRole: $cloudRole
+					dagDeployment: $dagDeployment
+				) {
+					id
+					type
+					label
+					releaseName
+					version
+					airflowVersion
+					urls {
+						type
+						url
+					}
+					createdAt
+					updatedAt
+				}
+			}`,
 		},
 		{
 			version: "0.28.0",
 			query: `
-mutation CreateDeployment(
-$label: String!
-$type: String = "airflow"
-$releaseName: String
-$workspaceId: Uuid!
-$executor: ExecutorType!
-$airflowVersion: String
-$namespace: String
-$config: JSON
-$cloudRole: String
-$dagDeployment: DagDeployment
-$triggererReplicas: Int
-) {
-createDeployment(
-label: $label
-type: $type
-workspaceUuid: $workspaceId
-releaseName: $releaseName
-executor: $executor
-airflowVersion: $airflowVersion
-namespace: $namespace
-config: $config
-cloudRole: $cloudRole
-dagDeployment: $dagDeployment
-triggerer: {
-replicas: $triggererReplicas
-}
-) {
-id
-type
-label
-releaseName
-version
-airflowVersion
-urls {
-type
-url
-}
-createdAt
-updatedAt
-}
-}`,
+			mutation CreateDeployment(
+				$label: String!
+				$type: String = "airflow"
+				$releaseName: String
+				$workspaceId: Uuid!
+				$executor: ExecutorType!
+				$airflowVersion: String
+				$namespace: String
+				$config: JSON
+				$cloudRole: String
+				$dagDeployment: DagDeployment
+				$triggererReplicas: Int
+			) {
+				createDeployment(
+					label: $label
+					type: $type
+					workspaceUuid: $workspaceId
+					releaseName: $releaseName
+					executor: $executor
+						airflowVersion: $airflowVersion
+					namespace: $namespace
+					config: $config
+					cloudRole: $cloudRole
+					dagDeployment: $dagDeployment
+					triggerer: {
+						replicas: $triggererReplicas
+					}
+				) {
+					id
+					type
+					label
+					releaseName
+					version
+					airflowVersion
+					urls {
+						type
+						url
+					}
+					createdAt
+					updatedAt
+				}
+			}`,
 		},
 		{
 			version: "0.29.0",
 			query: `
-mutation CreateDeployment(
-$label: String!
-$type: String = "airflow"
-$releaseName: String
-$workspaceId: Uuid!
-$executor: ExecutorType!
-$airflowVersion: String
-$runtimeVersion: String
-$namespace: String
-$config: JSON
-$cloudRole: String
-$dagDeployment: DagDeployment
-$triggererReplicas: Int
-){
-createDeployment(
-label: $label
-type: $type
-workspaceUuid: $workspaceId
-releaseName: $releaseName
-executor: $executor
-airflowVersion: $airflowVersion
-runtimeVersion: $runtimeVersion
-namespace: $namespace
-config: $config
-cloudRole: $cloudRole
-dagDeployment: $dagDeployment
-triggerer: {
-replicas: $triggererReplicas
-}
-){
-id
-type
-label
-releaseName
-version
-airflowVersion
-runtimeVersion
-urls {
-type
-url
-}
-createdAt
-updatedAt
-}
-}`,
+			mutation CreateDeployment(
+				$label: String!
+				$type: String = "airflow"
+				$releaseName: String
+				$workspaceId: Uuid!
+				$executor: ExecutorType!
+				$airflowVersion: String
+				$runtimeVersion: String
+				$namespace: String
+				$config: JSON
+				$cloudRole: String
+				$dagDeployment: DagDeployment
+				$triggererReplicas: Int
+			){
+				createDeployment(
+					label: $label
+					type: $type
+					workspaceUuid: $workspaceId
+					releaseName: $releaseName
+					executor: $executor
+					airflowVersion: $airflowVersion
+					runtimeVersion: $runtimeVersion
+					namespace: $namespace
+					config: $config
+					cloudRole: $cloudRole
+					dagDeployment: $dagDeployment
+					triggerer: {
+						replicas: $triggererReplicas
+					}
+				){
+					id
+					type
+					label
+					releaseName
+					version
+					airflowVersion
+					runtimeVersion
+					urls {
+						type
+						url
+					}
+					createdAt
+					updatedAt
+				}
+			}`,
 		},
 	}
 
@@ -175,61 +175,61 @@ updatedAt
 		{
 			version: "0.25.0",
 			query: `
-query GetDeployment(
-$workspaceId: Uuid!
-$releaseName: String
-) {
-workspaceDeployments(
-workspaceUuid: $workspaceId
-releaseName: $releaseName
-) {
-id
-type
-label
-releaseName
-workspace {
-id
-}
-deployInfo {
-nextCli
-current
-}
-version
-airflowVersion
-createdAt
-updatedAt
-}
-}`,
+			query GetDeployment(
+				$workspaceId: Uuid!
+				$releaseName: String
+			) {
+				workspaceDeployments(
+					workspaceUuid: $workspaceId
+					releaseName: $releaseName
+				) {
+					id
+					type
+					label
+					releaseName
+					workspace {
+						id
+					}
+					deployInfo {
+						nextCli
+						current
+					}
+					version
+					airflowVersion
+					createdAt
+					updatedAt
+				}
+			}`,
 		},
 		{
 			version: "0.29.0",
 			query: `
-query GetDeployment(
-$workspaceId: Uuid!
-$releaseName: String
-){
-workspaceDeployments(
-workspaceUuid: $workspaceId
-releaseName: $releaseName
-){
-id
-type
-label
-releaseName
-workspace {
-id
-}
-deployInfo {
-nextCli
-current
-}
-version
-airflowVersion
-runtimeVersion
-createdAt
-updatedAt
-}
-}`,
+			query GetDeployment(
+				$workspaceId: Uuid!
+				$releaseName: String
+			){
+				workspaceDeployments(
+					workspaceUuid: $workspaceId
+					releaseName: $releaseName
+				){
+					id
+					type
+					label
+					releaseName
+					workspace {
+						id
+					}
+					deployInfo {
+						nextCli
+						current
+					}
+					version
+					airflowVersion
+					runtimeVersion
+					createdAt
+					updatedAt
+				}
+			}`,
 		},
 	}
 
@@ -237,74 +237,74 @@ updatedAt
 		{
 			version: "0.25.0",
 			query: `
-mutation UpdateDeployment(
-$deploymentId: Uuid!,
-$payload: JSON!,
-$cloudRole: String,
-$executor: ExecutorType,
-$dagDeployment: DagDeployment
-){
-updateDeployment(
-deploymentUuid: $deploymentId,
-payload: $payload,
-cloudRole: $cloudRole,
-executor: $executor,
-dagDeployment: $dagDeployment
-){
-id
-type
-label
-description
-releaseName
-version
-airflowVersion
-workspace {
-id
-}
-deployInfo {
-current
-}
-createdAt
-updatedAt
-}
-}`,
+			mutation UpdateDeployment(
+				$deploymentId: Uuid!,
+				$payload: JSON!,
+				$cloudRole: String,
+				$executor: ExecutorType,
+				$dagDeployment: DagDeployment
+			){
+				updateDeployment(
+					deploymentUuid: $deploymentId,
+					payload: $payload,
+					cloudRole: $cloudRole,
+					executor: $executor,
+					dagDeployment: $dagDeployment
+				){
+					id
+					type
+					label
+					description
+					releaseName
+					version
+					airflowVersion
+					workspace {
+						id
+					}
+					deployInfo {
+						current
+					}
+					createdAt
+					updatedAt
+				}
+			}`,
 		},
 		{
 			version: "0.28.0",
 			query: `
-mutation UpdateDeployment(
-$deploymentId: Uuid!,
-$payload: JSON!,
-$executor: ExecutorType,
-$cloudRole: String,
-$dagDeployment: DagDeployment,
-$triggererReplicas: Int
-){
-updateDeployment(
-deploymentUuid: $deploymentId,
-payload: $payload,
-executor: $executor,
-cloudRole: $cloudRole,
-dagDeployment: $dagDeployment,
-triggerer:{ replicas: $triggererReplicas }
-){
-id
-type
-label
-description
-releaseName
-version
-airflowVersion
-workspace {
-id
-}
-deployInfo {
-current
-}
-createdAt
-updatedAt
-}
-}`,
+			mutation UpdateDeployment(
+				$deploymentId: Uuid!,
+				$payload: JSON!,
+				$executor: ExecutorType,
+				$cloudRole: String,
+				$dagDeployment: DagDeployment,
+				$triggererReplicas: Int
+			){
+				updateDeployment(
+					deploymentUuid: $deploymentId,
+					payload: $payload,
+					executor: $executor,
+					cloudRole: $cloudRole,
+					dagDeployment: $dagDeployment,
+					triggerer:{ replicas: $triggererReplicas }
+				){
+					id
+					type
+					label
+					description
+					releaseName
+					version
+					airflowVersion
+					workspace {
+						id
+					}
+					deployInfo {
+						current
+					}
+					createdAt
+					updatedAt
+				}
+			}`,
 		},
 	}
 
@@ -312,159 +312,159 @@ updatedAt
 		{
 			version: "0.25.0",
 			query: `
-query GetDeployment(
-$id: String!
-) {
-deployment(
-where: {id: $id}
-) {
-id
-airflowVersion
-desiredAirflowVersion
-urls {
-type
-url
-}
-}
-}`,
+			query GetDeployment(
+				$id: String!
+			) {
+				deployment(
+					where: {id: $id}
+				) {
+					id
+					airflowVersion
+					desiredAirflowVersion
+					urls {
+						type
+						url
+					}
+				}
+			}`,
 		},
 		{
 			version: "0.29.0",
 			query: `
-query GetDeployment(
-$id: String!
-){
-deployment(
-where: {id: $id}
-){
-id
-airflowVersion
-desiredAirflowVersion
-runtimeVersion
-desiredRuntimeVersion
-runtimeAirflowVersion
-urls {
-type
-url
-}
-dagDeployment {
-type
-}
-}
-}`,
+			query GetDeployment(
+				$id: String!
+			){
+				deployment(
+					where: {id: $id}
+				){
+					id
+					airflowVersion
+					desiredAirflowVersion
+					runtimeVersion
+					desiredRuntimeVersion
+					runtimeAirflowVersion
+					urls {
+						type
+						url
+					}
+					dagDeployment {
+						type
+					}
+				}
+			}`,
 		},
 	}
 
 	DeploymentDeleteRequest = `
-mutation DeleteDeployment(
-$deploymentId: Uuid!
-$deploymentHardDelete: Boolean
-){
-deleteDeployment(
-deploymentUuid: $deploymentId
-deploymentHardDelete: $deploymentHardDelete
-){
-id
-type
-label
-description
-releaseName
-version
-workspace {
-id
-}
-createdAt
-updatedAt
-}
-}`
+	mutation DeleteDeployment(
+		$deploymentId: Uuid!
+		$deploymentHardDelete: Boolean
+	){
+		deleteDeployment(
+			deploymentUuid: $deploymentId
+			deploymentHardDelete: $deploymentHardDelete
+		){
+			id
+			type
+			label
+			description
+			releaseName
+			version
+			workspace {
+				id
+			}
+			createdAt
+			updatedAt
+		}
+	}`
 
 	UpdateDeploymentAirflowRequest = `
-mutation updateDeploymentAirflow($deploymentId: Uuid!, $desiredAirflowVersion: String!) {
-updateDeploymentAirflow(deploymentUuid: $deploymentId, desiredAirflowVersion: $desiredAirflowVersion) {
-id
-label
-version
-releaseName
-airflowVersion
-desiredAirflowVersion
-}
-}`
+	mutation updateDeploymentAirflow($deploymentId: Uuid!, $desiredAirflowVersion: String!) {
+		updateDeploymentAirflow(deploymentUuid: $deploymentId, desiredAirflowVersion: $desiredAirflowVersion) {
+			id
+			label
+			version
+			releaseName
+			airflowVersion
+			desiredAirflowVersion
+		}
+	}`
 
 	DeploymentInfoRequest = `
-query DeploymentInfo {
-deploymentConfig {
-airflowImages {
-version
-tag
-}
-airflowVersions
-defaultAirflowImageTag
-}
-}`
+	query DeploymentInfo {
+		deploymentConfig {
+			airflowImages {
+				version
+				tag
+			}
+			airflowVersions
+			defaultAirflowImageTag
+		}
+	}`
 
 	DeploymentLogsGetRequest = `
-query GetLogs(
-$deploymentId: Uuid!
-$component: String
-$timestamp: DateTime
-$search: String
-){
-logs(
-deploymentUuid: $deploymentId
-component: $component
-timestamp: $timestamp
-search: $search
-){
-id
-createdAt: timestamp
-log: message
-}
-}`
+	query GetLogs(
+		$deploymentId: Uuid!
+		$component: String
+		$timestamp: DateTime
+		$search: String
+	){
+		logs(
+			deploymentUuid: $deploymentId
+			component: $component
+			timestamp: $timestamp
+			search: $search
+		){
+			id
+			createdAt: timestamp
+			log: message
+		}
+	}`
 
 	DeploymentImageUpdateRequest = `
-mutation updateDeploymentImage(
-$releaseName:String!,
-$image:String!,
-$airflowVersion:String,
-$runtimeVersion:String,
-){
-updateDeploymentImage(
-releaseName:$releaseName,
-image:$image,
-airflowVersion:$airflowVersion,
-runtimeVersion:$runtimeVersion
-){
-releaseName
-airflowVersion
-runtimeVersion
-}
-}`
+	mutation updateDeploymentImage(
+		$releaseName:String!,
+		$image:String!,
+		$airflowVersion:String,
+		$runtimeVersion:String,
+	){
+		updateDeploymentImage(
+			releaseName:$releaseName,
+			image:$image,
+			airflowVersion:$airflowVersion,
+			runtimeVersion:$runtimeVersion
+		){
+			releaseName
+			airflowVersion
+			runtimeVersion
+		}
+	}`
 
 	UpdateDeploymentRuntimeRequest = `
-mutation updateDeploymentRuntime($deploymentUuid: Uuid!, $desiredRuntimeVersion: String!) {
-updateDeploymentRuntime(deploymentUuid: $deploymentUuid, desiredRuntimeVersion: $desiredRuntimeVersion) {
-id
-label
-version
-releaseName
-runtimeVersion
-desiredRuntimeVersion
-runtimeAirflowVersion
-}
-}`
+	mutation updateDeploymentRuntime($deploymentUuid: Uuid!, $desiredRuntimeVersion: String!) {
+		updateDeploymentRuntime(deploymentUuid: $deploymentUuid, desiredRuntimeVersion: $desiredRuntimeVersion) {
+		  	id
+			label
+			version
+			releaseName
+		  	runtimeVersion
+		  	desiredRuntimeVersion
+		  	runtimeAirflowVersion
+		}
+	}`
 
 	CancelUpdateDeploymentRuntimeRequest = `
-mutation cancelRuntimeUpdate($deploymentUuid: Uuid!) {
-cancelRuntimeUpdate(deploymentUuid: $deploymentUuid) {
-id
-label
-version
-releaseName
-runtimeVersion
-desiredRuntimeVersion
-runtimeAirflowVersion
-}
-}`
+	mutation cancelRuntimeUpdate($deploymentUuid: Uuid!) {
+		cancelRuntimeUpdate(deploymentUuid: $deploymentUuid) {
+			id
+			label
+			version
+			releaseName
+			runtimeVersion
+			desiredRuntimeVersion
+			runtimeAirflowVersion
+		}
+	}`
 )
 
 // CreateDeployment - create a deployment
