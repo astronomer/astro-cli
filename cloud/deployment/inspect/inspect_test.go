@@ -224,6 +224,7 @@ func TestReturnSpecifiedValue(t *testing.T) {
 
 		_, err := ReturnSpecifiedValue(workspaceID, "", deploymentID, mockPlatformCoreClient, mockCoreClient, "configuration.name")
 		assert.ErrorIs(t, err, errMarshal)
+
 	})
 }
 
