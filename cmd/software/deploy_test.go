@@ -5,6 +5,7 @@ import (
 
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/software/deploy"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
@@ -40,4 +41,9 @@ func TestDeploy(t *testing.T) {
 
 	err = execDeployCmd([]string{"test-deployment-id", "--save"}...)
 	assert.NoError(t, err)
+
+	t.Run("Test for the flag --dag-only", func(t *testing.T) {
+		err := execDeployCmd([]string{"test-deployment-id", "--dag-only", "--force"}...)
+		assert.ErrorIs(t, err, deploy.ErrDagOnlyDeployDisabledInConfig)
+	})
 }

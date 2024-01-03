@@ -33,7 +33,7 @@ var (
 	errInvalidDeploymentID                  = errors.New("please specify a valid deployment ID")
 	errDeploymentNotFound                   = errors.New("no airflow deployments found")
 	errInvalidDeploymentSelected            = errors.New("invalid deployment selection\n") //nolint
-	errDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in the Astronomer Platform")
+	ErrDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in the Astronomer Platform")
 	errDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the deployment type to 'dag_only' via the UI or the API")
 )
 
@@ -303,7 +303,7 @@ func isDagOnlyDeploymentEnabledForDeployment(deploymentInfo *houston.Deployment)
 func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID string) error {
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
-		return errDagOnlyDeployDisabledInConfig
+		return ErrDagOnlyDeployDisabledInConfig
 	}
 
 	// Throw error if the feature is disabled at Deployment level
