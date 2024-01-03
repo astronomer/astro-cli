@@ -404,4 +404,24 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		err := DagsOnlyDeploy(houstonMock, appConfig, deploymentID)
 		assert.ErrorIs(t, err, errDagOnlyDeployNotEnabledForDeployment)
 	})
+
+	t.Run("When it runs successfully as the feature is enabled at all levels", func(t *testing.T) {
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		err := DagsOnlyDeploy(houstonMock, appConfig, deploymentID)
+		assert.ErrorIs(t, err, nil)
+	})
 }
