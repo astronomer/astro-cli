@@ -202,6 +202,32 @@ func restoreYAMLMarshal(replace func(v interface{}) ([]byte, error)) {
 	yamlMarshal = replace
 }
 
+func TestReturnSpecifiedValue(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	workspaceID := "test-ws-id"
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	deploymentName := "test-deployment-label"
+
+	t.Run("run function successfully", func(t *testing.T) {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+
+		value, err := ReturnSpecifiedValue(workspaceID, "", deploymentID, mockPlatformCoreClient, mockCoreClient, "configuration.name")
+		assert.NoError(t, err)
+		assert.Contains(t, value, deploymentName)
+	})
+	t.Run("get deployment error", func(t *testing.T) {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMarshal).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, errMarshal).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+
+		_, err := ReturnSpecifiedValue(workspaceID, "", deploymentID, mockPlatformCoreClient, mockCoreClient, "configuration.name")
+		assert.ErrorIs(t, err, errMarshal)
+		// assert.Contains(t, value, deploymentName)
+	})
+}
+
 func TestInspect(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
