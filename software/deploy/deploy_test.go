@@ -404,5 +404,4 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		err := DeployDagsOnly(houstonMock, appConfig, deploymentID)
 		assert.ErrorIs(t, err, errDagOnlyDeployNotEnabledForDeployment)
 	})
-
 }
