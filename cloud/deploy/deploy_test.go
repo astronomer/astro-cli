@@ -30,6 +30,7 @@ var (
 	dagTarballVersionTest      = "test-version"
 	dagsUploadTestURL          = "test-url"
 	deploymentID               = "test-deployment-id"
+	tarballVersion             = "test-version"
 	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 		{
@@ -128,14 +129,15 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &astroplatformcore.Deployment{
-			Id:               deploymentID,
-			RuntimeVersion:   "4.2.5",
-			Namespace:        "test-name",
-			WorkspaceId:      ws,
-			WebServerUrl:     "test-url",
-			DagDeployEnabled: true,
-			IsCicdEnforced:   false,
-			Type:             &hybridType,
+			Id:                deploymentID,
+			RuntimeVersion:    "4.2.5",
+			Namespace:         "test-name",
+			WorkspaceId:       ws,
+			WebServerUrl:      "test-url",
+			DagDeployEnabled:  true,
+			IsCicdEnforced:    false,
+			Type:              &hybridType,
+			DagTarballVersion: &tarballVersion,
 		},
 	}
 	mockCoreDeploymentResponse = []astrocore.Deployment{
@@ -446,11 +448,11 @@ func TestDagsDeploySuccess(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
-	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(5)
-	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(10)
-	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
-	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)
-	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(5)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(6)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(12)
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(4)
+	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(6)
+	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(6)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -489,6 +491,12 @@ func TestDagsDeploySuccess(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
+	assert.NoError(t, err)
+	// image deploy
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Image = true
+
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
