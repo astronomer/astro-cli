@@ -5,6 +5,8 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/software/deploy"
 
@@ -52,7 +54,9 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
 	cmd.Flags().BoolVarP(&ignoreCacheDeploy, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
-	cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dag-only", "", false, "Deploy only those dags which are present in the /dags folder")
+	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
+		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dag-only", "", false, "Deploy only those dags which are present in the /dags folder")
+	}
 	return cmd
 }
 
