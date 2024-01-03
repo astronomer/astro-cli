@@ -447,10 +447,9 @@ func TestGetDeploymentConfig(t *testing.T) {
 	})
 
 	t.Run("returns deployment config for the requested cloud standard deployment", func(t *testing.T) {
-		sourceDeployment.Type =
-			&standardType
-		taskPodNodePoolId := "task_node_id"
-		sourceDeployment.TaskPodNodePoolId = &taskPodNodePoolId
+		sourceDeployment.Type = &standardType
+		taskPodNodePoolID := "task_node_id"
+		sourceDeployment.TaskPodNodePoolId = &taskPodNodePoolID
 		cloudProvider := "azure"
 		sourceDeployment.CloudProvider = &cloudProvider
 		var actualDeploymentConfig deploymentConfig
@@ -480,8 +479,8 @@ func TestGetDeploymentConfig(t *testing.T) {
 func TestGetPrintableDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	sourceDeployment.Type = &hybridType
-	taskPodNodePoolId := "task_node_id"
-	sourceDeployment.TaskPodNodePoolId = &taskPodNodePoolId
+	taskPodNodePoolID := "task_node_id"
+	sourceDeployment.TaskPodNodePoolId = &taskPodNodePoolID
 	t.Run("returns a deployment map", func(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
