@@ -35,7 +35,7 @@ var (
 	clusterName            = "test-cluster"
 	highAvailability       = true
 	region                 = "test-region"
-	cloudProvider          = "test-provider"
+	cloudProvider          = "aws"
 	description            = "description 1"
 	deploymentResponse     = astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
@@ -920,6 +920,64 @@ deployment:
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
+	t.Run("reads the yaml file and creates a deployment with kube executor", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		filePath = "./deployment.yaml"
+		data = `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name: test-deployment-label
+    description: description
+    runtime_version: 6.0.0
+    executor: KubernetesExecutor
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_name: test-cluster
+    workspace_name: test-workspace
+    deployment_type: HYBRID
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    webserver_url: some-url
+  alert_emails:
+    - test1@test.com
+    - test2@test.com
+`
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), "configuration:\n        name: test-deployment-label")
+		assert.Contains(t, out.String(), "metadata:\n        deployment_id: test-deployment-id")
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
 	t.Run("reads the yaml file and creates a hosted dedicated deployment", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
@@ -944,9 +1002,13 @@ deployment:
     executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
+    scheduler_size: small
     cluster_name: test-cluster
     workspace_name: test-workspace
+    cloud_provider: gcp
+    scheduler_size: small
     deployment_type: DEDICATED
+    cloud_provider: gcp
     is_high_availability: true
     ci_cd_enforcement: true
   worker_queues:
@@ -1119,10 +1181,11 @@ deployment:
             "executor": "CeleryExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
+			"scheduler_size": "large",
             "workspace_name": "test-workspace",
 			"deployment_type": "STANDARD",
 			"region": "test-region",
-			"cloud_provider": "test-provider"
+			"cloud_provider": "aws"
         },
         "worker_queues": [
             {
@@ -1607,6 +1670,62 @@ deployment:
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
+	t.Run("reads the yaml file and updates an existing kube deployment", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		filePath = "./deployment.yaml"
+		data = `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name: test-deployment-label
+    description: description 1
+    runtime_version: 6.0.0
+    executor: KubernetesExecutor
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_name: test-cluster
+    workspace_name: test-workspace
+    deployment_type: HYBRID
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    webserver_url: some-url
+  alert_emails:
+    - test1@test.com
+    - test2@test.com
+`
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), "configuration:\n        name: test-deployment-label")
+		assert.Contains(t, out.String(), "\n        description: description 1")
+		assert.Contains(t, out.String(), "metadata:\n        deployment_id: test-deployment-id")
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
 	t.Run("reads the yaml file and updates an existing hosted standard deployment", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
@@ -1632,8 +1751,84 @@ deployment:
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: clusterName
+    cloud_provider: azure
+    scheduler_size: medium
     workspace_name: test-workspace
     deployment_type: STANDARD
+  worker_queues:
+    - name: default
+      is_default: true
+      max_worker_count: 20
+      min_worker_count: 5
+      worker_concurrency: 10
+      worker_type: a5
+    - name: test-queue-1
+      is_default: false
+      max_worker_count: 20
+      min_worker_count: 8
+      worker_concurrency: 10
+      worker_type: a5
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    status: HEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    webserver_url: some-url
+  alert_emails:
+    - test1@test.com
+    - test2@test.com
+`
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		mockCoreDeploymentResponse[0].ClusterId = nil
+		mockCoreDeploymentCreateResponse[0].ClusterId = nil
+		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), "configuration:\n        name: test-deployment-label")
+		assert.Contains(t, out.String(), "\n        description: description 1")
+		assert.Contains(t, out.String(), "metadata:\n        deployment_id: test-deployment-id")
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
+	t.Run("reads the yaml file and updates an existing hosted dedicated deployment", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		filePath = "./deployment.yaml"
+		data = `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name: test-deployment-label
+    description: description 1
+    runtime_version: 6.0.0
+    dag_deploy_enabled: true
+    executor: CeleryExecutor
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_name: clusterName
+    cloud_provider: azure
+    scheduler_size: medium
+    workspace_name: test-workspace
+    deployment_type: DEDICATED
   worker_queues:
     - name: default
       is_default: true
