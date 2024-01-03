@@ -366,7 +366,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		houstonMock := new(houston_mocks.ClientInterface)
 		houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
 
-		err := DeployDagsOnly(houstonMock, appConfig, deploymentID)
+		err := DagsOnlyDeploy(houstonMock, appConfig, deploymentID)
 		assert.ErrorIs(t, err, errDagOnlyDeployDisabledInConfig)
 	})
 
@@ -381,7 +381,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
 		houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
 
-		err := DeployDagsOnly(houstonMock, appConfig, deploymentID)
+		err := DagsOnlyDeploy(houstonMock, appConfig, deploymentID)
 		assert.ErrorContains(t, err, "failed to get deployment info: some houston error")
 	})
 
@@ -401,7 +401,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 			DagDeployment: *dagDeployment,
 		}
 		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-		err := DeployDagsOnly(houstonMock, appConfig, deploymentID)
+		err := DagsOnlyDeploy(houstonMock, appConfig, deploymentID)
 		assert.ErrorIs(t, err, errDagOnlyDeployNotEnabledForDeployment)
 	})
 }

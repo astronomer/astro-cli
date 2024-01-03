@@ -93,7 +93,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	}
 
 	if isDagOnlyDeploy {
-		return deploy.DeployDagsOnly(houstonClient, appConfig, deploymentID)
+		return deploy.DagsOnlyDeploy(houstonClient, appConfig, deploymentID)
 	}
 	return DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
 }
