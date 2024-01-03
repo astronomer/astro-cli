@@ -106,14 +106,14 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 			return err
 		}
 		// get correct value for dag deploy
-		if &formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil { //nolint:staticcheck
+		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil { //nolint:staticcheck
 			if organization.IsOrgHosted() {
 				dagDeploy = true
 			} else {
 				dagDeploy = false
 			}
 		} else {
-			dagDeploy = formattedDeployment.Deployment.Configuration.DagDeployEnabled
+			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
 		}
 		// check if deployment exists
 		if deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
@@ -149,10 +149,10 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
 		workspaceID = existingDeployment.WorkspaceId
 		// determine dagDeploy
-		if &formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil { //nolint:staticcheck
+		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil { //nolint:staticcheck
 			dagDeploy = existingDeployment.DagDeployEnabled
 		} else {
-			dagDeploy = formattedDeployment.Deployment.Configuration.DagDeployEnabled
+			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
 		}
 		if !deployment.IsDeploymentStandard(deploymentType) {
 			clusterID = *existingDeployment.ClusterId
