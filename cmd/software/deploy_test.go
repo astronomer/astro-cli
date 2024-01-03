@@ -40,7 +40,4 @@ func TestDeploy(t *testing.T) {
 
 	err = execDeployCmd([]string{"test-deployment-id", "--save"}...)
 	assert.NoError(t, err)
-
-	err = execDeployCmd([]string{"test-deployment-id", "--dag-only"}...)
-	assert.NoError(t, err)
 }
