@@ -313,6 +313,26 @@ func TestCreate(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
+	t.Run("happy path creates a new worker queue for a hosted deployment when worker queues exist", func(t *testing.T) {
+		expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace created\n"
+		out := new(bytes.Buffer)
+		defer testUtil.MockUserInput(t, "2")()
+		astroMachine := "a5"
+		deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{{Name: "test-queue-1", NodePoolId: &testPoolID, AstroMachine: &astroMachine}}
+		deploymentResponse.JSON200.Type = &standardType
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil).Times(2)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-worker-queue", createAction, "", -1, 20, 10, false, mockPlatformCoreClient, mockCoreClient, out)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), expectedOutMessage)
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+		deploymentResponse.JSON200.Type = &hybridType
+
+	})
 	t.Run("returns an error when getting worker queue default options fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
