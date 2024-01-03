@@ -472,6 +472,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
+		sourceDeployment.Type = &hybridType
 	})
 }
 
