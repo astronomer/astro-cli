@@ -421,6 +421,8 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 func TestGetDeploymentConfig(t *testing.T) {
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
 		sourceDeployment.Type = &hybridType
+		cloudProvider := "aws"
+		sourceDeployment.CloudProvider = &cloudProvider
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedDeploymentConfig := deploymentConfig{
@@ -448,13 +450,14 @@ func TestGetDeploymentConfig(t *testing.T) {
 		sourceDeployment.Type = &standardType
 		taskPodNodePoolId := "task_node_id"
 		sourceDeployment.TaskPodNodePoolId = &taskPodNodePoolId
+		cloudProvider := "azure"
+		sourceDeployment.CloudProvider = &cloudProvider
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedDeploymentConfig := deploymentConfig{
 			Name:             sourceDeployment.Name,
 			Description:      *sourceDeployment.Description,
 			WorkspaceName:    *sourceDeployment.WorkspaceName,
-			ClusterName:      *sourceDeployment.ClusterName,
 			RunTimeVersion:   sourceDeployment.RuntimeVersion,
 			SchedulerAU:      *sourceDeployment.SchedulerAu,
 			SchedulerCount:   sourceDeployment.SchedulerReplicas,

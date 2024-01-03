@@ -36,7 +36,7 @@ type deploymentConfig struct {
 	Name                  string `mapstructure:"name" yaml:"name" json:"name"`
 	Description           string `mapstructure:"description" yaml:"description" json:"description"`
 	RunTimeVersion        string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
-	DagDeployEnabled      bool   `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
+	DagDeployEnabled      bool   `mapstructure:"dag_deploy_enabled,omitempty" yaml:"dag_deploy_enabled,omitempty" json:"dag_deploy_enabled,omitempty"`
 	APIKeyOnlyDeployments bool   `mapstructure:"ci_cd_enforcement" yaml:"ci_cd_enforcement" json:"ci_cd_enforcement"`
 	SchedulerSize         string `mapstructure:"scheduler_size" yaml:"scheduler_size" json:"scheduler_size"`
 	IsHighAvailability    bool   `mapstructure:"is_high_availability" yaml:"is_high_availability" json:"is_high_availability"`
