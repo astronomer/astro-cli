@@ -291,6 +291,7 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 	}
 	return ""
 }
+
 func isDagOnlyDeploymentEnabled(appConfig *houston.AppConfig) bool {
 	return appConfig != nil && appConfig.Flags.DagOnlyDeployment
 }
@@ -300,7 +301,6 @@ func isDagOnlyDeploymentEnabledForDeployment(deploymentInfo *houston.Deployment)
 }
 
 func DeployDagsOnly(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID string) error {
-
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
 		return errDagOnlyDeployDisabledInConfig
