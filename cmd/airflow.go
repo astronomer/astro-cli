@@ -191,7 +191,7 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 	cmd.Flags().BoolVarP(&dagTest, "dag-test", "d", false, "Only run DAG tests. These tests check whether your DAGs will generate import errors after you upgrade.")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against.")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "n", "", "Name of the upgraded image. Updates the FROM line in your Dockerfile to pull this image for the upgrade.")
-	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
+	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Expose a secret to containers. Equivalent to 'docker build --secret'. Example input id=mysecret,src=secrets.txt")
 	var err error
 	var avoidACFlag bool
 
