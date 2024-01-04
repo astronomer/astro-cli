@@ -8,6 +8,7 @@ import (
 	"net/mail"
 	"os"
 	"sort"
+	"strings"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -836,17 +837,17 @@ func isValidExecutor(executor string) bool {
 	return executor == deployment.CeleryExecutor || executor == deployment.KubeExecutor || executor == deployment.CELERY || executor == deployment.KUBERNETES
 }
 
-// temporary code
 func transformDeploymentType(deploymentType string) astroplatformcore.DeploymentType {
 	var transformedDeploymentType astroplatformcore.DeploymentType
-	if deploymentType == "STANDARD" || deploymentType == "standard" {
+
+	switch strings.ToUpper(deploymentType) {
+	case "STANDARD":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
-	}
-	if deploymentType == "DEDICATED" || deploymentType == "dedicated" {
+	case "DEDICATED":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
-	}
-	if deploymentType == "HYBRID" || deploymentType == "hybrid" {
+	case "HYBRID":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeHYBRID
 	}
+
 	return transformedDeploymentType
 }
