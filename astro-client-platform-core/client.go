@@ -47,7 +47,11 @@ func requestEditor(ctx httpContext.Context, req *http.Request) error {
 	req.URL = requestURL
 	req.Header.Add("authorization", currentCtx.Token)
 	req.Header.Add("x-astro-client-identifier", "cli")
+<<<<<<< HEAD
 	req.Header.Add("x-astro-client-version", "1.19.0") // version.CurrVersion)
+=======
+	req.Header.Add("x-astro-client-version", version.CurrVersion) // version.CurrVersion)
+>>>>>>> 8c16e02c (Fix login and organization list/switch (#1476))
 	req.Header.Add("x-client-os-identifier", os+"-"+arch)
 	req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.CurrVersion))
 	return nil
