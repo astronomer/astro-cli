@@ -7,6 +7,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/git"
+	"github.com/astronomer/astro-cli/pkg/util"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -39,6 +40,7 @@ Menu will be presented if you do not specify a deployment ID:
 
 	DeployImage      = cloud.Deploy
 	EnsureProjectDir = utils.EnsureProjectDir
+	buildSecrets     = []string{}
 )
 
 const (
@@ -71,6 +73,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
+	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
 	return cmd
 }
 
@@ -133,20 +136,23 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	BuildSecretString := util.GetbuildSecretString(buildSecrets)
+
 	deployInput := cloud.InputDeploy{
-		Path:           config.WorkingPath,
-		RuntimeID:      deploymentID,
-		WsID:           workspaceID,
-		Pytest:         pytestFile,
-		EnvFile:        envFile,
-		ImageName:      imageName,
-		DeploymentName: deploymentName,
-		Prompt:         forcePrompt,
-		Dags:           dags,
-		Image:          image,
-		WaitForStatus:  waitForDeploy,
-		DagsPath:       dagsPath,
-		Description:    deployDescription,
+		Path:              config.WorkingPath,
+		RuntimeID:         deploymentID,
+		WsID:              workspaceID,
+		Pytest:            pytestFile,
+		EnvFile:           envFile,
+		ImageName:         imageName,
+		DeploymentName:    deploymentName,
+		Prompt:            forcePrompt,
+		Dags:              dags,
+		Image:             image,
+		WaitForStatus:     waitForDeploy,
+		DagsPath:          dagsPath,
+		Description:       deployDescription,
+		BuildSecretString: BuildSecretString,
 	}
 
 	return DeployImage(deployInput, platformCoreClient, astroCoreClient)

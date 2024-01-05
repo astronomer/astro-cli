@@ -12,13 +12,13 @@ type ImageHandler struct {
 	mock.Mock
 }
 
-// Build provides a mock function with given fields: dockerfile, config
-func (_m *ImageHandler) Build(dockerfile string, config types.ImageBuildConfig) error {
-	ret := _m.Called(dockerfile, config)
+// Build provides a mock function with given fields: dockerfile, buildSecretString, config
+func (_m *ImageHandler) Build(dockerfile string, buildSecretString string, config types.ImageBuildConfig) error {
+	ret := _m.Called(dockerfile, buildSecretString, config)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, types.ImageBuildConfig) error); ok {
-		r0 = rf(dockerfile, config)
+	if rf, ok := ret.Get(0).(func(string, string, types.ImageBuildConfig) error); ok {
+		r0 = rf(dockerfile, buildSecretString, config)
 	} else {
 		r0 = ret.Error(0)
 	}

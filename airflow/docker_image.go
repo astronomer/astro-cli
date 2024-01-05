@@ -44,7 +44,7 @@ func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(dockerfile string, buildConfig airflowTypes.ImageBuildConfig) error {
+func (d *DockerImage) Build(dockerfile, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
 	dockerCommand := config.CFG.DockerCommand.GetString()
 	if dockerfile == "" {
 		dockerfile = "Dockerfile"
@@ -68,6 +68,13 @@ func (d *DockerImage) Build(dockerfile string, buildConfig airflowTypes.ImageBui
 	if len(buildConfig.TargetPlatforms) > 0 {
 		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(buildConfig.TargetPlatforms, ",")))
 	}
+	if buildSecretString != "" {
+		buildSecretArgs := []string{
+			"--secret",
+			buildSecretString,
+		}
+		args = append(args, buildSecretArgs...)
+	}
 	// Build image
 	var stdout, stderr io.Writer
 	if buildConfig.Output {
@@ -77,6 +84,7 @@ func (d *DockerImage) Build(dockerfile string, buildConfig airflowTypes.ImageBui
 		stdout = nil
 		stderr = nil
 	}
+	fmt.Println(args)
 	err = cmdExec(dockerCommand, stdout, stderr, args...)
 	if err != nil {
 		return fmt.Errorf("command '%s build -t %s failed: %w", dockerCommand, d.imageName, err)
