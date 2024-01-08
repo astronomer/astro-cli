@@ -412,7 +412,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -433,7 +433,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -469,7 +469,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -505,7 +505,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -521,7 +521,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -550,7 +550,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, nil).Return(nil).Once()
+			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, nil).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -564,7 +564,7 @@ func TestAirflowUpgradeTest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, nil).Return(errMock).Once()
+			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, nil).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -900,7 +900,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop", true).Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -935,7 +935,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop", true).Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -970,7 +970,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop", true).Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1003,7 +1003,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop", true).Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", true, true, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1036,7 +1036,7 @@ func TestAirflowPytest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "").Return("0", nil).Once()
+			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "", "").Return("0", nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1054,7 +1054,7 @@ func TestAirflowPytest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "").Return("exit code 1", errMock).Once()
+			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "", "").Return("exit code 1", errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1072,7 +1072,7 @@ func TestAirflowPytest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "").Return("0", nil).Once()
+			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "", "").Return("0", nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1090,7 +1090,7 @@ func TestAirflowPytest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "").Return("0", errMock).Once()
+			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "", "").Return("0", errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1136,7 +1136,7 @@ func TestAirflowParse(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Parse", "", "").Return(nil).Once()
+			mockContainerHandler.On("Parse", "", "", "").Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1151,7 +1151,7 @@ func TestAirflowParse(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Parse", "", "").Return(errMock).Once()
+			mockContainerHandler.On("Parse", "", "", "").Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 

@@ -169,7 +169,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
@@ -178,7 +178,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
 	}
@@ -313,7 +313,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
@@ -322,8 +322,8 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
-		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
 	}
 
@@ -451,7 +451,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 	// Test pytest with dags deploy
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
@@ -460,8 +460,8 @@ func TestDagsDeploySuccess(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
-		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
 	}
 
@@ -565,15 +565,15 @@ func TestDagsDeployFailed(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("4.2.5", nil)
 		return mockImageHandler
 	}
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(errMock)
-		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errMock)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(errMock)
+		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errMock)
 		return mockContainerHandler, nil
 	}
 
@@ -630,14 +630,14 @@ func TestDeployFailure(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("4.2.5", nil)
 		return mockImageHandler
 	}
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(errMock)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(errMock)
 		return mockContainerHandler, nil
 	}
 
@@ -724,7 +724,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	// Test pytest with dags deploy
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
@@ -733,8 +733,8 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
-		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
 	}
 
@@ -802,7 +802,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	// Test pytest with dags deploy
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
@@ -811,8 +811,8 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
-		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
 	}
 
@@ -846,28 +846,28 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// image build failure
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(errMock).Once()
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
-	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", false, nil)
+	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", "", false, nil)
 	assert.ErrorIs(t, err, errMock)
 
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("4.2.5", nil)
 		return mockImageHandler
 	}
 
 	// dockerfile parsing error
 	dockerfile = "Dockerfile.invalid"
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", false, nil)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
 	// failed to get runtime releases
 	dockerfile = "Dockerfile"
-	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", false, mockPlatformCoreClient)
+	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 	mockCoreClient.AssertExpectations(t)
 	mockPlatformCoreClient.AssertExpectations(t)
@@ -919,16 +919,16 @@ func TestCheckPyTest(t *testing.T) {
 	mockDeployImage := "test-image"
 
 	mockContainerHandler := new(mocks.ContainerHandler)
-	mockContainerHandler.On("Pytest", "", "", mockDeployImage, "").Return("", errMock).Once()
+	mockContainerHandler.On("Pytest", "", "", mockDeployImage, "", "").Return("", errMock).Once()
 
 	// random error on running airflow pytest
-	err := checkPytest("", mockDeployImage, mockContainerHandler)
+	err := checkPytest("", mockDeployImage, "", mockContainerHandler)
 	assert.ErrorIs(t, err, errMock)
 	mockContainerHandler.AssertExpectations(t)
 
 	// airflow pytest exited with status code 1
-	mockContainerHandler.On("Pytest", "", "", mockDeployImage, "").Return("exit code 1", errMock).Once()
-	err = checkPytest("", mockDeployImage, mockContainerHandler)
+	mockContainerHandler.On("Pytest", "", "", mockDeployImage, "", "").Return("exit code 1", errMock).Once()
+	err = checkPytest("", mockDeployImage, "", mockContainerHandler)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
 	mockContainerHandler.AssertExpectations(t)

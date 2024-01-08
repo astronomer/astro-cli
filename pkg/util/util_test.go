@@ -1,6 +1,7 @@
 package util
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -226,5 +227,37 @@ func TestIsM1(t *testing.T) {
 	})
 	t.Run("returns false if running on windows", func(t *testing.T) {
 		assert.False(t, IsM1("windows", "amd64"))
+	})
+}
+
+func TestGetbuildSecretString(t *testing.T) {
+	t.Run("returns empty string if buildSecret is empty", func(t *testing.T) {
+		assert.Equal(t, "", GetbuildSecretString([]string{}))
+	})
+
+	t.Run("returns the only secret if buildSecret has only one element", func(t *testing.T) {
+		assert.Equal(t, "secret1", GetbuildSecretString([]string{"secret1"}))
+	})
+
+	t.Run("returns comma-separated string for multiple secrets in buildSecret", func(t *testing.T) {
+		assert.Equal(t, "secret1,secret2,secret3", GetbuildSecretString([]string{"secret1", "secret2", "secret3"}))
+	})
+
+	t.Run("overrides buildSecretString with BUILD_SECRET_INPUT if set", func(t *testing.T) {
+		// Save the original value of BUILD_SECRET_INPUT
+		originalBuildSecretInput := os.Getenv("BUILD_SECRET_INPUT")
+		defer func() {
+			// Reset BUILD_SECRET_INPUT to its original value after the test
+			os.Setenv("BUILD_SECRET_INPUT", originalBuildSecretInput)
+		}()
+
+		// Set BUILD_SECRET_INPUT to a different value
+		os.Setenv("BUILD_SECRET_INPUT", "override_secret")
+
+		// Test with a non-empty buildSecret
+		assert.Equal(t, "secret1,secret2", GetbuildSecretString([]string{"secret1", "secret2"}))
+
+		// Test with an empty buildSecret
+		assert.Equal(t, "override_secret", GetbuildSecretString([]string{}))
 	})
 }

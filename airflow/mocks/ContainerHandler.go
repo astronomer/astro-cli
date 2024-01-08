@@ -121,13 +121,13 @@ func (_m *ContainerHandler) PS() error {
 	return r0
 }
 
-// Parse provides a mock function with given fields: customImageName, deployImageName
-func (_m *ContainerHandler) Parse(customImageName string, deployImageName string) error {
-	ret := _m.Called(customImageName, deployImageName)
+// Parse provides a mock function with given fields: customImageName, deployImageName, buildSecretString
+func (_m *ContainerHandler) Parse(customImageName string, deployImageName string, buildSecretString string) error {
+	ret := _m.Called(customImageName, deployImageName, buildSecretString)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(customImageName, deployImageName)
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(customImageName, deployImageName, buildSecretString)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -135,23 +135,23 @@ func (_m *ContainerHandler) Parse(customImageName string, deployImageName string
 	return r0
 }
 
-// Pytest provides a mock function with given fields: pytestFile, customImageName, deployImageName, pytestArgsString
-func (_m *ContainerHandler) Pytest(pytestFile string, customImageName string, deployImageName string, pytestArgsString string) (string, error) {
-	ret := _m.Called(pytestFile, customImageName, deployImageName, pytestArgsString)
+// Pytest provides a mock function with given fields: pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString
+func (_m *ContainerHandler) Pytest(pytestFile string, customImageName string, deployImageName string, pytestArgsString string, buildSecretString string) (string, error) {
+	ret := _m.Called(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString)
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string) (string, error)); ok {
-		return rf(pytestFile, customImageName, deployImageName, pytestArgsString)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, string) (string, error)); ok {
+		return rf(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, string, string) string); ok {
-		r0 = rf(pytestFile, customImageName, deployImageName, pytestArgsString)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, string) string); ok {
+		r0 = rf(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, string, string) error); ok {
-		r1 = rf(pytestFile, customImageName, deployImageName, pytestArgsString)
+	if rf, ok := ret.Get(1).(func(string, string, string, string, string) error); ok {
+		r1 = rf(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -187,13 +187,13 @@ func (_m *ContainerHandler) RunDAG(dagID string, settingsFile string, dagFile st
 	return r0
 }
 
-// Start provides a mock function with given fields: imageName, settingsFile, composeFile, noCache, noBrowser, waitTime, envConns
-func (_m *ContainerHandler) Start(imageName string, settingsFile string, composeFile string, noCache bool, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
-	ret := _m.Called(imageName, settingsFile, composeFile, noCache, noBrowser, waitTime, envConns)
+// Start provides a mock function with given fields: imageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns
+func (_m *ContainerHandler) Start(imageName string, settingsFile string, composeFile string, buildSecretString string, noCache bool, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+	ret := _m.Called(imageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, bool, bool, time.Duration, map[string]astrocore.EnvironmentObjectConnection) error); ok {
-		r0 = rf(imageName, settingsFile, composeFile, noCache, noBrowser, waitTime, envConns)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, bool, time.Duration, map[string]astrocore.EnvironmentObjectConnection) error); ok {
+		r0 = rf(imageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns)
 	} else {
 		r0 = ret.Error(0)
 	}
