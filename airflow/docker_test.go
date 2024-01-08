@@ -1158,7 +1158,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", "", true, false, false, mockPlatformCoreClient)
+		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", "", true, false, false, mockPlatformCoreClient)
 
 		assert.NoError(t, err)
 		imageHandler.AssertExpectations(t)
@@ -1294,7 +1294,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", "", true, false, false, mockPlatformCoreClient)
+		err = mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", "", true, false, false, mockPlatformCoreClient)
 		assert.Error(t, err)
 		imageHandler.AssertExpectations(t)
 	})
