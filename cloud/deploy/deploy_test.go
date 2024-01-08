@@ -866,7 +866,7 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// failed to get runtime releases
 	dockerfile = "Dockerfile"
-	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
 	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 	mockCoreClient.AssertExpectations(t)
