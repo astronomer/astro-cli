@@ -36,7 +36,7 @@ var (
 	errInvalidDeploymentSelected            = errors.New("invalid deployment selection\n") //nolint
 	ErrDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in the Astronomer Platform")
 	errDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the deployment type to 'dag_only' via the UI or the API")
-	ErrEmptyDagFolderUserCancelledOperation = errors.New("no DAGs found in the dags folder. User cancelled the operation.")
+	ErrEmptyDagFolderUserCancelledOperation = errors.New("no DAGs found in the dags folder. User canceled the operation.")
 )
 
 const (
