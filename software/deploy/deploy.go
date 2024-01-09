@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -35,6 +36,7 @@ var (
 	errInvalidDeploymentSelected            = errors.New("invalid deployment selection\n") //nolint
 	ErrDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in the Astronomer Platform")
 	errDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the deployment type to 'dag_only' via the UI or the API")
+	ErrEmptyDagFolderUserCancelledOperation = errors.New("no DAGs found in the dags folder. User cancelled the operation.")
 )
 
 const (
@@ -300,7 +302,23 @@ func isDagOnlyDeploymentEnabledForDeployment(deploymentInfo *houston.Deployment)
 	return deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType
 }
 
-func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID string) error {
+func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) error {
+	_, err := config.GetCurrentContext()
+	if err != nil {
+		return fmt.Errorf("could not get current context! Error: %w", err)
+	}
+	if deploymentInfo == nil || deploymentInfo.ReleaseName == "" {
+		return fmt.Errorf("invalid deployment id")
+	}
+	return nil
+}
+
+func getDagDeployURL(deploymentInfo *houston.Deployment) string {
+	c, _ := config.GetCurrentContext()
+	return fmt.Sprintf("deployments.%s/%s/upload", c.Domain, deploymentInfo.ReleaseName)
+}
+
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID string, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
 		return ErrDagOnlyDeployDisabledInConfig
@@ -315,5 +333,51 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		return errDagOnlyDeployNotEnabledForDeployment
 	}
 
-	return nil
+	uploadUrl := ""
+	if dagDeployURL == nil {
+		// Throw error if the upload URL can't be constructed
+		err = validateIfDagDeployURLCanBeConstructed(deploymentInfo)
+		if err != nil {
+			return err
+		}
+		uploadUrl = getDagDeployURL(deploymentInfo)
+	} else {
+		uploadUrl = *dagDeployURL
+	}
+
+	dagsPath := filepath.Join(dagsParentPath, "dags")
+	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
+
+	// Alert the user if dags folder is empty
+	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
+		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+		if !i {
+			return ErrEmptyDagFolderUserCancelledOperation
+		}
+	}
+
+	start := time.Now()
+
+	// Generate the dags tar
+	err = fileutil.Tar(dagsPath, dagsParentPath)
+	if err != nil {
+		return err
+	}
+	if cleanUpFiles {
+		defer os.Remove(dagsParentPath + "/dags.tar")
+	}
+
+	// Gzip the tar
+	err = fileutil.GzipFile(dagsParentPath+"/dags.tar", dagsParentPath+"/dags.tar.gz")
+	if err != nil {
+		return err
+	}
+	if cleanUpFiles {
+		defer os.Remove(dagsParentPath + "/dags.tar.gz")
+	}
+
+	end := time.Now()
+	fmt.Println("Time taken to create tar.gz file: ", end.Sub(start))
+
+	return fileutil.UploadFile(dagsParentPath+"/dags.tar.gz", uploadUrl, "file1")
 }

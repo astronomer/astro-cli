@@ -55,7 +55,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&ignoreCacheDeploy, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
-		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dag-only", "", false, "Deploy only those dags which are present in the /dags folder")
+		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dag-only", "", false, "Deploy only those dags which are present in the dags folder from working directory")
 	}
 	return cmd
 }
@@ -96,7 +96,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		byoRegistryDomain = appConfig.BYORegistryDomain
 	}
 	if isDagOnlyDeploy {
-		return deploy.DagsOnlyDeploy(houstonClient, appConfig, deploymentID)
+		return deploy.DagsOnlyDeploy(houstonClient, appConfig, deploymentID, config.WorkingPath, nil, true)
 	}
 	return DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
 }

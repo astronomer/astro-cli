@@ -343,6 +343,7 @@ var (
 					runtimeVersion
 					desiredRuntimeVersion
 					runtimeAirflowVersion
+					releaseName
 					urls {
 						type
 						url

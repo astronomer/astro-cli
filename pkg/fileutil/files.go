@@ -3,8 +3,12 @@ package fileutil
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
+	"mime/multipart"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -235,4 +239,70 @@ func CreateFile(p string) (*os.File, error) {
 		return nil, err
 	}
 	return os.Create(p)
+}
+
+func UploadFile(filePath string, targetURL string, formFileFieldName string) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("error opening file: %w", err)
+	}
+	fmt.Println("File opened successfully")
+	defer file.Close()
+
+	// Create a new buffer to store the multipart/form-data request
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Create a form field for the file
+	fileWriter, err := writer.CreateFormFile(formFileFieldName, filePath)
+	if err != nil {
+		return fmt.Errorf("error creating form file: %w", err)
+	}
+
+	// Copy the file content into the form field
+	_, err = io.Copy(fileWriter, file)
+	if err != nil {
+		return fmt.Errorf("error copying file content: %w", err)
+	}
+
+	// Close the multipart writer to finalize the request
+	writer.Close()
+
+	// Make a POST request with the multipart/form-data content
+	response, err := http.Post(targetURL, writer.FormDataContentType(), body)
+	if err != nil {
+		return fmt.Errorf("error making POST request: %w", err)
+	}
+	defer response.Body.Close()
+
+	// Check the response status
+	if response.StatusCode == http.StatusOK {
+		fmt.Println("File uploaded successfully")
+		return nil
+	} else {
+		data, _ := io.ReadAll(response.Body)
+		return fmt.Errorf("file upload failed. Status code: %d and Message: %s", response.StatusCode, string(data))
+	}
+}
+
+func GzipFile(srcFilePath string, destFilePath string) error {
+	srcFile, err := os.Open(srcFilePath)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	destFile, err := os.Create(destFilePath)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	// Create a gzip writer on top of file writer
+	gzipWriter := gzip.NewWriter(destFile)
+	defer gzipWriter.Close()
+
+	// Copy contents of the file to the gzip writer
+	_, err = io.Copy(gzipWriter, srcFile)
+	return err
 }
