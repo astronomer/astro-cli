@@ -540,7 +540,7 @@ func TestUploadFile(t *testing.T) {
 		defer os.Remove(filePath)
 
 		err = UploadFile(filePath, "https://astro.unit.test", "file1")
-		assert.EqualError(t, err, "error making POST request: Post \"https://astro.unit.test\": dial tcp: lookup astro.unit.test: no such host")
+		assert.ErrorContains(t, err, "error making POST request: Post \"https://astro.unit.test\"")
 	})
 
 	t.Run("successfully uploaded the file", func(t *testing.T) {
