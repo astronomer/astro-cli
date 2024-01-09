@@ -308,7 +308,7 @@ func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) 
 		return fmt.Errorf("could not get current context! Error: %w", err)
 	}
 	if deploymentInfo == nil || deploymentInfo.ReleaseName == "" {
-		return fmt.Errorf("invalid deployment id")
+		return errInvalidDeploymentID
 	}
 	return nil
 }
@@ -318,7 +318,7 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 	return fmt.Sprintf("deployments.%s/%s/upload", c.Domain, deploymentInfo.ReleaseName)
 }
 
-func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID string, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
 		return ErrDagOnlyDeployDisabledInConfig
@@ -333,16 +333,16 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		return errDagOnlyDeployNotEnabledForDeployment
 	}
 
-	uploadUrl := ""
+	uploadURL := ""
 	if dagDeployURL == nil {
 		// Throw error if the upload URL can't be constructed
 		err = validateIfDagDeployURLCanBeConstructed(deploymentInfo)
 		if err != nil {
 			return err
 		}
-		uploadUrl = getDagDeployURL(deploymentInfo)
+		uploadURL = getDagDeployURL(deploymentInfo)
 	} else {
-		uploadUrl = *dagDeployURL
+		uploadURL = *dagDeployURL
 	}
 
 	dagsPath := filepath.Join(dagsParentPath, "dags")
@@ -379,5 +379,5 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 	end := time.Now()
 	fmt.Println("Time taken to create tar.gz file: ", end.Sub(start))
 
-	return fileutil.UploadFile(dagsParentPath+"/dags.tar.gz", uploadUrl, "file1")
+	return fileutil.UploadFile(dagsParentPath+"/dags.tar.gz", uploadURL, "file1")
 }

@@ -241,7 +241,7 @@ func CreateFile(p string) (*os.File, error) {
 	return os.Create(p)
 }
 
-func UploadFile(filePath string, targetURL string, formFileFieldName string) error {
+func UploadFile(filePath, targetURL, formFileFieldName string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("error opening file: %w", err)
@@ -269,7 +269,7 @@ func UploadFile(filePath string, targetURL string, formFileFieldName string) err
 	writer.Close()
 
 	// Make a POST request with the multipart/form-data content
-	response, err := http.Post(targetURL, writer.FormDataContentType(), body)
+	response, err := http.Post(targetURL, writer.FormDataContentType(), body) //nolint
 	if err != nil {
 		return fmt.Errorf("error making POST request: %w", err)
 	}
@@ -279,13 +279,12 @@ func UploadFile(filePath string, targetURL string, formFileFieldName string) err
 	if response.StatusCode == http.StatusOK {
 		fmt.Println("File uploaded successfully")
 		return nil
-	} else {
-		data, _ := io.ReadAll(response.Body)
-		return fmt.Errorf("file upload failed. Status code: %d and Message: %s", response.StatusCode, string(data))
 	}
+	data, _ := io.ReadAll(response.Body)
+	return fmt.Errorf("file upload failed. Status code: %d and Message: %s", response.StatusCode, string(data)) //nolint
 }
 
-func GzipFile(srcFilePath string, destFilePath string) error {
+func GzipFile(srcFilePath, destFilePath string) error {
 	srcFile, err := os.Open(srcFilePath)
 	if err != nil {
 		return err

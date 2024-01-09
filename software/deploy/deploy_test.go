@@ -450,7 +450,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		}
 		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
 		err := DagsOnlyDeploy(houstonMock, appConfig, deploymentID, config.WorkingPath, nil, false)
-		assert.EqualError(t, err, "invalid deployment id")
+		assert.ErrorIs(t, err, errInvalidDeploymentID)
 	})
 
 	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is empty. User doesn't give operation confirmation", func(t *testing.T) {
