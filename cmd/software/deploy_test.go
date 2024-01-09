@@ -42,8 +42,8 @@ func TestDeploy(t *testing.T) {
 	err = execDeployCmd([]string{"test-deployment-id", "--save"}...)
 	assert.NoError(t, err)
 
-	t.Run("Test for the flag --dag-only", func(t *testing.T) {
-		err := execDeployCmd([]string{"test-deployment-id", "--dag-only", "--force"}...)
+	t.Run("Test for the flag --dags", func(t *testing.T) {
+		err := execDeployCmd([]string{"test-deployment-id", "--dags", "--force"}...)
 		assert.ErrorIs(t, err, deploy.ErrDagOnlyDeployDisabledInConfig)
 	})
 }
