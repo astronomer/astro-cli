@@ -801,7 +801,7 @@ func TestCreate(t *testing.T) {
 			},
 		}, nil).Times(1)
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
+		mockCoreClient.On("ListClustersWithResponse", mock.Anything, org, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
@@ -855,7 +855,7 @@ func TestCreate(t *testing.T) {
 		deploymentCreateInput.APIKeyOnlyDeployments = true
 		defer func() { deploymentCreateInput.APIKeyOnlyDeployments = false }()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
+		mockCoreClient.On("ListClustersWithResponse", mock.Anything, org, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 

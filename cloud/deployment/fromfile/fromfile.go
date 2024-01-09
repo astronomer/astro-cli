@@ -88,7 +88,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 
 	if !deployment.IsDeploymentHosted(formattedDeployment.Deployment.Configuration.DeploymentType) {
 		// map cluster name to id and collect node pools for cluster
-		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.OrganizationShortName, coreClient)
+		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.Organization, coreClient)
 		if err != nil {
 			return err
 		}
@@ -421,16 +421,16 @@ func deploymentFromName(existingDeployments []astro.Deployment, deploymentName s
 	return astro.Deployment{}
 }
 
-// getClusterInfoFromName takes clusterName and organizationShortName as its arguments.
+// getClusterInfoFromName takes clusterName and org as its arguments.
 // It returns the clusterID and list of nodepools if the cluster is found in the organization.
 // It returns an errClusterNotFound if the cluster does not exist in the organization.
-func getClusterInfoFromName(clusterName, organizationShortName string, coreClient astrocore.CoreClient) (string, []astrocore.NodePool, error) {
+func getClusterInfoFromName(clusterName, org string, coreClient astrocore.CoreClient) (string, []astrocore.NodePool, error) {
 	var (
 		existingClusters []astrocore.Cluster
 		err              error
 	)
 
-	existingClusters, err = organization.ListClusters(organizationShortName, coreClient)
+	existingClusters, err = organization.ListClusters(org, coreClient)
 	if err != nil {
 		return "", nil, err
 	}
@@ -440,7 +440,7 @@ func getClusterInfoFromName(clusterName, organizationShortName string, coreClien
 			return cluster.Id, cluster.NodePools, nil
 		}
 	}
-	err = fmt.Errorf("cluster_name: %s %w in organization: %s", clusterName, errNotFound, organizationShortName)
+	err = fmt.Errorf("cluster_name: %s %w in organization: %s", clusterName, errNotFound, org)
 	return "", nil, err
 }
 
