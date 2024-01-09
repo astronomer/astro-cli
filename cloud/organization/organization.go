@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 	"strconv"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
@@ -180,18 +182,51 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 }
 
 // Write the audit logs to the provided io.Writer.
-func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earliest int) error {
-	logStreamBuffer, err := client.GetOrganizationAuditLogs(orgName, earliest)
+func ExportAuditLogs(coreClient astrocore.CoreClient, out io.Writer, orgName string, earliest int) error {
+	var orgID string
+	if orgName == "" {
+		// get current context
+		c, err := context.GetCurrentContext()
+		if err != nil {
+			return err
+		}
+		orgID = c.Organization
+	}
+
+	earliestString := fmt.Sprint(earliest)
+	organizationAuditLogsParams := &astrocore.GetOrganizationAuditLogsParams{
+		Earliest: &earliestString,
+	}
+	resp, err := coreClient.GetOrganizationAuditLogsWithResponse(http_context.Background(), orgID, organizationAuditLogsParams)
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(out, logStreamBuffer)
+	err = astroplatformcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		logStreamBuffer.Close()
 		return err
 	}
-	logStreamBuffer.Close()
+
+	err = ioutil.WriteFile("audit-logs.gz", resp.Body, os.ModePerm)
+	if err != nil {
+		return err
+	}
 	fmt.Println("Finished exporting logs to local GZIP file")
+	return nil
+}
+
+func saveToFile(data []int, filePath string) error {
+	// Convert []int to []byte
+	byteData := make([]byte, len(data))
+	for i, v := range data {
+		byteData[i] = byte(v)
+	}
+
+	// Write the binary data to a file
+	err := ioutil.WriteFile(filePath, byteData, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
