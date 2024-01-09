@@ -356,8 +356,6 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		}
 	}
 
-	start := time.Now()
-
 	// Generate the dags tar
 	err = fileutil.Tar(dagsPath, dagsParentPath)
 	if err != nil {
@@ -375,9 +373,6 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 	if cleanUpFiles {
 		defer os.Remove(dagsParentPath + "/dags.tar.gz")
 	}
-
-	end := time.Now()
-	fmt.Println("Time taken to create tar.gz file: ", end.Sub(start))
 
 	return fileutil.UploadFile(dagsParentPath+"/dags.tar.gz", uploadURL, "file1")
 }
