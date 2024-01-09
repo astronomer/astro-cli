@@ -572,6 +572,51 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		defer os.Remove(destFilePath)
 	})
 
+	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. Tar creation throws an error", func(t *testing.T) {
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			ReleaseName:   "testReleaseName",
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "y")()
+
+		err = DagsOnlyDeploy(houstonMock, appConfig, deploymentID, "./dags", nil, false)
+		assert.EqualError(t, err, "open dags/dags.tar: no such file or directory")
+
+		// assert that no tar or gz file exists
+		_, err = os.Stat("./dags.tar")
+		assert.True(t, os.IsNotExist(err))
+		_, err = os.Stat("./dags.tar.gz")
+		assert.True(t, os.IsNotExist(err))
+	})
+
 	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. No need of User confirmation", func(t *testing.T) {
 		featureFlags := &houston.FeatureFlags{
 			DagOnlyDeployment: true,
