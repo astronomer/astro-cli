@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -113,11 +112,7 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 			return organizationExportAuditLogs(cmd)
 		},
 	}
-	cmd.PersistentFlags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for.")
-	err := cmd.MarkPersistentFlagRequired("organization-name")
-	if err != nil {
-		log.Fatalf("Error marking organization-name flag as required in astro Organization audit-logs command: %s", err.Error())
-	}
+	cmd.Flags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for.")
 	cmd.Flags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
 	cmd.Flags().IntVarP(&auditLogsEarliestParam, "include", "i", auditLogsEarliestParamDefaultValue,
 		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90.")
@@ -223,7 +218,7 @@ func organizationExportAuditLogs(cmd *cobra.Command) error {
 	}
 	out := bufio.NewWriter(f)
 	fmt.Println("This may take some time depending on how many days are being exported.")
-	return orgExportAuditLogs(astroClient, out, orgName, auditLogsEarliestParam)
+	return orgExportAuditLogs(astroCoreClient, out, orgName, auditLogsEarliestParam)
 }
 
 func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
