@@ -1,14 +1,13 @@
 package auth
 
 import (
-	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/config"
 )
 
 // higher order functions to facilate writing unit test cases
 type (
-	RequestToken             func(authConfig astro.AuthConfig, verifier, code string) (Result, error)
-	RequestUserInfo          func(authConfig astro.AuthConfig, accessToken string) (UserInfo, error)
+	RequestToken             func(authConfig AuthConfig, verifier, code string) (Result, error)
+	RequestUserInfo          func(authConfig AuthConfig, accessToken string) (UserInfo, error)
 	AuthorizeCallbackHandler func() (string, error)
 )
 

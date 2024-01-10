@@ -193,7 +193,7 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationNameOrID = args[0]
 	}
 
-	return orgSwitch(organizationNameOrID, astroClient, astroCoreClient, platformCoreClient, out, shouldDisplayLoginLink)
+	return orgSwitch(organizationNameOrID, astroCoreClient, platformCoreClient, out, shouldDisplayLoginLink)
 }
 
 func organizationExportAuditLogs(cmd *cobra.Command) error {

@@ -17,7 +17,6 @@ import (
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/workspace"
@@ -64,7 +63,14 @@ var authenticator = Authenticator{
 	callbackHandler:   authorizeCallbackHandler,
 }
 
-func requestUserInfo(authConfig astro.AuthConfig, accessToken string) (UserInfo, error) {
+// AuthConfig holds data related to oAuth and basic authentication
+type AuthConfig struct {
+	ClientID  string `json:"clientId"`
+	Audience  string `json:"audience"`
+	DomainURL string `json:"domainUrl"`
+}
+
+func requestUserInfo(authConfig AuthConfig, accessToken string) (UserInfo, error) {
 	addr := authConfig.DomainURL + "userinfo"
 	ctx := http_context.Background()
 	doOptions := &httputil.DoOptions{
@@ -92,7 +98,7 @@ func requestUserInfo(authConfig astro.AuthConfig, accessToken string) (UserInfo,
 
 // request a device code from auth0 for the user's cli
 // Get user's token using PKCE flow
-func requestToken(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
+func requestToken(authConfig AuthConfig, verifier, code string) (Result, error) {
 	addr := authConfig.DomainURL + "oauth/token"
 	data := url.Values{
 		"client_id":     {authConfig.ClientID},
@@ -179,7 +185,7 @@ func authorizeCallbackHandler() (string, error) {
 	return authorizationCode, nil
 }
 
-func (a *Authenticator) authDeviceLogin(authConfig astro.AuthConfig, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(authConfig AuthConfig, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
 	// Generate PKCE verifier and challenge
 	token := make([]byte, 32)                            //nolint:gomnd
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
@@ -254,7 +260,7 @@ func switchToLastUsedWorkspace(c *config.Context, workspaces []astrocore.Workspa
 }
 
 // check client status after a successfully login
-func CheckUserSession(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	// fetch self user based on token
 	// we set CreateIfNotExist to true so we always create astro user when a successfully login
 	createIfNotExist := true
@@ -339,7 +345,7 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+func Login(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = domainutil.FormatDomain(domain)
 	authConfig, err := FetchDomainAuthConfig(domain)
@@ -393,7 +399,7 @@ func Login(domain, token string, client astro.Client, coreClient astrocore.CoreC
 
 	fmt.Printf("Logging in as %s\n", ansi.Green(res.UserEmail))
 
-	err = CheckUserSession(&c, client, coreClient, platformCoreClient, out)
+	err = CheckUserSession(&c, coreClient, platformCoreClient, out)
 	if err != nil {
 		return err
 	}
@@ -425,9 +431,9 @@ func Logout(domain string, out io.Writer) {
 	fmt.Fprintln(out, "Successfully logged out of Astronomer")
 }
 
-func FetchDomainAuthConfig(domain string) (astro.AuthConfig, error) {
+func FetchDomainAuthConfig(domain string) (AuthConfig, error) {
 	var (
-		authConfig  astro.AuthConfig
+		authConfig  AuthConfig
 		addr        string
 		validDomain bool
 	)

@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
@@ -19,6 +18,10 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+)
+
+const (
+	AstronomerConnectionErrMsg = "cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions. If you are using an API Key or Token make sure your context is correct.\n\nDetails"
 )
 
 var (
@@ -62,7 +65,7 @@ func List(out io.Writer, platformCoreClient astroplatformcore.CoreClient) error 
 	}
 	or, err := ListOrganizations(platformCoreClient)
 	if err != nil {
-		return fmt.Errorf(astro.AstronomerConnectionErrMsg+"%w", err)
+		return fmt.Errorf(AstronomerConnectionErrMsg+"%w", err)
 	}
 	tab := newTableOut()
 	for i := range or {
@@ -120,7 +123,7 @@ func getOrganizationSelection(out io.Writer, platformCoreClient astroplatformcor
 	return &selected, nil
 }
 
-func SwitchWithContext(domain string, targetOrg *astroplatformcore.Organization, astroClient astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+func SwitchWithContext(domain string, targetOrg *astroplatformcore.Organization, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	c, _ := context.GetCurrentContext()
 
 	// reset org context
@@ -135,7 +138,7 @@ func SwitchWithContext(domain string, targetOrg *astroplatformcore.Organization,
 	_ = c.SetContextKey("user_email", c.UserEmail)
 	c, _ = context.GetCurrentContext()
 	// call check user session which will trigger workspace switcher flow
-	err := CheckUserSession(&c, astroClient, coreClient, platformCoreClient, out)
+	err := CheckUserSession(&c, coreClient, platformCoreClient, out)
 	if err != nil {
 		return err
 	}
@@ -144,7 +147,7 @@ func SwitchWithContext(domain string, targetOrg *astroplatformcore.Organization,
 }
 
 // Switch switches organizations
-func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+func Switch(orgNameOrID string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	// get current context
 	c, err := context.GetCurrentContext()
 	if err != nil {
@@ -180,7 +183,7 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 		fmt.Fprintln(out, "You selected the same organization as the current one. No switch was made")
 		return nil
 	}
-	return SwitchWithContext(c.Domain, targetOrg, astroClient, coreClient, platformCoreClient, out)
+	return SwitchWithContext(c.Domain, targetOrg, coreClient, platformCoreClient, out)
 }
 
 // Write the audit logs to the provided io.Writer.

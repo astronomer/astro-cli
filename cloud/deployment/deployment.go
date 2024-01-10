@@ -144,7 +144,7 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 		workspaceID := d.WorkspaceId
 		region := notApplicable
 		cloudProvider := notApplicable
-		if IsDeploymentStandard(*d.Type) || IsDeploymentDedicated(*d.Type) {
+		if IsDeploymentStandard(*d.Type) {
 			region = *d.Region
 			cloudProvider = *d.CloudProvider
 		}
