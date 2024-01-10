@@ -1,15 +1,12 @@
 package cloud
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/astronomer/astro-cli/pkg/printutil"
 
@@ -203,22 +200,9 @@ func organizationExportAuditLogs(cmd *cobra.Command) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	var outputFileName string
-	if auditLogsOutputFilePath != "" {
-		outputFileName = auditLogsOutputFilePath
-	} else {
-		outputFileName = fmt.Sprintf("audit-logs-%s.ndjson.gz", time.Now().Format("2006-01-02-150405"))
-	}
-
-	var filePerms fs.FileMode = 0o755
-	// In CLI mode we should not need to close f
-	f, err := os.OpenFile(outputFileName, os.O_RDWR|os.O_CREATE, filePerms)
-	if err != nil {
-		return err
-	}
-	out := bufio.NewWriter(f)
 	fmt.Println("This may take some time depending on how many days are being exported.")
-	return orgExportAuditLogs(astroCoreClient, out, orgName, auditLogsEarliestParam)
+	return orgExportAuditLogs(astroCoreClient, platformCoreClient,
+		orgName, auditLogsOutputFilePath, auditLogsEarliestParam)
 }
 
 func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {

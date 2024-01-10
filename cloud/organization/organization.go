@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -182,7 +184,7 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 }
 
 // Write the audit logs to the provided io.Writer.
-func ExportAuditLogs(coreClient astrocore.CoreClient, out io.Writer, orgName string, earliest int) error {
+func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, orgName, filePath string, earliest int) error {
 	var orgID string
 	if orgName == "" {
 		// get current context
@@ -191,9 +193,30 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, out io.Writer, orgName str
 			return err
 		}
 		orgID = c.Organization
+		orgName = c.OrganizationShortName
+	} else {
+		or, err := ListOrganizations(platformCoreClient)
+		if err != nil {
+			return err
+		}
+		for i := range or {
+			if orgName == or[i].Name {
+				orgID = or[i].Id
+			}
+		}
+		if orgID == "" {
+			return errInvalidOrganizationName
+		}
+	}
+	earliestString := fmt.Sprint(earliest)
+	if filePath == "" {
+		orgShortName := strings.ReplaceAll(strings.ToLower(orgName), " ", "")
+
+		currentTime := time.Now()
+		date := "-" + currentTime.Format("20060102")
+		filePath = fmt.Sprintf("%s-logs-%d-day%s%s.ndjson.gz", orgShortName, earliest, pluralize(earliest), date)
 	}
 
-	earliestString := fmt.Sprint(earliest)
 	organizationAuditLogsParams := &astrocore.GetOrganizationAuditLogsParams{
 		Earliest: &earliestString,
 	}
@@ -206,12 +229,20 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, out io.Writer, orgName str
 		return err
 	}
 
-	err = ioutil.WriteFile("audit-logs.gz", resp.Body, os.ModePerm)
+	err = ioutil.WriteFile(filePath, resp.Body, os.ModePerm)
 	if err != nil {
 		return err
 	}
+
 	fmt.Println("Finished exporting logs to local GZIP file")
 	return nil
+}
+
+func pluralize(count int) string {
+	if count > 1 {
+		return "s"
+	}
+	return ""
 }
 
 func saveToFile(data []int, filePath string) error {
