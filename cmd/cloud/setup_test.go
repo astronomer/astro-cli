@@ -10,10 +10,8 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -35,7 +33,7 @@ func TestSetup(t *testing.T) {
 		cmd := &cobra.Command{Use: "login"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
-		err = Setup(cmd, nil, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -47,7 +45,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -64,11 +62,11 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -85,11 +83,11 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -101,7 +99,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -113,7 +111,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -125,7 +123,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -137,7 +135,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "context"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -149,7 +147,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "completion"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -165,11 +163,11 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "deployment"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -185,11 +183,11 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil, nil)
+		err = Setup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -219,7 +217,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -240,7 +238,7 @@ func TestSetup(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		err = Setup(cmd, nil, mockPlatformCoreClient, mockCoreClient)
+		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
@@ -268,7 +266,7 @@ func TestCheckAPIKeys(t *testing.T) {
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -306,20 +304,20 @@ func TestCheckAPIKeys(t *testing.T) {
 func TestCheckToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("test check token", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		// run checkToken
-		err := checkToken(mockClient, mockCoreClient, mockPlatformCoreClient, nil)
+		err := checkToken(mockCoreClient, mockPlatformCoreClient, nil)
 		assert.NoError(t, err)
 	})
 
 	t.Run("trigger login when no token is found", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return errorLogin
 		}
 
@@ -327,7 +325,7 @@ func TestCheckToken(t *testing.T) {
 		assert.NoError(t, err)
 		ctx.SetContextKey("token", "")
 		// run checkToken
-		err = checkToken(mockClient, mockCoreClient, mockPlatformCoreClient, nil)
+		err = checkToken(mockCoreClient, mockPlatformCoreClient, nil)
 		assert.Contains(t, err.Error(), "failed to login")
 	})
 }
@@ -355,7 +353,7 @@ func TestCheckAPIToken(t *testing.T) {
 			Permissions: permissions,
 		}
 
-		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -383,7 +381,7 @@ func TestCheckAPIToken(t *testing.T) {
 			Permissions: permissions,
 		}
 
-		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 

@@ -9,12 +9,10 @@ import (
 	"os"
 	"testing"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
-	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
@@ -161,39 +159,36 @@ func TestSwitch(t *testing.T) {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("successful switch with name", func(t *testing.T) {
-		mockGQLClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
-		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, corePlatformClient astroplatformcore.CoreClient, out io.Writer) error {
+		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, corePlatformClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("org1", mockGQLClient, mockCoreClient, mockPlatformCoreClient, buf, false)
+		err := Switch("org1", mockCoreClient, mockPlatformCoreClient, buf, false)
 		assert.NoError(t, err)
 		assert.Equal(t, "\nSuccessfully switched organization\n", buf.String())
 		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("switching to a current organization", func(t *testing.T) {
-		mockGQLClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := Switch("org1", mockGQLClient, mockCoreClient, mockPlatformCoreClient, buf, false)
+		err := Switch("org1", mockCoreClient, mockPlatformCoreClient, buf, false)
 		assert.NoError(t, err)
 		assert.Equal(t, "You selected the same organization as the current one. No switch was made\n", buf.String())
 		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("successful switch without name", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
-		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
 		// mock os.Stdin
@@ -212,31 +207,29 @@ func TestSwitch(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 		buf := new(bytes.Buffer)
-		err = Switch("", mockClient, mockCoreClient, mockPlatformCoreClient, buf, false)
+		err = Switch("", mockCoreClient, mockPlatformCoreClient, buf, false)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failed switch wrong name", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
-		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("name-wrong", mockClient, mockCoreClient, mockPlatformCoreClient, buf, false)
+		err := Switch("name-wrong", mockCoreClient, mockPlatformCoreClient, buf, false)
 		assert.ErrorIs(t, err, errInvalidOrganizationName)
 		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failed switch bad selection", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
-		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
 		// mock os.Stdin
@@ -255,7 +248,7 @@ func TestSwitch(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 		buf := new(bytes.Buffer)
-		err = Switch("", mockClient, mockCoreClient, mockPlatformCoreClient, buf, false)
+		err = Switch("", mockCoreClient, mockPlatformCoreClient, buf, false)
 		assert.ErrorIs(t, err, errInvalidOrganizationKey)
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -271,15 +264,14 @@ func TestSwitch(t *testing.T) {
 				},
 			},
 		}
-		mockGQLClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
-		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("org1", mockGQLClient, mockCoreClient, mockPlatformCoreClient, buf, false)
+		err := Switch("org1", mockCoreClient, mockPlatformCoreClient, buf, false)
 		assert.NoError(t, err)
 		assert.Equal(t, "\nSuccessfully switched organization\n", buf.String())
 		mockCoreClient.AssertExpectations(t)

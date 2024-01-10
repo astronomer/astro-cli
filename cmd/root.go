@@ -9,7 +9,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/registry"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
@@ -44,7 +43,6 @@ func NewRootCmd() *cobra.Command {
 	houstonClient = houston.NewClient(httpClient)
 
 	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
-	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
 	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
 	platformCoreClient := astroplatformcore.NewPlatformCoreClient(httputil.NewHTTPClient())
 
@@ -83,7 +81,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 				}
 			}
 			if isCloudCtx {
-				err = cloudCmd.Setup(cmd, astroClient, platformCoreClient, astroCoreClient)
+				err = cloudCmd.Setup(cmd, platformCoreClient, astroCoreClient)
 				if err != nil {
 					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 				}
@@ -99,7 +97,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	}
 
 	rootCmd.AddCommand(
-		newLoginCommand(astroClient, astroCoreClient, platformCoreClient, os.Stdout),
+		newLoginCommand(astroCoreClient, platformCoreClient, os.Stdout),
 		newLogoutCommand(os.Stdout),
 		newVersionCommand(),
 		newDevRootCmd(platformCoreClient, astroCoreClient),
@@ -110,7 +108,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			cloudCmd.AddCmds(astroClient, platformCoreClient, astroCoreClient, airflowClient, os.Stdout)...,
+			cloudCmd.AddCmds(platformCoreClient, astroCoreClient, airflowClient, os.Stdout)...,
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(

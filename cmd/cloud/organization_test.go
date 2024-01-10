@@ -13,7 +13,6 @@ import (
 
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/astronomer/astro-cli/cloud/user"
@@ -74,7 +73,7 @@ func TestOrganizationList(t *testing.T) {
 }
 
 func TestOrganizationSwitch(t *testing.T) {
-	orgSwitch = func(orgName string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+	orgSwitch = func(orgName string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 		return nil
 	}
 
@@ -86,7 +85,7 @@ func TestOrganizationSwitch(t *testing.T) {
 func TestOrganizationExportAuditLogs(t *testing.T) {
 	// turn on audit logs
 	config.CFG.AuditLogs.SetHomeString("true")
-	orgExportAuditLogs = func(client astro.Client, out io.Writer, orgName string, earliest int) error {
+	orgExportAuditLogs = func(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, orgName, filePath string, earliest int) error {
 		return nil
 	}
 
