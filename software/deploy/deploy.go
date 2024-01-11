@@ -376,5 +376,11 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		defer os.Remove(dagsParentPath + "/dags.tar.gz")
 	}
 
-	return fileutil.UploadFile(dagsParentPath+"/dags.tar.gz", uploadURL, "file1")
+	c, _ := config.GetCurrentContext()
+
+	headers := map[string]string{
+		"authorization": c.Token,
+	}
+
+	return fileutil.UploadFile(dagsParentPath+"/dags.tar.gz", uploadURL, "file", headers)
 }

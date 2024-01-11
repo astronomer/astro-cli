@@ -242,7 +242,7 @@ func CreateFile(p string) (*os.File, error) {
 	return os.Create(p)
 }
 
-func UploadFile(filePath, targetURL, formFileFieldName string) error {
+func UploadFile(filePath, targetURL, formFileFieldName string, headers map[string]string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("error opening file: %w", err)
@@ -268,8 +268,22 @@ func UploadFile(filePath, targetURL, formFileFieldName string) error {
 	// Close the multipart writer to finalize the request
 	writer.Close()
 
-	// Make a POST request with the multipart/form-data content
-	response, err := http.Post(targetURL, writer.FormDataContentType(), body) //nolint
+	req, err := http.NewRequest("POST", targetURL, body)
+	if err != nil {
+		return err
+	}
+
+	headers["Content-Type"] = writer.FormDataContentType()
+
+	// set headers
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	// Perform the request
+	client := &http.Client{}
+	response, err := client.Do(req)
+
 	if err != nil {
 		return fmt.Errorf("error making POST request: %w", err)
 	}
