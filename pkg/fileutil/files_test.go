@@ -1,7 +1,13 @@
 package fileutil
 
 import (
+	"bytes"
+	"compress/gzip"
+	http_context "context"
+	"io"
 	f "io/fs"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -424,4 +430,217 @@ func TestRemoveLineFromFile(t *testing.T) {
 			assert.ErrorIs(t, err, errMock)
 		})
 	}
+}
+
+func TestGzipFile(t *testing.T) {
+	t.Run("source file not found", func(t *testing.T) {
+		err := GzipFile("non-existent-file.txt", "./zipped.txt.gz")
+		assert.EqualError(t, err, "open non-existent-file.txt: no such file or directory")
+	})
+
+	t.Run("destination file error", func(t *testing.T) {
+		// Create a temporary source file
+		srcContent := []byte("This is a test file.")
+		srcFilePath := "./testFileForTestGzipFile.txt"
+		err := os.WriteFile(srcFilePath, srcContent, os.ModePerm)
+		assert.NoError(t, err)
+		defer os.Remove(srcFilePath)
+
+		err = GzipFile(srcFilePath, "/invalidPath/zipped.txt.gz")
+		assert.EqualError(t, err, "open /invalidPath/zipped.txt.gz: no such file or directory")
+	})
+
+	t.Run("successful gzip", func(t *testing.T) {
+		// Create a temporary source file
+		srcContent := []byte("This is a test file.")
+		srcFilePath := "./testFileForTestGzipFile.txt"
+		err := os.WriteFile(srcFilePath, srcContent, os.ModePerm)
+		assert.NoError(t, err)
+		defer os.Remove(srcFilePath)
+
+		destFilePath := "./zipped.txt.gz"
+		err = GzipFile(srcFilePath, destFilePath)
+		assert.NoError(t, err)
+		defer os.Remove(destFilePath)
+
+		// Create the expected content
+		expectedContent := new(bytes.Buffer)
+		gzipWriter := gzip.NewWriter(expectedContent)
+		_, err = gzipWriter.Write(srcContent)
+		assert.NoError(t, err, "Error writing to gzip buffer")
+		gzipWriter.Close()
+
+		// Check if the destination file has the expected content
+		actualContent, err := os.ReadFile(destFilePath)
+		assert.NoError(t, err, "Error reading gZipped file")
+		assert.True(t, bytes.Equal(expectedContent.Bytes(), actualContent), "GZipped file content does not match expected")
+
+		// Check if the gZipped file is a valid gzip file
+		destFile, err := os.Open(destFilePath)
+		assert.NoError(t, err, "Error opening gZipped file")
+		defer destFile.Close()
+		gzipReader, err := gzip.NewReader(destFile)
+		assert.NoError(t, err, "Error creating gzip reader")
+		defer gzipReader.Close()
+
+		// Read the content from the gzip reader
+		actualGZippedContent, err := io.ReadAll(gzipReader)
+		assert.NoError(t, err, "Error reading gZipped file with gzip reader")
+		assert.True(t, bytes.Equal(srcContent, actualGZippedContent), "Unzipped content does not match original")
+	})
+}
+
+func createMockServer(statusCode int, responseBody string, headers map[string][]string) *httptest.Server {
+	handler := &testHandler{
+		StatusCode:   statusCode,
+		ResponseBody: responseBody,
+		Headers:      headers,
+	}
+	return httptest.NewServer(handler)
+}
+
+func getCapturedRequest(server *httptest.Server) *http.Request {
+	handler, ok := server.Config.Handler.(*testHandler)
+	if !ok {
+		panic("Unexpected server handler type")
+	}
+	return handler.Request
+}
+
+type testHandler struct {
+	StatusCode   int
+	ResponseBody string
+	Headers      map[string][]string
+	Request      *http.Request
+}
+
+func (h *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.Request = r
+	w.WriteHeader(h.StatusCode)
+	for key, values := range h.Headers {
+		w.Header()[key] = values
+	}
+	w.Write([]byte(h.ResponseBody))
+}
+
+func TestUploadFile(t *testing.T) {
+	t.Run("attempt to upload a non-existent file", func(t *testing.T) {
+		err := UploadFile("non-existent-file.txt", "http://localhost:8080/upload", "file1", map[string]string{})
+		assert.EqualError(t, err, "error opening file: open non-existent-file.txt: no such file or directory")
+	})
+
+	t.Run("io copy throws an error", func(t *testing.T) {
+		ioCopyError := errors.New("mock error")
+
+		ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
+			return 0, ioCopyError
+		}
+
+		// Create a temporary file with some content for testing
+		filePath := "./testFile.txt"
+		fileContent := []byte("This is a test file.")
+		err := os.WriteFile(filePath, fileContent, os.ModePerm)
+		assert.NoError(t, err, "Error creating test file")
+		defer os.Remove(filePath)
+
+		err = UploadFile(filePath, "testURL", "file1", map[string]string{})
+		assert.ErrorIs(t, err, ioCopyError)
+
+		ioCopy = io.Copy
+	})
+
+	t.Run("newRequestWithContext throws an error", func(t *testing.T) {
+		requestError := errors.New("mock error")
+		newRequestWithContext = func(ctx http_context.Context, method, url string, body io.Reader) (*http.Request, error) {
+			return nil, requestError
+		}
+		// Create a temporary file with some content for testing
+		filePath := "./testFile.txt"
+		fileContent := []byte("This is a test file.")
+		err := os.WriteFile(filePath, fileContent, os.ModePerm)
+		assert.NoError(t, err, "Error creating test file")
+		defer os.Remove(filePath)
+
+		err = UploadFile(filePath, "testURL", "file1", map[string]string{})
+		assert.ErrorIs(t, err, requestError)
+
+		newRequestWithContext = http.NewRequestWithContext
+	})
+
+	t.Run("uploaded the file but got non-OK response", func(t *testing.T) {
+		// Prepare a test server to respond with a non-OK status code
+		server := createMockServer(http.StatusInternalServerError, "Internal Server Error", make(map[string][]string))
+		defer server.Close()
+
+		// Create a temporary file with some content for testing
+		filePath := "./testFile.txt"
+		fileContent := []byte("This is a test file.")
+		err := os.WriteFile(filePath, fileContent, os.ModePerm)
+		assert.NoError(t, err, "Error creating test file")
+		defer os.Remove(filePath)
+
+		headers := map[string]string{
+			"Authorization": "Bearer token",
+			"Content-Type":  "application/json",
+		}
+
+		// Execute the function under test
+		err = UploadFile(filePath, server.URL, "file1", headers)
+
+		// Assert the error is as expected
+		assert.EqualError(t, err, "file upload failed. Status code: 500 and Message: Internal Server Error")
+	})
+
+	t.Run("error making POST request due to invalid URL", func(t *testing.T) {
+		// Prepare a test server to capture the request
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Assert the request method is POST
+			assert.Equal(t, http.MethodPost, r.Method)
+
+			// Assert the correct form field name
+			err := r.ParseMultipartForm(10 << 20) // 10 MB
+			assert.NoError(t, err, "Error parsing multipart form")
+			assert.NotNil(t, r.MultipartForm.File["file1"], "Form file not found in request")
+
+			// Respond with a success status code
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		// Create a temporary file with some content for testing
+		filePath := "./testFile.txt"
+		fileContent := []byte("This is a test file.")
+		err := os.WriteFile(filePath, fileContent, os.ModePerm)
+		assert.NoError(t, err, "Error creating test file")
+		defer os.Remove(filePath)
+
+		err = UploadFile(filePath, "https://astro.unit.test", "file1", map[string]string{})
+		assert.ErrorContains(t, err, "astro.unit.test")
+	})
+
+	t.Run("successfully uploaded the file", func(t *testing.T) {
+		// Prepare a test server to capture the request
+		server := createMockServer(http.StatusOK, "OK", make(map[string][]string))
+		defer server.Close()
+
+		// Create a temporary file with some content for testing
+		filePath := "./testFile.txt"
+		fileContent := []byte("This is a test file.")
+		err := os.WriteFile(filePath, fileContent, os.ModePerm)
+		assert.NoError(t, err, "Error creating test file")
+		defer os.Remove(filePath)
+
+		headers := map[string]string{
+			"Authorization": "Bearer token",
+			"Content-Type":  "application/json",
+		}
+
+		err = UploadFile(filePath, server.URL, "file1", headers)
+		assert.NoError(t, err, "Expected no error")
+
+		// assert the received headers
+		request := getCapturedRequest(server)
+		assert.Equal(t, "Bearer token", request.Header.Get("Authorization"))
+		assert.Contains(t, request.Header.Get("Content-Type"), "multipart/form-data")
+	})
 }

@@ -635,7 +635,7 @@ func deploymentFromName(existingDeployments []astroplatformcore.Deployment, depl
 	return astroplatformcore.Deployment{}
 }
 
-// getClusterInfoFromName takes clusterName and organizationShortName as its arguments.
+// getClusterInfoFromName takes clusterName and org as its arguments.
 // It returns the clusterID and list of nodepools if the cluster is found in the organization.
 // It returns an errClusterNotFound if the cluster does not exist in the organization.
 func getClusterInfoFromName(clusterName, organizationShortName string, platformCoreClient astroplatformcore.CoreClient) (string, []astroplatformcore.NodePool, error) {
@@ -654,7 +654,7 @@ func getClusterInfoFromName(clusterName, organizationShortName string, platformC
 			return cluster.Id, *cluster.NodePools, nil
 		}
 	}
-	err = fmt.Errorf("cluster_name: %s %w in organization: %s", clusterName, errNotFound, organizationShortName)
+	err = fmt.Errorf("cluster_name: %s %w in organization: %s", clusterName, errNotFound, org)
 	return "", nil, err
 }
 
