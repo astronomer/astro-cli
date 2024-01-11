@@ -390,7 +390,7 @@ func TestGetDeployment(t *testing.T) {
 			name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement,
 			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
-			corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
+			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
 			return errMock
 		}
@@ -425,7 +425,7 @@ func TestGetDeployment(t *testing.T) {
 		createDeployment = func(
 			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
-			corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
+			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
 			return nil
 		}
@@ -464,7 +464,7 @@ func TestGetDeployment(t *testing.T) {
 			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement,
 			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
-			corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
+			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
 			return nil
 		}

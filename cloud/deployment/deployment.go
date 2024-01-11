@@ -217,7 +217,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
 	var dagDeployEnabled bool
@@ -289,7 +289,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 
 	// select and validate cluster
 	if !IsDeploymentStandard(deploymentType) {
-		clusterID, err = selectCluster(clusterID, c.Organization, corePlatformClient)
+		clusterID, err = selectCluster(clusterID, c.Organization, platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -439,7 +439,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	}
 	// build hybrid input
 	if !IsDeploymentStandard(deploymentType) && !IsDeploymentDedicated(deploymentType) {
-		cluster, err := CoreGetCluster("", clusterID, corePlatformClient)
+		cluster, err := CoreGetCluster("", clusterID, platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -498,13 +498,13 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 	}
 
-	d, err := CoreCreateDeployment(organizationID, createDeploymentRequest, corePlatformClient)
+	d, err := CoreCreateDeployment(organizationID, createDeploymentRequest, platformCoreClient)
 	if err != nil {
 		return err
 	}
 
 	if waitForStatus {
-		err = HealthPoll(d.Id, workspaceID, sleepTime, tickNum, timeoutNum, corePlatformClient)
+		err = HealthPoll(d.Id, workspaceID, sleepTime, tickNum, timeoutNum, platformCoreClient)
 		if err != nil {
 			errOutput := createOutput(workspaceID, &d)
 			if errOutput != nil {
@@ -641,14 +641,14 @@ func selectRegion(cloudProvider, region string, coreClient astrocore.CoreClient)
 	return region, nil
 }
 
-func selectCluster(clusterID, organizationID string, corePlatformClient astroplatformcore.CoreClient) (newClusterID string, err error) {
+func selectCluster(clusterID, organizationID string, platformCoreClient astroplatformcore.CoreClient) (newClusterID string, err error) {
 	clusterTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
 		Header:         []string{"#", "CLUSTER NAME", "CLOUD PROVIDER", "CLUSTER ID"},
 	}
 
-	cs, err := organization.ListClusters(organizationID, corePlatformClient)
+	cs, err := organization.ListClusters(organizationID, platformCoreClient)
 	if err != nil {
 		return "", err
 	}
@@ -687,7 +687,7 @@ func selectCluster(clusterID, organizationID string, corePlatformClient astropla
 	return clusterID, nil
 }
 
-func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, corePlatformClient astroplatformcore.CoreClient) error {
+func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, platformCoreClient astroplatformcore.CoreClient) error {
 	fmt.Printf("\nWaiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
 	time.Sleep(time.Duration(sleepTime) * time.Second)
 	buf := new(bytes.Buffer)
@@ -702,7 +702,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, cor
 		case <-ticker.C:
 			buf.Reset()
 			// get core deployment
-			currentDeployment, err := CoreGetDeployment("", deploymentID, corePlatformClient)
+			currentDeployment, err := CoreGetDeployment("", deploymentID, platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -1162,7 +1162,7 @@ func IsDeploymentDedicated(deploymentType astroplatformcore.DeploymentType) bool
 	return deploymentType == astroplatformcore.DeploymentTypeDEDICATED
 }
 
-var CoreGetDeployments = func(ws, orgID string, corePlatformClient astroplatformcore.CoreClient) ([]astroplatformcore.Deployment, error) {
+var CoreGetDeployments = func(ws, orgID string, platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1175,7 +1175,7 @@ var CoreGetDeployments = func(ws, orgID string, corePlatformClient astroplatform
 		deploymentListParams.WorkspaceIds = &[]string{ws}
 	}
 
-	resp, err := corePlatformClient.ListDeploymentsWithResponse(context.Background(), orgID, deploymentListParams)
+	resp, err := platformCoreClient.ListDeploymentsWithResponse(context.Background(), orgID, deploymentListParams)
 	if err != nil {
 		return []astroplatformcore.Deployment{}, err
 	}
@@ -1191,7 +1191,7 @@ var CoreGetDeployments = func(ws, orgID string, corePlatformClient astroplatform
 }
 
 //nolint:dupl
-var CoreGetCluster = func(orgID, clusterID string, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Cluster, error) {
+var CoreGetCluster = func(orgID, clusterID string, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.Cluster, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1200,7 +1200,7 @@ var CoreGetCluster = func(orgID, clusterID string, corePlatformClient astroplatf
 		orgID = c.Organization
 	}
 
-	resp, err := corePlatformClient.GetClusterWithResponse(context.Background(), orgID, clusterID)
+	resp, err := platformCoreClient.GetClusterWithResponse(context.Background(), orgID, clusterID)
 	if err != nil {
 		return astroplatformcore.Cluster{}, err
 	}
@@ -1215,7 +1215,7 @@ var CoreGetCluster = func(orgID, clusterID string, corePlatformClient astroplatf
 }
 
 //nolint:dupl
-var CoreGetDeployment = func(orgID, deploymentID string, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+var CoreGetDeployment = func(orgID, deploymentID string, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1224,7 +1224,7 @@ var CoreGetDeployment = func(orgID, deploymentID string, corePlatformClient astr
 		orgID = c.Organization
 	}
 
-	resp, err := corePlatformClient.GetDeploymentWithResponse(context.Background(), orgID, deploymentID)
+	resp, err := platformCoreClient.GetDeploymentWithResponse(context.Background(), orgID, deploymentID)
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
 	}
@@ -1239,7 +1239,7 @@ var CoreGetDeployment = func(orgID, deploymentID string, corePlatformClient astr
 }
 
 // CoreCreateDeployment creates a deployment with the core API
-var CoreCreateDeployment = func(orgID string, createDeploymentRequest astroplatformcore.CreateDeploymentJSONRequestBody, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+var CoreCreateDeployment = func(orgID string, createDeploymentRequest astroplatformcore.CreateDeploymentJSONRequestBody, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1248,7 +1248,7 @@ var CoreCreateDeployment = func(orgID string, createDeploymentRequest astroplatf
 		orgID = c.Organization
 	}
 
-	resp, err := corePlatformClient.CreateDeploymentWithResponse(context.Background(), orgID, createDeploymentRequest)
+	resp, err := platformCoreClient.CreateDeploymentWithResponse(context.Background(), orgID, createDeploymentRequest)
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
 	}
@@ -1263,7 +1263,7 @@ var CoreCreateDeployment = func(orgID string, createDeploymentRequest astroplatf
 }
 
 // CoreUpdateDeployment updates a deployment with the core API
-var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequest astroplatformcore.UpdateDeploymentJSONRequestBody, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequest astroplatformcore.UpdateDeploymentJSONRequestBody, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1271,7 +1271,7 @@ var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequ
 		}
 		orgID = c.Organization
 	}
-	resp, err := corePlatformClient.UpdateDeploymentWithResponse(context.Background(), orgID, deploymentID, updateDeploymentRequest)
+	resp, err := platformCoreClient.UpdateDeploymentWithResponse(context.Background(), orgID, deploymentID, updateDeploymentRequest)
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
 	}
@@ -1285,7 +1285,7 @@ var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequ
 }
 
 // CoreDeleteDeployment deletes a deployment with the core API
-var CoreDeleteDeployment = func(orgID, deploymentID string, corePlatformClient astroplatformcore.CoreClient) error {
+var CoreDeleteDeployment = func(orgID, deploymentID string, platformCoreClient astroplatformcore.CoreClient) error {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1294,7 +1294,7 @@ var CoreDeleteDeployment = func(orgID, deploymentID string, corePlatformClient a
 		orgID = c.Organization
 	}
 
-	resp, err := corePlatformClient.DeleteDeploymentWithResponse(context.Background(), orgID, deploymentID)
+	resp, err := platformCoreClient.DeleteDeploymentWithResponse(context.Background(), orgID, deploymentID)
 	if err != nil {
 		return err
 	}
@@ -1420,8 +1420,8 @@ var SelectDeployment = func(deployments []astroplatformcore.Deployment, message 
 	return selected, nil
 }
 
-func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bool, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) { //nolint:gocognit
-	deployments, err := CoreGetDeployments(ws, "", corePlatformClient)
+func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) { //nolint:gocognit
+	deployments, err := CoreGetDeployments(ws, "", platformCoreClient)
 	if err != nil {
 		return astroplatformcore.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
 	}
@@ -1448,7 +1448,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 			fmt.Printf("No Deployment with the name %s was found\n", deploymentName)
 			return astroplatformcore.Deployment{}, errInvalidDeployment
 		}
-		currentDeployment, err := CoreGetDeployment("", stageDeployments[0].Id, corePlatformClient)
+		currentDeployment, err := CoreGetDeployment("", stageDeployments[0].Id, platformCoreClient)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
@@ -1459,7 +1459,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 
 	// select deployment if deploymentID is empty
 	if deploymentID == "" {
-		currentDeployment, err = deploymentSelectionProcess(ws, deployments, corePlatformClient, coreClient)
+		currentDeployment, err = deploymentSelectionProcess(ws, deployments, platformCoreClient, coreClient)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
@@ -1474,14 +1474,14 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 		return astroplatformcore.Deployment{}, errInvalidDeployment
 	}
 
-	currentDeployment, err = CoreGetDeployment("", currentDeployment.Id, corePlatformClient)
+	currentDeployment, err = CoreGetDeployment("", currentDeployment.Id, platformCoreClient)
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
 	}
 	return currentDeployment, nil
 }
 
-func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deployment, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) {
+func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deployment, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) {
 	currentDeployment, err := SelectDeployment(deployments, "Select a Deployment")
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
@@ -1495,12 +1495,12 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 		}
 		cicdEnforcement := disable
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, disable, CeleryExecutor, "", "", "medium", "", "", cicdEnforcement, "", "", "", "", 0, 0, corePlatformClient, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, disable, CeleryExecutor, "", "", "medium", "", "", cicdEnforcement, "", "", "", "", 0, 0, platformCoreClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
 		// get a new deployment list
-		deployments, err = CoreGetDeployments(ws, "", corePlatformClient)
+		deployments, err = CoreGetDeployments(ws, "", platformCoreClient)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}

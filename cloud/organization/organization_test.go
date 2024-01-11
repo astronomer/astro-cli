@@ -165,7 +165,7 @@ func TestSwitch(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
-		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, corePlatformClient astroplatformcore.CoreClient, out io.Writer) error {
+		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
