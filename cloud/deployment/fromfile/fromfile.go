@@ -654,7 +654,7 @@ func getClusterInfoFromName(clusterName, organizationShortName string, platformC
 			return cluster.Id, *cluster.NodePools, nil
 		}
 	}
-	err = fmt.Errorf("cluster_name: %s %w in organization: %s", clusterName, errNotFound, org)
+	err = fmt.Errorf("cluster_name: %s %w in organization", clusterName, errNotFound)
 	return "", nil, err
 }
 
