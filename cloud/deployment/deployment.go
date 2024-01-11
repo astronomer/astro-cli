@@ -374,17 +374,14 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if executor == CeleryExecutor {
 				standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
-			if schedulerSize != "" {
-				if schedulerSize == SmallScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeSMALL
-				}
-				if schedulerSize == MediumScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
-				}
-				if schedulerSize == LargeScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
-				}
-			} else {
+			switch schedulerSize {
+			case SmallScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeSMALL
+			case MediumScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
+			case LargeScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
+			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
 			}
 			if highAvailability == enable { //nolint: goconst
@@ -423,17 +420,15 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if executor == CeleryExecutor {
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
-			if schedulerSize != "" {
-				if schedulerSize == SmallScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
-				}
-				if schedulerSize == MediumScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-				}
-				if schedulerSize == LargeScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
-				}
-			} else {
+
+			switch schedulerSize {
+			case SmallScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
+			case MediumScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
+			case LargeScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
 			}
 			err := createDeploymentRequest.FromCreateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
@@ -473,8 +468,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		var requestedExecutor astroplatformcore.CreateHybridDeploymentRequestExecutor
 		if executor == CeleryExecutor {
 			requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorCELERY
-		}
-		if executor == KubeExecutor {
+		} else if executor == KubeExecutor {
 			requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorKUBERNETES
 		}
 		hybridDeploymentRequest := astroplatformcore.CreateHybridDeploymentRequest{
@@ -533,9 +527,15 @@ func createOutput(workspaceID string, d *astroplatformcore.Deployment) error {
 
 	runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
 	clusterName := notApplicable
-	releaseName := d.Namespace
-	cloudProvider := *d.CloudProvider
+	cloudProvider := notApplicable
 	region := notApplicable
+	releaseName := d.Namespace
+	if IsDeploymentStandard(*d.Type) {
+		cloudProvider = *d.CloudProvider
+		region = *d.Region
+	} else {
+		clusterName = *d.ClusterName
+	}
 	tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 	deploymentURL, err := GetDeploymentURL(d.Id, workspaceID)
 	if err != nil {
@@ -557,7 +557,7 @@ func validateHybridResources(schedulerAU, schedulerReplicas int, configOption as
 	schedulerReplicasMin := int(configOption.LegacyAstro.SchedulerReplicaRange.Floor)
 	schedulerReplicasMax := int(configOption.LegacyAstro.SchedulerReplicaRange.Ceiling)
 	if schedulerAU > schedulerAuMax || schedulerAU < schedulerAuMin {
-		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs", schedulerAuMin, schedulerAuMax)
+		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs\n", schedulerAuMin, schedulerAuMax)
 		return false
 	}
 	if schedulerReplicas > schedulerReplicasMax || schedulerReplicas < schedulerReplicasMin {
@@ -844,14 +844,15 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			workerQueuesRequest = wQueueList
 		}
 		var highAvailabilityValue bool
-		if highAvailability == "" { //nolint: goconst
+		switch highAvailability {
+		case "":
 			highAvailabilityValue = *currentDeployment.IsHighAvailability
-		}
-		if highAvailability == enable {
+		case enable:
 			highAvailabilityValue = true
-		}
-		if highAvailability == disable {
+		case disable:
 			highAvailabilityValue = false
+		default:
+			return errors.New("Invalid --high-availability value")
 		}
 		if defaultTaskPodCpu == "" {
 			if currentDeployment.DefaultTaskPodCpu != nil {
@@ -877,11 +878,9 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
 			if executor == "" {
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutor(*currentDeployment.Executor)
-			}
-			if executor == CeleryExecutor {
+			} else if executor == CeleryExecutor {
 				requestedExecutor = astroplatformcore.CELERY
-			}
-			if executor == KubeExecutor {
+			} else if executor == KubeExecutor {
 				requestedExecutor = astroplatformcore.KUBERNETES
 			}
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
@@ -899,18 +898,14 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				DefaultTaskPodCpu:    defaultTaskPodCpu,
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 			}
-			if schedulerSize != "" {
-				if schedulerSize == SmallScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.SMALL
-				}
-				if schedulerSize == MediumScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.MEDIUM
-				}
-				if schedulerSize == LargeScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.LARGE
-				}
-			}
-			if schedulerSize == "" {
+			switch schedulerSize {
+			case SmallScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.SMALL
+			case MediumScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.MEDIUM
+			case LargeScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.LARGE
+			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
 			if standardDeploymentRequest.Executor == astroplatformcore.CELERY {
@@ -937,11 +932,9 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			var requestedExecutor astroplatformcore.UpdateDedicatedDeploymentRequestExecutor
 			if executor == "" {
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutor(*currentDeployment.Executor)
-			}
-			if executor == CeleryExecutor {
+			} else if executor == CeleryExecutor {
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY
-			}
-			if executor == KubeExecutor {
+			} else if executor == KubeExecutor {
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
 			dedicatedDeploymentRequest := astroplatformcore.UpdateDedicatedDeploymentRequest{
@@ -960,18 +953,14 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				EnvironmentVariables: deploymentEnvironmentVariablesRequest,
 				WorkerQueues:         &workerQueuesRequest,
 			}
-			if schedulerSize != "" {
-				if schedulerSize == SmallScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeSMALL
-				}
-				if schedulerSize == MediumScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-				}
-				if schedulerSize == LargeScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
-				}
-			}
-			if schedulerSize == "" {
+			switch schedulerSize {
+			case SmallScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeSMALL
+			case MediumScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
+			case LargeScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
 			if dedicatedDeploymentRequest.Executor == astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY {
@@ -1030,11 +1019,9 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		var requestedExecutor astroplatformcore.UpdateHybridDeploymentRequestExecutor
 		if executor == "" {
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutor(*currentDeployment.Executor)
-		}
-		if executor == CeleryExecutor {
+		} else if executor == CeleryExecutor {
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorCELERY
-		}
-		if executor == KubeExecutor {
+		} else if executor == KubeExecutor {
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES
 		}
 		hybridDeploymentRequest := astroplatformcore.UpdateHybridDeploymentRequest{
@@ -1115,8 +1102,14 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
 		releaseName := d.Namespace
 		clusterName := notApplicable
-		cloudProvider := *d.CloudProvider
+		cloudProvider := notApplicable
 		region := notApplicable
+		if IsDeploymentStandard(*d.Type) {
+			cloudProvider = *d.CloudProvider
+			region = *d.Region
+		} else {
+			clusterName = *d.ClusterName
+		}
 		tabDeployment.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
@@ -1455,9 +1448,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
-		if len(stageDeployments) == 1 {
-			return currentDeployment, nil
-		}
+		return currentDeployment, nil
 	}
 
 	var currentDeployment astroplatformcore.Deployment
