@@ -98,6 +98,8 @@ func TestVariableModify(t *testing.T) {
 			Id:            "test-id",
 			CloudProvider: &cloudProvider,
 			Type:          &hybridType,
+			Region:        &cluster.Region,
+			ClusterName:   &cluster.Name,
 			EnvironmentVariables: &[]astroplatformcore.DeploymentEnvironmentVariable{
 				{
 					Key:   "test-key-1",
