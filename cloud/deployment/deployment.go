@@ -260,13 +260,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 	}
 
-	var isCicdEnforced bool
-	if cicdEnforcement == "" {
-		isCicdEnforced = false
-	}
-	if cicdEnforcement == disable {
-		isCicdEnforced = false
-	}
+	isCicdEnforced := false
 	if cicdEnforcement == enable {
 		isCicdEnforced = true
 	}
