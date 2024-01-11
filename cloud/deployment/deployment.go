@@ -234,6 +234,9 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	if cloudProvider == gcpCloud {
 		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("GCP")
 	}
+	if cloudProvider == azureCloud {
+		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("AZURE")
+	}
 	deploymentOptionsParams := astrocore.GetDeploymentOptionsParams{
 		DeploymentType: &coreDeploymentType,
 		CloudProvider:  &coreCloudProvider,
@@ -304,7 +307,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		dagDeployEnabled = false
 	}
 	createDeploymentRequest := astroplatformcore.CreateDeploymentRequest{}
-	// build standard input
 	if IsDeploymentStandard(deploymentType) || IsDeploymentDedicated(deploymentType) {
 		var highAvailabilityValue bool
 		if highAvailability == enable { //nolint: goconst
@@ -338,22 +340,24 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		if resourceQuotaMemory == "" {
 			resourceQuotaMemory = configOption.ResourceQuotas.ResourceQuota.Memory.Default
 		}
+		// build standard input
 		if IsDeploymentStandard(deploymentType) {
 			var requestedCloudProvider astroplatformcore.CreateStandardDeploymentRequestCloudProvider
-			if cloudProvider == gcpCloud {
+			switch cloudProvider {
+			case gcpCloud:
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderGCP
-			}
-			if cloudProvider == awsCloud {
+			case awsCloud:
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAWS
-			}
-			if cloudProvider == azureCloud {
+			case azureCloud:
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAZURE
+			default:
+				// Handle the case when cloudProvider doesn't match any of the known values
+				fmt.Println("Unknown cloud provider:", cloudProvider)
 			}
 			var requestedExecutor astroplatformcore.CreateStandardDeploymentRequestExecutor
 			if executor == CeleryExecutor {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorCELERY
-			}
-			if executor == KubeExecutor {
+			} else if executor == KubeExecutor {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
 			}
 			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
