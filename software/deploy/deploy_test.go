@@ -617,6 +617,54 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		assert.True(t, os.IsNotExist(err))
 	})
 
+	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. Tar is successfully created. But gzip creation throws an error", func(t *testing.T) {
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			ReleaseName:   "testReleaseName",
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+
+		// create the non-empty dags folder
+		err := os.Mkdir("dags", os.ModePerm)
+		assert.NoError(t, err)
+		defer os.RemoveAll("dags")
+		fileContent := []byte("print('Hello, World!')")
+		err = os.WriteFile("./dags/test.py", fileContent, os.ModePerm)
+		assert.NoError(t, err)
+
+		gzipMockError := errors.New("some gzip error")
+
+		// mock the gzip creation to throw an error
+		gzipFile = func(srcFilePath, destFilePath string) error {
+			return gzipMockError
+		}
+
+		err = DagsOnlyDeploy(houstonMock, appConfig, deploymentID, ".", nil, false)
+		assert.ErrorIs(t, err, gzipMockError)
+
+		// Validate that dags.tar file was created
+		destFilePath := "./dags.tar"
+		_, err = os.ReadFile(destFilePath)
+		assert.NoError(t, err, "Error reading tar file")
+		defer os.Remove(destFilePath)
+
+		// Validate that dags.tar.gz file was not created
+		destFilePath = "./dags.tar.gz"
+		_, err = os.Stat("./dags.tar.gz")
+		assert.True(t, os.IsNotExist(err))
+	})
+
 	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. No need of User confirmation", func(t *testing.T) {
 		featureFlags := &houston.FeatureFlags{
 			DagOnlyDeployment: true,

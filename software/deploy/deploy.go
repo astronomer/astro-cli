@@ -26,6 +26,8 @@ var (
 	dockerfile = "Dockerfile"
 
 	deployImagePlatformSupport = []string{"linux/amd64"}
+
+	gzipFile = fileutil.GzipFile
 )
 
 var (
@@ -366,7 +368,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 	}
 
 	// Gzip the tar
-	err = fileutil.GzipFile(dagsParentPath+"/dags.tar", dagsParentPath+"/dags.tar.gz")
+	err = gzipFile(dagsParentPath+"/dags.tar", dagsParentPath+"/dags.tar.gz")
 	if err != nil {
 		return err
 	}

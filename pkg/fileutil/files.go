@@ -246,7 +246,6 @@ func UploadFile(filePath, targetURL, formFileFieldName string) error {
 	if err != nil {
 		return fmt.Errorf("error opening file: %w", err)
 	}
-	fmt.Println("File opened successfully")
 	defer file.Close()
 
 	// Create a new buffer to store the multipart/form-data request
@@ -277,7 +276,6 @@ func UploadFile(filePath, targetURL, formFileFieldName string) error {
 
 	// Check the response status
 	if response.StatusCode == http.StatusOK {
-		fmt.Println("File uploaded successfully")
 		return nil
 	}
 	data, _ := io.ReadAll(response.Body)
