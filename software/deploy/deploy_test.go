@@ -644,7 +644,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		err = os.WriteFile("./dags/test.py", fileContent, os.ModePerm)
 		assert.NoError(t, err)
 
-		gzipMockError := errors.New("some gzip error")
+		gzipMockError := errors.New("some gzip error") //nolint
 
 		// mock the gzip creation to throw an error
 		gzipFile = func(srcFilePath, destFilePath string) error {
@@ -662,7 +662,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 
 		// Validate that dags.tar.gz file was not created
 		destFilePath = "./dags.tar.gz"
-		_, err = os.Stat("./dags.tar.gz")
+		_, err = os.Stat(destFilePath)
 		assert.True(t, os.IsNotExist(err))
 
 		gzipFile = fileutil.GzipFile
