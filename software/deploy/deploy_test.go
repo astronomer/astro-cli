@@ -550,7 +550,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 			// Assert the correct form field name
 			err := r.ParseMultipartForm(10 << 20) // 10 MB
 			assert.NoError(t, err, "Error parsing multipart form")
-			assert.NotNil(t, r.MultipartForm.File["file1"], "Form file not found in request")
+			assert.NotNil(t, r.MultipartForm.File["file"], "Form file not found in request")
 
 			// Respond with a success status code
 			w.WriteHeader(http.StatusOK)
@@ -702,7 +702,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 			// Assert the correct form field name
 			err := r.ParseMultipartForm(10 << 20) // 10 MB
 			assert.NoError(t, err, "Error parsing multipart form")
-			assert.NotNil(t, r.MultipartForm.File["file1"], "Form file not found in request")
+			assert.NotNil(t, r.MultipartForm.File["file"], "Form file not found in request")
 
 			// Respond with a success status code
 			w.WriteHeader(http.StatusOK)
@@ -759,7 +759,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 			// Assert the correct form field name
 			err := r.ParseMultipartForm(10 << 20) // 10 MB
 			assert.NoError(t, err, "Error parsing multipart form")
-			assert.NotNil(t, r.MultipartForm.File["file1"], "Form file not found in request")
+			assert.NotNil(t, r.MultipartForm.File["file"], "Form file not found in request")
 
 			// Respond with a success status code
 			w.WriteHeader(http.StatusOK)
