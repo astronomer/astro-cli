@@ -1380,7 +1380,7 @@ var SelectDeployment = func(deployments []astroplatformcore.Deployment, message 
 	if len(deployments) == 0 {
 		return astroplatformcore.Deployment{}, nil
 	}
-	if len(deployments) == 1 && os.Getenv("ASTRO_API_TOKEN") != "" {
+	if len(deployments) == 1 && (os.Getenv("ASTRO_API_TOKEN") != "" || os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != "") {
 		if !CleanOutput {
 			fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
 				fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Name)) +
