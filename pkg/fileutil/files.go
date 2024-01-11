@@ -22,10 +22,11 @@ import (
 const openPermissions = 0o777
 
 var (
-	perm     os.FileMode = 0o777
-	openFile             = os.OpenFile
-	readFile             = os.ReadFile
-	ioCopy               = io.Copy
+	perm                  os.FileMode = 0o777
+	openFile                          = os.OpenFile
+	readFile                          = os.ReadFile
+	ioCopy                            = io.Copy
+	newRequestWithContext             = http.NewRequestWithContext
 )
 
 // Exists returns a boolean indicating if the given path already exists
@@ -269,7 +270,7 @@ func UploadFile(filePath, targetURL, formFileFieldName string, headers map[strin
 	// Close the multipart writer to finalize the request
 	writer.Close()
 
-	req, err := http.NewRequestWithContext(http_context.Background(), "POST", targetURL, body)
+	req, err := newRequestWithContext(http_context.Background(), "POST", targetURL, body)
 	if err != nil {
 		return err
 	}

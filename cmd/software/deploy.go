@@ -55,7 +55,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&ignoreCacheDeploy, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
-		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "", false, "Push only DAGs to your Astronomer Deployment")
+		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "", false, "Push only DAGs to your Deployment")
 	}
 	return cmd
 }

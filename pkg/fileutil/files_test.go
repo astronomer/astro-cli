@@ -3,6 +3,7 @@ package fileutil
 import (
 	"bytes"
 	"compress/gzip"
+	http_context "context"
 	"io"
 	f "io/fs"
 	"net/http"
@@ -546,6 +547,24 @@ func TestUploadFile(t *testing.T) {
 		assert.ErrorIs(t, err, ioCopyError)
 
 		ioCopy = io.Copy
+	})
+
+	t.Run("newRequestWithContext throws an error", func(t *testing.T) {
+		requestError := errors.New("mock error")
+		newRequestWithContext = func(ctx http_context.Context, method, url string, body io.Reader) (*http.Request, error) {
+			return nil, requestError
+		}
+		// Create a temporary file with some content for testing
+		filePath := "./testFile.txt"
+		fileContent := []byte("This is a test file.")
+		err := os.WriteFile(filePath, fileContent, os.ModePerm)
+		assert.NoError(t, err, "Error creating test file")
+		defer os.Remove(filePath)
+
+		err = UploadFile(filePath, "testURL", "file1", map[string]string{})
+		assert.ErrorIs(t, err, requestError)
+
+		newRequestWithContext = http.NewRequestWithContext
 	})
 
 	t.Run("uploaded the file but got non-OK response", func(t *testing.T) {
