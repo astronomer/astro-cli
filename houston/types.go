@@ -102,21 +102,26 @@ type Decoded struct {
 
 // Deployment defines structure of a houston response Deployment object
 type Deployment struct {
-	ID                    string          `json:"id"`
-	Type                  string          `json:"type"`
-	Label                 string          `json:"label"`
-	ReleaseName           string          `json:"releaseName"`
-	Version               string          `json:"version"`
-	AirflowVersion        string          `json:"airflowVersion"`
-	DesiredAirflowVersion string          `json:"desiredAirflowVersion"`
-	RuntimeVersion        string          `json:"runtimeVersion"`
-	RuntimeAirflowVersion string          `json:"runtimeAirflowVersion"`
-	DesiredRuntimeVersion string          `json:"desiredRuntimeVersion"`
-	DeploymentInfo        DeploymentInfo  `json:"deployInfo"`
-	Workspace             Workspace       `json:"workspace"`
-	Urls                  []DeploymentURL `json:"urls"`
-	CreatedAt             time.Time       `json:"createdAt"`
-	UpdatedAt             time.Time       `json:"updatedAt"`
+	ID                    string              `json:"id"`
+	Type                  string              `json:"type"`
+	Label                 string              `json:"label"`
+	ReleaseName           string              `json:"releaseName"`
+	Version               string              `json:"version"`
+	AirflowVersion        string              `json:"airflowVersion"`
+	DesiredAirflowVersion string              `json:"desiredAirflowVersion"`
+	RuntimeVersion        string              `json:"runtimeVersion"`
+	RuntimeAirflowVersion string              `json:"runtimeAirflowVersion"`
+	DesiredRuntimeVersion string              `json:"desiredRuntimeVersion"`
+	DeploymentInfo        DeploymentInfo      `json:"deployInfo"`
+	Workspace             Workspace           `json:"workspace"`
+	Urls                  []DeploymentURL     `json:"urls"`
+	CreatedAt             time.Time           `json:"createdAt"`
+	UpdatedAt             time.Time           `json:"updatedAt"`
+	DagDeployment         DagDeploymentConfig `json:"dagDeployment"`
+}
+
+type DagDeploymentConfig struct {
+	Type string `json:"type"`
 }
 
 // DeploymentURL defines structure of a houston response DeploymentURL object
@@ -364,6 +369,7 @@ type FeatureFlags struct {
 	NamespaceFreeFormEntry bool `json:"namespaceFreeFormEntry"`
 	BYORegistryEnabled     bool `json:"byoUpdateRegistryEnabled"`
 	AstroRuntimeEnabled    bool `json:"astroRuntimeEnabled"`
+	DagOnlyDeployment      bool `json:"dagOnlyDeployment"`
 }
 
 // coerce a string into SemVer if possible

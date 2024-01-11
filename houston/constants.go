@@ -25,4 +25,5 @@ const (
 	GitSyncDeploymentType = "git_sync"
 	VolumeDeploymentType  = "volume"
 	ImageDeploymentType   = "image"
+	DagOnlyDeploymentType = "dag_deploy"
 )
