@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	http_context "context"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -268,7 +269,7 @@ func UploadFile(filePath, targetURL, formFileFieldName string, headers map[strin
 	// Close the multipart writer to finalize the request
 	writer.Close()
 
-	req, err := http.NewRequest("POST", targetURL, body)
+	req, err := http.NewRequestWithContext(http_context.Background(), "POST", targetURL, body)
 	if err != nil {
 		return err
 	}
