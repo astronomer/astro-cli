@@ -1262,6 +1262,8 @@ func TestUpdate(t *testing.T) { //nolint
 			Id:            "test-id",
 			CloudProvider: &cloudProvider,
 			Type:          &hybridType,
+			Region:        &cluster.Region,
+			ClusterName:   &cluster.Name,
 		},
 
 		HTTPResponse: &http.Response{

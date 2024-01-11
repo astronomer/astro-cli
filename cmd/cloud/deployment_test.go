@@ -72,6 +72,8 @@ var (
 			CloudProvider: &cloudProvider,
 			Type:          &hybridType,
 			ClusterId:     &clusterID,
+			Region:        &region,
+			ClusterName:   &cluster.Name,
 		},
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
