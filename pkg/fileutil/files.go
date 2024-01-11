@@ -284,7 +284,6 @@ func UploadFile(filePath, targetURL, formFileFieldName string, headers map[strin
 	// Perform the request
 	client := &http.Client{}
 	response, err := client.Do(req)
-
 	if err != nil {
 		return fmt.Errorf("error making POST request: %w", err)
 	}
