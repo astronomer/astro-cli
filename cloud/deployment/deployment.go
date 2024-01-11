@@ -144,7 +144,7 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 		workspaceID := d.WorkspaceId
 		region := notApplicable
 		cloudProvider := notApplicable
-		if IsDeploymentStandard(*d.Type) || IsDeploymentDedicated(*d.Type) {
+		if IsDeploymentStandard(*d.Type) {
 			region = *d.Region
 			cloudProvider = *d.CloudProvider
 		}
@@ -1380,8 +1380,7 @@ var SelectDeployment = func(deployments []astroplatformcore.Deployment, message 
 	if len(deployments) == 0 {
 		return astroplatformcore.Deployment{}, nil
 	}
-
-	if len(deployments) == 1 {
+	if len(deployments) == 1 && os.Getenv("ASTRO_API_TOKEN") != "" {
 		if !CleanOutput {
 			fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
 				fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Name)) +
