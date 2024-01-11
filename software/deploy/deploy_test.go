@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
 	"github.com/spf13/afero"
@@ -663,6 +664,8 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		destFilePath = "./dags.tar.gz"
 		_, err = os.Stat("./dags.tar.gz")
 		assert.True(t, os.IsNotExist(err))
+
+		gzipFile = fileutil.GzipFile
 	})
 
 	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. No need of User confirmation", func(t *testing.T) {

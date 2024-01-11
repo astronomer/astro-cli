@@ -24,6 +24,7 @@ var (
 	perm     os.FileMode = 0o777
 	openFile             = os.OpenFile
 	readFile             = os.ReadFile
+	ioCopy               = io.Copy
 )
 
 // Exists returns a boolean indicating if the given path already exists
@@ -259,7 +260,7 @@ func UploadFile(filePath, targetURL, formFileFieldName string) error {
 	}
 
 	// Copy the file content into the form field
-	_, err = io.Copy(fileWriter, file)
+	_, err = ioCopy(fileWriter, file)
 	if err != nil {
 		return fmt.Errorf("error copying file content: %w", err)
 	}

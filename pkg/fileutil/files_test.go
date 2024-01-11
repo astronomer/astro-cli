@@ -495,6 +495,26 @@ func TestUploadFile(t *testing.T) {
 		assert.EqualError(t, err, "error opening file: open non-existent-file.txt: no such file or directory")
 	})
 
+	t.Run("io copy throws an error", func(t *testing.T) {
+		ioCopyError := errors.New("mock error")
+
+		ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
+			return 0, ioCopyError
+		}
+
+		// Create a temporary file with some content for testing
+		filePath := "./testFile.txt"
+		fileContent := []byte("This is a test file.")
+		err := os.WriteFile(filePath, fileContent, os.ModePerm)
+		assert.NoError(t, err, "Error creating test file")
+		defer os.Remove(filePath)
+
+		err = UploadFile(filePath, "testURL", "file1")
+		assert.ErrorIs(t, err, ioCopyError)
+
+		ioCopy = io.Copy
+	})
+
 	t.Run("uploaded the file but got non-OK response", func(t *testing.T) {
 		// Prepare a test server to respond with a non-OK status code
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
