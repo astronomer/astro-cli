@@ -876,13 +876,15 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 		if IsDeploymentStandard(*currentDeployment.Type) {
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
-			if executor == "" {
+			switch executor {
+			case "":
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutor(*currentDeployment.Executor)
-			} else if executor == CeleryExecutor {
+			case CeleryExecutor:
 				requestedExecutor = astroplatformcore.CELERY
-			} else if executor == KubeExecutor {
+			case KubeExecutor:
 				requestedExecutor = astroplatformcore.KUBERNETES
 			}
+
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
 				Description:          &description,
 				Name:                 name,
@@ -930,11 +932,12 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 		if IsDeploymentDedicated(*currentDeployment.Type) {
 			var requestedExecutor astroplatformcore.UpdateDedicatedDeploymentRequestExecutor
-			if executor == "" {
+			switch executor {
+			case "":
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutor(*currentDeployment.Executor)
-			} else if executor == CeleryExecutor {
+			case CeleryExecutor:
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY
-			} else if executor == KubeExecutor {
+			case KubeExecutor:
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
 			dedicatedDeploymentRequest := astroplatformcore.UpdateDedicatedDeploymentRequest{
@@ -1017,11 +1020,12 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			return ErrInvalidResourceRequest
 		}
 		var requestedExecutor astroplatformcore.UpdateHybridDeploymentRequestExecutor
-		if executor == "" {
+		switch executor {
+		case "":
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutor(*currentDeployment.Executor)
-		} else if executor == CeleryExecutor {
+		case CeleryExecutor:
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorCELERY
-		} else if executor == KubeExecutor {
+		case KubeExecutor:
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES
 		}
 		hybridDeploymentRequest := astroplatformcore.UpdateHybridDeploymentRequest{
