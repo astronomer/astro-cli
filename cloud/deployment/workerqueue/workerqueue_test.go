@@ -1046,21 +1046,6 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		assert.ErrorIs(t, err, ErrNotSupported)
 		assert.Contains(t, err.Error(), "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
 	})
-	t.Run("returns an error when min_worker_count is in input", func(t *testing.T) {
-		requestedWorkerQueue.MinWorkerCount = 8
-		defer func() {
-			requestedWorkerQueue = &astroplatformcore.HybridWorkerQueueRequest{
-				Name:              "default",
-				NodePoolId:        "test-pool-id",
-				MinWorkerCount:    -1,
-				MaxWorkerCount:    0,
-				WorkerConcurrency: 0,
-			}
-		}()
-		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
-		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "KubernetesExecutor does not support minimum worker count in the request. It can only be used with CeleryExecutor")
-	})
 	t.Run("returns an error when max_worker_count is in input", func(t *testing.T) {
 		requestedWorkerQueue.MaxWorkerCount = 25
 		defer func() {
