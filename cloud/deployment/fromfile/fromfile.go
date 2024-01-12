@@ -33,7 +33,8 @@ var (
 	errInvalidValue                   = errors.New("is not valid")
 	errNotPermitted                   = errors.New("is not permitted")
 	errNoUseWorkerQueues              = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
-	errUseDefaultWokerType            = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
+	errUseDefaultWorkerType           = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
+	errDeploymentsWithSameName        = errors.New("You currently have two deployments with the name specified in the your worksapce. Make sure your deployment's name is unique in the workspace to update it with a deployment file")
 
 	canCiCdDeploy = deployment.CanCiCdDeploy
 )
@@ -90,7 +91,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 	deploymentType := transformDeploymentType(formattedDeployment.Deployment.Configuration.DeploymentType)
 	if !deployment.IsDeploymentStandard(deploymentType) {
 		// map cluster name to id and collect node pools for cluster
-		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.OrganizationShortName, astroPlatformCore)
+		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.Organization, astroPlatformCore)
 		if err != nil {
 			return err
 		}
@@ -129,6 +130,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		if err != nil {
 			return err
 		}
+		// users can not creat a deployment with env vars or alert emails in v1beta1 so to create them with a deployment file we need update right after deployment creation
 		if hasEnvVarsOrAlertEmails(&formattedDeployment) {
 			action = updateAction
 		}
@@ -147,7 +149,10 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 				errNotFound, errHelp)
 		}
 		// this deployment exists so update it
-		existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
+		existingDeployment, err = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
+		if err != nil {
+			return err
+		}
 		workspaceID = existingDeployment.WorkspaceId
 		// determine dagDeploy
 		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil { //nolint:staticcheck
@@ -170,7 +175,10 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		}
 	}
 	// Get deployment created or updated
-	existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
+	existingDeployment, err = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
+	if err != nil {
+		return err
+	}
 	if jsonOutput {
 		outputFormat = jsonFormat
 	}
@@ -233,17 +241,17 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				workerQueue.WorkerConcurrency = listQueues[i].WorkerConcurrency
 				workerQueue.AstroMachine = astroplatformcore.WorkerQueueRequestAstroMachine(*listQueues[i].AstroMachine)
 				// set default values if none were specified
-				a := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
+				requestedWorkerQueue := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
 				// check if queue is valid
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 					return errNoUseWorkerQueues
 				}
-				err = workerqueue.IsHostedCeleryWorkerQueueInputValid(a, defaultOptions, &astroMachine)
+				err = workerqueue.IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, defaultOptions, &astroMachine)
 				if err != nil {
 					return err
 				}
 				// add it to the list of queues to be created
-				listQueuesRequest = append(listQueuesRequest, *a)
+				listQueuesRequest = append(listQueuesRequest, *requestedWorkerQueue)
 			} else {
 				var workerQueue astroplatformcore.HybridWorkerQueueRequest
 				workerQueue.Id = &listQueues[i].Id
@@ -255,15 +263,15 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				workerQueue.NodePoolId = *listQueues[i].NodePoolId
 				// check if queue is valid
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
-					return errUseDefaultWokerType
+					return errUseDefaultWorkerType
 				}
 				// set default values if none were specified
-				a := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
-				err = workerqueue.IsCeleryWorkerQueueInputValid(a, defaultOptions)
+				requestedHybridWorkerQueue := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
+				err = workerqueue.IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue, defaultOptions)
 				if err != nil {
 					return err
 				}
-				workerQueue = *a
+				workerQueue = *requestedHybridWorkerQueue
 				// add it to the list of queues to be created
 				listHybridQueuesRequest = append(listHybridQueuesRequest, workerQueue)
 			}
@@ -625,26 +633,32 @@ func deploymentExists(existingDeployments []astroplatformcore.Deployment, deploy
 
 // deploymentFromName takes existingDeployments and deploymentName as its arguments.
 // It returns the existing deployment that matches deploymentName.
-func deploymentFromName(existingDeployments []astroplatformcore.Deployment, deploymentName string) astroplatformcore.Deployment {
+func deploymentFromName(existingDeployments []astroplatformcore.Deployment, deploymentName string) (astroplatformcore.Deployment, error) {
+	var existingDeployment astroplatformcore.Deployment
+	var i int
 	for i := range existingDeployments {
 		if existingDeployments[i].Name == deploymentName {
 			// deployment that matched name
-			return existingDeployments[i]
+			existingDeployment = existingDeployments[i]
+			i++
 		}
 	}
-	return astroplatformcore.Deployment{}
+	if i > 1 {
+		return astroplatformcore.Deployment{}, errDeploymentsWithSameName
+	}
+	return existingDeployment, nil
 }
 
 // getClusterInfoFromName takes clusterName and org as its arguments.
 // It returns the clusterID and list of nodepools if the cluster is found in the organization.
 // It returns an errClusterNotFound if the cluster does not exist in the organization.
-func getClusterInfoFromName(clusterName, organizationShortName string, platformCoreClient astroplatformcore.CoreClient) (string, []astroplatformcore.NodePool, error) {
+func getClusterInfoFromName(clusterName, organizationID string, platformCoreClient astroplatformcore.CoreClient) (string, []astroplatformcore.NodePool, error) {
 	var (
 		existingClusters []astroplatformcore.Cluster
 		err              error
 	)
 
-	existingClusters, err = organization.ListClusters(organizationShortName, platformCoreClient)
+	existingClusters, err = organization.ListClusters(organizationID, platformCoreClient)
 	if err != nil {
 		return "", nil, err
 	}
@@ -771,11 +785,8 @@ func hasAlertEmails(deploymentFromFile *inspect.FormattedDeployment) bool {
 }
 
 func hasEnvVarsOrAlertEmails(deploymentFromFile *inspect.FormattedDeployment) bool {
-	if hasEnvVars(deploymentFromFile) {
-		return hasEnvVars(deploymentFromFile)
-	}
-	if hasAlertEmails(deploymentFromFile) {
-		return hasAlertEmails(deploymentFromFile)
+	if hasEnvVars(deploymentFromFile) || hasAlertEmails(deploymentFromFile) {
+		return true
 	}
 	return false
 }

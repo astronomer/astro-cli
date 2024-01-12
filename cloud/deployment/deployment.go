@@ -87,7 +87,6 @@ func newTableOutAll() *printutil.Table {
 }
 
 func CanCiCdDeploy(bearerToken string) bool {
-	fmt.Println(bearerToken)
 	token := strings.Split(bearerToken, " ")[1] // Stripping Bearer
 	// Parse the token to peek at the custom claims
 	claims, err := parseToken(token)
@@ -140,8 +139,7 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 		}
 		runtimeVersionText := " (based on Airflow " + d.RuntimeVersion + ")"
 		releaseName := d.Namespace
-		// change to workspace name
-		workspaceID := d.WorkspaceId
+		workspaceName := d.WorkspaceName
 		region := notApplicable
 		cloudProvider := notApplicable
 		if IsDeploymentStandard(*d.Type) {
@@ -149,7 +147,7 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 			cloudProvider = *d.CloudProvider
 		}
 		if all {
-			tab.AddRow([]string{d.Name, workspaceID, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
+			tab.AddRow([]string{d.Name, *workspaceName, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 		} else {
 			tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 		}
@@ -228,13 +226,12 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	}
 	coreDeploymentType := astrocore.GetDeploymentOptionsParamsDeploymentType(deploymentType)
 	var coreCloudProvider astrocore.GetDeploymentOptionsParamsCloudProvider
-	if cloudProvider == awsCloud {
+	switch cloudProvider {
+	case awsCloud:
 		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("AWS")
-	}
-	if cloudProvider == gcpCloud {
+	case gcpCloud:
 		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("GCP")
-	}
-	if cloudProvider == azureCloud {
+	case azureCloud:
 		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("AZURE")
 	}
 	deploymentOptionsParams := astrocore.GetDeploymentOptionsParams{
@@ -344,9 +341,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAWS
 			case azureCloud:
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAZURE
-			default:
-				// Handle the case when cloudProvider doesn't match any of the known values
-				fmt.Println("Unknown cloud provider:", cloudProvider)
 			}
 			var requestedExecutor astroplatformcore.CreateStandardDeploymentRequestExecutor
 			if executor == CeleryExecutor {
@@ -792,12 +786,12 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	var deploymentEnvironmentVariablesRequest []astroplatformcore.DeploymentEnvironmentVariableRequest
 	if len(newEnvironmentVariables) == 0 {
 		if currentDeployment.EnvironmentVariables != nil {
-			EnvironmentVariables := *currentDeployment.EnvironmentVariables
+			environmentVariables := *currentDeployment.EnvironmentVariables
 			for i := range *currentDeployment.EnvironmentVariables {
 				var deploymentEnvironmentVariableRequest astroplatformcore.DeploymentEnvironmentVariableRequest
-				deploymentEnvironmentVariableRequest.IsSecret = EnvironmentVariables[i].IsSecret
-				deploymentEnvironmentVariableRequest.Key = EnvironmentVariables[i].Key
-				deploymentEnvironmentVariableRequest.Value = EnvironmentVariables[i].Value
+				deploymentEnvironmentVariableRequest.IsSecret = environmentVariables[i].IsSecret
+				deploymentEnvironmentVariableRequest.Key = environmentVariables[i].Key
+				deploymentEnvironmentVariableRequest.Value = environmentVariables[i].Value
 				deploymentEnvironmentVariablesRequest = append(deploymentEnvironmentVariablesRequest, deploymentEnvironmentVariableRequest)
 			}
 		} else {
@@ -811,7 +805,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		var workerQueuesRequest []astroplatformcore.WorkerQueueRequest
 		if currentDeployment.WorkerQueues != nil {
 			workerQueues := *currentDeployment.WorkerQueues
-			for i := range *currentDeployment.WorkerQueues {
+			for i := range workerQueues {
 				var workerQueueRequest astroplatformcore.WorkerQueueRequest
 				workerQueueRequest.AstroMachine = astroplatformcore.WorkerQueueRequestAstroMachine(*workerQueues[i].AstroMachine)
 				workerQueueRequest.Id = &workerQueues[i].Id
@@ -910,7 +904,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
-			if standardDeploymentRequest.Executor == astroplatformcore.CELERY {
+			switch standardDeploymentRequest.Executor {
+			case astroplatformcore.CELERY:
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES {
 					confirmWithUser = true
 				}
@@ -919,8 +914,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				} else {
 					standardDeploymentRequest.WorkerQueues = &workerQueuesRequest
 				}
-			}
-			if standardDeploymentRequest.Executor == astroplatformcore.KUBERNETES {
+			case astroplatformcore.KUBERNETES:
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
 					confirmWithUser = true
 				}
@@ -966,7 +960,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
-			if dedicatedDeploymentRequest.Executor == astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY {
+			switch dedicatedDeploymentRequest.Executor {
+			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY:
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES {
 					confirmWithUser = true
 				}
@@ -975,8 +970,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				} else {
 					dedicatedDeploymentRequest.WorkerQueues = &workerQueuesRequest
 				}
-			}
-			if dedicatedDeploymentRequest.Executor == astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES {
+			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES:
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
 					confirmWithUser = true
 				}

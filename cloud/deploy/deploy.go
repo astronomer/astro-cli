@@ -218,8 +218,6 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	}
 
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
-	fmt.Println("deployment id:")
-	fmt.Println(deployInput.RuntimeID)
 
 	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, platformCoreClient, coreClient)
 	if err != nil {
@@ -295,7 +293,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, astroplatformcore.DeploymentType(dagsUploadURL))
+		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, astroplatformcore.DeploymentType(deployInfo.deploymentType))
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				fmt.Println("deployment id:")

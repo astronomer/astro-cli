@@ -3489,9 +3489,9 @@ func TestIsJSON(t *testing.T) {
 
 func TestDeploymentFromName(t *testing.T) {
 	var (
-		existingDeployments       []astroplatformcore.Deployment
-		deploymentToCreate        string
-		actual, expectedeployment astroplatformcore.Deployment
+		existingDeployments []astroplatformcore.Deployment
+		deploymentToCreate  string
+		expectedeployment   astroplatformcore.Deployment
 	)
 	description = "deployment 1"
 	description2 := "deployment 2"
@@ -3515,13 +3515,15 @@ func TestDeploymentFromName(t *testing.T) {
 	}
 	deploymentToCreate = "test-deployment-2"
 	t.Run("returns the deployment id for the matching deployment name", func(t *testing.T) {
-		actual = deploymentFromName(existingDeployments, deploymentToCreate)
+		actual, err := deploymentFromName(existingDeployments, deploymentToCreate)
+		assert.NoError(t, err)
 		assert.Equal(t, expectedeployment, actual)
 	})
 	t.Run("returns empty string if deployment name does not match", func(t *testing.T) {
 		deploymentToCreate = "test-d-2"
 		expectedeployment = astroplatformcore.Deployment{}
-		actual = deploymentFromName(existingDeployments, deploymentToCreate)
+		actual, err := deploymentFromName(existingDeployments, deploymentToCreate)
+		assert.NoError(t, err)
 		assert.Equal(t, expectedeployment, actual)
 	})
 }
