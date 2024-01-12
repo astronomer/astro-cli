@@ -80,13 +80,15 @@ var (
 			Type:          &standardType,
 			Region:        &testRegion,
 			CloudProvider: &testProvider,
+			WorkspaceName: &workspace1.Name,
 		},
 		{
-			Id:          "test-id-2",
-			Name:        "test",
-			Status:      "HEALTHY",
-			Type:        &hybridType,
-			ClusterName: &testCluster,
+			Id:            "test-id-2",
+			Name:          "test",
+			Status:        "HEALTHY",
+			Type:          &hybridType,
+			ClusterName:   &testCluster,
+			WorkspaceName: &workspace1.Name,
 		},
 	}
 	mockListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{
@@ -335,13 +337,15 @@ func TestGetDeployment(t *testing.T) {
 				Type:          &standardType,
 				Region:        &testRegion,
 				CloudProvider: &testProvider,
+				WorkspaceName: &workspace1.Name,
 			},
 			{
-				Id:          "test-id-2",
-				Name:        "test",
-				Status:      "HEALTHY",
-				Type:        &hybridType,
-				ClusterName: &testCluster,
+				Id:            "test-id-2",
+				Name:          "test",
+				Status:        "HEALTHY",
+				Type:          &hybridType,
+				ClusterName:   &testCluster,
+				WorkspaceName: &workspace1.Name,
 			},
 		}
 

@@ -129,13 +129,15 @@ var (
 			Type:          &standardType,
 			Region:        &testRegion,
 			CloudProvider: &testProvider,
+			WorkspaceName: &workspaceName,
 		},
 		{
-			Id:          "test-id-2",
-			Name:        "test-2",
-			Status:      "HEALTHY",
-			Type:        &hybridType,
-			ClusterName: &testCluster,
+			Id:            "test-id-2",
+			Name:          "test-2",
+			Status:        "HEALTHY",
+			Type:          &hybridType,
+			ClusterName:   &testCluster,
+			WorkspaceName: &workspaceName,
 		},
 	}
 	mockGetDeploymentLogsResponse = astrocore.GetDeploymentLogsResponse{
