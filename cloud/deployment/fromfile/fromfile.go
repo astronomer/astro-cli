@@ -34,7 +34,7 @@ var (
 	errNotPermitted                   = errors.New("is not permitted")
 	errNoUseWorkerQueues              = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
 	errUseDefaultWorkerType           = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
-	errDeploymentsWithSameName        = errors.New("You currently have two deployments with the name specified in the your worksapce. Make sure your deployment's name is unique in the workspace to update it with a deployment file")
+	errDeploymentsWithSameName        = errors.New("you currently have two deployments with the name specified in the your worksapce. Make sure your deployment's name is unique in the workspace to update it with a deployment file")
 
 	canCiCdDeploy = deployment.CanCiCdDeploy
 )
@@ -640,15 +640,15 @@ func deploymentExists(existingDeployments []astroplatformcore.Deployment, deploy
 // It returns the existing deployment that matches deploymentName.
 func deploymentFromName(existingDeployments []astroplatformcore.Deployment, deploymentName string) (astroplatformcore.Deployment, error) {
 	var existingDeployment astroplatformcore.Deployment
-	var i int
+	var j int
 	for i := range existingDeployments {
 		if existingDeployments[i].Name == deploymentName {
 			// deployment that matched name
 			existingDeployment = existingDeployments[i]
-			i++
+			j++
 		}
 	}
-	if i > 1 {
+	if j > 1 {
 		return astroplatformcore.Deployment{}, errDeploymentsWithSameName
 	}
 	return existingDeployment, nil

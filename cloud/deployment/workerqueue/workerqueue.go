@@ -179,7 +179,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
 			return errNoUseWorkerQueues
 		}
-		// -1 is the CLI default to allow users to request wQueueMin=0. Here we set it to default becuase MinWorkerCount is not used in Kubernetes Deployments
+		// -1 is the CLI default to allow users to request wQueueMin=0. Here we set it to default because MinWorkerCount is not used in Kubernetes Deployments
 		queueToCreateOrUpdateHybrid.MinWorkerCount = -1
 		err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid)
 		if err != nil {
