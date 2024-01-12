@@ -589,7 +589,7 @@ deployment:
 		astroCoreClient = mockCoreClient
 		platformCoreClient = mockPlatformCoreClient
 		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--cluster-type", "dedicated",
+			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated",
 		}
 
 		// Mock user input for deployment name and wait for status
@@ -609,11 +609,11 @@ deployment:
 		ctx.SetContextKey("workspace", ws)
 		astroCoreClient = mockCoreClient
 		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--cluster-type", "wrong-value",
+			"create", "--name", "test-name", "--workspace-id", ws, "--type", "wrong-value",
 		}
 
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "Invalid --cluster-type value")
+		assert.ErrorContains(t, err, "Invalid --type value")
 		mockCoreClient.AssertExpectations(t)
 	})
 }
