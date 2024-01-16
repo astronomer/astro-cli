@@ -500,13 +500,13 @@ func selectNodePool(workerType string, nodePools []astroplatformcore.NodePool, o
 // An errCannotDeleteDefaultQueue is returned if a user chooses the default queue
 func Delete(ws, deploymentID, deploymentName, name string, force bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer) error { //nolint:gocognit
 	var (
-		requestedDeployment astroplatformcore.Deployment
-		err                 error
-		queueToDelete       *astroplatformcore.WorkerQueueRequest
-		queueToDeleteHybrid *astroplatformcore.HybridWorkerQueueRequest
-		existingQueues      []astroplatformcore.WorkerQueue
-		listToDelete        []astroplatformcore.WorkerQueueRequest
-		hybridListToDelete  []astroplatformcore.HybridWorkerQueueRequest
+		requestedDeployment      astroplatformcore.Deployment
+		err                      error
+		queueToDelete            *astroplatformcore.WorkerQueueRequest
+		queueToDeleteHybrid      *astroplatformcore.HybridWorkerQueueRequest
+		existingQueues           []astroplatformcore.WorkerQueue
+		workerQueuesToKeep       []astroplatformcore.WorkerQueueRequest
+		hybridWorkerQueuesToKeep []astroplatformcore.HybridWorkerQueueRequest
 	)
 	// get or select the deployment
 	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, platformCoreClient, coreClient)
@@ -553,7 +553,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 			}
 		}
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-			// create a new listToDelete without queueToDelete in it
+			// create a new workerQueuesToKeep without queueToDelete in it
 			for i := range existingQueues { //nolint
 				if existingQueues[i].Name != queueToDelete.Name {
 					existingQueueRequest := astroplatformcore.WorkerQueueRequest{
@@ -565,11 +565,11 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 						WorkerConcurrency: existingQueues[i].WorkerConcurrency,
 						AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(*existingQueues[i].AstroMachine),
 					}
-					listToDelete = append(listToDelete, existingQueueRequest)
+					workerQueuesToKeep = append(workerQueuesToKeep, existingQueueRequest)
 				}
 			}
 			// update the deployment with the new list
-			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToDelete, hybridListToDelete, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
+			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -587,11 +587,11 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 						WorkerConcurrency: existingQueues[i].WorkerConcurrency,
 						NodePoolId:        *existingQueues[i].NodePoolId,
 					}
-					hybridListToDelete = append(hybridListToDelete, existingQueueRequest)
+					hybridWorkerQueuesToKeep = append(hybridWorkerQueuesToKeep, existingQueueRequest)
 				}
 			}
 			// update the deployment with the new list
-			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToDelete, hybridListToDelete, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
+			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
 			if err != nil {
 				return err
 			}
