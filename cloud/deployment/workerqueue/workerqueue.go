@@ -268,7 +268,7 @@ func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQue
 
 // SetWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
 func SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astroplatformcore.HybridWorkerQueueRequest, workerQueueDefaultOptions astroplatformcore.WorkerQueueOptions) *astroplatformcore.HybridWorkerQueueRequest {
-	// -1 is the CLI default to allow users to request wQueueMin=0
+	// -1 is the CLI default to allow users to request wQueueMin=default
 	if wQueueMin == -1 {
 		// set default value as user input did not have it
 		workerQueueToCreate.MinWorkerCount = int(workerQueueDefaultOptions.MinWorkers.Default)
