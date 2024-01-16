@@ -46,7 +46,7 @@ var (
 			RuntimeVersion:     "4.2.5",
 			Namespace:          "test-name",
 			WebServerUrl:       "test-url",
-			DagDeployEnabled:   false,
+			IsDagDeployEnabled: false,
 			Description:        &description,
 			Name:               "test-deployment-label",
 			Status:             "HEALTHY",

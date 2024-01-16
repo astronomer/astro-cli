@@ -441,8 +441,8 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 			return deploymentInfo{}, err
 		}
 		var desiredDagTarballVersion string
-		if coreDeployment.DagTarballVersion != nil {
-			desiredDagTarballVersion = *coreDeployment.DagTarballVersion
+		if coreDeployment.DesiredDagTarballVersion != nil {
+			desiredDagTarballVersion = *coreDeployment.DesiredDagTarballVersion
 		} else {
 			desiredDagTarballVersion = ""
 		}
@@ -457,7 +457,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 			currentDeployment.WebServerAirflowApiUrl,
 			string(*currentDeployment.Type),
 			desiredDagTarballVersion,
-			currentDeployment.DagDeployEnabled,
+			currentDeployment.IsDagDeployEnabled,
 			currentDeployment.IsCicdEnforced,
 		}, nil
 	}
@@ -569,11 +569,11 @@ func getImageName(cloudDomain, deploymentID, organizationID string, platformCore
 	namespace := resp.JSON200.Namespace
 	workspaceID := resp.JSON200.WorkspaceId
 	webserverURL := resp.JSON200.WebServerUrl
-	dagDeployEnabled := resp.JSON200.DagDeployEnabled
+	dagDeployEnabled := resp.JSON200.IsDagDeployEnabled
 	cicdEnforcement := resp.JSON200.IsCicdEnforced
 	var desiredDagTarballVersion string
-	if resp.JSON200.DagTarballVersion != nil {
-		desiredDagTarballVersion = *resp.JSON200.DagTarballVersion
+	if resp.JSON200.DesiredDagTarballVersion != nil {
+		desiredDagTarballVersion = *resp.JSON200.DesiredDagTarballVersion
 	} else {
 		desiredDagTarballVersion = ""
 	}

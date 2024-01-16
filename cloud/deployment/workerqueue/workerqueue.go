@@ -411,7 +411,7 @@ func selectWorkerMachine(workerType string, workerMachines []astroplatformcore.W
 
 		for i := range workerMachines {
 			index := i + 1
-			tab.AddRow([]string{strconv.Itoa(index), workerMachines[i].Name, workerMachines[i].Spec.Cpu + " vCPU", workerMachines[i].Spec.Memory}, false)
+			tab.AddRow([]string{strconv.Itoa(index), string(workerMachines[i].Name), workerMachines[i].Spec.Cpu + " vCPU", workerMachines[i].Spec.Memory}, false)
 
 			machineMap[strconv.Itoa(index)] = workerMachines[i]
 		}
@@ -427,7 +427,7 @@ func selectWorkerMachine(workerType string, workerMachines []astroplatformcore.W
 		return selectedPool, nil
 	default:
 		for _, workerMachine = range workerMachines {
-			if workerMachine.Name == workerType {
+			if string(workerMachine.Name) == workerType {
 				return workerMachine, nil
 			}
 		}

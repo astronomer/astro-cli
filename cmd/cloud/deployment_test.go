@@ -93,7 +93,7 @@ var (
 			Namespace:              "test-name",
 			WorkspaceId:            "workspace-id",
 			WebServerUrl:           "test-url",
-			DagDeployEnabled:       false,
+			IsDagDeployEnabled:     false,
 			Name:                   "test",
 			Status:                 "HEALTHY",
 			Type:                   &hybridType,

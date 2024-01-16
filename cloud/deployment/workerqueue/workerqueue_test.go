@@ -50,7 +50,7 @@ var (
 			Namespace:           "test-deployment-label",
 			WorkspaceId:         "workspace-id",
 			WebServerUrl:        "test-url",
-			DagDeployEnabled:    false,
+			IsDagDeployEnabled:  false,
 			Name:                "test-deployment-label",
 			Status:              "HEALTHY",
 			Type:                &hybridType,

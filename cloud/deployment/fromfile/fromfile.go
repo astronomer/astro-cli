@@ -156,7 +156,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		workspaceID = existingDeployment.WorkspaceId
 		// determine dagDeploy
 		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil { //nolint:staticcheck
-			dagDeploy = existingDeployment.DagDeployEnabled
+			dagDeploy = existingDeployment.IsDagDeployEnabled
 		} else {
 			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
 		}
@@ -228,7 +228,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			if deployment.IsDeploymentStandard(deploymentType) || deployment.IsDeploymentDedicated(deploymentType) {
 				astroMachines := configOptions.WorkerMachines
 				for j := range astroMachines {
-					if astroMachines[j].Name == *listQueues[i].AstroMachine {
+					if string(astroMachines[j].Name) == *listQueues[i].AstroMachine {
 						astroMachine = astroMachines[j]
 					}
 				}
@@ -431,19 +431,19 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
 			switch deploymentFromFile.Deployment.Configuration.Executor {
 			case deployment.CeleryExecutor, deployment.CELERY:
-				requestedExecutor = astroplatformcore.CELERY
+				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
 			case deployment.KubeExecutor, deployment.KUBERNETES:
-				requestedExecutor = astroplatformcore.KUBERNETES
+				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
 			}
 
 			var schedulerSize astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
 			case deployment.SMALL:
-				schedulerSize = astroplatformcore.SMALL
+				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeSMALL
 			case deployment.MEDIUM:
-				schedulerSize = astroplatformcore.MEDIUM
+				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
 			case deployment.LARGE:
-				schedulerSize = astroplatformcore.LARGE
+				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
 			}
 
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{

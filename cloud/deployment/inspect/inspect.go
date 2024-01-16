@@ -217,7 +217,7 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 		"region":               coreDeployment.Region,
 		"cluster_name":         clusterName,
 		"runtime_version":      coreDeployment.RuntimeVersion,
-		"dag_deploy_enabled":   coreDeployment.DagDeployEnabled,
+		"dag_deploy_enabled":   coreDeployment.IsDagDeployEnabled,
 		"ci_cd_enforcement":    coreDeployment.IsCicdEnforced,
 		"is_high_availability": coreDeployment.IsHighAvailability,
 		"scheduler_au":         coreDeployment.SchedulerAu,
