@@ -850,7 +850,7 @@ var CoreGetDeployment = func(ws, org, deploymentId string, coreClient astrocore.
 		if err != nil {
 			return astrocore.Deployment{}, err
 		}
-		org = c.OrganizationShortName
+		org = c.Organization
 	}
 
 	depIds := []string{deploymentId}
