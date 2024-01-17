@@ -202,7 +202,7 @@ var (
 )
 
 func TestCreate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkerQueue := astroplatformcore.WorkerQueue{
 		Name:              "test-worker-queue",
 		IsDefault:         false,
@@ -393,7 +393,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateHostedShared(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedOutMessage := "worker queue test-worker-queue for test-deployment-label in test-ws-id workspace created\n"
 	out := new(bytes.Buffer)
 	// hosted deployments
@@ -453,7 +453,7 @@ func TestCreateHostedShared(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkerQueue := astroplatformcore.WorkerQueue{
 		Name:              "test-queue-1",
 		IsDefault:         false,
@@ -953,7 +953,7 @@ func TestIsCeleryWorkerQueueInputValid(t *testing.T) {
 }
 
 func TestIsHostedCeleryWorkerQueueInputValid(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockWorkerQueueDefaultOptions := astroplatformcore.WorkerQueueOptions{
 		MinWorkers: astroplatformcore.Range{
 			Floor:   0,
@@ -1018,7 +1018,7 @@ func TestIsHostedCeleryWorkerQueueInputValid(t *testing.T) {
 }
 
 func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	requestedWorkerQueue := &astroplatformcore.HybridWorkerQueueRequest{
 		Name:              "default",
 		MinWorkerCount:    -1,

@@ -192,7 +192,7 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("use API token", func(t *testing.T) {
-		mockOrgsResponse := astrocore.ListOrganizationsResponse{
+		mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
@@ -248,7 +248,7 @@ func TestSetup(t *testing.T) {
 func TestCheckAPIKeys(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("test context switch", func(t *testing.T) {
-		mockOrgsResponse := astrocore.ListOrganizationsResponse{
+		mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},

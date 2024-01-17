@@ -44,7 +44,7 @@ func TestNewDeploymentWorkerQueueRootCmd(t *testing.T) {
 
 func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 	expectedHelp := "Create a worker queue for an Astro Deployment"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	platformCoreClient = mockPlatformCoreClient
 	astroCoreClient = mockCoreClient
 	t.Run("-h prints worker-queue help", func(t *testing.T) {
@@ -138,7 +138,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 
 func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 	expectedHelp := "Delete a worker queue from an Astro Deployment"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	platformCoreClient = mockPlatformCoreClient
 	astroCoreClient = mockCoreClient
 
@@ -207,7 +207,7 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 
 func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 	expectedHelp := "Update a worker queue for an Astro Deployment"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	platformCoreClient = mockPlatformCoreClient
 	astroCoreClient = mockCoreClient
 

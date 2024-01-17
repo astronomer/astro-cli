@@ -274,7 +274,7 @@ func TestList(t *testing.T) {
 
 func TestGetDeployment(t *testing.T) {
 	deploymentID := "test-id-wrong"
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("invalid deployment ID", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
@@ -518,7 +518,7 @@ func TestGetDeployment(t *testing.T) {
 }
 
 func TestCoreGetDeployment(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	deploymentID := "test-id-1"
 	t.Run("success", func(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
@@ -570,7 +570,7 @@ func TestIsDeploymentDedicated(t *testing.T) {
 }
 
 func TestSelectRegion(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("list regions failure", func(t *testing.T) {
 		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
@@ -726,7 +726,7 @@ func TestSelectRegion(t *testing.T) {
 }
 
 func TestLogs(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	deploymentID := "test-id-1"
 	logCount := 2
 	mockGetDeploymentLogsResponse := astrocore.GetDeploymentLogsResponse{
@@ -825,7 +825,6 @@ func TestLogs(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
 	csID := "test-cluster-id"
 	var (
 		cloudProvider                = "test-provider"
@@ -1231,7 +1230,7 @@ func TestCanCiCdDeploy(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) { //nolint
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	cloudProvider := "test-provider"
 	astroMachine := "test-machine"
 	nodeID := "test-id"

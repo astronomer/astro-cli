@@ -295,7 +295,7 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.deploymentType)
+		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, astroplatformcore.DeploymentType(deployInfo.deploymentType))
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				fmt.Println("deployment id:")
@@ -386,7 +386,7 @@ func Deploy(deployInput InputDeploy, corePlatformClient astroplatformcore.CoreCl
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
 			if !deployInput.Image {
-				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentType, dagsUploadURL)
+				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, astroplatformcore.DeploymentType(deployInfo.deploymentType))
 				if err != nil {
 					return err
 				}
@@ -438,7 +438,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 		if err != nil {
 			return deploymentInfo{}, err
 		}
-		coreDeployment, err := deployment.CoreGetDeployment(currentDeployment.Workspace.ID, currentDeployment.Workspace.OrganizationID, currentDeployment.ID, coreClient)
+		coreDeployment, err := deployment.CoreGetDeployment(currentDeployment.OrganizationId, currentDeployment.Id, corePlatformClient)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
@@ -450,17 +450,17 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 		}
 
 		return deploymentInfo{
-			currentDeployment.ID,
-			currentDeployment.ReleaseName,
-			airflow.ImageName(currentDeployment.ReleaseName, "latest"),
-			currentDeployment.RuntimeRelease.Version,
-			currentDeployment.Workspace.OrganizationID,
-			currentDeployment.Workspace.ID,
-			currentDeployment.DeploymentSpec.Webserver.URL,
-			currentDeployment.Type,
+			currentDeployment.Id,
+			currentDeployment.Namespace,
+			airflow.ImageName(currentDeployment.Namespace, "latest"),
+			currentDeployment.RuntimeVersion,
+			currentDeployment.OrganizationId,
+			currentDeployment.WorkspaceId,
+			currentDeployment.WebServerAirflowApiUrl,
+			string(*currentDeployment.Type),
 			desiredDagTarballVersion,
-			currentDeployment.DagDeployEnabled,
-			currentDeployment.APIKeyOnlyDeployments,
+			currentDeployment.IsDagDeployEnabled,
+			currentDeployment.IsCicdEnforced,
 		}, nil
 	}
 	c, err := config.GetCurrentContext()
