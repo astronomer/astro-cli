@@ -572,7 +572,7 @@ func getImageName(cloudDomain, deploymentID, organizationID string, corePlatform
 	workspaceID := resp.JSON200.WorkspaceId
 	webserverURL := resp.JSON200.WebServerUrl
 	dagDeployEnabled := resp.JSON200.IsDagDeployEnabled
-	cicdEnforcement := resp.JSON200.ApiKeyOnlyDeployments
+	cicdEnforcement := resp.JSON200.IsCicdEnforced
 	var desiredDagTarballVersion string
 	if resp.JSON200.DesiredDagTarballVersion != nil {
 		desiredDagTarballVersion = *resp.JSON200.DesiredDagTarballVersion

@@ -121,7 +121,7 @@ var (
 			Namespace:           "test-name",
 			WorkspaceId:         ws,
 			WebServerUrl:        "test-url",
-			DagDeployEnabled:    false,
+			IsDagDeployEnabled:  false,
 			Name:                "test",
 			Status:              "HEALTHY",
 			Type:                &hybridType,
@@ -1428,7 +1428,7 @@ func TestUpdate(t *testing.T) { //nolint
 	t.Run("cancel update", func(t *testing.T) {
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		deploymentResponse.JSON200.DagDeployEnabled = true
+		deploymentResponse.JSON200.IsDagDeployEnabled = true
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
@@ -1458,7 +1458,7 @@ func TestUpdate(t *testing.T) { //nolint
 
 	t.Run("do not update deployment to enable dag deploy if already enabled", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		deploymentResponse.JSON200.DagDeployEnabled = true
+		deploymentResponse.JSON200.IsDagDeployEnabled = true
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
 		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)

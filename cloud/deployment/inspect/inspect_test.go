@@ -161,7 +161,7 @@ var (
 		WorkerQueues:           &workerqueue,
 		UpdatedAt:              time.Now(),
 		Status:                 "UNHEALTHY",
-		DagDeployEnabled:       true,
+		IsDagDeployEnabled:     true,
 	}
 
 	getDeploymentResponse = astroplatformcore.GetDeploymentResponse{
@@ -433,7 +433,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			RunTimeVersion:   sourceDeployment.RuntimeVersion,
 			SchedulerAU:      *sourceDeployment.SchedulerAu,
 			SchedulerCount:   sourceDeployment.SchedulerReplicas,
-			DagDeployEnabled: &sourceDeployment.DagDeployEnabled,
+			DagDeployEnabled: &sourceDeployment.IsDagDeployEnabled,
 			Executor:         string(*sourceDeployment.Executor),
 			Region:           *sourceDeployment.Region,
 			DeploymentType:   string(*sourceDeployment.Type),
@@ -461,7 +461,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			RunTimeVersion:   sourceDeployment.RuntimeVersion,
 			SchedulerAU:      *sourceDeployment.SchedulerAu,
 			SchedulerCount:   sourceDeployment.SchedulerReplicas,
-			DagDeployEnabled: &sourceDeployment.DagDeployEnabled,
+			DagDeployEnabled: &sourceDeployment.IsDagDeployEnabled,
 			Executor:         string(*sourceDeployment.Executor),
 			Region:           *sourceDeployment.Region,
 			DeploymentType:   string(*sourceDeployment.Type),

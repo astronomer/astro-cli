@@ -149,9 +149,9 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 			cloudProvider = *d.CloudProvider
 		}
 		if all {
-			tab.AddRow([]string{d.Name, workspaceID, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
+			tab.AddRow([]string{d.Name, workspaceID, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 		} else {
-			tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
+			tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 		}
 	}
 	tab.Print(out)
@@ -314,7 +314,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 		var workerConcurrency int
 		for i := range configOption.WorkerMachines {
-			if strings.EqualFold(configOption.DefaultValues.WorkerMachineName, configOption.WorkerMachines[i].Name) {
+			if strings.EqualFold(configOption.DefaultValues.WorkerMachineName, string(configOption.WorkerMachines[i].Name)) {
 				workerConcurrency = int(configOption.WorkerMachines[i].Concurrency.Default)
 			}
 		}
@@ -538,7 +538,7 @@ func createOutput(workspaceID string, d *astroplatformcore.Deployment) error {
 	releaseName := d.Namespace
 	cloudProvider := *d.CloudProvider
 	region := notApplicable
-	tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
+	tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 	deploymentURL, err := GetDeploymentURL(d.Id, workspaceID)
 	if err != nil {
 		return err
@@ -754,7 +754,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	// determine isDagDeployEnabled
 	var dagDeployEnabled bool
 	if dagDeploy == enable {
-		if currentDeployment.DagDeployEnabled {
+		if currentDeployment.IsDagDeployEnabled {
 			fmt.Println("\nDAG deploys are already enabled for this Deployment. Your DAGs will continue to run as scheduled.")
 			return nil
 		}
@@ -763,7 +763,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			"\nRun `astro deploy --dags` to complete enabling this feature and resume your DAGs. It may take a few minutes for the Airflow UI to update..\n\n")
 		dagDeployEnabled = true
 	} else if dagDeploy == disable {
-		if !currentDeployment.DagDeployEnabled {
+		if !currentDeployment.IsDagDeployEnabled {
 			fmt.Println("\nDAG-only deploys is already disabled for this deployment.")
 			return nil
 		}
@@ -828,7 +828,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 
 		var workerConcurrency int
 		for i := range configOption.WorkerMachines {
-			if strings.EqualFold(configOption.DefaultValues.WorkerMachineName, configOption.WorkerMachines[i].Name) {
+			if strings.EqualFold(configOption.DefaultValues.WorkerMachineName, string(configOption.WorkerMachines[i].Name)) {
 				workerConcurrency = int(configOption.WorkerMachines[i].Concurrency.Default)
 			}
 		}
@@ -881,10 +881,10 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutor(*currentDeployment.Executor)
 			}
 			if executor == CeleryExecutor {
-				requestedExecutor = astroplatformcore.CELERY
+				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
 			}
 			if executor == KubeExecutor {
-				requestedExecutor = astroplatformcore.KUBERNETES
+				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
 			}
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
 				Description:          &description,
@@ -903,19 +903,19 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			}
 			if schedulerSize != "" {
 				if schedulerSize == SmallScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.SMALL
+					standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeSMALL
 				}
 				if schedulerSize == MediumScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.MEDIUM
+					standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
 				}
 				if schedulerSize == LargeScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.LARGE
+					standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
 				}
 			}
 			if schedulerSize == "" {
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
-			if standardDeploymentRequest.Executor == astroplatformcore.CELERY {
+			if standardDeploymentRequest.Executor == astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY {
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES {
 					confirmWithUser = true
 				}
@@ -925,7 +925,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 					standardDeploymentRequest.WorkerQueues = &workerQueuesRequest
 				}
 			}
-			if standardDeploymentRequest.Executor == astroplatformcore.KUBERNETES {
+			if standardDeploymentRequest.Executor == astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES {
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
 					confirmWithUser = true
 				}
@@ -1119,7 +1119,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		clusterName := notApplicable
 		cloudProvider := *d.CloudProvider
 		region := notApplicable
-		tabDeployment.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
+		tabDeployment.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
 	}
@@ -1411,7 +1411,7 @@ var SelectDeployment = func(deployments []astroplatformcore.Deployment, message 
 	deployMap := map[string]astroplatformcore.Deployment{}
 	for i := range deployments {
 		index := i + 1
-		tab.AddRow([]string{strconv.Itoa(index), deployments[i].Name, deployments[i].Namespace, deployments[i].Id, strconv.FormatBool(deployments[i].DagDeployEnabled)}, false)
+		tab.AddRow([]string{strconv.Itoa(index), deployments[i].Name, deployments[i].Namespace, deployments[i].Id, strconv.FormatBool(deployments[i].IsDagDeployEnabled)}, false)
 
 		deployMap[strconv.Itoa(index)] = deployments[i]
 	}

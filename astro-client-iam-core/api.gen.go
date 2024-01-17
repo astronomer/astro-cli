@@ -35,18 +35,6 @@ const (
 	ApiTokenRoleEntityTypeWORKSPACE    ApiTokenRoleEntityType = "WORKSPACE"
 )
 
-// Defines values for ApiTokenRoleRole.
-const (
-	ApiTokenRoleRoleDEPLOYMENTADMIN          ApiTokenRoleRole = "DEPLOYMENT_ADMIN"
-	ApiTokenRoleRoleORGANIZATIONBILLINGADMIN ApiTokenRoleRole = "ORGANIZATION_BILLING_ADMIN"
-	ApiTokenRoleRoleORGANIZATIONMEMBER       ApiTokenRoleRole = "ORGANIZATION_MEMBER"
-	ApiTokenRoleRoleORGANIZATIONOWNER        ApiTokenRoleRole = "ORGANIZATION_OWNER"
-	ApiTokenRoleRoleWORKSPACEAUTHOR          ApiTokenRoleRole = "WORKSPACE_AUTHOR"
-	ApiTokenRoleRoleWORKSPACEMEMBER          ApiTokenRoleRole = "WORKSPACE_MEMBER"
-	ApiTokenRoleRoleWORKSPACEOPERATOR        ApiTokenRoleRole = "WORKSPACE_OPERATOR"
-	ApiTokenRoleRoleWORKSPACEOWNER           ApiTokenRoleRole = "WORKSPACE_OWNER"
-)
-
 // Defines values for BasicSubjectProfileSubjectType.
 const (
 	SERVICEKEY BasicSubjectProfileSubjectType = "SERVICEKEY"
@@ -121,9 +109,9 @@ const (
 
 // Defines values for UserOrganizationRole.
 const (
-	ORGANIZATIONBILLINGADMIN UserOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
-	ORGANIZATIONMEMBER       UserOrganizationRole = "ORGANIZATION_MEMBER"
-	ORGANIZATIONOWNER        UserOrganizationRole = "ORGANIZATION_OWNER"
+	UserOrganizationRoleORGANIZATIONBILLINGADMIN UserOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
+	UserOrganizationRoleORGANIZATIONMEMBER       UserOrganizationRole = "ORGANIZATION_MEMBER"
+	UserOrganizationRoleORGANIZATIONOWNER        UserOrganizationRole = "ORGANIZATION_OWNER"
 )
 
 // Defines values for UserStatus.
@@ -256,14 +244,11 @@ type ApiTokenRole struct {
 	EntityType ApiTokenRoleEntityType `json:"entityType"`
 
 	// Role The role of the API token.
-	Role ApiTokenRoleRole `json:"role"`
+	Role string `json:"role"`
 }
 
 // ApiTokenRoleEntityType The type of the entity to which the API token is scoped for.
 type ApiTokenRoleEntityType string
-
-// ApiTokenRoleRole The role of the API token.
-type ApiTokenRoleRole string
 
 // ApiTokensPaginated defines model for ApiTokensPaginated.
 type ApiTokensPaginated struct {
@@ -708,6 +693,9 @@ type UpdateApiTokenJSONRequestBody = UpdateApiTokenRequest
 // UpdateApiTokenRolesJSONRequestBody defines body for UpdateApiTokenRoles for application/json ContentType.
 type UpdateApiTokenRolesJSONRequestBody = UpdateApiTokenRolesRequest
 
+// UpdateUserRolesJSONRequestBody defines body for UpdateUserRoles for application/json ContentType.
+type UpdateUserRolesJSONRequestBody = UpdateUserRolesRequest
+
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
 
@@ -859,6 +847,8 @@ type ClientInterface interface {
 
 	// UpdateUserRoles request with any body
 	UpdateUserRolesWithBody(ctx context.Context, organizationId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateUserRoles(ctx context.Context, organizationId string, userId string, body UpdateUserRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) CreateUserInviteWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1199,6 +1189,18 @@ func (c *Client) GetUser(ctx context.Context, organizationId string, userId stri
 
 func (c *Client) UpdateUserRolesWithBody(ctx context.Context, organizationId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateUserRolesRequestWithBody(c.Server, organizationId, userId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateUserRoles(ctx context.Context, organizationId string, userId string, body UpdateUserRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateUserRolesRequest(c.Server, organizationId, userId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2370,6 +2372,17 @@ func NewGetUserRequest(server string, organizationId string, userId string) (*ht
 	return req, nil
 }
 
+// NewUpdateUserRolesRequest calls the generic UpdateUserRoles builder with application/json body
+func NewUpdateUserRolesRequest(server string, organizationId string, userId string, body UpdateUserRolesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateUserRolesRequestWithBody(server, organizationId, userId, "application/json", bodyReader)
+}
+
 // NewUpdateUserRolesRequestWithBody generates requests for UpdateUserRoles with any type of body
 func NewUpdateUserRolesRequestWithBody(server string, organizationId string, userId string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -2534,6 +2547,8 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateUserRoles request with any body
 	UpdateUserRolesWithBodyWithResponse(ctx context.Context, organizationId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateUserRolesResponse, error)
+
+	UpdateUserRolesWithResponse(ctx context.Context, organizationId string, userId string, body UpdateUserRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateUserRolesResponse, error)
 }
 
 type CreateUserInviteResponse struct {
@@ -3344,6 +3359,14 @@ func (c *ClientWithResponses) GetUserWithResponse(ctx context.Context, organizat
 // UpdateUserRolesWithBodyWithResponse request with arbitrary body returning *UpdateUserRolesResponse
 func (c *ClientWithResponses) UpdateUserRolesWithBodyWithResponse(ctx context.Context, organizationId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateUserRolesResponse, error) {
 	rsp, err := c.UpdateUserRolesWithBody(ctx, organizationId, userId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateUserRolesResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateUserRolesWithResponse(ctx context.Context, organizationId string, userId string, body UpdateUserRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateUserRolesResponse, error) {
+	rsp, err := c.UpdateUserRoles(ctx, organizationId, userId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

@@ -57,6 +57,7 @@ const (
 	ClusterStatusDELETEFAILED ClusterStatus = "DELETE_FAILED"
 	ClusterStatusDELETING     ClusterStatus = "DELETING"
 	ClusterStatusFORCEDELETED ClusterStatus = "FORCE_DELETED"
+	ClusterStatusUPDATEFAILED ClusterStatus = "UPDATE_FAILED"
 	ClusterStatusUPDATING     ClusterStatus = "UPDATING"
 )
 
@@ -83,6 +84,7 @@ const (
 	ClusterDetailedStatusDELETEFAILED ClusterDetailedStatus = "DELETE_FAILED"
 	ClusterDetailedStatusDELETING     ClusterDetailedStatus = "DELETING"
 	ClusterDetailedStatusFORCEDELETED ClusterDetailedStatus = "FORCE_DELETED"
+	ClusterDetailedStatusUPDATEFAILED ClusterDetailedStatus = "UPDATE_FAILED"
 	ClusterDetailedStatusUPDATING     ClusterDetailedStatus = "UPDATING"
 )
 
@@ -91,6 +93,16 @@ const (
 	ClusterDetailedTypeBRINGYOUROWNCLOUD ClusterDetailedType = "BRING_YOUR_OWN_CLOUD"
 	ClusterDetailedTypeHOSTED            ClusterDetailedType = "HOSTED"
 	ClusterDetailedTypeSHARED            ClusterDetailedType = "SHARED"
+)
+
+// Defines values for ClusterRouteSource.
+const (
+	ClusterRouteSourceMANUAL ClusterRouteSource = "MANUAL"
+)
+
+// Defines values for ClusterRouteTargetType.
+const (
+	ClusterRouteTargetTypeAWSPCX ClusterRouteTargetType = "AWS_PCX"
 )
 
 // Defines values for CreateAwsClusterRequestType.
@@ -105,6 +117,16 @@ const (
 	CreateAzureClusterRequestTypeBRINGYOUROWNCLOUD CreateAzureClusterRequestType = "BRING_YOUR_OWN_CLOUD"
 	CreateAzureClusterRequestTypeHOSTED            CreateAzureClusterRequestType = "HOSTED"
 	CreateAzureClusterRequestTypeSHARED            CreateAzureClusterRequestType = "SHARED"
+)
+
+// Defines values for CreateClusterRouteRequestSource.
+const (
+	CreateClusterRouteRequestSourceMANUAL CreateClusterRouteRequestSource = "MANUAL"
+)
+
+// Defines values for CreateClusterRouteRequestTargetType.
+const (
+	CreateClusterRouteRequestTargetTypeAWSPCX CreateClusterRouteRequestTargetType = "AWS_PCX"
 )
 
 // Defines values for CreateDedicatedDeploymentRequestExecutor.
@@ -136,7 +158,6 @@ const (
 // Defines values for CreateEnvironmentObjectLinkRequestScope.
 const (
 	CreateEnvironmentObjectLinkRequestScopeDEPLOYMENT CreateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
-	CreateEnvironmentObjectLinkRequestScopePROJECT    CreateEnvironmentObjectLinkRequestScope = "PROJECT"
 )
 
 // Defines values for CreateEnvironmentObjectRequestObjectType.
@@ -148,7 +169,6 @@ const (
 // Defines values for CreateEnvironmentObjectRequestScope.
 const (
 	CreateEnvironmentObjectRequestScopeDEPLOYMENT CreateEnvironmentObjectRequestScope = "DEPLOYMENT"
-	CreateEnvironmentObjectRequestScopePROJECT    CreateEnvironmentObjectRequestScope = "PROJECT"
 	CreateEnvironmentObjectRequestScopeWORKSPACE  CreateEnvironmentObjectRequestScope = "WORKSPACE"
 )
 
@@ -234,10 +254,11 @@ const (
 
 // Defines values for DeploymentStatus.
 const (
-	DeploymentStatusCREATING  DeploymentStatus = "CREATING"
-	DeploymentStatusDEPLOYING DeploymentStatus = "DEPLOYING"
-	DeploymentStatusHEALTHY   DeploymentStatus = "HEALTHY"
-	DeploymentStatusUNHEALTHY DeploymentStatus = "UNHEALTHY"
+	DeploymentStatusCREATING    DeploymentStatus = "CREATING"
+	DeploymentStatusDEPLOYING   DeploymentStatus = "DEPLOYING"
+	DeploymentStatusHEALTHY     DeploymentStatus = "HEALTHY"
+	DeploymentStatusHIBERNATING DeploymentStatus = "HIBERNATING"
+	DeploymentStatusUNHEALTHY   DeploymentStatus = "UNHEALTHY"
 )
 
 // Defines values for DeploymentType.
@@ -245,6 +266,12 @@ const (
 	DeploymentTypeDEDICATED DeploymentType = "DEDICATED"
 	DeploymentTypeHYBRID    DeploymentType = "HYBRID"
 	DeploymentTypeSTANDARD  DeploymentType = "STANDARD"
+)
+
+// Defines values for DeploymentHibernationStatusNextEventType.
+const (
+	HIBERNATE DeploymentHibernationStatusNextEventType = "HIBERNATE"
+	WAKE      DeploymentHibernationStatusNextEventType = "WAKE"
 )
 
 // Defines values for DeploymentLogEntrySource.
@@ -255,13 +282,16 @@ const (
 	DeploymentLogEntrySourceWorker    DeploymentLogEntrySource = "worker"
 )
 
-// Defines values for EntitlementRequiredTier.
+// Defines values for EntitlementRequiredPlan.
 const (
-	EntitlementRequiredTierBASIC            EntitlementRequiredTier = "BASIC"
-	EntitlementRequiredTierBUSINESSCRITICAL EntitlementRequiredTier = "BUSINESS_CRITICAL"
-	EntitlementRequiredTierPREMIUM          EntitlementRequiredTier = "PREMIUM"
-	EntitlementRequiredTierSTANDARD         EntitlementRequiredTier = "STANDARD"
-	EntitlementRequiredTierTRIAL            EntitlementRequiredTier = "TRIAL"
+	EntitlementRequiredPlanAZUREMANAGEDPREVIEW EntitlementRequiredPlan = "AZURE_MANAGED_PREVIEW"
+	EntitlementRequiredPlanBASIC               EntitlementRequiredPlan = "BASIC"
+	EntitlementRequiredPlanBUSINESSCRITICAL    EntitlementRequiredPlan = "BUSINESS_CRITICAL"
+	EntitlementRequiredPlanINTERNAL            EntitlementRequiredPlan = "INTERNAL"
+	EntitlementRequiredPlanPOV                 EntitlementRequiredPlan = "POV"
+	EntitlementRequiredPlanPREMIUM             EntitlementRequiredPlan = "PREMIUM"
+	EntitlementRequiredPlanSTANDARD            EntitlementRequiredPlan = "STANDARD"
+	EntitlementRequiredPlanTRIAL               EntitlementRequiredPlan = "TRIAL"
 )
 
 // Defines values for EnvironmentObjectObjectType.
@@ -273,14 +303,12 @@ const (
 // Defines values for EnvironmentObjectScope.
 const (
 	EnvironmentObjectScopeDEPLOYMENT EnvironmentObjectScope = "DEPLOYMENT"
-	EnvironmentObjectScopePROJECT    EnvironmentObjectScope = "PROJECT"
 	EnvironmentObjectScopeWORKSPACE  EnvironmentObjectScope = "WORKSPACE"
 )
 
 // Defines values for EnvironmentObjectLinkScope.
 const (
 	EnvironmentObjectLinkScopeDEPLOYMENT EnvironmentObjectLinkScope = "DEPLOYMENT"
-	EnvironmentObjectLinkScopePROJECT    EnvironmentObjectLinkScope = "PROJECT"
 )
 
 // Defines values for ManagedDomainStatus.
@@ -291,11 +319,11 @@ const (
 
 // Defines values for MutateWorkerQueueRequestAstroMachine.
 const (
-	A10 MutateWorkerQueueRequestAstroMachine = "A10"
-	A20 MutateWorkerQueueRequestAstroMachine = "A20"
-	A40 MutateWorkerQueueRequestAstroMachine = "A40"
-	A5  MutateWorkerQueueRequestAstroMachine = "A5"
-	A60 MutateWorkerQueueRequestAstroMachine = "A60"
+	MutateWorkerQueueRequestAstroMachineA10 MutateWorkerQueueRequestAstroMachine = "A10"
+	MutateWorkerQueueRequestAstroMachineA20 MutateWorkerQueueRequestAstroMachine = "A20"
+	MutateWorkerQueueRequestAstroMachineA40 MutateWorkerQueueRequestAstroMachine = "A40"
+	MutateWorkerQueueRequestAstroMachineA5  MutateWorkerQueueRequestAstroMachine = "A5"
+	MutateWorkerQueueRequestAstroMachineA60 MutateWorkerQueueRequestAstroMachine = "A60"
 )
 
 // Defines values for OrganizationPaymentMethod.
@@ -324,12 +352,20 @@ const (
 const (
 	OrganizationSupportPlanAZUREMANAGEDPREVIEW OrganizationSupportPlan = "AZURE_MANAGED_PREVIEW"
 	OrganizationSupportPlanBASIC               OrganizationSupportPlan = "BASIC"
+	OrganizationSupportPlanBASICPAYGO          OrganizationSupportPlan = "BASIC_PAYGO"
 	OrganizationSupportPlanBUSINESSCRITICAL    OrganizationSupportPlan = "BUSINESS_CRITICAL"
 	OrganizationSupportPlanINTERNAL            OrganizationSupportPlan = "INTERNAL"
 	OrganizationSupportPlanPOV                 OrganizationSupportPlan = "POV"
 	OrganizationSupportPlanPREMIUM             OrganizationSupportPlan = "PREMIUM"
 	OrganizationSupportPlanSTANDARD            OrganizationSupportPlan = "STANDARD"
 	OrganizationSupportPlanTRIAL               OrganizationSupportPlan = "TRIAL"
+)
+
+// Defines values for SchedulerMachineName.
+const (
+	SchedulerMachineNameLARGE  SchedulerMachineName = "LARGE"
+	SchedulerMachineNameMEDIUM SchedulerMachineName = "MEDIUM"
+	SchedulerMachineNameSMALL  SchedulerMachineName = "SMALL"
 )
 
 // Defines values for SelfSignupType.
@@ -354,13 +390,13 @@ const (
 	SharedClusterStatusDELETEFAILED SharedClusterStatus = "DELETE_FAILED"
 	SharedClusterStatusDELETING     SharedClusterStatus = "DELETING"
 	SharedClusterStatusFORCEDELETED SharedClusterStatus = "FORCE_DELETED"
+	SharedClusterStatusUPDATEFAILED SharedClusterStatus = "UPDATE_FAILED"
 	SharedClusterStatusUPDATING     SharedClusterStatus = "UPDATING"
 )
 
 // Defines values for UpdateEnvironmentObjectLinkRequestScope.
 const (
 	UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT UpdateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
-	UpdateEnvironmentObjectLinkRequestScopePROJECT    UpdateEnvironmentObjectLinkRequestScope = "PROJECT"
 )
 
 // Defines values for UpdateEnvironmentObjectRequestObjectType.
@@ -372,7 +408,6 @@ const (
 // Defines values for UpdateEnvironmentObjectRequestScope.
 const (
 	UpdateEnvironmentObjectRequestScopeDEPLOYMENT UpdateEnvironmentObjectRequestScope = "DEPLOYMENT"
-	UpdateEnvironmentObjectRequestScopePROJECT    UpdateEnvironmentObjectRequestScope = "PROJECT"
 	UpdateEnvironmentObjectRequestScopeWORKSPACE  UpdateEnvironmentObjectRequestScope = "WORKSPACE"
 )
 
@@ -384,9 +419,9 @@ const (
 
 // Defines values for UpdateHostedDeploymentRequestSchedulerSize.
 const (
-	UpdateHostedDeploymentRequestSchedulerSizeLARGE  UpdateHostedDeploymentRequestSchedulerSize = "LARGE"
-	UpdateHostedDeploymentRequestSchedulerSizeMEDIUM UpdateHostedDeploymentRequestSchedulerSize = "MEDIUM"
-	UpdateHostedDeploymentRequestSchedulerSizeSMALL  UpdateHostedDeploymentRequestSchedulerSize = "SMALL"
+	LARGE  UpdateHostedDeploymentRequestSchedulerSize = "LARGE"
+	MEDIUM UpdateHostedDeploymentRequestSchedulerSize = "MEDIUM"
+	SMALL  UpdateHostedDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for UpdateHostedDeploymentRequestType.
@@ -419,6 +454,15 @@ const (
 const (
 	UserSignupTypeRegular UserSignupType = "Regular"
 	UserSignupTypeTrial   UserSignupType = "Trial"
+)
+
+// Defines values for WorkerMachineName.
+const (
+	WorkerMachineNameA10 WorkerMachineName = "A10"
+	WorkerMachineNameA20 WorkerMachineName = "A20"
+	WorkerMachineNameA40 WorkerMachineName = "A40"
+	WorkerMachineNameA5  WorkerMachineName = "A5"
+	WorkerMachineNameA60 WorkerMachineName = "A60"
 )
 
 // Defines values for GetSharedClusterParamsCloudProvider.
@@ -532,6 +576,7 @@ const (
 	DELETEFAILED ListClustersParamsStatuses = "DELETE_FAILED"
 	DELETING     ListClustersParamsStatuses = "DELETING"
 	FORCEDELETED ListClustersParamsStatuses = "FORCE_DELETED"
+	UPDATEFAILED ListClustersParamsStatuses = "UPDATE_FAILED"
 	UPDATING     ListClustersParamsStatuses = "UPDATING"
 )
 
@@ -567,11 +612,29 @@ const (
 	ListClustersParamsSortsVpcSubnetRangeDesc      ListClustersParamsSorts = "vpcSubnetRange:desc"
 )
 
+// Defines values for ListClusterRoutesParamsSorts.
+const (
+	ListClusterRoutesParamsSortsCreatedAtAsc    ListClusterRoutesParamsSorts = "createdAt:asc"
+	ListClusterRoutesParamsSortsCreatedAtDesc   ListClusterRoutesParamsSorts = "createdAt:desc"
+	ListClusterRoutesParamsSortsDescriptionAsc  ListClusterRoutesParamsSorts = "description:asc"
+	ListClusterRoutesParamsSortsDescriptionDesc ListClusterRoutesParamsSorts = "description:desc"
+	ListClusterRoutesParamsSortsIdAsc           ListClusterRoutesParamsSorts = "id:asc"
+	ListClusterRoutesParamsSortsIdDesc          ListClusterRoutesParamsSorts = "id:desc"
+	ListClusterRoutesParamsSortsNameAsc         ListClusterRoutesParamsSorts = "name:asc"
+	ListClusterRoutesParamsSortsNameDesc        ListClusterRoutesParamsSorts = "name:desc"
+)
+
 // Defines values for GetDeploymentOptionsParamsDeploymentType.
 const (
 	GetDeploymentOptionsParamsDeploymentTypeDEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
 	GetDeploymentOptionsParamsDeploymentTypeHYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
 	GetDeploymentOptionsParamsDeploymentTypeSTANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
+)
+
+// Defines values for GetDeploymentOptionsParamsExecutor.
+const (
+	CELERY     GetDeploymentOptionsParamsExecutor = "CELERY"
+	KUBERNETES GetDeploymentOptionsParamsExecutor = "KUBERNETES"
 )
 
 // Defines values for GetDeploymentOptionsParamsCloudProvider.
@@ -743,20 +806,20 @@ const (
 
 // Defines values for ListWorkspaceUsersParamsSorts.
 const (
-	ListWorkspaceUsersParamsSortsCreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
-	ListWorkspaceUsersParamsSortsCreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
-	ListWorkspaceUsersParamsSortsFullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
-	ListWorkspaceUsersParamsSortsFullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
-	ListWorkspaceUsersParamsSortsIdAsc             ListWorkspaceUsersParamsSorts = "id:asc"
-	ListWorkspaceUsersParamsSortsIdDesc            ListWorkspaceUsersParamsSorts = "id:desc"
-	ListWorkspaceUsersParamsSortsStatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
-	ListWorkspaceUsersParamsSortsStatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
-	ListWorkspaceUsersParamsSortsUpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
-	ListWorkspaceUsersParamsSortsUpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
-	ListWorkspaceUsersParamsSortsUsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
-	ListWorkspaceUsersParamsSortsUsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
-	ListWorkspaceUsersParamsSortsWorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
-	ListWorkspaceUsersParamsSortsWorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
+	CreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
+	CreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
+	FullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
+	FullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
+	IdAsc             ListWorkspaceUsersParamsSorts = "id:asc"
+	IdDesc            ListWorkspaceUsersParamsSorts = "id:desc"
+	StatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
+	StatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
+	UpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
+	UpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
+	UsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
+	UsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
+	WorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
+	WorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
 )
 
 // AddTeamMembersRequest defines model for AddTeamMembersRequest.
@@ -838,6 +901,7 @@ type Cluster struct {
 	OrganizationId         string               `json:"organizationId"`
 	PodSubnetRange         string               `json:"podSubnetRange"`
 	ProviderAccount        string               `json:"providerAccount"`
+	RdsSnapshotIdentifier  *string              `json:"rdsSnapshotIdentifier,omitempty"`
 	Region                 string               `json:"region"`
 	ServicePeeringRange    string               `json:"servicePeeringRange"`
 	ServiceSubnetRange     string               `json:"serviceSubnetRange"`
@@ -887,6 +951,7 @@ type ClusterDetailed struct {
 	OrganizationTrialExpiresAt *string               `json:"organizationTrialExpiresAt,omitempty"`
 	PodSubnetRange             string                `json:"podSubnetRange"`
 	ProviderAccount            string                `json:"providerAccount"`
+	RdsSnapshotIdentifier      *string               `json:"rdsSnapshotIdentifier,omitempty"`
 	Region                     string                `json:"region"`
 	ServicePeeringRange        string                `json:"servicePeeringRange"`
 	ServiceSubnetRange         string                `json:"serviceSubnetRange"`
@@ -913,7 +978,8 @@ type ClusterDetailedType string
 
 // ClusterMetadata defines model for ClusterMetadata.
 type ClusterMetadata struct {
-	ExternalIPs *[]string `json:"externalIPs,omitempty"`
+	ExternalIPs   *[]string `json:"externalIPs,omitempty"`
+	OidcIssuerUrl *string   `json:"oidcIssuerUrl,omitempty"`
 }
 
 // ClusterOptions defines model for ClusterOptions.
@@ -933,6 +999,33 @@ type ClusterOptions struct {
 	Provider                   string                 `json:"provider"`
 	Regions                    []ProviderRegion       `json:"regions"`
 	TemplateVersions           []TemplateVersion      `json:"templateVersions"`
+}
+
+// ClusterRoute defines model for ClusterRoute.
+type ClusterRoute struct {
+	CreatedAt       time.Time              `json:"createdAt"`
+	CreatedById     string                 `json:"createdById"`
+	Description     *string                `json:"description,omitempty"`
+	DestinationCidr string                 `json:"destinationCidr"`
+	Id              string                 `json:"id"`
+	Name            string                 `json:"name"`
+	Source          ClusterRouteSource     `json:"source"`
+	Target          string                 `json:"target"`
+	TargetType      ClusterRouteTargetType `json:"targetType"`
+}
+
+// ClusterRouteSource defines model for ClusterRoute.Source.
+type ClusterRouteSource string
+
+// ClusterRouteTargetType defines model for ClusterRoute.TargetType.
+type ClusterRouteTargetType string
+
+// ClusterRoutesPaginated defines model for ClusterRoutesPaginated.
+type ClusterRoutesPaginated struct {
+	ClusterRoutes []ClusterRoute `json:"clusterRoutes"`
+	Limit         int            `json:"limit"`
+	Offset        int            `json:"offset"`
+	TotalCount    int            `json:"totalCount"`
 }
 
 // ClusterTag defines model for ClusterTag.
@@ -1009,13 +1102,30 @@ type CreateAzureClusterRequest struct {
 // CreateAzureClusterRequestType defines model for CreateAzureClusterRequest.Type.
 type CreateAzureClusterRequestType string
 
+// CreateClusterRouteRequest defines model for CreateClusterRouteRequest.
+type CreateClusterRouteRequest struct {
+	Description     *string                             `json:"description,omitempty"`
+	DestinationCidr string                              `json:"destinationCidr"`
+	Name            string                              `json:"name"`
+	Source          CreateClusterRouteRequestSource     `json:"source"`
+	Target          string                              `json:"target"`
+	TargetType      CreateClusterRouteRequestTargetType `json:"targetType"`
+}
+
+// CreateClusterRouteRequestSource defines model for CreateClusterRouteRequest.Source.
+type CreateClusterRouteRequestSource string
+
+// CreateClusterRouteRequestTargetType defines model for CreateClusterRouteRequest.TargetType.
+type CreateClusterRouteRequestTargetType string
+
 // CreateDedicatedDeploymentRequest defines model for CreateDedicatedDeploymentRequest.
 type CreateDedicatedDeploymentRequest struct {
 	// AstroRuntimeVersion Version of the astro runtime to use
 	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
 
 	// ClusterId Cluster where the deployment should be created on
-	ClusterId string `json:"clusterId"`
+	ClusterId     string    `json:"clusterId"`
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
 
 	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
@@ -1035,6 +1145,9 @@ type CreateDedicatedDeploymentRequest struct {
 	// IsDagDeployEnabled If true, dags can be independently pushed through CLI
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
 
+	// IsDevelopmentOnly If true, deployment will be able to use development-only features, such as hibernation, but will not have guaranteed uptime SLAs
+	IsDevelopmentOnly bool `json:"isDevelopmentOnly"`
+
 	// IsHighAvailability If true, deployment will have backup components
 	IsHighAvailability bool `json:"isHighAvailability"`
 
@@ -1045,7 +1158,8 @@ type CreateDedicatedDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory Must be valid kubernetes memory resource string, at least 2Gi in terms of Gibibytes (GiB)
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	ResourceQuotaMemory string                 `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpec `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
 	SchedulerSize CreateDedicatedDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -1151,7 +1265,6 @@ type CreateEnvironmentObjectOverridesRequest struct {
 type CreateEnvironmentObjectRequest struct {
 	AirflowVariable     *CreateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
 	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                                          `json:"autoLinkProjects,omitempty"`
 	Connection          *CreateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
 	Links               *[]CreateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
 	ObjectKey           string                                         `json:"objectKey"`
@@ -1192,7 +1305,8 @@ type CreateHybridDeploymentRequest struct {
 	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
 
 	// ClusterId Cluster where the deployment should be created on
-	ClusterId string `json:"clusterId"`
+	ClusterId     string    `json:"clusterId"`
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
 
 	// Description Optional description of the deployment
 	Description *string `json:"description,omitempty"`
@@ -1258,7 +1372,8 @@ type CreateStandardDeploymentRequest struct {
 	CloudProvider *CreateStandardDeploymentRequestCloudProvider `json:"cloudProvider,omitempty"`
 
 	// ClusterId Optional if cloud provider and region is specified
-	ClusterId *string `json:"clusterId,omitempty"`
+	ClusterId     *string   `json:"clusterId,omitempty"`
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
 
 	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
@@ -1278,6 +1393,9 @@ type CreateStandardDeploymentRequest struct {
 	// IsDagDeployEnabled If true, dags can be independently pushed through CLI
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
 
+	// IsDevelopmentOnly If true, deployment will be able to use development-only features, such as hibernation, but will not have guaranteed uptime SLAs
+	IsDevelopmentOnly bool `json:"isDevelopmentOnly"`
+
 	// IsHighAvailability If true, deployment will have backup components
 	IsHighAvailability bool `json:"isHighAvailability"`
 
@@ -1291,7 +1409,8 @@ type CreateStandardDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory Must be valid kubernetes memory resource string, at least 2Gi in terms of Gibibytes (GiB)
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	ResourceQuotaMemory string                 `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpec `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
 	SchedulerSize CreateStandardDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -1362,6 +1481,13 @@ type DagSchedule struct {
 	TimeDelta      *InternalScheduleIntervalTimeDelta      `json:"TimeDelta,omitempty"`
 }
 
+// DefaultPodSizeOption defines model for DefaultPodSizeOption.
+type DefaultPodSizeOption struct {
+	Cpu              ResourceRange `json:"cpu"`
+	EphemeralStorage ResourceRange `json:"ephemeralStorage"`
+	Memory           ResourceRange `json:"memory"`
+}
+
 // DefaultValueOptions defines model for DefaultValueOptions.
 type DefaultValueOptions struct {
 	SchedulerSize     string `json:"schedulerSize"`
@@ -1403,51 +1529,59 @@ type DeployRollbackRequest struct {
 
 // Deployment defines model for Deployment.
 type Deployment struct {
-	AirflowVersion           string                           `json:"airflowVersion"`
-	AlertEmails              *[]string                        `json:"alertEmails,omitempty"`
-	ApiKeyOnlyDeployments    bool                             `json:"apiKeyOnlyDeployments"`
-	ClusterCloudProvider     *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
-	ClusterId                string                           `json:"clusterId"`
-	ClusterName              *string                          `json:"clusterName,omitempty"`
-	ClusterRegion            *string                          `json:"clusterRegion,omitempty"`
-	CreatedAt                time.Time                        `json:"createdAt"`
-	CreatedBy                BasicSubjectProfile              `json:"createdBy"`
-	CurrentDagTarballVersion *string                          `json:"currentDagTarballVersion,omitempty"`
-	CurrentImageVersion      *string                          `json:"currentImageVersion,omitempty"`
-	DefaultTaskPodCpu        *string                          `json:"defaultTaskPodCpu,omitempty"`
-	DefaultTaskPodMemory     *string                          `json:"defaultTaskPodMemory,omitempty"`
-	DeployId                 string                           `json:"deployId"`
-	Description              *string                          `json:"description,omitempty"`
-	DesiredDagTarballVersion *string                          `json:"desiredDagTarballVersion,omitempty"`
-	EnvironmentVariables     *[]DeploymentEnvironmentVariable `json:"environmentVariables,omitempty"`
-	Executor                 *DeploymentExecutor              `json:"executor,omitempty"`
-	ExternalIPs              *[]string                        `json:"externalIPs,omitempty"`
-	Id                       string                           `json:"id"`
-	ImageId                  string                           `json:"imageId"`
-	ImageRepository          string                           `json:"imageRepository"`
-	ImageTag                 string                           `json:"imageTag"`
-	IsDagDeployEnabled       bool                             `json:"isDagDeployEnabled"`
-	IsHighAvailability       *bool                            `json:"isHighAvailability,omitempty"`
-	LaminarHealthStatus      *LaminarHealthStatus             `json:"laminarHealthStatus,omitempty"`
-	Name                     string                           `json:"name"`
-	OrganizationId           string                           `json:"organizationId"`
-	OrganizationName         string                           `json:"organizationName"`
-	OrganizationShortName    string                           `json:"organizationShortName"`
-	ReleaseName              string                           `json:"releaseName"`
-	ResourceQuotaCpu         *string                          `json:"resourceQuotaCpu,omitempty"`
-	ResourceQuotaMemory      *string                          `json:"resourceQuotaMemory,omitempty"`
-	RuntimeVersion           string                           `json:"runtimeVersion"`
-	SchedulerAu              *int                             `json:"schedulerAu,omitempty"`
-	SchedulerCpu             string                           `json:"schedulerCpu"`
-	SchedulerMemory          string                           `json:"schedulerMemory"`
-	SchedulerReplicas        int                              `json:"schedulerReplicas"`
-	SchedulerSize            *DeploymentSchedulerSize         `json:"schedulerSize,omitempty"`
-	Status                   DeploymentStatus                 `json:"status"`
-	StatusReason             *string                          `json:"statusReason,omitempty"`
-	TaskPodNodePoolId        *string                          `json:"taskPodNodePoolId,omitempty"`
-	Type                     *DeploymentType                  `json:"type,omitempty"`
-	UpdatedAt                time.Time                        `json:"updatedAt"`
-	UpdatedBy                BasicSubjectProfile              `json:"updatedBy"`
+	AirflowVersion               string                           `json:"airflowVersion"`
+	ClusterCloudProvider         *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
+	ClusterId                    string                           `json:"clusterId"`
+	ClusterName                  *string                          `json:"clusterName,omitempty"`
+	ClusterRegion                *string                          `json:"clusterRegion,omitempty"`
+	ContactEmails                []string                         `json:"contactEmails"`
+	CreatedAt                    time.Time                        `json:"createdAt"`
+	CreatedBy                    BasicSubjectProfile              `json:"createdBy"`
+	CurrentDagTarballVersion     *string                          `json:"currentDagTarballVersion,omitempty"`
+	CurrentEnvironmentSignatures *EnvironmentSignatures           `json:"currentEnvironmentSignatures,omitempty"`
+	CurrentImageVersion          *string                          `json:"currentImageVersion,omitempty"`
+	DefaultTaskPodCpu            *string                          `json:"defaultTaskPodCpu,omitempty"`
+	DefaultTaskPodMemory         *string                          `json:"defaultTaskPodMemory,omitempty"`
+	DeletedAt                    *time.Time                       `json:"deletedAt,omitempty"`
+	DeployId                     string                           `json:"deployId"`
+	Description                  *string                          `json:"description,omitempty"`
+	DesiredDagTarballVersion     *string                          `json:"desiredDagTarballVersion,omitempty"`
+	DesiredEnvironmentSignatures *EnvironmentSignatures           `json:"desiredEnvironmentSignatures,omitempty"`
+	DesiredImageVersion          *string                          `json:"desiredImageVersion,omitempty"`
+	EnvironmentVariables         *[]DeploymentEnvironmentVariable `json:"environmentVariables,omitempty"`
+	Executor                     *DeploymentExecutor              `json:"executor,omitempty"`
+	ExternalIPs                  *[]string                        `json:"externalIPs,omitempty"`
+	Id                           string                           `json:"id"`
+	ImageId                      string                           `json:"imageId"`
+	ImageRepository              string                           `json:"imageRepository"`
+	ImageTag                     string                           `json:"imageTag"`
+	IsCicdEnforced               bool                             `json:"isCicdEnforced"`
+	IsDagDeployEnabled           bool                             `json:"isDagDeployEnabled"`
+	IsDevelopmentOnly            bool                             `json:"isDevelopmentOnly"`
+	IsHighAvailability           *bool                            `json:"isHighAvailability,omitempty"`
+	LaminarHealthStatus          *LaminarHealthStatus             `json:"laminarHealthStatus,omitempty"`
+	Name                         string                           `json:"name"`
+	OidcIssuerUrl                *string                          `json:"oidcIssuerUrl,omitempty"`
+	OrganizationId               string                           `json:"organizationId"`
+	OrganizationName             string                           `json:"organizationName"`
+	OrganizationShortName        string                           `json:"organizationShortName"`
+	ReleaseName                  string                           `json:"releaseName"`
+	ResourceQuotaCpu             *string                          `json:"resourceQuotaCpu,omitempty"`
+	ResourceQuotaMemory          *string                          `json:"resourceQuotaMemory,omitempty"`
+	RuntimeVersion               string                           `json:"runtimeVersion"`
+	ScalingSpec                  *DeploymentScalingSpec           `json:"scalingSpec,omitempty"`
+	ScalingStatus                *DeploymentScalingStatus         `json:"scalingStatus,omitempty"`
+	SchedulerAu                  *int                             `json:"schedulerAu,omitempty"`
+	SchedulerCpu                 string                           `json:"schedulerCpu"`
+	SchedulerMemory              string                           `json:"schedulerMemory"`
+	SchedulerReplicas            int                              `json:"schedulerReplicas"`
+	SchedulerSize                *DeploymentSchedulerSize         `json:"schedulerSize,omitempty"`
+	Status                       DeploymentStatus                 `json:"status"`
+	StatusReason                 *string                          `json:"statusReason,omitempty"`
+	TaskPodNodePoolId            *string                          `json:"taskPodNodePoolId,omitempty"`
+	Type                         *DeploymentType                  `json:"type,omitempty"`
+	UpdatedAt                    time.Time                        `json:"updatedAt"`
+	UpdatedBy                    BasicSubjectProfile              `json:"updatedBy"`
 
 	// WebServerAirflowApiUrl The Deployment's webserver's base url to directly access the Airflow api.
 	WebServerAirflowApiUrl   string         `json:"webServerAirflowApiUrl"`
@@ -1492,6 +1626,56 @@ type DeploymentEnvironmentVariableRequest struct {
 	Value    *string `json:"value,omitempty"`
 }
 
+// DeploymentHibernationOverride defines model for DeploymentHibernationOverride.
+type DeploymentHibernationOverride struct {
+	// Hibernate Whether to go into hibernation or not via the override rule
+	Hibernate bool `json:"hibernate"`
+
+	// OverrideUntil Timestamp till the override on the hibernation schedule is in effect
+	OverrideUntil *string `json:"overrideUntil,omitempty"`
+}
+
+// DeploymentHibernationSchedule defines model for DeploymentHibernationSchedule.
+type DeploymentHibernationSchedule struct {
+	// Description To add contextual information for the schedule
+	Description *string `json:"description,omitempty"`
+
+	// HibernateAtCron Cron expression representing the hibernation schedule
+	HibernateAtCron string `json:"hibernateAtCron"`
+
+	// IsEnabled It is set to true if the hibernate/wake schedule is enabled
+	IsEnabled bool `json:"isEnabled"`
+
+	// WakeAtCron Cron expression representing the wake-up schedule
+	WakeAtCron string `json:"wakeAtCron"`
+}
+
+// DeploymentHibernationSpec defines model for DeploymentHibernationSpec.
+type DeploymentHibernationSpec struct {
+	Override *DeploymentHibernationOverride `json:"override,omitempty"`
+
+	// Schedules The list of schedules for the hibernation spec
+	Schedules *[]DeploymentHibernationSchedule `json:"schedules,omitempty"`
+}
+
+// DeploymentHibernationStatus defines model for DeploymentHibernationStatus.
+type DeploymentHibernationStatus struct {
+	// IsHibernating If the deployment is currently in hibernating state or not
+	IsHibernating *bool `json:"isHibernating,omitempty"`
+
+	// NextEventAt Timestamp of the next schedule hibernation event for the deployment
+	NextEventAt *time.Time `json:"nextEventAt,omitempty"`
+
+	// NextEventType Represents the type of the scheduled event for the deployment, one of HIBERNATE or WAKE
+	NextEventType *DeploymentHibernationStatusNextEventType `json:"nextEventType,omitempty"`
+
+	// Reason Reason indicating the current state of the deployment
+	Reason *string `json:"reason,omitempty"`
+}
+
+// DeploymentHibernationStatusNextEventType Represents the type of the scheduled event for the deployment, one of HIBERNATE or WAKE
+type DeploymentHibernationStatusNextEventType string
+
 // DeploymentInstanceSpecRequest defines model for DeploymentInstanceSpecRequest.
 type DeploymentInstanceSpecRequest struct {
 	Au       int `json:"au"`
@@ -1531,6 +1715,16 @@ type DeploymentOptions struct {
 	WorkloadIdentityOptions *[]WorkloadIdentityOption `json:"workloadIdentityOptions,omitempty"`
 }
 
+// DeploymentScalingSpec defines model for DeploymentScalingSpec.
+type DeploymentScalingSpec struct {
+	HibernationSpec *DeploymentHibernationSpec `json:"hibernationSpec,omitempty"`
+}
+
+// DeploymentScalingStatus defines model for DeploymentScalingStatus.
+type DeploymentScalingStatus struct {
+	HibernationStatus *DeploymentHibernationStatus `json:"hibernationStatus,omitempty"`
+}
+
 // DeploymentsPaginated defines model for DeploymentsPaginated.
 type DeploymentsPaginated struct {
 	Deployments []Deployment `json:"deployments"`
@@ -1549,20 +1743,20 @@ type DeploysPaginated struct {
 
 // Entitlement defines model for Entitlement.
 type Entitlement struct {
-	Enabled      bool                    `json:"enabled"`
-	RequiredTier EntitlementRequiredTier `json:"requiredTier"`
+	IsEnabled    bool                    `json:"isEnabled"`
+	RequiredPlan EntitlementRequiredPlan `json:"requiredPlan"`
 }
 
-// EntitlementRequiredTier defines model for Entitlement.RequiredTier.
-type EntitlementRequiredTier string
+// EntitlementRequiredPlan defines model for Entitlement.RequiredPlan.
+type EntitlementRequiredPlan string
 
 // EnvironmentObject defines model for EnvironmentObject.
 type EnvironmentObject struct {
 	AirflowVariable     *EnvironmentObjectAirflowVariable `json:"airflowVariable,omitempty"`
 	AutoLinkDeployments *bool                             `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                             `json:"autoLinkProjects,omitempty"`
 	Connection          *EnvironmentObjectConnection      `json:"connection,omitempty"`
 	CreatedAt           *string                           `json:"createdAt,omitempty"`
+	CreatedBy           *BasicSubjectProfile              `json:"createdBy,omitempty"`
 	Id                  *string                           `json:"id,omitempty"`
 	Links               *[]EnvironmentObjectLink          `json:"links,omitempty"`
 	ObjectKey           string                            `json:"objectKey"`
@@ -1570,6 +1764,7 @@ type EnvironmentObject struct {
 	Scope               EnvironmentObjectScope            `json:"scope"`
 	ScopeEntityId       string                            `json:"scopeEntityId"`
 	UpdatedAt           *string                           `json:"updatedAt,omitempty"`
+	UpdatedBy           *BasicSubjectProfile              `json:"updatedBy,omitempty"`
 }
 
 // EnvironmentObjectObjectType defines model for EnvironmentObject.ObjectType.
@@ -1629,6 +1824,12 @@ type EnvironmentObjectsPaginated struct {
 	Limit              int                 `json:"limit"`
 	Offset             int                 `json:"offset"`
 	TotalCount         int                 `json:"totalCount"`
+}
+
+// EnvironmentSignatures defines model for EnvironmentSignatures.
+type EnvironmentSignatures struct {
+	AirflowVariables *string `json:"airflowVariables,omitempty"`
+	Connections      *string `json:"connections,omitempty"`
 }
 
 // Error defines model for Error.
@@ -1726,6 +1927,16 @@ type ManagedDomain struct {
 
 // ManagedDomainStatus defines model for ManagedDomain.Status.
 type ManagedDomainStatus string
+
+// MutateDeploymentTeamRoleRequest defines model for MutateDeploymentTeamRoleRequest.
+type MutateDeploymentTeamRoleRequest struct {
+	Role string `json:"role"`
+}
+
+// MutateDeploymentUserRoleRequest defines model for MutateDeploymentUserRoleRequest.
+type MutateDeploymentUserRoleRequest struct {
+	Role string `json:"role"`
+}
 
 // MutateOrgTeamRoleRequest defines model for MutateOrgTeamRoleRequest.
 type MutateOrgTeamRoleRequest struct {
@@ -1851,8 +2062,8 @@ type ResourceOption struct {
 
 // ResourceQuotaOptions defines model for ResourceQuotaOptions.
 type ResourceQuotaOptions struct {
-	DefaultPodSize ResourceOption `json:"defaultPodSize"`
-	ResourceQuota  ResourceOption `json:"resourceQuota"`
+	DefaultPodSize DefaultPodSizeOption `json:"defaultPodSize"`
+	ResourceQuota  ResourceOption       `json:"resourceQuota"`
 }
 
 // ResourceRange defines model for ResourceRange.
@@ -1875,9 +2086,12 @@ type RuntimeRelease struct {
 // SchedulerMachine defines model for SchedulerMachine.
 type SchedulerMachine struct {
 	// Name The name of this machine.
-	Name string      `json:"name"`
-	Spec MachineSpec `json:"spec"`
+	Name SchedulerMachineName `json:"name"`
+	Spec MachineSpec          `json:"spec"`
 }
+
+// SchedulerMachineName The name of this machine.
+type SchedulerMachineName string
 
 // Scope defines model for Scope.
 type Scope struct {
@@ -1950,6 +2164,7 @@ type Team struct {
 	MembersCount     *int                 `json:"membersCount,omitempty"`
 	Name             string               `json:"name"`
 	OrganizationId   string               `json:"organizationId"`
+	OrganizationName *string              `json:"organizationName,omitempty"`
 	OrganizationRole string               `json:"organizationRole"`
 	Roles            *[]TeamRole          `json:"roles,omitempty"`
 	RolesCount       *int                 `json:"rolesCount,omitempty"`
@@ -2084,7 +2299,6 @@ type UpdateEnvironmentObjectOverridesRequest struct {
 type UpdateEnvironmentObjectRequest struct {
 	AirflowVariable     *UpdateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
 	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
-	AutoLinkProjects    *bool                                          `json:"autoLinkProjects,omitempty"`
 	Connection          *UpdateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
 	Links               *[]UpdateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
 	ObjectKey           string                                         `json:"objectKey"`
@@ -2136,7 +2350,8 @@ type UpdateHostedDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory Must be valid kubernetes memory resource string, at least 2Gi in terms of Gibibytes (GiB)
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	ResourceQuotaMemory string                 `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpec `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
 	SchedulerSize UpdateHostedDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -2313,12 +2528,16 @@ type UsersPaginated struct {
 
 // WorkerMachine defines model for WorkerMachine.
 type WorkerMachine struct {
-	Concurrency Range `json:"concurrency"`
+	Concurrency      Range         `json:"concurrency"`
+	EphemeralStorage ResourceRange `json:"ephemeralStorage"`
 
 	// Name The name of this machine.
-	Name string      `json:"name"`
-	Spec MachineSpec `json:"spec"`
+	Name WorkerMachineName `json:"name"`
+	Spec MachineSpec       `json:"spec"`
 }
+
+// WorkerMachineName The name of this machine.
+type WorkerMachineName string
 
 // WorkerQueue defines model for WorkerQueue.
 type WorkerQueue struct {
@@ -2570,6 +2789,21 @@ type ListClustersParamsStatuses string
 // ListClustersParamsSorts defines parameters for ListClusters.
 type ListClustersParamsSorts string
 
+// ListClusterRoutesParams defines parameters for ListClusterRoutes.
+type ListClusterRoutesParams struct {
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListClusterRoutesParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+}
+
+// ListClusterRoutesParamsSorts defines parameters for ListClusterRoutes.
+type ListClusterRoutesParamsSorts string
+
 // GetDeploymentOptionsParams defines parameters for GetDeploymentOptions.
 type GetDeploymentOptionsParams struct {
 	// DeploymentId deployment ID
@@ -2578,12 +2812,18 @@ type GetDeploymentOptionsParams struct {
 	// DeploymentType The runtime type of the deployment.
 	DeploymentType *GetDeploymentOptionsParamsDeploymentType `form:"deploymentType,omitempty" json:"deploymentType,omitempty"`
 
+	// Executor The executor of the deployment.
+	Executor *GetDeploymentOptionsParamsExecutor `form:"executor,omitempty" json:"executor,omitempty"`
+
 	// CloudProvider The cloud provider of the cluster for the deployment.
 	CloudProvider *GetDeploymentOptionsParamsCloudProvider `form:"cloudProvider,omitempty" json:"cloudProvider,omitempty"`
 }
 
 // GetDeploymentOptionsParamsDeploymentType defines parameters for GetDeploymentOptions.
 type GetDeploymentOptionsParamsDeploymentType string
+
+// GetDeploymentOptionsParamsExecutor defines parameters for GetDeploymentOptions.
+type GetDeploymentOptionsParamsExecutor string
 
 // GetDeploymentOptionsParamsCloudProvider defines parameters for GetDeploymentOptions.
 type GetDeploymentOptionsParamsCloudProvider string
@@ -2683,9 +2923,6 @@ type ListEnvironmentObjectsParams struct {
 	// DeploymentId deployment ID
 	DeploymentId *string `form:"deploymentId,omitempty" json:"deploymentId,omitempty"`
 
-	// ProjectId project ID
-	ProjectId *string `form:"projectId,omitempty" json:"projectId,omitempty"`
-
 	// ObjectType object type
 	ObjectType *ListEnvironmentObjectsParamsObjectType `form:"objectType,omitempty" json:"objectType,omitempty"`
 
@@ -2707,6 +2944,15 @@ type ListEnvironmentObjectsParamsObjectType string
 
 // ListOrganizationTeamsParams defines parameters for ListOrganizationTeams.
 type ListOrganizationTeamsParams struct {
+	// IncludeMembers includes details about the teams members
+	IncludeMembers *bool `form:"includeMembers,omitempty" json:"includeMembers,omitempty"`
+
+	// IncludeRoles include details about the teams roles
+	IncludeRoles *bool `form:"includeRoles,omitempty" json:"includeRoles,omitempty"`
+
+	// IncludeSubjectInfo include details about who created or updated the team entry
+	IncludeSubjectInfo *bool `form:"includeSubjectInfo,omitempty" json:"includeSubjectInfo,omitempty"`
+
 	// Offset offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
@@ -2897,6 +3143,9 @@ type CreateGcpClusterJSONRequestBody = CreateGcpClusterRequest
 // UpdateGcpClusterJSONRequestBody defines body for UpdateGcpCluster for application/json ContentType.
 type UpdateGcpClusterJSONRequestBody = UpdateGcpClusterRequest
 
+// CreateClusterRouteJSONRequestBody defines body for CreateClusterRoute for application/json ContentType.
+type CreateClusterRouteJSONRequestBody = CreateClusterRouteRequest
+
 // CreateDeploymentJSONRequestBody defines body for CreateDeployment for application/json ContentType.
 type CreateDeploymentJSONRequestBody = CreateDeploymentRequest
 
@@ -2918,8 +3167,14 @@ type CreateDeployJSONRequestBody = CreateDeployRequest
 // UpdateDeployJSONRequestBody defines body for UpdateDeploy for application/json ContentType.
 type UpdateDeployJSONRequestBody = UpdateDeployRequest
 
+// MutateDeploymentTeamRoleJSONRequestBody defines body for MutateDeploymentTeamRole for application/json ContentType.
+type MutateDeploymentTeamRoleJSONRequestBody = MutateDeploymentTeamRoleRequest
+
 // TransferDeploymentJSONRequestBody defines body for TransferDeployment for application/json ContentType.
 type TransferDeploymentJSONRequestBody = TransferDeploymentRequest
+
+// MutateDeploymentUserRoleJSONRequestBody defines body for MutateDeploymentUserRole for application/json ContentType.
+type MutateDeploymentUserRoleJSONRequestBody = MutateDeploymentUserRoleRequest
 
 // CreateEnvironmentObjectJSONRequestBody defines body for CreateEnvironmentObject for application/json ContentType.
 type CreateEnvironmentObjectJSONRequestBody = CreateEnvironmentObjectRequest
@@ -3278,6 +3533,17 @@ type ClientInterface interface {
 	// GetCluster request
 	GetCluster(ctx context.Context, organizationId string, clusterId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListClusterRoutes request
+	ListClusterRoutes(ctx context.Context, organizationId string, clusterId string, params *ListClusterRoutesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateClusterRoute request with any body
+	CreateClusterRouteWithBody(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateClusterRoute(ctx context.Context, organizationId string, clusterId string, body CreateClusterRouteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteClusterRoute request
+	DeleteClusterRoute(ctx context.Context, organizationId string, clusterId string, routeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetDeploymentOptions request
 	GetDeploymentOptions(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -3346,10 +3612,26 @@ type ClientInterface interface {
 	// GetDeploymentLogs request
 	GetDeploymentLogs(ctx context.Context, organizationId string, deploymentId string, params *GetDeploymentLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteDeploymentTeam request
+	DeleteDeploymentTeam(ctx context.Context, organizationId string, deploymentId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MutateDeploymentTeamRole request with any body
+	MutateDeploymentTeamRoleWithBody(ctx context.Context, organizationId string, deploymentId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	MutateDeploymentTeamRole(ctx context.Context, organizationId string, deploymentId string, teamId string, body MutateDeploymentTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// TransferDeployment request with any body
 	TransferDeploymentWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	TransferDeployment(ctx context.Context, organizationId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteDeploymentUser request
+	DeleteDeploymentUser(ctx context.Context, organizationId string, deploymentId string, userId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MutateDeploymentUserRole request with any body
+	MutateDeploymentUserRoleWithBody(ctx context.Context, organizationId string, deploymentId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	MutateDeploymentUserRole(ctx context.Context, organizationId string, deploymentId string, userId string, body MutateDeploymentUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListEnvironmentObjects request
 	ListEnvironmentObjects(ctx context.Context, organizationId string, params *ListEnvironmentObjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3898,6 +4180,54 @@ func (c *Client) GetCluster(ctx context.Context, organizationId string, clusterI
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListClusterRoutes(ctx context.Context, organizationId string, clusterId string, params *ListClusterRoutesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListClusterRoutesRequest(c.Server, organizationId, clusterId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateClusterRouteWithBody(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateClusterRouteRequestWithBody(c.Server, organizationId, clusterId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateClusterRoute(ctx context.Context, organizationId string, clusterId string, body CreateClusterRouteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateClusterRouteRequest(c.Server, organizationId, clusterId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteClusterRoute(ctx context.Context, organizationId string, clusterId string, routeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteClusterRouteRequest(c.Server, organizationId, clusterId, routeId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetDeploymentOptions(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetDeploymentOptionsRequest(c.Server, organizationId, params)
 	if err != nil {
@@ -4198,6 +4528,42 @@ func (c *Client) GetDeploymentLogs(ctx context.Context, organizationId string, d
 	return c.Client.Do(req)
 }
 
+func (c *Client) DeleteDeploymentTeam(ctx context.Context, organizationId string, deploymentId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteDeploymentTeamRequest(c.Server, organizationId, deploymentId, teamId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MutateDeploymentTeamRoleWithBody(ctx context.Context, organizationId string, deploymentId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateDeploymentTeamRoleRequestWithBody(c.Server, organizationId, deploymentId, teamId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MutateDeploymentTeamRole(ctx context.Context, organizationId string, deploymentId string, teamId string, body MutateDeploymentTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateDeploymentTeamRoleRequest(c.Server, organizationId, deploymentId, teamId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) TransferDeploymentWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTransferDeploymentRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
 	if err != nil {
@@ -4212,6 +4578,42 @@ func (c *Client) TransferDeploymentWithBody(ctx context.Context, organizationId 
 
 func (c *Client) TransferDeployment(ctx context.Context, organizationId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTransferDeploymentRequest(c.Server, organizationId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteDeploymentUser(ctx context.Context, organizationId string, deploymentId string, userId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteDeploymentUserRequest(c.Server, organizationId, deploymentId, userId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MutateDeploymentUserRoleWithBody(ctx context.Context, organizationId string, deploymentId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateDeploymentUserRoleRequestWithBody(c.Server, organizationId, deploymentId, userId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MutateDeploymentUserRole(ctx context.Context, organizationId string, deploymentId string, userId string, body MutateDeploymentUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateDeploymentUserRoleRequest(c.Server, organizationId, deploymentId, userId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6181,6 +6583,201 @@ func NewGetClusterRequest(server string, organizationId string, clusterId string
 	return req, nil
 }
 
+// NewListClusterRoutesRequest generates requests for ListClusterRoutes
+func NewListClusterRoutesRequest(server string, organizationId string, clusterId string, params *ListClusterRoutesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/%s/cluster-routes", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateClusterRouteRequest calls the generic CreateClusterRoute builder with application/json body
+func NewCreateClusterRouteRequest(server string, organizationId string, clusterId string, body CreateClusterRouteJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateClusterRouteRequestWithBody(server, organizationId, clusterId, "application/json", bodyReader)
+}
+
+// NewCreateClusterRouteRequestWithBody generates requests for CreateClusterRoute with any type of body
+func NewCreateClusterRouteRequestWithBody(server string, organizationId string, clusterId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/%s/cluster-routes", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteClusterRouteRequest generates requests for DeleteClusterRoute
+func NewDeleteClusterRouteRequest(server string, organizationId string, clusterId string, routeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "routeId", runtime.ParamLocationPath, routeId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/%s/cluster-routes/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetDeploymentOptionsRequest generates requests for GetDeploymentOptions
 func NewGetDeploymentOptionsRequest(server string, organizationId string, params *GetDeploymentOptionsParams) (*http.Request, error) {
 	var err error
@@ -6228,6 +6825,22 @@ func NewGetDeploymentOptionsRequest(server string, organizationId string, params
 	if params.DeploymentType != nil {
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deploymentType", runtime.ParamLocationQuery, *params.DeploymentType); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Executor != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "executor", runtime.ParamLocationQuery, *params.Executor); err != nil {
 			return nil, err
 		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 			return nil, err
@@ -7392,6 +8005,115 @@ func NewGetDeploymentLogsRequest(server string, organizationId string, deploymen
 	return req, nil
 }
 
+// NewDeleteDeploymentTeamRequest generates requests for DeleteDeploymentTeam
+func NewDeleteDeploymentTeamRequest(server string, organizationId string, deploymentId string, teamId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/teams/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewMutateDeploymentTeamRoleRequest calls the generic MutateDeploymentTeamRole builder with application/json body
+func NewMutateDeploymentTeamRoleRequest(server string, organizationId string, deploymentId string, teamId string, body MutateDeploymentTeamRoleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMutateDeploymentTeamRoleRequestWithBody(server, organizationId, deploymentId, teamId, "application/json", bodyReader)
+}
+
+// NewMutateDeploymentTeamRoleRequestWithBody generates requests for MutateDeploymentTeamRole with any type of body
+func NewMutateDeploymentTeamRoleRequestWithBody(server string, organizationId string, deploymentId string, teamId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/teams/%s/role", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewTransferDeploymentRequest calls the generic TransferDeployment builder with application/json body
 func NewTransferDeploymentRequest(server string, organizationId string, deploymentId string, body TransferDeploymentJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -7427,6 +8149,115 @@ func NewTransferDeploymentRequestWithBody(server string, organizationId string, 
 	}
 
 	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/transfer", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteDeploymentUserRequest generates requests for DeleteDeploymentUser
+func NewDeleteDeploymentUserRequest(server string, organizationId string, deploymentId string, userId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "userId", runtime.ParamLocationPath, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/users/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewMutateDeploymentUserRoleRequest calls the generic MutateDeploymentUserRole builder with application/json body
+func NewMutateDeploymentUserRoleRequest(server string, organizationId string, deploymentId string, userId string, body MutateDeploymentUserRoleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMutateDeploymentUserRoleRequestWithBody(server, organizationId, deploymentId, userId, "application/json", bodyReader)
+}
+
+// NewMutateDeploymentUserRoleRequestWithBody generates requests for MutateDeploymentUserRole with any type of body
+func NewMutateDeploymentUserRoleRequestWithBody(server string, organizationId string, deploymentId string, userId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "userId", runtime.ParamLocationPath, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/users/%s/role", pathParam0, pathParam1, pathParam2)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -7541,22 +8372,6 @@ func NewListEnvironmentObjectsRequest(server string, organizationId string, para
 	if params.DeploymentId != nil {
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deploymentId", runtime.ParamLocationQuery, *params.DeploymentId); err != nil {
-			return nil, err
-		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-			return nil, err
-		} else {
-			for k, v := range parsed {
-				for _, v2 := range v {
-					queryValues.Add(k, v2)
-				}
-			}
-		}
-
-	}
-
-	if params.ProjectId != nil {
-
-		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "projectId", runtime.ParamLocationQuery, *params.ProjectId); err != nil {
 			return nil, err
 		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 			return nil, err
@@ -7942,6 +8757,54 @@ func NewListOrganizationTeamsRequest(server string, organizationId string, param
 	}
 
 	queryValues := queryURL.Query()
+
+	if params.IncludeMembers != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeMembers", runtime.ParamLocationQuery, *params.IncludeMembers); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.IncludeRoles != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeRoles", runtime.ParamLocationQuery, *params.IncludeRoles); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.IncludeSubjectInfo != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeSubjectInfo", runtime.ParamLocationQuery, *params.IncludeSubjectInfo); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
 
 	if params.Offset != nil {
 
@@ -10235,6 +11098,17 @@ type ClientWithResponsesInterface interface {
 	// GetCluster request
 	GetClusterWithResponse(ctx context.Context, organizationId string, clusterId string, reqEditors ...RequestEditorFn) (*GetClusterResponse, error)
 
+	// ListClusterRoutes request
+	ListClusterRoutesWithResponse(ctx context.Context, organizationId string, clusterId string, params *ListClusterRoutesParams, reqEditors ...RequestEditorFn) (*ListClusterRoutesResponse, error)
+
+	// CreateClusterRoute request with any body
+	CreateClusterRouteWithBodyWithResponse(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateClusterRouteResponse, error)
+
+	CreateClusterRouteWithResponse(ctx context.Context, organizationId string, clusterId string, body CreateClusterRouteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateClusterRouteResponse, error)
+
+	// DeleteClusterRoute request
+	DeleteClusterRouteWithResponse(ctx context.Context, organizationId string, clusterId string, routeId string, reqEditors ...RequestEditorFn) (*DeleteClusterRouteResponse, error)
+
 	// GetDeploymentOptions request
 	GetDeploymentOptionsWithResponse(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error)
 
@@ -10303,10 +11177,26 @@ type ClientWithResponsesInterface interface {
 	// GetDeploymentLogs request
 	GetDeploymentLogsWithResponse(ctx context.Context, organizationId string, deploymentId string, params *GetDeploymentLogsParams, reqEditors ...RequestEditorFn) (*GetDeploymentLogsResponse, error)
 
+	// DeleteDeploymentTeam request
+	DeleteDeploymentTeamWithResponse(ctx context.Context, organizationId string, deploymentId string, teamId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentTeamResponse, error)
+
+	// MutateDeploymentTeamRole request with any body
+	MutateDeploymentTeamRoleWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateDeploymentTeamRoleResponse, error)
+
+	MutateDeploymentTeamRoleWithResponse(ctx context.Context, organizationId string, deploymentId string, teamId string, body MutateDeploymentTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateDeploymentTeamRoleResponse, error)
+
 	// TransferDeployment request with any body
 	TransferDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TransferDeploymentResponse, error)
 
 	TransferDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*TransferDeploymentResponse, error)
+
+	// DeleteDeploymentUser request
+	DeleteDeploymentUserWithResponse(ctx context.Context, organizationId string, deploymentId string, userId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentUserResponse, error)
+
+	// MutateDeploymentUserRole request with any body
+	MutateDeploymentUserRoleWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateDeploymentUserRoleResponse, error)
+
+	MutateDeploymentUserRoleWithResponse(ctx context.Context, organizationId string, deploymentId string, userId string, body MutateDeploymentUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateDeploymentUserRoleResponse, error)
 
 	// ListEnvironmentObjects request
 	ListEnvironmentObjectsWithResponse(ctx context.Context, organizationId string, params *ListEnvironmentObjectsParams, reqEditors ...RequestEditorFn) (*ListEnvironmentObjectsResponse, error)
@@ -11078,6 +11968,86 @@ func (r GetClusterResponse) StatusCode() int {
 	return 0
 }
 
+type ListClusterRoutesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ClusterRoutesPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListClusterRoutesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListClusterRoutesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateClusterRouteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ClusterRoute
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateClusterRouteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateClusterRouteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteClusterRouteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteClusterRouteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteClusterRouteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetDeploymentOptionsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -11556,6 +12526,59 @@ func (r GetDeploymentLogsResponse) StatusCode() int {
 	return 0
 }
 
+type DeleteDeploymentTeamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteDeploymentTeamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteDeploymentTeamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type MutateDeploymentTeamRoleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TeamRole
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r MutateDeploymentTeamRoleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MutateDeploymentTeamRoleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type TransferDeploymentResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -11577,6 +12600,59 @@ func (r TransferDeploymentResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r TransferDeploymentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteDeploymentUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteDeploymentUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteDeploymentUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type MutateDeploymentUserRoleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *UserRole
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r MutateDeploymentUserRoleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MutateDeploymentUserRoleResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -12940,6 +14016,41 @@ func (c *ClientWithResponses) GetClusterWithResponse(ctx context.Context, organi
 	return ParseGetClusterResponse(rsp)
 }
 
+// ListClusterRoutesWithResponse request returning *ListClusterRoutesResponse
+func (c *ClientWithResponses) ListClusterRoutesWithResponse(ctx context.Context, organizationId string, clusterId string, params *ListClusterRoutesParams, reqEditors ...RequestEditorFn) (*ListClusterRoutesResponse, error) {
+	rsp, err := c.ListClusterRoutes(ctx, organizationId, clusterId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListClusterRoutesResponse(rsp)
+}
+
+// CreateClusterRouteWithBodyWithResponse request with arbitrary body returning *CreateClusterRouteResponse
+func (c *ClientWithResponses) CreateClusterRouteWithBodyWithResponse(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateClusterRouteResponse, error) {
+	rsp, err := c.CreateClusterRouteWithBody(ctx, organizationId, clusterId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateClusterRouteResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateClusterRouteWithResponse(ctx context.Context, organizationId string, clusterId string, body CreateClusterRouteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateClusterRouteResponse, error) {
+	rsp, err := c.CreateClusterRoute(ctx, organizationId, clusterId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateClusterRouteResponse(rsp)
+}
+
+// DeleteClusterRouteWithResponse request returning *DeleteClusterRouteResponse
+func (c *ClientWithResponses) DeleteClusterRouteWithResponse(ctx context.Context, organizationId string, clusterId string, routeId string, reqEditors ...RequestEditorFn) (*DeleteClusterRouteResponse, error) {
+	rsp, err := c.DeleteClusterRoute(ctx, organizationId, clusterId, routeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteClusterRouteResponse(rsp)
+}
+
 // GetDeploymentOptionsWithResponse request returning *GetDeploymentOptionsResponse
 func (c *ClientWithResponses) GetDeploymentOptionsWithResponse(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error) {
 	rsp, err := c.GetDeploymentOptions(ctx, organizationId, params, reqEditors...)
@@ -13158,6 +14269,32 @@ func (c *ClientWithResponses) GetDeploymentLogsWithResponse(ctx context.Context,
 	return ParseGetDeploymentLogsResponse(rsp)
 }
 
+// DeleteDeploymentTeamWithResponse request returning *DeleteDeploymentTeamResponse
+func (c *ClientWithResponses) DeleteDeploymentTeamWithResponse(ctx context.Context, organizationId string, deploymentId string, teamId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentTeamResponse, error) {
+	rsp, err := c.DeleteDeploymentTeam(ctx, organizationId, deploymentId, teamId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteDeploymentTeamResponse(rsp)
+}
+
+// MutateDeploymentTeamRoleWithBodyWithResponse request with arbitrary body returning *MutateDeploymentTeamRoleResponse
+func (c *ClientWithResponses) MutateDeploymentTeamRoleWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateDeploymentTeamRoleResponse, error) {
+	rsp, err := c.MutateDeploymentTeamRoleWithBody(ctx, organizationId, deploymentId, teamId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateDeploymentTeamRoleResponse(rsp)
+}
+
+func (c *ClientWithResponses) MutateDeploymentTeamRoleWithResponse(ctx context.Context, organizationId string, deploymentId string, teamId string, body MutateDeploymentTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateDeploymentTeamRoleResponse, error) {
+	rsp, err := c.MutateDeploymentTeamRole(ctx, organizationId, deploymentId, teamId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateDeploymentTeamRoleResponse(rsp)
+}
+
 // TransferDeploymentWithBodyWithResponse request with arbitrary body returning *TransferDeploymentResponse
 func (c *ClientWithResponses) TransferDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TransferDeploymentResponse, error) {
 	rsp, err := c.TransferDeploymentWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
@@ -13173,6 +14310,32 @@ func (c *ClientWithResponses) TransferDeploymentWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseTransferDeploymentResponse(rsp)
+}
+
+// DeleteDeploymentUserWithResponse request returning *DeleteDeploymentUserResponse
+func (c *ClientWithResponses) DeleteDeploymentUserWithResponse(ctx context.Context, organizationId string, deploymentId string, userId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentUserResponse, error) {
+	rsp, err := c.DeleteDeploymentUser(ctx, organizationId, deploymentId, userId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteDeploymentUserResponse(rsp)
+}
+
+// MutateDeploymentUserRoleWithBodyWithResponse request with arbitrary body returning *MutateDeploymentUserRoleResponse
+func (c *ClientWithResponses) MutateDeploymentUserRoleWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateDeploymentUserRoleResponse, error) {
+	rsp, err := c.MutateDeploymentUserRoleWithBody(ctx, organizationId, deploymentId, userId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateDeploymentUserRoleResponse(rsp)
+}
+
+func (c *ClientWithResponses) MutateDeploymentUserRoleWithResponse(ctx context.Context, organizationId string, deploymentId string, userId string, body MutateDeploymentUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateDeploymentUserRoleResponse, error) {
+	rsp, err := c.MutateDeploymentUserRole(ctx, organizationId, deploymentId, userId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateDeploymentUserRoleResponse(rsp)
 }
 
 // ListEnvironmentObjectsWithResponse request returning *ListEnvironmentObjectsResponse
@@ -15044,6 +16207,182 @@ func ParseGetClusterResponse(rsp *http.Response) (*GetClusterResponse, error) {
 	return response, nil
 }
 
+// ParseListClusterRoutesResponse parses an HTTP response from a ListClusterRoutesWithResponse call
+func ParseListClusterRoutesResponse(rsp *http.Response) (*ListClusterRoutesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListClusterRoutesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ClusterRoutesPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateClusterRouteResponse parses an HTTP response from a CreateClusterRouteWithResponse call
+func ParseCreateClusterRouteResponse(rsp *http.Response) (*CreateClusterRouteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateClusterRouteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ClusterRoute
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteClusterRouteResponse parses an HTTP response from a DeleteClusterRouteWithResponse call
+func ParseDeleteClusterRouteResponse(rsp *http.Response) (*DeleteClusterRouteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteClusterRouteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetDeploymentOptionsResponse parses an HTTP response from a GetDeploymentOptionsWithResponse call
 func ParseGetDeploymentOptionsResponse(rsp *http.Response) (*GetDeploymentOptionsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -16086,6 +17425,121 @@ func ParseGetDeploymentLogsResponse(rsp *http.Response) (*GetDeploymentLogsRespo
 	return response, nil
 }
 
+// ParseDeleteDeploymentTeamResponse parses an HTTP response from a DeleteDeploymentTeamWithResponse call
+func ParseDeleteDeploymentTeamResponse(rsp *http.Response) (*DeleteDeploymentTeamResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteDeploymentTeamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMutateDeploymentTeamRoleResponse parses an HTTP response from a MutateDeploymentTeamRoleWithResponse call
+func ParseMutateDeploymentTeamRoleResponse(rsp *http.Response) (*MutateDeploymentTeamRoleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MutateDeploymentTeamRoleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TeamRole
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseTransferDeploymentResponse parses an HTTP response from a TransferDeploymentWithResponse call
 func ParseTransferDeploymentResponse(rsp *http.Response) (*TransferDeploymentResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -16102,6 +17556,121 @@ func ParseTransferDeploymentResponse(rsp *http.Response) (*TransferDeploymentRes
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest Deployment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteDeploymentUserResponse parses an HTTP response from a DeleteDeploymentUserWithResponse call
+func ParseDeleteDeploymentUserResponse(rsp *http.Response) (*DeleteDeploymentUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteDeploymentUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMutateDeploymentUserRoleResponse parses an HTTP response from a MutateDeploymentUserRoleWithResponse call
+func ParseMutateDeploymentUserRoleResponse(rsp *http.Response) (*MutateDeploymentUserRoleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MutateDeploymentUserRoleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UserRole
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

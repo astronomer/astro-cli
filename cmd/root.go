@@ -6,8 +6,6 @@ import (
 	"os"
 	"time"
 
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-
 	"github.com/astronomer/astro-cli/cmd/registry"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"

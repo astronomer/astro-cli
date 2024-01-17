@@ -974,6 +974,39 @@ func (_m *ClientWithResponsesInterface) UpdateUserRolesWithBodyWithResponse(ctx 
 	return r0, r1
 }
 
+// UpdateUserRolesWithResponse provides a mock function with given fields: ctx, organizationId, userId, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateUserRolesWithResponse(ctx context.Context, organizationId string, userId string, body astroiamcore.UpdateUserRolesRequest, reqEditors ...astroiamcore.RequestEditorFn) (*astroiamcore.UpdateUserRolesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, userId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroiamcore.UpdateUserRolesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astroiamcore.UpdateUserRolesRequest, ...astroiamcore.RequestEditorFn) (*astroiamcore.UpdateUserRolesResponse, error)); ok {
+		return rf(ctx, organizationId, userId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astroiamcore.UpdateUserRolesRequest, ...astroiamcore.RequestEditorFn) *astroiamcore.UpdateUserRolesResponse); ok {
+		r0 = rf(ctx, organizationId, userId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroiamcore.UpdateUserRolesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, astroiamcore.UpdateUserRolesRequest, ...astroiamcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, userId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // NewClientWithResponsesInterface creates a new instance of ClientWithResponsesInterface. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewClientWithResponsesInterface(t interface {

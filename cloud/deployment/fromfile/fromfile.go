@@ -151,7 +151,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		workspaceID = existingDeployment.WorkspaceId
 		// determine dagDeploy
 		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil { //nolint:staticcheck
-			dagDeploy = existingDeployment.DagDeployEnabled
+			dagDeploy = existingDeployment.IsDagDeployEnabled
 		} else {
 			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
 		}
@@ -220,7 +220,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			if deployment.IsDeploymentStandard(deploymentType) || deployment.IsDeploymentDedicated(deploymentType) {
 				astroMachines := configOptions.WorkerMachines
 				for j := range astroMachines {
-					if astroMachines[j].Name == *listQueues[i].AstroMachine {
+					if string(astroMachines[j].Name) == *listQueues[i].AstroMachine {
 						astroMachine = astroMachines[j]
 					}
 				}
@@ -420,20 +420,20 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		if deployment.IsDeploymentStandard(deploymentType) {
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
 			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
-				requestedExecutor = astroplatformcore.CELERY
+				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
 			}
 			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
-				requestedExecutor = astroplatformcore.KUBERNETES
+				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
 			}
 			var schedulerSize astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize
 			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SmallScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SMALL {
-				schedulerSize = astroplatformcore.SMALL
+				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeSMALL
 			}
 			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MediumScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MEDIUM {
-				schedulerSize = astroplatformcore.MEDIUM
+				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
 			}
 			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LargeScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LARGE {
-				schedulerSize = astroplatformcore.LARGE
+				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
 			}
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
