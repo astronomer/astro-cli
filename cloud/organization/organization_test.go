@@ -353,6 +353,7 @@ func TestListClusters(t *testing.T) {
 		assert.ErrorIs(t, err, errNetwork)
 	})
 }
+
 func TestExportAuditLogs(t *testing.T) {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
