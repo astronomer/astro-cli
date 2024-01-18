@@ -387,7 +387,7 @@ func TestExportAuditLogs(t *testing.T) {
 		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(nil, errNetwork).Once()
-		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
+		err := ExportAuditLogs(mockClient, mockPlatformClient, "org1", "", 1)
 		assert.Contains(t, err.Error(), "network error")
 		mockClient.AssertExpectations(t)
 	})
