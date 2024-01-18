@@ -42,6 +42,25 @@ var (
 			},
 		},
 	}
+	auditLogsResp          = []int{}
+	auditLogsBody          = []byte{}
+	mockOKAuditLogResponse = astrocore.GetOrganizationAuditLogsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &auditLogsResp,
+		Body:    auditLogsBody,
+	}
+	errorAuditLogsBody, _ = json.Marshal(astrocore.Error{
+		Message: "failed to fetch organizations audit logs",
+	})
+	mockOKAuditLogResponseError = astrocore.GetOrganizationAuditLogsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		JSON200: nil,
+		Body:    errorAuditLogsBody,
+	}
 	errorBody, _ = json.Marshal(astrocore.Error{
 		Message: "failed to fetch organizations",
 	})
@@ -332,5 +351,52 @@ func TestListClusters(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListClustersResponse{}, errNetwork).Once()
 		_, err := ListClusters(orgShortName, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errNetwork)
+	})
+}
+func TestExportAuditLogs(t *testing.T) {
+	// initialize empty config
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Run("export audit logs success", func(t *testing.T) {
+		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
+		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+		mockPlatformClient.AssertExpectations(t)
+	})
+	t.Run("export audit logs and select org success", func(t *testing.T) {
+		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
+		err := ExportAuditLogs(mockClient, mockPlatformClient, "org1", "", 1)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+		mockPlatformClient.AssertExpectations(t)
+	})
+	t.Run("export failure", func(t *testing.T) {
+		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
+		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
+		assert.Contains(t, err.Error(), "network error")
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("list failure", func(t *testing.T) {
+		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(nil, errNetwork).Once()
+		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
+		assert.Contains(t, err.Error(), "network error")
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("organization list error", func(t *testing.T) {
+		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponseError, nil).Once()
+		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
+		assert.Contains(t, err.Error(), "failed to fetch organizations audit logs")
+		mockClient.AssertExpectations(t)
 	})
 }
