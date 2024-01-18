@@ -300,11 +300,9 @@ func TestCheckAPIKeys(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 }
-
 func TestCheckToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("test check token", func(t *testing.T) {
-
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
@@ -313,9 +311,7 @@ func TestCheckToken(t *testing.T) {
 		err := checkToken(mockCoreClient, mockPlatformCoreClient, nil)
 		assert.NoError(t, err)
 	})
-
 	t.Run("trigger login when no token is found", func(t *testing.T) {
-
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return errorLogin

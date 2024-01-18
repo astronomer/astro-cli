@@ -160,7 +160,7 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 
 	t.Run("pr preview is a valid domain", func(t *testing.T) {
 		// mocking this as once a PR closes, test would fail
-		mockResponse := AuthConfig{
+		mockResponse := Config{
 			ClientID:  "client-id",
 			Audience:  "audience",
 			DomainURL: "https://myURL.com/",
@@ -206,7 +206,7 @@ func TestRequestUserInfo(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		resp, err := requestUserInfo(AuthConfig{}, mockAccessToken)
+		resp, err := requestUserInfo(Config{}, mockAccessToken)
 		assert.NoError(t, err)
 		assert.Equal(t, mockUserInfo, resp)
 	})
@@ -220,7 +220,7 @@ func TestRequestUserInfo(t *testing.T) {
 			}
 		})
 
-		_, err := requestUserInfo(AuthConfig{}, mockAccessToken)
+		_, err := requestUserInfo(Config{}, mockAccessToken)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 
@@ -233,7 +233,7 @@ func TestRequestUserInfo(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		_, err := requestUserInfo(AuthConfig{}, mockAccessToken)
+		_, err := requestUserInfo(Config{}, mockAccessToken)
 		assert.Contains(t, err.Error(), "cannot retrieve email")
 	})
 }
@@ -257,7 +257,7 @@ func TestRequestToken(t *testing.T) {
 			}
 		})
 
-		resp, err := requestToken(AuthConfig{}, "", "")
+		resp, err := requestToken(Config{}, "", "")
 		assert.NoError(t, err)
 		assert.Equal(t, Result{RefreshToken: mockResponse.RefreshToken, AccessToken: mockResponse.AccessToken, ExpiresIn: mockResponse.ExpiresIn}, resp)
 	})
@@ -271,7 +271,7 @@ func TestRequestToken(t *testing.T) {
 			}
 		})
 
-		_, err := requestToken(AuthConfig{}, "", "")
+		_, err := requestToken(Config{}, "", "")
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 
@@ -292,7 +292,7 @@ func TestRequestToken(t *testing.T) {
 			}
 		})
 
-		_, err := requestToken(AuthConfig{}, "", "")
+		_, err := requestToken(Config{}, "", "")
 		assert.Contains(t, err.Error(), mockResponse.ErrorDescription)
 	})
 }
@@ -346,14 +346,14 @@ func TestAuthDeviceLogin(t *testing.T) {
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
-		tokenRequester := func(authConfig AuthConfig, verifier, code string) (Result, error) {
+		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
 			return mockResponse, nil
 		}
 		openURL = func(url string) error {
 			return nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		resp, err := mockAuthenticator.authDeviceLogin(AuthConfig{}, false)
+		resp, err := mockAuthenticator.authDeviceLogin(Config{}, false)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
 	})
@@ -366,7 +366,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
-		_, err = mockAuthenticator.authDeviceLogin(AuthConfig{}, false)
+		_, err = mockAuthenticator.authDeviceLogin(Config{}, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -374,14 +374,14 @@ func TestAuthDeviceLogin(t *testing.T) {
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
-		tokenRequester := func(authConfig AuthConfig, verifier, code string) (Result, error) {
+		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
 			return Result{}, errMock
 		}
 		openURL = func(url string) error {
 			return nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		_, err = mockAuthenticator.authDeviceLogin(AuthConfig{}, false)
+		_, err = mockAuthenticator.authDeviceLogin(Config{}, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -390,11 +390,11 @@ func TestAuthDeviceLogin(t *testing.T) {
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
-		tokenRequester := func(authConfig AuthConfig, verifier, code string) (Result, error) {
+		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
 			return mockResponse, nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		resp, err := mockAuthenticator.authDeviceLogin(AuthConfig{}, true)
+		resp, err := mockAuthenticator.authDeviceLogin(Config{}, true)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
 	})
@@ -404,7 +404,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
-		_, err = mockAuthenticator.authDeviceLogin(AuthConfig{}, true)
+		_, err = mockAuthenticator.authDeviceLogin(Config{}, true)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -412,11 +412,11 @@ func TestAuthDeviceLogin(t *testing.T) {
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
-		tokenRequester := func(authConfig AuthConfig, verifier, code string) (Result, error) {
+		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
 			return Result{}, errMock
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		_, err = mockAuthenticator.authDeviceLogin(AuthConfig{}, true)
+		_, err = mockAuthenticator.authDeviceLogin(Config{}, true)
 		assert.ErrorIs(t, err, errMock)
 	})
 }
@@ -646,10 +646,10 @@ func TestLogin(t *testing.T) {
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
-		tokenRequester := func(authConfig AuthConfig, verifier, code string) (Result, error) {
+		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
 			return mockResponse, nil
 		}
-		userInfoRequester := func(authConfig AuthConfig, accessToken string) (UserInfo, error) {
+		userInfoRequester := func(authConfig Config, accessToken string) (UserInfo, error) {
 			return mockUserInfo, nil
 		}
 		openURL = func(url string) error {
@@ -669,7 +669,7 @@ func TestLogin(t *testing.T) {
 	t.Run("can login to a pr preview environment successfully", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPrPreview)
 		// mocking this as once a PR closes, test would fail
-		mockAuthConfigResponse := AuthConfig{
+		mockAuthConfigResponse := Config{
 			ClientID:  "client-id",
 			Audience:  "audience",
 			DomainURL: "https://myURL.com/",
@@ -688,10 +688,10 @@ func TestLogin(t *testing.T) {
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
-		tokenRequester := func(authConfig AuthConfig, verifier, code string) (Result, error) {
+		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
 			return mockResponse, nil
 		}
-		userInfoRequester := func(authConfig AuthConfig, accessToken string) (UserInfo, error) {
+		userInfoRequester := func(authConfig Config, accessToken string) (UserInfo, error) {
 			return mockUserInfo, nil
 		}
 		openURL = func(url string) error {
@@ -742,10 +742,10 @@ func TestLogin(t *testing.T) {
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
-		tokenRequester := func(authConfig AuthConfig, verifier, code string) (Result, error) {
+		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
 			return mockResponse, nil
 		}
-		userInfoRequester := func(authConfig AuthConfig, accessToken string) (UserInfo, error) {
+		userInfoRequester := func(authConfig Config, accessToken string) (UserInfo, error) {
 			return mockUserInfo, nil
 		}
 		openURL = func(url string) error {
@@ -772,13 +772,13 @@ func TestLogin(t *testing.T) {
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 		// initialize the test authenticator
 		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
-		userInfoRequester := func(authConfig AuthConfig, accessToken string) (UserInfo, error) {
+		userInfoRequester := func(authConfig Config, accessToken string) (UserInfo, error) {
 			return mockUserInfo, nil
 		}
 		authenticator = Authenticator{
 			userInfoRequester: userInfoRequester,
 			callbackHandler:   func() (string, error) { return "authorizationCode", nil },
-			tokenRequester: func(authConfig AuthConfig, verifier, code string) (Result, error) {
+			tokenRequester: func(authConfig Config, verifier, code string) (Result, error) {
 				return Result{
 					RefreshToken: "refresh_token",
 					AccessToken:  "access_token",
@@ -805,13 +805,13 @@ func TestLogin(t *testing.T) {
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 		// initialize the test authenticator
 		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
-		userInfoRequester := func(authConfig AuthConfig, accessToken string) (UserInfo, error) {
+		userInfoRequester := func(authConfig Config, accessToken string) (UserInfo, error) {
 			return mockUserInfo, nil
 		}
 		authenticator = Authenticator{
 			userInfoRequester: userInfoRequester,
 			callbackHandler:   func() (string, error) { return "authorizationCode", nil },
-			tokenRequester: func(authConfig AuthConfig, verifier, code string) (Result, error) {
+			tokenRequester: func(authConfig Config, verifier, code string) (Result, error) {
 				return Result{
 					RefreshToken: "refresh_token",
 					AccessToken:  "access_token",

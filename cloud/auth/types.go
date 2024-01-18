@@ -6,8 +6,8 @@ import (
 
 // higher order functions to facilate writing unit test cases
 type (
-	RequestToken             func(authConfig AuthConfig, verifier, code string) (Result, error)
-	RequestUserInfo          func(authConfig AuthConfig, accessToken string) (UserInfo, error)
+	RequestToken             func(authConfig Config, verifier, code string) (Result, error)
+	RequestUserInfo          func(authConfig Config, accessToken string) (UserInfo, error)
 	AuthorizeCallbackHandler func() (string, error)
 )
 

@@ -63,14 +63,14 @@ var authenticator = Authenticator{
 	callbackHandler:   authorizeCallbackHandler,
 }
 
-// AuthConfig holds data related to oAuth and basic authentication
-type AuthConfig struct {
+// Config holds data related to oAuth and basic authentication
+type Config struct {
 	ClientID  string `json:"clientId"`
 	Audience  string `json:"audience"`
 	DomainURL string `json:"domainUrl"`
 }
 
-func requestUserInfo(authConfig AuthConfig, accessToken string) (UserInfo, error) {
+func requestUserInfo(authConfig Config, accessToken string) (UserInfo, error) {
 	addr := authConfig.DomainURL + "userinfo"
 	ctx := http_context.Background()
 	doOptions := &httputil.DoOptions{
@@ -98,7 +98,7 @@ func requestUserInfo(authConfig AuthConfig, accessToken string) (UserInfo, error
 
 // request a device code from auth0 for the user's cli
 // Get user's token using PKCE flow
-func requestToken(authConfig AuthConfig, verifier, code string) (Result, error) {
+func requestToken(authConfig Config, verifier, code string) (Result, error) {
 	addr := authConfig.DomainURL + "oauth/token"
 	data := url.Values{
 		"client_id":     {authConfig.ClientID},
@@ -185,7 +185,7 @@ func authorizeCallbackHandler() (string, error) {
 	return authorizationCode, nil
 }
 
-func (a *Authenticator) authDeviceLogin(authConfig AuthConfig, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
 	// Generate PKCE verifier and challenge
 	token := make([]byte, 32)                            //nolint:gomnd
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
@@ -431,9 +431,9 @@ func Logout(domain string, out io.Writer) {
 	fmt.Fprintln(out, "Successfully logged out of Astronomer")
 }
 
-func FetchDomainAuthConfig(domain string) (AuthConfig, error) {
+func FetchDomainAuthConfig(domain string) (Config, error) {
 	var (
-		authConfig  AuthConfig
+		authConfig  Config
 		addr        string
 		validDomain bool
 	)

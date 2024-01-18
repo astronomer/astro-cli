@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -232,7 +231,7 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astropl
 		return err
 	}
 
-	err = ioutil.WriteFile(filePath, resp.Body, os.ModePerm)
+	err = os.WriteFile(filePath, resp.Body, os.ModePerm)
 	if err != nil {
 		return err
 	}
@@ -246,22 +245,6 @@ func pluralize(count int) string {
 		return "s"
 	}
 	return ""
-}
-
-func saveToFile(data []int, filePath string) error {
-	// Convert []int to []byte
-	byteData := make([]byte, len(data))
-	for i, v := range data {
-		byteData[i] = byte(v)
-	}
-
-	// Write the binary data to a file
-	err := ioutil.WriteFile(filePath, byteData, os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func IsOrgHosted() bool {
