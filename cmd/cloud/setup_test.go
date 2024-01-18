@@ -300,6 +300,7 @@ func TestCheckAPIKeys(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 }
+
 func TestCheckToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("test check token", func(t *testing.T) {
