@@ -52,7 +52,7 @@ func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient
 		InviteeEmail: email,
 		Role:         role,
 	}
-	resp, err := client.CreateUserInviteWithResponse(httpContext.Background(), ctx.OrganizationShortName, userInviteInput)
+	resp, err := client.CreateUserInviteWithResponse(httpContext.Background(), ctx.Organization, userInviteInput)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func UpdateUserRole(email, role string, out io.Writer, client astrocore.CoreClie
 	mutateUserInput := astrocore.MutateOrgUserRoleRequest{
 		Role: role,
 	}
-	resp, err := client.MutateOrgUserRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, userID, mutateUserInput)
+	resp, err := client.MutateOrgUserRoleWithResponse(httpContext.Background(), ctx.Organization, userID, mutateUserInput)
 	if err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func GetOrgUsers(client astrocore.CoreClient) ([]astrocore.User, error) {
 	}
 
 	for {
-		resp, err := client.ListOrgUsersWithResponse(httpContext.Background(), ctx.OrganizationShortName, &astrocore.ListOrgUsersParams{
+		resp, err := client.ListOrgUsersWithResponse(httpContext.Background(), ctx.Organization, &astrocore.ListOrgUsersParams{
 			Offset: &offset,
 			Limit:  &userPagnationLimit,
 		})
@@ -274,7 +274,7 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 	mutateUserInput := astrocore.MutateWorkspaceUserRoleRequest{
 		Role: role,
 	}
-	resp, err := client.MutateWorkspaceUserRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, userID, mutateUserInput)
+	resp, err := client.MutateWorkspaceUserRoleWithResponse(httpContext.Background(), ctx.Organization, workspace, userID, mutateUserInput)
 	if err != nil {
 		return err
 	}
@@ -314,7 +314,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 		Role: role,
 	}
 	fmt.Println("workspace: " + workspace)
-	resp, err := client.MutateWorkspaceUserRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, userID, mutateUserInput)
+	resp, err := client.MutateWorkspaceUserRoleWithResponse(httpContext.Background(), ctx.Organization, workspace, userID, mutateUserInput)
 	if err != nil {
 		fmt.Println("error in MutateWorkspaceUserRoleWithResponse")
 		return err
@@ -370,7 +370,7 @@ func GetWorkspaceUsers(client astrocore.CoreClient, workspace string, limit int)
 		workspace = ctx.Workspace
 	}
 	for {
-		resp, err := client.ListWorkspaceUsersWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, &astrocore.ListWorkspaceUsersParams{
+		resp, err := client.ListWorkspaceUsersWithResponse(httpContext.Background(), ctx.Organization, workspace, &astrocore.ListWorkspaceUsersParams{
 			Offset: &offset,
 			Limit:  &limit,
 		})
@@ -439,7 +439,7 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	if err != nil {
 		return err
 	}
-	resp, err := client.DeleteWorkspaceUserWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, userID)
+	resp, err := client.DeleteWorkspaceUserWithResponse(httpContext.Background(), ctx.Organization, workspace, userID)
 	if err != nil {
 		return err
 	}
@@ -478,7 +478,7 @@ func GetUser(client astrocore.CoreClient, userID string) (user astrocore.User, e
 		return user, ErrNoShortName
 	}
 
-	resp, err := client.GetUserWithResponse(httpContext.Background(), ctx.OrganizationShortName, userID)
+	resp, err := client.GetUserWithResponse(httpContext.Background(), ctx.Organization, userID)
 	if err != nil {
 		return user, err
 	}

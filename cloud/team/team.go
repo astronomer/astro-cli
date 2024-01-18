@@ -62,7 +62,7 @@ func CreateTeam(name, description, role string, out io.Writer, client astrocore.
 		Name:             name,
 		OrganizationRole: &role,
 	}
-	resp, err := client.CreateTeamWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamCreateRequest)
+	resp, err := client.CreateTeamWithResponse(httpContext.Background(), ctx.Organization, teamCreateRequest)
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func GetTeam(client astrocore.CoreClient, teamID string) (team astrocore.Team, e
 		return team, ErrNoShortName
 	}
 
-	resp, err := client.GetTeamWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID)
+	resp, err := client.GetTeamWithResponse(httpContext.Background(), ctx.Organization, teamID)
 	if err != nil {
 		return team, err
 	}
@@ -139,7 +139,7 @@ func UpdateWorkspaceTeamRole(id, role, workspace string, out io.Writer, client a
 	teamID := team.Id
 
 	teamMutateRequest := astrocore.MutateWorkspaceTeamRoleRequest{Role: role}
-	resp, err := client.MutateWorkspaceTeamRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, teamID, teamMutateRequest)
+	resp, err := client.MutateWorkspaceTeamRoleWithResponse(httpContext.Background(), ctx.Organization, workspace, teamID, teamMutateRequest)
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func UpdateTeam(id, name, description, role string, out io.Writer, client astroc
 		teamUpdateRequest.Description = description
 	}
 
-	resp, err := client.UpdateTeamWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID, teamUpdateRequest)
+	resp, err := client.UpdateTeamWithResponse(httpContext.Background(), ctx.Organization, teamID, teamUpdateRequest)
 	if err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func UpdateTeam(id, name, description, role string, out io.Writer, client astroc
 			return err
 		}
 		teamMutateRoleRequest := astrocore.MutateOrgTeamRoleRequest{Role: role}
-		resp, err := client.MutateOrgTeamRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID, teamMutateRoleRequest)
+		resp, err := client.MutateOrgTeamRoleWithResponse(httpContext.Background(), ctx.Organization, teamID, teamMutateRoleRequest)
 		if err != nil {
 			return err
 		}
@@ -269,7 +269,7 @@ func RemoveWorkspaceTeam(id, workspace string, out io.Writer, client astrocore.C
 		}
 	}
 	teamID := team.Id
-	resp, err := client.DeleteWorkspaceTeamWithResponse(httpContext.Background(), ctx.OrganizationShortName, ctx.Workspace, teamID)
+	resp, err := client.DeleteWorkspaceTeamWithResponse(httpContext.Background(), ctx.Organization, ctx.Workspace, teamID)
 	if err != nil {
 		return err
 	}
@@ -324,7 +324,7 @@ func GetWorkspaceTeams(client astrocore.CoreClient, workspace string, limit int)
 		workspace = ctx.Workspace
 	}
 	for {
-		resp, err := client.ListWorkspaceTeamsWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, &astrocore.ListWorkspaceTeamsParams{
+		resp, err := client.ListWorkspaceTeamsWithResponse(httpContext.Background(), ctx.Organization, workspace, &astrocore.ListWorkspaceTeamsParams{
 			Offset: &offset,
 			Limit:  &limit,
 		})
@@ -430,7 +430,7 @@ func AddWorkspaceTeam(id, role, workspace string, out io.Writer, client astrocor
 	mutateUserInput := astrocore.MutateWorkspaceTeamRoleRequest{
 		Role: role,
 	}
-	resp, err := client.MutateWorkspaceTeamRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, teamID, mutateUserInput)
+	resp, err := client.MutateWorkspaceTeamRoleWithResponse(httpContext.Background(), ctx.Organization, workspace, teamID, mutateUserInput)
 	if err != nil {
 		return err
 	}
@@ -455,7 +455,7 @@ func GetOrgTeams(client astrocore.CoreClient) ([]astrocore.Team, error) {
 	}
 
 	for {
-		resp, err := client.ListOrganizationTeamsWithResponse(httpContext.Background(), ctx.OrganizationShortName, &astrocore.ListOrganizationTeamsParams{
+		resp, err := client.ListOrganizationTeamsWithResponse(httpContext.Background(), ctx.Organization, &astrocore.ListOrganizationTeamsParams{
 			Offset: &offset,
 			Limit:  &teamPagnationLimit,
 		})
@@ -543,7 +543,7 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 		}
 	}
 	teamID := team.Id
-	resp, err := client.DeleteTeamWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID)
+	resp, err := client.DeleteTeamWithResponse(httpContext.Background(), ctx.Organization, teamID)
 	if err != nil {
 		return err
 	}
@@ -618,7 +618,7 @@ func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.Cor
 	}
 	userID := teamMemberSelection.UserId
 
-	resp, err := client.RemoveTeamMemberWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID, userID)
+	resp, err := client.RemoveTeamMemberWithResponse(httpContext.Background(), ctx.Organization, teamID, userID)
 	if err != nil {
 		return err
 	}
@@ -698,7 +698,7 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 		MemberIds: []string{userID},
 	}
 
-	resp, err := client.AddTeamMembersWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID, addTeamMembersRequest)
+	resp, err := client.AddTeamMembersWithResponse(httpContext.Background(), ctx.Organization, teamID, addTeamMembersRequest)
 	if err != nil {
 		return err
 	}

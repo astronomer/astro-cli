@@ -76,7 +76,7 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 			return err
 		}
 	} else {
-		token, err = getOrganizationTokenByID(id, ctx.OrganizationShortName, client)
+		token, err = getOrganizationTokenByID(id, ctx.Organization, client)
 		if err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 		Roles:       updateOrganizationAPITokenRoles,
 	}
 
-	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, apiTokenID, updateOrganizationAPITokenRequest)
+	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.Organization, apiTokenID, updateOrganizationAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func getOrganizationTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, e
 		return []astrocore.ApiToken{}, user.ErrNoShortName
 	}
 
-	resp, err := client.ListOrganizationApiTokensWithResponse(httpContext.Background(), ctx.OrganizationShortName, &astrocore.ListOrganizationApiTokensParams{})
+	resp, err := client.ListOrganizationApiTokensWithResponse(httpContext.Background(), ctx.Organization, &astrocore.ListOrganizationApiTokensParams{})
 	if err != nil {
 		return []astrocore.ApiToken{}, err
 	}
@@ -259,8 +259,14 @@ func ListTokens(client astrocore.CoreClient, out io.Writer) error {
 			}
 		}
 		created := TimeAgo(apiTokens[i].CreatedAt)
-		createdBy := apiTokens[i].CreatedBy.FullName
-		tab.AddRow([]string{id, name, description, string(scope), role, created, *createdBy}, false)
+		var createdBy string
+		switch {
+		case apiTokens[i].CreatedBy.FullName != nil:
+			createdBy = *apiTokens[i].CreatedBy.FullName
+		case apiTokens[i].CreatedBy.ApiTokenName != nil:
+			createdBy = *apiTokens[i].CreatedBy.ApiTokenName
+		}
+		tab.AddRow([]string{id, name, description, string(scope), role, created, createdBy}, false)
 	}
 	tab.Print(out)
 
@@ -284,7 +290,7 @@ func ListTokenRoles(id string, client astrocore.CoreClient, out io.Writer) (err 
 		if err != nil {
 			return err
 		}
-		apiToken, err = getOrganizationTokenByID(id, ctx.OrganizationShortName, client)
+		apiToken, err = getOrganizationTokenByID(id, ctx.Organization, client)
 		if err != nil {
 			return err
 		}
@@ -327,7 +333,7 @@ func CreateToken(name, description, role string, expiration int, cleanOutput boo
 	if expiration != 0 {
 		CreateOrganizationAPITokenRequest.TokenExpiryPeriodInDays = &expiration
 	}
-	resp, err := client.CreateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, CreateOrganizationAPITokenRequest)
+	resp, err := client.CreateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.Organization, CreateOrganizationAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -368,7 +374,7 @@ func UpdateToken(id, name, newName, description, role string, out io.Writer, cli
 			return err
 		}
 	} else {
-		token, err = getOrganizationTokenByID(id, ctx.OrganizationShortName, client)
+		token, err = getOrganizationTokenByID(id, ctx.Organization, client)
 		if err != nil {
 			return err
 		}
@@ -424,7 +430,7 @@ func UpdateToken(id, name, newName, description, role string, out io.Writer, cli
 		UpdateOrganizationAPITokenRequest.Roles = updateOrganizationAPITokenRoles
 	}
 
-	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, apiTokenID, UpdateOrganizationAPITokenRequest)
+	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.Organization, apiTokenID, UpdateOrganizationAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -458,7 +464,7 @@ func RotateToken(id, name string, cleanOutput, force bool, out io.Writer, client
 			return err
 		}
 	} else {
-		token, err = getOrganizationTokenByID(id, ctx.OrganizationShortName, client)
+		token, err = getOrganizationTokenByID(id, ctx.Organization, client)
 		if err != nil {
 			return err
 		}
@@ -475,7 +481,7 @@ func RotateToken(id, name string, cleanOutput, force bool, out io.Writer, client
 			return nil
 		}
 	}
-	resp, err := client.RotateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, apiTokenID)
+	resp, err := client.RotateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.Organization, apiTokenID)
 	if err != nil {
 		return err
 	}
@@ -517,7 +523,7 @@ func DeleteToken(id, name string, force bool, out io.Writer, client astrocore.Co
 			return err
 		}
 	} else {
-		token, err = getOrganizationTokenByID(id, ctx.OrganizationShortName, client)
+		token, err = getOrganizationTokenByID(id, ctx.Organization, client)
 		if err != nil {
 			return err
 		}
@@ -546,7 +552,7 @@ func DeleteToken(id, name string, force bool, out io.Writer, client astrocore.Co
 		}
 	}
 
-	resp, err := client.DeleteOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, apiTokenID)
+	resp, err := client.DeleteOrganizationApiTokenWithResponse(httpContext.Background(), ctx.Organization, apiTokenID)
 	if err != nil {
 		return err
 	}

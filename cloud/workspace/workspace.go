@@ -198,7 +198,7 @@ func Create(name, description, enforceCD string, out io.Writer, client astrocore
 		Description:                  &description,
 		Name:                         name,
 	}
-	resp, err := client.CreateWorkspaceWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceCreateRequest)
+	resp, err := client.CreateWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceCreateRequest)
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 		}
 		workspaceUpdateRequest.ApiKeyOnlyDeploymentsDefault = enforce
 	}
-	resp, err := client.UpdateWorkspaceWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceID, workspaceUpdateRequest)
+	resp, err := client.UpdateWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceID, workspaceUpdateRequest)
 	if err != nil {
 		return err
 	}
@@ -309,7 +309,7 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 		}
 	}
 	workspaceID := workspace.Id
-	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceID)
+	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceID)
 	if err != nil {
 		return err
 	}
