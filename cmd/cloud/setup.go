@@ -199,7 +199,7 @@ func isExpired(t time.Time, threshold time.Duration) bool {
 
 // Refresh gets a new access token from the provided refresh token,
 // The request is used the default client_id and endpoint for device authentication.
-func refresh(refreshToken string, authConfig auth.AuthConfig) (TokenResponse, error) {
+func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error) {
 	addr := authConfig.DomainURL + "oauth/token"
 	data := url.Values{
 		"client_id":     {authConfig.ClientID},
