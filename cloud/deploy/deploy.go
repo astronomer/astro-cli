@@ -223,8 +223,6 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	if err != nil {
 		return err
 	}
-	fmt.Println("CI/CD enforcement:")
-	fmt.Println(deployInfo.cicdEnforcement)
 	if deployInfo.cicdEnforcement {
 		if !canCiCdDeploy(c.Token) {
 			return errCiCdEnforcementUpdate
@@ -287,7 +285,6 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		if !deployInfo.dagDeployEnabled {
-			fmt.Println("deployment id:")
 			fmt.Println(deployInfo.deploymentID)
 			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 		}
@@ -296,7 +293,6 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, astroplatformcore.DeploymentType(deployInfo.deploymentType))
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
-				fmt.Println("deployment id:")
 				fmt.Println(deployInfo.deploymentID)
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 			}

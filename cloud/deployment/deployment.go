@@ -942,7 +942,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				IsDagDeployEnabled:   dagDeployEnabled,
 				IsHighAvailability:   highAvailabilityValue,
 				WorkspaceId:          currentDeployment.WorkspaceId,
-				Type:                 astroplatformcore.UpdateDedicatedDeploymentRequestTypeSTANDARD,
+				Type:                 astroplatformcore.UpdateDedicatedDeploymentRequestTypeDEDICATED,
 				DefaultTaskPodCpu:    defaultTaskPodCpu,
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 				ResourceQuotaCpu:     resourceQuotaCpu,
