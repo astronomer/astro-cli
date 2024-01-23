@@ -368,8 +368,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
 	}
-	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared || deploymentType == fromfile.
-		HostedDedicated) {
+	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared || deploymentType == fromfile.HostedDedicated) {
 		return errors.New("Invalid --type value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
@@ -392,21 +391,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if !organization.IsOrgHosted() {
 		coreDeploymentType = astroplatformcore.DeploymentTypeHYBRID
 	}
-	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --enforce-cicd value")
-	}
-	var coreDeploymentType astroplatformcore.DeploymentType
-	if deploymentType == standard {
-		coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
-	}
-
-	if deploymentType == dedicated {
-		coreDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
-	}
-	if !organization.IsOrgHosted() {
-		coreDeploymentType = astroplatformcore.DeploymentTypeHYBRID
-	}
-
 	// request is to create from a file
 	if inputFile != "" {
 		requestedFlags := cmd.Flags().NFlag()
