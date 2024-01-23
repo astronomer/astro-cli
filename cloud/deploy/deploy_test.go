@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	"github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -25,13 +25,45 @@ import (
 )
 
 var (
-	errMock               = errors.New("mock error")
-	org                   = "test-org-id"
-	ws                    = "test-ws-id"
-	dagTarballVersionTest = "test-version"
-	dagsUploadTestURL     = "test-url"
-	deploymentID          = "test-id"
-	createDeployResponse  = astrocore.CreateDeployResponse{
+	errMock                    = errors.New("mock error")
+	ws                         = "test-ws-id"
+	dagTarballVersionTest      = "test-version"
+	dagsUploadTestURL          = "test-url"
+	deploymentID               = "test-deployment-id"
+	tarballVersion             = "test-version"
+	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
+	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
+		{
+			Id:     deploymentID,
+			Status: "HEALTHY",
+			Type:   &hybridType,
+		},
+	}
+	mockCoreDeploymentResponseCICD = []astroplatformcore.Deployment{
+		{
+			Id:             deploymentID,
+			Status:         "HEALTHY",
+			IsCicdEnforced: true,
+			Type:           &hybridType,
+		},
+	}
+	mockListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.DeploymentsPaginated{
+			Deployments: mockCoreDeploymentResponse,
+		},
+	}
+	mockListDeploymentsResponseCICD = astroplatformcore.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.DeploymentsPaginated{
+			Deployments: mockCoreDeploymentResponseCICD,
+		},
+	}
+	createDeployResponse = astrocore.CreateDeployResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -52,55 +84,61 @@ var (
 			ImageTag:          "test-tag",
 		},
 	}
-	getDeploymentOptionsResponse = astrocore.GetDeploymentOptionsResponse{
+	getDeploymentOptionsResponse = astroplatformcore.GetDeploymentOptionsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.DeploymentOptions{
-			RuntimeReleases: []astrocore.RuntimeRelease{
+		JSON200: &astroplatformcore.DeploymentOptions{
+			RuntimeReleases: []astroplatformcore.RuntimeRelease{
 				{Version: "4.0.0"},
 				{Version: "5.0.0"},
 			},
 		},
 	}
-	DesiredDagTarballVersion = "desired-dag-tar-ball-version"
-	deploymentResponse       = astrocore.GetDeploymentResponse{
+	deploymentResponse = astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.Deployment{
-			RuntimeVersion:           "4.2.5",
-			ReleaseName:              "test-name",
-			WorkspaceId:              ws,
-			WebServerUrl:             "test-url",
-			IsDagDeployEnabled:       false,
-			DesiredDagTarballVersion: &DesiredDagTarballVersion,
-		},
-	}
-	deploymentResponse2 = astrocore.GetDeploymentResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astrocore.Deployment{
+		JSON200: &astroplatformcore.Deployment{
+			Id:                 deploymentID,
 			RuntimeVersion:     "4.2.5",
-			ReleaseName:        "test-name",
+			Namespace:          "test-name",
 			WorkspaceId:        ws,
 			WebServerUrl:       "test-url",
 			IsDagDeployEnabled: false,
+			Type:               &hybridType,
 		},
 	}
-	mockCoreDeploymentResponse = []astrocore.Deployment{
-		{
-			Id:     deploymentID,
-			Status: "HEALTHY",
-		},
-	}
-	mockListDeploymentsResponse = astrocore.ListDeploymentsResponse{
+	deploymentResponseCICD = astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.DeploymentsPaginated{
-			Deployments: mockCoreDeploymentResponse,
+		JSON200: &astroplatformcore.Deployment{
+			Id:                 deploymentID,
+			RuntimeVersion:     "4.2.5",
+			Namespace:          "test-name",
+			WorkspaceId:        ws,
+			WebServerUrl:       "test-url",
+			IsDagDeployEnabled: false,
+			IsCicdEnforced:     true,
+			Type:               &hybridType,
+		},
+	}
+	deploymentResponseDags = astroplatformcore.GetDeploymentResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.Deployment{
+			Id:                       deploymentID,
+			RuntimeVersion:           "4.2.5",
+			Namespace:                "test-name",
+			WorkspaceId:              ws,
+			WebServerUrl:             "test-url",
+			IsDagDeployEnabled:       true,
+			IsCicdEnforced:           false,
+			Type:                     &hybridType,
+			DagTarballVersion:        &tarballVersion,
+			DesiredDagTarballVersion: &tarballVersion,
 		},
 	}
 )
@@ -121,12 +159,12 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	mockClient := new(astro_mocks.Client)
 
-	mockCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse2, nil).Times(4)
-	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}}}, nil).Once()
-	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(5)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(5)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(5)
 
@@ -169,27 +207,27 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	os.Stdin = r
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = "test-id"
 	deployInput.Pytest = "pytest"
 	deployInput.Prompt = false
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	// test custom image
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.ImageName = "custom-image"
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	config.CFG.ProjectDeployment.SetProjectString("test-id")
 	// test both deploymentID and name used
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.DeploymentName = "test-name"
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
@@ -197,20 +235,20 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	deployInput.WaitForStatus = true
 	sleepTime = 1
 	timeoutNum = 1
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.ErrorContains(t, err, "timed out waiting for the deployment to become healthy")
 
-	mockClient.AssertExpectations(t)
 	mockCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 	mockContainerHandler.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
 }
 
 func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 	os.Mkdir("./testfiles/dags", os.ModePerm)
 	path := "./testfiles/dags/test.py"
 	fileutil.WriteStringToFile(path, "testing")
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
@@ -226,21 +264,19 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	mockClient := new(astro_mocks.Client)
-
 	canCiCdDeploy = func(astroAPIToken string) bool {
 		return false
 	}
-	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}, DagDeployEnabled: true, APIKeyOnlyDeployments: true}}, nil).Once()
 
-	err := Deploy(deployInput, mockClient, mockCoreClient)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseCICD, nil).Twice()
+
+	err := Deploy(deployInput, mockPlatformCoreClient, nil)
 	assert.ErrorIs(t, err, errCiCdEnforcementUpdate)
 
 	defer os.RemoveAll("./testfiles/dags/")
 
-	mockClient.AssertExpectations(t)
-	mockCoreClient.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
 }
 
 func TestDeployWithDagsDeploySuccess(t *testing.T) {
@@ -248,6 +284,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	path := "./testfiles/dags/test.py"
 	fileutil.WriteStringToFile(path, "testing")
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
@@ -265,10 +302,9 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
-	mockCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(5)
-	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}, DagDeployEnabled: true}}, nil).Times(2)
-	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
-	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(7)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(9)
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(7)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(7)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(7)
 
@@ -315,37 +351,37 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	os.Stdin = r
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = "test-id"
 	deployInput.Pytest = "pytest"
 	deployInput.Prompt = false
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	config.CFG.ProjectDeployment.SetProjectString("test-id")
 	// test both deploymentID and name used
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.DeploymentName = "test-name"
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	// test custom image with dag deploy enabled
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.ImageName = "custom-image"
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	os.Mkdir("./testfiles1/", os.ModePerm)
@@ -366,7 +402,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		Dags:           false,
 	}
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles1/")
@@ -376,38 +412,16 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	mockCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 	mockContainerHandler.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
 }
 
 func TestDagsDeploySuccess(t *testing.T) {
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-	mockDeplyResp := []astro.Deployment{
-		{
-			ID:             "test-id",
-			ReleaseName:    "test-name",
-			Workspace:      astro.Workspace{ID: ws},
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: true,
-		},
-		{
-			ID:             "test-id-2",
-			ReleaseName:    "test-name-2",
-			Workspace:      astro.Workspace{ID: ws},
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: true,
-		},
-	}
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
-		RuntimeID:      "test-id",
+		RuntimeID:      "",
 		WsID:           ws,
 		Pytest:         "",
 		EnvFile:        "",
@@ -421,19 +435,18 @@ func TestDagsDeploySuccess(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
-
-	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
-	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(5)
-	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(5)
-	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)
-	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(5)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(6)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(12)
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(4)
+	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(6)
+	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(6)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
-	err := Deploy(deployInput, mockClient, mockCoreClient)
+	err := Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	// Test pytest with dags deploy
@@ -455,17 +468,23 @@ func TestDagsDeploySuccess(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
+	assert.NoError(t, err)
+	// image deploy
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Image = true
+
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
@@ -473,20 +492,21 @@ func TestDagsDeploySuccess(t *testing.T) {
 	deployInput.WaitForStatus = true
 	dagOnlyDeploySleepTime = 1
 	timeoutNum = 1
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.ErrorContains(t, err, "timed out waiting for the deployment to become healthy")
 
 	defer os.RemoveAll("./testfiles/dags/")
 
 	mockCoreClient.AssertExpectations(t)
 	mockClient.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
 }
 
 func TestNoDagsDeploy(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("true")
-	mockClient := new(astro_mocks.Client)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
@@ -494,38 +514,13 @@ func TestNoDagsDeploy(t *testing.T) {
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
-	mockDeplyResp := []astro.Deployment{
-		{
-			ID:             "test-id",
-			ReleaseName:    "test-name",
-			Workspace:      astro.Workspace{ID: ws},
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: true,
-		},
-		{
-			ID:             "test-id-2",
-			ReleaseName:    "test-name-2",
-			Workspace:      astro.Workspace{ID: ws},
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: true,
-		},
-	}
-
-	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
-	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(2)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(1)
 
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
-		RuntimeID:      "test-id",
+		RuntimeID:      "",
 		WsID:           ws,
 		Pytest:         "",
 		EnvFile:        "",
@@ -535,47 +530,22 @@ func TestNoDagsDeploy(t *testing.T) {
 		WaitForStatus:  false,
 		Dags:           true,
 	}
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
-	mockClient.AssertExpectations(t)
 	mockCoreClient.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
 }
 
 func TestDagsDeployFailed(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	mockClient := new(astro_mocks.Client)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-
-	mockDeplyResp := []astro.Deployment{
-		{
-			ID:             "test-id",
-			ReleaseName:    "test-name",
-			Workspace:      astro.Workspace{ID: ws},
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: false,
-		},
-		{
-			ID:             "test-id-2",
-			ReleaseName:    "test-name-2",
-			Workspace:      astro.Workspace{ID: ws},
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: true,
-		},
-	}
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
-		RuntimeID:      "test-id",
+		RuntimeID:      deploymentID,
 		WsID:           ws,
 		Pytest:         "",
 		EnvFile:        "",
@@ -585,14 +555,14 @@ func TestDagsDeployFailed(t *testing.T) {
 		WaitForStatus:  false,
 		Dags:           true,
 	}
-	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(3)
-	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
-	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(2)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(2)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(3)
 
 	defer testUtil.MockUserInput(t, "y")()
-	err := Deploy(deployInput, mockClient, mockCoreClient)
-	assert.Equal(t, err.Error(), "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update test-id --dag-deploy enable' to enable DAG-only deploys.")
+	err := Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
+	assert.Equal(t, err.Error(), "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update test-deployment-id --dag-deploy enable' to enable DAG-only deploys.")
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -610,16 +580,16 @@ func TestDagsDeployFailed(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.Error(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.Error(t, err)
 
-	mockClient.AssertExpectations(t)
 	mockCoreClient.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
 }
 
 func TestDeployFailure(t *testing.T) {
@@ -634,10 +604,11 @@ func TestDeployFailure(t *testing.T) {
 	err := config.ResetCurrentContext()
 	assert.NoError(t, err)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
-		RuntimeID:      "test-id",
+		RuntimeID:      deploymentID,
 		WsID:           ws,
 		Pytest:         "parse",
 		EnvFile:        "./testfiles/.env",
@@ -649,27 +620,14 @@ func TestDeployFailure(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, nil, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 
-	// airflow parse failure
-	mockDeplyResp := []astro.Deployment{
-		{
-			ID:             "test-id",
-			ReleaseName:    "test-name",
-			Workspace:      astro.Workspace{ID: ws},
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-		},
-	}
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", org, ws).Return(mockDeplyResp, nil).Times(2)
-	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(1)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(2)
-	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -702,57 +660,32 @@ func TestDeployFailure(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = ""
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.ErrorIs(t, err, errDagsParseFailed)
 
-	mockClient.On("ListDeployments", org, "invalid-workspace").Return(mockDeplyResp, nil).Once()
 	defer testUtil.MockUserInput(t, "y")()
-	deployInput.RuntimeID = "test-id"
+	deployInput.RuntimeID = deploymentID
 	deployInput.WsID = "invalid-workspace"
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.WsID = ws
 	deployInput.EnvFile = "invalid-path"
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.ErrorIs(t, err, envFileMissing)
 
-	mockClient.AssertExpectations(t)
 	mockCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
+
 	mockContainerHandler.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
 }
 
 func TestDeployMonitoringDAGNonHosted(t *testing.T) {
-	mockDeplyResp := []astro.Deployment{
-		{
-			ID:             "test-id",
-			ReleaseName:    "test-name",
-			Workspace:      astro.Workspace{ID: ws},
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: true,
-		},
-		{
-			ID:             "test-id-2",
-			ReleaseName:    "test-name-2",
-			Workspace:      astro.Workspace{ID: ws},
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: true,
-		},
-	}
-
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
-		RuntimeID:      "test-id",
+		RuntimeID:      deploymentID,
 		WsID:           ws,
 		Pytest:         "",
 		EnvFile:        "",
@@ -764,8 +697,8 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	mockClient := new(astro_mocks.Client)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
@@ -773,9 +706,9 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
-	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
-	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(4)
-	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(8)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
 
@@ -786,7 +719,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	// Test pytest with dags deploy
@@ -808,56 +741,29 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
 
 	mockCoreClient.AssertExpectations(t)
-	mockClient.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
 }
 
 func TestDeployNoMonitoringDAGHosted(t *testing.T) {
-	mockDeplyResp := []astro.Deployment{
-		{
-			ID:             "test-id",
-			ReleaseName:    "test-name",
-			Workspace:      astro.Workspace{ID: ws},
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: true,
-			Type:             "HOSTED_SHARED",
-		},
-		{
-			ID:             "test-id-2",
-			ReleaseName:    "test-name-2",
-			Workspace:      astro.Workspace{ID: ws},
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: true,
-			Type:             "HOSTED_DEDICATED",
-		},
-	}
-
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
-		RuntimeID:      "test-id",
+		RuntimeID:      deploymentID,
 		WsID:           ws,
 		Pytest:         "",
 		EnvFile:        "",
@@ -869,8 +775,8 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	mockClient := new(astro_mocks.Client)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
@@ -878,9 +784,9 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
-	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
-	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(4)
-	mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(8)
 	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
 	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
 
@@ -891,7 +797,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	// Test pytest with dags deploy
@@ -913,23 +819,23 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockClient, mockCoreClient)
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
 
 	mockCoreClient.AssertExpectations(t)
-	mockClient.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
 }
 
 func TestBuildImageFailure(t *testing.T) {
@@ -937,6 +843,7 @@ func TestBuildImageFailure(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
 	// image build failure
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -960,10 +867,11 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// failed to get runtime releases
 	dockerfile = "Dockerfile"
-	mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, mockCoreClient)
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 	mockCoreClient.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 }
 

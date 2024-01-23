@@ -32,7 +32,7 @@ mockery: $(ENVTEST_ASSETS_DIR)
 lint:
 	@test -f ${ENVTEST_ASSETS_DIR}/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} ${GOLANGCI_LINT_VERSION}
 	${ENVTEST_ASSETS_DIR}/golangci-lint version
-	${ENVTEST_ASSETS_DIR}/golangci-lint run --timeout 3m0s
+	${ENVTEST_ASSETS_DIR}/golangci-lint run --timeout 15m0s
 
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go

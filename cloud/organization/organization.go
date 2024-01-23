@@ -200,14 +200,12 @@ func IsOrgHosted() bool {
 	return c.OrganizationProduct == "HOSTED"
 }
 
-func ListClusters(organization string, coreClient astrocore.CoreClient) ([]astrocore.Cluster, error) {
-	clusterTypes := []astrocore.ListClustersParamsTypes{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
+func ListClusters(organizationID string, platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Cluster, error) {
 	limit := 1000
-	clusterListParams := &astrocore.ListClustersParams{
-		Types: &clusterTypes,
+	clusterListParams := &astroplatformcore.ListClustersParams{
 		Limit: &limit,
 	}
-	resp, err := coreClient.ListClustersWithResponse(http_context.Background(), organization, clusterListParams)
+	resp, err := platformCoreClient.ListClustersWithResponse(http_context.Background(), organizationID, clusterListParams)
 	if err != nil {
 		return nil, err
 	}

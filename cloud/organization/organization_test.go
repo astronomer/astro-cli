@@ -9,12 +9,11 @@ import (
 	"os"
 	"testing"
 
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
-
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -166,7 +165,7 @@ func TestSwitch(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
-		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, corePlatformClient astroplatformcore.CoreClient, out io.Writer) error {
+		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -310,14 +309,14 @@ func TestIsOrgHosted(t *testing.T) {
 func TestListClusters(t *testing.T) {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	orgShortName := "test-org-name"
-	mockListClustersResponse := astrocore.ListClustersResponse{
+	mockListClustersResponse := astroplatformcore.ListClustersResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.ClustersPaginated{
-			Clusters: []astrocore.Cluster{
+		JSON200: &astroplatformcore.ClustersPaginated{
+			Clusters: []astroplatformcore.Cluster{
 				{
 					Id:   "test-cluster-id",
 					Name: "test-cluster",
@@ -331,15 +330,15 @@ func TestListClusters(t *testing.T) {
 	}
 
 	t.Run("successful list all clusters", func(t *testing.T) {
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		clusters, err := ListClusters(orgShortName, mockCoreClient)
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		clusters, err := ListClusters(orgShortName, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, len(clusters), 2)
 	})
 
 	t.Run("error on listing clusters", func(t *testing.T) {
-		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrocore.ListClustersResponse{}, errNetwork).Once()
-		_, err := ListClusters(orgShortName, mockCoreClient)
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListClustersResponse{}, errNetwork).Once()
+		_, err := ListClusters(orgShortName, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errNetwork)
 	})
 }

@@ -12,10 +12,9 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/yaml.v3"
 
-	"github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
-	"github.com/astronomer/astro-cli/cloud/organization"
 )
 
 type deploymentMetadata struct {
@@ -37,7 +36,7 @@ type deploymentConfig struct {
 	Name                  string `mapstructure:"name" yaml:"name" json:"name"`
 	Description           string `mapstructure:"description" yaml:"description" json:"description"`
 	RunTimeVersion        string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
-	DagDeployEnabled      *bool  `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
+	DagDeployEnabled      *bool  `mapstructure:"dag_deploy_enabled,omitempty" yaml:"dag_deploy_enabled,omitempty" json:"dag_deploy_enabled,omitempty"`
 	APIKeyOnlyDeployments bool   `mapstructure:"ci_cd_enforcement" yaml:"ci_cd_enforcement" json:"ci_cd_enforcement"`
 	SchedulerSize         string `mapstructure:"scheduler_size" yaml:"scheduler_size" json:"scheduler_size"`
 	IsHighAvailability    bool   `mapstructure:"is_high_availability" yaml:"is_high_availability" json:"is_high_availability"`
@@ -49,12 +48,17 @@ type deploymentConfig struct {
 	DeploymentType        string `mapstructure:"deployment_type" yaml:"deployment_type" json:"deployment_type"`
 	CloudProvider         string `mapstructure:"cloud_provider" yaml:"cloud_provider" json:"cloud_provider"`
 	Region                string `mapstructure:"region" yaml:"region" json:"region"`
+	DefaultTaskPodCPU     string `mapstructure:"default_task_pod_cpu,omitempty" yaml:"default_task_pod_cpu,omitempty" json:"default_task_pod_cpu,omitempty"`
+	DefaultTaskPodMemory  string `mapstructure:"default_task_pod_memory,omitempty" yaml:"default_task_pod_memory,omitempty" json:"default_task_pod_memory,omitempty"`
+	ResourceQuotaCPU      string `mapstructure:"resource_quota_cpu,omitempty" yaml:"resource_quota_cpu,omitempty" json:"resource_quota_cpu,omitempty"`
+	ResourceQuotaMemory   string `mapstructure:"resource_quota_memory,omitempty" yaml:"resource_quota_memory,omitempty" json:"resource_quota_memory,omitempty"`
+	DefaultWorkerType     string `mapstructure:"default_worker_type,omitempty" yaml:"default_worker_type,omitempty" json:"default_worker_type,omitempty"`
 }
 
 type Workerq struct {
 	Name              string `mapstructure:"name" yaml:"name" json:"name"`
 	MaxWorkerCount    int    `mapstructure:"max_worker_count,omitempty" yaml:"max_worker_count,omitempty" json:"max_worker_count,omitempty"`
-	MinWorkerCount    *int   `mapstructure:"min_worker_count,omitempty" yaml:"min_worker_count,omitempty" json:"min_worker_count,omitempty"`
+	MinWorkerCount    int    `mapstructure:"min_worker_count,omitempty" yaml:"min_worker_count,omitempty" json:"min_worker_count,omitempty"`
 	WorkerConcurrency int    `mapstructure:"worker_concurrency,omitempty" yaml:"worker_concurrency,omitempty" json:"worker_concurrency,omitempty"`
 	WorkerType        string `mapstructure:"worker_type" yaml:"worker_type" json:"worker_type"`
 	PodCPU            string `mapstructure:"pod_cpu,omitempty" yaml:"pod_cpu,omitempty" json:"pod_cpu,omitempty"`
@@ -92,39 +96,45 @@ const (
 	notApplicable = "N/A"
 )
 
-func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, requestedField string, template bool) error {
+func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer, requestedField string, template bool) error {
 	var (
-		requestedDeployment                                                        astro.Deployment
+		requestedDeployment                                                        astroplatformcore.Deployment
 		err                                                                        error
 		infoToPrint                                                                []byte
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, true, client, coreClient)
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, true, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
 
-	if requestedDeployment.ID == "" {
+	if requestedDeployment.Id == "" {
 		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(wsID))
 		return nil
 	}
-
-	// get core deployment
-	coreDeployment, err := deployment.CoreGetDeployment(wsID, "", requestedDeployment.ID, coreClient)
-	if err != nil {
-		return err
-	}
-
 	// create a map for deployment.information
-	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment, coreDeployment)
+	deploymentInfoMap, err = getDeploymentInfo(requestedDeployment)
 	if err != nil {
 		return err
 	}
 	// create a map for deployment.configuration
-	deploymentConfigMap = getDeploymentConfig(&requestedDeployment)
+	deploymentConfigMap, err = getDeploymentConfig(&requestedDeployment, platformCoreClient)
+	if err != nil {
+		return err
+	}
 	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.astronomer_variables
-	additionalMap = getAdditional(&requestedDeployment)
+	nodePools := []astroplatformcore.NodePool{}
+	if requestedDeployment.ClusterId != nil {
+		cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, platformCoreClient)
+		if err != nil {
+			return err
+		}
+		if cluster.NodePools != nil {
+			nodePools = *cluster.NodePools
+		}
+	}
+	additionalMap = getAdditionalNullableFields(&requestedDeployment, nodePools)
 	// create a map for the entire deployment
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 	// get specific field if requested
@@ -145,22 +155,22 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 	return nil
 }
 
-func getDeploymentInfo(sourceDeployment *astro.Deployment, coreDeployment astrocore.Deployment) (map[string]interface{}, error) { //nolint
+func getDeploymentInfo(coreDeployment astroplatformcore.Deployment) (map[string]interface{}, error) { //nolint
 	var (
 		deploymentURL    string
 		workloadIdentity string
 		err              error
 	)
 
-	deploymentURL, err = deployment.GetDeploymentURL(sourceDeployment.ID, sourceDeployment.Workspace.ID)
+	deploymentURL, err = deployment.GetDeploymentURL(coreDeployment.Id, coreDeployment.WorkspaceId)
 	if err != nil {
 		return nil, err
 	}
-	clusterID := sourceDeployment.Cluster.ID
-	releaseName := sourceDeployment.ReleaseName
-	if organization.IsOrgHosted() {
-		if deployment.IsDeploymentHosted(sourceDeployment.Type) {
-			clusterID = sourceDeployment.Cluster.Region
+	clusterID := coreDeployment.ClusterId
+	releaseName := coreDeployment.Namespace
+	if deployment.IsDeploymentStandard(*coreDeployment.Type) || deployment.IsDeploymentDedicated(*coreDeployment.Type) {
+		if deployment.IsDeploymentStandard(*coreDeployment.Type) {
+			clusterID = nil
 		}
 		releaseName = notApplicable
 	}
@@ -168,85 +178,112 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment, coreDeployment astroc
 		workloadIdentity = *coreDeployment.WorkloadIdentity
 	}
 	return map[string]interface{}{
-		"deployment_id":     sourceDeployment.ID,
-		"workspace_id":      sourceDeployment.Workspace.ID,
+		"deployment_id":     coreDeployment.Id,
+		"workspace_id":      coreDeployment.WorkspaceId,
 		"cluster_id":        clusterID,
-		"airflow_version":   sourceDeployment.RuntimeRelease.AirflowVersion,
-		"current_tag":       sourceDeployment.DeploymentSpec.Image.Tag,
+		"airflow_version":   coreDeployment.AirflowVersion,
+		"current_tag":       coreDeployment.ImageTag,
 		"release_name":      releaseName,
 		"deployment_url":    deploymentURL,
-		"webserver_url":     sourceDeployment.DeploymentSpec.Webserver.URL,
-		"created_at":        sourceDeployment.CreatedAt,
-		"updated_at":        sourceDeployment.UpdatedAt,
+		"webserver_url":     coreDeployment.WebServerUrl,
+		"created_at":        coreDeployment.CreatedAt,
+		"updated_at":        coreDeployment.UpdatedAt,
 		"workload_identity": workloadIdentity,
 		"status":            coreDeployment.Status,
 	}, nil
 }
 
-func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interface{} {
-	clusterName := sourceDeployment.Cluster.Name
-	if organization.IsOrgHosted() {
-		if deployment.IsDeploymentHosted(sourceDeployment.Type) {
-			clusterName = sourceDeployment.Cluster.Region
+func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, platformCoreClient astroplatformcore.CoreClient) (map[string]interface{}, error) {
+	var clusterName string
+	var defaultWorkerType string
+	var err error
+	coreDeployment := *coreDeploymentPointer
+	if !deployment.IsDeploymentStandard(*coreDeployment.Type) {
+		clusterName = *coreDeployment.ClusterName
+		if coreDeployment.TaskPodNodePoolId != nil {
+			defaultWorkerType, err = GetDefaultWorkerType(*coreDeployment.TaskPodNodePoolId, *coreDeployment.ClusterId, platformCoreClient)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
-	return map[string]interface{}{
-		"name":                 sourceDeployment.Label,
-		"description":          sourceDeployment.Description,
-		"workspace_name":       sourceDeployment.Workspace.Label,
-		"deployment_type":      sourceDeployment.Type,
-		"cloud_provider":       sourceDeployment.Cluster.CloudProvider,
-		"region":               sourceDeployment.Cluster.Region,
+
+	deploymentMap := map[string]interface{}{
+		"name":                 coreDeployment.Name,
+		"description":          coreDeployment.Description,
+		"workspace_name":       coreDeployment.WorkspaceName,
+		"deployment_type":      string(*coreDeployment.Type),
+		"cloud_provider":       coreDeployment.CloudProvider,
+		"region":               coreDeployment.Region,
 		"cluster_name":         clusterName,
-		"runtime_version":      sourceDeployment.RuntimeRelease.Version,
-		"dag_deploy_enabled":   sourceDeployment.DagDeployEnabled,
-		"ci_cd_enforcement":    sourceDeployment.APIKeyOnlyDeployments,
-		"scheduler_size":       sourceDeployment.SchedulerSize,
-		"is_high_availability": sourceDeployment.IsHighAvailability,
-		"scheduler_au":         sourceDeployment.DeploymentSpec.Scheduler.AU,
-		"scheduler_count":      sourceDeployment.DeploymentSpec.Scheduler.Replicas,
-		"executor":             sourceDeployment.DeploymentSpec.Executor,
+		"runtime_version":      coreDeployment.RuntimeVersion,
+		"dag_deploy_enabled":   coreDeployment.IsDagDeployEnabled,
+		"ci_cd_enforcement":    coreDeployment.IsCicdEnforced,
+		"is_high_availability": coreDeployment.IsHighAvailability,
+		"scheduler_au":         coreDeployment.SchedulerAu,
+		"scheduler_count":      coreDeployment.SchedulerReplicas,
+		"executor":             coreDeployment.Executor,
+		"scheduler_size":       coreDeployment.SchedulerSize,
 	}
+	if deployment.IsDeploymentStandard(*coreDeployment.Type) || deployment.IsDeploymentDedicated(*coreDeployment.Type) {
+		deploymentMap["default_task_pod_cpu"] = coreDeployment.DefaultTaskPodCpu
+		deploymentMap["default_task_pod_memory"] = coreDeployment.DefaultTaskPodMemory
+		deploymentMap["resource_quota_cpu"] = coreDeployment.ResourceQuotaCpu
+		deploymentMap["resource_quota_memory"] = coreDeployment.ResourceQuotaMemory
+	}
+	if !deployment.IsDeploymentStandard(*coreDeployment.Type) {
+		deploymentMap["default_worker_type"] = defaultWorkerType
+	}
+
+	return deploymentMap, nil
 }
 
-func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
-	qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor, sourceDeployment.Type)
+func getAdditionalNullableFields(coreDeployment *astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool) map[string]interface{} {
+	qList := getQMap(coreDeployment, nodePools)
+	var envVarList []astroplatformcore.DeploymentEnvironmentVariable
+	if coreDeployment.EnvironmentVariables != nil {
+		envVarList = *coreDeployment.EnvironmentVariables
+	}
 	return map[string]interface{}{
-		"alert_emails":          sourceDeployment.AlertEmails,
+		"alert_emails":          coreDeployment.ContactEmails,
 		"worker_queues":         qList,
-		"environment_variables": getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), // API only returns values when !EnvironmentVariablesObject.isSecret
+		"environment_variables": getVariablesMap(envVarList), // API only returns values when !EnvironmentVariablesObject.isSecret
 	}
 }
 
-func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astro.Client, coreClient astrocore.CoreClient, requestedField string) (value any, err error) {
+func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatformCore astroplatformcore.CoreClient, coreClient astrocore.CoreClient, requestedField string) (value any, err error) {
 	var (
-		requestedDeployment                                                        astro.Deployment
+		requestedDeployment                                                        astroplatformcore.Deployment
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, false, client, coreClient)
-	if err != nil {
-		return nil, err
-	}
-
-	// get core deployment
-	coreDeployment, err := deployment.CoreGetDeployment(wsID, "", requestedDeployment.ID, coreClient)
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, false, astroPlatformCore, coreClient)
 	if err != nil {
 		return nil, err
 	}
 
 	// create a map for deployment.information
-	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment, coreDeployment)
+	deploymentInfoMap, err = getDeploymentInfo(requestedDeployment)
 	if err != nil {
 		return nil, err
 	}
 	// create a map for deployment.configuration
-	deploymentConfigMap = getDeploymentConfig(&requestedDeployment)
-	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.astronomer_variables
-	additionalMap = getAdditional(&requestedDeployment)
+	deploymentConfigMap, err = getDeploymentConfig(&requestedDeployment, astroPlatformCore)
+	if err != nil {
+		return nil, err
+	}
+	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.environment_variables
+	cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, astroPlatformCore)
+	if err != nil {
+		return nil, err
+	}
+	nodePools := []astroplatformcore.NodePool{}
+	if cluster.NodePools != nil {
+		nodePools = *cluster.NodePools
+	}
+	additionalMap = getAdditionalNullableFields(&requestedDeployment, nodePools)
 	// create a map for the entire deployment
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
-
 	value, err = getSpecificField(printableDeployment, requestedField)
 	if err != nil {
 		return nil, err
@@ -254,11 +291,16 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astr
 	return value, nil
 }
 
-func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool, sourceExecutor, deploymentType string) []map[string]interface{} {
+func getQMap(coreDeploymentPointer *astroplatformcore.Deployment, sourceNodePools []astroplatformcore.NodePool) []map[string]interface{} {
+	coreDeployment := *coreDeploymentPointer
+	var sourceDeploymentQs []astroplatformcore.WorkerQueue
+	if coreDeployment.WorkerQueues != nil {
+		sourceDeploymentQs = *coreDeployment.WorkerQueues
+	}
 	var resources map[string]interface{}
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))
 	for _, queue := range sourceDeploymentQs { //nolint
-		if sourceExecutor == "CeleryExecutor" {
+		if *coreDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
 			resources = map[string]interface{}{
 				"max_worker_count":   queue.MaxWorkerCount,
 				"min_worker_count":   queue.MinWorkerCount,
@@ -266,15 +308,15 @@ func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.Nod
 			}
 		} else {
 			resources = map[string]interface{}{
-				"pod_cpu": queue.PodCPU,
-				"pod_ram": queue.PodRAM,
+				"pod_cpu": queue.PodCpu,
+				"pod_ram": queue.PodMemory,
 			}
 		}
 		var workerType string
-		if deployment.IsDeploymentDedicated(deploymentType) || deployment.IsDeploymentHosted(deploymentType) {
-			workerType = queue.AstroMachine
+		if deployment.IsDeploymentDedicated(*coreDeployment.Type) || deployment.IsDeploymentStandard(*coreDeployment.Type) {
+			workerType = *queue.AstroMachine
 		} else {
-			workerType = getWorkerTypeFromNodePoolID(queue.NodePoolID, sourceNodePools)
+			workerType = getWorkerTypeFromNodePoolID(*queue.NodePoolId, sourceNodePools)
 		}
 		newQ := map[string]interface{}{
 			"name": queue.Name,
@@ -291,7 +333,7 @@ func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.Nod
 	return queueMap
 }
 
-func getVariablesMap(sourceDeploymentVars []astro.EnvironmentVariablesObject) []map[string]interface{} {
+func getVariablesMap(sourceDeploymentVars []astroplatformcore.DeploymentEnvironmentVariable) []map[string]interface{} {
 	variablesMap := make([]map[string]interface{}, 0, len(sourceDeploymentVars))
 	for _, variable := range sourceDeploymentVars {
 		newVar := map[string]interface{}{
@@ -375,11 +417,10 @@ func getPrintableDeployment(infoMap, configMap, additionalMap map[string]interfa
 
 // getWorkerTypeFromNodePoolID takes maps the workerType to a node pool id in nodePools.
 // It returns an error if the worker type does not exist in any node pool in nodePools.
-func getWorkerTypeFromNodePoolID(poolID string, nodePools []astro.NodePool) string {
-	var pool astro.NodePool
-	for _, pool = range nodePools {
-		if pool.ID == poolID {
-			return pool.NodeInstanceType
+func getWorkerTypeFromNodePoolID(poolID string, nodePools []astroplatformcore.NodePool) string {
+	for i := range nodePools {
+		if nodePools[i].Id == poolID {
+			return nodePools[i].NodeInstanceType
 		}
 	}
 	return ""
@@ -413,4 +454,20 @@ func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
 	}
 
 	return template
+}
+
+func GetDefaultWorkerType(taskPodNodePoolID, clusterID string, platformCoreClient astroplatformcore.CoreClient) (string, error) {
+	var defaultWorkerType string
+	cluster, err := deployment.CoreGetCluster("", clusterID, platformCoreClient)
+	if err != nil {
+		return "", err
+	}
+	nodePools := *cluster.NodePools
+	for i := range nodePools {
+		if nodePools[i].Id == taskPodNodePoolID {
+			defaultWorkerType = nodePools[i].NodeInstanceType
+		}
+	}
+
+	return defaultWorkerType, nil
 }

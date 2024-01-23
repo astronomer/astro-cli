@@ -6,13 +6,12 @@ import (
 	"os"
 	"time"
 
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-
 	"github.com/astronomer/astro-cli/cmd/registry"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/config"
@@ -84,7 +83,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 				}
 			}
 			if isCloudCtx {
-				err = cloudCmd.Setup(cmd, astroClient, astroCoreClient, platformCoreClient)
+				err = cloudCmd.Setup(cmd, astroClient, platformCoreClient, astroCoreClient)
 				if err != nil {
 					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 				}
@@ -103,7 +102,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newLoginCommand(astroClient, astroCoreClient, platformCoreClient, os.Stdout),
 		newLogoutCommand(os.Stdout),
 		newVersionCommand(),
-		newDevRootCmd(astroClient, astroCoreClient),
+		newDevRootCmd(platformCoreClient, astroCoreClient),
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),

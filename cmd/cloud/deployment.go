@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/astro-client"
-
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/fromfile"
 	"github.com/astronomer/astro-cli/cloud/organization"
@@ -24,37 +23,43 @@ const (
 )
 
 var (
-	label                         string
-	runtimeVersion                string
-	deploymentID                  string
-	forceDelete                   bool
-	description                   string
-	clusterID                     string
-	dagDeploy                     string
-	schedulerAU                   int
-	schedulerReplicas             int
-	updateSchedulerReplicas       int
-	updateSchedulerAU             int
-	forceUpdate                   bool
-	allDeployments                bool
-	warnLogs                      bool
-	errorLogs                     bool
-	infoLogs                      bool
-	waitForStatus                 bool
-	logCount                      = 500
-	variableKey                   string
-	variableValue                 string
-	useEnvFile                    bool
-	makeSecret                    bool
-	executor                      string
-	inputFile                     string
-	cloudProvider                 string
-	region                        string
-	schedulerSize                 string
-	highAvailability              string
-	deploymentCreateEnforceCD     bool
-	deploymentUpdateEnforceCD     bool
-	clusterType                   = standard
+	label                     string
+	runtimeVersion            string
+	deploymentID              string
+	forceDelete               bool
+	description               string
+	clusterID                 string
+	dagDeploy                 string
+	schedulerAU               int
+	schedulerReplicas         int
+	updateSchedulerReplicas   int
+	updateSchedulerAU         int
+	forceUpdate               bool
+	allDeployments            bool
+	warnLogs                  bool
+	errorLogs                 bool
+	infoLogs                  bool
+	waitForStatus             bool
+	deploymentCreateEnforceCD bool
+	deploymentUpdateEnforceCD bool
+	logCount                  = 500
+	variableKey               string
+	variableValue             string
+	useEnvFile                bool
+	makeSecret                bool
+	executor                  string
+	inputFile                 string
+	cloudProvider             string
+	region                    string
+	schedulerSize             string
+	highAvailability          string
+	cicdEnforcement           string
+	defaultTaskPodMemory      string
+	resourceQuotaCPU          string
+	resourceQuotaMemory       string
+	defaultTaskPodCPU         string
+
+	deploymentType                = standard
 	deploymentVariableListExample = `
 		# List a deployment's variables
 		$ astro deployment variable list --deployment-id <deployment-id> --key FOO
@@ -148,17 +153,28 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the Deployment")
-	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the Deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
+	cmd.Flags().StringVarP(&executor, "executor", "e", "CeleryExecutor", "The executor to use for the Deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
+	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable")
+	cmd.Flags().BoolVarP(&deploymentCreateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. This flag has been deprecated for the --cicd-enforcement flag.")
+	err := cmd.Flags().MarkDeprecated("enforce-cicd", "use --cicd-enforcement instead")
+	if err != nil {
+		fmt.Println(err)
+	}
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the Deployment to create. File can be in either JSON or YAML format.")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
-	cmd.Flags().BoolVarP(&deploymentCreateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
 	if organization.IsOrgHosted() {
-		cmd.Flags().StringVarP(&clusterType, "cluster-type", "", standard, "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated.")
+		cmd.Flags().StringVarP(&deploymentType, "cluster-type", "", standard, "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated. This flag has been deprecated for the --type flag.")
+		err := cmd.Flags().MarkDeprecated("cluster-type", "use --type instead")
+		if err != nil {
+			fmt.Println(err)
+		}
+		cmd.Flags().StringVarP(&deploymentType, "type", "", standard, "The Type to use for the Deployment. Possible values can be standard or dedicated.")
 		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "gcp", "The Cloud Provider to use for the Deployment. Possible values can be gcp, aws.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the Deployment.")
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of scheduler for the Deployment. Possible values can be small, medium, large")
 		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "disable", "Enables High Availability for the Deployment")
+		cmd.Flags().StringVarP(&resourceQuotaCPU, "resource-quota-cpu", "r", "", "The Deployment's CPU resource quota")
 	} else {
 		cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", 0, "The Deployment's scheduler resources in AUs")
 		cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", 0, "The number of scheduler replicas for the Deployment")
@@ -185,10 +201,15 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().IntVarP(&updateSchedulerAU, "scheduler-au", "s", 0, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "Force update: Don't prompt a user before Deployment update")
+	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable.")
+	cmd.Flags().BoolVarP(&deploymentUpdateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Pass enforce-cicd=false to disable this feature. This flag has been deprecated for the --cicd-enforcement flag.")
+	err := cmd.Flags().MarkDeprecated("enforce-cicd", "use --cicd-enforcement instead")
+	if err != nil {
+		fmt.Println(err)
+	}
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment to update")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the deployment")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "clean output to only include inspect yaml or json file in any situation.")
-	cmd.Flags().BoolVarP(&deploymentUpdateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Pass enforce-cicd=false to disable this feature")
 	if organization.IsOrgHosted() {
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of Scheduler for the Deployment. Possible values can be small, medium, large")
 		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "", "Enables High Availability for the Deployment")
@@ -307,7 +328,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.List(ws, allDeployments, astroClient, out)
+	return deployment.List(ws, allDeployments, platformCoreClient, out)
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string) error {
@@ -321,10 +342,10 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid Workspace")
 	}
 
-	return deployment.Logs(deploymentID, ws, deploymentName, warnLogs, errorLogs, infoLogs, logCount, astroClient)
+	return deployment.Logs(deploymentID, ws, deploymentName, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroCoreClient)
 }
 
-func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit
+func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -347,9 +368,29 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
 	}
+	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared || deploymentType == fromfile.
+		HostedDedicated) {
+		return errors.New("Invalid --type value")
+	}
+	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
+		return errors.New("Invalid --enforce-cicd value")
+	}
+	if deploymentCreateEnforceCD && cicdEnforcement == disable {
+		return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
+	}
+	if deploymentCreateEnforceCD {
+		cicdEnforcement = enable
+	}
+	var coreDeploymentType astroplatformcore.DeploymentType
+	if deploymentType == standard || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared {
+		coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
+	}
+	if deploymentType == dedicated || deploymentType == fromfile.HostedDedicated {
+		coreDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
+	}
 
-	if organization.IsOrgHosted() && !(clusterType == standard || clusterType == dedicated) {
-		return errors.New("Invalid --cluster-type value")
+	if !organization.IsOrgHosted() {
+		coreDeploymentType = astroplatformcore.DeploymentTypeHYBRID
 	}
 
 	// request is to create from a file
@@ -360,7 +401,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 			return errFlag
 		}
 
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, astroCoreClient, out)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
@@ -390,10 +431,10 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, clusterType, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus, &deploymentCreateEnforceCD)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, coreDeploymentType, schedulerAU, schedulerReplicas, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
-func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
+func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -417,7 +458,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 			// other flags were requested
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, astroCoreClient, out)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value")
@@ -426,6 +467,23 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
 	}
+	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
+		return errors.New("Invalid --enforce-cicd value")
+	}
+	if cmd.Flags().Changed("enforce-cicd") {
+		if deploymentUpdateEnforceCD && cicdEnforcement == disable {
+			return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
+		}
+		if !deploymentUpdateEnforceCD && cicdEnforcement == enable {
+			return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
+		}
+		if deploymentUpdateEnforceCD {
+			cicdEnforcement = enable
+		}
+		if !deploymentUpdateEnforceCD {
+			cicdEnforcement = disable
+		}
+	}
 
 	// Get release name from args, if passed
 	if len(args) > 0 {
@@ -433,10 +491,10 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	if !cmd.Flags().Changed("enforce-cicd") {
-		return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, nil, astroClient)
+		return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, &deploymentUpdateEnforceCD, astroClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
@@ -453,7 +511,7 @@ func deploymentDelete(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Delete(deploymentID, ws, deploymentName, forceDelete, astroClient)
+	return deployment.Delete(deploymentID, ws, deploymentName, forceDelete, platformCoreClient)
 }
 
 func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -465,7 +523,7 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, astroClient, out)
+	return deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, platformCoreClient, out)
 }
 
 func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -479,7 +537,7 @@ func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, false, astroClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, false, astroCoreClient, platformCoreClient, out)
 }
 
 func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -493,7 +551,7 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroCoreClient, platformCoreClient, out)
 }
 
 func isValidExecutor(executor string) bool {

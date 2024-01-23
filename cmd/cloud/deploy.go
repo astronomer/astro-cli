@@ -155,5 +155,5 @@ func deploy(cmd *cobra.Command, args []string) error {
 		BuildSecretString: BuildSecretString,
 	}
 
-	return DeployImage(deployInput, astroClient, astroCoreClient)
+	return DeployImage(deployInput, platformCoreClient, astroCoreClient)
 }

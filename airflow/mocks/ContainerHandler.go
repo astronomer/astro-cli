@@ -3,8 +3,8 @@
 package mocks
 
 import (
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -215,13 +215,13 @@ func (_m *ContainerHandler) Stop(waitForExit bool) error {
 	return r0
 }
 
-// UpgradeTest provides a mock function with given fields: runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString, dependencyTest, versionTest, dagTest, client
-func (_m *ContainerHandler) UpgradeTest(runtimeVersion string, deploymentID string, newImageName string, customImageName string, buildSecretString string, dependencyTest bool, versionTest bool, dagTest bool, client astro.Client) error {
-	ret := _m.Called(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString, dependencyTest, versionTest, dagTest, client)
+// UpgradeTest provides a mock function with given fields: runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString, dependencyTest, versionTest, dagTest, astroPlatformCore
+func (_m *ContainerHandler) UpgradeTest(runtimeVersion string, deploymentID string, newImageName string, customImageName string, buildSecretString string, dependencyTest bool, versionTest bool, dagTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error {
+	ret := _m.Called(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString, dependencyTest, versionTest, dagTest, astroPlatformCore)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, string, bool, bool, bool, astro.Client) error); ok {
-		r0 = rf(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString, dependencyTest, versionTest, dagTest, client)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, string, bool, bool, bool, astroplatformcore.ClientWithResponsesInterface) error); ok {
+		r0 = rf(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString, dependencyTest, versionTest, dagTest, astroPlatformCore)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/config"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -29,10 +29,9 @@ var (
 )
 
 func TestSetup(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("login cmd", func(t *testing.T) {
-		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "login"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -41,7 +40,6 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("dev cmd", func(t *testing.T) {
-		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "dev"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -54,10 +52,13 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("dev cmd with workspace flag set", func(t *testing.T) {
-		testUtil.SetupOSArgsForGinkgo()
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("domain", "astronomer.io")
+		assert.NoError(t, err)
 		cmd := &cobra.Command{Use: "dev"}
 		cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "test-workspace-id", "")
-		cmd, err := cmd.ExecuteC()
+		cmd, err = cmd.ExecuteC()
 		assert.NoError(t, err)
 
 		rootCmd := &cobra.Command{Use: "astro"}
@@ -72,10 +73,13 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("dev cmd with deployment flag set", func(t *testing.T) {
-		testUtil.SetupOSArgsForGinkgo()
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("domain", "astronomer.io")
+		assert.NoError(t, err)
 		cmd := &cobra.Command{Use: "dev"}
 		cmd.Flags().StringVarP(&workspaceID, "deployment-id", "w", "test-deployment-id", "")
-		cmd, err := cmd.ExecuteC()
+		cmd, err = cmd.ExecuteC()
 		assert.NoError(t, err)
 
 		rootCmd := &cobra.Command{Use: "astro"}
@@ -90,7 +94,6 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("flow cmd", func(t *testing.T) {
-		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "flow"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -103,7 +106,6 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("help cmd", func(t *testing.T) {
-		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "help"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -116,7 +118,6 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("version cmd", func(t *testing.T) {
-		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "version"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -129,7 +130,6 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("context cmd", func(t *testing.T) {
-		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "list"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -142,7 +142,6 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("completion cmd", func(t *testing.T) {
-		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "generate"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -155,9 +154,12 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("deployment cmd", func(t *testing.T) {
-		testUtil.SetupOSArgsForGinkgo()
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("domain", "astronomer.io")
+		assert.NoError(t, err)
 		cmd := &cobra.Command{Use: "inspect"}
-		cmd, err := cmd.ExecuteC()
+		cmd, err = cmd.ExecuteC()
 		assert.NoError(t, err)
 
 		rootCmd := &cobra.Command{Use: "deployment"}
@@ -172,9 +174,12 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("deploy cmd", func(t *testing.T) {
-		testUtil.SetupOSArgsForGinkgo()
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("domain", "astronomer.io")
+		assert.NoError(t, err)
 		cmd := &cobra.Command{Use: "deploy"}
-		cmd, err := cmd.ExecuteC()
+		cmd, err = cmd.ExecuteC()
 		assert.NoError(t, err)
 
 		rootCmd := &cobra.Command{Use: "astro"}
@@ -189,12 +194,6 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("use API token", func(t *testing.T) {
-		mockDeplyResp := []astro.Deployment{
-			{
-				ID:        "test-id",
-				Workspace: astro.Workspace{ID: "workspace-id"},
-			},
-		}
 		mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
@@ -205,15 +204,16 @@ func TestSetup(t *testing.T) {
 				},
 			},
 		}
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", "test-org-id", "").Return(mockDeplyResp, nil).Once()
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("domain", "astronomer.io")
+		assert.NoError(t, err)
 
 		cmd := &cobra.Command{Use: "deploy"}
-		testUtil.SetupOSArgsForGinkgo()
-		cmd, err := cmd.ExecuteC()
+		cmd, err = cmd.ExecuteC()
 		assert.NoError(t, err)
 
 		rootCmd := &cobra.Command{Use: "astro"}
@@ -240,22 +240,16 @@ func TestSetup(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-
-		err = Setup(cmd, mockClient, mockCoreClient, mockPlatformCoreClient)
+		err = Setup(cmd, nil, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 
 func TestCheckAPIKeys(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("test context switch", func(t *testing.T) {
-		mockDeplyResp := []astro.Deployment{
-			{
-				ID:        "test-id",
-				Workspace: astro.Workspace{ID: "workspace-id"},
-			},
-		}
 		mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
@@ -266,10 +260,13 @@ func TestCheckAPIKeys(t *testing.T) {
 				},
 			},
 		}
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", "test-org-id", "").Return(mockDeplyResp, nil).Once()
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("domain", "astronomer.io")
+		assert.NoError(t, err)
+
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
@@ -299,8 +296,10 @@ func TestCheckAPIKeys(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIKeys(mockClient, mockPlatformCoreClient, false)
+		_, err = checkAPIKeys(mockPlatformCoreClient, false)
 		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 
@@ -309,7 +308,6 @@ func TestCheckToken(t *testing.T) {
 	t.Run("test check token", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
@@ -321,7 +319,6 @@ func TestCheckToken(t *testing.T) {
 	t.Run("trigger login when no token is found", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return errorLogin
 		}
@@ -337,7 +334,6 @@ func TestCheckToken(t *testing.T) {
 
 func TestCheckAPIToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,

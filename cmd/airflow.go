@@ -9,8 +9,8 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/environment"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
@@ -108,7 +108,7 @@ astro dev init --airflow-version 2.2.3
 	buildSecrets           = []string{}
 )
 
-func newDevRootCmd(astroClient astro.Client, astroCoreClient astrocore.CoreClient) *cobra.Command {
+func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -129,7 +129,7 @@ func newDevRootCmd(astroClient astro.Client, astroCoreClient astrocore.CoreClien
 		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
-		newAirflowUpgradeTestCmd(astroClient),
+		newAirflowUpgradeTestCmd(platformCoreClient),
 	)
 	return cmd
 }
@@ -173,7 +173,7 @@ func newAirflowInitCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
+func newAirflowUpgradeTestCmd(platformCoreClient astroplatformcore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade-test",
 		Short: "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test results.",
@@ -183,7 +183,7 @@ func newAirflowUpgradeTestCmd(astroClient astro.Client) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return airflowUpgradeTest(cmd, astroClient)
+			return airflowUpgradeTest(cmd, platformCoreClient)
 		},
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The version of Airflow you want to upgrade to. The default is the latest available version. Tests are run against the equivalent Astro Runtime version. ")
@@ -360,7 +360,6 @@ func newAirflowPytestCmd() *cobra.Command {
 		Use:   "pytest [pytest file/directory]",
 		Short: "Run pytests in a local Airflow environment",
 		Long:  "This command spins up a local Python environment to run pytests against your DAGs. If a specific pytest file is not specified, all pytests in the tests directory will be run. To run pytests with a different environment file, specify that with the '--env' flag. ",
-		// Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -574,7 +573,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error { //nolint:gocognit
+func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocognit
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersionsUpgrade
@@ -632,7 +631,7 @@ func airflowUpgradeTest(cmd *cobra.Command, astroClient astro.Client) error { //
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, customImageName, buildSecretString, conflictTest, versionTest, dagTest, astroClient)
+	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, customImageName, buildSecretString, conflictTest, versionTest, dagTest, platformCoreClient)
 	if err != nil {
 		return err
 	}

@@ -12,10 +12,9 @@ import (
 	"strings"
 	"time"
 
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/organization"
@@ -65,7 +64,7 @@ type CustomClaims struct {
 }
 
 //nolint:gocognit
-func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error {
+func Setup(cmd *cobra.Command, client astro.Client, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil
@@ -118,7 +117,7 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	}
 
 	// run auth setup for any command that requires auth
-	apiKey, err := checkAPIKeys(client, platformCoreClient, isDeploymentFile)
+	apiKey, err := checkAPIKeys(platformCoreClient, isDeploymentFile)
 	if err != nil {
 		return err
 	}
@@ -240,7 +239,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys(astroClient astro.Client, platformCoreClient astroplatformcore.CoreClient, isDeploymentFile bool) (bool, error) {
+func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, isDeploymentFile bool) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -342,11 +341,11 @@ func checkAPIKeys(astroClient astro.Client, platformCoreClient astroplatformcore
 	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
 	// get workspace ID
-	deployments, err := deployment.GetDeployments("", orgID, astroClient)
+	deployments, err := deployment.CoreGetDeployments("", orgID, platformCoreClient)
 	if err != nil {
 		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
-	workspaceID = deployments[0].Workspace.ID
+	workspaceID = deployments[0].WorkspaceId
 
 	err = c.SetContextKey("workspace", workspaceID) // c.Workspace
 	if err != nil {

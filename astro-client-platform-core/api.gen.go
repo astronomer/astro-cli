@@ -39,6 +39,7 @@ const (
 	ClusterStatusCREATED      ClusterStatus = "CREATED"
 	ClusterStatusCREATEFAILED ClusterStatus = "CREATE_FAILED"
 	ClusterStatusCREATING     ClusterStatus = "CREATING"
+	ClusterStatusUPDATEFAILED ClusterStatus = "UPDATE_FAILED"
 	ClusterStatusUPDATING     ClusterStatus = "UPDATING"
 )
 
@@ -169,11 +170,12 @@ const (
 
 // Defines values for DeploymentStatus.
 const (
-	DeploymentStatusCREATING  DeploymentStatus = "CREATING"
-	DeploymentStatusDEPLOYING DeploymentStatus = "DEPLOYING"
-	DeploymentStatusHEALTHY   DeploymentStatus = "HEALTHY"
-	DeploymentStatusUNHEALTHY DeploymentStatus = "UNHEALTHY"
-	DeploymentStatusUNKNOWN   DeploymentStatus = "UNKNOWN"
+	DeploymentStatusCREATING    DeploymentStatus = "CREATING"
+	DeploymentStatusDEPLOYING   DeploymentStatus = "DEPLOYING"
+	DeploymentStatusHEALTHY     DeploymentStatus = "HEALTHY"
+	DeploymentStatusHIBERNATING DeploymentStatus = "HIBERNATING"
+	DeploymentStatusUNHEALTHY   DeploymentStatus = "UNHEALTHY"
+	DeploymentStatusUNKNOWN     DeploymentStatus = "UNKNOWN"
 )
 
 // Defines values for DeploymentType.
@@ -227,6 +229,18 @@ const (
 	OrganizationSupportPlanTRIAL            OrganizationSupportPlan = "TRIAL"
 )
 
+// Defines values for SchedulerMachineName.
+const (
+	SchedulerMachineNameLARGE  SchedulerMachineName = "LARGE"
+	SchedulerMachineNameMEDIUM SchedulerMachineName = "MEDIUM"
+	SchedulerMachineNameSMALL  SchedulerMachineName = "SMALL"
+)
+
+// Defines values for UpdateDedicatedClusterRequestClusterType.
+const (
+	UpdateDedicatedClusterRequestClusterTypeDEDICATED UpdateDedicatedClusterRequestClusterType = "DEDICATED"
+)
+
 // Defines values for UpdateDedicatedDeploymentRequestExecutor.
 const (
 	UpdateDedicatedDeploymentRequestExecutorCELERY     UpdateDedicatedDeploymentRequestExecutor = "CELERY"
@@ -247,6 +261,11 @@ const (
 	UpdateDedicatedDeploymentRequestTypeSTANDARD  UpdateDedicatedDeploymentRequestType = "STANDARD"
 )
 
+// Defines values for UpdateHybridClusterRequestClusterType.
+const (
+	UpdateHybridClusterRequestClusterTypeHYBRID UpdateHybridClusterRequestClusterType = "HYBRID"
+)
+
 // Defines values for UpdateHybridDeploymentRequestExecutor.
 const (
 	UpdateHybridDeploymentRequestExecutorCELERY     UpdateHybridDeploymentRequestExecutor = "CELERY"
@@ -262,15 +281,15 @@ const (
 
 // Defines values for UpdateStandardDeploymentRequestExecutor.
 const (
-	CELERY     UpdateStandardDeploymentRequestExecutor = "CELERY"
-	KUBERNETES UpdateStandardDeploymentRequestExecutor = "KUBERNETES"
+	UpdateStandardDeploymentRequestExecutorCELERY     UpdateStandardDeploymentRequestExecutor = "CELERY"
+	UpdateStandardDeploymentRequestExecutorKUBERNETES UpdateStandardDeploymentRequestExecutor = "KUBERNETES"
 )
 
 // Defines values for UpdateStandardDeploymentRequestSchedulerSize.
 const (
-	LARGE  UpdateStandardDeploymentRequestSchedulerSize = "LARGE"
-	MEDIUM UpdateStandardDeploymentRequestSchedulerSize = "MEDIUM"
-	SMALL  UpdateStandardDeploymentRequestSchedulerSize = "SMALL"
+	UpdateStandardDeploymentRequestSchedulerSizeLARGE  UpdateStandardDeploymentRequestSchedulerSize = "LARGE"
+	UpdateStandardDeploymentRequestSchedulerSizeMEDIUM UpdateStandardDeploymentRequestSchedulerSize = "MEDIUM"
+	UpdateStandardDeploymentRequestSchedulerSizeSMALL  UpdateStandardDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for UpdateStandardDeploymentRequestType.
@@ -280,13 +299,22 @@ const (
 	UpdateStandardDeploymentRequestTypeSTANDARD  UpdateStandardDeploymentRequestType = "STANDARD"
 )
 
+// Defines values for WorkerMachineName.
+const (
+	WorkerMachineNameA10 WorkerMachineName = "A10"
+	WorkerMachineNameA20 WorkerMachineName = "A20"
+	WorkerMachineNameA40 WorkerMachineName = "A40"
+	WorkerMachineNameA5  WorkerMachineName = "A5"
+	WorkerMachineNameA60 WorkerMachineName = "A60"
+)
+
 // Defines values for WorkerQueueRequestAstroMachine.
 const (
-	A10 WorkerQueueRequestAstroMachine = "A10"
-	A20 WorkerQueueRequestAstroMachine = "A20"
-	A40 WorkerQueueRequestAstroMachine = "A40"
-	A5  WorkerQueueRequestAstroMachine = "A5"
-	A60 WorkerQueueRequestAstroMachine = "A60"
+	WorkerQueueRequestAstroMachineA10 WorkerQueueRequestAstroMachine = "A10"
+	WorkerQueueRequestAstroMachineA20 WorkerQueueRequestAstroMachine = "A20"
+	WorkerQueueRequestAstroMachineA40 WorkerQueueRequestAstroMachine = "A40"
+	WorkerQueueRequestAstroMachineA5  WorkerQueueRequestAstroMachine = "A5"
+	WorkerQueueRequestAstroMachineA60 WorkerQueueRequestAstroMachine = "A60"
 )
 
 // Defines values for ListOrganizationsParamsSupportPlan.
@@ -323,8 +351,8 @@ const (
 
 // Defines values for GetClusterOptionsParamsType.
 const (
-	GetClusterOptionsParamsTypeDEDICATED GetClusterOptionsParamsType = "DEDICATED"
-	GetClusterOptionsParamsTypeHYBRID    GetClusterOptionsParamsType = "HYBRID"
+	DEDICATED GetClusterOptionsParamsType = "DEDICATED"
+	HYBRID    GetClusterOptionsParamsType = "HYBRID"
 )
 
 // Defines values for ListClustersParamsProvider.
@@ -346,9 +374,15 @@ const (
 
 // Defines values for GetDeploymentOptionsParamsDeploymentType.
 const (
-	DEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
-	HYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
-	STANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
+	GetDeploymentOptionsParamsDeploymentTypeDEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
+	GetDeploymentOptionsParamsDeploymentTypeHYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
+	GetDeploymentOptionsParamsDeploymentTypeSTANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
+)
+
+// Defines values for GetDeploymentOptionsParamsExecutor.
+const (
+	GetDeploymentOptionsParamsExecutorCELERY     GetDeploymentOptionsParamsExecutor = "CELERY"
+	GetDeploymentOptionsParamsExecutorKUBERNETES GetDeploymentOptionsParamsExecutor = "KUBERNETES"
 )
 
 // Defines values for GetDeploymentOptionsParamsCloudProvider.
@@ -488,6 +522,9 @@ type ClusterK8sTag struct {
 type ClusterMetadata struct {
 	// ExternalIPs External IPs of the cluster.
 	ExternalIPs *[]string `json:"externalIPs,omitempty"`
+
+	// OidcIssuerUrl OIDC issuer URL for the cluster
+	OidcIssuerUrl *string `json:"oidcIssuerUrl,omitempty"`
 }
 
 // ClusterOptions defines model for ClusterOptions.
@@ -552,7 +589,7 @@ type CreateAwsClusterRequest struct {
 	// CloudProvider The cluster's cloud provider.
 	CloudProvider CreateAwsClusterRequestCloudProvider `json:"cloudProvider"`
 
-	// DbInstanceType The type of database instance that is used for the cluster. For Hybrid clusters only. Ignored for Dedicated clusters.
+	// DbInstanceType The type of database instance that is used for the cluster. Required for Hybrid clusters.
 	DbInstanceType *string `json:"dbInstanceType,omitempty"`
 
 	// K8sTags The Kubernetes tags in the cluster.
@@ -591,7 +628,7 @@ type CreateAzureClusterRequest struct {
 	// CloudProvider The cluster's cloud provider.
 	CloudProvider CreateAzureClusterRequestCloudProvider `json:"cloudProvider"`
 
-	// DbInstanceType The type of database instance that is used for the cluster. For Hybrid clusters only. Ignored for Dedicated clusters.
+	// DbInstanceType The type of database instance that is used for the cluster. Required for Hybrid clusters.
 	DbInstanceType *string `json:"dbInstanceType,omitempty"`
 
 	// K8sTags The Kubernetes tags in the cluster.
@@ -703,7 +740,7 @@ type CreateGcpClusterRequest struct {
 	// CloudProvider The cluster's cloud provider.
 	CloudProvider CreateGcpClusterRequestCloudProvider `json:"cloudProvider"`
 
-	// DbInstanceType The type of database instance that is used for the cluster. For Hybrid clusters only. Ignored for Dedicated clusters.
+	// DbInstanceType The type of database instance that is used for the cluster. Required for Hybrid clusters.
 	DbInstanceType *string `json:"dbInstanceType,omitempty"`
 
 	// K8sTags The Kubernetes tags in the cluster.
@@ -906,10 +943,7 @@ type Deployment struct {
 	CreatedAt time.Time           `json:"createdAt"`
 	CreatedBy BasicSubjectProfile `json:"createdBy"`
 
-	// DagDeployEnabled Whether the Deployment has DAG deploys enabled.
-	DagDeployEnabled bool `json:"dagDeployEnabled"`
-
-	// DagTarballVersion The Deployment's DAG tarball version. This is updated when DAG-only deploys are enabled a user triggers a deploy.
+	// DagTarballVersion The Deployment's current DAG tarball version. Once a deploy is completed, this field will be the same as the desired DAG tarball version.
 	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
 
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
@@ -920,6 +954,9 @@ type Deployment struct {
 
 	// Description The Deployment's description.
 	Description *string `json:"description,omitempty"`
+
+	// DesiredDagTarballVersion The Deployment's desired DAG tarball version. This is updated when DAG-only deploys are enabled a user triggers a deploy.
+	DesiredDagTarballVersion *string `json:"desiredDagTarballVersion,omitempty"`
 
 	// EnvironmentVariables The Deployment's environment variables. Secret values will be omitted from response.
 	EnvironmentVariables *[]DeploymentEnvironmentVariable `json:"environmentVariables,omitempty"`
@@ -945,6 +982,9 @@ type Deployment struct {
 	// IsCicdEnforced Whether the Deployment requires that all deploys are made through CI/CD.
 	IsCicdEnforced bool `json:"isCicdEnforced"`
 
+	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
+	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
+
 	// IsHighAvailability Whether the Deployment has high availability (HA) enabled. If `true`, multiple scheduler Pods will run at once.
 	IsHighAvailability *bool `json:"isHighAvailability,omitempty"`
 
@@ -953,6 +993,9 @@ type Deployment struct {
 
 	// Namespace The Deployment's namespace name in the Kubernetes cluster.
 	Namespace string `json:"namespace"`
+
+	// OidcIssuerUrl OIDC issuer URL of the deployment's cluster
+	OidcIssuerUrl *string `json:"oidcIssuerUrl,omitempty"`
 
 	// OrganizationId The ID of the Organization to which the Deployment belongs.
 	OrganizationId string `json:"organizationId"`
@@ -1375,13 +1418,24 @@ type RuntimeRelease struct {
 // SchedulerMachine defines model for SchedulerMachine.
 type SchedulerMachine struct {
 	// Name The machine's name.
-	Name string      `json:"name"`
-	Spec MachineSpec `json:"spec"`
+	Name SchedulerMachineName `json:"name"`
+	Spec MachineSpec          `json:"spec"`
 }
+
+// SchedulerMachineName The machine's name.
+type SchedulerMachineName string
 
 // UpdateClusterRequest defines model for UpdateClusterRequest.
 type UpdateClusterRequest struct {
-	// DbInstanceType The cluster's database instance type. For Hybrid clusters only. Ignored for Dedicated clusters.
+	union json.RawMessage
+}
+
+// UpdateDedicatedClusterRequest defines model for UpdateDedicatedClusterRequest.
+type UpdateDedicatedClusterRequest struct {
+	// ClusterType The cluster's type.
+	ClusterType *UpdateDedicatedClusterRequestClusterType `json:"clusterType,omitempty"`
+
+	// DbInstanceType The cluster's database instance type. Required for Hybrid clusters.
 	DbInstanceType *string `json:"dbInstanceType,omitempty"`
 
 	// K8sTags A list of Kubernetes tags to add to the cluster.
@@ -1396,6 +1450,9 @@ type UpdateClusterRequest struct {
 	// WorkspaceIds The list of Workspaces that are authorized to the cluster. If this value is not provided, the existing list of Workspaces remains. If this value is '[]' then all workspace cluster mappings are removed.
 	WorkspaceIds *[]string `json:"workspaceIds,omitempty"`
 }
+
+// UpdateDedicatedClusterRequestClusterType The cluster's type.
+type UpdateDedicatedClusterRequestClusterType string
 
 // UpdateDedicatedDeploymentRequest defines model for UpdateDedicatedDeploymentRequest.
 type UpdateDedicatedDeploymentRequest struct {
@@ -1464,6 +1521,18 @@ type UpdateDedicatedDeploymentRequestType string
 type UpdateDeploymentRequest struct {
 	union json.RawMessage
 }
+
+// UpdateHybridClusterRequest defines model for UpdateHybridClusterRequest.
+type UpdateHybridClusterRequest struct {
+	// ClusterType The cluster's type.
+	ClusterType UpdateHybridClusterRequestClusterType `json:"clusterType"`
+
+	// WorkspaceIds The list of Workspaces that are authorized to the cluster. If this value is not provided, the existing list of Workspaces remains. If this value is '[]' then all workspace cluster mappings are removed.
+	WorkspaceIds *[]string `json:"workspaceIds,omitempty"`
+}
+
+// UpdateHybridClusterRequestClusterType The cluster's type.
+type UpdateHybridClusterRequestClusterType string
 
 // UpdateHybridDeploymentRequest defines model for UpdateHybridDeploymentRequest.
 type UpdateHybridDeploymentRequest struct {
@@ -1621,9 +1690,12 @@ type WorkerMachine struct {
 	Concurrency Range `json:"concurrency"`
 
 	// Name The machine's name.
-	Name string      `json:"name"`
-	Spec MachineSpec `json:"spec"`
+	Name WorkerMachineName `json:"name"`
+	Spec MachineSpec       `json:"spec"`
 }
+
+// WorkerMachineName The machine's name.
+type WorkerMachineName string
 
 // WorkerQueue defines model for WorkerQueue.
 type WorkerQueue struct {
@@ -1822,12 +1894,18 @@ type GetDeploymentOptionsParams struct {
 	// DeploymentType The runtime type of the deployment.
 	DeploymentType *GetDeploymentOptionsParamsDeploymentType `form:"deploymentType,omitempty" json:"deploymentType,omitempty"`
 
+	// Executor The executor of the deployment.
+	Executor *GetDeploymentOptionsParamsExecutor `form:"executor,omitempty" json:"executor,omitempty"`
+
 	// CloudProvider The cloud provider of the cluster for the deployment.
 	CloudProvider *GetDeploymentOptionsParamsCloudProvider `form:"cloudProvider,omitempty" json:"cloudProvider,omitempty"`
 }
 
 // GetDeploymentOptionsParamsDeploymentType defines parameters for GetDeploymentOptions.
 type GetDeploymentOptionsParamsDeploymentType string
+
+// GetDeploymentOptionsParamsExecutor defines parameters for GetDeploymentOptions.
+type GetDeploymentOptionsParamsExecutor string
 
 // GetDeploymentOptionsParamsCloudProvider defines parameters for GetDeploymentOptions.
 type GetDeploymentOptionsParamsCloudProvider string
@@ -2064,6 +2142,68 @@ func (t CreateDeploymentRequest) MarshalJSON() ([]byte, error) {
 }
 
 func (t *CreateDeploymentRequest) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsUpdateDedicatedClusterRequest returns the union data inside the UpdateClusterRequest as a UpdateDedicatedClusterRequest
+func (t UpdateClusterRequest) AsUpdateDedicatedClusterRequest() (UpdateDedicatedClusterRequest, error) {
+	var body UpdateDedicatedClusterRequest
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromUpdateDedicatedClusterRequest overwrites any union data inside the UpdateClusterRequest as the provided UpdateDedicatedClusterRequest
+func (t *UpdateClusterRequest) FromUpdateDedicatedClusterRequest(v UpdateDedicatedClusterRequest) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeUpdateDedicatedClusterRequest performs a merge with any union data inside the UpdateClusterRequest, using the provided UpdateDedicatedClusterRequest
+func (t *UpdateClusterRequest) MergeUpdateDedicatedClusterRequest(v UpdateDedicatedClusterRequest) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(b, t.union)
+	t.union = merged
+	return err
+}
+
+// AsUpdateHybridClusterRequest returns the union data inside the UpdateClusterRequest as a UpdateHybridClusterRequest
+func (t UpdateClusterRequest) AsUpdateHybridClusterRequest() (UpdateHybridClusterRequest, error) {
+	var body UpdateHybridClusterRequest
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromUpdateHybridClusterRequest overwrites any union data inside the UpdateClusterRequest as the provided UpdateHybridClusterRequest
+func (t *UpdateClusterRequest) FromUpdateHybridClusterRequest(v UpdateHybridClusterRequest) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeUpdateHybridClusterRequest performs a merge with any union data inside the UpdateClusterRequest, using the provided UpdateHybridClusterRequest
+func (t *UpdateClusterRequest) MergeUpdateHybridClusterRequest(v UpdateHybridClusterRequest) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(b, t.union)
+	t.union = merged
+	return err
+}
+
+func (t UpdateClusterRequest) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *UpdateClusterRequest) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -3238,6 +3378,22 @@ func NewGetDeploymentOptionsRequest(server string, organizationId string, params
 	if params.DeploymentType != nil {
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deploymentType", runtime.ParamLocationQuery, *params.DeploymentType); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Executor != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "executor", runtime.ParamLocationQuery, *params.Executor); err != nil {
 			return nil, err
 		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 			return nil, err
