@@ -87,7 +87,6 @@ func newTableOutAll() *printutil.Table {
 }
 
 func CanCiCdDeploy(bearerToken string) bool {
-	fmt.Println(bearerToken)
 	token := strings.Split(bearerToken, " ")[1] // Stripping Bearer
 	// Parse the token to peek at the custom claims
 	claims, err := parseToken(token)
