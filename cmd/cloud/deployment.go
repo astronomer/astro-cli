@@ -466,7 +466,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		return errors.New("Invalid --high-availability value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --enforce-cicd value")
+		return errors.New("Invalid --cicd-enforcment value")
 	}
 	if cmd.Flags().Changed("enforce-cicd") {
 		if deploymentUpdateEnforceCD && cicdEnforcement == disable {
@@ -483,17 +483,9 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		}
 	}
 
-	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --enforce-cicd value")
-	}
-
 	// Get release name from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
-	}
-
-	if !cmd.Flags().Changed("enforce-cicd") {
-		return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
 	}
 
 	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
