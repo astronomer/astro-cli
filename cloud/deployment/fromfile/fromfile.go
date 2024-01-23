@@ -35,8 +35,7 @@ var (
 	errNoUseWorkerQueues              = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
 	errUseDefaultWorkerType           = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
 	errDeploymentsWithSameName        = errors.New("you currently have two deployments with the name specified in the your worksapce. Make sure your deployment's name is unique in the workspace to update it with a deployment file")
-
-	canCiCdDeploy = deployment.CanCiCdDeploy
+	canCiCdDeploy                     = deployment.CanCiCdDeploy
 )
 
 const (
@@ -45,6 +44,8 @@ const (
 	updateAction    = "update"
 	defaultQueue    = "default"
 	HostedDedicated = "HOSTED_DEDICATED"
+	HostedStandard  = "HOSTED_STANDARD"
+	HostedShared    = "HOSTED_SHARED"
 )
 
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
@@ -860,9 +861,9 @@ func transformDeploymentType(deploymentType string) astroplatformcore.Deployment
 	switch strings.ToUpper(deploymentType) {
 	case "STANDARD":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
-	case "HOSTED_SHARED":
+	case HostedShared:
 		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
-	case "HOSTED_STANDARD":
+	case HostedStandard:
 		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 	case "DEDICATED":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
