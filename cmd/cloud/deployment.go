@@ -16,11 +16,10 @@ import (
 )
 
 const (
-	enable          = "enable"
-	disable         = "disable"
-	standard        = "standard"
-	dedicated       = "dedicated"
-	HostedDedicated = "HOSTED_DEDICATED"
+	enable    = "enable"
+	disable   = "disable"
+	standard  = "standard"
+	dedicated = "dedicated"
 )
 
 var (
@@ -369,7 +368,8 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
 	}
-	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated || deploymentType == "HOSTED_STANDARD" || deploymentType == "HOSTED_SHARED" || deploymentType == HostedDedicated) {
+	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated || deploymentType == "HOSTED_STANDARD" || deploymentType == "HOSTED_SHARED" || deploymentType == fromfile.
+		HostedDedicated) {
 		return errors.New("Invalid --type value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
@@ -385,7 +385,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if deploymentType == standard || deploymentType == "HOSTED_STANDARD" || deploymentType == "HOSTED_SHARED" {
 		coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 	}
-	if deploymentType == dedicated || deploymentType == HostedDedicated {
+	if deploymentType == dedicated || deploymentType == fromfile.HostedDedicated {
 		coreDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
 	}
 

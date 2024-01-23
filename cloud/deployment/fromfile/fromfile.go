@@ -40,10 +40,11 @@ var (
 )
 
 const (
-	jsonFormat   = "json"
-	createAction = "create"
-	updateAction = "update"
-	defaultQueue = "default"
+	jsonFormat      = "json"
+	createAction    = "create"
+	updateAction    = "update"
+	defaultQueue    = "default"
+	HostedDedicated = "HOSTED_DEDICATED"
 )
 
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
@@ -865,7 +866,7 @@ func transformDeploymentType(deploymentType string) astroplatformcore.Deployment
 		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 	case "DEDICATED":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
-	case deployment.HostedDedicated:
+	case HostedDedicated:
 		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
 	case "HYBRID":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeHYBRID
