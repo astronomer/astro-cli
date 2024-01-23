@@ -435,6 +435,21 @@ func TestDeploymentCreate(t *testing.T) {
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
+	t.Run("returns an error if cluster-type flag has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--cluster-type", "some-value"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("returns an error if type flag has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", "some-value"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("returns an error if cicd-enforcement flag has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--cicd-enforcement", "some-value"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
 	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubeExecutor"}
 		_, err = execDeploymentCmd(cmdArgs...)
@@ -672,6 +687,16 @@ func TestDeploymentUpdate(t *testing.T) {
 	})
 	t.Run("returns an error if ci-cd enforcement has an incorrect value", func(t *testing.T) {
 		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--cicd-enforcement", "some-value"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("returns an error if cluster-type enforcement has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--cluster-type", "some-value"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("returns an error if type enforcement has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--type", "some-value"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
