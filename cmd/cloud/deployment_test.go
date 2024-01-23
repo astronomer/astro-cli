@@ -671,7 +671,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if ci-cd enforcement has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--enforce-cicd", "some-value"}
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--cicd-enforcement", "some-value"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
