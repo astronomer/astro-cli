@@ -140,8 +140,7 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 		}
 		runtimeVersionText := " (based on Airflow " + d.RuntimeVersion + ")"
 		releaseName := d.Namespace
-		// change to workspace name
-		workspaceID := d.WorkspaceId
+		workspaceName := d.WorkspaceName
 		region := notApplicable
 		cloudProvider := notApplicable
 		if IsDeploymentStandard(*d.Type) {
@@ -149,7 +148,7 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 			cloudProvider = *d.CloudProvider
 		}
 		if all {
-			tab.AddRow([]string{d.Name, workspaceID, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
+			tab.AddRow([]string{d.Name, *workspaceName, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 		} else {
 			tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 		}
@@ -217,7 +216,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
 	var dagDeployEnabled bool
@@ -228,11 +227,13 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	}
 	coreDeploymentType := astrocore.GetDeploymentOptionsParamsDeploymentType(deploymentType)
 	var coreCloudProvider astrocore.GetDeploymentOptionsParamsCloudProvider
-	if cloudProvider == awsCloud {
+	switch cloudProvider {
+	case awsCloud:
 		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("AWS")
-	}
-	if cloudProvider == gcpCloud {
+	case gcpCloud:
 		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("GCP")
+	case azureCloud:
+		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("AZURE")
 	}
 	deploymentOptionsParams := astrocore.GetDeploymentOptionsParams{
 		DeploymentType: &coreDeploymentType,
@@ -257,13 +258,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 	}
 
-	var isCicdEnforced bool
-	if cicdEnforcement == "" {
-		isCicdEnforced = false
-	}
-	if cicdEnforcement == disable {
-		isCicdEnforced = false
-	}
+	isCicdEnforced := false
 	if cicdEnforcement == enable {
 		isCicdEnforced = true
 	}
@@ -292,7 +287,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 
 	// select and validate cluster
 	if !IsDeploymentStandard(deploymentType) {
-		clusterID, err = selectCluster(clusterID, c.Organization, corePlatformClient)
+		clusterID, err = selectCluster(clusterID, c.Organization, platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -304,7 +299,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		dagDeployEnabled = false
 	}
 	createDeploymentRequest := astroplatformcore.CreateDeploymentRequest{}
-	// build standard input
 	if IsDeploymentStandard(deploymentType) || IsDeploymentDedicated(deploymentType) {
 		var highAvailabilityValue bool
 		if highAvailability == enable { //nolint: goconst
@@ -338,22 +332,21 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		if resourceQuotaMemory == "" {
 			resourceQuotaMemory = configOption.ResourceQuotas.ResourceQuota.Memory.Default
 		}
+		// build standard input
 		if IsDeploymentStandard(deploymentType) {
 			var requestedCloudProvider astroplatformcore.CreateStandardDeploymentRequestCloudProvider
-			if cloudProvider == gcpCloud {
+			switch cloudProvider {
+			case gcpCloud:
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderGCP
-			}
-			if cloudProvider == awsCloud {
+			case awsCloud:
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAWS
-			}
-			if cloudProvider == azureCloud {
+			case azureCloud:
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAZURE
 			}
 			var requestedExecutor astroplatformcore.CreateStandardDeploymentRequestExecutor
 			if executor == CeleryExecutor {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorCELERY
-			}
-			if executor == KubeExecutor {
+			} else if executor == KubeExecutor {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
 			}
 			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
@@ -376,17 +369,14 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if executor == CeleryExecutor {
 				standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
-			if schedulerSize != "" {
-				if schedulerSize == SmallScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeSMALL
-				}
-				if schedulerSize == MediumScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
-				}
-				if schedulerSize == LargeScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
-				}
-			} else {
+			switch schedulerSize {
+			case SmallScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeSMALL
+			case MediumScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
+			case LargeScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
+			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
 			}
 			if highAvailability == enable { //nolint: goconst
@@ -425,17 +415,15 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if executor == CeleryExecutor {
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
-			if schedulerSize != "" {
-				if schedulerSize == SmallScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
-				}
-				if schedulerSize == MediumScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-				}
-				if schedulerSize == LargeScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
-				}
-			} else {
+
+			switch schedulerSize {
+			case SmallScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
+			case MediumScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
+			case LargeScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
 			}
 			err := createDeploymentRequest.FromCreateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
@@ -446,7 +434,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	}
 	// build hybrid input
 	if !IsDeploymentStandard(deploymentType) && !IsDeploymentDedicated(deploymentType) {
-		cluster, err := CoreGetCluster("", clusterID, corePlatformClient)
+		cluster, err := CoreGetCluster("", clusterID, platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -475,8 +463,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		var requestedExecutor astroplatformcore.CreateHybridDeploymentRequestExecutor
 		if executor == CeleryExecutor {
 			requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorCELERY
-		}
-		if executor == KubeExecutor {
+		} else if executor == KubeExecutor {
 			requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorKUBERNETES
 		}
 		hybridDeploymentRequest := astroplatformcore.CreateHybridDeploymentRequest{
@@ -506,13 +493,13 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 	}
 
-	d, err := CoreCreateDeployment(organizationID, createDeploymentRequest, corePlatformClient)
+	d, err := CoreCreateDeployment(organizationID, createDeploymentRequest, platformCoreClient)
 	if err != nil {
 		return err
 	}
 
 	if waitForStatus {
-		err = HealthPoll(d.Id, workspaceID, sleepTime, tickNum, timeoutNum, corePlatformClient)
+		err = HealthPoll(d.Id, workspaceID, sleepTime, tickNum, timeoutNum, platformCoreClient)
 		if err != nil {
 			errOutput := createOutput(workspaceID, &d)
 			if errOutput != nil {
@@ -535,9 +522,15 @@ func createOutput(workspaceID string, d *astroplatformcore.Deployment) error {
 
 	runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
 	clusterName := notApplicable
-	releaseName := d.Namespace
-	cloudProvider := *d.CloudProvider
+	cloudProvider := notApplicable
 	region := notApplicable
+	releaseName := d.Namespace
+	if IsDeploymentStandard(*d.Type) {
+		cloudProvider = *d.CloudProvider
+		region = *d.Region
+	} else {
+		clusterName = *d.ClusterName
+	}
 	tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 	deploymentURL, err := GetDeploymentURL(d.Id, workspaceID)
 	if err != nil {
@@ -643,14 +636,14 @@ func selectRegion(cloudProvider, region string, coreClient astrocore.CoreClient)
 	return region, nil
 }
 
-func selectCluster(clusterID, organizationID string, corePlatformClient astroplatformcore.CoreClient) (newClusterID string, err error) {
+func selectCluster(clusterID, organizationID string, platformCoreClient astroplatformcore.CoreClient) (newClusterID string, err error) {
 	clusterTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
 		Header:         []string{"#", "CLUSTER NAME", "CLOUD PROVIDER", "CLUSTER ID"},
 	}
 
-	cs, err := organization.ListClusters(organizationID, corePlatformClient)
+	cs, err := organization.ListClusters(organizationID, platformCoreClient)
 	if err != nil {
 		return "", err
 	}
@@ -689,7 +682,7 @@ func selectCluster(clusterID, organizationID string, corePlatformClient astropla
 	return clusterID, nil
 }
 
-func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, corePlatformClient astroplatformcore.CoreClient) error {
+func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, platformCoreClient astroplatformcore.CoreClient) error {
 	fmt.Printf("\nWaiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
 	time.Sleep(time.Duration(sleepTime) * time.Second)
 	buf := new(bytes.Buffer)
@@ -704,7 +697,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, cor
 		case <-ticker.C:
 			buf.Reset()
 			// get core deployment
-			currentDeployment, err := CoreGetDeployment("", deploymentID, corePlatformClient)
+			currentDeployment, err := CoreGetDeployment("", deploymentID, platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -794,12 +787,12 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	var deploymentEnvironmentVariablesRequest []astroplatformcore.DeploymentEnvironmentVariableRequest
 	if len(newEnvironmentVariables) == 0 {
 		if currentDeployment.EnvironmentVariables != nil {
-			EnvironmentVariables := *currentDeployment.EnvironmentVariables
+			environmentVariables := *currentDeployment.EnvironmentVariables
 			for i := range *currentDeployment.EnvironmentVariables {
 				var deploymentEnvironmentVariableRequest astroplatformcore.DeploymentEnvironmentVariableRequest
-				deploymentEnvironmentVariableRequest.IsSecret = EnvironmentVariables[i].IsSecret
-				deploymentEnvironmentVariableRequest.Key = EnvironmentVariables[i].Key
-				deploymentEnvironmentVariableRequest.Value = EnvironmentVariables[i].Value
+				deploymentEnvironmentVariableRequest.IsSecret = environmentVariables[i].IsSecret
+				deploymentEnvironmentVariableRequest.Key = environmentVariables[i].Key
+				deploymentEnvironmentVariableRequest.Value = environmentVariables[i].Value
 				deploymentEnvironmentVariablesRequest = append(deploymentEnvironmentVariablesRequest, deploymentEnvironmentVariableRequest)
 			}
 		} else {
@@ -813,7 +806,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		var workerQueuesRequest []astroplatformcore.WorkerQueueRequest
 		if currentDeployment.WorkerQueues != nil {
 			workerQueues := *currentDeployment.WorkerQueues
-			for i := range *currentDeployment.WorkerQueues {
+			for i := range workerQueues {
 				var workerQueueRequest astroplatformcore.WorkerQueueRequest
 				workerQueueRequest.AstroMachine = astroplatformcore.WorkerQueueRequestAstroMachine(*workerQueues[i].AstroMachine)
 				workerQueueRequest.Id = &workerQueues[i].Id
@@ -846,14 +839,15 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			workerQueuesRequest = wQueueList
 		}
 		var highAvailabilityValue bool
-		if highAvailability == "" { //nolint: goconst
+		switch highAvailability {
+		case "":
 			highAvailabilityValue = *currentDeployment.IsHighAvailability
-		}
-		if highAvailability == enable {
+		case enable:
 			highAvailabilityValue = true
-		}
-		if highAvailability == disable {
+		case disable:
 			highAvailabilityValue = false
+		default:
+			return errors.New("Invalid --high-availability value")
 		}
 		if defaultTaskPodCpu == "" {
 			if currentDeployment.DefaultTaskPodCpu != nil {
@@ -877,15 +871,15 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 		if IsDeploymentStandard(*currentDeployment.Type) {
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
-			if executor == "" {
+			switch executor {
+			case "":
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutor(*currentDeployment.Executor)
-			}
-			if executor == CeleryExecutor {
+			case CeleryExecutor:
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
-			}
-			if executor == KubeExecutor {
+			case KubeExecutor:
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
 			}
+
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
 				Description:          &description,
 				Name:                 name,
@@ -901,21 +895,18 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				DefaultTaskPodCpu:    defaultTaskPodCpu,
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 			}
-			if schedulerSize != "" {
-				if schedulerSize == SmallScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeSMALL
-				}
-				if schedulerSize == MediumScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
-				}
-				if schedulerSize == LargeScheduler {
-					standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
-				}
-			}
-			if schedulerSize == "" {
+			switch schedulerSize {
+			case SmallScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeSMALL
+			case MediumScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
+			case LargeScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
+			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
-			if standardDeploymentRequest.Executor == astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY {
+			switch standardDeploymentRequest.Executor {
+			case astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY:
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES {
 					confirmWithUser = true
 				}
@@ -924,8 +915,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				} else {
 					standardDeploymentRequest.WorkerQueues = &workerQueuesRequest
 				}
-			}
-			if standardDeploymentRequest.Executor == astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES {
+			case astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES:
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
 					confirmWithUser = true
 				}
@@ -937,13 +927,12 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 		if IsDeploymentDedicated(*currentDeployment.Type) {
 			var requestedExecutor astroplatformcore.UpdateDedicatedDeploymentRequestExecutor
-			if executor == "" {
+			switch executor {
+			case "":
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutor(*currentDeployment.Executor)
-			}
-			if executor == CeleryExecutor {
+			case CeleryExecutor:
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY
-			}
-			if executor == KubeExecutor {
+			case KubeExecutor:
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
 			dedicatedDeploymentRequest := astroplatformcore.UpdateDedicatedDeploymentRequest{
@@ -954,7 +943,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				IsDagDeployEnabled:   dagDeployEnabled,
 				IsHighAvailability:   highAvailabilityValue,
 				WorkspaceId:          currentDeployment.WorkspaceId,
-				Type:                 astroplatformcore.UpdateDedicatedDeploymentRequestTypeSTANDARD,
+				Type:                 astroplatformcore.UpdateDedicatedDeploymentRequestTypeDEDICATED,
 				DefaultTaskPodCpu:    defaultTaskPodCpu,
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 				ResourceQuotaCpu:     resourceQuotaCpu,
@@ -962,21 +951,18 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				EnvironmentVariables: deploymentEnvironmentVariablesRequest,
 				WorkerQueues:         &workerQueuesRequest,
 			}
-			if schedulerSize != "" {
-				if schedulerSize == SmallScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeSMALL
-				}
-				if schedulerSize == MediumScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-				}
-				if schedulerSize == LargeScheduler {
-					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
-				}
-			}
-			if schedulerSize == "" {
+			switch schedulerSize {
+			case SmallScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeSMALL
+			case MediumScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
+			case LargeScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
-			if dedicatedDeploymentRequest.Executor == astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY {
+			switch dedicatedDeploymentRequest.Executor {
+			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY:
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES {
 					confirmWithUser = true
 				}
@@ -985,8 +971,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				} else {
 					dedicatedDeploymentRequest.WorkerQueues = &workerQueuesRequest
 				}
-			}
-			if dedicatedDeploymentRequest.Executor == astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES {
+			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES:
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
 					confirmWithUser = true
 				}
@@ -1030,13 +1015,12 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			return ErrInvalidResourceRequest
 		}
 		var requestedExecutor astroplatformcore.UpdateHybridDeploymentRequestExecutor
-		if executor == "" {
+		switch executor {
+		case "":
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutor(*currentDeployment.Executor)
-		}
-		if executor == CeleryExecutor {
+		case CeleryExecutor:
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorCELERY
-		}
-		if executor == KubeExecutor {
+		case KubeExecutor:
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES
 		}
 		hybridDeploymentRequest := astroplatformcore.UpdateHybridDeploymentRequest{
@@ -1117,8 +1101,14 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
 		releaseName := d.Namespace
 		clusterName := notApplicable
-		cloudProvider := *d.CloudProvider
+		cloudProvider := notApplicable
 		region := notApplicable
+		if IsDeploymentStandard(*d.Type) {
+			cloudProvider = *d.CloudProvider
+			region = *d.Region
+		} else {
+			clusterName = *d.ClusterName
+		}
 		tabDeployment.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
@@ -1167,7 +1157,7 @@ func IsDeploymentDedicated(deploymentType astroplatformcore.DeploymentType) bool
 	return deploymentType == astroplatformcore.DeploymentTypeDEDICATED
 }
 
-var CoreGetDeployments = func(ws, orgID string, corePlatformClient astroplatformcore.CoreClient) ([]astroplatformcore.Deployment, error) {
+var CoreGetDeployments = func(ws, orgID string, platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1180,7 +1170,7 @@ var CoreGetDeployments = func(ws, orgID string, corePlatformClient astroplatform
 		deploymentListParams.WorkspaceIds = &[]string{ws}
 	}
 
-	resp, err := corePlatformClient.ListDeploymentsWithResponse(context.Background(), orgID, deploymentListParams)
+	resp, err := platformCoreClient.ListDeploymentsWithResponse(context.Background(), orgID, deploymentListParams)
 	if err != nil {
 		return []astroplatformcore.Deployment{}, err
 	}
@@ -1196,7 +1186,7 @@ var CoreGetDeployments = func(ws, orgID string, corePlatformClient astroplatform
 }
 
 //nolint:dupl
-var CoreGetCluster = func(orgID, clusterID string, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Cluster, error) {
+var CoreGetCluster = func(orgID, clusterID string, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.Cluster, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1205,7 +1195,7 @@ var CoreGetCluster = func(orgID, clusterID string, corePlatformClient astroplatf
 		orgID = c.Organization
 	}
 
-	resp, err := corePlatformClient.GetClusterWithResponse(context.Background(), orgID, clusterID)
+	resp, err := platformCoreClient.GetClusterWithResponse(context.Background(), orgID, clusterID)
 	if err != nil {
 		return astroplatformcore.Cluster{}, err
 	}
@@ -1220,7 +1210,7 @@ var CoreGetCluster = func(orgID, clusterID string, corePlatformClient astroplatf
 }
 
 //nolint:dupl
-var CoreGetDeployment = func(orgID, deploymentID string, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+var CoreGetDeployment = func(orgID, deploymentID string, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1229,7 +1219,7 @@ var CoreGetDeployment = func(orgID, deploymentID string, corePlatformClient astr
 		orgID = c.Organization
 	}
 
-	resp, err := corePlatformClient.GetDeploymentWithResponse(context.Background(), orgID, deploymentID)
+	resp, err := platformCoreClient.GetDeploymentWithResponse(context.Background(), orgID, deploymentID)
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
 	}
@@ -1244,7 +1234,7 @@ var CoreGetDeployment = func(orgID, deploymentID string, corePlatformClient astr
 }
 
 // CoreCreateDeployment creates a deployment with the core API
-var CoreCreateDeployment = func(orgID string, createDeploymentRequest astroplatformcore.CreateDeploymentJSONRequestBody, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+var CoreCreateDeployment = func(orgID string, createDeploymentRequest astroplatformcore.CreateDeploymentJSONRequestBody, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1253,7 +1243,7 @@ var CoreCreateDeployment = func(orgID string, createDeploymentRequest astroplatf
 		orgID = c.Organization
 	}
 
-	resp, err := corePlatformClient.CreateDeploymentWithResponse(context.Background(), orgID, createDeploymentRequest)
+	resp, err := platformCoreClient.CreateDeploymentWithResponse(context.Background(), orgID, createDeploymentRequest)
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
 	}
@@ -1268,7 +1258,7 @@ var CoreCreateDeployment = func(orgID string, createDeploymentRequest astroplatf
 }
 
 // CoreUpdateDeployment updates a deployment with the core API
-var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequest astroplatformcore.UpdateDeploymentJSONRequestBody, corePlatformClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequest astroplatformcore.UpdateDeploymentJSONRequestBody, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1276,7 +1266,7 @@ var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequ
 		}
 		orgID = c.Organization
 	}
-	resp, err := corePlatformClient.UpdateDeploymentWithResponse(context.Background(), orgID, deploymentID, updateDeploymentRequest)
+	resp, err := platformCoreClient.UpdateDeploymentWithResponse(context.Background(), orgID, deploymentID, updateDeploymentRequest)
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
 	}
@@ -1290,7 +1280,7 @@ var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequ
 }
 
 // CoreDeleteDeployment deletes a deployment with the core API
-var CoreDeleteDeployment = func(orgID, deploymentID string, corePlatformClient astroplatformcore.CoreClient) error {
+var CoreDeleteDeployment = func(orgID, deploymentID string, platformCoreClient astroplatformcore.CoreClient) error {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1299,7 +1289,7 @@ var CoreDeleteDeployment = func(orgID, deploymentID string, corePlatformClient a
 		orgID = c.Organization
 	}
 
-	resp, err := corePlatformClient.DeleteDeploymentWithResponse(context.Background(), orgID, deploymentID)
+	resp, err := platformCoreClient.DeleteDeploymentWithResponse(context.Background(), orgID, deploymentID)
 	if err != nil {
 		return err
 	}
@@ -1385,7 +1375,6 @@ var SelectDeployment = func(deployments []astroplatformcore.Deployment, message 
 	if len(deployments) == 0 {
 		return astroplatformcore.Deployment{}, nil
 	}
-
 	if len(deployments) == 1 {
 		if !CleanOutput {
 			fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
@@ -1425,8 +1414,8 @@ var SelectDeployment = func(deployments []astroplatformcore.Deployment, message 
 	return selected, nil
 }
 
-func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bool, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) { //nolint:gocognit
-	deployments, err := CoreGetDeployments(ws, "", corePlatformClient)
+func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) { //nolint:gocognit
+	deployments, err := CoreGetDeployments(ws, "", platformCoreClient)
 	if err != nil {
 		return astroplatformcore.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
 	}
@@ -1453,20 +1442,18 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 			fmt.Printf("No Deployment with the name %s was found\n", deploymentName)
 			return astroplatformcore.Deployment{}, errInvalidDeployment
 		}
-		currentDeployment, err := CoreGetDeployment("", stageDeployments[0].Id, corePlatformClient)
+		currentDeployment, err := CoreGetDeployment("", stageDeployments[0].Id, platformCoreClient)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
-		if len(stageDeployments) == 1 {
-			return currentDeployment, nil
-		}
+		return currentDeployment, nil
 	}
 
 	var currentDeployment astroplatformcore.Deployment
 
 	// select deployment if deploymentID is empty
 	if deploymentID == "" {
-		currentDeployment, err = deploymentSelectionProcess(ws, deployments, corePlatformClient, coreClient)
+		currentDeployment, err = deploymentSelectionProcess(ws, deployments, platformCoreClient, coreClient)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
@@ -1481,14 +1468,14 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 		return astroplatformcore.Deployment{}, errInvalidDeployment
 	}
 
-	currentDeployment, err = CoreGetDeployment("", currentDeployment.Id, corePlatformClient)
+	currentDeployment, err = CoreGetDeployment("", currentDeployment.Id, platformCoreClient)
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
 	}
 	return currentDeployment, nil
 }
 
-func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deployment, corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) {
+func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deployment, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) {
 	currentDeployment, err := SelectDeployment(deployments, "Select a Deployment")
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
@@ -1502,12 +1489,12 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 		}
 		cicdEnforcement := disable
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, disable, CeleryExecutor, "", "", "medium", "", "", cicdEnforcement, "", "", "", "", 0, 0, corePlatformClient, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, disable, CeleryExecutor, "", "", "medium", "", "", cicdEnforcement, "", "", "", "", 0, 0, platformCoreClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
 		// get a new deployment list
-		deployments, err = CoreGetDeployments(ws, "", corePlatformClient)
+		deployments, err = CoreGetDeployments(ws, "", platformCoreClient)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}

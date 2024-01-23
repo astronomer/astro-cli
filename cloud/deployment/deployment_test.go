@@ -80,13 +80,15 @@ var (
 			Type:          &standardType,
 			Region:        &testRegion,
 			CloudProvider: &testProvider,
+			WorkspaceName: &workspace1.Name,
 		},
 		{
-			Id:          "test-id-2",
-			Name:        "test",
-			Status:      "HEALTHY",
-			Type:        &hybridType,
-			ClusterName: &testCluster,
+			Id:            "test-id-2",
+			Name:          "test",
+			Status:        "HEALTHY",
+			Type:          &hybridType,
+			ClusterName:   &testCluster,
+			WorkspaceName: &workspace1.Name,
 		},
 	}
 	mockListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{
@@ -335,13 +337,15 @@ func TestGetDeployment(t *testing.T) {
 				Type:          &standardType,
 				Region:        &testRegion,
 				CloudProvider: &testProvider,
+				WorkspaceName: &workspace1.Name,
 			},
 			{
-				Id:          "test-id-2",
-				Name:        "test",
-				Status:      "HEALTHY",
-				Type:        &hybridType,
-				ClusterName: &testCluster,
+				Id:            "test-id-2",
+				Name:          "test",
+				Status:        "HEALTHY",
+				Type:          &hybridType,
+				ClusterName:   &testCluster,
+				WorkspaceName: &workspace1.Name,
 			},
 		}
 
@@ -390,7 +394,7 @@ func TestGetDeployment(t *testing.T) {
 			name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement,
 			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
-			corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
+			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
 			return errMock
 		}
@@ -425,7 +429,7 @@ func TestGetDeployment(t *testing.T) {
 		createDeployment = func(
 			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
-			corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
+			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
 			return nil
 		}
@@ -464,7 +468,7 @@ func TestGetDeployment(t *testing.T) {
 			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement,
 			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
-			corePlatformClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
+			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
 			return nil
 		}
@@ -833,6 +837,8 @@ func TestCreate(t *testing.T) {
 				Id:            "test-id",
 				CloudProvider: &cloudProvider,
 				Type:          &hybridType,
+				ClusterName:   &cluster.Name,
+				Region:        &cluster.Region,
 			},
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
@@ -1260,6 +1266,8 @@ func TestUpdate(t *testing.T) { //nolint
 			Id:            "test-id",
 			CloudProvider: &cloudProvider,
 			Type:          &hybridType,
+			Region:        &cluster.Region,
+			ClusterName:   &cluster.Name,
 		},
 
 		HTTPResponse: &http.Response{

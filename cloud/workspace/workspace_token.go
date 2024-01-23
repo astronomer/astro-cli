@@ -69,8 +69,14 @@ func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) er
 			}
 		}
 		created := TimeAgo(apiTokens[i].CreatedAt)
-		createdBy := apiTokens[i].CreatedBy.FullName
-		tab.AddRow([]string{id, name, description, string(scope), role, created, *createdBy}, false)
+		var createdBy string
+		switch {
+		case apiTokens[i].CreatedBy.FullName != nil:
+			createdBy = *apiTokens[i].CreatedBy.FullName
+		case apiTokens[i].CreatedBy.ApiTokenName != nil:
+			createdBy = *apiTokens[i].CreatedBy.ApiTokenName
+		}
+		tab.AddRow([]string{id, name, description, string(scope), role, created, createdBy}, false)
 	}
 	tab.Print(out)
 
@@ -104,7 +110,7 @@ func CreateToken(name, description, role, workspace string, expiration int, clea
 	if expiration != 0 {
 		CreateWorkspaceAPITokenRequest.TokenExpiryPeriodInDays = &expiration
 	}
-	resp, err := client.CreateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, CreateWorkspaceAPITokenRequest)
+	resp, err := client.CreateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.Organization, workspace, CreateWorkspaceAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -148,7 +154,7 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 			return err
 		}
 	} else {
-		token, err = getWorkspaceTokenByID(id, workspace, ctx.OrganizationShortName, client)
+		token, err = getWorkspaceTokenByID(id, workspace, ctx.Organization, client)
 		if err != nil {
 			return err
 		}
@@ -189,7 +195,7 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 		UpdateWorkspaceAPITokenRequest.Role = role
 	}
 
-	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenID, UpdateWorkspaceAPITokenRequest)
+	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.Organization, workspace, apiTokenID, UpdateWorkspaceAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -224,7 +230,7 @@ func RotateToken(id, name, workspace string, cleanOutput, force bool, out io.Wri
 			return err
 		}
 	} else {
-		token, err = getWorkspaceTokenByID(id, workspace, ctx.OrganizationShortName, client)
+		token, err = getWorkspaceTokenByID(id, workspace, ctx.Organization, client)
 		if err != nil {
 			return err
 		}
@@ -241,7 +247,7 @@ func RotateToken(id, name, workspace string, cleanOutput, force bool, out io.Wri
 			return nil
 		}
 	}
-	resp, err := client.RotateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenID)
+	resp, err := client.RotateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.Organization, workspace, apiTokenID)
 	if err != nil {
 		return err
 	}
@@ -284,7 +290,7 @@ func DeleteToken(id, name, workspace string, force bool, out io.Writer, client a
 			return err
 		}
 	} else {
-		token, err = getWorkspaceTokenByID(id, workspace, ctx.OrganizationShortName, client)
+		token, err = getWorkspaceTokenByID(id, workspace, ctx.Organization, client)
 		if err != nil {
 			return err
 		}
@@ -313,7 +319,7 @@ func DeleteToken(id, name, workspace string, force bool, out io.Writer, client a
 		}
 	}
 
-	resp, err := client.DeleteWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenID)
+	resp, err := client.DeleteWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.Organization, workspace, apiTokenID)
 	if err != nil {
 		return err
 	}
@@ -344,7 +350,13 @@ func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.A
 			}
 		}
 		created := TimeAgo(apiTokens[i].CreatedAt)
-		createdBy := apiTokens[i].CreatedBy.FullName
+		var createdBy string
+		switch {
+		case apiTokens[i].CreatedBy.FullName != nil:
+			createdBy = *apiTokens[i].CreatedBy.FullName
+		case apiTokens[i].CreatedBy.ApiTokenName != nil:
+			createdBy = *apiTokens[i].CreatedBy.ApiTokenName
+		}
 
 		index := i + 1
 		tab.AddRow([]string{
@@ -355,7 +367,7 @@ func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.A
 			string(scope),
 			role,
 			created,
-			*createdBy,
+			createdBy,
 		}, false)
 		apiTokensMap[strconv.Itoa(index)] = apiTokens[i]
 	}
@@ -383,7 +395,7 @@ func getWorkspaceTokens(workspace string, client astrocore.CoreClient) ([]astroc
 		workspace = ctx.Workspace
 	}
 
-	resp, err := client.ListWorkspaceApiTokensWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, &astrocore.ListWorkspaceApiTokensParams{})
+	resp, err := client.ListWorkspaceApiTokensWithResponse(httpContext.Background(), ctx.Organization, workspace, &astrocore.ListWorkspaceApiTokensParams{})
 	if err != nil {
 		return []astrocore.ApiToken{}, err
 	}
@@ -455,8 +467,8 @@ func TimeAgo(date time.Time) string {
 	}
 }
 
-func getWorkspaceTokenByID(id, workspaceID, orgShortName string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
-	resp, err := client.GetWorkspaceApiTokenWithResponse(httpContext.Background(), orgShortName, workspaceID, id)
+func getWorkspaceTokenByID(id, workspaceID, orgID string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
+	resp, err := client.GetWorkspaceApiTokenWithResponse(httpContext.Background(), orgID, workspaceID, id)
 	if err != nil {
 		return astrocore.ApiToken{}, err
 	}

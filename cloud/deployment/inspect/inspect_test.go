@@ -486,7 +486,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		additional := getAdditional(&sourceDeployment, nodePools)
+		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
 				"metadata":              info,
@@ -501,7 +501,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 	})
 }
 
-func TestGetAdditional(t *testing.T) {
+func TestGetAdditionalNullableFields(t *testing.T) {
 	sourceDeployment.Type = &hybridType
 	sourceDeployment.TaskPodNodePoolId = nil
 	t.Run("returns alert emails, queues and variables for the requested deployment with CeleryExecutor", func(t *testing.T) {
@@ -528,7 +528,7 @@ func TestGetAdditional(t *testing.T) {
 			"worker_queues":         qList,
 			"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
 		}
-		rawAdditional := getAdditional(&sourceDeployment, nodePools)
+		rawAdditional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		err := decodeToStruct(rawAdditional, &actualAdditional)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawExpected, &expectedAdditional)
@@ -558,7 +558,7 @@ func TestGetAdditional(t *testing.T) {
 			"worker_queues":         qList,
 			"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
 		}
-		rawAdditional := getAdditional(&sourceDeployment, nodePools)
+		rawAdditional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		err := decodeToStruct(rawAdditional, &actualAdditional)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawExpected, &expectedAdditional)
@@ -575,7 +575,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		additional := getAdditional(&sourceDeployment, nodePools)
+		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
@@ -666,7 +666,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment2)
 		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		additional := getAdditional(&sourceDeployment2, nodePools)
+		additional := getAdditionalNullableFields(&sourceDeployment2, nodePools)
 
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
@@ -733,7 +733,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment2)
 		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		additional := getAdditional(&sourceDeployment2, nodePools)
+		additional := getAdditionalNullableFields(&sourceDeployment2, nodePools)
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
 				"metadata":              info,
@@ -835,7 +835,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		additional := getAdditional(&sourceDeployment, nodePools)
+		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
 				"metadata":              info,
@@ -895,7 +895,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		additional := getAdditional(&sourceDeployment, nodePools)
+		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
 		actualPrintableDeployment, err := formatPrintableDeployment("", false, getPrintableDeployment(info, config, additional))
 		assert.ErrorIs(t, err, errMarshal)
@@ -908,7 +908,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		additional := getAdditional(&sourceDeployment, nodePools)
+		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
 		actualPrintableDeployment, err := formatPrintableDeployment("", false, getPrintableDeployment(info, config, additional))
 		assert.ErrorIs(t, err, errMarshal)
@@ -921,7 +921,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
-		additional := getAdditional(&sourceDeployment, nodePools)
+		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
 		actualPrintableDeployment, err := formatPrintableDeployment("json", false, getPrintableDeployment(info, config, additional))
 		assert.ErrorIs(t, err, errMarshal)
@@ -935,7 +935,7 @@ func TestGetSpecificField(t *testing.T) {
 	info, _ := getDeploymentInfo(sourceDeployment)
 	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 	assert.NoError(t, err)
-	additional := getAdditional(&sourceDeployment, nodePools)
+	additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 	t.Run("returns a value if key is found in deployment.metadata", func(t *testing.T) {
 		requestedField := "metadata.workspace_id"
 		printableDeployment := map[string]interface{}{
@@ -1110,7 +1110,7 @@ func TestGetTemplate(t *testing.T) {
 	info, _ := getDeploymentInfo(sourceDeployment)
 	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 	assert.NoError(t, err)
-	additional := getAdditional(&sourceDeployment, nodePools)
+	additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 
 	t.Run("returns a formatted template", func(t *testing.T) {
 		printableDeployment := map[string]interface{}{

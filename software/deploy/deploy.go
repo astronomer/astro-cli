@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -25,14 +26,19 @@ var (
 	dockerfile = "Dockerfile"
 
 	deployImagePlatformSupport = []string{"linux/amd64"}
+
+	gzipFile = fileutil.GzipFile
 )
 
 var (
-	errNoWorkspaceID             = errors.New("no workspace id provided")
-	errNoDomainSet               = errors.New("no domain set, re-authenticate")
-	errInvalidDeploymentID       = errors.New("please specify a valid deployment ID")
-	errDeploymentNotFound        = errors.New("no airflow deployments found")
-	errInvalidDeploymentSelected = errors.New("invalid deployment selection\n") //nolint
+	errNoWorkspaceID                        = errors.New("no workspace id provided")
+	errNoDomainSet                          = errors.New("no domain set, re-authenticate")
+	errInvalidDeploymentID                  = errors.New("please specify a valid deployment ID")
+	errDeploymentNotFound                   = errors.New("no airflow deployments found")
+	errInvalidDeploymentSelected            = errors.New("invalid deployment selection\n") //nolint
+	ErrDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your Astronomer cluster")
+	errDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the Deployment type to 'dag_only' via the UI or the API")
+	ErrEmptyDagFolderUserCancelledOperation = errors.New("no DAGs found in the dags folder. User canceled the operation")
 )
 
 const (
@@ -288,4 +294,93 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 		}
 	}
 	return ""
+}
+
+func isDagOnlyDeploymentEnabled(appConfig *houston.AppConfig) bool {
+	return appConfig != nil && appConfig.Flags.DagOnlyDeployment
+}
+
+func isDagOnlyDeploymentEnabledForDeployment(deploymentInfo *houston.Deployment) bool {
+	return deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType
+}
+
+func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) error {
+	_, err := config.GetCurrentContext()
+	if err != nil {
+		return fmt.Errorf("could not get current context! Error: %w", err)
+	}
+	if deploymentInfo == nil || deploymentInfo.ReleaseName == "" {
+		return errInvalidDeploymentID
+	}
+	return nil
+}
+
+func getDagDeployURL(deploymentInfo *houston.Deployment) string {
+	c, _ := config.GetCurrentContext()
+	return fmt.Sprintf("deployments.%s/%s/upload", c.Domain, deploymentInfo.ReleaseName)
+}
+
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+	// Throw error if the feature is disabled at Houston level
+	if !isDagOnlyDeploymentEnabled(appConfig) {
+		return ErrDagOnlyDeployDisabledInConfig
+	}
+
+	// Throw error if the feature is disabled at Deployment level
+	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment info: %w", err)
+	}
+	if !isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
+		return errDagOnlyDeployNotEnabledForDeployment
+	}
+
+	uploadURL := ""
+	if dagDeployURL == nil {
+		// Throw error if the upload URL can't be constructed
+		err = validateIfDagDeployURLCanBeConstructed(deploymentInfo)
+		if err != nil {
+			return err
+		}
+		uploadURL = getDagDeployURL(deploymentInfo)
+	} else {
+		uploadURL = *dagDeployURL
+	}
+
+	dagsPath := filepath.Join(dagsParentPath, "dags")
+	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
+
+	// Alert the user if dags folder is empty
+	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
+		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+		if !i {
+			return ErrEmptyDagFolderUserCancelledOperation
+		}
+	}
+
+	// Generate the dags tar
+	err = fileutil.Tar(dagsPath, dagsParentPath)
+	if err != nil {
+		return err
+	}
+	if cleanUpFiles {
+		defer os.Remove(dagsParentPath + "/dags.tar")
+	}
+
+	// Gzip the tar
+	err = gzipFile(dagsParentPath+"/dags.tar", dagsParentPath+"/dags.tar.gz")
+	if err != nil {
+		return err
+	}
+	if cleanUpFiles {
+		defer os.Remove(dagsParentPath + "/dags.tar.gz")
+	}
+
+	c, _ := config.GetCurrentContext()
+
+	headers := map[string]string{
+		"authorization": c.Token,
+	}
+
+	return fileutil.UploadFile(dagsParentPath+"/dags.tar.gz", uploadURL, "file", headers)
 }

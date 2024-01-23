@@ -3,8 +3,13 @@ package fileutil
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
+	"compress/gzip"
+	http_context "context"
 	"fmt"
 	"io"
+	"mime/multipart"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,9 +22,11 @@ import (
 const openPermissions = 0o777
 
 var (
-	perm     os.FileMode = 0o777
-	openFile             = os.OpenFile
-	readFile             = os.ReadFile
+	perm                  os.FileMode = 0o777
+	openFile                          = os.OpenFile
+	readFile                          = os.ReadFile
+	ioCopy                            = io.Copy
+	newRequestWithContext             = http.NewRequestWithContext
 )
 
 // Exists returns a boolean indicating if the given path already exists
@@ -235,4 +242,80 @@ func CreateFile(p string) (*os.File, error) {
 		return nil, err
 	}
 	return os.Create(p)
+}
+
+func UploadFile(filePath, targetURL, formFileFieldName string, headers map[string]string) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("error opening file: %w", err)
+	}
+	defer file.Close()
+
+	// Create a new buffer to store the multipart/form-data request
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Create a form field for the file
+	fileWriter, err := writer.CreateFormFile(formFileFieldName, filePath)
+	if err != nil {
+		return fmt.Errorf("error creating form file: %w", err)
+	}
+
+	// Copy the file content into the form field
+	_, err = ioCopy(fileWriter, file)
+	if err != nil {
+		return fmt.Errorf("error copying file content: %w", err)
+	}
+
+	// Close the multipart writer to finalize the request
+	writer.Close()
+
+	req, err := newRequestWithContext(http_context.Background(), "POST", targetURL, body)
+	if err != nil {
+		return err
+	}
+
+	headers["Content-Type"] = writer.FormDataContentType()
+
+	// set headers
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	// Perform the request
+	client := &http.Client{}
+	response, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error making POST request: %w", err)
+	}
+	defer response.Body.Close()
+
+	// Check the response status
+	if response.StatusCode == http.StatusOK {
+		return nil
+	}
+	data, _ := io.ReadAll(response.Body)
+	return fmt.Errorf("file upload failed. Status code: %d and Message: %s", response.StatusCode, string(data)) //nolint
+}
+
+func GzipFile(srcFilePath, destFilePath string) error {
+	srcFile, err := os.Open(srcFilePath)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	destFile, err := os.Create(destFilePath)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	// Create a gzip writer on top of file writer
+	gzipWriter := gzip.NewWriter(destFile)
+	defer gzipWriter.Close()
+
+	// Copy contents of the file to the gzip writer
+	_, err = io.Copy(gzipWriter, srcFile)
+	return err
 }

@@ -72,6 +72,8 @@ var (
 			CloudProvider: &cloudProvider,
 			Type:          &hybridType,
 			ClusterId:     &clusterID,
+			Region:        &region,
+			ClusterName:   &cluster.Name,
 		},
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -127,13 +129,15 @@ var (
 			Type:          &standardType,
 			Region:        &testRegion,
 			CloudProvider: &testProvider,
+			WorkspaceName: &workspaceName,
 		},
 		{
-			Id:          "test-id-2",
-			Name:        "test-2",
-			Status:      "HEALTHY",
-			Type:        &hybridType,
-			ClusterName: &testCluster,
+			Id:            "test-id-2",
+			Name:          "test-2",
+			Status:        "HEALTHY",
+			Type:          &hybridType,
+			ClusterName:   &testCluster,
+			WorkspaceName: &workspaceName,
 		},
 	}
 	mockGetDeploymentLogsResponse = astrocore.GetDeploymentLogsResponse{
@@ -245,6 +249,8 @@ var (
 			Id:            "test-id",
 			CloudProvider: &cloudProvider,
 			Type:          &hybridType,
+			Region:        &region,
+			ClusterName:   &cluster.Name,
 		},
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -429,6 +435,21 @@ func TestDeploymentCreate(t *testing.T) {
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
+	t.Run("returns an error if cluster-type flag has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--cluster-type", "some-value"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("returns an error if type flag has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", "some-value"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("returns an error if cicd-enforcement flag has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--cicd-enforcement", "some-value"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
 	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubeExecutor"}
 		_, err = execDeploymentCmd(cmdArgs...)
@@ -583,7 +604,7 @@ deployment:
 		astroCoreClient = mockCoreClient
 		platformCoreClient = mockPlatformCoreClient
 		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--cluster-type", "dedicated",
+			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated",
 		}
 
 		// Mock user input for deployment name and wait for status
@@ -603,11 +624,11 @@ deployment:
 		ctx.SetContextKey("workspace", ws)
 		astroCoreClient = mockCoreClient
 		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--cluster-type", "wrong-value",
+			"create", "--name", "test-name", "--workspace-id", ws, "--type", "wrong-value",
 		}
 
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "Invalid --cluster-type value")
+		assert.ErrorContains(t, err, "Invalid --type value")
 		mockCoreClient.AssertExpectations(t)
 	})
 }
@@ -665,7 +686,17 @@ func TestDeploymentUpdate(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if ci-cd enforcement has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--enforce-cicd", "some-value"}
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--cicd-enforcement", "some-value"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("returns an error if cluster-type enforcement has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--cluster-type", "some-value"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("returns an error if type enforcement has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--type", "some-value"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})

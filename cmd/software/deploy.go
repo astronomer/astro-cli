@@ -5,6 +5,8 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/software/deploy"
 
@@ -20,16 +22,17 @@ var (
 
 	EnsureProjectDir   = utils.EnsureProjectDir
 	DeployAirflowImage = deploy.Airflow
+	isDagOnlyDeploy    bool
 )
 
 var deployExample = `
 Deployment you would like to deploy to Airflow cluster:
 
-  $ astro deploy <deployment-id>
+$ astro deploy <deployment-id>
 
 Menu will be presented if you do not specify a deployment name:
 
-  $ astro deploy
+$ astro deploy
 `
 
 const (
@@ -51,6 +54,9 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
 	cmd.Flags().BoolVarP(&ignoreCacheDeploy, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
+	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
+		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "", false, "Push only DAGs to your Deployment")
+	}
 	return cmd
 }
 
@@ -89,6 +95,8 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		byoRegistryEnabled = true
 		byoRegistryDomain = appConfig.BYORegistryDomain
 	}
-
+	if isDagOnlyDeploy {
+		return deploy.DagsOnlyDeploy(houstonClient, appConfig, deploymentID, config.WorkingPath, nil, true)
+	}
 	return DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
 }

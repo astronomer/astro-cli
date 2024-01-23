@@ -134,7 +134,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCo
 			nodePools = *cluster.NodePools
 		}
 	}
-	additionalMap = getAdditional(&requestedDeployment, nodePools)
+	additionalMap = getAdditionalNullableFields(&requestedDeployment, nodePools)
 	// create a map for the entire deployment
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 	// get specific field if requested
@@ -238,7 +238,7 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	return deploymentMap, nil
 }
 
-func getAdditional(coreDeployment *astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool) map[string]interface{} {
+func getAdditionalNullableFields(coreDeployment *astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool) map[string]interface{} {
 	qList := getQMap(coreDeployment, nodePools)
 	var envVarList []astroplatformcore.DeploymentEnvironmentVariable
 	if coreDeployment.EnvironmentVariables != nil {
@@ -272,7 +272,7 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatfo
 	if err != nil {
 		return nil, err
 	}
-	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.astronomer_variables
+	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.environment_variables
 	cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, astroPlatformCore)
 	if err != nil {
 		return nil, err
@@ -281,7 +281,7 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatfo
 	if cluster.NodePools != nil {
 		nodePools = *cluster.NodePools
 	}
-	additionalMap = getAdditional(&requestedDeployment, nodePools)
+	additionalMap = getAdditionalNullableFields(&requestedDeployment, nodePools)
 	// create a map for the entire deployment
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 	value, err = getSpecificField(printableDeployment, requestedField)

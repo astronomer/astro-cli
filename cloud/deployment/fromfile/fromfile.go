@@ -33,16 +33,19 @@ var (
 	errInvalidValue                   = errors.New("is not valid")
 	errNotPermitted                   = errors.New("is not permitted")
 	errNoUseWorkerQueues              = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
-	errUseDefaultWokerType            = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
-
-	canCiCdDeploy = deployment.CanCiCdDeploy
+	errUseDefaultWorkerType           = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_worker_type' instead")
+	errDeploymentsWithSameName        = errors.New("you currently have two deployments with the name specified in the your worksapce. Make sure your deployment's name is unique in the workspace to update it with a deployment file")
+	canCiCdDeploy                     = deployment.CanCiCdDeploy
 )
 
 const (
-	jsonFormat   = "json"
-	createAction = "create"
-	updateAction = "update"
-	defaultQueue = "default"
+	jsonFormat      = "json"
+	createAction    = "create"
+	updateAction    = "update"
+	defaultQueue    = "default"
+	HostedDedicated = "HOSTED_DEDICATED"
+	HostedStandard  = "HOSTED_STANDARD"
+	HostedShared    = "HOSTED_SHARED"
 )
 
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
@@ -90,7 +93,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 	deploymentType := transformDeploymentType(formattedDeployment.Deployment.Configuration.DeploymentType)
 	if !deployment.IsDeploymentStandard(deploymentType) {
 		// map cluster name to id and collect node pools for cluster
-		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.OrganizationShortName, astroPlatformCore)
+		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.Organization, astroPlatformCore)
 		if err != nil {
 			return err
 		}
@@ -129,6 +132,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		if err != nil {
 			return err
 		}
+		// users can not creat a deployment with env vars or alert emails in v1beta1 so to create them with a deployment file we need update right after deployment creation
 		if hasEnvVarsOrAlertEmails(&formattedDeployment) {
 			action = updateAction
 		}
@@ -147,7 +151,10 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 				errNotFound, errHelp)
 		}
 		// this deployment exists so update it
-		existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
+		existingDeployment, err = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
+		if err != nil {
+			return err
+		}
 		workspaceID = existingDeployment.WorkspaceId
 		// determine dagDeploy
 		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil { //nolint:staticcheck
@@ -170,7 +177,10 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		}
 	}
 	// Get deployment created or updated
-	existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
+	existingDeployment, err = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
+	if err != nil {
+		return err
+	}
 	if jsonOutput {
 		outputFormat = jsonFormat
 	}
@@ -233,17 +243,17 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				workerQueue.WorkerConcurrency = listQueues[i].WorkerConcurrency
 				workerQueue.AstroMachine = astroplatformcore.WorkerQueueRequestAstroMachine(*listQueues[i].AstroMachine)
 				// set default values if none were specified
-				a := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
+				requestedWorkerQueue := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
 				// check if queue is valid
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 					return errNoUseWorkerQueues
 				}
-				err = workerqueue.IsHostedCeleryWorkerQueueInputValid(a, defaultOptions, &astroMachine)
+				err = workerqueue.IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, defaultOptions, &astroMachine)
 				if err != nil {
 					return err
 				}
 				// add it to the list of queues to be created
-				listQueuesRequest = append(listQueuesRequest, *a)
+				listQueuesRequest = append(listQueuesRequest, *requestedWorkerQueue)
 			} else {
 				var workerQueue astroplatformcore.HybridWorkerQueueRequest
 				workerQueue.Id = &listQueues[i].Id
@@ -255,15 +265,15 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				workerQueue.NodePoolId = *listQueues[i].NodePoolId
 				// check if queue is valid
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
-					return errUseDefaultWokerType
+					return errUseDefaultWorkerType
 				}
 				// set default values if none were specified
-				a := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
-				err = workerqueue.IsCeleryWorkerQueueInputValid(a, defaultOptions)
+				requestedHybridWorkerQueue := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
+				err = workerqueue.IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue, defaultOptions)
 				if err != nil {
 					return err
 				}
-				workerQueue = *a
+				workerQueue = *requestedHybridWorkerQueue
 				// add it to the list of queues to be created
 				listHybridQueuesRequest = append(listHybridQueuesRequest, workerQueue)
 			}
@@ -274,32 +284,33 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		createDeploymentRequest := astroplatformcore.CreateDeploymentRequest{}
 		if deployment.IsDeploymentStandard(deploymentType) {
 			var requestedCloudProvider astroplatformcore.CreateStandardDeploymentRequestCloudProvider
-			if deploymentFromFile.Deployment.Configuration.CloudProvider == "gcp" || deploymentFromFile.Deployment.Configuration.CloudProvider == "GCP" {
+			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.CloudProvider) {
+			case "GCP":
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderGCP
-			}
-			if deploymentFromFile.Deployment.Configuration.CloudProvider == "aws" || deploymentFromFile.Deployment.Configuration.CloudProvider == "AWS" {
+			case "AWS":
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAWS
-			}
-			if deploymentFromFile.Deployment.Configuration.CloudProvider == "azure" || deploymentFromFile.Deployment.Configuration.CloudProvider == "AZURE" {
+			case "AZURE":
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAZURE
 			}
+
 			var requestedExecutor astroplatformcore.CreateStandardDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
+			switch deploymentFromFile.Deployment.Configuration.Executor {
+			case deployment.CeleryExecutor, deployment.CELERY:
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorCELERY
-			}
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
+			case deployment.KubeExecutor, deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
 			}
+
 			var schedulerSize astroplatformcore.CreateStandardDeploymentRequestSchedulerSize
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SmallScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SMALL {
+			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
+			case deployment.SMALL:
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeSMALL
-			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MediumScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MEDIUM {
+			case deployment.MEDIUM:
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
-			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LargeScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LARGE {
+			case deployment.LARGE:
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
 			}
+
 			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
 				AstroRuntimeVersion:  deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 				CloudProvider:        &requestedCloudProvider,
@@ -326,20 +337,20 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if deployment.IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.CreateDedicatedDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
+			switch deploymentFromFile.Deployment.Configuration.Executor {
+			case deployment.CeleryExecutor, deployment.CELERY:
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorCELERY
-			}
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
+			case deployment.KubeExecutor, deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
+
 			var schedulerSize astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SmallScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SMALL {
+			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
+			case deployment.SMALL:
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
-			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MediumScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MEDIUM {
+			case deployment.MEDIUM:
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LargeScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LARGE {
+			case deployment.LARGE:
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
 			}
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
@@ -367,12 +378,13 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if !deployment.IsDeploymentStandard(deploymentType) && !deployment.IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.CreateHybridDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
+			switch deploymentFromFile.Deployment.Configuration.Executor {
+			case deployment.CeleryExecutor, deployment.CELERY:
 				requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorCELERY
-			}
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
+			case deployment.KubeExecutor, deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorKUBERNETES
 			}
+
 			hybridDeploymentRequest := astroplatformcore.CreateHybridDeploymentRequest{
 				AstroRuntimeVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 				Description:         &deploymentFromFile.Deployment.Configuration.Description,
@@ -419,22 +431,23 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if deployment.IsDeploymentStandard(deploymentType) {
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
+			switch deploymentFromFile.Deployment.Configuration.Executor {
+			case deployment.CeleryExecutor, deployment.CELERY:
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
-			}
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
+			case deployment.KubeExecutor, deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
 			}
+
 			var schedulerSize astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SmallScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SMALL {
+			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
+			case deployment.SMALL:
 				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeSMALL
-			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MediumScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MEDIUM {
+			case deployment.MEDIUM:
 				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
-			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LargeScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LARGE {
+			case deployment.LARGE:
 				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
 			}
+
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
@@ -460,22 +473,23 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if deployment.IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.UpdateDedicatedDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
+			switch deploymentFromFile.Deployment.Configuration.Executor {
+			case deployment.CeleryExecutor, deployment.CELERY:
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY
-			}
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
+			case deployment.KubeExecutor, deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
+
 			var schedulerSize astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SmallScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.SMALL {
+			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
+			case deployment.SMALL:
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeSMALL
-			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MediumScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.MEDIUM {
+			case deployment.MEDIUM:
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-			}
-			if deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LargeScheduler || deploymentFromFile.Deployment.Configuration.SchedulerSize == deployment.LARGE {
+			case deployment.LARGE:
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
 			}
+
 			dedicatedDeploymentRequest := astroplatformcore.UpdateDedicatedDeploymentRequest{
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
@@ -501,12 +515,13 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if !deployment.IsDeploymentStandard(deploymentType) && !deployment.IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.UpdateHybridDeploymentRequestExecutor
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.CELERY {
+			switch deploymentFromFile.Deployment.Configuration.Executor {
+			case deployment.CeleryExecutor, deployment.CELERY:
 				requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorCELERY
-			}
-			if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
+			case deployment.KubeExecutor, deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES
 			}
+
 			hybridDeploymentRequest := astroplatformcore.UpdateHybridDeploymentRequest{
 				Description:        &deploymentFromFile.Deployment.Configuration.Description,
 				Name:               deploymentFromFile.Deployment.Configuration.Name,
@@ -625,26 +640,32 @@ func deploymentExists(existingDeployments []astroplatformcore.Deployment, deploy
 
 // deploymentFromName takes existingDeployments and deploymentName as its arguments.
 // It returns the existing deployment that matches deploymentName.
-func deploymentFromName(existingDeployments []astroplatformcore.Deployment, deploymentName string) astroplatformcore.Deployment {
+func deploymentFromName(existingDeployments []astroplatformcore.Deployment, deploymentName string) (astroplatformcore.Deployment, error) {
+	var existingDeployment astroplatformcore.Deployment
+	var j int
 	for i := range existingDeployments {
 		if existingDeployments[i].Name == deploymentName {
 			// deployment that matched name
-			return existingDeployments[i]
+			existingDeployment = existingDeployments[i]
+			j++
 		}
 	}
-	return astroplatformcore.Deployment{}
+	if j > 1 {
+		return astroplatformcore.Deployment{}, errDeploymentsWithSameName
+	}
+	return existingDeployment, nil
 }
 
-// getClusterInfoFromName takes clusterName and organizationShortName as its arguments.
+// getClusterInfoFromName takes clusterName and org as its arguments.
 // It returns the clusterID and list of nodepools if the cluster is found in the organization.
 // It returns an errClusterNotFound if the cluster does not exist in the organization.
-func getClusterInfoFromName(clusterName, organizationShortName string, corePlatformClient astroplatformcore.CoreClient) (string, []astroplatformcore.NodePool, error) {
+func getClusterInfoFromName(clusterName, organizationID string, platformCoreClient astroplatformcore.CoreClient) (string, []astroplatformcore.NodePool, error) {
 	var (
 		existingClusters []astroplatformcore.Cluster
 		err              error
 	)
 
-	existingClusters, err = organization.ListClusters(organizationShortName, corePlatformClient)
+	existingClusters, err = organization.ListClusters(organizationID, platformCoreClient)
 	if err != nil {
 		return "", nil, err
 	}
@@ -654,7 +675,7 @@ func getClusterInfoFromName(clusterName, organizationShortName string, corePlatf
 			return cluster.Id, *cluster.NodePools, nil
 		}
 	}
-	err = fmt.Errorf("cluster_name: %s %w in organization: %s", clusterName, errNotFound, organizationShortName)
+	err = fmt.Errorf("cluster_name: %s %w in organization", clusterName, errNotFound)
 	return "", nil, err
 }
 
@@ -771,11 +792,8 @@ func hasAlertEmails(deploymentFromFile *inspect.FormattedDeployment) bool {
 }
 
 func hasEnvVarsOrAlertEmails(deploymentFromFile *inspect.FormattedDeployment) bool {
-	if hasEnvVars(deploymentFromFile) {
-		return hasEnvVars(deploymentFromFile)
-	}
-	if hasAlertEmails(deploymentFromFile) {
-		return hasAlertEmails(deploymentFromFile)
+	if hasEnvVars(deploymentFromFile) || hasAlertEmails(deploymentFromFile) {
+		return true
 	}
 	return false
 }
@@ -843,7 +861,13 @@ func transformDeploymentType(deploymentType string) astroplatformcore.Deployment
 	switch strings.ToUpper(deploymentType) {
 	case "STANDARD":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
+	case HostedShared:
+		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
+	case HostedStandard:
+		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 	case "DEDICATED":
+		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
+	case HostedDedicated:
 		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
 	case "HYBRID":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeHYBRID

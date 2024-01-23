@@ -41,18 +41,6 @@ const (
 	USER       BasicSubjectProfileSubjectType = "USER"
 )
 
-// Defines values for CreateApiTokenRequestRole.
-const (
-	CreateApiTokenRequestRoleDEPLOYMENTADMIN          CreateApiTokenRequestRole = "DEPLOYMENT_ADMIN"
-	CreateApiTokenRequestRoleORGANIZATIONBILLINGADMIN CreateApiTokenRequestRole = "ORGANIZATION_BILLING_ADMIN"
-	CreateApiTokenRequestRoleORGANIZATIONMEMBER       CreateApiTokenRequestRole = "ORGANIZATION_MEMBER"
-	CreateApiTokenRequestRoleORGANIZATIONOWNER        CreateApiTokenRequestRole = "ORGANIZATION_OWNER"
-	CreateApiTokenRequestRoleWORKSPACEAUTHOR          CreateApiTokenRequestRole = "WORKSPACE_AUTHOR"
-	CreateApiTokenRequestRoleWORKSPACEMEMBER          CreateApiTokenRequestRole = "WORKSPACE_MEMBER"
-	CreateApiTokenRequestRoleWORKSPACEOPERATOR        CreateApiTokenRequestRole = "WORKSPACE_OPERATOR"
-	CreateApiTokenRequestRoleWORKSPACEOWNER           CreateApiTokenRequestRole = "WORKSPACE_OWNER"
-)
-
 // Defines values for CreateApiTokenRequestType.
 const (
 	DEPLOYMENT   CreateApiTokenRequestType = "DEPLOYMENT"
@@ -301,7 +289,7 @@ type CreateApiTokenRequest struct {
 	Name string `json:"name"`
 
 	// Role The role of the API token.
-	Role CreateApiTokenRequestRole `json:"role"`
+	Role string `json:"role"`
 
 	// TokenExpiryPeriodInDays The expiry period of the API token in days. If not specified, the token will never expire.
 	TokenExpiryPeriodInDays *int `json:"tokenExpiryPeriodInDays,omitempty"`
@@ -309,9 +297,6 @@ type CreateApiTokenRequest struct {
 	// Type The scope of the API token.
 	Type CreateApiTokenRequestType `json:"type"`
 }
-
-// CreateApiTokenRequestRole The role of the API token.
-type CreateApiTokenRequestRole string
 
 // CreateApiTokenRequestType The scope of the API token.
 type CreateApiTokenRequestType string
