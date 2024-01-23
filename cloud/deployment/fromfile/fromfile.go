@@ -859,7 +859,13 @@ func transformDeploymentType(deploymentType string) astroplatformcore.Deployment
 	switch strings.ToUpper(deploymentType) {
 	case "STANDARD":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
+	case "HOSTED_SHARED":
+		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
+	case "HOSTED_STANDARD":
+		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 	case "DEDICATED":
+		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
+	case "HOSTED_DEDICATED":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
 	case "HYBRID":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeHYBRID
