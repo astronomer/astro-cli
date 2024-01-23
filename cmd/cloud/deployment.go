@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	enable    = "enable"
-	disable   = "disable"
-	standard  = "standard"
-	dedicated = "dedicated"
+	enable          = "enable"
+	disable         = "disable"
+	standard        = "standard"
+	dedicated       = "dedicated"
+	HostedDedicated = "HOSTED_DEDICATED"
 )
 
 var (
@@ -156,13 +157,19 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&executor, "executor", "e", "CeleryExecutor", "The executor to use for the Deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
 	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable")
 	cmd.Flags().BoolVarP(&deploymentCreateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. This flag has been deprecated for the --cicd-enforcement flag.")
-	cmd.Flags().MarkDeprecated("enforce-cicd", "use --cicd-enforcement instead")
+	err := cmd.Flags().MarkDeprecated("enforce-cicd", "use --cicd-enforcement instead")
+	if err != nil {
+		fmt.Println(err)
+	}
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the Deployment to create. File can be in either JSON or YAML format.")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
 	if organization.IsOrgHosted() {
 		cmd.Flags().StringVarP(&deploymentType, "cluster-type", "", standard, "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated. This flag has been deprecated for the --type flag.")
-		cmd.Flags().MarkDeprecated("cluster-type", "use --type instead")
+		err := cmd.Flags().MarkDeprecated("cluster-type", "use --type instead")
+		if err != nil {
+			fmt.Println(err)
+		}
 		cmd.Flags().StringVarP(&deploymentType, "type", "", standard, "The Type to use for the Deployment. Possible values can be standard or dedicated.")
 		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "gcp", "The Cloud Provider to use for the Deployment. Possible values can be gcp, aws.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the Deployment.")
@@ -197,7 +204,10 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "Force update: Don't prompt a user before Deployment update")
 	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable.")
 	cmd.Flags().BoolVarP(&deploymentUpdateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Pass enforce-cicd=false to disable this feature. This flag has been deprecated for the --cicd-enforcement flag.")
-	cmd.Flags().MarkDeprecated("enforce-cicd", "use --cicd-enforcement instead")
+	err := cmd.Flags().MarkDeprecated("enforce-cicd", "use --cicd-enforcement instead")
+	if err != nil {
+		fmt.Println(err)
+	}
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment to update")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the deployment")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "clean output to only include inspect yaml or json file in any situation.")
@@ -359,23 +369,23 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
 	}
-	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated || deploymentType == "HOSTED_STANDARD" || deploymentType == "HOSTED_SHARED" || deploymentType == "HOSTED_DEDICATED") {
+	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated || deploymentType == "HOSTED_STANDARD" || deploymentType == "HOSTED_SHARED" || deploymentType == HostedDedicated) {
 		return errors.New("Invalid --type value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
 		return errors.New("Invalid --enforce-cicd value")
 	}
-	if deploymentCreateEnforceCD == true && cicdEnforcement == disable {
+	if deploymentCreateEnforceCD && cicdEnforcement == disable {
 		return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
 	}
-	if deploymentCreateEnforceCD == true {
+	if deploymentCreateEnforceCD {
 		cicdEnforcement = enable
 	}
 	var coreDeploymentType astroplatformcore.DeploymentType
 	if deploymentType == standard || deploymentType == "HOSTED_STANDARD" || deploymentType == "HOSTED_SHARED" {
 		coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 	}
-	if deploymentType == dedicated || deploymentType == "HOSTED_DEDICATED" {
+	if deploymentType == dedicated || deploymentType == HostedDedicated {
 		coreDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
 	}
 
@@ -424,7 +434,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, coreDeploymentType, schedulerAU, schedulerReplicas, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
-func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
+func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -461,16 +471,16 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		return errors.New("Invalid --enforce-cicd value")
 	}
 	if cmd.Flags().Changed("enforce-cicd") {
-		if deploymentUpdateEnforceCD == true && cicdEnforcement == disable {
+		if deploymentUpdateEnforceCD && cicdEnforcement == disable {
 			return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
 		}
-		if deploymentUpdateEnforceCD == false && cicdEnforcement == enable {
+		if !deploymentUpdateEnforceCD && cicdEnforcement == enable {
 			return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
 		}
-		if deploymentUpdateEnforceCD == true {
+		if deploymentUpdateEnforceCD {
 			cicdEnforcement = enable
 		}
-		if deploymentUpdateEnforceCD == false {
+		if !deploymentUpdateEnforceCD {
 			cicdEnforcement = disable
 		}
 	}

@@ -865,7 +865,7 @@ func transformDeploymentType(deploymentType string) astroplatformcore.Deployment
 		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 	case "DEDICATED":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
-	case "HOSTED_DEDICATED":
+	case deployment.HostedDedicated:
 		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
 	case "HYBRID":
 		transformedDeploymentType = astroplatformcore.DeploymentTypeHYBRID
