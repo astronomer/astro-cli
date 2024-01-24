@@ -204,6 +204,7 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astropl
 		for i := range or {
 			if orgName == or[i].Name {
 				orgID = or[i].Id
+				break
 			}
 		}
 		if orgID == "" {
