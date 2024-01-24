@@ -251,6 +251,7 @@ var (
 			Type:          &hybridType,
 			Region:        &region,
 			ClusterName:   &cluster.Name,
+			ClusterId:     &clusterID,
 		},
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
