@@ -527,8 +527,10 @@ func createOutput(workspaceID string, d *astroplatformcore.Deployment) error {
 	if IsDeploymentStandard(*d.Type) {
 		cloudProvider = *d.CloudProvider
 		region = *d.Region
-	} else {
+	} else if IsDeploymentDedicated(*d.Type) {
 		clusterName = *d.ClusterName
+	} else {
+		clusterName = *d.ClusterId
 	}
 	tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 	deploymentURL, err := GetDeploymentURL(d.Id, workspaceID)
