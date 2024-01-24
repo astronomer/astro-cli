@@ -317,7 +317,7 @@ func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) 
 
 func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 	c, _ := config.GetCurrentContext()
-	return fmt.Sprintf("deployments.%s/%s/upload", c.Domain, deploymentInfo.ReleaseName)
+	return fmt.Sprintf("https://deployments.%s/%s/dags/upload", c.Domain, deploymentInfo.ReleaseName)
 }
 
 func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
