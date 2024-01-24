@@ -839,6 +839,7 @@ func TestCreate(t *testing.T) {
 				Type:          &hybridType,
 				ClusterName:   &cluster.Name,
 				Region:        &cluster.Region,
+				ClusterId:     &clusterID,
 			},
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
