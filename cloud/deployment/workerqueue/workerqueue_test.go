@@ -193,6 +193,17 @@ var (
 			StatusCode: 200,
 		},
 	}
+	emptyGetDeploymentOptionsPlatformResponseOK = astroplatformcore.GetDeploymentOptionsResponse{
+		JSON200: &astroplatformcore.DeploymentOptions{
+			ResourceQuotas: astroplatformcore.ResourceQuotaOptions{},
+			Executors:      []string{},
+			WorkerQueues:   astroplatformcore.WorkerQueueOptions{},
+			WorkerMachines: []astroplatformcore.WorkerMachine{},
+		},
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+	}
 	emptyListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 		JSON200: &astroplatformcore.DeploymentsPaginated{
@@ -384,18 +395,14 @@ func TestCreate(t *testing.T) {
 	})
 	t.Run("returns a queue already exists error when request is to create a new queue", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyGetDeploymentOptionsPlatformResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 		deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{{Name: "default", NodePoolId: &testPoolID}}
-		GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.MaxWorkers.Default = 0
-		GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.WorkerConcurrency.Default = 0
 		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "default", createAction, "test-instance-type-1", -1, 0, 0, false, mockPlatformCoreClient, mockCoreClient, out)
 		assert.ErrorIs(t, err, errCannotUpdateExistingQueue)
 		mockPlatformCoreClient.AssertExpectations(t)
-		GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.MaxWorkers.Default = 125
-		GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.WorkerConcurrency.Default = 180
 	})
 }
 
@@ -632,12 +639,10 @@ func TestUpdate(t *testing.T) {
 	})
 	// kube executor
 	deploymentResponse.JSON200.Executor = &executorKubernetes
-	GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.MaxWorkers.Default = 0
-	GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.WorkerConcurrency.Default = 0
 	t.Run("happy path update existing worker queue for a deployment", func(t *testing.T) {
 		expectedOutMessage := "worker queue default for test-deployment-label in test-ws-id workspace updated\n"
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyGetDeploymentOptionsPlatformResponseOK, nil).Times(1)
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
@@ -655,7 +660,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("update existing worker queue with a new worker type", func(t *testing.T) {
 		expectedOutMessage := "worker queue default for test-deployment-label in test-ws-id workspace updated\n"
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyGetDeploymentOptionsPlatformResponseOK, nil).Times(1)
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
@@ -668,10 +673,7 @@ func TestUpdate(t *testing.T) {
 		assert.Contains(t, out.String(), expectedOutMessage)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
-
 	})
-	GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.MaxWorkers.Default = 125
-	GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.WorkerConcurrency.Default = 180
 	t.Run("returns an error when requested input is not valid", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil).Times(1)
