@@ -394,9 +394,9 @@ func TestCreate(t *testing.T) {
 		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "default", createAction, "test-instance-type-1", -1, 0, 0, false, mockPlatformCoreClient, mockCoreClient, out)
 		assert.ErrorIs(t, err, errCannotUpdateExistingQueue)
 		mockPlatformCoreClient.AssertExpectations(t)
+		GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.MaxWorkers.Default = 125
+		GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.WorkerConcurrency.Default = 180
 	})
-	GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.MaxWorkers.Default = 125
-	GetDeploymentOptionsPlatformResponseOK.JSON200.WorkerQueues.WorkerConcurrency.Default = 180
 }
 
 func TestCreateHostedShared(t *testing.T) {
