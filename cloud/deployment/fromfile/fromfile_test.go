@@ -37,27 +37,40 @@ var (
 	region                 = "test-region"
 	cloudProvider          = "aws"
 	description            = "description 1"
+	schedulerAU            = 5
+	schedulerTestSize      = astroplatformcore.DeploymentSchedulerSizeSMALL
+	defaultTaskPodCPU      = "defaultTaskPodCPU"
+	defaultTaskPodMemory   = "defaultTaskPodMemory"
+	resourceQuotaCPU       = "resourceQuotaCPU"
+	ResourceQuotaMemory    = "ResourceQuotaMemory"
 	deploymentResponse     = astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
 		JSON200: &astroplatformcore.Deployment{
-			Id:                 "test-deployment-id",
-			RuntimeVersion:     "4.2.5",
-			Namespace:          "test-name",
-			WebServerUrl:       "test-url",
-			IsDagDeployEnabled: false,
-			Description:        &description,
-			Name:               "test-deployment-label",
-			Status:             "HEALTHY",
-			Type:               &hybridType,
-			ClusterId:          &clusterID,
-			Executor:           &executorCelery,
-			ClusterName:        &clusterName,
-			IsHighAvailability: &highAvailability,
-			IsCicdEnforced:     true,
-			Region:             &region,
-			CloudProvider:      &cloudProvider,
+			Id:                   "test-deployment-id",
+			RuntimeVersion:       "4.2.5",
+			Namespace:            "test-name",
+			WebServerUrl:         "test-url",
+			IsDagDeployEnabled:   false,
+			Description:          &description,
+			Name:                 "test-deployment-label",
+			Status:               "HEALTHY",
+			Type:                 &hybridType,
+			ClusterId:            &clusterID,
+			Executor:             &executorCelery,
+			ClusterName:          &clusterName,
+			IsHighAvailability:   &highAvailability,
+			SchedulerAu:          &schedulerAU,
+			DefaultTaskPodCpu:    &defaultTaskPodCPU,
+			DefaultTaskPodMemory: &defaultTaskPodMemory,
+			ResourceQuotaCpu:     &resourceQuotaCPU,
+			ResourceQuotaMemory:  &ResourceQuotaMemory,
+			SchedulerSize:        &schedulerTestSize,
+			WorkspaceName:        &workspace1.Name,
+			IsCicdEnforced:       true,
+			Region:               &region,
+			CloudProvider:        &cloudProvider,
 		},
 	}
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{

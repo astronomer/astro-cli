@@ -94,6 +94,7 @@ var (
 			WorkspaceId:            "workspace-id",
 			WebServerUrl:           "test-url",
 			IsDagDeployEnabled:     false,
+			Description:            &description,
 			Name:                   "test",
 			Status:                 "HEALTHY",
 			Type:                   &hybridType,
