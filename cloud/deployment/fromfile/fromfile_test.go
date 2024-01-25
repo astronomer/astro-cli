@@ -42,7 +42,7 @@ var (
 	defaultTaskPodCPU      = "defaultTaskPodCPU"
 	defaultTaskPodMemory   = "defaultTaskPodMemory"
 	resourceQuotaCPU       = "resourceQuotaCPU"
-	ResourceQuotaMemory    = "ResourceQuotaMemory"
+	resourceQuotaMemory    = "ResourceQuotaMemory"
 	deploymentResponse     = astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -65,7 +65,7 @@ var (
 			DefaultTaskPodCpu:    &defaultTaskPodCPU,
 			DefaultTaskPodMemory: &defaultTaskPodMemory,
 			ResourceQuotaCpu:     &resourceQuotaCPU,
-			ResourceQuotaMemory:  &ResourceQuotaMemory,
+			ResourceQuotaMemory:  &resourceQuotaMemory,
 			SchedulerSize:        &schedulerTestSize,
 			WorkspaceName:        &workspace1.Name,
 			IsCicdEnforced:       true,

@@ -272,7 +272,6 @@ func SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency int, wor
 		// set default value as user input did not have it
 		workerQueueToCreate.MaxWorkerCount = int(workerQueueDefaultOptions.MaxWorkers.Default)
 	}
-
 	if wQueueConcurrency == 0 {
 		// set default value as user input did not have it
 		workerQueueToCreate.WorkerConcurrency = int(workerQueueDefaultOptions.WorkerConcurrency.Default)

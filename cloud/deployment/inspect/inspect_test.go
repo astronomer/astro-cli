@@ -139,7 +139,13 @@ var (
 		},
 		JSON200: &cluster,
 	}
-	sourceDeployment = astroplatformcore.Deployment{
+	defaultTaskPodCPU    = "defaultTaskPodCPU"
+	defaultTaskPodMemory = "defaultTaskPodMemory"
+	resourceQuotaCPU     = "resourceQuotaCPU"
+	resourceQuotaMemory  = "ResourceQuotaMemory"
+	cloudProvider        = "cloud-provider"
+	schedulerTestSize    = astroplatformcore.DeploymentSchedulerSizeSMALL
+	sourceDeployment     = astroplatformcore.Deployment{
 		Id:                     deploymentID,
 		Name:                   "test-deployment-label",
 		Description:            &description,
@@ -162,6 +168,12 @@ var (
 		UpdatedAt:              time.Now(),
 		Status:                 "UNHEALTHY",
 		IsDagDeployEnabled:     true,
+		DefaultTaskPodCpu:      &defaultTaskPodCPU,
+		DefaultTaskPodMemory:   &defaultTaskPodMemory,
+		ResourceQuotaCpu:       &resourceQuotaCPU,
+		ResourceQuotaMemory:    &resourceQuotaMemory,
+		SchedulerSize:          &schedulerTestSize,
+		CloudProvider:          &cloudProvider,
 	}
 
 	getDeploymentResponse = astroplatformcore.GetDeploymentResponse{
