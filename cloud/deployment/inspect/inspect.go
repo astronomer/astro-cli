@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"time"
 
@@ -209,30 +210,38 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	}
 
 	deploymentMap := map[string]interface{}{
-		"name":                 coreDeployment.Name,
-		"description":          coreDeployment.Description,
-		"workspace_name":       coreDeployment.WorkspaceName,
-		"deployment_type":      string(*coreDeployment.Type),
-		"cloud_provider":       coreDeployment.CloudProvider,
-		"region":               coreDeployment.Region,
-		"cluster_name":         clusterName,
-		"runtime_version":      coreDeployment.RuntimeVersion,
-		"dag_deploy_enabled":   coreDeployment.IsDagDeployEnabled,
-		"ci_cd_enforcement":    coreDeployment.IsCicdEnforced,
-		"is_high_availability": coreDeployment.IsHighAvailability,
-		"scheduler_au":         coreDeployment.SchedulerAu,
-		"scheduler_count":      coreDeployment.SchedulerReplicas,
-		"executor":             coreDeployment.Executor,
-		"scheduler_size":       coreDeployment.SchedulerSize,
+		"name":               coreDeployment.Name,
+		"workspace_name":     *coreDeployment.WorkspaceName,
+		"deployment_type":    string(*coreDeployment.Type),
+		"cluster_name":       clusterName,
+		"runtime_version":    coreDeployment.RuntimeVersion,
+		"dag_deploy_enabled": coreDeployment.IsDagDeployEnabled,
+		"ci_cd_enforcement":  coreDeployment.IsCicdEnforced,
+		"scheduler_count":    coreDeployment.SchedulerReplicas,
+		"executor":           *coreDeployment.Executor,
 	}
 	if deployment.IsDeploymentStandard(*coreDeployment.Type) || deployment.IsDeploymentDedicated(*coreDeployment.Type) {
-		deploymentMap["default_task_pod_cpu"] = coreDeployment.DefaultTaskPodCpu
-		deploymentMap["default_task_pod_memory"] = coreDeployment.DefaultTaskPodMemory
-		deploymentMap["resource_quota_cpu"] = coreDeployment.ResourceQuotaCpu
-		deploymentMap["resource_quota_memory"] = coreDeployment.ResourceQuotaMemory
+		deploymentMap["scheduler_size"] = *coreDeployment.SchedulerSize
+		deploymentMap["cloud_provider"] = *coreDeployment.CloudProvider
+		deploymentMap["default_task_pod_cpu"] = *coreDeployment.DefaultTaskPodCpu
+		deploymentMap["default_task_pod_memory"] = *coreDeployment.DefaultTaskPodMemory
+		deploymentMap["resource_quota_cpu"] = *coreDeployment.ResourceQuotaCpu
+		deploymentMap["resource_quota_memory"] = *coreDeployment.ResourceQuotaMemory
+	}
+	if deployment.IsDeploymentStandard(*coreDeployment.Type) {
+		deploymentMap["region"] = *coreDeployment.Region
 	}
 	if !deployment.IsDeploymentStandard(*coreDeployment.Type) {
 		deploymentMap["default_worker_type"] = defaultWorkerType
+	}
+	if coreDeployment.Description != nil {
+		deploymentMap["description"] = *coreDeployment.Description
+	}
+	if coreDeployment.IsHighAvailability != nil {
+		deploymentMap["is_high_availability"] = *coreDeployment.IsHighAvailability
+	}
+	if coreDeployment.SchedulerAu != nil {
+		deploymentMap["scheduler_au"] = *coreDeployment.SchedulerAu
 	}
 
 	return deploymentMap, nil
@@ -400,6 +409,10 @@ func getSpecificField(deploymentMap map[string]interface{}, requestedField strin
 		}
 	}
 	return nil, fmt.Errorf("requested key %s %w", requestedField, errKeyNotFound)
+}
+
+func isPointer(x interface{}) bool {
+	return reflect.TypeOf(x).Kind() == reflect.Ptr
 }
 
 func getPrintableDeployment(infoMap, configMap, additionalMap map[string]interface{}) map[string]interface{} {
