@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"reflect"
 	"strings"
 	"time"
 
@@ -234,6 +233,7 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	if !deployment.IsDeploymentStandard(*coreDeployment.Type) {
 		deploymentMap["default_worker_type"] = defaultWorkerType
 	}
+
 	if coreDeployment.Description != nil {
 		deploymentMap["description"] = *coreDeployment.Description
 	}
@@ -409,10 +409,6 @@ func getSpecificField(deploymentMap map[string]interface{}, requestedField strin
 		}
 	}
 	return nil, fmt.Errorf("requested key %s %w", requestedField, errKeyNotFound)
-}
-
-func isPointer(x interface{}) bool {
-	return reflect.TypeOf(x).Kind() == reflect.Ptr
 }
 
 func getPrintableDeployment(infoMap, configMap, additionalMap map[string]interface{}) map[string]interface{} {
