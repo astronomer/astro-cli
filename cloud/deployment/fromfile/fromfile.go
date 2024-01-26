@@ -840,6 +840,7 @@ func checkEnvVars(deploymentFromFile *inspect.FormattedDeployment, action string
 }
 
 func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment) (envVars []astroplatformcore.DeploymentEnvironmentVariableRequest) {
+	envVars = []astroplatformcore.DeploymentEnvironmentVariableRequest{}
 	for i := range deploymentFromFile.Deployment.EnvVars {
 		var envVar astroplatformcore.DeploymentEnvironmentVariableRequest
 		envVar.IsSecret = deploymentFromFile.Deployment.EnvVars[i].IsSecret

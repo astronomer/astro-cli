@@ -139,7 +139,13 @@ var (
 		},
 		JSON200: &cluster,
 	}
-	sourceDeployment = astroplatformcore.Deployment{
+	defaultTaskPodCPU    = "defaultTaskPodCPU"
+	defaultTaskPodMemory = "defaultTaskPodMemory"
+	resourceQuotaCPU     = "resourceQuotaCPU"
+	resourceQuotaMemory  = "ResourceQuotaMemory"
+	cloudProvider        = "cloud-provider"
+	schedulerTestSize    = astroplatformcore.DeploymentSchedulerSizeSMALL
+	sourceDeployment     = astroplatformcore.Deployment{
 		Id:                     deploymentID,
 		Name:                   "test-deployment-label",
 		Description:            &description,
@@ -162,6 +168,12 @@ var (
 		UpdatedAt:              time.Now(),
 		Status:                 "UNHEALTHY",
 		IsDagDeployEnabled:     true,
+		DefaultTaskPodCpu:      &defaultTaskPodCPU,
+		DefaultTaskPodMemory:   &defaultTaskPodMemory,
+		ResourceQuotaCpu:       &resourceQuotaCPU,
+		ResourceQuotaMemory:    &resourceQuotaMemory,
+		SchedulerSize:          &schedulerTestSize,
+		CloudProvider:          &cloudProvider,
 	}
 
 	getDeploymentResponse = astroplatformcore.GetDeploymentResponse{
@@ -435,9 +447,9 @@ func TestGetDeploymentConfig(t *testing.T) {
 			SchedulerCount:   sourceDeployment.SchedulerReplicas,
 			DagDeployEnabled: &sourceDeployment.IsDagDeployEnabled,
 			Executor:         string(*sourceDeployment.Executor),
-			Region:           *sourceDeployment.Region,
+			Region:           "",
 			DeploymentType:   string(*sourceDeployment.Type),
-			CloudProvider:    *sourceDeployment.CloudProvider,
+			CloudProvider:    "",
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
@@ -455,17 +467,22 @@ func TestGetDeploymentConfig(t *testing.T) {
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedDeploymentConfig := deploymentConfig{
-			Name:             sourceDeployment.Name,
-			Description:      *sourceDeployment.Description,
-			WorkspaceName:    *sourceDeployment.WorkspaceName,
-			RunTimeVersion:   sourceDeployment.RuntimeVersion,
-			SchedulerAU:      *sourceDeployment.SchedulerAu,
-			SchedulerCount:   sourceDeployment.SchedulerReplicas,
-			DagDeployEnabled: &sourceDeployment.IsDagDeployEnabled,
-			Executor:         string(*sourceDeployment.Executor),
-			Region:           *sourceDeployment.Region,
-			DeploymentType:   string(*sourceDeployment.Type),
-			CloudProvider:    *sourceDeployment.CloudProvider,
+			Name:                 sourceDeployment.Name,
+			Description:          *sourceDeployment.Description,
+			WorkspaceName:        *sourceDeployment.WorkspaceName,
+			RunTimeVersion:       sourceDeployment.RuntimeVersion,
+			SchedulerAU:          *sourceDeployment.SchedulerAu,
+			SchedulerCount:       sourceDeployment.SchedulerReplicas,
+			DagDeployEnabled:     &sourceDeployment.IsDagDeployEnabled,
+			SchedulerSize:        string(*sourceDeployment.SchedulerSize),
+			Executor:             string(*sourceDeployment.Executor),
+			Region:               *sourceDeployment.Region,
+			DeploymentType:       string(*sourceDeployment.Type),
+			CloudProvider:        *sourceDeployment.CloudProvider,
+			DefaultTaskPodCPU:    *sourceDeployment.DefaultTaskPodCpu,
+			DefaultTaskPodMemory: *sourceDeployment.DefaultTaskPodMemory,
+			ResourceQuotaCPU:     *sourceDeployment.ResourceQuotaCpu,
+			ResourceQuotaMemory:  *sourceDeployment.ResourceQuotaMemory,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)

@@ -63,14 +63,16 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		return nil
 	}
 
+	getDeploymentOptions := astroplatformcore.GetDeploymentOptionsParams{
+		DeploymentId: &requestedDeployment.Id,
+	}
+	deploymentOptions, err := deployment.GetPlatformDeploymentOptions("", getDeploymentOptions, platformCoreClient)
+	if err != nil {
+		return err
+	}
+	defaultOptions = deploymentOptions.WorkerQueues
+
 	if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-		getDeploymentOptions := astroplatformcore.GetDeploymentOptionsParams{
-			DeploymentId: &requestedDeployment.Id,
-		}
-		deploymentOptions, err := deployment.GetPlatformDeploymentOptions("", getDeploymentOptions, platformCoreClient)
-		if err != nil {
-			return err
-		}
 		WorkerMachines := deploymentOptions.WorkerMachines
 		// get the machine to use
 		workerMachine, err = selectWorkerMachine(workerType, WorkerMachines, out)
@@ -156,13 +158,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 	switch *requestedDeployment.Executor {
 	case astroplatformcore.DeploymentExecutorCELERY:
-		deploymentOptions, err := deployment.GetPlatformDeploymentOptions("", astroplatformcore.GetDeploymentOptionsParams{}, platformCoreClient)
-		if err != nil {
-			return err
-		}
-
-		defaultOptions = deploymentOptions.WorkerQueues
-
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
 			err = IsHostedCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &workerMachine)
 			if err != nil {
@@ -273,12 +268,10 @@ func SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency int, wor
 		// set default value as user input did not have it
 		workerQueueToCreate.MinWorkerCount = int(workerQueueDefaultOptions.MinWorkers.Default)
 	}
-
 	if wQueueMax == 0 {
 		// set default value as user input did not have it
 		workerQueueToCreate.MaxWorkerCount = int(workerQueueDefaultOptions.MaxWorkers.Default)
 	}
-
 	if wQueueConcurrency == 0 {
 		// set default value as user input did not have it
 		workerQueueToCreate.WorkerConcurrency = int(workerQueueDefaultOptions.WorkerConcurrency.Default)
