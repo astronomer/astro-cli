@@ -544,7 +544,7 @@ func TestUserUpdate(t *testing.T) {
 		resp, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
-		// mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(t)
 	})
 }
 
