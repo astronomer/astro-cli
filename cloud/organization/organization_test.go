@@ -112,8 +112,8 @@ func TestGetOrganizationSelection(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("get organiation selection success", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -132,9 +132,11 @@ func TestGetOrganizationSelection(t *testing.T) {
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		_, err = getOrganizationSelection(buf, mockPlatformClient)
+		_, err = getOrganizationSelection(buf, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+
 	})
 
 	t.Run("get organization selection list error", func(t *testing.T) {
@@ -189,6 +191,7 @@ func TestSwitch(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "\nSuccessfully switched organization\n", buf.String())
 		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("switching to a current organization", func(t *testing.T) {
@@ -201,6 +204,7 @@ func TestSwitch(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "You selected the same organization as the current one. No switch was made\n", buf.String())
 		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("successful switch without name", func(t *testing.T) {
@@ -229,6 +233,7 @@ func TestSwitch(t *testing.T) {
 		err = Switch("", mockCoreClient, mockPlatformCoreClient, buf, false)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failed switch wrong name", func(t *testing.T) {
@@ -242,6 +247,7 @@ func TestSwitch(t *testing.T) {
 		err := Switch("name-wrong", mockCoreClient, mockPlatformCoreClient, buf, false)
 		assert.ErrorIs(t, err, errInvalidOrganizationName)
 		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failed switch bad selection", func(t *testing.T) {
@@ -270,6 +276,7 @@ func TestSwitch(t *testing.T) {
 		err = Switch("", mockCoreClient, mockPlatformCoreClient, buf, false)
 		assert.ErrorIs(t, err, errInvalidOrganizationKey)
 		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("successful switch with name and set default product", func(t *testing.T) {
@@ -294,6 +301,7 @@ func TestSwitch(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "\nSuccessfully switched organization\n", buf.String())
 		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 }
 
