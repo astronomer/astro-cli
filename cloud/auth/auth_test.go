@@ -613,7 +613,6 @@ func TestCheckUserSession(t *testing.T) {
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
-
 	})
 
 	t.Run("success with identity first auth flow", func(t *testing.T) {
@@ -629,7 +628,6 @@ func TestCheckUserSession(t *testing.T) {
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
-
 	})
 
 	t.Run("set default org product", func(t *testing.T) {

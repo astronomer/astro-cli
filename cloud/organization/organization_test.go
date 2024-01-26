@@ -136,7 +136,6 @@ func TestGetOrganizationSelection(t *testing.T) {
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
-
 	})
 
 	t.Run("get organization selection list error", func(t *testing.T) {
