@@ -1,6 +1,6 @@
 .git
 .env
-.DS_Store # macOS specific ignore
+.DS_Store
 airflow_settings.yaml
 __pycache__/
 astro
