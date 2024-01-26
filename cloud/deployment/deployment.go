@@ -973,6 +973,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES:
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
 					confirmWithUser = true
+					dedicatedDeploymentRequest.WorkerQueues = nil
 				}
 			}
 			err := updateDeploymentRequest.FromUpdateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
