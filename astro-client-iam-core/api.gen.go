@@ -97,9 +97,9 @@ const (
 
 // Defines values for UserOrganizationRole.
 const (
-	ORGANIZATIONBILLINGADMIN UserOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
-	ORGANIZATIONMEMBER       UserOrganizationRole = "ORGANIZATION_MEMBER"
-	ORGANIZATIONOWNER        UserOrganizationRole = "ORGANIZATION_OWNER"
+	UserOrganizationRoleORGANIZATIONBILLINGADMIN UserOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
+	UserOrganizationRoleORGANIZATIONMEMBER       UserOrganizationRole = "ORGANIZATION_MEMBER"
+	UserOrganizationRoleORGANIZATIONOWNER        UserOrganizationRole = "ORGANIZATION_OWNER"
 )
 
 // Defines values for UserStatus.

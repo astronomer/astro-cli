@@ -943,7 +943,7 @@ type Deployment struct {
 	CreatedAt time.Time           `json:"createdAt"`
 	CreatedBy BasicSubjectProfile `json:"createdBy"`
 
-	// DagTarballVersion The Deployment's current DAG tarball version. Once a deploy is completed, this field will be the same as the desired DAG tarball version.
+	// DagTarballVersion The Deployment's current DAG tarball version, also known as the Bundle Version in the Cloud UI. If no deploys are currently processing, this value should be the same as DesiredDagTarballVersion.
 	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
 
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
@@ -955,7 +955,7 @@ type Deployment struct {
 	// Description The Deployment's description.
 	Description *string `json:"description,omitempty"`
 
-	// DesiredDagTarballVersion The Deployment's desired DAG tarball version. This is updated when DAG-only deploys are enabled a user triggers a deploy.
+	// DesiredDagTarballVersion The Deployment's expected DAG tarball version after a currently processing deploy completes. This value is updated when a user triggers a DAG-only deploy to indicate that the Deployment is expecting a new DAG tarball version. If no deploys are currently processing, this value should be the same as DagTarballVersion.
 	DesiredDagTarballVersion *string `json:"desiredDagTarballVersion,omitempty"`
 
 	// EnvironmentVariables The Deployment's environment variables. Secret values will be omitted from response.

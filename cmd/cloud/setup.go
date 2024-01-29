@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
@@ -64,7 +63,7 @@ type CustomClaims struct {
 }
 
 //nolint:gocognit
-func Setup(cmd *cobra.Command, client astro.Client, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
+func Setup(cmd *cobra.Command, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil
@@ -124,7 +123,7 @@ func Setup(cmd *cobra.Command, client astro.Client, platformCoreClient astroplat
 	if apiKey {
 		return nil
 	}
-	err = checkToken(client, coreClient, platformCoreClient, os.Stdout)
+	err = checkToken(coreClient, platformCoreClient, os.Stdout)
 	if err != nil {
 		return err
 	}
@@ -132,7 +131,7 @@ func Setup(cmd *cobra.Command, client astro.Client, platformCoreClient astroplat
 	return nil
 }
 
-func checkToken(client astro.Client, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+func checkToken(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		return err
@@ -141,7 +140,7 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, platformCo
 	// check if user is logged in
 	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
 		// guide the user through the login process if not logged in
-		err := authLogin(c.Domain, "", client, coreClient, platformCoreClient, out, false)
+		err := authLogin(c.Domain, "", coreClient, platformCoreClient, out, false)
 		if err != nil {
 			return err
 		}
@@ -155,7 +154,7 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, platformCo
 		res, err := refresh(c.RefreshToken, authConfig)
 		if err != nil {
 			// guide the user through the login process if refresh doesn't work
-			err := authLogin(c.Domain, "", client, coreClient, platformCoreClient, out, false)
+			err := authLogin(c.Domain, "", coreClient, platformCoreClient, out, false)
 			if err != nil {
 				return err
 			}
@@ -200,7 +199,7 @@ func isExpired(t time.Time, threshold time.Duration) bool {
 
 // Refresh gets a new access token from the provided refresh token,
 // The request is used the default client_id and endpoint for device authentication.
-func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, error) {
+func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error) {
 	addr := authConfig.DomainURL + "oauth/token"
 	data := url.Values{
 		"client_id":     {authConfig.ClientID},
@@ -343,7 +342,7 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, isDeploymentF
 	// get workspace ID
 	deployments, err := deployment.CoreGetDeployments("", orgID, platformCoreClient)
 	if err != nil {
-		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return false, errors.Wrap(err, organization.AstronomerConnectionErrMsg)
 	}
 	workspaceID = deployments[0].WorkspaceId
 

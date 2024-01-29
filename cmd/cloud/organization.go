@@ -1,16 +1,12 @@
 package cloud
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
-	"log"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/astronomer/astro-cli/pkg/printutil"
 
@@ -113,11 +109,7 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 			return organizationExportAuditLogs(cmd)
 		},
 	}
-	cmd.PersistentFlags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for.")
-	err := cmd.MarkPersistentFlagRequired("organization-name")
-	if err != nil {
-		log.Fatalf("Error marking organization-name flag as required in astro Organization audit-logs command: %s", err.Error())
-	}
+	cmd.Flags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for.")
 	cmd.Flags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
 	cmd.Flags().IntVarP(&auditLogsEarliestParam, "include", "i", auditLogsEarliestParamDefaultValue,
 		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90.")
@@ -201,29 +193,16 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationNameOrID = args[0]
 	}
 
-	return orgSwitch(organizationNameOrID, astroClient, astroCoreClient, platformCoreClient, out, shouldDisplayLoginLink)
+	return orgSwitch(organizationNameOrID, astroCoreClient, platformCoreClient, out, shouldDisplayLoginLink)
 }
 
 func organizationExportAuditLogs(cmd *cobra.Command) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	var outputFileName string
-	if auditLogsOutputFilePath != "" {
-		outputFileName = auditLogsOutputFilePath
-	} else {
-		outputFileName = fmt.Sprintf("audit-logs-%s.ndjson.gz", time.Now().Format("2006-01-02-150405"))
-	}
-
-	var filePerms fs.FileMode = 0o755
-	// In CLI mode we should not need to close f
-	f, err := os.OpenFile(outputFileName, os.O_RDWR|os.O_CREATE, filePerms)
-	if err != nil {
-		return err
-	}
-	out := bufio.NewWriter(f)
 	fmt.Println("This may take some time depending on how many days are being exported.")
-	return orgExportAuditLogs(astroClient, out, orgName, auditLogsEarliestParam)
+	return orgExportAuditLogs(astroCoreClient, platformCoreClient,
+		orgName, auditLogsOutputFilePath, auditLogsEarliestParam)
 }
 
 func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {

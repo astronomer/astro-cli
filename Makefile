@@ -56,7 +56,7 @@ test:
 temp-astro:
 	cd $(shell mktemp -d) && ${PWD}/astro dev init
 
-mock: mockery mock_airflow mock_houston mock_astro mock_pkg mock_astro_core mock_airflow_api
+mock: mockery mock_airflow mock_houston mock_pkg mock_astro_core mock_airflow_api
 
 mock_houston:
 	$(MOCKERY) --filename=ClientInterface.go --output=houston/mocks --dir=houston --outpkg=houston_mocks --name ClientInterface
@@ -71,9 +71,6 @@ mock_airflow:
 
 mock_airflow_api:
 	$(MOCKERY) --filename=Client.go --output=airflow-client/mocks --dir=airflow-client --outpkg=airflow_mocks --name Client
-
-mock_astro:
-	$(MOCKERY) --filename=Client.go --output=astro-client/mocks --dir=astro-client --outpkg=astro_mocks --name Client
 
 mock_astro_core:
 	$(MOCKERY) --filename=client.go --output=astro-client-core/mocks --dir=astro-client-core --outpkg=astrocore_mocks --name ClientWithResponsesInterface
