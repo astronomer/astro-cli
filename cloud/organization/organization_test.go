@@ -389,6 +389,7 @@ func TestExportAuditLogs(t *testing.T) {
 		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
 		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
 		assert.Contains(t, err.Error(), "network error")
+		mockPlatformClient.AssertExpectations(t)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("list failure", func(t *testing.T) {
@@ -397,6 +398,7 @@ func TestExportAuditLogs(t *testing.T) {
 		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(nil, errNetwork).Once()
 		err := ExportAuditLogs(mockClient, mockPlatformClient, "org1", "", 1)
 		assert.Contains(t, err.Error(), "network error")
+		mockPlatformClient.AssertExpectations(t)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("organization list error", func(t *testing.T) {
@@ -405,6 +407,7 @@ func TestExportAuditLogs(t *testing.T) {
 		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponseError, nil).Once()
 		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
 		assert.Contains(t, err.Error(), "failed to fetch organizations audit logs")
+		mockPlatformClient.AssertExpectations(t)
 		mockClient.AssertExpectations(t)
 	})
 }
