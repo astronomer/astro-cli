@@ -1530,6 +1530,7 @@ func TestUpdate(t *testing.T) { //nolint
 		err = Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "disable", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 
 		assert.NoError(t, err)
+		assert.Equal(t, (*[]astroplatformcore.WorkerQueueRequest)(nil), dedicatedDeploymentRequest.WorkerQueues)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})

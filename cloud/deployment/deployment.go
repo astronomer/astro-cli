@@ -65,9 +65,10 @@ const (
 )
 
 var (
-	sleepTime  = 180
-	tickNum    = 10
-	timeoutNum = 180
+	sleepTime                  = 180
+	tickNum                    = 10
+	timeoutNum                 = 180
+	dedicatedDeploymentRequest = astroplatformcore.UpdateDedicatedDeploymentRequest{}
 )
 
 func newTableOut() *printutil.Table {
@@ -934,7 +935,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			case KubeExecutor:
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
-			dedicatedDeploymentRequest := astroplatformcore.UpdateDedicatedDeploymentRequest{
+			dedicatedDeploymentRequest = astroplatformcore.UpdateDedicatedDeploymentRequest{
 				Description:          &description,
 				Name:                 name,
 				Executor:             requestedExecutor,
@@ -976,6 +977,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 					dedicatedDeploymentRequest.WorkerQueues = nil
 				}
 			}
+			fmt.Println(dedicatedDeploymentRequest.WorkerQueues)
 			err := updateDeploymentRequest.FromUpdateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
 			if err != nil {
 				return err
