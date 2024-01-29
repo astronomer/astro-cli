@@ -977,7 +977,6 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 					dedicatedDeploymentRequest.WorkerQueues = nil
 				}
 			}
-			fmt.Println(dedicatedDeploymentRequest.WorkerQueues)
 			err := updateDeploymentRequest.FromUpdateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
 			if err != nil {
 				return err
