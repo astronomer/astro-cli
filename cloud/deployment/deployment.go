@@ -138,7 +138,7 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 		} else {
 			clusterName = notApplicable
 		}
-		runtimeVersionText := " (based on Airflow " + d.RuntimeVersion + ")"
+		runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
 		releaseName := d.Namespace
 		workspaceName := d.WorkspaceName
 		region := notApplicable
