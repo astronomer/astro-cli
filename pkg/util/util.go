@@ -2,6 +2,7 @@ package util
 
 import (
 	b64 "encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -124,4 +125,17 @@ func GetbuildSecretString(buildSecret []string) (buildSecretString string) {
 	}
 
 	return buildSecretString
+}
+
+func StripOutKeysFromJSONByteArray(jsonData []byte, keys []string) ([]byte, error) {
+	if !json.Valid(jsonData) {
+		return jsonData, nil
+	}
+	var jsonDataStruct map[string]interface{}
+	json.Unmarshal(jsonData, &jsonDataStruct)
+	for _, key := range keys {
+		delete(jsonDataStruct, key)
+	}
+	resultJson, _ := json.Marshal(jsonDataStruct)
+	return resultJson, nil
 }

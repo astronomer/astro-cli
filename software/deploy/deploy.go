@@ -382,5 +382,15 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		"authorization": c.Token,
 	}
 
-	return fileutil.UploadFile(dagsParentPath+"/dags.tar.gz", uploadURL, "file", headers)
+	uploadFileArgs := fileutil.UploadFileArguments{
+		FilePath:            dagsParentPath + "/dags.tar.gz",
+		TargetURL:           uploadURL,
+		FormFileFieldName:   "file",
+		Headers:             headers,
+		MaxTries:            7,
+		InitialDelayInMS:    1 * 1000,
+		BackoffFactor:       2,
+		RetryDisplayMessage: "please wait, attempting to upload the dags",
+	}
+	return fileutil.UploadFile(uploadFileArgs)
 }
