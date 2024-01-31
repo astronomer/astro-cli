@@ -392,5 +392,5 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		BackoffFactor:       2,
 		RetryDisplayMessage: "please wait, attempting to upload the dags",
 	}
-	return fileutil.UploadFile(uploadFileArgs)
+	return fileutil.UploadFile(&uploadFileArgs)
 }

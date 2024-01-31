@@ -257,7 +257,7 @@ func CreateFile(p string) (*os.File, error) {
 	return os.Create(p)
 }
 
-func UploadFile(args UploadFileArguments) error {
+func UploadFile(args *UploadFileArguments) error {
 	file, err := os.Open(args.FilePath)
 	if err != nil {
 		return fmt.Errorf("error opening file: %w", err)
@@ -308,7 +308,9 @@ func UploadFile(args UploadFileArguments) error {
 			// If we have a dial tcp error, we should retry with exponential backoff
 			continue
 		}
-		defer response.Body.Close()
+		data, _ := io.ReadAll(response.Body)
+		responseStatusCode := response.StatusCode
+		response.Body.Close()
 
 		// Return success for 2xx status code
 		if response.StatusCode == http.StatusOK {
@@ -317,15 +319,14 @@ func UploadFile(args UploadFileArguments) error {
 			break
 		}
 
-		data, _ := io.ReadAll(response.Body)
 		strippedOutData, err := util.StripOutKeysFromJSONByteArray(data, []string{"exceptions", "args", "path", "status"})
 		if err != nil {
 			return fmt.Errorf("error in parsing the response body: %w", err)
 		}
-		currentUploadError = fmt.Errorf("file upload failed. Status code: %d and Message: %s", response.StatusCode, string(strippedOutData)) //nolint
+		currentUploadError = fmt.Errorf("file upload failed. Status code: %d and Message: %s", responseStatusCode, string(strippedOutData)) //nolint
 
 		// don't retry for 4xx since it is a client side error
-		if response.StatusCode >= http.StatusBadRequest && response.StatusCode < http.StatusInternalServerError {
+		if responseStatusCode >= http.StatusBadRequest && responseStatusCode < http.StatusInternalServerError {
 			break
 		}
 	}

@@ -564,7 +564,7 @@ func TestUploadFile(t *testing.T) {
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
-		err := UploadFile(uploadFileArgs)
+		err := UploadFile(&uploadFileArgs)
 		assert.EqualError(t, err, "error opening file: open non-existent-file.txt: no such file or directory")
 	})
 
@@ -592,7 +592,7 @@ func TestUploadFile(t *testing.T) {
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
-		err = UploadFile(uploadFileArgs)
+		err = UploadFile(&uploadFileArgs)
 
 		assert.ErrorIs(t, err, ioCopyError)
 		ioCopy = io.Copy
@@ -620,7 +620,7 @@ func TestUploadFile(t *testing.T) {
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
-		err = UploadFile(uploadFileArgs)
+		err = UploadFile(&uploadFileArgs)
 
 		assert.ErrorIs(t, err, requestError)
 		newRequestWithContext = http.NewRequestWithContext
@@ -630,10 +630,6 @@ func TestUploadFile(t *testing.T) {
 		mockServer := createMockServerWithHitCountReturning500()
 		testServer := httptest.NewServer(mockServer)
 		defer testServer.Close()
-
-		// Prepare a test server to respond with a non-OK status code
-		server := createMockServer(http.StatusInternalServerError, "Internal Server Error", make(map[string][]string))
-		defer server.Close()
 
 		// Create a temporary file with some content for testing
 		filePath := "./testFile.txt"
@@ -657,7 +653,7 @@ func TestUploadFile(t *testing.T) {
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
-		err = UploadFile(uploadFileArgs)
+		err = UploadFile(&uploadFileArgs)
 
 		// Assert the error is as expected
 		assert.EqualError(t, err, "file upload failed. Status code: 500 and Message: Internal Server Error")
@@ -670,10 +666,6 @@ func TestUploadFile(t *testing.T) {
 		testServer := httptest.NewServer(mockServer)
 		defer testServer.Close()
 
-		// Prepare a test server to respond with a non-OK status code
-		server := createMockServer(http.StatusInternalServerError, "Internal Server Error", make(map[string][]string))
-		defer server.Close()
-
 		// Create a temporary file with some content for testing
 		filePath := "./testFile.txt"
 		fileContent := []byte("This is a test file.")
@@ -696,7 +688,7 @@ func TestUploadFile(t *testing.T) {
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
-		err = UploadFile(uploadFileArgs)
+		err = UploadFile(&uploadFileArgs)
 
 		// Assert the error is as expected
 		assert.EqualError(t, err, "file upload failed. Status code: 400 and Message: Bad Request")
@@ -722,7 +714,7 @@ func TestUploadFile(t *testing.T) {
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
-		err = UploadFile(uploadFileArgs)
+		err = UploadFile(&uploadFileArgs)
 
 		assert.ErrorContains(t, err, "astro.unit.test")
 	})
@@ -754,7 +746,7 @@ func TestUploadFile(t *testing.T) {
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
-		err = UploadFile(uploadFileArgs)
+		err = UploadFile(&uploadFileArgs)
 
 		assert.NoError(t, err, "Expected no error")
 		// assert the received headers
