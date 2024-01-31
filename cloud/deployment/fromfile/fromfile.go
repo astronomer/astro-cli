@@ -230,7 +230,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			if deployment.IsDeploymentStandard(deploymentType) || deployment.IsDeploymentDedicated(deploymentType) {
 				astroMachines := configOptions.WorkerMachines
 				for j := range astroMachines {
-					if string(astroMachines[j].Name) == *listQueues[i].AstroMachine {
+					if strings.ToUpper(string(astroMachines[j].Name)) == strings.ToUpper(*listQueues[i].AstroMachine) {
 						astroMachine = astroMachines[j]
 					}
 				}
@@ -241,7 +241,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				workerQueue.MaxWorkerCount = listQueues[i].MaxWorkerCount
 				workerQueue.MinWorkerCount = listQueues[i].MinWorkerCount
 				workerQueue.WorkerConcurrency = listQueues[i].WorkerConcurrency
-				workerQueue.AstroMachine = astroplatformcore.WorkerQueueRequestAstroMachine(*listQueues[i].AstroMachine)
+				workerQueue.AstroMachine = astroplatformcore.WorkerQueueRequestAstroMachine(strings.ToUpper(*listQueues[i].AstroMachine))
 				// set default values if none were specified
 				requestedWorkerQueue := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
 				// check if queue is valid
@@ -663,6 +663,7 @@ func getClusterInfoFromName(clusterName, organizationID string, platformCoreClie
 	var (
 		existingClusters []astroplatformcore.Cluster
 		err              error
+		nodePools        []astroplatformcore.NodePool
 	)
 
 	existingClusters, err = organization.ListClusters(organizationID, platformCoreClient)
@@ -672,7 +673,10 @@ func getClusterInfoFromName(clusterName, organizationID string, platformCoreClie
 
 	for _, cluster := range existingClusters { //nolint
 		if cluster.Name == clusterName {
-			return cluster.Id, *cluster.NodePools, nil
+			if cluster.NodePools != nil {
+				nodePools = *cluster.NodePools
+			}
+			return cluster.Id, nodePools, nil
 		}
 	}
 	err = fmt.Errorf("cluster_name: %s %w in organization", clusterName, errNotFound)
