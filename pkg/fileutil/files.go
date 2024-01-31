@@ -319,10 +319,7 @@ func UploadFile(args *UploadFileArguments) error {
 			break
 		}
 
-		strippedOutData, err := util.StripOutKeysFromJSONByteArray(data, []string{"exceptions", "args", "path", "status"})
-		if err != nil {
-			return fmt.Errorf("error in parsing the response body: %w", err)
-		}
+		strippedOutData, _ := util.StripOutKeysFromJSONByteArray(data, []string{"exceptions", "args", "path", "status"})
 		currentUploadError = fmt.Errorf("file upload failed. Status code: %d and Message: %s", responseStatusCode, string(strippedOutData)) //nolint
 
 		// don't retry for 4xx since it is a client side error
