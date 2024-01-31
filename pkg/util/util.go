@@ -128,14 +128,15 @@ func GetbuildSecretString(buildSecret []string) (buildSecretString string) {
 }
 
 func StripOutKeysFromJSONByteArray(jsonData []byte, keys []string) ([]byte, error) {
-	if !json.Valid(jsonData) {
+	var jsonDataStruct map[string]interface{}
+	err := json.Unmarshal(jsonData, &jsonDataStruct)
+	if err != nil {
+		// If not a valid json, return the original data itself
 		return jsonData, nil
 	}
-	var jsonDataStruct map[string]interface{}
-	json.Unmarshal(jsonData, &jsonDataStruct)
 	for _, key := range keys {
 		delete(jsonDataStruct, key)
 	}
-	resultJson, _ := json.Marshal(jsonDataStruct)
-	return resultJson, nil
+	resultJSON, _ := json.Marshal(jsonDataStruct)
+	return resultJSON, nil
 }

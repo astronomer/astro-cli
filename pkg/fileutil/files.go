@@ -292,7 +292,6 @@ func UploadFile(args UploadFileArguments) error {
 		headers := args.Headers
 		headers["Content-Type"] = writer.FormDataContentType()
 		req, err := newRequestWithContext(http_context.Background(), "POST", args.TargetURL, body)
-
 		if err != nil {
 			currentUploadError = err
 			continue
@@ -304,7 +303,6 @@ func UploadFile(args UploadFileArguments) error {
 		}
 		client := &http.Client{}
 		response, err := client.Do(req)
-
 		if err != nil {
 			currentUploadError = err
 			// If we have a dial tcp error, we should retry with exponential backoff
@@ -324,7 +322,7 @@ func UploadFile(args UploadFileArguments) error {
 		if err != nil {
 			return fmt.Errorf("error in parsing the response body: %w", err)
 		}
-		currentUploadError = fmt.Errorf("file upload failed. Status code: %d and Message: %s", response.StatusCode, string(strippedOutData))
+		currentUploadError = fmt.Errorf("file upload failed. Status code: %d and Message: %s", response.StatusCode, string(strippedOutData)) //nolint
 
 		// don't retry for 4xx since it is a client side error
 		if response.StatusCode >= http.StatusBadRequest && response.StatusCode < http.StatusInternalServerError {
