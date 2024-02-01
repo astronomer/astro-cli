@@ -588,6 +588,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	var expectedPrintableDeployment []byte
 	sourceDeployment.Type = &hybridType
+
 	t.Run("returns a yaml formatted printable deployment", func(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
@@ -733,6 +734,103 @@ func TestFormatPrintableDeployment(t *testing.T) {
 `
 		var orderedAndTaggedDeployment FormattedDeployment
 		actualPrintableDeployment, err := formatPrintableDeployment("", true, printableDeployment)
+		assert.NoError(t, err)
+		// testing we get valid yaml
+		err = yaml.Unmarshal(actualPrintableDeployment, &orderedAndTaggedDeployment)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedDeployment, string(actualPrintableDeployment), "tag and order should match")
+	})
+
+	t.Run("returns a yaml formatted standard deployment", func(t *testing.T) {
+		sourceDeployment2 := sourceDeployment
+		sourceDeployment2.Type = &standardType
+		sourceDeployment2.Executor = &executorCelery
+		description = "description"
+		sourceDeployment2.Description = &description
+		sourceDeployment2.ClusterId = nil
+		one := "1"
+		sourceDeployment2.DefaultTaskPodCpu = &one
+		sourceDeployment2.DefaultTaskPodMemory = &one
+		sourceDeployment2.ResourceQuotaCpu = &one
+		sourceDeployment2.ResourceQuotaMemory = &one
+		sourceDeployment2.WebServerUrl = "some-url"
+		sourceDeployment2.UpdatedAt = time.Date(2023, time.February, 1, 12, 0, 0, 0, time.UTC)
+
+		info, _ := getDeploymentInfo(sourceDeployment2)
+		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
+		assert.NoError(t, err)
+		additional := getAdditionalNullableFields(&sourceDeployment2, nodePools)
+
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
+			},
+		}
+		expectedDeployment :=
+			`deployment:
+    environment_variables:
+        - is_secret: false
+          key: foo
+          updated_at: NOW
+          value: bar
+        - is_secret: true
+          key: bar
+          updated_at: NOW+1
+          value: baz
+    configuration:
+        name: test-deployment-label
+        description: description
+        runtime_version: 6.0.0
+        dag_deploy_enabled: true
+        ci_cd_enforcement: false
+        scheduler_size: SMALL
+        is_high_availability: false
+        executor: CELERY
+        scheduler_au: 5
+        scheduler_count: 3
+        cluster_name: ""
+        workspace_name: test-ws
+        deployment_type: STANDARD
+        cloud_provider: cloud-provider
+        region: us-central1
+        default_task_pod_cpu: "1"
+        default_task_pod_memory: "1"
+        resource_quota_cpu: "1"
+        resource_quota_memory: "1"
+    worker_queues:
+        - name: default
+          max_worker_count: 130
+          min_worker_count: 12
+          worker_concurrency: 110
+          worker_type: a5
+        - name: test-queue-1
+          max_worker_count: 175
+          min_worker_count: 8
+          worker_concurrency: 150
+          worker_type: a5
+    metadata:
+        deployment_id: test-deployment-id
+        workspace_id: test-ws-id
+        cluster_id: N/A
+        release_name: N/A
+        airflow_version: 2.4.0
+        current_tag: ""
+        status: UNHEALTHY
+        created_at: 0001-01-01T00:00:00Z
+        updated_at: 2023-02-01T12:00:00Z
+        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+        webserver_url: some-url
+        workload_identity: ""
+    alert_emails:
+        - email1
+        - email2
+`
+		var orderedAndTaggedDeployment FormattedDeployment
+		actualPrintableDeployment, err := formatPrintableDeployment("", false, printableDeployment)
 		assert.NoError(t, err)
 		// testing we get valid yaml
 		err = yaml.Unmarshal(actualPrintableDeployment, &orderedAndTaggedDeployment)
