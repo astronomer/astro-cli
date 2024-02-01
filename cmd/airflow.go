@@ -827,7 +827,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	exitCode, err := containerHandler.Pytest(pytestFile, customImageName, "", buildSecretString, pytestArgs)
+	exitCode, err := containerHandler.Pytest(pytestFile, customImageName, "", pytestArgs, buildSecretString)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("pytests failed")
