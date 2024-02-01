@@ -226,15 +226,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		return err
 	}
 	coreDeploymentType := astrocore.GetDeploymentOptionsParamsDeploymentType(deploymentType)
-	var coreCloudProvider astrocore.GetDeploymentOptionsParamsCloudProvider
-	switch cloudProvider {
-	case awsCloud:
-		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("AWS")
-	case gcpCloud:
-		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("GCP")
-	case azureCloud:
-		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("AZURE")
-	}
+	coreCloudProvider := GetCoreCloudProvider(cloudProvider)
 	deploymentOptionsParams := astrocore.GetDeploymentOptionsParams{
 		DeploymentType: &coreDeploymentType,
 		CloudProvider:  &coreCloudProvider,
@@ -1556,4 +1548,17 @@ func printWarning(executor string, existingQLength int) bool {
 		}
 	}
 	return printed
+}
+
+func GetCoreCloudProvider(cloudProvider string) astrocore.GetDeploymentOptionsParamsCloudProvider {
+	var coreCloudProvider astrocore.GetDeploymentOptionsParamsCloudProvider
+	switch strings.ToUpper(cloudProvider) {
+	case strings.ToUpper(awsCloud):
+		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("AWS")
+	case strings.ToUpper(gcpCloud):
+		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("GCP")
+	case strings.ToUpper(azureCloud):
+		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("AZURE")
+	}
+	return coreCloudProvider
 }

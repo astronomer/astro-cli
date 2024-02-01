@@ -443,6 +443,7 @@ deployment:
 		defer afero.NewOsFs().Remove(filePath)
 		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
 		assert.ErrorContains(t, err, "no context set")
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if cluster does not exist", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -505,6 +506,7 @@ deployment:
 		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
 		assert.ErrorIs(t, err, errNotFound)
 		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if listing cluster fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -2287,6 +2289,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 	clusterID = "test-cluster-id"
 	workspaceID = "test-workspace-id"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	t.Run("returns error if worker type does not match existing pools", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
 		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2328,8 +2331,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			},
 		}
 
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorContains(t, err, "worker_type: test-worker-8 does not exist in cluster: test-cluster")
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns error if queue options are invalid", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
@@ -2373,9 +2378,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			},
 		}
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorContains(t, err, "worker queue option is invalid: min worker count")
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns error if getting worker queue options fails", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
@@ -2419,9 +2425,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			},
 		}
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, errTest).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errTest)
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("sets default queue options if none were requested", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
@@ -2481,9 +2488,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		}
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if more than one worker queue are requested", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
@@ -2519,9 +2527,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			},
 		}
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorContains(t, err, "don't use 'worker_queues' to update default queue with KubernetesExecutor")
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("transforms formattedDeployment to CreateDeploymentInput if no queues were requested", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
@@ -2536,9 +2545,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, nil, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, nil, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("transforms formattedDeployment to CreateDeploymentInput if Kubernetes executor was requested", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
@@ -2566,9 +2576,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		}
 
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns correct deployment input when multiple queues are requested", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
@@ -2632,9 +2643,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("transforms formattedDeployment to UpdateDeploymentInput if no queues were requested", func(t *testing.T) {
 		deploymentID = "test-deployment-id"
@@ -2668,9 +2680,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		}
 
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if the cluster is being changed", func(t *testing.T) {
 		deploymentID = "test-deployment-id"
@@ -2689,10 +2702,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			Name:      "test-deployment",
 			ClusterId: &clusterID,
 		}
-		err = createOrUpdateDeployment(&deploymentFromFile, "diff-cluster", workspaceID, "update", &existingDeployment, nil, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, "diff-cluster", workspaceID, "update", &existingDeployment, nil, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errNotPermitted)
 		assert.ErrorContains(t, err, "changing an existing deployment's cluster is not permitted")
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with no queues", func(t *testing.T) {
 		deploymentID = "test-deployment-id"
@@ -2729,9 +2743,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		}
 
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with a queue", func(t *testing.T) {
 		deploymentID = "test-deployment-id"
@@ -2770,9 +2785,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		}
 
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns correct update deployment input when multiple queues are requested", func(t *testing.T) {
 		deploymentID = "test-deployment-id"
@@ -2844,9 +2860,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 
@@ -3501,6 +3518,7 @@ func TestIsJSON(t *testing.T) {
 }
 
 func TestDeploymentFromName(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	var (
 		existingDeployments []astroplatformcore.Deployment
 		deploymentToCreate  string
@@ -3526,18 +3544,27 @@ func TestDeploymentFromName(t *testing.T) {
 		Name:        "test-deployment-2",
 		Description: &description,
 	}
+	deploymentResponse = astroplatformcore.GetDeploymentResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &expectedeployment,
+	}
 	deploymentToCreate = "test-deployment-2"
 	t.Run("returns the deployment id for the matching deployment name", func(t *testing.T) {
-		actual, err := deploymentFromName(existingDeployments, deploymentToCreate)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		actual, err := deploymentFromName(existingDeployments, deploymentToCreate, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedeployment, actual)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns empty string if deployment name does not match", func(t *testing.T) {
 		deploymentToCreate = "test-d-2"
 		expectedeployment = astroplatformcore.Deployment{}
-		actual, err := deploymentFromName(existingDeployments, deploymentToCreate)
+		actual, err := deploymentFromName(existingDeployments, deploymentToCreate, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedeployment, actual)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 }
 
