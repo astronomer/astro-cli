@@ -31,7 +31,7 @@ var (
 )
 
 var (
-	errNoWorkspaceID                        = errors.New("no workspace id provided")
+	ErrNoWorkspaceID                        = errors.New("no workspace id provided")
 	errNoDomainSet                          = errors.New("no domain set, re-authenticate")
 	errInvalidDeploymentID                  = errors.New("please specify a valid deployment ID")
 	errDeploymentNotFound                   = errors.New("no airflow deployments found")
@@ -65,7 +65,7 @@ var tab = printutil.Table{
 
 func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
 	if wsID == "" {
-		return deploymentID, errNoWorkspaceID
+		return deploymentID, ErrNoWorkspaceID
 	}
 
 	// Validate workspace

@@ -47,6 +47,20 @@ func TestDeploy(t *testing.T) {
 	assert.NoError(t, err)
 
 	DagsOnlyDeploy = deploy.DagsOnlyDeploy
+
+	t.Run("error should be returned for astro deploy, if DeployAirflowImage throws error", func(t *testing.T) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
+			return deploymentID, deploy.ErrNoWorkspaceID
+		}
+
+		err := execDeployCmd([]string{"-f"}...)
+		assert.ErrorIs(t, err, deploy.ErrNoWorkspaceID)
+
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
+			return deploymentID, nil
+		}
+	})
+
 	t.Run("error should be returned for astro deploy, if dags deploy throws error", func(t *testing.T) {
 		err := execDeployCmd([]string{"-f"}...)
 		assert.ErrorIs(t, err, deploy.ErrDagOnlyDeployDisabledInConfig)

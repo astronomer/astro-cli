@@ -268,7 +268,7 @@ func TestGetAirflowUILinkFailure(t *testing.T) {
 func TestAirflowFailure(t *testing.T) {
 	// No workspace ID test case
 	_, err := Airflow(nil, "", "", "", "", false, false, false)
-	assert.ErrorIs(t, err, errNoWorkspaceID)
+	assert.ErrorIs(t, err, ErrNoWorkspaceID)
 
 	// houston GetWorkspace failure case
 	houstonMock := new(houston_mocks.ClientInterface)
@@ -314,6 +314,12 @@ func TestAirflowFailure(t *testing.T) {
 	houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil)
 	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
 	assert.ErrorIs(t, err, errInvalidDeploymentSelected)
+
+	// return error When houston get deployment throws an error
+	houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil)
+	houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
+	_, err = Airflow(houstonMock, "", "test-deployment-id", "test-workspace-id", "", false, false, false)
+	assert.Equal(t, err.Error(), "failed to get deployment info: "+errMockHouston.Error())
 
 	// buildPushDockerImage failure case
 	houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{}, nil)
