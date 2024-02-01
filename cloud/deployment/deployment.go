@@ -220,7 +220,6 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
-	var dagDeployEnabled bool
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -746,7 +745,6 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 	}
 	// determine isDagDeployEnabled
-	var dagDeployEnabled bool
 	if dagDeploy == enable {
 		if currentDeployment.IsDagDeployEnabled {
 			fmt.Println("\nDAG deploys are already enabled for this Deployment. Your DAGs will continue to run as scheduled.")
