@@ -755,6 +755,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.ResourceQuotaMemory = &one
 		sourceDeployment2.WebServerUrl = "some-url"
 		sourceDeployment2.UpdatedAt = time.Date(2023, time.February, 1, 12, 0, 0, 0, time.UTC)
+		sourceDeployment2.CreatedAt = time.Date(2023, time.February, 1, 12, 0, 0, 0, time.UTC)
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
 		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
@@ -770,8 +771,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 				"environment_variables": additional["environment_variables"],
 			},
 		}
-		expectedDeployment :=
-			`deployment:
+		expectedDeployment := `deployment:
     environment_variables:
         - is_secret: false
           key: foo
@@ -795,7 +795,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         cluster_name: ""
         workspace_name: test-ws
         deployment_type: STANDARD
-        cloud_provider: cloud-provider
+        cloud_provider: azure
         region: us-central1
         default_task_pod_cpu: "1"
         default_task_pod_memory: "1"
@@ -818,9 +818,9 @@ func TestFormatPrintableDeployment(t *testing.T) {
         cluster_id: N/A
         release_name: N/A
         airflow_version: 2.4.0
-        current_tag: ""
+        current_tag: "some-tag"
         status: UNHEALTHY
-        created_at: 0001-01-01T00:00:00Z
+        created_at: 2023-02-01T12:00:00Z
         updated_at: 2023-02-01T12:00:00Z
         deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
         webserver_url: some-url
