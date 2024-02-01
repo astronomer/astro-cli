@@ -1288,6 +1288,7 @@ func TestUpdate(t *testing.T) { //nolint
 		// success with hybrid type
 		err := Update("", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, true, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
+		assert.Equal(t, deploymentResponse.JSON200.IsDagDeployEnabled, dagDeployEnabled)
 
 		// Mock user input for deployment name
 		// defer testUtil.MockUserInput(t, "1")()
