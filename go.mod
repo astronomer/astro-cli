@@ -39,7 +39,8 @@ require (
 	github.com/mitchellh/mapstructure v1.4.2
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	github.com/whilp/git-urls v1.0.0
-	golang.org/x/mod v0.8.0
+	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a
+	golang.org/x/mod v0.14.0
 	golang.org/x/term v0.15.0
 	gopkg.in/yaml.v3 v3.0.1
 )
