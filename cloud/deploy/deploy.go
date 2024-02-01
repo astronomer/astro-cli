@@ -114,6 +114,14 @@ type InputDeploy struct {
 	BuildSecretString string
 }
 
+const accessYourDeploymentFmt = `
+
+ Access your Deployment:
+
+ Deployment View: %s
+ Airflow UI: %s
+`
+
 func removeDagsFromDockerIgnore(fullpath string) error {
 	f, err := os.Open(fullpath)
 	if err != nil {
@@ -311,18 +319,24 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 				return err
 			}
 
-			fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(dagTarballVersion) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful." +
-				"\n\n Access your Deployment: \n" +
-				fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
-				fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
+			fmt.Println(
+				"\nSuccessfully uploaded DAGs with version " + ansi.Bold(dagTarballVersion) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful." +
+					fmt.Sprintf(accessYourDeploymentFmt, ansi.Bold(deploymentURL), ansi.Bold(deployInfo.webserverURL)),
+			)
 
 			return nil
 		}
 
-		fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(dagTarballVersion) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
-			"\n\n Access your Deployment: \n" +
-			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
-			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
+		fmt.Println(
+			"\nSuccessfully uploaded DAGs with version " + ansi.Bold(
+				dagTarballVersion,
+			) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
+				fmt.Sprintf(
+					accessYourDeploymentFmt,
+					ansi.Bold(deploymentURL),
+					ansi.Bold(deployInfo.webserverURL),
+				),
+		)
 	} else {
 		fullpath := filepath.Join(deployInput.Path, ".dockerignore")
 		fileExist, _ := fileutil.Exists(fullpath, nil)
@@ -403,9 +417,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		fmt.Println("Successfully pushed image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
-			"\n\n Access your Deployment: \n" +
-			fmt.Sprintf("\n Deployment View: %s", ansi.Bold("https://"+deploymentURL)) +
-			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold("https://"+deployInfo.webserverURL)))
+			fmt.Sprintf(accessYourDeploymentFmt, ansi.Bold("https://"+deploymentURL), ansi.Bold("https://"+deployInfo.webserverURL)))
 	}
 
 	return nil

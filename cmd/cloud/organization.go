@@ -37,7 +37,17 @@ var (
 	organizationID                     string
 	updateOrganizationRole             string
 	teamOrgRole                        string
+	validOrganizationRoles             []string
 )
+
+const (
+	allowedOrganizationRoleNames      = "ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER"
+	allowedOrganizationRoleNamesProse = "ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, and ORGANIZATION_OWNER"
+)
+
+func init() {
+	validOrganizationRoles = []string{"ORGANIZATION_MEMBER", "ORGANIZATION_BILLING_ADMIN", "ORGANIZATION_OWNER"}
+}
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -137,14 +147,13 @@ func newOrganizationUserInviteCmd(out io.Writer) *cobra.Command {
 		Use:     "invite [email]",
 		Aliases: []string{"inv"},
 		Short:   "Invite a user to your Astro Organization",
-		Long: "Invite a user to your Astro Organization\n$astro user invite [email] --role [ORGANIZATION_MEMBER, " +
-			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
+		Long:    "Invite a user to your Astro Organization\n$astro user invite [email] --role [" + allowedOrganizationRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return userInvite(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&role, "role", "r", "ORGANIZATION_MEMBER", "The role for the "+
-		"user. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+		"user. Possible values are"+allowedOrganizationRoleNamesProse)
 	return cmd
 }
 
@@ -166,14 +175,13 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [email]",
 		Aliases: []string{"up"},
 		Short:   "Update a the role of a user your in Astro Organization",
-		Long: "Update the role of a user in your Astro Organization\n$astro user update [email] --role [ORGANIZATION_MEMBER, " +
-			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
+		Long:    "Update the role of a user in your Astro Organization\n$astro user update [email] --role [" + allowedOrganizationRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return userUpdate(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&updateRole, "role", "r", "", "The new role for the "+
-		"user. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+		"user. Possible values are "+allowedOrganizationRoleNamesProse)
 	return cmd
 }
 
@@ -237,7 +245,7 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	if updateRole == "" {
 		// no role was provided so ask the user for it
-		updateRole = input.Text("enter a user Organization role(ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER) to update user: ")
+		updateRole = input.Text("enter a user Organization role(" + allowedOrganizationRoleNames + ") to update user: ")
 	}
 
 	cmd.SilenceUsage = true
@@ -292,9 +300,10 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
+	cmd.Flags().
+		StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
 	cmd.Flags().StringVarP(&updateOrganizationRole, "role", "r", "", "The new role for the "+
-		"team. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER ")
+		"team. Possible values are "+allowedOrganizationRoleNamesProse)
 	return cmd
 }
 
@@ -322,8 +331,7 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire team within quotes \"\" ")
 	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team in quotes \"\"")
-	cmd.Flags().StringVarP(&teamOrgRole, "role", "r", "", "The role for the "+
-		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER")
+	cmd.Flags().StringVarP(&teamOrgRole, "role", "r", "", "The role for the token. Possible values are"+allowedOrganizationRoleNamesProse)
 
 	return cmd
 }
@@ -496,8 +504,7 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create an API token in an Astro Organization",
-		Long: "Create an API token in an Astro Organization\n$astro organization token create --name [token name] --role [ORGANIZATION_MEMBER, " +
-			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_MEMBER].",
+		Long:    "Create an API token in an Astro Organization\n$astro organization token create --name [token name] --role [" + allowedOrganizationRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createOrganizationToken(cmd, out)
 		},
@@ -505,8 +512,7 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the "+
-		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
 	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Expiration of the token in days. If the flag isn't used the token won't have an expiration. Must be between 1 and 3650 days. ")
 	return cmd
 }
@@ -517,8 +523,7 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
 		Short:   "Update a Organization or Organaization API token",
-		Long: "Update a Organization or Organaization API token that has a role in an Astro Organization\n$astro organization token update [TOKEN_ID] --name [new token name] --role [ORGANIZATION_MEMBER, " +
-			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
+		Long:    "Update a Organization or Organaization API token that has a role in an Astro Organization\n$astro organization token update [TOKEN_ID] --name [new token name] --role [" + allowedOrganizationRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateOrganizationToken(cmd, args, out)
 		},
@@ -526,8 +531,7 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the "+
-		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
 	return cmd
 }
 
@@ -645,14 +649,13 @@ func selectOrganizationRole() (string, error) {
 		DynamicPadding: true,
 		Header:         []string{"#", "ROLE"},
 	}
-	roles := []string{"ORGANIZATION_MEMBER", "ORGANIZATION_BILLING_ADMIN", "ORGANIZATION_OWNER"}
-	for i := range roles {
+	for i := range validOrganizationRoles {
 		index := i + 1
 		tab.AddRow([]string{
 			strconv.Itoa(index),
-			roles[i],
+			validOrganizationRoles[i],
 		}, false)
-		tokenRolesMap[strconv.Itoa(index)] = roles[i]
+		tokenRolesMap[strconv.Itoa(index)] = validOrganizationRoles[i]
 	}
 
 	tab.Print(os.Stdout)
