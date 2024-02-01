@@ -98,5 +98,10 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	if isDagOnlyDeploy {
 		return deploy.DagsOnlyDeploy(houstonClient, appConfig, deploymentID, config.WorkingPath, nil, true)
 	}
-	return DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
+	// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
+	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
+	if err != nil {
+		return err
+	}
+	return deploy.DagsOnlyDeploy(houstonClient, appConfig, deploymentID, config.WorkingPath, nil, true)
 }

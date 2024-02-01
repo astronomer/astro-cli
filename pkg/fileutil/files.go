@@ -271,7 +271,7 @@ func UploadFile(args *UploadFileArguments) error {
 		// exponential backoff
 		time.Sleep(time.Duration(retryDelayInMS) * time.Millisecond)
 		retryDelayInMS *= args.BackoffFactor
-		fmt.Print(args.RetryDisplayMessage + "\n")
+		fmt.Println(args.RetryDisplayMessage)
 
 		// Create a new buffer to store the multipart/form-data request
 		body := &bytes.Buffer{}
@@ -315,7 +315,7 @@ func UploadFile(args *UploadFileArguments) error {
 		// Return success for 2xx status code
 		if response.StatusCode == http.StatusOK {
 			currentUploadError = nil
-			fmt.Print("upload successful\n")
+			fmt.Println("upload successful")
 			break
 		}
 
