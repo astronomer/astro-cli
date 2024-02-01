@@ -23,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
+	"golang.org/x/exp/slices"
 
 	"github.com/pkg/errors"
 )
@@ -105,14 +106,14 @@ func CanCiCdDeploy(bearerToken string) bool {
 }
 
 // List all airflow deployments
-func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+func List(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 	tab := newTableOut()
 
-	if all {
+	if fromAllWorkspaces {
 		ws = ""
 		tab = newTableOutAll()
 	}
@@ -128,30 +129,8 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 
 	sort.Slice(deployments, func(i, j int) bool { return deployments[i].Name > deployments[j].Name })
 
-	// Build rows
 	for i := range deployments {
-		d := deployments[i]
-		// change to cluster name
-		var clusterName string
-		if !IsDeploymentStandard(*d.Type) {
-			clusterName = *d.ClusterName
-		} else {
-			clusterName = notApplicable
-		}
-		runtimeVersionText := " (based on Airflow " + d.RuntimeVersion + ")"
-		releaseName := d.Namespace
-		workspaceName := d.WorkspaceName
-		region := notApplicable
-		cloudProvider := notApplicable
-		if IsDeploymentStandard(*d.Type) {
-			region = *d.Region
-			cloudProvider = *d.CloudProvider
-		}
-		if all {
-			tab.AddRow([]string{d.Name, *workspaceName, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
-		} else {
-			tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
-		}
+		deploymentToTableRow(tab, &deployments[i], fromAllWorkspaces)
 	}
 	tab.Print(out)
 	return nil
@@ -519,19 +498,8 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 
 func createOutput(workspaceID string, d *astroplatformcore.Deployment) error {
 	tab := newTableOut()
+	deploymentToTableRow(tab, d, false)
 
-	runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
-	clusterName := notApplicable
-	cloudProvider := notApplicable
-	region := notApplicable
-	releaseName := d.Namespace
-	if IsDeploymentStandard(*d.Type) {
-		cloudProvider = *d.CloudProvider
-		region = *d.Region
-	} else {
-		clusterName = *d.ClusterName
-	}
-	tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 	deploymentURL, err := GetDeploymentURL(d.Id, workspaceID)
 	if err != nil {
 		return err
@@ -540,10 +508,38 @@ func createOutput(workspaceID string, d *astroplatformcore.Deployment) error {
 		"\n Deployment can be accessed at the following URLs \n" +
 		fmt.Sprintf("\n Deployment Dashboard: %s", ansi.Bold(deploymentURL)) +
 		fmt.Sprintf("\n Airflow Dashboard: %s", ansi.Bold(d.WebServerUrl))
-
 	tab.Print(os.Stdout)
-
 	return nil
+}
+
+func deploymentToTableRow(table *printutil.Table, d *astroplatformcore.Deployment, includeWorkspaceName bool) {
+	runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
+	cloudProvider := notApplicable
+	clusterName := notApplicable
+	region := notApplicable
+	releaseName := d.Namespace
+	if IsDeploymentStandard(*d.Type) {
+		cloudProvider = *d.CloudProvider
+		region = *d.Region
+	} else {
+		clusterName = *d.ClusterName
+	}
+	cols := []string{
+		d.Name,
+		releaseName,
+		clusterName,
+		cloudProvider,
+		region,
+		d.Id,
+		runtimeVersionText,
+		strconv.FormatBool(d.IsDagDeployEnabled),
+		strconv.FormatBool(d.IsCicdEnforced),
+		string(*d.Type),
+	}
+	if includeWorkspaceName {
+		cols = slices.Insert(cols, 1, *d.WorkspaceName)
+	}
+	table.AddRow(cols, false)
 }
 
 func validateHybridResources(schedulerAU, schedulerReplicas int, configOption astrocore.DeploymentOptions) bool { //nolint:gocritic
