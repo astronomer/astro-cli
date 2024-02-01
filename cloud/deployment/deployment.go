@@ -768,6 +768,10 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		dagDeployEnabled = false
 	}
 
+	if dagDeploy == "" {
+		dagDeployEnabled = currentDeployment.IsDagDeployEnabled
+	}
+
 	configOption, err := GetDeploymentOptions("", astrocore.GetDeploymentOptionsParams{}, coreClient)
 	if err != nil {
 		return err
