@@ -70,6 +70,7 @@ var (
 	tickNum                    = 10
 	timeoutNum                 = 180
 	dedicatedDeploymentRequest = astroplatformcore.UpdateDedicatedDeploymentRequest{}
+	dagDeployEnabled           bool
 )
 
 func newTableOut() *printutil.Table {
@@ -198,7 +199,6 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
-	var dagDeployEnabled bool
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -741,8 +741,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 	}
 	// determine isDagDeployEnabled
-	var dagDeployEnabled bool
-	if dagDeploy == enable {
+	switch dagDeploy {
+	case enable:
 		if currentDeployment.IsDagDeployEnabled {
 			fmt.Println("\nDAG deploys are already enabled for this Deployment. Your DAGs will continue to run as scheduled.")
 			return nil
@@ -751,7 +751,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		fmt.Printf("\nYou enabled DAG-only deploys for this Deployment. Running tasks are not interrupted but new tasks will not be scheduled." +
 			"\nRun `astro deploy --dags` to complete enabling this feature and resume your DAGs. It may take a few minutes for the Airflow UI to update..\n\n")
 		dagDeployEnabled = true
-	} else if dagDeploy == disable {
+	case disable:
 		if !currentDeployment.IsDagDeployEnabled {
 			fmt.Println("\nDAG-only deploys is already disabled for this deployment.")
 			return nil
@@ -762,8 +762,9 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			confirmWithUser = true
 		}
 		dagDeployEnabled = false
+	case "":
+		dagDeployEnabled = currentDeployment.IsDagDeployEnabled
 	}
-
 	configOption, err := GetDeploymentOptions("", astrocore.GetDeploymentOptionsParams{}, coreClient)
 	if err != nil {
 		return err
