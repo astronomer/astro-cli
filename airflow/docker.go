@@ -625,27 +625,15 @@ func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCor
 	if err != nil {
 		return err
 	}
-	domain := c.Domain
-	if domain == "" {
-		return errors.New("no domain set, re-authenticate")
-	}
 	ws := c.Workspace
-	registry := GetRegistryURL(domain)
-	repository := registry + "/" + c.Organization + "/" + deploymentID
 	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}
-	currentImageTag := currentDeployment.ImageTag
-	deploymentImage := fmt.Sprintf("%s:%s", repository, currentImageTag)
+	deploymentImage := fmt.Sprintf("%s:%s", currentDeployment.ImageRepository, currentDeployment.ImageTag)
 	token := c.Token
-	// Splitting out the Bearer part from the token
-	splittedToken := strings.Split(token, " ")
-	if len(splittedToken) > 1 {
-		token = strings.Split(token, " ")[1]
-	}
 	fmt.Printf("\nPulling image from Astro Deployment %s\n\n", currentDeployment.Name)
-	err = d.imageHandler.Pull(registry, registryUsername, token, deploymentImage)
+	err = d.imageHandler.Pull(deploymentImage, registryUsername, token)
 	if err != nil {
 		return err
 	}
@@ -769,16 +757,6 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerF
 		fmt.Println("\n" + ansi.Green("✔") + " no errors detected in your DAGs ")
 	}
 	return nil
-}
-
-func GetRegistryURL(domain string) string {
-	var registry string
-	if domain == "localhost" {
-		registry = config.CFG.LocalRegistry.GetString()
-	} else {
-		registry = "images." + strings.Split(domain, ".")[0] + ".cloud"
-	}
-	return registry
 }
 
 func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage string) error { //nolint:gocognit

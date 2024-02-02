@@ -40,14 +40,23 @@ type Context struct {
 // GetCurrentContext looks up current context and gets corresponding Context struct
 func GetCurrentContext() (Context, error) {
 	c := Context{}
+	var err error
+	c.Domain, err = GetCurrentDomain()
+	if err != nil {
+		return Context{}, err
+	}
+	return c.GetContext()
+}
+
+// Get CurrentDonain returns the currently configured astro domain, or an error if one is not set
+func GetCurrentDomain() (string, error) {
 	var domain string
 	if domain = os.Getenv("ASTRO_DOMAIN"); domain == "" {
 		if domain = CFG.Context.GetHomeString(); domain == "" {
-			return Context{}, ErrGetHomeString
+			return "", ErrGetHomeString
 		}
 	}
-	c.Domain = domain
-	return c.GetContext()
+	return domain, nil
 }
 
 // ResetCurrentContext reset the current context and is used when someone logs out
