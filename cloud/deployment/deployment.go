@@ -344,10 +344,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAZURE
 			}
 			var requestedExecutor astroplatformcore.CreateStandardDeploymentRequestExecutor
-			if strings.ToUpper(executor) == strings.ToUpper(CeleryExecutor) || strings.ToUpper(executor) == strings.ToUpper(CELERY) {
+			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorCELERY
 			}
-			if strings.ToUpper(executor) == strings.ToUpper(KubeExecutor) || strings.ToUpper(executor) == strings.ToUpper(KUBERNETES) {
+			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
 			}
 			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
@@ -367,7 +367,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
 			}
-			if strings.ToUpper(executor) == strings.ToUpper(CeleryExecutor) || strings.ToUpper(executor) == strings.ToUpper(CELERY) {
+			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
 			switch schedulerSize {
@@ -391,10 +391,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		// build dedicated input
 		if IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.CreateDedicatedDeploymentRequestExecutor
-			if strings.ToUpper(executor) == strings.ToUpper(CeleryExecutor) || strings.ToUpper(executor) == strings.ToUpper(CELERY) {
+			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorCELERY
 			}
-			if strings.ToUpper(executor) == strings.ToUpper(KubeExecutor) || strings.ToUpper(executor) == strings.ToUpper(KUBERNETES) {
+			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
@@ -413,7 +413,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
 			}
-			if strings.ToUpper(executor) == strings.ToUpper(CeleryExecutor) || strings.ToUpper(executor) == strings.ToUpper(CELERY) {
+			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
 
@@ -462,10 +462,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			return ErrInvalidResourceRequest
 		}
 		var requestedExecutor astroplatformcore.CreateHybridDeploymentRequestExecutor
-		if strings.ToUpper(executor) == strings.ToUpper(CeleryExecutor) || strings.ToUpper(executor) == strings.ToUpper(CELERY) {
+		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 			requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorCELERY
 		}
-		if strings.ToUpper(executor) == strings.ToUpper(KubeExecutor) || strings.ToUpper(executor) == strings.ToUpper(KUBERNETES) {
+		if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 			requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorKUBERNETES
 		}
 		hybridDeploymentRequest := astroplatformcore.CreateHybridDeploymentRequest{
@@ -484,7 +484,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			},
 			Type: astroplatformcore.CreateHybridDeploymentRequestTypeHYBRID,
 		}
-		if strings.ToUpper(executor) == strings.ToUpper(CeleryExecutor) || strings.ToUpper(executor) == strings.ToUpper(CELERY) {
+		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 			hybridDeploymentRequest.WorkerQueues = &defautWorkerQueue
 		} else {
 			hybridDeploymentRequest.TaskPodNodePoolId = &nodePools[0].Id
@@ -884,7 +884,6 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
 			case strings.ToUpper(KUBERNETES):
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
-
 			}
 
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
@@ -945,7 +944,6 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY
 			case strings.ToUpper(KUBERNETES):
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
-
 			}
 			dedicatedDeploymentRequest = astroplatformcore.UpdateDedicatedDeploymentRequest{
 				Description:          &description,
@@ -1039,7 +1037,6 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorCELERY
 		case strings.ToUpper(KUBERNETES):
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES
-
 		}
 		hybridDeploymentRequest := astroplatformcore.UpdateHybridDeploymentRequest{
 			Description:        &description,
@@ -1554,14 +1551,14 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 // It returns true if a warning was printed and false if not.
 func printWarning(executor string, existingQLength int) bool {
 	var printed bool
-	if strings.ToUpper(executor) == strings.ToUpper(KubeExecutor) || strings.ToUpper(executor) == strings.ToUpper(KUBERNETES) {
+	if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 		if existingQLength > 1 {
 			fmt.Println("\n Switching to KubernetesExecutor will replace all existing worker queues " +
 				"with one new default worker queue for this deployment.")
 			printed = true
 		}
 	} else {
-		if strings.ToUpper(executor) == strings.ToUpper(CeleryExecutor) || strings.ToUpper(executor) == strings.ToUpper(CELERY) {
+		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 			fmt.Println("\n Switching to CeleryExecutor will replace the existing worker queue " +
 				"with a new default worker queue for this deployment.")
 			printed = true
