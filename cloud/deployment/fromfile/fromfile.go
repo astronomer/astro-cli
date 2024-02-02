@@ -229,7 +229,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			if deployment.IsDeploymentStandard(deploymentType) || deployment.IsDeploymentDedicated(deploymentType) {
 				astroMachines := configOptions.WorkerMachines
 				for j := range astroMachines {
-					if strings.ToUpper(string(astroMachines[j].Name)) == strings.ToUpper(*listQueues[i].AstroMachine) {
+					if strings.EqualFold(string(astroMachines[j].Name), *listQueues[i].AstroMachine) {
 						astroMachine = astroMachines[j]
 					}
 				}
@@ -708,14 +708,14 @@ func deploymentFromName(existingDeployments []astroplatformcore.Deployment, depl
 	}
 
 	if j == 0 {
-		return existingDeployment, nil
+		return astroplatformcore.Deployment{}, nil
 	}
 
-	deployment, err := deployment.CoreGetDeployment("", existingDeployment.Id, platformCoreClient)
+	existingDeployment, err := deployment.CoreGetDeployment("", existingDeployment.Id, platformCoreClient)
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
 	}
-	return deployment, nil
+	return existingDeployment, nil
 }
 
 // getClusterInfoFromName takes clusterName and org as its arguments.

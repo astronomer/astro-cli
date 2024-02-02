@@ -421,7 +421,7 @@ func selectWorkerMachine(workerType string, workerMachines []astroplatformcore.W
 		return selectedPool, nil
 	default:
 		for _, workerMachine = range workerMachines {
-			if strings.ToUpper(string(workerMachine.Name)) == strings.ToUpper(workerType) {
+			if strings.EqualFold(string(workerMachine.Name), workerType) {
 				return workerMachine, nil
 			}
 		}
