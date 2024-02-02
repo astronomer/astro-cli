@@ -528,7 +528,6 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			case deployment.LARGE:
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
 			}
-			fmt.Println(existingDeployment)
 			if deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU == "" {
 				deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU = *existingDeployment.DefaultTaskPodCpu
 			}
