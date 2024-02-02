@@ -393,9 +393,11 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			var requestedExecutor astroplatformcore.CreateDedicatedDeploymentRequestExecutor
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorCELERY
+				fmt.Println(requestedExecutor)
 			}
 			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorKUBERNETES
+				fmt.Println(requestedExecutor)
 			}
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
 				AstroRuntimeVersion:  runtimeVersion,
@@ -416,7 +418,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
-
+			fmt.Println(dedicatedDeploymentRequest.Executor)
 			switch schedulerSize {
 			case SmallScheduler:
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
