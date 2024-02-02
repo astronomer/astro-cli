@@ -745,7 +745,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 	}
 	// determine isDagDeployEnabled
-	if dagDeploy == enable {
+	switch dagDeploy {
+	case enable:
 		if currentDeployment.IsDagDeployEnabled {
 			fmt.Println("\nDAG deploys are already enabled for this Deployment. Your DAGs will continue to run as scheduled.")
 			return nil
@@ -754,7 +755,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		fmt.Printf("\nYou enabled DAG-only deploys for this Deployment. Running tasks are not interrupted but new tasks will not be scheduled." +
 			"\nRun `astro deploy --dags` to complete enabling this feature and resume your DAGs. It may take a few minutes for the Airflow UI to update..\n\n")
 		dagDeployEnabled = true
-	} else if dagDeploy == disable {
+	case disable:
 		if !currentDeployment.IsDagDeployEnabled {
 			fmt.Println("\nDAG-only deploys is already disabled for this deployment.")
 			return nil
@@ -765,12 +766,9 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			confirmWithUser = true
 		}
 		dagDeployEnabled = false
-	}
-
-	if dagDeploy == "" {
+	case "":
 		dagDeployEnabled = currentDeployment.IsDagDeployEnabled
 	}
-
 	configOption, err := GetDeploymentOptions("", astrocore.GetDeploymentOptionsParams{}, coreClient)
 	if err != nil {
 		return err
