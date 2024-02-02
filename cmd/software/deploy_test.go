@@ -29,7 +29,11 @@ func TestDeploy(t *testing.T) {
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
-	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) error {
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
+		return deploymentID, nil
+	}
+
+	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
 		return nil
 	}
 
@@ -41,6 +45,26 @@ func TestDeploy(t *testing.T) {
 
 	err = execDeployCmd([]string{"test-deployment-id", "--save"}...)
 	assert.NoError(t, err)
+
+	DagsOnlyDeploy = deploy.DagsOnlyDeploy
+
+	t.Run("error should be returned for astro deploy, if DeployAirflowImage throws error", func(t *testing.T) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
+			return deploymentID, deploy.ErrNoWorkspaceID
+		}
+
+		err := execDeployCmd([]string{"-f"}...)
+		assert.ErrorIs(t, err, deploy.ErrNoWorkspaceID)
+
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
+			return deploymentID, nil
+		}
+	})
+
+	t.Run("error should be returned for astro deploy, if dags deploy throws error", func(t *testing.T) {
+		err := execDeployCmd([]string{"-f"}...)
+		assert.ErrorIs(t, err, deploy.ErrDagOnlyDeployDisabledInConfig)
+	})
 
 	t.Run("Test for the flag --dags", func(t *testing.T) {
 		err := execDeployCmd([]string{"test-deployment-id", "--dags", "--force"}...)

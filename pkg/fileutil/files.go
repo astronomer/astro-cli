@@ -324,7 +324,7 @@ func UploadFile(args *UploadFileArguments) error {
 		// Return success for 2xx status code
 		if response.StatusCode == http.StatusOK {
 			currentUploadError = nil
-			fmt.Print("upload successful\n")
+			fmt.Println("upload successful")
 			break
 		}
 
