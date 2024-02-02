@@ -9,7 +9,7 @@ CORE_PLATFORM_OPENAPI_SPEC=../astro/apps/core/docs/platform/v1beta1/platform_v1b
 
 OUTPUT ?= astro
 # golangci-lint version
-GOLANGCI_LINT_VERSION ?=v1.50.1
+GOLANGCI_LINT_VERSION ?=1.55.2
 
 PWD=$(shell pwd)
 
@@ -30,7 +30,7 @@ mockery: $(ENVTEST_ASSETS_DIR)
 
 
 lint:
-	@test -f ${ENVTEST_ASSETS_DIR}/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} ${GOLANGCI_LINT_VERSION}
+	@{ test -f ${ENVTEST_ASSETS_DIR}/golangci-lint && (${ENVTEST_ASSETS_DIR}/golangci-lint --version 2>&1 | grep -cq $(GOLANGCI_LINT_VERSION)); } || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} v${GOLANGCI_LINT_VERSION}
 	${ENVTEST_ASSETS_DIR}/golangci-lint version
 	${ENVTEST_ASSETS_DIR}/golangci-lint run --timeout 15m0s
 
