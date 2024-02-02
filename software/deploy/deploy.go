@@ -391,7 +391,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		TargetURL:           uploadURL,
 		FormFileFieldName:   "file",
 		Headers:             headers,
-		MaxTries:            7,
+		MaxTries:            8,
 		InitialDelayInMS:    1 * 1000,
 		BackoffFactor:       2,
 		RetryDisplayMessage: "please wait, attempting to upload the dags",
