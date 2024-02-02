@@ -1285,7 +1285,7 @@ func TestUpdate(t *testing.T) { //nolint
 		// Mock user input for deployment name
 		defer testUtil.MockUserInput(t, "1")()
 
-		// success with hybrid type
+		// success with hybrid type in this test nothing is being change just ensuring that dag deploy stays true. Addtionally no deployment id/name is given so user input is needed to select one
 		err := Update("", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, true, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentResponse.JSON200.IsDagDeployEnabled, dagDeployEnabled)
@@ -1294,7 +1294,7 @@ func TestUpdate(t *testing.T) { //nolint
 		// defer testUtil.MockUserInput(t, "1")()
 		defer testUtil.MockUserInput(t, "y")()
 
-		// kubernetes executor
+		// success updating the kubernetes executor on hybrid type. deployment name is given
 		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
@@ -1306,14 +1306,15 @@ func TestUpdate(t *testing.T) { //nolint
 		// defer testUtil.MockUserInput(t, "1")()
 		defer testUtil.MockUserInput(t, "y")()
 
-		// success with standard type
+		// success with standard type and deployment name input and dag deploy stays the same
 		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
+		assert.Equal(t, deploymentResponse.JSON200.IsDagDeployEnabled, dagDeployEnabled)
 
 		// Mock user input for deployment name
 		defer testUtil.MockUserInput(t, "y")()
 
-		// kubernetes executor
+		// sucesses updating to kubernetes executor on standard type
 		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
@@ -1323,14 +1324,16 @@ func TestUpdate(t *testing.T) { //nolint
 		// Mock user input for deployment name
 		// defer testUtil.MockUserInput(t, "1")()
 
-		// success with dedicated type
+		// success with dedicated type no changes made asserts that dag deploy stays the same
 		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
+		assert.Equal(t, deploymentResponse.JSON200.IsDagDeployEnabled, dagDeployEnabled)
+
 		// Mock user input for deployment name
 		defer testUtil.MockUserInput(t, "y")()
 
-		// kubernetes executor
-		err = Update("test-id-1", "", ws, "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		// success with dedicated updating to kubernetes executor
+		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
