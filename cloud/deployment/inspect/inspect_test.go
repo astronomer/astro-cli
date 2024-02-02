@@ -759,6 +759,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		provider := "azure"
 		sourceDeployment2.CloudProvider = &provider
 		sourceDeployment2.ImageTag = "some-tag"
+		sourceDeployment2.Status = "UNHEALTHY"
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
 		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
