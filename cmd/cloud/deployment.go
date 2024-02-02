@@ -550,8 +550,7 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 }
 
 func isValidExecutor(executor string) bool {
-	executor = strings.ToUpper(executor)
-	return executor == strings.ToUpper(deployment.KubeExecutor) || executor == strings.ToUpper(deployment.CeleryExecutor) || executor == "" || executor == strings.ToUpper(deployment.CELERY) || executor == strings.ToUpper(deployment.KUBERNETES)
+	return strings.EqualFold(executor, deployment.KubeExecutor) || strings.EqualFold(executor, deployment.CeleryExecutor) || executor == "" || strings.EqualFold(executor, deployment.CELERY) || strings.EqualFold(executor, deployment.KUBERNETES)
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.
