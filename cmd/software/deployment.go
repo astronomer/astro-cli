@@ -16,6 +16,7 @@ const (
 	k8sExecutorArg        = "k8s"
 
 	cliDeploymentHardDeletePrompt = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with hard delete?"
+	deploymentTypeCmdMessage      = "DAG Deployment mechanism: image, volume, git_sync, dag_only"
 )
 
 var (
@@ -108,10 +109,6 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func getDeploymentTypeCmdMessage() string {
-	return "DAG Deployment mechanism: image, volume, git_sync, dag_only"
-}
-
 func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -135,7 +132,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 	// let's hide under feature flag
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
-		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", getDeploymentTypeCmdMessage())
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", deploymentTypeCmdMessage)
 	}
 
 	if nfsMountDAGDeploymentEnabled {
@@ -227,7 +224,7 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 
 	// let's hide under feature flag
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
-		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", getDeploymentTypeCmdMessage())
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", deploymentTypeCmdMessage)
 	}
 
 	if nfsMountDAGDeploymentEnabled {
