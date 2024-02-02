@@ -1130,6 +1130,14 @@ func TestAirflowPytest(t *testing.T) {
 		err := airflowPytest(cmd, args)
 		assert.ErrorIs(t, err, errMock)
 	})
+
+	t.Run("too many args failure failure", func(t *testing.T) {
+		cmd := newAirflowParseCmd()
+		args := []string{"arg1", "arg2"}
+
+		err := airflowPytest(cmd, args)
+		assert.ErrorIs(t, err, errPytestArgs)
+	})
 }
 
 func TestAirflowParse(t *testing.T) {
