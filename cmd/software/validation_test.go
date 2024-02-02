@@ -17,6 +17,7 @@ func TestValidateDagDeploymentArgs(t *testing.T) {
 	}{
 		{dagDeploymentType: houston.VolumeDeploymentType, nfsLocation: "test:/test", expectedError: nil},
 		{dagDeploymentType: houston.ImageDeploymentType, expectedError: nil},
+		{dagDeploymentType: houston.DagOnlyDeploymentType, expectedError: nil},
 		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "https://github.com/neel-astro/private-airflow-dags-test", expectedError: nil},
 		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "http://github.com/neel-astro/private-airflow-dags-test", expectedError: nil},
 		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "git@github.com:neel-astro/private-airflow-dags-test.git", expectedError: nil},
@@ -40,7 +41,7 @@ func TestValidateDagDeploymentArgsErrors(t *testing.T) {
 		expectedError                              string
 	}{
 		{dagDeploymentType: houston.VolumeDeploymentType, expectedError: "please specify the nfs location via --nfs-location flag"},
-		{dagDeploymentType: "unknown", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
+		{dagDeploymentType: "unknown", expectedError: ErrInvalidDAGDeploymentType.Error()},
 		{dagDeploymentType: houston.ImageDeploymentType, expectedError: ""},
 		{dagDeploymentType: houston.GitSyncDeploymentType, expectedError: "please specify a valid git repository URL via --git-repository-url"},
 		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "/tmp/test/local-repo.git", expectedError: "please specify a valid git repository URL via --git-repository-url"},
