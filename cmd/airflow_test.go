@@ -1031,12 +1031,15 @@ func TestAirflowPytest(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		cmd := newAirflowPytestCmd()
+		cmd.Flag("args").Value.Set("args-string")
+		cmd.Flag("build-secrets").Value.Set("id=mysecret,src=secrets.txt")
+		cmd.Flag("image-name").Value.Set("custom-image")
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", "test-pytest-file", "", "", "", "").Return("0", nil).Once()
+			mockContainerHandler.On("Pytest", "test-pytest-file", "custom-image", "", "args-string", "id=mysecret,src=secrets.txt").Return("0", nil).Once()
 			return mockContainerHandler, nil
 		}
 
