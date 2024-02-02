@@ -104,7 +104,7 @@ astro dev init --airflow-version 2.2.3
 	pytestDir = "/tests"
 
 	airflowUpgradeCheckCmd = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
-	errPytestArgs          = errors.New("")
+	errPytestArgs          = errors.New("you can only pass one pytest file or directory")
 	buildSecrets           = []string{}
 )
 
@@ -827,7 +827,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	exitCode, err := containerHandler.Pytest(pytestFile, customImageName, "", buildSecretString, pytestArgs)
+	exitCode, err := containerHandler.Pytest(pytestFile, customImageName, "", pytestArgs, buildSecretString)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("pytests failed")
