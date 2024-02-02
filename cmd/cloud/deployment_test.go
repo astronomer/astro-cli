@@ -62,7 +62,7 @@ var (
 			WorkloadIdentity: &workloadIdentity,
 			ClusterId:        &clusterID,
 			ClusterName:      &testCluster,
-			Id:               "deployment-id",
+			Id:               "test-deployment-id",
 		},
 	}
 	mockUpdateDeploymentResponse = astroplatformcore.UpdateDeploymentResponse{
@@ -88,14 +88,14 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &astroplatformcore.Deployment{
-			Id:                     "test-id-1",
+			Id:                     "test-deployment-id",
 			RuntimeVersion:         "4.2.5",
 			Namespace:              "test-name",
 			WorkspaceId:            "workspace-id",
 			WebServerUrl:           "test-url",
 			IsDagDeployEnabled:     false,
 			Description:            &description,
-			Name:                   "test",
+			Name:                   "test-deployment-label",
 			Status:                 "HEALTHY",
 			Type:                   &hybridType,
 			SchedulerAu:            &schedulerAU,
@@ -520,7 +520,7 @@ deployment:
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
 		astroCoreClient = mockCoreClient
