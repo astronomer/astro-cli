@@ -257,6 +257,13 @@ func CreateFile(p string) (*os.File, error) {
 	return os.Create(p)
 }
 
+func backOff(retryDelayInMS, backoffFactor int) int {
+	// exponential backoff
+	time.Sleep(time.Duration(retryDelayInMS) * time.Millisecond)
+	retryDelayInMS *= backoffFactor
+	return retryDelayInMS
+}
+
 func UploadFile(args *UploadFileArguments) error {
 	file, err := os.Open(args.FilePath)
 	if err != nil {
@@ -268,11 +275,6 @@ func UploadFile(args *UploadFileArguments) error {
 	currentUploadError := err
 
 	for i := 1; i <= args.MaxTries; i++ {
-		// exponential backoff
-		time.Sleep(time.Duration(retryDelayInMS) * time.Millisecond)
-		retryDelayInMS *= args.BackoffFactor
-		fmt.Print(args.RetryDisplayMessage + "\n")
-
 		// Create a new buffer to store the multipart/form-data request
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
@@ -291,9 +293,13 @@ func UploadFile(args *UploadFileArguments) error {
 
 		headers := args.Headers
 		headers["Content-Type"] = writer.FormDataContentType()
+		fmt.Println(args.RetryDisplayMessage)
 		req, err := newRequestWithContext(http_context.Background(), "POST", args.TargetURL, body)
 		if err != nil {
 			currentUploadError = err
+			if i < args.MaxTries {
+				retryDelayInMS = backOff(retryDelayInMS, args.BackoffFactor)
+			}
 			continue
 		}
 
@@ -306,6 +312,9 @@ func UploadFile(args *UploadFileArguments) error {
 		if err != nil {
 			currentUploadError = err
 			// If we have a dial tcp error, we should retry with exponential backoff
+			if i < args.MaxTries {
+				retryDelayInMS = backOff(retryDelayInMS, args.BackoffFactor)
+			}
 			continue
 		}
 		data, _ := io.ReadAll(response.Body)
@@ -325,6 +334,9 @@ func UploadFile(args *UploadFileArguments) error {
 		// don't retry for 4xx since it is a client side error
 		if responseStatusCode >= http.StatusBadRequest && responseStatusCode < http.StatusInternalServerError {
 			break
+		}
+		if i < args.MaxTries {
+			retryDelayInMS = backOff(retryDelayInMS, args.BackoffFactor)
 		}
 	}
 	return currentUploadError
