@@ -999,6 +999,30 @@ func TestIsValidExecutor(t *testing.T) {
 		actual := isValidExecutor(deployment.CeleryExecutor)
 		assert.True(t, actual)
 	})
+	t.Run("returns true if executor is CELERY", func(t *testing.T) {
+		actual := isValidExecutor(deployment.CELERY)
+		assert.True(t, actual)
+	})
+	t.Run("returns true if executor is KUBERNETES", func(t *testing.T) {
+		actual := isValidExecutor(deployment.KUBERNETES)
+		assert.True(t, actual)
+	})
+	t.Run("returns true if executor is celery", func(t *testing.T) {
+		actual := isValidExecutor("celery")
+		assert.True(t, actual)
+	})
+	t.Run("returns true if executor is kubernetes", func(t *testing.T) {
+		actual := isValidExecutor("kubernetes")
+		assert.True(t, actual)
+	})
+	t.Run("returns true if executor is celery", func(t *testing.T) {
+		actual := isValidExecutor("celeryexecutor")
+		assert.True(t, actual)
+	})
+	t.Run("returns true if executor is kubernetes", func(t *testing.T) {
+		actual := isValidExecutor("kubernetesexecutor")
+		assert.True(t, actual)
+	})
 	t.Run("returns true when no Executor is requested", func(t *testing.T) {
 		actual := isValidExecutor("")
 		assert.True(t, actual)
