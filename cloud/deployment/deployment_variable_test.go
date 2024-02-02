@@ -147,6 +147,36 @@ func TestVariableModify(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
+	t.Run("success with secret value", func(t *testing.T) {
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+
+		deploymentResponse.JSON200.EnvironmentVariables = &[]astroplatformcore.DeploymentEnvironmentVariable{
+			{
+				Key:      "test-key-1",
+				Value:    nil,
+				IsSecret: true,
+			},
+			{
+				Key:      "test-key-2",
+				Value:    nil,
+				IsSecret: true,
+			},
+		}
+
+		buf := new(bytes.Buffer)
+		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockCoreClient, mockPlatformCoreClient, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "test-key-1")
+		assert.Contains(t, buf.String(), "test-key-2")
+		assert.Contains(t, buf.String(), "N/A")
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
 	t.Run("list deployment failure", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMock).Times(1)
 

@@ -74,7 +74,7 @@ func (c *Context) ContextExists() bool {
 		return false
 	}
 
-	return viperHome.IsSet("contexts" + "." + key)
+	return viperHome.IsSet(contextsKey + "." + key)
 }
 
 // GetContext gets the full context from the specified Context receiver struct
@@ -88,7 +88,7 @@ func (c *Context) GetContext() (Context, error) {
 	if !c.ContextExists() {
 		return *c, errNotConnected
 	}
-	err = viperHome.UnmarshalKey("contexts"+"."+key, &c)
+	err = viperHome.UnmarshalKey(contextsKey+"."+key, &c)
 	if err != nil {
 		return *c, err
 	}
@@ -126,7 +126,7 @@ func (c *Context) SetContext() error {
 		"user_email":              c.UserEmail,
 	}
 
-	viperHome.Set("contexts"+"."+key, context)
+	viperHome.Set(contextsKey+"."+key, context)
 	err = saveConfig(viperHome, HomeConfigFile)
 	if err != nil {
 		return err
@@ -142,7 +142,7 @@ func (c *Context) SetContextKey(key, value string) error {
 		return err
 	}
 
-	cfgPath := fmt.Sprintf("contexts.%s.%s", cKey, key)
+	cfgPath := fmt.Sprintf("%s.%s.%s", contextsKey, cKey, key)
 	viperHome.Set(cfgPath, value)
 	err = saveConfig(viperHome, HomeConfigFile)
 	if err != nil {
@@ -212,7 +212,7 @@ func (c *Context) SetExpiresIn(value int64) error {
 
 	expiretime := time.Now().Add(time.Duration(value) * time.Second)
 
-	cfgPath := fmt.Sprintf("contexts.%s.%s", cKey, "ExpiresIn")
+	cfgPath := fmt.Sprintf("%s.%s.%s", contextsKey, cKey, "ExpiresIn")
 	viperHome.Set(cfgPath, expiretime)
 	err = saveConfig(viperHome, HomeConfigFile)
 	if err != nil {
@@ -228,6 +228,6 @@ func (c *Context) GetExpiresIn() (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	cfgPath := fmt.Sprintf("contexts.%s.%s", cKey, "ExpiresIn")
+	cfgPath := fmt.Sprintf("%s.%s.%s", contextsKey, cKey, "ExpiresIn")
 	return viperHome.GetTime(cfgPath), nil
 }

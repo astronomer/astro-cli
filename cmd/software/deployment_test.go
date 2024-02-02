@@ -189,7 +189,7 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	}{
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -225,7 +225,39 @@ func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:bote795/private-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
+	}
+	for _, tt := range myTests {
+		houstonClient = api
+		output, err := execDeploymentCmd(tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentCreateCommandDagOnlyDeployEnabled(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	appConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(5)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -325,7 +357,7 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:bote795/private-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=wrong", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=wrong", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--executor=local"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--cloud-role=arn:aws:iam::1234567890:role/test_role4c2301381e"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 	}
@@ -362,6 +394,38 @@ func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 	}{
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "", expectedError: "unknown flag: --git-repository-url"},
+	}
+	for _, tt := range myTests {
+		houstonClient = api
+		output, err := execDeploymentCmd(tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentUpdateCommandDagOnlyDeployEnabled(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	appConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=invalid"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
 		houstonClient = api

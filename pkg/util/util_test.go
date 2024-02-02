@@ -261,3 +261,32 @@ func TestGetbuildSecretString(t *testing.T) {
 		assert.Equal(t, "override_secret", GetbuildSecretString([]string{}))
 	})
 }
+
+func TestStripOutKeysFromJSONByteArray(t *testing.T) {
+	t.Run("valid JSON, strip out keys", func(t *testing.T) {
+		jsonData := []byte(`{"a": 1, "b": 2, "c": 3}`)
+		keys := []string{"a", "c"}
+		expectedResult := []byte(`{"b":2}`)
+		result, err := StripOutKeysFromJSONByteArray(jsonData, keys)
+		assert.Nil(t, err)
+		assert.Equal(t, result, expectedResult)
+	})
+
+	t.Run("invalid JSON, return as is - case 1", func(t *testing.T) {
+		jsonData := []byte(`{invalid: json}`)
+		keys := []string{"a", "c"}
+		expectedResult := jsonData
+		result, err := StripOutKeysFromJSONByteArray(jsonData, keys)
+		assert.Nil(t, err)
+		assert.Equal(t, result, expectedResult)
+	})
+
+	t.Run("invalid JSON, return as is - case 2", func(t *testing.T) {
+		jsonData := []byte(``)
+		keys := []string{"a", "c"}
+		expectedResult := jsonData
+		result, err := StripOutKeysFromJSONByteArray(jsonData, keys)
+		assert.Nil(t, err)
+		assert.Equal(t, result, expectedResult)
+	})
+}

@@ -919,7 +919,7 @@ func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment) (envV
 
 // isValidExecutor returns true for valid executor values and false if not.
 func isValidExecutor(executor string) bool {
-	return executor == deployment.CeleryExecutor || executor == deployment.KubeExecutor || executor == deployment.CELERY || executor == deployment.KUBERNETES
+	return strings.EqualFold(executor, deployment.KubeExecutor) || strings.EqualFold(executor, deployment.CeleryExecutor) || strings.EqualFold(executor, deployment.CELERY) || strings.EqualFold(executor, deployment.KUBERNETES)
 }
 
 func transformDeploymentType(deploymentType string) astroplatformcore.DeploymentType {

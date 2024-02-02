@@ -138,7 +138,11 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 	var index int
 	for i := range environmentVariablesObjects {
 		index = i + 1
-		varTab.AddRow([]string{strconv.Itoa(index), environmentVariablesObjects[i].Key, *environmentVariablesObjects[i].Value, strconv.FormatBool(environmentVariablesObjects[i].IsSecret)}, false)
+		printValue := notApplicable
+		if environmentVariablesObjects[i].Value != nil {
+			printValue = *environmentVariablesObjects[i].Value
+		}
+		varTab.AddRow([]string{strconv.Itoa(index), environmentVariablesObjects[i].Key, printValue, strconv.FormatBool(environmentVariablesObjects[i].IsSecret)}, false)
 	}
 
 	if index == 0 {
