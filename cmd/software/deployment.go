@@ -108,15 +108,8 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func getDeploymentTypeCmdMessage(gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool) string {
-	deploymentTypeMsg := "DAG Deployment mechanism: image, volume"
-	if gitSyncDAGDeploymentEnabled {
-		deploymentTypeMsg += ", git_sync"
-	}
-	if dagOnlyDeployEnabled {
-		deploymentTypeMsg += ", dag_only"
-	}
-	return deploymentTypeMsg
+func getDeploymentTypeCmdMessage() string {
+	return "DAG Deployment mechanism: image, volume, git_sync, dag_only"
 }
 
 func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
@@ -142,7 +135,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 	// let's hide under feature flag
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
-		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", getDeploymentTypeCmdMessage(gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled))
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", getDeploymentTypeCmdMessage())
 	}
 
 	if nfsMountDAGDeploymentEnabled {
@@ -234,7 +227,7 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 
 	// let's hide under feature flag
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
-		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", getDeploymentTypeCmdMessage(gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled))
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", getDeploymentTypeCmdMessage())
 	}
 
 	if nfsMountDAGDeploymentEnabled {
