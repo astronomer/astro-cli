@@ -58,7 +58,7 @@ type deploymentConfig struct {
 type Workerq struct {
 	Name              string `mapstructure:"name" yaml:"name" json:"name"`
 	MaxWorkerCount    int    `mapstructure:"max_worker_count,omitempty" yaml:"max_worker_count,omitempty" json:"max_worker_count,omitempty"`
-	MinWorkerCount    int    `mapstructure:"min_worker_count,omitempty" yaml:"min_worker_count,omitempty" json:"min_worker_count,omitempty"`
+	MinWorkerCount    int    `mapstructure:"min_worker_count" yaml:"min_worker_count" json:"min_worker_count"`
 	WorkerConcurrency int    `mapstructure:"worker_concurrency,omitempty" yaml:"worker_concurrency,omitempty" json:"worker_concurrency,omitempty"`
 	WorkerType        string `mapstructure:"worker_type" yaml:"worker_type" json:"worker_type"`
 	PodCPU            string `mapstructure:"pod_cpu,omitempty" yaml:"pod_cpu,omitempty" json:"pod_cpu,omitempty"`

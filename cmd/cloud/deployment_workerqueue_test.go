@@ -55,7 +55,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 	})
 
 	t.Run("create worker queue when no deployment id was provided", func(t *testing.T) {
-		expectedoutput := "worker queue test-queue for test in ck05r3bor07h40d02y2hw4n4v workspace created\n"
+		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "1")()
 
@@ -73,7 +73,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("create worker queue when deployment id was provided", func(t *testing.T) {
-		expectedoutput := "worker queue test-queue for test in ck05r3bor07h40d02y2hw4n4v workspace created\n"
+		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "1")()
 
@@ -91,7 +91,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("create worker queue when deployment name was provided", func(t *testing.T) {
-		expectedoutput := "worker queue test-queue for test in ck05r3bor07h40d02y2hw4n4v workspace created\n"
+		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "1")()
 
@@ -109,7 +109,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("create worker queue when no name was provided", func(t *testing.T) {
-		expectedoutput := "worker queue test-queue for test in ck05r3bor07h40d02y2hw4n4v workspace created\n"
+		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "test-queue")()
 
@@ -176,7 +176,7 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 			},
 		}
 		deploymentResponse.JSON200.WorkerQueues = &workerQueueList
-		expectedOutMessage := "worker queue test-worker-queue-1 for test in ck05r3bor07h40d02y2hw4n4v workspace deleted\n"
+		expectedOutMessage := "worker queue test-worker-queue-1 for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace deleted\n"
 
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "1")()
@@ -226,7 +226,7 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "1")()
 		deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{{Name: "default", NodePoolId: &testPoolID}}
-		expectedOutMessage := "worker queue default for test in ck05r3bor07h40d02y2hw4n4v workspace updated\n"
+		expectedOutMessage := "worker queue default for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace updated\n"
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
