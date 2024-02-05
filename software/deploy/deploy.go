@@ -31,7 +31,7 @@ var (
 )
 
 var (
-	errNoWorkspaceID                        = errors.New("no workspace id provided")
+	ErrNoWorkspaceID                        = errors.New("no workspace id provided")
 	errNoDomainSet                          = errors.New("no domain set, re-authenticate")
 	errInvalidDeploymentID                  = errors.New("please specify a valid deployment ID")
 	errDeploymentNotFound                   = errors.New("no airflow deployments found")
@@ -63,15 +63,15 @@ var tab = printutil.Table{
 	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
 }
 
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) error {
+func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
 	if wsID == "" {
-		return errNoWorkspaceID
+		return deploymentID, ErrNoWorkspaceID
 	}
 
 	// Validate workspace
 	currentWorkspace, err := houston.Call(houstonClient.GetWorkspace)(wsID)
 	if err != nil {
-		return err
+		return deploymentID, err
 	}
 
 	// Get Deployments from workspace ID
@@ -80,17 +80,17 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	}
 	deployments, err := houston.Call(houstonClient.ListDeployments)(request)
 	if err != nil {
-		return err
+		return deploymentID, err
 	}
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return deploymentID, err
 	}
 
 	cloudDomain := c.Domain
 	if cloudDomain == "" {
-		return errNoDomainSet
+		return deploymentID, errNoDomainSet
 	}
 
 	// Use config deployment if provided
@@ -99,13 +99,13 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	}
 
 	if deploymentID != "" && !deploymentExists(deploymentID, deployments) {
-		return errInvalidDeploymentID
+		return deploymentID, errInvalidDeploymentID
 	}
 
 	// Prompt user for deployment if no deployment passed in
 	if deploymentID == "" || prompt {
 		if len(deployments) == 0 {
-			return errDeploymentNotFound
+			return deploymentID, errDeploymentNotFound
 		}
 
 		fmt.Printf(houstonDeploymentHeader, cloudDomain)
@@ -124,7 +124,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 		choice := input.Text("\n> ")
 		selected, ok := deployMap[choice]
 		if !ok {
-			return errInvalidDeploymentSelected
+			return deploymentID, errInvalidDeploymentSelected
 		}
 		deploymentID = selected.ID
 	}
@@ -145,7 +145,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
-		return fmt.Errorf("failed to get deployment info: %w", err)
+		return deploymentID, fmt.Errorf("failed to get deployment info: %w", err)
 	}
 
 	fmt.Printf(houstonDeploymentPrompt, releaseName)
@@ -153,13 +153,13 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	// Build the image to deploy
 	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled)
 	if err != nil {
-		return err
+		return deploymentID, err
 	}
 
 	deploymentLink := getAirflowUILink(deploymentID, deploymentInfo.Urls)
 	fmt.Printf("Successfully pushed Docker image to Astronomer registry, it can take a few minutes to update the deployment with the new image. Navigate to the Astronomer UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
-	return nil
+	return deploymentID, nil
 }
 
 // Find deployment ID in deployments slice
@@ -326,6 +326,10 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		return ErrDagOnlyDeployDisabledInConfig
 	}
 
+	if deploymentID == "" {
+		return errInvalidDeploymentID
+	}
+
 	// Throw error if the feature is disabled at Deployment level
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
@@ -382,5 +386,15 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		"authorization": c.Token,
 	}
 
-	return fileutil.UploadFile(dagsParentPath+"/dags.tar.gz", uploadURL, "file", headers)
+	uploadFileArgs := fileutil.UploadFileArguments{
+		FilePath:            dagsParentPath + "/dags.tar.gz",
+		TargetURL:           uploadURL,
+		FormFileFieldName:   "file",
+		Headers:             headers,
+		MaxTries:            8,
+		InitialDelayInMS:    1 * 1000,
+		BackoffFactor:       2,
+		RetryDisplayMessage: "please wait, attempting to upload the dags",
+	}
+	return fileutil.UploadFile(&uploadFileArgs)
 }

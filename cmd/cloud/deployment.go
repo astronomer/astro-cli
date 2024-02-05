@@ -3,6 +3,7 @@ package cloud
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -549,7 +550,7 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 }
 
 func isValidExecutor(executor string) bool {
-	return executor == deployment.KubeExecutor || executor == deployment.CeleryExecutor || executor == ""
+	return strings.EqualFold(executor, deployment.KubeExecutor) || strings.EqualFold(executor, deployment.CeleryExecutor) || executor == "" || strings.EqualFold(executor, deployment.CELERY) || strings.EqualFold(executor, deployment.KUBERNETES)
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.

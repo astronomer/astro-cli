@@ -23,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
+	"golang.org/x/exp/slices"
 
 	"github.com/pkg/errors"
 )
@@ -69,6 +70,7 @@ var (
 	tickNum                    = 10
 	timeoutNum                 = 180
 	dedicatedDeploymentRequest = astroplatformcore.UpdateDedicatedDeploymentRequest{}
+	dagDeployEnabled           bool
 )
 
 func newTableOut() *printutil.Table {
@@ -105,14 +107,14 @@ func CanCiCdDeploy(bearerToken string) bool {
 }
 
 // List all airflow deployments
-func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+func List(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 	tab := newTableOut()
 
-	if all {
+	if fromAllWorkspaces {
 		ws = ""
 		tab = newTableOutAll()
 	}
@@ -128,30 +130,8 @@ func List(ws string, all bool, platformCoreClient astroplatformcore.CoreClient, 
 
 	sort.Slice(deployments, func(i, j int) bool { return deployments[i].Name > deployments[j].Name })
 
-	// Build rows
 	for i := range deployments {
-		d := deployments[i]
-		// change to cluster name
-		var clusterName string
-		if !IsDeploymentStandard(*d.Type) {
-			clusterName = *d.ClusterName
-		} else {
-			clusterName = notApplicable
-		}
-		runtimeVersionText := " (based on Airflow " + d.RuntimeVersion + ")"
-		releaseName := d.Namespace
-		workspaceName := d.WorkspaceName
-		region := notApplicable
-		cloudProvider := notApplicable
-		if IsDeploymentStandard(*d.Type) {
-			region = *d.Region
-			cloudProvider = *d.CloudProvider
-		}
-		if all {
-			tab.AddRow([]string{d.Name, *workspaceName, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
-		} else {
-			tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
-		}
+		deploymentToTableRow(tab, &deployments[i], fromAllWorkspaces)
 	}
 	tab.Print(out)
 	return nil
@@ -219,7 +199,6 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
-	var dagDeployEnabled bool
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -344,9 +323,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAZURE
 			}
 			var requestedExecutor astroplatformcore.CreateStandardDeploymentRequestExecutor
-			if executor == CeleryExecutor {
+			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorCELERY
-			} else if executor == KubeExecutor {
+			}
+			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
 			}
 			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
@@ -366,7 +346,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
 			}
-			if executor == CeleryExecutor {
+			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
 			switch schedulerSize {
@@ -390,11 +370,13 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		// build dedicated input
 		if IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.CreateDedicatedDeploymentRequestExecutor
-			if executor == CeleryExecutor {
+			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorCELERY
+				fmt.Println(requestedExecutor)
 			}
-			if executor == KubeExecutor {
+			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorKUBERNETES
+				fmt.Println(requestedExecutor)
 			}
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
 				AstroRuntimeVersion:  runtimeVersion,
@@ -412,10 +394,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
 			}
-			if executor == CeleryExecutor {
+			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
-
+			fmt.Println(dedicatedDeploymentRequest.Executor)
 			switch schedulerSize {
 			case SmallScheduler:
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
@@ -461,9 +443,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			return ErrInvalidResourceRequest
 		}
 		var requestedExecutor astroplatformcore.CreateHybridDeploymentRequestExecutor
-		if executor == CeleryExecutor {
+		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 			requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorCELERY
-		} else if executor == KubeExecutor {
+		}
+		if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 			requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorKUBERNETES
 		}
 		hybridDeploymentRequest := astroplatformcore.CreateHybridDeploymentRequest{
@@ -482,7 +465,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			},
 			Type: astroplatformcore.CreateHybridDeploymentRequestTypeHYBRID,
 		}
-		if executor == CeleryExecutor {
+		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 			hybridDeploymentRequest.WorkerQueues = &defautWorkerQueue
 		} else {
 			hybridDeploymentRequest.TaskPodNodePoolId = &nodePools[0].Id
@@ -519,19 +502,8 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 
 func createOutput(workspaceID string, d *astroplatformcore.Deployment) error {
 	tab := newTableOut()
+	deploymentToTableRow(tab, d, false)
 
-	runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
-	clusterName := notApplicable
-	cloudProvider := notApplicable
-	region := notApplicable
-	releaseName := d.Namespace
-	if IsDeploymentStandard(*d.Type) {
-		cloudProvider = *d.CloudProvider
-		region = *d.Region
-	} else {
-		clusterName = *d.ClusterName
-	}
-	tab.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
 	deploymentURL, err := GetDeploymentURL(d.Id, workspaceID)
 	if err != nil {
 		return err
@@ -540,10 +512,38 @@ func createOutput(workspaceID string, d *astroplatformcore.Deployment) error {
 		"\n Deployment can be accessed at the following URLs \n" +
 		fmt.Sprintf("\n Deployment Dashboard: %s", ansi.Bold(deploymentURL)) +
 		fmt.Sprintf("\n Airflow Dashboard: %s", ansi.Bold(d.WebServerUrl))
-
 	tab.Print(os.Stdout)
-
 	return nil
+}
+
+func deploymentToTableRow(table *printutil.Table, d *astroplatformcore.Deployment, includeWorkspaceName bool) {
+	runtimeVersionText := d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
+	cloudProvider := notApplicable
+	clusterName := notApplicable
+	region := notApplicable
+	releaseName := d.Namespace
+	if IsDeploymentStandard(*d.Type) {
+		cloudProvider = *d.CloudProvider
+		region = *d.Region
+	} else {
+		clusterName = *d.ClusterName
+	}
+	cols := []string{
+		d.Name,
+		releaseName,
+		clusterName,
+		cloudProvider,
+		region,
+		d.Id,
+		runtimeVersionText,
+		strconv.FormatBool(d.IsDagDeployEnabled),
+		strconv.FormatBool(d.IsCicdEnforced),
+		string(*d.Type),
+	}
+	if includeWorkspaceName {
+		cols = slices.Insert(cols, 1, *d.WorkspaceName)
+	}
+	table.AddRow(cols, false)
 }
 
 func validateHybridResources(schedulerAU, schedulerReplicas int, configOption astrocore.DeploymentOptions) bool { //nolint:gocritic
@@ -745,8 +745,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 	}
 	// determine isDagDeployEnabled
-	var dagDeployEnabled bool
-	if dagDeploy == enable {
+	switch dagDeploy {
+	case enable:
 		if currentDeployment.IsDagDeployEnabled {
 			fmt.Println("\nDAG deploys are already enabled for this Deployment. Your DAGs will continue to run as scheduled.")
 			return nil
@@ -755,7 +755,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		fmt.Printf("\nYou enabled DAG-only deploys for this Deployment. Running tasks are not interrupted but new tasks will not be scheduled." +
 			"\nRun `astro deploy --dags` to complete enabling this feature and resume your DAGs. It may take a few minutes for the Airflow UI to update..\n\n")
 		dagDeployEnabled = true
-	} else if dagDeploy == disable {
+	case disable:
 		if !currentDeployment.IsDagDeployEnabled {
 			fmt.Println("\nDAG-only deploys is already disabled for this deployment.")
 			return nil
@@ -766,8 +766,9 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			confirmWithUser = true
 		}
 		dagDeployEnabled = false
+	case "":
+		dagDeployEnabled = currentDeployment.IsDagDeployEnabled
 	}
-
 	configOption, err := GetDeploymentOptions("", astrocore.GetDeploymentOptionsParams{}, coreClient)
 	if err != nil {
 		return err
@@ -871,12 +872,16 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 		if IsDeploymentStandard(*currentDeployment.Type) {
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
-			switch executor {
+			switch strings.ToUpper(executor) {
 			case "":
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutor(*currentDeployment.Executor)
-			case CeleryExecutor:
+			case strings.ToUpper(CeleryExecutor):
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
-			case KubeExecutor:
+			case strings.ToUpper(KubeExecutor):
+				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
+			case strings.ToUpper(CELERY):
+				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
+			case strings.ToUpper(KUBERNETES):
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
 			}
 
@@ -927,12 +932,16 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 		if IsDeploymentDedicated(*currentDeployment.Type) {
 			var requestedExecutor astroplatformcore.UpdateDedicatedDeploymentRequestExecutor
-			switch executor {
+			switch strings.ToUpper(executor) {
 			case "":
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutor(*currentDeployment.Executor)
-			case CeleryExecutor:
+			case strings.ToUpper(CeleryExecutor):
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY
-			case KubeExecutor:
+			case strings.ToUpper(KubeExecutor):
+				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
+			case strings.ToUpper(CELERY):
+				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY
+			case strings.ToUpper(KUBERNETES):
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
 			dedicatedDeploymentRequest = astroplatformcore.UpdateDedicatedDeploymentRequest{
@@ -1016,12 +1025,16 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			return ErrInvalidResourceRequest
 		}
 		var requestedExecutor astroplatformcore.UpdateHybridDeploymentRequestExecutor
-		switch executor {
+		switch strings.ToUpper(executor) {
 		case "":
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutor(*currentDeployment.Executor)
-		case CeleryExecutor:
+		case strings.ToUpper(CeleryExecutor):
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorCELERY
-		case KubeExecutor:
+		case strings.ToUpper(KubeExecutor):
+			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES
+		case strings.ToUpper(CELERY):
+			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorCELERY
+		case strings.ToUpper(KUBERNETES):
 			requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES
 		}
 		hybridDeploymentRequest := astroplatformcore.UpdateHybridDeploymentRequest{
@@ -1537,14 +1550,14 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 // It returns true if a warning was printed and false if not.
 func printWarning(executor string, existingQLength int) bool {
 	var printed bool
-	if executor == KubeExecutor {
+	if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 		if existingQLength > 1 {
 			fmt.Println("\n Switching to KubernetesExecutor will replace all existing worker queues " +
 				"with one new default worker queue for this deployment.")
 			printed = true
 		}
 	} else {
-		if executor == CeleryExecutor {
+		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 			fmt.Println("\n Switching to CeleryExecutor will replace the existing worker queue " +
 				"with a new default worker queue for this deployment.")
 			printed = true

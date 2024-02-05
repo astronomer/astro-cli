@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	http_context "context"
+	"fmt"
 	"io"
 	f "io/fs"
 	"net/http"
@@ -523,9 +524,47 @@ func (h *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(h.ResponseBody))
 }
 
+type MockServerWithHitCountReturning500 struct {
+	hitCount int
+}
+
+func (m *MockServerWithHitCountReturning500) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	m.hitCount++
+	w.WriteHeader(http.StatusInternalServerError)
+	fmt.Fprint(w, "Internal Server Error")
+}
+
+func createMockServerWithHitCountReturning500() *MockServerWithHitCountReturning500 {
+	return &MockServerWithHitCountReturning500{}
+}
+
+type MockServerWithHitCountReturning400 struct {
+	hitCount int
+}
+
+func (m *MockServerWithHitCountReturning400) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	m.hitCount++
+	w.WriteHeader(http.StatusBadRequest)
+	fmt.Fprint(w, "Bad Request")
+}
+
+func createMockServerWithHitCountReturning400() *MockServerWithHitCountReturning400 {
+	return &MockServerWithHitCountReturning400{}
+}
+
 func TestUploadFile(t *testing.T) {
 	t.Run("attempt to upload a non-existent file", func(t *testing.T) {
-		err := UploadFile("non-existent-file.txt", "http://localhost:8080/upload", "file1", map[string]string{})
+		uploadFileArgs := UploadFileArguments{
+			FilePath:            "non-existent-file.txt",
+			TargetURL:           "http://localhost:8080/upload",
+			FormFileFieldName:   "file",
+			Headers:             map[string]string{},
+			MaxTries:            3,
+			InitialDelayInMS:    1 * 1000,
+			BackoffFactor:       2,
+			RetryDisplayMessage: "please wait, attempting to upload the dags",
+		}
+		err := UploadFile(&uploadFileArgs)
 		assert.EqualError(t, err, "error opening file: open non-existent-file.txt: no such file or directory")
 	})
 
@@ -543,9 +582,19 @@ func TestUploadFile(t *testing.T) {
 		assert.NoError(t, err, "Error creating test file")
 		defer os.Remove(filePath)
 
-		err = UploadFile(filePath, "testURL", "file1", map[string]string{})
-		assert.ErrorIs(t, err, ioCopyError)
+		uploadFileArgs := UploadFileArguments{
+			FilePath:            filePath,
+			TargetURL:           "testURL",
+			FormFileFieldName:   "file",
+			Headers:             map[string]string{},
+			MaxTries:            3,
+			InitialDelayInMS:    1 * 1000,
+			BackoffFactor:       2,
+			RetryDisplayMessage: "please wait, attempting to upload the dags",
+		}
+		err = UploadFile(&uploadFileArgs)
 
+		assert.ErrorIs(t, err, ioCopyError)
 		ioCopy = io.Copy
 	})
 
@@ -561,16 +610,26 @@ func TestUploadFile(t *testing.T) {
 		assert.NoError(t, err, "Error creating test file")
 		defer os.Remove(filePath)
 
-		err = UploadFile(filePath, "testURL", "file1", map[string]string{})
-		assert.ErrorIs(t, err, requestError)
+		uploadFileArgs := UploadFileArguments{
+			FilePath:            filePath,
+			TargetURL:           "testURL",
+			FormFileFieldName:   "file",
+			Headers:             map[string]string{},
+			MaxTries:            3,
+			InitialDelayInMS:    1 * 1000,
+			BackoffFactor:       2,
+			RetryDisplayMessage: "please wait, attempting to upload the dags",
+		}
+		err = UploadFile(&uploadFileArgs)
 
+		assert.ErrorIs(t, err, requestError)
 		newRequestWithContext = http.NewRequestWithContext
 	})
 
-	t.Run("uploaded the file but got non-OK response", func(t *testing.T) {
-		// Prepare a test server to respond with a non-OK status code
-		server := createMockServer(http.StatusInternalServerError, "Internal Server Error", make(map[string][]string))
-		defer server.Close()
+	t.Run("uploaded the file but got 500 response code. Uploading should be retried", func(t *testing.T) {
+		mockServer := createMockServerWithHitCountReturning500()
+		testServer := httptest.NewServer(mockServer)
+		defer testServer.Close()
 
 		// Create a temporary file with some content for testing
 		filePath := "./testFile.txt"
@@ -584,28 +643,28 @@ func TestUploadFile(t *testing.T) {
 			"Content-Type":  "application/json",
 		}
 
-		// Execute the function under test
-		err = UploadFile(filePath, server.URL, "file1", headers)
+		uploadFileArgs := UploadFileArguments{
+			FilePath:            filePath,
+			TargetURL:           testServer.URL,
+			FormFileFieldName:   "file",
+			Headers:             headers,
+			MaxTries:            2,
+			InitialDelayInMS:    1 * 1000,
+			BackoffFactor:       2,
+			RetryDisplayMessage: "please wait, attempting to upload the dags",
+		}
+		err = UploadFile(&uploadFileArgs)
 
 		// Assert the error is as expected
 		assert.EqualError(t, err, "file upload failed. Status code: 500 and Message: Internal Server Error")
+		// Assert that the server is hit required number of times
+		assert.Equal(t, 2, mockServer.hitCount)
 	})
 
-	t.Run("error making POST request due to invalid URL", func(t *testing.T) {
-		// Prepare a test server to capture the request
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Assert the request method is POST
-			assert.Equal(t, http.MethodPost, r.Method)
-
-			// Assert the correct form field name
-			err := r.ParseMultipartForm(10 << 20) // 10 MB
-			assert.NoError(t, err, "Error parsing multipart form")
-			assert.NotNil(t, r.MultipartForm.File["file1"], "Form file not found in request")
-
-			// Respond with a success status code
-			w.WriteHeader(http.StatusOK)
-		}))
-		defer server.Close()
+	t.Run("uploaded the file but got 400 response code. Uploading should not be retried", func(t *testing.T) {
+		mockServer := createMockServerWithHitCountReturning400()
+		testServer := httptest.NewServer(mockServer)
+		defer testServer.Close()
 
 		// Create a temporary file with some content for testing
 		filePath := "./testFile.txt"
@@ -614,7 +673,49 @@ func TestUploadFile(t *testing.T) {
 		assert.NoError(t, err, "Error creating test file")
 		defer os.Remove(filePath)
 
-		err = UploadFile(filePath, "https://astro.unit.test", "file1", map[string]string{})
+		headers := map[string]string{
+			"Authorization": "Bearer token",
+			"Content-Type":  "application/json",
+		}
+
+		uploadFileArgs := UploadFileArguments{
+			FilePath:            filePath,
+			TargetURL:           testServer.URL,
+			FormFileFieldName:   "file",
+			Headers:             headers,
+			MaxTries:            2,
+			InitialDelayInMS:    1 * 1000,
+			BackoffFactor:       2,
+			RetryDisplayMessage: "please wait, attempting to upload the dags",
+		}
+		err = UploadFile(&uploadFileArgs)
+
+		// Assert the error is as expected
+		assert.EqualError(t, err, "file upload failed. Status code: 400 and Message: Bad Request")
+		// Assert that the server is hit required number of times
+		assert.Equal(t, 1, mockServer.hitCount)
+	})
+
+	t.Run("error making POST request due to invalid URL.", func(t *testing.T) {
+		// Create a temporary file with some content for testing
+		filePath := "./testFile.txt"
+		fileContent := []byte("This is a test file.")
+		err := os.WriteFile(filePath, fileContent, os.ModePerm)
+		assert.NoError(t, err, "Error creating test file")
+		defer os.Remove(filePath)
+
+		uploadFileArgs := UploadFileArguments{
+			FilePath:            filePath,
+			TargetURL:           "https://astro.unit.test",
+			FormFileFieldName:   "file",
+			Headers:             map[string]string{},
+			MaxTries:            2,
+			InitialDelayInMS:    1 * 1000,
+			BackoffFactor:       2,
+			RetryDisplayMessage: "please wait, attempting to upload the dags",
+		}
+		err = UploadFile(&uploadFileArgs)
+
 		assert.ErrorContains(t, err, "astro.unit.test")
 	})
 
@@ -635,9 +736,19 @@ func TestUploadFile(t *testing.T) {
 			"Content-Type":  "application/json",
 		}
 
-		err = UploadFile(filePath, server.URL, "file1", headers)
-		assert.NoError(t, err, "Expected no error")
+		uploadFileArgs := UploadFileArguments{
+			FilePath:            filePath,
+			TargetURL:           server.URL,
+			FormFileFieldName:   "file",
+			Headers:             headers,
+			MaxTries:            2,
+			InitialDelayInMS:    1 * 1000,
+			BackoffFactor:       2,
+			RetryDisplayMessage: "please wait, attempting to upload the dags",
+		}
+		err = UploadFile(&uploadFileArgs)
 
+		assert.NoError(t, err, "Expected no error")
 		// assert the received headers
 		request := getCapturedRequest(server)
 		assert.Equal(t, "Bearer token", request.Header.Get("Authorization"))

@@ -166,13 +166,16 @@ func getDeploymentInfo(coreDeployment astroplatformcore.Deployment) (map[string]
 	if err != nil {
 		return nil, err
 	}
-	clusterID := coreDeployment.ClusterId
+	var clusterID string
 	releaseName := coreDeployment.Namespace
 	if deployment.IsDeploymentStandard(*coreDeployment.Type) || deployment.IsDeploymentDedicated(*coreDeployment.Type) {
-		if deployment.IsDeploymentStandard(*coreDeployment.Type) {
-			clusterID = nil
-		}
 		releaseName = notApplicable
+	}
+	if !deployment.IsDeploymentStandard(*coreDeployment.Type) {
+		clusterID = *coreDeployment.ClusterId
+	}
+	if deployment.IsDeploymentStandard(*coreDeployment.Type) {
+		clusterID = notApplicable
 	}
 	if coreDeployment.WorkloadIdentity != nil {
 		workloadIdentity = *coreDeployment.WorkloadIdentity

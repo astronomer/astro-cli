@@ -16,6 +16,7 @@ const (
 	k8sExecutorArg        = "k8s"
 
 	cliDeploymentHardDeletePrompt = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with hard delete?"
+	deploymentTypeCmdMessage      = "DAG Deployment mechanism: image, volume, git_sync, dag_only"
 )
 
 var (
@@ -120,17 +121,18 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
-	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, runtimeEnabled bool
+	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, runtimeEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		triggererEnabled = appConfig.Flags.TriggererEnabled
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
 		runtimeEnabled = appConfig.Flags.AstroRuntimeEnabled
+		dagOnlyDeployEnabled = appConfig.Flags.DagOnlyDeployment
 	}
 
 	// let's hide under feature flag
-	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
-		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", "DAG Deployment mechanism: image, volume, git_sync")
+	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", deploymentTypeCmdMessage)
 	}
 
 	if nfsMountDAGDeploymentEnabled {
@@ -210,18 +212,19 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 		},
 	}
 
-	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
+	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		triggererEnabled = appConfig.Flags.TriggererEnabled
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
+		dagOnlyDeployEnabled = appConfig.Flags.DagOnlyDeployment
 	}
 
 	cmd.Flags().StringVarP(&executorUpdate, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
 
 	// let's hide under feature flag
-	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
-		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", "DAG Deployment mechanism: image, volume, git_sync")
+	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", deploymentTypeCmdMessage)
 	}
 
 	if nfsMountDAGDeploymentEnabled {
@@ -360,10 +363,11 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
+	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
+		dagOnlyDeployEnabled = appConfig.Flags.DagOnlyDeployment
 	}
 
 	if !cmd.Flags().Changed("triggerer-replicas") {
@@ -371,7 +375,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	// we should validate only in case when this feature has been enabled
-	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
+	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
 		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, false)
 		if err != nil {
 			return err
@@ -442,14 +446,15 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
+	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
+		dagOnlyDeployEnabled = appConfig.Flags.DagOnlyDeployment
 	}
 
 	// we should validate only in case when this feature has been enabled
-	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
+	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
 		err := validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, true)
 		if err != nil {
 			return err

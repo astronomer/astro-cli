@@ -4,13 +4,13 @@ jobs:
   lint:
     working_directory: /go/src/github.com/astronomer/astro-cli
     docker:
-      - image: quay.io/astronomer/ap-dind-golang:20.10.21
+      - image: quay.io/astronomer/ap-dind-golang:24.0.6
     steps:
       - lint
   test:
     working_directory: /go/src/github.com/astronomer/astro-cli
     docker:
-      - image: quay.io/astronomer/ap-dind-golang:20.10.21
+      - image: quay.io/astronomer/ap-dind-golang:24.0.6
     steps:
       - test
   new-tag:
@@ -20,7 +20,7 @@ jobs:
       - commit-next-tag
   release:
     docker:
-      - image: golang:1.19.12
+      - image: golang:1.21.6
     working_directory: /go/src/github.com/astronomer/astro-cli
     steps:
       - checkout
@@ -60,7 +60,7 @@ executors:
     environment:
       GIT_ORG: astronomer
     docker:
-      - image: circleci/python:3
+      - image: cimg/python:3.11
 commands:
   lint:
     description: "Run linting checks"
