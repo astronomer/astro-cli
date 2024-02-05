@@ -1829,6 +1829,7 @@ deployment:
 		out := new(bytes.Buffer)
 		mockCoreDeploymentResponse[0].ClusterId = &clusterID
 		mockCoreDeploymentCreateResponse[0].ClusterId = &clusterID
+		deploymentResponse.JSON200.ClusterId = &clusterID
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		filePath = "./deployment.yaml"
 		data = `

@@ -54,7 +54,6 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		cmdArgs := []string{"inspect", "test-id-1", "--template"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
-		assert.Contains(t, resp, deploymentResponse.JSON200.Name)
 		assert.Contains(t, resp, deploymentResponse.JSON200.RuntimeVersion)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})

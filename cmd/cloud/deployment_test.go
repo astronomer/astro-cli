@@ -62,13 +62,13 @@ var (
 			WorkloadIdentity: &workloadIdentity,
 			ClusterId:        &clusterID,
 			ClusterName:      &testCluster,
-			Id:               "test-deployment-id",
+			Id:               "test-id-1",
 		},
 	}
 	mockUpdateDeploymentResponse = astroplatformcore.UpdateDeploymentResponse{
 		JSON200: &astroplatformcore.Deployment{
 			Name:          "test-deployment-label",
-			Id:            "test-deployment-id",
+			Id:            "test-id-1",
 			CloudProvider: &cloudProvider,
 			Type:          &hybridType,
 			ClusterId:     &clusterID,
@@ -88,7 +88,7 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &astroplatformcore.Deployment{
-			Id:                     "test-deployment-id",
+			Id:                     "test-id-1",
 			RuntimeVersion:         "4.2.5",
 			Namespace:              "test-name",
 			WorkspaceId:            "workspace-id",

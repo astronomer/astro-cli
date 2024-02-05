@@ -98,7 +98,6 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 			return err
 		}
 	}
-
 	existingDeployments, err = deployment.CoreGetDeployments(workspaceID, c.Organization, astroPlatformCore)
 	if err != nil {
 		return err
