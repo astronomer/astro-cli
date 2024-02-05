@@ -1412,6 +1412,25 @@ func TestAirflowObjectExport(t *testing.T) {
 		mockContainerHandler.AssertExpectations(t)
 	})
 
+	t.Run("error compose-file used without compose", func(t *testing.T) {
+		cmd := newObjectExportCmd()
+		cmd.SetArgs([]string{"dev", "object", "export", "--compose-file", "file.yaml"})
+
+		// Set the "compose-file" flag explicitly to mark it as changed
+		cmd.Flags().Set("compose-file", "file.yaml")
+
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			return mockContainerHandler, nil
+		}
+
+		err := airflowSettingsExport(cmd, args)
+		assert.ErrorIs(t, err, errNoCompose)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
 	t.Run("without any object flag", func(t *testing.T) {
 		cmd := newObjectExportCmd()
 		args := []string{}
