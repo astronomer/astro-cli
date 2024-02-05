@@ -6,6 +6,7 @@ import (
 	"io"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
 
@@ -420,7 +421,7 @@ func selectWorkerMachine(workerType string, workerMachines []astroplatformcore.W
 		return selectedPool, nil
 	default:
 		for _, workerMachine = range workerMachines {
-			if string(workerMachine.Name) == workerType {
+			if strings.EqualFold(string(workerMachine.Name), workerType) {
 				return workerMachine, nil
 			}
 		}
