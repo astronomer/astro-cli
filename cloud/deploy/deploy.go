@@ -207,15 +207,9 @@ func deployDags(path, dagsPath, dagsUploadURL string, deploymentType astroplatfo
 
 // Deploy pushes a new docker image
 func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error { //nolint
-	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-
-	domain := c.Domain
-	if domain == "" {
-		return errors.New("no domain set, re-authenticate")
 	}
 
 	var dagsPath string
@@ -227,7 +221,13 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
-	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, platformCoreClient, coreClient)
+	if c.Domain == astroDomain {
+		fmt.Printf(deploymentHeaderMsg, "Astro")
+	} else {
+		fmt.Printf(deploymentHeaderMsg, c.Domain)
+	}
+
+	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
@@ -375,17 +375,12 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			fmt.Println("No DAGs found. Skipping testing...")
 		}
 
-		registry := airflow.GetRegistryURL(domain)
 		repository := resp.JSON200.ImageRepository
 		// TODO: Resolve the edge case where two people push the same nextTag at the same time
 		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
 
-		token := c.Token
-		// Splitting out the Bearer part from the token
-		splittedToken := strings.Split(token, " ")[1]
-
 		imageHandler := airflowImageHandler(deployInfo.deployImage)
-		err = imageHandler.Push(registry, registryUsername, splittedToken, remoteImage)
+		err = imageHandler.Push(remoteImage, registryUsername, c.Token)
 		if err != nil {
 			return err
 		}
@@ -423,7 +418,12 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	return nil
 }
 
-func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (deploymentInfo, error) {
+func getDeploymentInfo(
+	deploymentID, wsID, deploymentName string,
+	prompt bool,
+	platformCoreClient astroplatformcore.CoreClient,
+	coreClient astrocore.CoreClient,
+) (deploymentInfo, error) {
 	// Use config deployment if provided
 	if deploymentID == "" {
 		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
@@ -471,7 +471,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 	if err != nil {
 		return deploymentInfo{}, err
 	}
-	deployInfo, err := getImageName(cloudDomain, deploymentID, c.Organization, platformCoreClient)
+	deployInfo, err := getImageName(deploymentID, c.Organization, platformCoreClient)
 	if err != nil {
 		return deploymentInfo{}, err
 	}
@@ -554,13 +554,7 @@ func checkPytest(pytest, deployImage, buildSecretString string, containerHandler
 	return err
 }
 
-func getImageName(cloudDomain, deploymentID, organizationID string, platformCoreClient astroplatformcore.CoreClient) (deploymentInfo, error) {
-	if cloudDomain == astroDomain {
-		fmt.Printf(deploymentHeaderMsg, "Astro")
-	} else {
-		fmt.Printf(deploymentHeaderMsg, cloudDomain)
-	}
-
+func getImageName(deploymentID, organizationID string, platformCoreClient astroplatformcore.CoreClient) (deploymentInfo, error) {
 	resp, err := platformCoreClient.GetDeploymentWithResponse(httpContext.Background(), organizationID, deploymentID)
 	if err != nil {
 		return deploymentInfo{}, err

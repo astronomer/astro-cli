@@ -128,13 +128,13 @@ func (_m *ImageHandler) ListLabels() (map[string]string, error) {
 	return r0, r1
 }
 
-// Pull provides a mock function with given fields: registry, username, token, remoteImage
-func (_m *ImageHandler) Pull(registry string, username string, token string, remoteImage string) error {
-	ret := _m.Called(registry, username, token, remoteImage)
+// Pull provides a mock function with given fields: remoteImage, username, token
+func (_m *ImageHandler) Pull(remoteImage string, username string, token string) error {
+	ret := _m.Called(remoteImage, username, token)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string) error); ok {
-		r0 = rf(registry, username, token, remoteImage)
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(remoteImage, username, token)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -142,13 +142,13 @@ func (_m *ImageHandler) Pull(registry string, username string, token string, rem
 	return r0
 }
 
-// Push provides a mock function with given fields: registry, username, token, remoteImage
-func (_m *ImageHandler) Push(registry string, username string, token string, remoteImage string) error {
-	ret := _m.Called(registry, username, token, remoteImage)
+// Push provides a mock function with given fields: remoteImage, username, token
+func (_m *ImageHandler) Push(remoteImage string, username string, token string) error {
+	ret := _m.Called(remoteImage, username, token)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string) error); ok {
-		r0 = rf(registry, username, token, remoteImage)
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(remoteImage, username, token)
 	} else {
 		r0 = ret.Error(0)
 	}
