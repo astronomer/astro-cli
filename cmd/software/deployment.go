@@ -16,7 +16,7 @@ const (
 	k8sExecutorArg        = "k8s"
 
 	cliDeploymentHardDeletePrompt = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with hard delete?"
-	deploymentTypeCmdMessage      = "DAG Deployment mechanism: image, volume, git_sync, dag_only"
+	deploymentTypeCmdMessage      = "DAG Deployment mechanism: image, volume, git_sync, dag_deploy"
 )
 
 var (
