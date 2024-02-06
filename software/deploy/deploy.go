@@ -244,7 +244,7 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		token = c.Token
 	}
 
-	err = imageHandler.Push(registry, "", token, remoteImage)
+	err = imageHandler.Push(remoteImage, "", token)
 	if err != nil {
 		return err
 	}

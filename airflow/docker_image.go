@@ -36,6 +36,10 @@ const (
 
 var errGetImageLabel = errors.New("error getting image label")
 
+var getDockerClient = func() (client.APIClient, error) {
+	return client.NewClientWithOpts(client.FromEnv)
+}
+
 type DockerImage struct {
 	imageName string
 }
@@ -299,11 +303,16 @@ func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error 
 	return nil
 }
 
-func (d *DockerImage) Push(registry, username, token, remoteImage string) error {
+func (d *DockerImage) Push(remoteImage, username, token string) error {
 	dockerCommand := config.CFG.DockerCommand.GetString()
 	err := cmdExec(dockerCommand, nil, nil, "tag", d.imageName, remoteImage)
 	if err != nil {
 		return fmt.Errorf("command '%s tag %s %s' failed: %w", dockerCommand, d.imageName, remoteImage, err)
+	}
+
+	registry, err := d.getRegistryToAuth(remoteImage)
+	if err != nil {
+		return err
 	}
 
 	// Push image to registry
@@ -334,13 +343,31 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 
 	log.Debugf("Exec Push %s creds %v \n", dockerCommand, authConfig)
 
+	err = d.pushWithClient(&authConfig, remoteImage)
+
+	if err != nil {
+		// if it does not work with the go library use bash to run docker commands. Support for (old?) versions of Colima
+		err = pushWithBash(&authConfig, remoteImage)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Delete the image tags we just generated
+	err = cmdExec(dockerCommand, nil, nil, "rmi", remoteImage)
+	if err != nil {
+		return fmt.Errorf("command '%s rmi %s' failed: %w", dockerCommand, remoteImage, err)
+	}
+	return nil
+}
+
+func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImage string) error {
 	ctx := context.Background()
 
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := getDockerClient()
 	if err != nil {
 		log.Debugf("Error setting up new Client ops %v", err)
-		// if NewClientWithOpt does not work use bash to run docker commands
-		return useBash(&authConfig, remoteImage)
+		return err
 	}
 	cli.NegotiateAPIVersion(ctx)
 	buf, err := json.Marshal(authConfig)
@@ -353,27 +380,40 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 	if err != nil {
 		log.Debugf("Error pushing image to docker: %v", err)
 		// if NewClientWithOpt does not work use bash to run docker commands
-		return useBash(&authConfig, remoteImage)
+		return err
 	}
 	defer responseBody.Close()
-	err = displayJSONMessagesToStream(responseBody, nil)
-	if err != nil {
-		return useBash(&authConfig, remoteImage)
-	}
-	// Delete the image tags we just generated
-	err = cmdExec(dockerCommand, nil, nil, "rmi", remoteImage)
-	if err != nil {
-		return fmt.Errorf("command '%s rmi %s' failed: %w", dockerCommand, remoteImage, err)
-	}
-	return nil
+	return displayJSONMessagesToStream(responseBody, nil)
 }
 
-func (d *DockerImage) Pull(registry, username, token, remoteImage string) error {
+// Get the registry name to authenticate against
+func (d *DockerImage) getRegistryToAuth(imageName string) (string, error) {
+	domain, err := config.GetCurrentDomain()
+	if err != nil {
+		return "", err
+	}
+
+	if domain == "localhost" {
+		return config.CFG.LocalRegistry.GetString(), nil
+	}
+	parts := strings.SplitN(imageName, "/", 2)
+	if len(parts) != 2 || !strings.Contains(parts[1], "/") {
+		// This _should_ be impossible for users to hit
+		return "", fmt.Errorf("internal logic error: unsure how to get registry from image name %q", imageName) //nolint:goerr113
+	}
+	return parts[0], nil
+}
+
+func (d *DockerImage) Pull(remoteImage, username, token string) error {
 	// Pulling image to registry
 	fmt.Println(pullingImagePrompt)
 	dockerCommand := config.CFG.DockerCommand.GetString()
 	var err error
 	if username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
+		var registry string
+		if registry, err = d.getRegistryToAuth(remoteImage); err != nil {
+			return err
+		}
 		pass := token
 		pass = strings.TrimPrefix(pass, prefix)
 		cmd := "echo \"" + pass + "\"" + " | " + dockerCommand + " login " + registry + " -u " + username + " --password-stdin"
@@ -583,7 +623,7 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 }
 
 // When login and push do not work use bash to run docker commands, this function is for users using colima
-func useBash(authConfig *cliTypes.AuthConfig, image string) error {
+func pushWithBash(authConfig *cliTypes.AuthConfig, image string) error {
 	dockerCommand := config.CFG.DockerCommand.GetString()
 
 	var err error
@@ -592,19 +632,10 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 		pass = strings.TrimPrefix(pass, prefix)
 		cmd := "echo \"" + pass + "\"" + " | " + dockerCommand + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
 		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
-	}
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 	// docker push <image>
-	err = cmdExec(dockerCommand, os.Stdout, os.Stderr, "push", image)
-	if err != nil {
-		return err
-	}
-	// Delete the image tags we just generated
-	err = cmdExec(dockerCommand, nil, nil, "rmi", image)
-	if err != nil {
-		return fmt.Errorf("command '%s rmi %s' failed: %w", dockerCommand, image, err)
-	}
-	return nil
+	return cmdExec(dockerCommand, os.Stdout, os.Stderr, "push", image)
 }
