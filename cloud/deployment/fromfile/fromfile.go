@@ -241,7 +241,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				workerQueue.WorkerConcurrency = listQueues[i].WorkerConcurrency
 				workerQueue.AstroMachine = astroplatformcore.WorkerQueueRequestAstroMachine(strings.ToUpper(*listQueues[i].AstroMachine))
 				// set default values if none were specified
-				requestedWorkerQueue := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
+				requestedWorkerQueue := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions, &astroMachine)
 				// check if queue is valid
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 					return errNoUseWorkerQueues
