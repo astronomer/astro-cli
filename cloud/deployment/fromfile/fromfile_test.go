@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	mockOrgShortName = "test-org-short-name"
+	mockOrgId = "test-org-id"
 )
 
 var (
@@ -3068,14 +3068,14 @@ func TestGetClusterFromName(t *testing.T) {
 	clusterName = "test-cluster"
 	t.Run("returns a cluster id if cluster exists in organization", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, mockOrgShortName, mockPlatformCoreClient)
+		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, mockOrgId, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedClusterID, actualClusterID)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns error from api if listing cluster fails", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListClustersResponse{}, errTest).Once()
-		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, mockOrgShortName, mockPlatformCoreClient)
+		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, mockOrgId, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errTest)
 		assert.Equal(t, "", actualClusterID)
 		assert.Equal(t, []astroplatformcore.NodePool(nil), actualNodePools)
@@ -3091,7 +3091,7 @@ func TestGetClusterFromName(t *testing.T) {
 			},
 		}
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, mockOrgShortName, mockPlatformCoreClient)
+		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, mockOrgId, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errNotFound)
 		assert.ErrorContains(t, err, "cluster_name: test-cluster does not exist in organization")
 		assert.Equal(t, "", actualClusterID)

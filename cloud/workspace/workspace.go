@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -152,7 +151,7 @@ func Switch(id string, client astrocore.CoreClient, out io.Writer) error {
 		return err
 	}
 
-	err = c.SetOrganizationContext(c.Organization, c.OrganizationShortName, c.OrganizationProduct)
+	err = c.SetOrganizationContext(c.Organization, c.OrganizationProduct)
 	if err != nil {
 		return err
 	}
@@ -186,9 +185,6 @@ func Create(name, description, enforceCD string, out io.Writer, client astrocore
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
 	enforce, err := validateEnforceCD(enforceCD)
 	if err != nil {
 		return err
@@ -214,9 +210,6 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
 	}
 	workspaces, err := GetWorkspaces(client)
 	if err != nil {
@@ -281,9 +274,6 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
 	}
 	workspaces, err := GetWorkspaces(client)
 	if err != nil {
@@ -367,9 +357,6 @@ func GetWorkspaces(client astrocore.CoreClient) ([]astrocore.Workspace, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return []astrocore.Workspace{}, err
-	}
-	if ctx.OrganizationShortName == "" {
-		return []astrocore.Workspace{}, user.ErrNoShortName
 	}
 
 	sorts := []astrocore.ListWorkspacesParamsSorts{"name:asc"}

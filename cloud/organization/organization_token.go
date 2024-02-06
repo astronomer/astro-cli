@@ -59,9 +59,6 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
@@ -163,10 +160,6 @@ func getOrganizationTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, e
 	if err != nil {
 		return []astrocore.ApiToken{}, err
 	}
-	if ctx.OrganizationShortName == "" {
-		return []astrocore.ApiToken{}, user.ErrNoShortName
-	}
-
 	resp, err := client.ListOrganizationApiTokensWithResponse(httpContext.Background(), ctx.Organization, &astrocore.ListOrganizationApiTokensParams{})
 	if err != nil {
 		return []astrocore.ApiToken{}, err
@@ -181,8 +174,8 @@ func getOrganizationTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, e
 	return APITokens, nil
 }
 
-func getOrganizationTokenByID(id, orgShortName string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
-	resp, err := client.GetOrganizationApiTokenWithResponse(httpContext.Background(), orgShortName, id)
+func getOrganizationTokenByID(id, orgID string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
+	resp, err := client.GetOrganizationApiTokenWithResponse(httpContext.Background(), orgID, id)
 	if err != nil {
 		return astrocore.ApiToken{}, err
 	}
@@ -321,10 +314,6 @@ func CreateToken(name, description, role string, expiration int, cleanOutput boo
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
-
 	CreateOrganizationAPITokenRequest := astrocore.CreateOrganizationApiTokenJSONRequestBody{
 		Description: &description,
 		Name:        name,
@@ -359,10 +348,6 @@ func UpdateToken(id, name, newName, description, role string, out io.Writer, cli
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
-
 	var token astrocore.ApiToken
 	if id == "" {
 		tokens, err := getOrganizationTokens(client)
@@ -448,10 +433,6 @@ func RotateToken(id, name string, cleanOutput, force bool, out io.Writer, client
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
-
 	var token astrocore.ApiToken
 
 	if id == "" {
@@ -507,12 +488,7 @@ func DeleteToken(id, name string, force bool, out io.Writer, client astrocore.Co
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
-
 	var token astrocore.ApiToken
-
 	if id == "" {
 		tokens, err := getOrganizationTokens(client)
 		if err != nil {

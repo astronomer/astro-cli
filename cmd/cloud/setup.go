@@ -180,10 +180,6 @@ func checkToken(coreClient astrocore.CoreClient, platformCoreClient astroplatfor
 		if err != nil {
 			return err
 		}
-		err = c.SetContextKey("organization_short_name", c.OrganizationShortName)
-		if err != nil {
-			return err
-		}
 		err = c.SetContextKey("organization_product", c.OrganizationProduct)
 		if err != nil {
 			return err
@@ -336,7 +332,6 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, isDeploymentF
 
 	org := orgs[0]
 	orgID := org.Id
-	orgName := org.Name
 	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
 	// get workspace ID
@@ -351,7 +346,7 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, isDeploymentF
 		fmt.Println("no workspace set")
 	}
 
-	err = c.SetOrganizationContext(orgID, orgName, orgProduct)
+	err = c.SetOrganizationContext(orgID, orgProduct)
 	if err != nil {
 		fmt.Println("no organization context set")
 	}
@@ -413,7 +408,7 @@ func checkAPIToken(isDeploymentFile bool, platformCoreClient astroplatformcore.C
 		return false, errNotAPIToken
 	}
 
-	var wsID, orgID, orgShortName string
+	var wsID, orgID string
 	for _, permission := range claims.Permissions {
 		splitPermission := strings.Split(permission, ":")
 		permissionType := splitPermission[0]
@@ -423,8 +418,6 @@ func checkAPIToken(isDeploymentFile bool, platformCoreClient astroplatformcore.C
 			wsID = id
 		case "organizationId":
 			orgID = id
-		case "orgShortName":
-			orgShortName = id
 		}
 	}
 
@@ -444,7 +437,7 @@ func checkAPIToken(isDeploymentFile bool, platformCoreClient astroplatformcore.C
 	if err != nil {
 		fmt.Println("no workspace set")
 	}
-	err = c.SetOrganizationContext(orgID, orgShortName, orgProduct)
+	err = c.SetOrganizationContext(orgID, orgProduct)
 	if err != nil {
 		fmt.Println("no organization context set")
 	}

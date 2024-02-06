@@ -45,9 +45,6 @@ func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return ErrNoShortName
-	}
 	userInviteInput = astrocore.CreateUserInviteRequest{
 		InviteeEmail: email,
 		Role:         role,
@@ -73,9 +70,6 @@ func UpdateUserRole(email, role string, out io.Writer, client astrocore.CoreClie
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return ErrNoShortName
 	}
 	// Get all org users
 	users, err := GetOrgUsers(client)
@@ -187,9 +181,6 @@ func GetOrgUsers(client astrocore.CoreClient) ([]astrocore.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	if ctx.OrganizationShortName == "" {
-		return nil, ErrNoShortName
-	}
 
 	for {
 		resp, err := client.ListOrgUsersWithResponse(httpContext.Background(), ctx.Organization, &astrocore.ListOrgUsersParams{
@@ -256,9 +247,6 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return ErrNoShortName
-	}
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
@@ -294,9 +282,6 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return ErrNoShortName
 	}
 	if workspace == "" {
 		workspace = ctx.Workspace
@@ -363,9 +348,7 @@ func GetWorkspaceUsers(client astrocore.CoreClient, workspace string, limit int)
 	if err != nil {
 		return nil, err
 	}
-	if ctx.OrganizationShortName == "" {
-		return nil, ErrNoShortName
-	}
+
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
@@ -424,9 +407,6 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return ErrNoShortName
-	}
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
@@ -473,9 +453,6 @@ func GetUser(client astrocore.CoreClient, userID string) (user astrocore.User, e
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return user, err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user, ErrNoShortName
 	}
 
 	resp, err := client.GetUserWithResponse(httpContext.Background(), ctx.Organization, userID)
