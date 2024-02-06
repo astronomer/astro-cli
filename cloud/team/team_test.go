@@ -341,18 +341,6 @@ func TestListOrgTeam(t *testing.T) {
 		assert.EqualError(t, err, "failed to list teams")
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = ListOrgTeams(out, mockClient)
-		assert.ErrorIs(t, err, ErrNoShortName)
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -471,18 +459,6 @@ func TestUpdateWorkspaceTeamRole(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = UpdateWorkspaceTeamRole(team1.Id, "WORKSPACE_MEMBER", "", out, mockClient)
-		assert.EqualError(t, err, "cannot retrieve organization short name from context")
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -567,18 +543,6 @@ func TestAddWorkspaceTeam(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = AddWorkspaceTeam(team1.Id, "WORKSPACE_MEMBER", "", out, mockClient)
-		assert.ErrorIs(t, err, ErrNoShortName)
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -653,18 +617,6 @@ func TestRemoveWorkspaceTeam(t *testing.T) {
 		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceTeamResponseError, nil).Once()
 		err := RemoveWorkspaceTeam(team1.Id, "", out, mockClient)
 		assert.EqualError(t, err, "failed to update team")
-	})
-
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = RemoveWorkspaceTeam(team1.Id, "", out, mockClient)
-		assert.EqualError(t, err, "cannot retrieve organization short name from context")
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -772,18 +724,6 @@ func TestDelete(t *testing.T) {
 		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseError, nil).Once()
 		err := Delete(team1.Id, out, mockClient)
 		assert.EqualError(t, err, "failed to update team")
-	})
-
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = Delete(team1.Id, out, mockClient)
-		assert.EqualError(t, err, "cannot retrieve organization short name from context")
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -959,18 +899,6 @@ func TestUpdate(t *testing.T) {
 		assert.EqualError(t, err, "failed to update team")
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = UpdateTeam(team1.Id, "name", "description", "", out, mockClient)
-		assert.EqualError(t, err, "cannot retrieve organization short name from context")
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -1045,18 +973,6 @@ func TestCreate(t *testing.T) {
 		mockClient.On("CreateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateTeamResponseError, nil).Once()
 		err := CreateTeam(team1.Name, *team1.Description, "ORGANIZATION_MEMBER", out, mockClient)
 		assert.EqualError(t, err, "failed to update team")
-	})
-
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = CreateTeam(team1.Name, *team1.Description, "ORGANIZATION_MEMBER", out, mockClient)
-		assert.EqualError(t, err, "cannot retrieve organization short name from context")
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -1150,18 +1066,6 @@ func TestAddUser(t *testing.T) {
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseError, nil).Once()
 		err := AddUser(team1.Id, user1.Id, out, mockClient)
 		assert.EqualError(t, err, "failed to update team membership")
-	})
-
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = AddUser(team1.Id, user1.Id, out, mockClient)
-		assert.EqualError(t, err, "cannot retrieve organization short name from context")
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -1337,18 +1241,6 @@ func TestRemoveUser(t *testing.T) {
 		assert.EqualError(t, err, "failed to update team membership")
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = RemoveUser(team1.Id, user1.Id, out, mockClient)
-		assert.EqualError(t, err, "cannot retrieve organization short name from context")
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -1450,18 +1342,6 @@ func TestListTeamUsers(t *testing.T) {
 		assert.EqualError(t, err, "failed to get team")
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = ListTeamUsers(team1.Id, out, mockClient)
-		assert.ErrorIs(t, err, ErrNoShortName)
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -1524,17 +1404,6 @@ func TestGetTeam(t *testing.T) {
 
 		_, err := GetTeam(mockClient, team1.Id)
 		assert.EqualError(t, err, "failed to get team")
-	})
-
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		_, err = GetTeam(mockClient, team1.Id)
-		assert.ErrorIs(t, err, ErrNoShortName)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {

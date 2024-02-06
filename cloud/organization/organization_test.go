@@ -328,7 +328,7 @@ func TestListClusters(t *testing.T) {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	orgId := "test-org-id"
+	orgID := "test-org-id"
 	mockListClustersResponse := astroplatformcore.ListClustersResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -349,14 +349,14 @@ func TestListClusters(t *testing.T) {
 
 	t.Run("successful list all clusters", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		clusters, err := ListClusters(orgId, mockPlatformCoreClient)
+		clusters, err := ListClusters(orgID, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, len(clusters), 2)
 	})
 
 	t.Run("error on listing clusters", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListClustersResponse{}, errNetwork).Once()
-		_, err := ListClusters(orgId, mockPlatformCoreClient)
+		_, err := ListClusters(orgID, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errNetwork)
 	})
 }

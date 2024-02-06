@@ -230,19 +230,6 @@ func TestCreateInvite(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
-		err = CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
-		assert.ErrorIs(t, err, ErrNoShortName)
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -329,18 +316,6 @@ func TestUpdateUserRole(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
-		assert.ErrorIs(t, err, ErrNoShortName)
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -401,18 +376,6 @@ func TestListOrgUser(t *testing.T) {
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseError, nil).Twice()
 		err := ListOrgUsers(out, mockClient)
 		assert.EqualError(t, err, "failed to list users")
-	})
-
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = ListOrgUsers(out, mockClient)
-		assert.ErrorIs(t, err, ErrNoShortName)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
@@ -534,18 +497,6 @@ func TestUpdateWorkspaceUserRole(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = UpdateWorkspaceUserRole("user@1.com", "WORKSPACE_MEMBER", "", out, mockClient)
-		assert.ErrorIs(t, err, ErrNoShortName)
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -622,18 +573,6 @@ func TestAddWorkspaceUser(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = AddWorkspaceUser("user@1.com", "WORKSPACE_MEMBER", "", out, mockClient)
-		assert.ErrorIs(t, err, ErrNoShortName)
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -702,18 +641,6 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		assert.EqualError(t, err, "failed to update user")
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = RemoveWorkspaceUser("user@1.com", "", out, mockClient)
-		assert.ErrorIs(t, err, ErrNoShortName)
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -776,17 +703,6 @@ func TestGetUser(t *testing.T) {
 
 		_, err := GetUser(mockClient, user1.Id)
 		assert.EqualError(t, err, "network error")
-	})
-
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		_, err = GetUser(mockClient, user1.Id)
-		assert.ErrorIs(t, err, ErrNoShortName)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
