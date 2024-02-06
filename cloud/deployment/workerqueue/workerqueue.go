@@ -91,11 +91,10 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			}
 		}
 		if name == "" {
-			queueToCreateOrUpdate.Name, err = getQueueName(name, action, &requestedDeployment, out)
+			name, err = getQueueName(name, action, &requestedDeployment, out)
 			if err != nil {
 				return err
 			}
-			name = queueToCreateOrUpdate.Name
 		}
 		if action == updateAction && workerType == "" {
 			// get workerType
