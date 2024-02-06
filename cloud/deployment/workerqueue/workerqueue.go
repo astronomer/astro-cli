@@ -74,6 +74,37 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	defaultOptions = deploymentOptions.WorkerQueues
 
 	if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
+		// create listToCreate
+		if requestedDeployment.WorkerQueues != nil {
+			queues := *requestedDeployment.WorkerQueues
+			for i := range *requestedDeployment.WorkerQueues {
+				existingQueueRequest := astroplatformcore.WorkerQueueRequest{
+					Name:              queues[i].Name,
+					Id:                &queues[i].Id,
+					IsDefault:         queues[i].IsDefault,
+					MaxWorkerCount:    queues[i].MaxWorkerCount,
+					MinWorkerCount:    queues[i].MinWorkerCount,
+					WorkerConcurrency: queues[i].WorkerConcurrency,
+					AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(*queues[i].AstroMachine),
+				}
+				listToCreate = append(listToCreate, existingQueueRequest)
+			}
+		}
+		if name == "" {
+			name, err = getQueueName(name, action, &requestedDeployment, out)
+			if err != nil {
+				return err
+			}
+		}
+		if action == updateAction && workerType == "" {
+			// get workerType
+			for i := range listToCreate {
+				if name == listToCreate[i].Name {
+					workerType = string(listToCreate[i].AstroMachine)
+				}
+			}
+		}
+
 		WorkerMachines := deploymentOptions.WorkerMachines
 		// get the machine to use
 		workerMachine, err = selectWorkerMachine(workerType, WorkerMachines, out)
@@ -92,30 +123,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			MaxWorkerCount:    wQueueMax,         // use the value from the user input
 			WorkerConcurrency: wQueueConcurrency, // use the value from the user input
 		}
-		// create listToCreate
-		if requestedDeployment.WorkerQueues != nil {
-			queues := *requestedDeployment.WorkerQueues
-			for i := range *requestedDeployment.WorkerQueues {
-				existingQueueRequest := astroplatformcore.WorkerQueueRequest{
-					Name:              queues[i].Name,
-					Id:                &queues[i].Id,
-					IsDefault:         queues[i].IsDefault,
-					MaxWorkerCount:    queues[i].MaxWorkerCount,
-					MinWorkerCount:    queues[i].MinWorkerCount,
-					WorkerConcurrency: queues[i].WorkerConcurrency,
-					AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(*queues[i].AstroMachine),
-				}
-				listToCreate = append(listToCreate, existingQueueRequest)
-			}
-		}
-		if name == "" {
-			queueToCreateOrUpdate.Name, err = getQueueName(name, action, &requestedDeployment, out)
-			if err != nil {
-				return err
-			}
-			name = queueToCreateOrUpdate.Name
-		}
-		queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
+		queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions, &workerMachine)
 	} else {
 		// get the node poolID to use
 		cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, platformCoreClient)
@@ -243,7 +251,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 }
 
 // SetWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
-func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astroplatformcore.WorkerQueueRequest, workerQueueDefaultOptions astroplatformcore.WorkerQueueOptions) *astroplatformcore.WorkerQueueRequest {
+func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astroplatformcore.WorkerQueueRequest, workerQueueDefaultOptions astroplatformcore.WorkerQueueOptions, machineOptions *astroplatformcore.WorkerMachine) *astroplatformcore.WorkerQueueRequest {
 	// -1 is the CLI default to allow users to request wQueueMin=0
 	if wQueueMin == -1 {
 		// set default value as user input did not have it
@@ -254,10 +262,9 @@ func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQue
 		// set default value as user input did not have it
 		workerQueueToCreate.MaxWorkerCount = int(workerQueueDefaultOptions.MaxWorkers.Default)
 	}
-
 	if wQueueConcurrency == 0 {
 		// set default value as user input did not have it
-		workerQueueToCreate.WorkerConcurrency = int(workerQueueDefaultOptions.WorkerConcurrency.Default)
+		workerQueueToCreate.WorkerConcurrency = int(machineOptions.Concurrency.Default)
 	}
 	return workerQueueToCreate
 }
