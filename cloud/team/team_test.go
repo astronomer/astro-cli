@@ -14,7 +14,6 @@ import (
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-	"github.com/astronomer/astro-cli/config"
 	"github.com/stretchr/testify/mock"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -379,18 +378,6 @@ func TestListWorkspaceTeam(t *testing.T) {
 		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseError, nil).Twice()
 		err := ListWorkspaceTeams(out, mockClient, "")
 		assert.EqualError(t, err, "failed to list teams")
-	})
-
-	t.Run("error path when no Workspaceanization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = ListWorkspaceTeams(out, mockClient, "")
-		assert.ErrorIs(t, err, ErrNoShortName)
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {

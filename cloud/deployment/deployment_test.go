@@ -202,7 +202,7 @@ const (
 	ws        = "workspace-id"
 	dagDeploy = "disable"
 	region    = "us-central1"
-	mockOrgId = "test-org-id"
+	mockOrgID = "test-org-id"
 )
 
 var (
@@ -1138,7 +1138,7 @@ func TestSelectCluster(t *testing.T) {
 	t.Run("list cluster failure", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListClustersResponse{}, errMock).Once()
 
-		_, err := selectCluster("", mockOrgId, mockPlatformCoreClient)
+		_, err := selectCluster("", mockOrgID, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errMock)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
@@ -1162,7 +1162,7 @@ func TestSelectCluster(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		resp, err := selectCluster("", mockOrgId, mockPlatformCoreClient)
+		resp, err := selectCluster("", mockOrgID, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, csID, resp)
 	})
@@ -1186,14 +1186,14 @@ func TestSelectCluster(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		_, err = selectCluster("", mockOrgId, mockPlatformCoreClient)
+		_, err = selectCluster("", mockOrgID, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, ErrInvalidClusterKey)
 	})
 
 	t.Run("not able to find cluster", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 
-		_, err := selectCluster("test-invalid-id", mockOrgId, mockPlatformCoreClient)
+		_, err := selectCluster("test-invalid-id", mockOrgID, mockPlatformCoreClient)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to find specified Cluster")
 	})

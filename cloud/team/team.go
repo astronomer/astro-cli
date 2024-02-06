@@ -24,7 +24,6 @@ var (
 	ErrInvalidName              = errors.New("no name provided for the team. Retry with a valid name")
 	ErrTeamNotFound             = errors.New("no team was found for the ID you provided")
 	ErrWrongEnforceInput        = errors.New("the input to the `--enforce-cicd` flag")
-	ErrNoShortName              = errors.New("cannot retrieve organization short name from context")
 	ErrNoTeamsFoundInOrg        = errors.New("no teams found in your organization")
 	ErrNoTeamsFoundInWorkspace  = errors.New("no teams found in your workspace")
 	ErrNoTeamMembersFoundInTeam = errors.New("no team members found in team")
