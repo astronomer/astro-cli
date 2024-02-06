@@ -88,7 +88,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 					AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(*queues[i].AstroMachine),
 				}
 				listToCreate = append(listToCreate, existingQueueRequest)
-				fmt.Println(queues[i].WorkerConcurrency)
 			}
 		}
 		if name == "" {
@@ -125,35 +124,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			MaxWorkerCount:    wQueueMax,         // use the value from the user input
 			WorkerConcurrency: wQueueConcurrency, // use the value from the user input
 		}
-		fmt.Println("worker con:" + fmt.Sprint(queueToCreateOrUpdate.WorkerConcurrency))
-
-		// // create listToCreate
-		// if requestedDeployment.WorkerQueues != nil {
-		// 	queues := *requestedDeployment.WorkerQueues
-		// 	for i := range *requestedDeployment.WorkerQueues {
-		// 		existingQueueRequest := astroplatformcore.WorkerQueueRequest{
-		// 			Name:              queues[i].Name,
-		// 			Id:                &queues[i].Id,
-		// 			IsDefault:         queues[i].IsDefault,
-		// 			MaxWorkerCount:    queues[i].MaxWorkerCount,
-		// 			MinWorkerCount:    queues[i].MinWorkerCount,
-		// 			WorkerConcurrency: queues[i].WorkerConcurrency,
-		// 			AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(*queues[i].AstroMachine),
-		// 		}
-		// 		listToCreate = append(listToCreate, existingQueueRequest)
-		// 		fmt.Println(queues[i].WorkerConcurrency)
-		// 	}
-		// }
-		// if name == "" {
-		// 	queueToCreateOrUpdate.Name, err = getQueueName(name, action, &requestedDeployment, out)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	name = queueToCreateOrUpdate.Name
-		// }
 		queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions, &workerMachine)
-		fmt.Println("default options:")
-		fmt.Println(defaultOptions.WorkerConcurrency)
 	} else {
 		// get the node poolID to use
 		cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, platformCoreClient)
@@ -198,10 +169,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	switch *requestedDeployment.Executor {
 	case astroplatformcore.DeploymentExecutorCELERY:
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-			fmt.Println(queueToCreateOrUpdate.WorkerConcurrency)
-			fmt.Println("worker machine options:")
-			fmt.Println(workerMachine.Concurrency.Ceiling)
-			fmt.Println(workerMachine.Concurrency.Default)
 			err = IsHostedCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &workerMachine)
 			if err != nil {
 				return err
@@ -296,7 +263,6 @@ func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQue
 		// set default value as user input did not have it
 		workerQueueToCreate.MaxWorkerCount = int(workerQueueDefaultOptions.MaxWorkers.Default)
 	}
-	fmt.Println(workerQueueDefaultOptions.WorkerConcurrency.Default)
 	if wQueueConcurrency == 0 {
 		// set default value as user input did not have it
 		workerQueueToCreate.WorkerConcurrency = int(machineOptions.Concurrency.Default)
@@ -363,7 +329,6 @@ func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue *astroplatformcore
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	// The floor for worker concurrency for hosted deployments is always 1 for all astro machines
-	fmt.Println(requestedWorkerQueue.WorkerConcurrency)
 	workerConcurrenyFloor := 1
 	if !(requestedWorkerQueue.WorkerConcurrency >= workerConcurrenyFloor) ||
 		!(requestedWorkerQueue.WorkerConcurrency <= int(machineOptions.Concurrency.Ceiling)) {
