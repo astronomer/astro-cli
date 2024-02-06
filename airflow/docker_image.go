@@ -36,11 +36,9 @@ const (
 
 var errGetImageLabel = errors.New("error getting image label")
 
-func realGetDockerClient() (client.APIClient, error) {
+var getDockerClient = func() (client.APIClient, error) {
 	return client.NewClientWithOpts(client.FromEnv)
 }
-
-var getDockerClient func() (client.APIClient, error) = realGetDockerClient
 
 type DockerImage struct {
 	imageName string
