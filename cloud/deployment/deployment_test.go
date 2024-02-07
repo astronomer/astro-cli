@@ -823,7 +823,7 @@ func TestLogs(t *testing.T) {
 	t.Run("query for more than one log level error", func(t *testing.T) {
 		err := Logs(deploymentID, ws, "", "", true, true, true, logCount, mockPlatformCoreClient, mockCoreClient)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot query for more than one log level at a time")
+		assert.Equal(t, err.Error(), "cannot query for more than one log level and or keyword at a time")
 	})
 }
 
