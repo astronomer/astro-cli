@@ -33,7 +33,7 @@ func TestDeploy(t *testing.T) {
 		return deploymentID, nil
 	}
 
-	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
 		return nil
 	}
 
