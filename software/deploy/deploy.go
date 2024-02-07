@@ -28,6 +28,8 @@ var (
 	deployImagePlatformSupport = []string{"linux/amd64"}
 
 	gzipFile = fileutil.GzipFile
+
+	getDeploymentIdForCurrentCommandVar = getDeploymentIdForCurrentCommand
 )
 
 var (
@@ -64,71 +66,13 @@ var tab = printutil.Table{
 }
 
 func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
-	if wsID == "" {
-		return deploymentID, ErrNoWorkspaceID
-	}
-
-	// Validate workspace
-	currentWorkspace, err := houston.Call(houstonClient.GetWorkspace)(wsID)
+	deploymentID, deployments, err := getDeploymentIdForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
 		return deploymentID, err
 	}
 
-	// Get Deployments from workspace ID
-	request := houston.ListDeploymentsRequest{
-		WorkspaceID: currentWorkspace.ID,
-	}
-	deployments, err := houston.Call(houstonClient.ListDeployments)(request)
-	if err != nil {
-		return deploymentID, err
-	}
-
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return deploymentID, err
-	}
-
+	c, _ := config.GetCurrentContext()
 	cloudDomain := c.Domain
-	if cloudDomain == "" {
-		return deploymentID, errNoDomainSet
-	}
-
-	// Use config deployment if provided
-	if deploymentID == "" {
-		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
-	}
-
-	if deploymentID != "" && !deploymentExists(deploymentID, deployments) {
-		return deploymentID, errInvalidDeploymentID
-	}
-
-	// Prompt user for deployment if no deployment passed in
-	if deploymentID == "" || prompt {
-		if len(deployments) == 0 {
-			return deploymentID, errDeploymentNotFound
-		}
-
-		fmt.Printf(houstonDeploymentHeader, cloudDomain)
-		fmt.Println(houstonSelectDeploymentPrompt)
-
-		deployMap := map[string]houston.Deployment{}
-		for i := range deployments {
-			deployment := deployments[i]
-			index := i + 1
-			tab.AddRow([]string{strconv.Itoa(index), deployment.Label, deployment.ReleaseName, currentWorkspace.Label, deployment.ID}, false)
-
-			deployMap[strconv.Itoa(index)] = deployment
-		}
-
-		tab.Print(os.Stdout)
-		choice := input.Text("\n> ")
-		selected, ok := deployMap[choice]
-		if !ok {
-			return deploymentID, errInvalidDeploymentSelected
-		}
-		deploymentID = selected.ID
-	}
-
 	nextTag := ""
 	releaseName := ""
 	for i := range deployments {
@@ -296,6 +240,74 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 	return ""
 }
 
+func getDeploymentIdForCurrentCommand(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+	if wsID == "" {
+		return deploymentID, []houston.Deployment{}, ErrNoWorkspaceID
+	}
+
+	// Validate workspace
+	currentWorkspace, err := houston.Call(houstonClient.GetWorkspace)(wsID)
+	if err != nil {
+		return deploymentID, []houston.Deployment{}, err
+	}
+
+	// Get Deployments from workspace ID
+	request := houston.ListDeploymentsRequest{
+		WorkspaceID: currentWorkspace.ID,
+	}
+	deployments, err := houston.Call(houstonClient.ListDeployments)(request)
+	if err != nil {
+		return deploymentID, deployments, err
+	}
+
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return deploymentID, deployments, err
+	}
+
+	cloudDomain := c.Domain
+	if cloudDomain == "" {
+		return deploymentID, deployments, errNoDomainSet
+	}
+
+	// Use config deployment if provided
+	if deploymentID == "" {
+		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
+	}
+
+	if deploymentID != "" && !deploymentExists(deploymentID, deployments) {
+		return deploymentID, deployments, errInvalidDeploymentID
+	}
+
+	// Prompt user for deployment if no deployment passed in
+	if deploymentID == "" || prompt {
+		if len(deployments) == 0 {
+			return deploymentID, deployments, errDeploymentNotFound
+		}
+
+		fmt.Printf(houstonDeploymentHeader, cloudDomain)
+		fmt.Println(houstonSelectDeploymentPrompt)
+
+		deployMap := map[string]houston.Deployment{}
+		for i := range deployments {
+			deployment := deployments[i]
+			index := i + 1
+			tab.AddRow([]string{strconv.Itoa(index), deployment.Label, deployment.ReleaseName, currentWorkspace.Label, deployment.ID}, false)
+
+			deployMap[strconv.Itoa(index)] = deployment
+		}
+
+		tab.Print(os.Stdout)
+		choice := input.Text("\n> ")
+		selected, ok := deployMap[choice]
+		if !ok {
+			return deploymentID, deployments, errInvalidDeploymentSelected
+		}
+		deploymentID = selected.ID
+	}
+	return deploymentID, deployments, nil
+}
+
 func isDagOnlyDeploymentEnabled(appConfig *houston.AppConfig) bool {
 	return appConfig != nil && appConfig.Flags.DagOnlyDeployment
 }
@@ -320,11 +332,17 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 	return fmt.Sprintf("https://deployments.%s/%s/dags/upload", c.Domain, deploymentInfo.ReleaseName)
 }
 
-func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID string, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
 		return ErrDagOnlyDeployDisabledInConfig
 	}
+
+	deploymentIdForCurrentCmd, _, err := getDeploymentIdForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
+	if err != nil {
+		return err
+	}
+	deploymentID = deploymentIdForCurrentCmd
 
 	if deploymentID == "" {
 		return errInvalidDeploymentID
