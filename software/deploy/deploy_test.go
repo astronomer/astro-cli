@@ -381,8 +381,8 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		houstonMock.AssertExpectations(t)
 	})
 
-	t.Run("When getDeploymentIdForCurrentCommandVar gives an error", func(t *testing.T) {
-		getDeploymentIdForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+	t.Run("When getDeploymentIDForCurrentCommandVar gives an error", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, errDeploymentNotFound
 		}
 		featureFlags := &houston.FeatureFlags{
@@ -399,7 +399,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 	})
 
 	t.Run("When config flag is set to true but an error occurs in the GetDeployment api call", func(t *testing.T) {
-		getDeploymentIdForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
 		featureFlags := &houston.FeatureFlags{
@@ -417,7 +417,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 	})
 
 	t.Run("When config flag is set to true but it is disabled at the deployment level", func(t *testing.T) {
-		getDeploymentIdForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
 		featureFlags := &houston.FeatureFlags{
@@ -440,7 +440,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 	})
 
 	t.Run("Valid Houston config, but unable to get context from astro-cli config", func(t *testing.T) {
-		getDeploymentIdForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
 		featureFlags := &houston.FeatureFlags{
@@ -466,7 +466,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 	})
 
 	t.Run("Valid Houston config, able to get context from config but no release name present", func(t *testing.T) {
-		getDeploymentIdForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
 		featureFlags := &houston.FeatureFlags{
@@ -490,7 +490,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 	})
 
 	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is empty. User doesn't give operation confirmation", func(t *testing.T) {
-		getDeploymentIdForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
 		featureFlags := &houston.FeatureFlags{
@@ -541,7 +541,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 	})
 
 	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is empty. User gives the operation confirmation", func(t *testing.T) {
-		getDeploymentIdForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
 		featureFlags := &houston.FeatureFlags{
@@ -615,7 +615,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 	})
 
 	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. Tar creation throws an error", func(t *testing.T) {
-		getDeploymentIdForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
 		featureFlags := &houston.FeatureFlags{
@@ -663,7 +663,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 	})
 
 	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. Tar is successfully created. But gzip creation throws an error", func(t *testing.T) {
-		getDeploymentIdForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
 		featureFlags := &houston.FeatureFlags{
@@ -716,7 +716,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 	})
 
 	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. No need of User confirmation", func(t *testing.T) {
-		getDeploymentIdForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
 		featureFlags := &houston.FeatureFlags{
@@ -776,7 +776,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 	})
 
 	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. No need of User confirmation. Files should be auto-cleaned", func(t *testing.T) {
-		getDeploymentIdForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
 		featureFlags := &houston.FeatureFlags{

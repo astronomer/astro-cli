@@ -29,7 +29,7 @@ var (
 
 	gzipFile = fileutil.GzipFile
 
-	getDeploymentIdForCurrentCommandVar = getDeploymentIdForCurrentCommand
+	getDeploymentIDForCurrentCommandVar = getDeploymentIdForCurrentCommand
 )
 
 var (
@@ -240,7 +240,7 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 	return ""
 }
 
-func getDeploymentIdForCurrentCommand(houstonClient houston.ClientInterface, wsID string, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+func getDeploymentIdForCurrentCommand(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 	if wsID == "" {
 		return deploymentID, []houston.Deployment{}, ErrNoWorkspaceID
 	}
@@ -332,17 +332,17 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 	return fmt.Sprintf("https://deployments.%s/%s/dags/upload", c.Domain, deploymentInfo.ReleaseName)
 }
 
-func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID string, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
 		return ErrDagOnlyDeployDisabledInConfig
 	}
 
-	deploymentIdForCurrentCmd, _, err := getDeploymentIdForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
+	deploymentIDForCurrentCmd, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
 	if err != nil {
 		return err
 	}
-	deploymentID = deploymentIdForCurrentCmd
+	deploymentID = deploymentIDForCurrentCmd
 
 	if deploymentID == "" {
 		return errInvalidDeploymentID
