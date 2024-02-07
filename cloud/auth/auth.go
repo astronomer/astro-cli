@@ -303,7 +303,7 @@ func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platfo
 	if activeOrg.Product != nil {
 		orgProduct = fmt.Sprintf("%s", *activeOrg.Product) //nolint
 	}
-	err = c.SetOrganizationContext(activeOrg.Id, activeOrg.Name, orgProduct)
+	err = c.SetOrganizationContext(activeOrg.Id, orgProduct)
 	if err != nil {
 		return err
 	}

@@ -198,11 +198,11 @@ var (
 )
 
 const (
-	org              = "test-org-id"
-	ws               = "workspace-id"
-	dagDeploy        = "disable"
-	region           = "us-central1"
-	mockOrgShortName = "test-org-short-name"
+	org       = "test-org-id"
+	ws        = "workspace-id"
+	dagDeploy = "disable"
+	region    = "us-central1"
+	mockOrgID = "test-org-id"
 )
 
 var (
@@ -1138,7 +1138,7 @@ func TestSelectCluster(t *testing.T) {
 	t.Run("list cluster failure", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListClustersResponse{}, errMock).Once()
 
-		_, err := selectCluster("", mockOrgShortName, mockPlatformCoreClient)
+		_, err := selectCluster("", mockOrgID, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errMock)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
@@ -1162,7 +1162,7 @@ func TestSelectCluster(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		resp, err := selectCluster("", mockOrgShortName, mockPlatformCoreClient)
+		resp, err := selectCluster("", mockOrgID, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, csID, resp)
 	})
@@ -1186,14 +1186,14 @@ func TestSelectCluster(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		_, err = selectCluster("", mockOrgShortName, mockPlatformCoreClient)
+		_, err = selectCluster("", mockOrgID, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, ErrInvalidClusterKey)
 	})
 
 	t.Run("not able to find cluster", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 
-		_, err := selectCluster("test-invalid-id", mockOrgShortName, mockPlatformCoreClient)
+		_, err := selectCluster("test-invalid-id", mockOrgID, mockPlatformCoreClient)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to find specified Cluster")
 	})
@@ -1221,7 +1221,6 @@ func TestCanCiCdDeploy(t *testing.T) {
 	permissions = []string{
 		"workspaceId:workspace-id",
 		"organizationId:org-ID",
-		"orgShortName:org-short-name",
 	}
 	mockClaims = util.CustomClaims{
 		Permissions: permissions,

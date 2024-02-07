@@ -26,15 +26,14 @@ type Contexts struct {
 
 // Context represents a single context
 type Context struct {
-	Domain                string `mapstructure:"domain"`
-	Organization          string `mapstructure:"organization"`
-	OrganizationShortName string `mapstructure:"organization_short_name"`
-	OrganizationProduct   string `mapstructure:"organization_product"`
-	Workspace             string `mapstructure:"workspace"`
-	LastUsedWorkspace     string `mapstructure:"last_used_workspace"`
-	Token                 string `mapstructure:"token"`
-	RefreshToken          string `mapstructure:"refreshtoken"`
-	UserEmail             string `mapstructure:"user_email"`
+	Domain              string `mapstructure:"domain"`
+	Organization        string `mapstructure:"organization"`
+	OrganizationProduct string `mapstructure:"organization_product"`
+	Workspace           string `mapstructure:"workspace"`
+	LastUsedWorkspace   string `mapstructure:"last_used_workspace"`
+	Token               string `mapstructure:"token"`
+	RefreshToken        string `mapstructure:"refreshtoken"`
+	UserEmail           string `mapstructure:"user_email"`
 }
 
 // GetCurrentContext looks up current context and gets corresponding Context struct
@@ -124,15 +123,14 @@ func (c *Context) SetContext() error {
 	}
 
 	context := map[string]string{
-		"token":                   c.Token,
-		"domain":                  c.Domain,
-		"organization":            c.Organization,
-		"organization_short_name": c.OrganizationShortName,
-		"organization_product":    c.OrganizationProduct,
-		"workspace":               c.Workspace,
-		"last_used_workspace":     c.Workspace,
-		"refreshtoken":            c.RefreshToken,
-		"user_email":              c.UserEmail,
+		"token":                c.Token,
+		"domain":               c.Domain,
+		"organization":         c.Organization,
+		"organization_product": c.OrganizationProduct,
+		"workspace":            c.Workspace,
+		"last_used_workspace":  c.Workspace,
+		"refreshtoken":         c.RefreshToken,
+		"user_email":           c.UserEmail,
 	}
 
 	viperHome.Set(contextsKey+"."+key, context)
@@ -162,12 +160,8 @@ func (c *Context) SetContextKey(key, value string) error {
 }
 
 // set organization id and short name in context config
-func (c *Context) SetOrganizationContext(orgID, orgShortName, orgProduct string) error {
+func (c *Context) SetOrganizationContext(orgID, orgProduct string) error {
 	err := c.SetContextKey("organization", orgID) // c.Organization
-	if err != nil {
-		return err
-	}
-	err = c.SetContextKey("organization_short_name", orgShortName)
 	if err != nil {
 		return err
 	}

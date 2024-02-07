@@ -309,7 +309,7 @@ func TestIsOrgHosted(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("org product is hosted", func(t *testing.T) {
 		ctx := config.Context{Domain: "localhost"}
-		ctx.SetOrganizationContext("org1", "org_short_name_1", "HOSTED")
+		ctx.SetOrganizationContext("org1", "HOSTED")
 
 		isHosted := IsOrgHosted()
 		assert.Equal(t, isHosted, true)
@@ -317,7 +317,7 @@ func TestIsOrgHosted(t *testing.T) {
 
 	t.Run("org product is hybrid", func(t *testing.T) {
 		ctx := config.Context{Domain: "localhost"}
-		ctx.SetOrganizationContext("org1", "org_short_name_1", "HYBRID")
+		ctx.SetOrganizationContext("org1", "HYBRID")
 
 		isHosted := IsOrgHosted()
 		assert.Equal(t, isHosted, false)
@@ -328,7 +328,7 @@ func TestListClusters(t *testing.T) {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	orgShortName := "test-org-name"
+	orgID := "test-org-id"
 	mockListClustersResponse := astroplatformcore.ListClustersResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -349,14 +349,14 @@ func TestListClusters(t *testing.T) {
 
 	t.Run("successful list all clusters", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		clusters, err := ListClusters(orgShortName, mockPlatformCoreClient)
+		clusters, err := ListClusters(orgID, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, len(clusters), 2)
 	})
 
 	t.Run("error on listing clusters", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListClustersResponse{}, errNetwork).Once()
-		_, err := ListClusters(orgShortName, mockPlatformCoreClient)
+		_, err := ListClusters(orgID, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errNetwork)
 	})
 }
@@ -367,6 +367,7 @@ func TestExportAuditLogs(t *testing.T) {
 	t.Run("export audit logs success", func(t *testing.T) {
 		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
 		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
 		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
 		assert.NoError(t, err)
@@ -386,6 +387,7 @@ func TestExportAuditLogs(t *testing.T) {
 	t.Run("export failure", func(t *testing.T) {
 		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
 		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
 		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
 		assert.Contains(t, err.Error(), "network error")
@@ -404,6 +406,7 @@ func TestExportAuditLogs(t *testing.T) {
 	t.Run("organization list error", func(t *testing.T) {
 		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
 		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponseError, nil).Once()
 		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
 		assert.Contains(t, err.Error(), "failed to fetch organizations audit logs")

@@ -96,9 +96,6 @@ func CreateToken(name, description, role, workspace string, expiration int, clea
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
@@ -135,9 +132,6 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
 	}
 	if workspace == "" {
 		workspace = ctx.Workspace
@@ -213,9 +207,6 @@ func RotateToken(id, name, workspace string, cleanOutput, force bool, out io.Wri
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
@@ -272,9 +263,6 @@ func DeleteToken(id, name, workspace string, force bool, out io.Writer, client a
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
 	}
 	if workspace == "" {
 		workspace = ctx.Workspace
@@ -387,9 +375,6 @@ func getWorkspaceTokens(workspace string, client astrocore.CoreClient) ([]astroc
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return []astrocore.ApiToken{}, err
-	}
-	if ctx.OrganizationShortName == "" {
-		return []astrocore.ApiToken{}, user.ErrNoShortName
 	}
 	if workspace == "" {
 		workspace = ctx.Workspace
