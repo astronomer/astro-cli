@@ -137,7 +137,7 @@ func List(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcor
 	return nil
 }
 
-func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs bool, logCount int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
+func Logs(deploymentID, ws, deploymentName, keyword string, warnLogs, errorLogs, infoLogs bool, logCount int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 	var logLevel string
 	var i int
 	// log level
@@ -153,8 +153,12 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 		logLevel = "INFO"
 		i++
 	}
+	if keyword != "" {
+		logLevel = keyword
+		i++
+	}
 	if i > 1 {
-		return errors.New("cannot query for more than one log level at a time")
+		return errors.New("cannot query for more than one log level and or keyword at a time")
 	}
 
 	// get deployment

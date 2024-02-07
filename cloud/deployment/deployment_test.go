@@ -764,7 +764,7 @@ func TestLogs(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, nil).Once()
 
-		err := Logs(deploymentID, ws, "", true, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
+		err := Logs(deploymentID, ws, "", "", true, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -796,7 +796,7 @@ func TestLogs(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Logs("", ws, "", false, false, false, 1, mockPlatformCoreClient, mockCoreClient)
+		err = Logs("", ws, "", "keyword", false, false, false, 1, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -813,7 +813,7 @@ func TestLogs(t *testing.T) {
 		// Mock GetDeploymentLogsWithResponse to return an error
 		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, errMock).Once()
 
-		err := Logs(deploymentID, ws, "", false, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
+		err := Logs(deploymentID, ws, "", "", false, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
 		assert.ErrorIs(t, err, errMock)
 
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -821,7 +821,7 @@ func TestLogs(t *testing.T) {
 	})
 
 	t.Run("query for more than one log level error", func(t *testing.T) {
-		err := Logs(deploymentID, ws, "", true, true, true, logCount, mockPlatformCoreClient, mockCoreClient)
+		err := Logs(deploymentID, ws, "", "", true, true, true, logCount, mockPlatformCoreClient, mockCoreClient)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot query for more than one log level at a time")
 	})
