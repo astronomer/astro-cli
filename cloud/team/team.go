@@ -24,7 +24,6 @@ var (
 	ErrInvalidName              = errors.New("no name provided for the team. Retry with a valid name")
 	ErrTeamNotFound             = errors.New("no team was found for the ID you provided")
 	ErrWrongEnforceInput        = errors.New("the input to the `--enforce-cicd` flag")
-	ErrNoShortName              = errors.New("cannot retrieve organization short name from context")
 	ErrNoTeamsFoundInOrg        = errors.New("no teams found in your organization")
 	ErrNoTeamsFoundInWorkspace  = errors.New("no teams found in your workspace")
 	ErrNoTeamMembersFoundInTeam = errors.New("no team members found in team")
@@ -54,9 +53,6 @@ func CreateTeam(name, description, role string, out io.Writer, client astrocore.
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
 	teamCreateRequest := astrocore.CreateTeamJSONRequestBody{
 		Description:      &description,
 		Name:             name,
@@ -79,10 +75,6 @@ func GetTeam(client astrocore.CoreClient, teamID string) (team astrocore.Team, e
 	if err != nil {
 		return team, err
 	}
-	if ctx.OrganizationShortName == "" {
-		return team, ErrNoShortName
-	}
-
 	resp, err := client.GetTeamWithResponse(httpContext.Background(), ctx.Organization, teamID)
 	if err != nil {
 		return team, err
@@ -105,9 +97,6 @@ func UpdateWorkspaceTeamRole(id, role, workspace string, out io.Writer, client a
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
 	}
 	if workspace == "" {
 		workspace = ctx.Workspace
@@ -155,9 +144,6 @@ func UpdateTeam(id, name, description, role string, out io.Writer, client astroc
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
 	}
 
 	var team astrocore.Team
@@ -238,9 +224,6 @@ func RemoveWorkspaceTeam(id, workspace string, out io.Writer, client astrocore.C
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
@@ -317,9 +300,6 @@ func GetWorkspaceTeams(client astrocore.CoreClient, workspace string, limit int)
 	if err != nil {
 		return nil, err
 	}
-	if ctx.OrganizationShortName == "" {
-		return nil, ErrNoShortName
-	}
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
@@ -394,9 +374,6 @@ func AddWorkspaceTeam(id, role, workspace string, out io.Writer, client astrocor
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return ErrNoShortName
-	}
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
@@ -449,9 +426,6 @@ func GetOrgTeams(client astrocore.CoreClient) ([]astrocore.Team, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
-	}
-	if ctx.OrganizationShortName == "" {
-		return nil, ErrNoShortName
 	}
 
 	for {
@@ -509,9 +483,6 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
 
 	var team astrocore.Team
 	if id == "" {
@@ -559,9 +530,6 @@ func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.Cor
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
 	}
 
 	var team astrocore.Team
@@ -634,9 +602,6 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
 	}
 
 	var team astrocore.Team

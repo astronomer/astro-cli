@@ -130,7 +130,7 @@ func SwitchWithContext(domain string, targetOrg *astroplatformcore.Organization,
 	if targetOrg.Product != nil {
 		orgProduct = fmt.Sprintf("%s", *targetOrg.Product) //nolint
 	}
-	_ = c.SetOrganizationContext(targetOrg.Id, targetOrg.Name, orgProduct)
+	_ = c.SetOrganizationContext(targetOrg.Id, orgProduct)
 	// need to reset all relevant keys because of https://github.com/spf13/viper/issues/1106 :shrug
 	_ = c.SetContextKey("token", c.Token)
 	_ = c.SetContextKey("refreshtoken", c.RefreshToken)
@@ -188,6 +188,10 @@ func Switch(orgNameOrID string, coreClient astrocore.CoreClient, platformCoreCli
 // Write the audit logs to the provided io.Writer.
 func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, orgName, filePath string, earliest int) error {
 	var orgID string
+	or, err := ListOrganizations(platformCoreClient)
+	if err != nil {
+		return err
+	}
 	if orgName == "" {
 		// get current context
 		c, err := context.GetCurrentContext()
@@ -195,12 +199,13 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astropl
 			return err
 		}
 		orgID = c.Organization
-		orgName = c.OrganizationShortName
-	} else {
-		or, err := ListOrganizations(platformCoreClient)
-		if err != nil {
-			return err
+		for i := range or {
+			if orgID == or[i].Id {
+				orgName = or[i].Name
+				break
+			}
 		}
+	} else {
 		for i := range or {
 			if orgName == or[i].Name {
 				orgID = or[i].Id
@@ -213,11 +218,11 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astropl
 	}
 	earliestString := fmt.Sprint(earliest)
 	if filePath == "" {
-		orgShortName := strings.ReplaceAll(strings.ToLower(orgName), " ", "")
+		orgName = strings.ReplaceAll(strings.ToLower(orgName), " ", "")
 
 		currentTime := time.Now()
 		date := "-" + currentTime.Format("20060102")
-		filePath = fmt.Sprintf("%s-logs-%d-day%s%s.ndjson.gz", orgShortName, earliest, pluralize(earliest), date)
+		filePath = fmt.Sprintf("%s-logs-%d-day%s%s.ndjson.gz", orgName, earliest, pluralize(earliest), date)
 	}
 
 	organizationAuditLogsParams := &astrocore.GetOrganizationAuditLogsParams{
