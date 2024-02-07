@@ -29,7 +29,7 @@ var (
 
 	gzipFile = fileutil.GzipFile
 
-	getDeploymentIDForCurrentCommandVar = getDeploymentIdForCurrentCommand
+	getDeploymentIDForCurrentCommandVar = getDeploymentIDForCurrentCommand
 )
 
 var (
@@ -66,7 +66,7 @@ var tab = printutil.Table{
 }
 
 func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
-	deploymentID, deployments, err := getDeploymentIdForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
+	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
 		return deploymentID, err
 	}
@@ -240,7 +240,7 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 	return ""
 }
 
-func getDeploymentIdForCurrentCommand(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+func getDeploymentIDForCurrentCommand(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 	if wsID == "" {
 		return deploymentID, []houston.Deployment{}, ErrNoWorkspaceID
 	}
