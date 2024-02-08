@@ -435,7 +435,7 @@ func TestDeployDagsOnlyFailure(t *testing.T) {
 		}
 		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
 		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
-		assert.ErrorIs(t, err, errDagOnlyDeployNotEnabledForDeployment)
+		assert.ErrorIs(t, err, ErrDagOnlyDeployNotEnabledForDeployment)
 		houstonMock.AssertExpectations(t)
 	})
 
