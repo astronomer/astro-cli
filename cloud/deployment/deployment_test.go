@@ -498,7 +498,7 @@ func TestGetDeployment(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
 		// Mock os.Stdin
-		input := []byte("y")
+		input := []byte("1")
 		r, w, err := os.Pipe()
 		if err != nil {
 			t.Fatal(err)
