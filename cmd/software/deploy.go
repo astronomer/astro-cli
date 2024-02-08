@@ -1,6 +1,7 @@
 package software
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/astronomer/astro-cli/cmd/utils"
@@ -107,7 +108,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 
 	err = DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true)
 	// Don't throw the error if dag-deploy itself is disabled
-	if err == deploy.ErrDagOnlyDeployDisabledInConfig || err == deploy.ErrDagOnlyDeployNotEnabledForDeployment {
+	if errors.Is(err, deploy.ErrDagOnlyDeployDisabledInConfig) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
 		return nil
 	}
 	return err
