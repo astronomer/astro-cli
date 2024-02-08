@@ -158,7 +158,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, warnLogs, errorLogs,
 		i++
 	}
 	if i > 1 {
-		return errors.New("cannot query for more than one log level and or keyword at a time")
+		return errors.New("cannot query for more than one log level and/or keyword at a time")
 	}
 
 	// get deployment
