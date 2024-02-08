@@ -1,6 +1,7 @@
 package software
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/astronomer/astro-cli/cmd/utils"
@@ -97,12 +98,18 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		byoRegistryDomain = appConfig.BYORegistryDomain
 	}
 	if isDagOnlyDeploy {
-		return DagsOnlyDeploy(houstonClient, appConfig, deploymentID, config.WorkingPath, nil, true)
+		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true)
 	}
 	// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
 	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
 	if err != nil {
 		return err
 	}
-	return DagsOnlyDeploy(houstonClient, appConfig, deploymentID, config.WorkingPath, nil, true)
+
+	err = DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true)
+	// Don't throw the error if dag-deploy itself is disabled
+	if errors.Is(err, deploy.ErrDagOnlyDeployDisabledInConfig) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
+		return nil
+	}
+	return err
 }

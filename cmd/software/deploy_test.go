@@ -33,7 +33,7 @@ func TestDeploy(t *testing.T) {
 		return deploymentID, nil
 	}
 
-	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
 		return nil
 	}
 
@@ -61,9 +61,18 @@ func TestDeploy(t *testing.T) {
 		}
 	})
 
-	t.Run("error should be returned for astro deploy, if dags deploy throws error", func(t *testing.T) {
+	t.Run("error should be returned for astro deploy, if dags deploy throws error and the feature is enabled", func(t *testing.T) {
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+			return deploy.ErrNoWorkspaceID
+		}
 		err := execDeployCmd([]string{"-f"}...)
-		assert.ErrorIs(t, err, deploy.ErrDagOnlyDeployDisabledInConfig)
+		assert.ErrorIs(t, err, deploy.ErrNoWorkspaceID)
+		DagsOnlyDeploy = deploy.DagsOnlyDeploy
+	})
+
+	t.Run("No error should be returned for astro deploy, if dags deploy throws error but the feature itself is disabled", func(t *testing.T) {
+		err := execDeployCmd([]string{"-f"}...)
+		assert.ErrorIs(t, err, nil)
 	})
 
 	t.Run("Test for the flag --dags", func(t *testing.T) {
