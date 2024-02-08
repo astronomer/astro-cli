@@ -45,6 +45,7 @@ type cfgs struct {
 	UpgradeMessage        cfg
 	DisableAstroRun       cfg
 	DisableEnvObjects     cfg
+	AutoSelect            cfg
 }
 
 // Creates a new cfg struct

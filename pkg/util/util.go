@@ -12,8 +12,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-var DeployCommandRun = false
-
 type CustomClaims struct {
 	OrgAuthServiceID      string   `json:"org_id"`
 	Scope                 string   `json:"scope"`

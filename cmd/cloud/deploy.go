@@ -155,7 +155,5 @@ func deploy(cmd *cobra.Command, args []string) error {
 		BuildSecretString: BuildSecretString,
 	}
 
-	util.DeployCommandRun = true
-
 	return DeployImage(deployInput, platformCoreClient, astroCoreClient)
 }

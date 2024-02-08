@@ -1380,16 +1380,8 @@ var SelectDeployment = func(deployments []astroplatformcore.Deployment, message 
 	if len(deployments) == 0 {
 		return astroplatformcore.Deployment{}, nil
 	}
-	var autoDeploy bool
-	switch {
-	case len(deployments) == 1 && !util.DeployCommandRun:
-		autoDeploy = true
-	case len(deployments) == 1 && util.DeployCommandRun:
-		if os.Getenv("ASTRO_API_TOKEN") != "" || os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != "" {
-			autoDeploy = true
-		}
-	}
-	if autoDeploy {
+
+	if len(deployments) == 1 && (os.Getenv("ASTRO_API_TOKEN") != "" || os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != "" || config.CFG.AutoSelect.GetBool()) {
 		if !CleanOutput {
 			fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
 				fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Name)) +
