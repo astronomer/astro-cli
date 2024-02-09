@@ -135,7 +135,7 @@ func newDeploymentLogsCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&warnLogs, "warn", "w", false, "Show logs with a log level of 'warning'")
 	cmd.Flags().BoolVarP(&errorLogs, "error", "e", false, "Show logs with a log level of 'error'")
 	cmd.Flags().BoolVarP(&infoLogs, "info", "i", false, "Show logs with a log level of 'info'")
-	cmd.Flags().StringVarP(&logsKeyword, "keyword", "k", "", "Show logs that contains this keyword or phrase.")
+	cmd.Flags().StringVarP(&logsKeyword, "keyword", "k", "", "Show logs that contain this exact keyword or phrase.")
 	cmd.Flags().IntVarP(&logCount, "log-count", "c", logCount, "Number of logs to show")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to show logs of")
 	return cmd
