@@ -204,7 +204,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(t, "1")()
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
@@ -269,6 +269,7 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseCICD, nil).Twice()
 
+	defer testUtil.MockUserInput(t, "1")()
 	err := Deploy(deployInput, mockPlatformCoreClient, nil)
 	assert.ErrorIs(t, err, errCiCdEnforcementUpdate)
 
@@ -347,7 +348,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(t, "1")()
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
@@ -398,7 +399,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		WaitForStatus:  false,
 		Dags:           false,
 	}
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(t, "1")()
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
@@ -440,7 +441,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		return "version-id", nil
 	}
 
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(t, "1")()
 	err := Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
@@ -461,28 +462,28 @@ func TestDagsDeploySuccess(t *testing.T) {
 		return mockContainerHandler, nil
 	}
 
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(t, "1")()
 	deployInput.Pytest = "parse"
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(t, "1")()
 	deployInput.Pytest = allTests
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(t, "1")()
 	deployInput.Pytest = parseAndPytest
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 	// image deploy
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(t, "1")()
 	deployInput.Image = true
 
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(t, "1")()
 	deployInput.Pytest = ""
 	deployInput.WaitForStatus = true
 	dagOnlyDeploySleepTime = 1
@@ -524,6 +525,7 @@ func TestNoDagsDeploy(t *testing.T) {
 		WaitForStatus:  false,
 		Dags:           true,
 	}
+	defer testUtil.MockUserInput(t, "1")()
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
 
@@ -652,7 +654,7 @@ func TestDeployFailure(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(t, "1")()
 	deployInput.RuntimeID = ""
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.ErrorIs(t, err, errDagsParseFailed)
