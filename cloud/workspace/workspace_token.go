@@ -156,7 +156,9 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 
 	apiTokenID := token.Id
 
-	UpdateWorkspaceAPITokenRequest := astrocore.UpdateWorkspaceApiTokenJSONRequestBody{}
+	UpdateWorkspaceAPITokenRequest := astrocore.UpdateWorkspaceApiTokenJSONRequestBody{
+		Roles: &astrocore.UpdateWorkspaceApiTokenRolesRequest{},
+	}
 
 	if newName == "" {
 		UpdateWorkspaceAPITokenRequest.Name = token.Name
@@ -180,13 +182,13 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 		if err != nil {
 			return err
 		}
-		UpdateWorkspaceAPITokenRequest.Role = role
+		UpdateWorkspaceAPITokenRequest.Roles.Workspace = &role
 	} else {
 		err := user.IsWorkspaceRoleValid(role)
 		if err != nil {
 			return err
 		}
-		UpdateWorkspaceAPITokenRequest.Role = role
+		UpdateWorkspaceAPITokenRequest.Roles.Workspace = &role
 	}
 
 	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.Organization, workspace, apiTokenID, UpdateWorkspaceAPITokenRequest)
