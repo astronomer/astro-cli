@@ -14,7 +14,7 @@ require (
 	github.com/iancoleman/strcase v0.2.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/lucsky/cuid v1.2.1
-	github.com/mattn/go-isatty v0.0.16
+	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/buildkit v0.8.2-0.20210401015549-df49b648c8bf
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
@@ -24,19 +24,20 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.9.0
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/net v0.17.0
+	golang.org/x/net v0.19.0
 	golang.org/x/sys v0.15.0
 )
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.4.1
-	github.com/deepmap/oapi-codegen v1.12.2
+	github.com/deepmap/oapi-codegen v1.12.4
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/fatih/camelcase v1.0.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/go-github/v48 v48.2.0
 	github.com/mitchellh/mapstructure v1.4.2
+	github.com/oapi-codegen/runtime v1.1.1
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a
@@ -96,7 +97,7 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.5.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-opentracing v0.0.0-20180507213350-8e809c8a8645 // indirect
@@ -109,7 +110,7 @@ require (
 	github.com/jinzhu/gorm v1.9.11 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/klauspost/compress v1.15.9 // indirect
+	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -151,12 +152,12 @@ require (
 	golang.org/x/oauth2 v0.10.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
+	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/grpc v1.58.3 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/ini.v1 v1.63.2 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apimachinery v0.22.5 // indirect
 	k8s.io/client-go v0.22.5 // indirect
