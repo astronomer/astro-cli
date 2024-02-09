@@ -301,20 +301,24 @@ const (
 
 // Defines values for WorkerMachineName.
 const (
-	WorkerMachineNameA10 WorkerMachineName = "A10"
-	WorkerMachineNameA20 WorkerMachineName = "A20"
-	WorkerMachineNameA40 WorkerMachineName = "A40"
-	WorkerMachineNameA5  WorkerMachineName = "A5"
-	WorkerMachineNameA60 WorkerMachineName = "A60"
+	WorkerMachineNameA10  WorkerMachineName = "A10"
+	WorkerMachineNameA120 WorkerMachineName = "A120"
+	WorkerMachineNameA160 WorkerMachineName = "A160"
+	WorkerMachineNameA20  WorkerMachineName = "A20"
+	WorkerMachineNameA40  WorkerMachineName = "A40"
+	WorkerMachineNameA5   WorkerMachineName = "A5"
+	WorkerMachineNameA60  WorkerMachineName = "A60"
 )
 
 // Defines values for WorkerQueueRequestAstroMachine.
 const (
-	WorkerQueueRequestAstroMachineA10 WorkerQueueRequestAstroMachine = "A10"
-	WorkerQueueRequestAstroMachineA20 WorkerQueueRequestAstroMachine = "A20"
-	WorkerQueueRequestAstroMachineA40 WorkerQueueRequestAstroMachine = "A40"
-	WorkerQueueRequestAstroMachineA5  WorkerQueueRequestAstroMachine = "A5"
-	WorkerQueueRequestAstroMachineA60 WorkerQueueRequestAstroMachine = "A60"
+	WorkerQueueRequestAstroMachineA10  WorkerQueueRequestAstroMachine = "A10"
+	WorkerQueueRequestAstroMachineA120 WorkerQueueRequestAstroMachine = "A120"
+	WorkerQueueRequestAstroMachineA160 WorkerQueueRequestAstroMachine = "A160"
+	WorkerQueueRequestAstroMachineA20  WorkerQueueRequestAstroMachine = "A20"
+	WorkerQueueRequestAstroMachineA40  WorkerQueueRequestAstroMachine = "A40"
+	WorkerQueueRequestAstroMachineA5   WorkerQueueRequestAstroMachine = "A5"
+	WorkerQueueRequestAstroMachineA60  WorkerQueueRequestAstroMachine = "A60"
 )
 
 // Defines values for ListOrganizationsParamsSupportPlan.
@@ -678,6 +682,9 @@ type CreateDedicatedDeploymentRequest struct {
 	// ClusterId The ID of the cluster where the Deployment will be created.
 	ClusterId string `json:"clusterId"`
 
+	// ContactEmails A list of contact emails for the Deployment.
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
+
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
 
@@ -686,6 +693,9 @@ type CreateDedicatedDeploymentRequest struct {
 
 	// Description The Deployment's description.
 	Description *string `json:"description,omitempty"`
+
+	// EnvironmentVariables List of environment variables to add to the Deployment.
+	EnvironmentVariables *[]DeploymentEnvironmentVariableRequest `json:"environmentVariables,omitempty"`
 
 	// Executor The Deployment's executor type.
 	Executor CreateDedicatedDeploymentRequestExecutor `json:"executor"`
@@ -791,8 +801,14 @@ type CreateHybridDeploymentRequest struct {
 	// ClusterId The ID of the cluster where the Deployment will be created.
 	ClusterId string `json:"clusterId"`
 
+	// ContactEmails A list of contact emails for the Deployment.
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
+
 	// Description The Deployment's description.
 	Description *string `json:"description,omitempty"`
+
+	// EnvironmentVariables List of environment variables to add to the Deployment.
+	EnvironmentVariables *[]DeploymentEnvironmentVariableRequest `json:"environmentVariables,omitempty"`
 
 	// Executor The Deployment's executor type.
 	Executor CreateHybridDeploymentRequestExecutor `json:"executor"`
@@ -852,6 +868,9 @@ type CreateStandardDeploymentRequest struct {
 	// ClusterId The ID of the cluster to which the Deployment will be created in. Optional if cloud provider and region is specified.
 	ClusterId *string `json:"clusterId,omitempty"`
 
+	// ContactEmails A list of contact emails for the Deployment.
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
+
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
 
@@ -860,6 +879,9 @@ type CreateStandardDeploymentRequest struct {
 
 	// Description The Deployment's description.
 	Description *string `json:"description,omitempty"`
+
+	// EnvironmentVariables List of environment variables to add to the Deployment.
+	EnvironmentVariables *[]DeploymentEnvironmentVariableRequest `json:"environmentVariables,omitempty"`
 
 	// Executor The Deployment's executor type.
 	Executor CreateStandardDeploymentRequestExecutor `json:"executor"`
@@ -924,8 +946,11 @@ type CreateWorkspaceRequest struct {
 
 // Deployment defines model for Deployment.
 type Deployment struct {
-	// AirflowVersion The Deployment's Astro Runtime version.
+	// AirflowVersion The Deployment's Airflow version.
 	AirflowVersion string `json:"airflowVersion"`
+
+	// AstroRuntimeVersion The Deployment's Astro Runtime version.
+	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
 
 	// CloudProvider The cloud provider of the cluster. Only for Standard Deployment.
 	CloudProvider *string `json:"cloudProvider,omitempty"`
@@ -1009,7 +1034,7 @@ type Deployment struct {
 	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
 	ResourceQuotaMemory *string `json:"resourceQuotaMemory,omitempty"`
 
-	// RuntimeVersion The Deployment's Astro Runtime version.
+	// RuntimeVersion Deprecated: runtimeVersion has been replaced with astroRuntimeVersion
 	RuntimeVersion string `json:"runtimeVersion"`
 
 	// SchedulerAu The number of Astronomer units (AU) for the Deployment's scheduler. Applies only to Deployments hosted on Hybrid clusters.

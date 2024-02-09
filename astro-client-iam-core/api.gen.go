@@ -41,6 +41,19 @@ const (
 	USER       BasicSubjectProfileSubjectType = "USER"
 )
 
+// Defines values for CreateApiTokenRequestRole.
+const (
+	CreateApiTokenRequestRoleDEPLOYMENTADMIN          CreateApiTokenRequestRole = "DEPLOYMENT_ADMIN"
+	CreateApiTokenRequestRoleORGANIZATIONBILLINGADMIN CreateApiTokenRequestRole = "ORGANIZATION_BILLING_ADMIN"
+	CreateApiTokenRequestRoleORGANIZATIONMEMBER       CreateApiTokenRequestRole = "ORGANIZATION_MEMBER"
+	CreateApiTokenRequestRoleORGANIZATIONOWNER        CreateApiTokenRequestRole = "ORGANIZATION_OWNER"
+	CreateApiTokenRequestRoleWORKSPACEACCESSOR        CreateApiTokenRequestRole = "WORKSPACE_ACCESSOR"
+	CreateApiTokenRequestRoleWORKSPACEAUTHOR          CreateApiTokenRequestRole = "WORKSPACE_AUTHOR"
+	CreateApiTokenRequestRoleWORKSPACEMEMBER          CreateApiTokenRequestRole = "WORKSPACE_MEMBER"
+	CreateApiTokenRequestRoleWORKSPACEOPERATOR        CreateApiTokenRequestRole = "WORKSPACE_OPERATOR"
+	CreateApiTokenRequestRoleWORKSPACEOWNER           CreateApiTokenRequestRole = "WORKSPACE_OWNER"
+)
+
 // Defines values for CreateApiTokenRequestType.
 const (
 	DEPLOYMENT   CreateApiTokenRequestType = "DEPLOYMENT"
@@ -112,6 +125,7 @@ const (
 
 // Defines values for WorkspaceRoleRole.
 const (
+	WORKSPACEACCESSOR WorkspaceRoleRole = "WORKSPACE_ACCESSOR"
 	WORKSPACEAUTHOR   WorkspaceRoleRole = "WORKSPACE_AUTHOR"
 	WORKSPACEMEMBER   WorkspaceRoleRole = "WORKSPACE_MEMBER"
 	WORKSPACEOPERATOR WorkspaceRoleRole = "WORKSPACE_OPERATOR"
@@ -289,7 +303,7 @@ type CreateApiTokenRequest struct {
 	Name string `json:"name"`
 
 	// Role The role of the API token.
-	Role string `json:"role"`
+	Role CreateApiTokenRequestRole `json:"role"`
 
 	// TokenExpiryPeriodInDays The expiry period of the API token in days. If not specified, the token will never expire.
 	TokenExpiryPeriodInDays *int `json:"tokenExpiryPeriodInDays,omitempty"`
@@ -297,6 +311,9 @@ type CreateApiTokenRequest struct {
 	// Type The scope of the API token.
 	Type CreateApiTokenRequestType `json:"type"`
 }
+
+// CreateApiTokenRequestRole The role of the API token.
+type CreateApiTokenRequestRole string
 
 // CreateApiTokenRequestType The scope of the API token.
 type CreateApiTokenRequestType string
