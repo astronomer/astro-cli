@@ -475,13 +475,13 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	}
 
 	// new dag deployment type or current dag deployment type is dag_deploy, confirm from user
-	if !skipPrompt {
+	if !skipPrompt && dagDeploymentType == houston.DagOnlyDeploymentType {
 		deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(args[0])
 		if err != nil {
 			return fmt.Errorf("failed to get deployment info: %w", err)
 		}
 
-		if deploymentInfo.DagDeployment.Type != houston.DagOnlyDeploymentType && dagDeploymentType == houston.DagOnlyDeploymentType {
+		if deploymentInfo.DagDeployment.Type != houston.DagOnlyDeploymentType {
 			y, _ := input.Confirm(UpdateDeploymentTypeToDagDeployPromptMsg)
 			if !y {
 				fmt.Println("canceling deployment update..")
