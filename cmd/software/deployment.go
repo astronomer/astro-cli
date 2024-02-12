@@ -18,9 +18,10 @@ const (
 
 	cliDeploymentHardDeletePrompt              = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with hard delete?"
 	deploymentTypeCmdMessage                   = "DAG Deployment mechanism: image, volume, git_sync, dag_deploy"
-	CreateDeploymentWithTypeDagDeployPromptMsg = "\nthis is an experimental feature. Please use with caution. See the Software documentation at " + houston.DagDeployDocsLink + " for more details. Do you want to continue?"
-	UpdateDeploymentTypeToDagDeployPromptMsg   = "\nthis is an experimental feature. Please use with caution. Changing to a DAG-only Deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the Software documentation at " + houston.DagDeployDocsLink + " for more details. Do you want to continue?"
-	UpdateDeploymentTypeFromDagDeployPromptMsg = "\nchanging from a DAG-only deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the Software documentation at " + houston.DeployViaCLIDocsLink + " for more details. Do you want to continue?"
+	continueSubMsg                             = " for more details. Do you want to continue?"
+	CreateDeploymentWithTypeDagDeployPromptMsg = "\nthis is an experimental feature. Please use with caution. See the Software documentation at " + houston.DagDeployDocsLink + continueSubMsg
+	UpdateDeploymentTypeToDagDeployPromptMsg   = "\nthis is an experimental feature. Please use with caution. Changing to a DAG-only Deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the Software documentation at " + houston.DagDeployDocsLink + continueSubMsg
+	UpdateDeploymentTypeFromDagDeployPromptMsg = "\nchanging from a DAG-only deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the Software documentation at " + houston.DeployViaCLIDocsLink + continueSubMsg
 	SkipUserPromptMsgForCreateDeployment       = "Skip user confirmation prompt for creating a deployment with type: dag_deploy (experimental feature)"
 	SkipUserPromptMsgForUpdateDeployment       = "Skip user confirmation prompt for updating the deployment type to/from dag_deploy (experimental feature)"
 )
@@ -455,7 +456,6 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, out io.Writer) error {
-	deploymentID := args[0]
 	argsMap := map[string]string{}
 	if deploymentUpdateDescription != "" {
 		argsMap["description"] = deploymentUpdateDescription
@@ -476,7 +476,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 
 	// new dag deployment type or current dag deployment type is dag_deploy, confirm from user
 	if !skipPrompt {
-		deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
+		deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(args[0])
 		if err != nil {
 			return fmt.Errorf("failed to get deployment info: %w", err)
 		}
@@ -487,7 +487,6 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 				fmt.Println("canceling deployment update..")
 				return nil
 			}
-
 		}
 
 		if deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType && dagDeploymentType != houston.DagOnlyDeploymentType {
@@ -496,7 +495,6 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 				fmt.Println("canceling deployment update..")
 				return nil
 			}
-
 		}
 	}
 
@@ -517,7 +515,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		}
 	}
 
-	return deployment.Update(deploymentID, cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, out)
+	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, out)
 }
 
 func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
