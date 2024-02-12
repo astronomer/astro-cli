@@ -38,12 +38,12 @@ type deploymentConfig struct {
 	RunTimeVersion        string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
 	DagDeployEnabled      *bool  `mapstructure:"dag_deploy_enabled,omitempty" yaml:"dag_deploy_enabled,omitempty" json:"dag_deploy_enabled,omitempty"`
 	APIKeyOnlyDeployments bool   `mapstructure:"ci_cd_enforcement" yaml:"ci_cd_enforcement" json:"ci_cd_enforcement"`
-	SchedulerSize         string `mapstructure:"scheduler_size" yaml:"scheduler_size" json:"scheduler_size"`
+	SchedulerSize         string `mapstructure:"scheduler_size,omitempty" yaml:"scheduler_size,omitempty" json:"scheduler_size,omitempty"`
 	IsHighAvailability    bool   `mapstructure:"is_high_availability" yaml:"is_high_availability" json:"is_high_availability"`
 	Executor              string `mapstructure:"executor" yaml:"executor" json:"executor"`
-	SchedulerAU           int    `mapstructure:"scheduler_au" yaml:"scheduler_au" json:"scheduler_au"`
+	SchedulerAU           int    `mapstructure:"scheduler_au,omitempty" yaml:"scheduler_au,omitempty" json:"scheduler_au,omitempty"`
 	SchedulerCount        int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
-	ClusterName           string `mapstructure:"cluster_name" yaml:"cluster_name" json:"cluster_name"`
+	ClusterName           string `mapstructure:"cluster_name,omitempty" yaml:"cluster_name,omitempty" json:"cluster_name,omitempty"`
 	WorkspaceName         string `mapstructure:"workspace_name" yaml:"workspace_name" json:"workspace_name"`
 	DeploymentType        string `mapstructure:"deployment_type" yaml:"deployment_type" json:"deployment_type"`
 	CloudProvider         string `mapstructure:"cloud_provider" yaml:"cloud_provider" json:"cloud_provider"`
@@ -224,7 +224,6 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	}
 	if deployment.IsDeploymentStandard(*coreDeployment.Type) || deployment.IsDeploymentDedicated(*coreDeployment.Type) {
 		deploymentMap["scheduler_size"] = *coreDeployment.SchedulerSize
-		deploymentMap["cloud_provider"] = *coreDeployment.CloudProvider
 		deploymentMap["default_task_pod_cpu"] = *coreDeployment.DefaultTaskPodCpu
 		deploymentMap["default_task_pod_memory"] = *coreDeployment.DefaultTaskPodMemory
 		deploymentMap["resource_quota_cpu"] = *coreDeployment.ResourceQuotaCpu
@@ -245,6 +244,10 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	}
 	if coreDeployment.SchedulerAu != nil {
 		deploymentMap["scheduler_au"] = *coreDeployment.SchedulerAu
+	}
+	if coreDeployment.CloudProvider != nil {
+		deploymentMap["cloud_provider"] = *coreDeployment.CloudProvider
+
 	}
 
 	return deploymentMap, nil
