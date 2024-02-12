@@ -110,129 +110,6 @@ func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 	}
 }
 
-func TestDeploymentCreateWithTypeDagDeploy(t *testing.T) {
-	t.Run("user should not be prompted if deployment type is not dag_deploy", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-		appConfig = &houston.AppConfig{
-			TriggererEnabled: true,
-			Flags: houston.FeatureFlags{
-				TriggererEnabled: true,
-			},
-		}
-		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(appConfig, nil)
-		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
-
-		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}
-		expectedOutput := "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs"
-		houstonClient = api
-		output, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, output, expectedOutput)
-		api.AssertExpectations(t)
-	})
-
-	t.Run("user should not be prompted if deployment type is dag_deploy but -f flag is sent", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-		appConfig = &houston.AppConfig{
-			TriggererEnabled: true,
-			Flags: houston.FeatureFlags{
-				TriggererEnabled:  true,
-				DagOnlyDeployment: true,
-			},
-		}
-		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(appConfig, nil)
-		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
-
-		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1", "--force"}
-		expectedOutput := "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs"
-		houstonClient = api
-		output, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, output, expectedOutput)
-		api.AssertExpectations(t)
-	})
-
-	t.Run("user should be prompted if deployment type is dag_deploy and -f flag is not sent. No deployment is created without confirmation.", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-		appConfig = &houston.AppConfig{
-			TriggererEnabled: true,
-			Flags: houston.FeatureFlags{
-				TriggererEnabled:  true,
-				DagOnlyDeployment: true,
-			},
-		}
-
-		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(appConfig, nil)
-		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
-		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1"}
-		houstonClient = api
-
-		// mock os.Stdin
-		input := []byte("1")
-		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-		defer testUtil.MockUserInput(t, "n")()
-
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		// Houston CreateDeployment API should not be called if user does not confirm the prompt
-		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
-	})
-
-	t.Run("user should be prompted if deployment type is dag_deploy and -f flag is not sent. Deployment is created with confirmation.", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-		appConfig = &houston.AppConfig{
-			TriggererEnabled: true,
-			Flags: houston.FeatureFlags{
-				TriggererEnabled:  true,
-				DagOnlyDeployment: true,
-			},
-		}
-
-		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(appConfig, nil)
-		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
-		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1"}
-		houstonClient = api
-
-		// mock os.Stdin
-		input := []byte("1")
-		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-		defer testUtil.MockUserInput(t, "y")()
-
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		// Houston CreateDeployment API should be called if user confirms the prompt
-		api.AssertCalled(t, "CreateDeployment", mock.Anything)
-	})
-}
-
 func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{TriggererEnabled: false}
@@ -422,6 +299,129 @@ func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
 		}
 		assert.Contains(t, output, tt.expectedOutput)
 	}
+}
+
+func TestDeploymentCreateWithTypeDagDeploy(t *testing.T) {
+	t.Run("user should not be prompted if deployment type is not dag_deploy", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			TriggererEnabled: true,
+			Flags: houston.FeatureFlags{
+				TriggererEnabled: true,
+			},
+		}
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+
+		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}
+		expectedOutput := "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs"
+		houstonClient = api
+		output, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, output, expectedOutput)
+		api.AssertExpectations(t)
+	})
+
+	t.Run("user should not be prompted if deployment type is dag_deploy but -f flag is sent", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			TriggererEnabled: true,
+			Flags: houston.FeatureFlags{
+				TriggererEnabled:  true,
+				DagOnlyDeployment: true,
+			},
+		}
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+
+		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1", "--force"}
+		expectedOutput := "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs"
+		houstonClient = api
+		output, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, output, expectedOutput)
+		api.AssertExpectations(t)
+	})
+
+	t.Run("user should be prompted if deployment type is dag_deploy and -f flag is not sent. No deployment is created without confirmation.", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			TriggererEnabled: true,
+			Flags: houston.FeatureFlags{
+				TriggererEnabled:  true,
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1"}
+		houstonClient = api
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "n")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		// Houston CreateDeployment API should not be called if user does not confirm the prompt
+		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
+	})
+
+	t.Run("user should be prompted if deployment type is dag_deploy and -f flag is not sent. Deployment is created with confirmation.", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			TriggererEnabled: true,
+			Flags: houston.FeatureFlags{
+				TriggererEnabled:  true,
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1"}
+		houstonClient = api
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "y")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		// Houston CreateDeployment API should be called if user confirms the prompt
+		api.AssertCalled(t, "CreateDeployment", mock.Anything)
+	})
 }
 
 func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
@@ -689,8 +689,8 @@ func TestDeploymentUpdateCommandDagOnlyDeployEnabled(t *testing.T) {
 		expectedOutput string
 		expectedError  string
 	}{
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=invalid"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy", "--force"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=invalid", "--force"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
