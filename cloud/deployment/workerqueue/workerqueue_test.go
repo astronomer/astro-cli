@@ -1276,6 +1276,12 @@ func TestSelectQueue(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidQueue)
 		assert.Equal(t, "", queueToDelete)
 	})
+	t.Run("errors if there are no worker queues", func(t *testing.T) {
+		queueToDelete, err = selectQueue(nil, out)
+		assert.ErrorIs(t, err, errNoWorkerQueues)
+		assert.Equal(t, "", queueToDelete)
+	})
+
 }
 
 func TestUpdateQueueList(t *testing.T) {
