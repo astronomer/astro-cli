@@ -9,7 +9,7 @@ repos:
         language: system
         entry: 'gofmt -w -s'
   - repo: https://github.com/psf/black
-    rev: 24.1.1
+    rev: 24.2.0
     hooks:
       - id: black
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -44,7 +44,7 @@ repos:
       - id: beautysh
         args: ['--indent-size', '2']
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.33.0
+    rev: v1.34.0
     hooks:
       - id: yamllint
   - repo: https://github.com/astronomer/pre-commit-hooks
