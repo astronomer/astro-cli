@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/software/deployment"
 	"github.com/spf13/cobra"
@@ -15,11 +16,17 @@ const (
 	kubernetesExecutorArg = "kubernetes"
 	k8sExecutorArg        = "k8s"
 
-	cliDeploymentHardDeletePrompt = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with hard delete?"
-	deploymentTypeCmdMessage      = "DAG Deployment mechanism: image, volume, git_sync, dag_deploy"
+	cliDeploymentHardDeletePrompt              = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with hard delete?"
+	deploymentTypeCmdMessage                   = "DAG Deployment mechanism: image, volume, git_sync, dag_deploy"
+	CreateDeploymentWithTypeDagDeployPromptMsg = "\nthis is an experimental feature. Please use with caution. See the Software documentation at " + houston.DagDeployDocsLink + " for more details. Do you want to continue?"
+	UpdateDeploymentTypeToDagDeployPromptMsg   = "\nthis is an experimental feature. Please use with caution. Changing to a DAG-only Deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the Software documentation at " + houston.DagDeployDocsLink + " for more details. Do you want to continue?"
+	UpdateDeploymentTypeFromDagDeployPromptMsg = "\nchanging from a DAG-only deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the Software documentation at " + houston.DeployViaCLIDocsLink + " for more details. Do you want to continue?"
+	SkipUserPromptMsgForCreateDeployment       = "Skip user confirmation prompt for creating a deployment with type: dag_deploy (experimental feature)"
+	SkipUserPromptMsgForUpdateDeployment       = "Skip user confirmation prompt for updating the deployment type to/from dag_deploy (experimental feature)"
 )
 
 var (
+	skipPrompt                  bool
 	allDeployments              bool
 	cancel                      bool
 	hardDelete                  bool
@@ -121,6 +128,8 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
+	cmd.Flags().BoolVarP(&skipPrompt, "force", "f", false, SkipUserPromptMsgForCreateDeployment)
+
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, runtimeEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
@@ -211,6 +220,8 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 			return deploymentUpdate(cmd, args, dagDeploymentType, nfsLocation, out)
 		},
 	}
+
+	cmd.Flags().BoolVarP(&skipPrompt, "force", "f", false, SkipUserPromptMsgForUpdateDeployment)
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
@@ -374,6 +385,15 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		createTriggererReplicas = -1
 	}
 
+	// If it's a dag_deploy type, validate from the user first
+	if !skipPrompt && dagDeploymentType == houston.DagOnlyDeploymentType {
+		y, _ := input.Confirm(CreateDeploymentWithTypeDagDeployPromptMsg)
+		if !y {
+			fmt.Println("canceling deployment create..")
+			return nil
+		}
+	}
+
 	// we should validate only in case when this feature has been enabled
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
 		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, false)
@@ -435,6 +455,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, out io.Writer) error {
+	deploymentID := args[0]
 	argsMap := map[string]string{}
 	if deploymentUpdateDescription != "" {
 		argsMap["description"] = deploymentUpdateDescription
@@ -451,6 +472,32 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
 		dagOnlyDeployEnabled = appConfig.Flags.DagOnlyDeployment
+	}
+
+	// new dag deployment type or current dag deployment type is dag_deploy, confirm from user
+	if !skipPrompt {
+		deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
+		if err != nil {
+			return fmt.Errorf("failed to get deployment info: %w", err)
+		}
+
+		if deploymentInfo.DagDeployment.Type != houston.DagOnlyDeploymentType && dagDeploymentType == houston.DagOnlyDeploymentType {
+			y, _ := input.Confirm(UpdateDeploymentTypeToDagDeployPromptMsg)
+			if !y {
+				fmt.Println("canceling deployment update..")
+				return nil
+			}
+
+		}
+
+		if deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType && dagDeploymentType != houston.DagOnlyDeploymentType {
+			y, _ := input.Confirm(UpdateDeploymentTypeFromDagDeployPromptMsg)
+			if !y {
+				fmt.Println("canceling deployment update..")
+				return nil
+			}
+
+		}
 	}
 
 	// we should validate only in case when this feature has been enabled
@@ -470,7 +517,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		}
 	}
 
-	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, out)
+	return deployment.Update(deploymentID, cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, out)
 }
 
 func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
