@@ -424,37 +424,6 @@ func TestDeploymentCreateWithTypeDagDeploy(t *testing.T) {
 	})
 }
 
-func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfig = &houston.AppConfig{
-		TriggererEnabled: true,
-		Flags:            houston.FeatureFlags{TriggererEnabled: true},
-	}
-
-	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(appConfig, nil)
-	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Twice()
-
-	myTests := []struct {
-		cmdArgs        []string
-		expectedOutput string
-		expectedError  string
-	}{
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--triggerer-replicas=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-	}
-	for _, tt := range myTests {
-		houstonClient = api
-		output, err := execDeploymentCmd(tt.cmdArgs...)
-		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
-		} else {
-			assert.NoError(t, err)
-		}
-		assert.Contains(t, output, tt.expectedOutput)
-	}
-}
-
 func TestDeploymentUpdateWithTypeDagDeploy(t *testing.T) {
 	t.Run("user should not be prompted if new deployment type is not dag_deploy", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
@@ -625,6 +594,37 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=wrong", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--executor=local"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--cloud-role=arn:aws:iam::1234567890:role/test_role4c2301381e"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		houstonClient = api
+		output, err := execDeploymentCmd(tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	appConfig = &houston.AppConfig{
+		TriggererEnabled: true,
+		Flags:            houston.FeatureFlags{TriggererEnabled: true},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Twice()
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--triggerer-replicas=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
