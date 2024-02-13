@@ -2840,8 +2840,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		clusterID := "test-cluster-id"
 		clusterName := "test-cluster"
 		defaultTaskPodMemory = "10"
-		defaultTaskPodCpu := "10"
-		resourceQuotaCpu := "10"
+		defaultTaskPodCPU := "10"
+		resourceQuotaCPU := "10"
 		resourceQuotaMemory := "10"
 		existingDeployment := astroplatformcore.Deployment{
 			Id:                   deploymentID,
@@ -2851,8 +2851,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			Executor:             &executorCelery,
 			WorkerQueues:         &expectedQList,
 			DefaultTaskPodMemory: &defaultTaskPodMemory,
-			DefaultTaskPodCpu:    &defaultTaskPodCpu,
-			ResourceQuotaCpu:     &resourceQuotaCpu,
+			DefaultTaskPodCpu:    &defaultTaskPodCPU,
+			ResourceQuotaCpu:     &resourceQuotaCPU,
 			ResourceQuotaMemory:  &resourceQuotaMemory,
 		}
 
@@ -2891,8 +2891,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		clusterID := "test-cluster-id"
 		clusterName := "test-cluster"
 		defaultTaskPodMemory = "10"
-		defaultTaskPodCpu := "10"
-		resourceQuotaCpu := "10"
+		defaultTaskPodCPU := "10"
+		resourceQuotaCPU := "10"
 		resourceQuotaMemory := "10"
 		existingDeployment := astroplatformcore.Deployment{
 			Id:                   deploymentID,
@@ -2902,8 +2902,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			Executor:             &executorCelery,
 			WorkerQueues:         &expectedQList,
 			DefaultTaskPodMemory: &defaultTaskPodMemory,
-			DefaultTaskPodCpu:    &defaultTaskPodCpu,
-			ResourceQuotaCpu:     &resourceQuotaCpu,
+			DefaultTaskPodCpu:    &defaultTaskPodCPU,
+			ResourceQuotaCpu:     &resourceQuotaCPU,
 			ResourceQuotaMemory:  &resourceQuotaMemory,
 		}
 
