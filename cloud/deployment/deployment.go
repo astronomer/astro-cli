@@ -71,7 +71,6 @@ var (
 	timeoutNum                 = 180
 	dedicatedDeploymentRequest = astroplatformcore.UpdateDedicatedDeploymentRequest{}
 	dagDeployEnabled           bool
-	emptyValue                 = ""
 )
 
 func newTableOut() *printutil.Table {
