@@ -284,14 +284,16 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatfo
 	if err != nil {
 		return nil, err
 	}
-	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.environment_variables
-	cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, astroPlatformCore)
-	if err != nil {
-		return nil, err
-	}
 	nodePools := []astroplatformcore.NodePool{}
-	if cluster.NodePools != nil {
-		nodePools = *cluster.NodePools
+	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.environment_variables
+	if requestedDeployment.ClusterId != nil {
+		cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, astroPlatformCore)
+		if err != nil {
+			return nil, err
+		}
+		if cluster.NodePools != nil {
+			nodePools = *cluster.NodePools
+		}
 	}
 	additionalMap = getAdditionalNullableFields(&requestedDeployment, nodePools)
 	// create a map for the entire deployment
