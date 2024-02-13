@@ -148,6 +148,8 @@ func TestVariableModify(t *testing.T) {
 	})
 
 	t.Run("success with secret value", func(t *testing.T) {
+		printValue = "****"
+
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
@@ -168,11 +170,11 @@ func TestVariableModify(t *testing.T) {
 		}
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockCoreClient, mockPlatformCoreClient, buf)
+		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, true, mockCoreClient, mockPlatformCoreClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "test-key-1")
 		assert.Contains(t, buf.String(), "test-key-2")
-		assert.Contains(t, buf.String(), "N/A")
+		assert.Contains(t, buf.String(), "****")
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})

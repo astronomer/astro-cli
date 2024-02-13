@@ -383,7 +383,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		return errors.New("Invalid --type value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --enforce-cicd value")
+		return errors.New("Invalid --cicd-enforcment value")
 	}
 	if deploymentCreateEnforceCD && cicdEnforcement == disable {
 		return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
