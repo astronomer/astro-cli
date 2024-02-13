@@ -37,6 +37,7 @@ var (
 	errCannotDeleteDefaultQueue  = errors.New("default queue can not be deleted")
 	ErrNotSupported              = errors.New("does not support")
 	errNoUseWorkerQueues         = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
+	errNoWorkerQueues            = errors.New("no worker queues found for this deployment")
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
@@ -612,9 +613,13 @@ func selectQueue(queueListIndex *[]astroplatformcore.WorkerQueue, out io.Writer)
 		errToReturn        error
 		queueName, message string
 		queueToDelete      astroplatformcore.WorkerQueue
+		queueList          []astroplatformcore.WorkerQueue
 	)
-
-	queueList := *queueListIndex
+	if queueListIndex != nil {
+		queueList = *queueListIndex
+	} else {
+		return "", errNoWorkerQueues
+	}
 
 	tab := printutil.Table{
 		Padding:        []int{5, 30, 20, 50},
