@@ -16,8 +16,9 @@ import (
 
 var (
 	errVarBool                  = false
-	errVarCreateUpdate          = errors.New("there was an error while creating or updating one or more of the environment variables. Check the logs above for more information")
+	errVarCreateUpdate          = errors.New("there was an error while creating or updating one or more of the environment variables. Check the command output above for more information")
 	environmentVariablesObjects = []astroplatformcore.DeploymentEnvironmentVariable{}
+	printValue                  = "****"
 )
 
 func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string, useEnvFile bool, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
@@ -47,13 +48,16 @@ func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string,
 
 	var nbEnvVarFound int
 	for i := range environmentVariablesObjects {
+		if environmentVariablesObjects[i].Value != nil && !environmentVariablesObjects[i].IsSecret {
+			printValue = *environmentVariablesObjects[i].Value
+		}
 		if environmentVariablesObjects[i].Key == variableKey {
 			nbEnvVarFound++
-			varTab.AddRow([]string{strconv.Itoa(nbEnvVarFound), environmentVariablesObjects[i].Key, *environmentVariablesObjects[i].Value, strconv.FormatBool(environmentVariablesObjects[i].IsSecret)}, false)
+			varTab.AddRow([]string{strconv.Itoa(nbEnvVarFound), environmentVariablesObjects[i].Key, printValue, strconv.FormatBool(environmentVariablesObjects[i].IsSecret)}, false)
 			break
 		} else if variableKey == "" {
 			nbEnvVarFound++
-			varTab.AddRow([]string{strconv.Itoa(nbEnvVarFound), environmentVariablesObjects[i].Key, *environmentVariablesObjects[i].Value, strconv.FormatBool(environmentVariablesObjects[i].IsSecret)}, false)
+			varTab.AddRow([]string{strconv.Itoa(nbEnvVarFound), environmentVariablesObjects[i].Key, printValue, strconv.FormatBool(environmentVariablesObjects[i].IsSecret)}, false)
 		}
 	}
 
@@ -138,8 +142,8 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 	var index int
 	for i := range environmentVariablesObjects {
 		index = i + 1
-		printValue := notApplicable
-		if environmentVariablesObjects[i].Value != nil {
+
+		if environmentVariablesObjects[i].Value != nil && !environmentVariablesObjects[i].IsSecret {
 			printValue = *environmentVariablesObjects[i].Value
 		}
 		varTab.AddRow([]string{strconv.Itoa(index), environmentVariablesObjects[i].Key, printValue, strconv.FormatBool(environmentVariablesObjects[i].IsSecret)}, false)
