@@ -1281,7 +1281,6 @@ func TestSelectQueue(t *testing.T) {
 		assert.ErrorIs(t, err, errNoWorkerQueues)
 		assert.Equal(t, "", queueToDelete)
 	})
-
 }
 
 func TestUpdateQueueList(t *testing.T) {
