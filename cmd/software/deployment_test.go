@@ -566,6 +566,96 @@ func TestDeploymentUpdateWithTypeDagDeploy(t *testing.T) {
 	})
 }
 
+func TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy(t *testing.T) {
+	t.Run("user should be prompted if new deployment type is not dag_deploy but current type is dag_deploy. User rejects.", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			Flags: houston.FeatureFlags{
+				DagOnlyDeployment: true,
+			},
+		}
+		api := new(mocks.ClientInterface)
+		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		api.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=image"}
+		houstonClient = api
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "n")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		api.AssertCalled(t, "GetDeployment", mock.Anything)
+		// Houston UpdateDeployment API should not be called if user does not confirm the prompt
+		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
+	})
+
+	t.Run("user should be prompted if new deployment type is not dag_deploy but current type is dag_deploy. User confirms.", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			Flags: houston.FeatureFlags{
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		api.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=image"}
+		houstonClient = api
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "y")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		api.AssertCalled(t, "GetDeployment", mock.Anything)
+		// Houston UpdateDeployment API should be called if user does not confirm the prompt
+		api.AssertCalled(t, "UpdateDeployment", mock.Anything)
+	})
+}
+
 func TestDeploymentUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
@@ -579,6 +669,13 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Times(8)
+	dagDeployment := &houston.DagDeploymentConfig{
+		Type: houston.ImageDeploymentType,
+	}
+	deployment := &houston.Deployment{
+		DagDeployment: *dagDeployment,
+	}
+	api.On("GetDeployment", mock.Anything).Return(deployment, nil).Times(9)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -617,7 +714,13 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Twice()
-
+	dagDeployment := &houston.DagDeploymentConfig{
+		Type: houston.ImageDeploymentType,
+	}
+	deployment := &houston.Deployment{
+		DagDeployment: *dagDeployment,
+	}
+	api.On("GetDeployment", mock.Anything).Return(deployment, nil).Times(2)
 	myTests := []struct {
 		cmdArgs        []string
 		expectedOutput string
@@ -651,7 +754,13 @@ func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
-
+	dagDeployment := &houston.DagDeploymentConfig{
+		Type: houston.ImageDeploymentType,
+	}
+	deployment := &houston.Deployment{
+		DagDeployment: *dagDeployment,
+	}
+	api.On("GetDeployment", mock.Anything).Return(deployment, nil).Times(2)
 	myTests := []struct {
 		cmdArgs        []string
 		expectedOutput string
