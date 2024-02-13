@@ -456,10 +456,10 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if deployment.IsDeploymentStandard(deploymentType) {
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
-			switch deploymentFromFile.Deployment.Configuration.Executor {
-			case deployment.CeleryExecutor, deployment.CELERY:
+			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.Executor) {
+			case strings.ToUpper(deployment.CeleryExecutor), deployment.CELERY:
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
-			case deployment.KubeExecutor, deployment.KUBERNETES:
+			case strings.ToUpper(deployment.KubeExecutor), deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
 			}
 
@@ -511,10 +511,10 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if deployment.IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.UpdateDedicatedDeploymentRequestExecutor
-			switch deploymentFromFile.Deployment.Configuration.Executor {
-			case deployment.CeleryExecutor, deployment.CELERY:
+			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.Executor) {
+			case strings.ToUpper(deployment.CeleryExecutor), deployment.CELERY:
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY
-			case deployment.KubeExecutor, deployment.KUBERNETES:
+			case strings.ToUpper(deployment.KubeExecutor), deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
 
@@ -565,10 +565,10 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		if !deployment.IsDeploymentStandard(deploymentType) && !deployment.IsDeploymentDedicated(deploymentType) {
 			var requestedExecutor astroplatformcore.UpdateHybridDeploymentRequestExecutor
-			switch deploymentFromFile.Deployment.Configuration.Executor {
-			case deployment.CeleryExecutor, deployment.CELERY:
+			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.Executor) {
+			case strings.ToUpper(deployment.CeleryExecutor), deployment.CELERY:
 				requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorCELERY
-			case deployment.KubeExecutor, deployment.KUBERNETES:
+			case strings.ToUpper(deployment.KubeExecutor), deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES
 			}
 

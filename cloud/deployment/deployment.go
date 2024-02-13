@@ -514,11 +514,14 @@ func deploymentToTableRow(table *printutil.Table, d *astroplatformcore.Deploymen
 	cloudProvider := notApplicable
 	clusterName := notApplicable
 	region := notApplicable
-	releaseName := d.Namespace
-	if IsDeploymentStandard(*d.Type) {
+	if d.CloudProvider != nil {
 		cloudProvider = *d.CloudProvider
+	}
+	if d.Region != nil {
 		region = *d.Region
-	} else {
+	}
+	releaseName := d.Namespace
+	if !IsDeploymentStandard(*d.Type) {
 		clusterName = *d.ClusterName
 	}
 	cols := []string{
@@ -1113,10 +1116,13 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		clusterName := notApplicable
 		cloudProvider := notApplicable
 		region := notApplicable
-		if IsDeploymentStandard(*d.Type) {
+		if d.CloudProvider != nil {
 			cloudProvider = *d.CloudProvider
+		}
+		if d.Region != nil {
 			region = *d.Region
-		} else {
+		}
+		if !IsDeploymentStandard(*d.Type) {
 			clusterName = *d.ClusterName
 		}
 		tabDeployment.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
