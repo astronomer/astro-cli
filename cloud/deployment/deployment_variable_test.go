@@ -172,7 +172,7 @@ func TestVariableModify(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "test-key-1")
 		assert.Contains(t, buf.String(), "test-key-2")
-		assert.Contains(t, buf.String(), "N/A")
+		assert.Contains(t, buf.String(), "****")
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
