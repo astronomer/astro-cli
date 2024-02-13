@@ -71,6 +71,7 @@ var (
 	timeoutNum                 = 180
 	dedicatedDeploymentRequest = astroplatformcore.UpdateDedicatedDeploymentRequest{}
 	dagDeployEnabled           bool
+	emptyValue                 = ""
 )
 
 func newTableOut() *printutil.Table {
@@ -368,11 +369,9 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			var requestedExecutor astroplatformcore.CreateDedicatedDeploymentRequestExecutor
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorCELERY
-				fmt.Println(requestedExecutor)
 			}
 			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorKUBERNETES
-				fmt.Println(requestedExecutor)
 			}
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
 				AstroRuntimeVersion:  runtimeVersion,
@@ -393,7 +392,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
-			fmt.Println(dedicatedDeploymentRequest.Executor)
 			switch schedulerSize {
 			case SmallScheduler:
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
@@ -740,6 +738,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			}
 		}
 	}
+	fmt.Println("made it to line 749")
 	// determine isDagDeployEnabled
 	switch dagDeploy {
 	case enable:
@@ -798,6 +797,9 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	} else {
 		queueCreateUpdate = true
 		deploymentEnvironmentVariablesRequest = newEnvironmentVariables
+	}
+	if deploymentEnvironmentVariablesRequest == nil {
+		deploymentEnvironmentVariablesRequest = []astroplatformcore.DeploymentEnvironmentVariableRequest{}
 	}
 	if IsDeploymentStandard(*currentDeployment.Type) || IsDeploymentDedicated(*currentDeployment.Type) {
 		var workerQueuesRequest []astroplatformcore.WorkerQueueRequest
