@@ -229,9 +229,6 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 		deploymentMap["resource_quota_cpu"] = *coreDeployment.ResourceQuotaCpu
 		deploymentMap["resource_quota_memory"] = *coreDeployment.ResourceQuotaMemory
 	}
-	if deployment.IsDeploymentStandard(*coreDeployment.Type) {
-		deploymentMap["region"] = *coreDeployment.Region
-	}
 	if !deployment.IsDeploymentStandard(*coreDeployment.Type) {
 		deploymentMap["default_worker_type"] = defaultWorkerType
 	}
@@ -247,7 +244,9 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	}
 	if coreDeployment.CloudProvider != nil {
 		deploymentMap["cloud_provider"] = *coreDeployment.CloudProvider
-
+	}
+	if coreDeployment.Region != nil {
+		deploymentMap["region"] = *coreDeployment.Region
 	}
 
 	return deploymentMap, nil
