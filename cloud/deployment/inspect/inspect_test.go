@@ -447,9 +447,9 @@ func TestGetDeploymentConfig(t *testing.T) {
 			SchedulerCount:   sourceDeployment.SchedulerReplicas,
 			DagDeployEnabled: &sourceDeployment.IsDagDeployEnabled,
 			Executor:         string(*sourceDeployment.Executor),
-			Region:           "",
+			Region:           *sourceDeployment.Region,
 			DeploymentType:   string(*sourceDeployment.Type),
-			CloudProvider:    "",
+			CloudProvider:    *sourceDeployment.CloudProvider,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
@@ -707,7 +707,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
         runtime_version: 6.0.0
         dag_deploy_enabled: true
         ci_cd_enforcement: false
-        scheduler_size: ""
         is_high_availability: false
         executor: CELERY
         scheduler_au: 5
@@ -796,7 +795,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
         executor: CELERY
         scheduler_au: 5
         scheduler_count: 3
-        cluster_name: ""
         workspace_name: test-ws
         deployment_type: STANDARD
         cloud_provider: azure
@@ -981,7 +979,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
             "ci_cd_enforcement": false,
-            "scheduler_size": "",
             "is_high_availability": false,
             "executor": "KUBERNETES",
             "scheduler_au": 5,
