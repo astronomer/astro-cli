@@ -48,7 +48,7 @@ func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string,
 
 	var nbEnvVarFound int
 	for i := range environmentVariablesObjects {
-		if environmentVariablesObjects[i].Value != nil {
+		if environmentVariablesObjects[i].Value != nil && !environmentVariablesObjects[i].IsSecret {
 			printValue = *environmentVariablesObjects[i].Value
 		}
 		if environmentVariablesObjects[i].Key == variableKey {
@@ -142,7 +142,8 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 	var index int
 	for i := range environmentVariablesObjects {
 		index = i + 1
-		if environmentVariablesObjects[i].Value != nil {
+
+		if environmentVariablesObjects[i].Value != nil && !environmentVariablesObjects[i].IsSecret {
 			printValue = *environmentVariablesObjects[i].Value
 		}
 		varTab.AddRow([]string{strconv.Itoa(index), environmentVariablesObjects[i].Key, printValue, strconv.FormatBool(environmentVariablesObjects[i].IsSecret)}, false)
