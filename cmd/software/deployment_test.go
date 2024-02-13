@@ -2,6 +2,7 @@ package software
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -448,6 +449,25 @@ func TestDeploymentUpdateWithTypeDagDeploy(t *testing.T) {
 		output, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, output, "Successfully updated deployment")
+	})
+
+	t.Run("GetDeployment throws an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			Flags: houston.FeatureFlags{
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		getDeploymentError := errors.New("Test error")
+		api.On("GetDeployment", mock.Anything).Return(nil, getDeploymentError).Once()
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}
+		houstonClient = api
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to get deployment info: "+getDeploymentError.Error())
 	})
 
 	t.Run("user should not be prompted if new deployment type is dag_deploy and current deployment type is also dag_deploy", func(t *testing.T) {
