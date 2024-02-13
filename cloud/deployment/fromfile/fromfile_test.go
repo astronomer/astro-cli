@@ -2811,6 +2811,108 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
+	t.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with a queue on standard", func(t *testing.T) {
+		deploymentID = "test-deployment-id"
+		deploymentFromFile = inspect.FormattedDeployment{}
+		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
+		deploymentFromFile.Deployment.Configuration.Name = "test-deployment-modified"
+		deploymentFromFile.Deployment.Configuration.Description = "test-description"
+		deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
+		deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
+		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+		deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+		deploymentFromFile.Deployment.Configuration.DeploymentType = "STANDARD"
+		dagDeploy := true
+		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
+		deploymentFromFile.Deployment.Configuration.DefaultWorkerType = "test-worker-1"
+		existingPools = []astroplatformcore.NodePool{
+			{
+				Id:               "test-pool-id",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-1",
+			},
+			{
+				Id:               "test-pool-id-2",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-2",
+			},
+		}
+		clusterID := "test-cluster-id"
+		clusterName := "test-cluster"
+		defaultTaskPodMemory = "10"
+		defaultTaskPodCPU := "10"
+		resourceQuotaCPU := "10"
+		resourceQuotaMemory := "10"
+		existingDeployment := astroplatformcore.Deployment{
+			Id:                   deploymentID,
+			Name:                 "test-deployment",
+			ClusterId:            &clusterID,
+			ClusterName:          &clusterName,
+			Executor:             &executorCelery,
+			WorkerQueues:         &expectedQList,
+			DefaultTaskPodMemory: &defaultTaskPodMemory,
+			DefaultTaskPodCpu:    &defaultTaskPodCPU,
+			ResourceQuotaCpu:     &resourceQuotaCPU,
+			ResourceQuotaMemory:  &resourceQuotaMemory,
+		}
+
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
+	t.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with a queue on dedicated", func(t *testing.T) {
+		deploymentID = "test-deployment-id"
+		deploymentFromFile = inspect.FormattedDeployment{}
+		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
+		deploymentFromFile.Deployment.Configuration.Name = "test-deployment-modified"
+		deploymentFromFile.Deployment.Configuration.Description = "test-description"
+		deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
+		deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
+		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+		deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+		deploymentFromFile.Deployment.Configuration.DeploymentType = "DEDICATED"
+		dagDeploy := true
+		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
+		deploymentFromFile.Deployment.Configuration.DefaultWorkerType = "test-worker-1"
+		existingPools = []astroplatformcore.NodePool{
+			{
+				Id:               "test-pool-id",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-1",
+			},
+			{
+				Id:               "test-pool-id-2",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-2",
+			},
+		}
+		clusterID := "test-cluster-id"
+		clusterName := "test-cluster"
+		defaultTaskPodMemory = "10"
+		defaultTaskPodCPU := "10"
+		resourceQuotaCPU := "10"
+		resourceQuotaMemory := "10"
+		existingDeployment := astroplatformcore.Deployment{
+			Id:                   deploymentID,
+			Name:                 "test-deployment",
+			ClusterId:            &clusterID,
+			ClusterName:          &clusterName,
+			Executor:             &executorCelery,
+			WorkerQueues:         &expectedQList,
+			DefaultTaskPodMemory: &defaultTaskPodMemory,
+			DefaultTaskPodCpu:    &defaultTaskPodCPU,
+			ResourceQuotaCpu:     &resourceQuotaCPU,
+			ResourceQuotaMemory:  &resourceQuotaMemory,
+		}
+
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
 	t.Run("returns correct update deployment input when multiple queues are requested", func(t *testing.T) {
 		deploymentID = "test-deployment-id"
 		deploymentFromFile = inspect.FormattedDeployment{}
