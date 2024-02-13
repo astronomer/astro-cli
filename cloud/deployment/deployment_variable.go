@@ -16,7 +16,7 @@ import (
 
 var (
 	errVarBool                  = false
-	errVarCreateUpdate          = errors.New("there was an error while creating or updating one or more of the environment variables. Check the logs above for more information")
+	errVarCreateUpdate          = errors.New("there was an error while creating or updating one or more of the environment variables. Check the command output above for more information")
 	environmentVariablesObjects = []astroplatformcore.DeploymentEnvironmentVariable{}
 	printValue                  = "****"
 )
