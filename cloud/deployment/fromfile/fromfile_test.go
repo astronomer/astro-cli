@@ -2862,7 +2862,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
-	t.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with a queue on standard", func(t *testing.T) {
+	t.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with a queue on dedicated", func(t *testing.T) {
 		deploymentID = "test-deployment-id"
 		deploymentFromFile = inspect.FormattedDeployment{}
 		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
