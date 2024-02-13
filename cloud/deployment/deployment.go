@@ -737,7 +737,6 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			}
 		}
 	}
-	fmt.Println("made it to line 749")
 	// determine isDagDeployEnabled
 	switch dagDeploy {
 	case enable:
