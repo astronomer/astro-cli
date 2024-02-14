@@ -953,6 +953,32 @@ func TestCreate(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
+	t.Run("success with workload identity", func(t *testing.T) {
+		mockWorkloadIdentity := "workload-id-1"
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.CreateDeploymentRequest) bool {
+				request, _ := input.AsCreateHybridDeploymentRequest()
+				return *request.WorkloadIdentity == mockWorkloadIdentity
+			},
+		)).Return(&mockCreateDeploymentResponse, nil).Once()
+
+		// Mock user input for deployment name
+		defer testUtil.MockUserInput(t, "test-name")()
+
+		// Call the Create function with a non-empty workload ID
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "us-west-2", "", "", "", "", "", "", "", mockWorkloadIdentity, astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.NoError(t, err)
+
+		// Assert expectations
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
 	t.Run("success with standard/dedicated type different scheduler sizes", func(t *testing.T) {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(6)
