@@ -39,7 +39,7 @@ build:
 
 core_api_gen:
     ifeq (, $(shell which oapi-codegen))
-	go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest
+	go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4
     endif
 	oapi-codegen -include-tags=User,Organization,Invite,Workspace,Cluster,Options,Team,ApiToken,Deployment,Deploy,Environment -generate=types,client -package=astrocore "${CORE_OPENAPI_SPEC}" > ./astro-client-core/api.gen.go
 	make mock_astro_core

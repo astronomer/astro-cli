@@ -423,8 +423,9 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 					Au:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
 					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
 				},
-				Type:         astroplatformcore.CreateHybridDeploymentRequestTypeHYBRID,
-				WorkerQueues: &listHybridQueuesRequest,
+				Type:             astroplatformcore.CreateHybridDeploymentRequestTypeHYBRID,
+				WorkerQueues:     &listHybridQueuesRequest,
+				WorkloadIdentity: &deploymentFromFile.Deployment.Configuration.WorkloadIdentity,
 			}
 			if requestedExecutor == astroplatformcore.CreateHybridDeploymentRequestExecutorKUBERNETES {
 				// map worker type to node pool id
@@ -587,6 +588,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
 				WorkerQueues:         &listHybridQueuesRequest,
+				WorkloadIdentity:     &deploymentFromFile.Deployment.Configuration.WorkloadIdentity,
 			}
 			if requestedExecutor == astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES {
 				taskPodNodePoolID, err := getNodePoolIDFromWorkerType(deploymentFromFile.Deployment.Configuration.DefaultWorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)

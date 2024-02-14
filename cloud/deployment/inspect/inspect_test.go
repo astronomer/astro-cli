@@ -826,7 +826,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
         updated_at: 2023-02-01T12:00:00Z
         deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
         webserver_url: some-url
-        workload_identity: ""
     alert_emails:
         - email1
         - email2

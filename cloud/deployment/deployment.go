@@ -200,7 +200,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, warnLogs, errorLogs,
 	return nil
 }
 
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
 
@@ -450,6 +450,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			IsCicdEnforced:      isCicdEnforced,
 			IsDagDeployEnabled:  dagDeployEnabled,
 			ClusterId:           clusterID,
+			WorkloadIdentity:    &workloadIdentity,
 			WorkspaceId:         workspaceID,
 
 			Scheduler: astroplatformcore.DeploymentInstanceSpecRequest{
@@ -1511,7 +1512,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 		} else {
 			coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 		}
-		err = createDeployment("", ws, "", "", runtimeVersion, disable, CeleryExecutor, "", "", "", "", "", cicdEnforcement, "", "", "", coreDeploymentType, 0, 0, platformCoreClient, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, disable, CeleryExecutor, "", "", "", "", "", cicdEnforcement, "", "", "", "", coreDeploymentType, 0, 0, platformCoreClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
