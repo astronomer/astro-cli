@@ -338,7 +338,7 @@ func IsOrganizationRoleValid(role string) error {
 	return ErrInvalidOrganizationRole
 }
 
-// Returns a list of all of an organizations users
+// Returns a list of all of a worksapces users
 func GetWorkspaceUsers(client astrocore.CoreClient, workspace string, limit int) ([]astrocore.User, error) {
 	offset := 0
 	var users []astrocore.User
@@ -375,7 +375,7 @@ func GetWorkspaceUsers(client astrocore.CoreClient, workspace string, limit int)
 	return users, nil
 }
 
-// Prints a list of all of an organizations users
+// Prints a list of all of a workspaces users
 func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace string) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
@@ -466,4 +466,156 @@ func GetUser(client astrocore.CoreClient, userID string) (user astrocore.User, e
 	user = *resp.JSON200
 
 	return user, nil
+}
+
+func AddDeploymentUser(email, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	// Get all org users. Setting limit to 1000 for now
+	users, err := GetOrgUsers(client)
+	if err != nil {
+		return err
+	}
+	userID, email, err := getUserID(email, users, false)
+	if err != nil {
+		return err
+	}
+	mutateUserInput := astrocore.MutateDeploymentUserRoleRequest{
+		Role: role,
+	}
+	resp, err := client.MutateDeploymentUserRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, userID, mutateUserInput)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "The user %s was successfully added to the deployment with the role %s\n", email, role)
+	return nil
+}
+
+func UpdateDeploymentUserRole(email, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	// Get all org users. Setting limit to 1000 for now
+	users, err := GetDeploymentUsers(client, deployment, userPagnationLimit)
+	if err != nil {
+		return err
+	}
+	userID, email, err := getUserID(email, users, true)
+	if err != nil {
+		return err
+	}
+	mutateUserInput := astrocore.MutateDeploymentUserRoleRequest{
+		Role: role,
+	}
+	fmt.Println("deployment: " + deployment)
+	resp, err := client.MutateDeploymentUserRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, userID, mutateUserInput)
+	if err != nil {
+		fmt.Println("error in MutateDeploymentUserRoleWithResponse")
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		fmt.Println("error in NormalizeAPIError")
+		return err
+	}
+	fmt.Fprintf(out, "The deployment user %s role was successfully updated to %s\n", email, role)
+	return nil
+}
+
+func RemoveDeploymentUser(email, deployment string, out io.Writer, client astrocore.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	// Get all org users. Setting limit to 1000 for now
+	users, err := GetDeploymentUsers(client, deployment, userPagnationLimit)
+	if err != nil {
+		return err
+	}
+	userID, email, err := getUserID(email, users, true)
+	if err != nil {
+		return err
+	}
+	resp, err := client.DeleteDeploymentUserWithResponse(httpContext.Background(), ctx.Organization, deployment, userID)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "The user %s was successfully removed from the deployment\n", email)
+	return nil
+}
+
+// Returns a list of all of a deployments users
+func GetDeploymentUsers(client astrocore.CoreClient, deployment string, limit int) ([]astrocore.User, error) {
+	offset := 0
+	var users []astrocore.User
+
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		includeDeploymentRoles := true
+		resp, err := client.ListDeploymentUsersWithResponse(httpContext.Background(), ctx.Organization, deployment, &astrocore.ListDeploymentUsersParams{
+			IncludeDeploymentRoles: &includeDeploymentRoles,
+			Offset:                 &offset,
+			Limit:                  &limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+		err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, resp.JSON200.Users...)
+
+		if resp.JSON200.TotalCount <= offset {
+			break
+		}
+
+		offset += limit
+	}
+
+	return users, nil
+}
+
+// Prints a list of all of an deployments users
+func ListDeploymentUsers(out io.Writer, client astrocore.CoreClient, deployment string) error {
+	table := printutil.Table{
+		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
+		DynamicPadding: true,
+		Header:         []string{"FULLNAME", "EMAIL", "ID", "DEPLOYMENT ROLE", "CREATE DATE"},
+	}
+	users, err := GetDeploymentUsers(client, deployment, userPagnationLimit)
+	if err != nil {
+		return err
+	}
+
+	for i := range users {
+		table.AddRow([]string{
+			users[i].FullName,
+			users[i].Username,
+			users[i].Id,
+			*users[i].DeploymentRole,
+			users[i].CreatedAt.Format(time.RFC3339),
+		}, false)
+	}
+
+	table.Print(out)
+	return nil
 }
