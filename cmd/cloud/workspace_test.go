@@ -256,7 +256,7 @@ func TestWorkspaceUserList(t *testing.T) {
 	})
 }
 
-func TestWorkspacUserUpdate(t *testing.T) {
+func TestWorkspaceUserUpdate(t *testing.T) {
 	expectedHelp := "astro workspace user update [email] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
@@ -410,7 +410,7 @@ func TestWorkspaceUserAdd(t *testing.T) {
 	})
 }
 
-func TestWorkspacUserRemove(t *testing.T) {
+func TestWorkspaceUserRemove(t *testing.T) {
 	expectedHelp := "Remove a user from an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
