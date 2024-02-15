@@ -72,6 +72,7 @@ var (
 	testRegion                 = "region"
 	testProvider               = "provider"
 	testCluster                = "cluster"
+	testWorkloadIdentity       = "test-workload-identity"
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 		{
 			Id:            "test-id-1",
@@ -135,6 +136,7 @@ var (
 			ResourceQuotaMemory: &ResourceQuotaMemory,
 			SchedulerSize:       &schedulerSize,
 			WorkerQueues:        &[]astroplatformcore.WorkerQueue{},
+			WorkloadIdentity:    &testWorkloadIdentity,
 		},
 	}
 	GetDeploymentOptionsResponseOK = astrocore.GetDeploymentOptionsResponse{
