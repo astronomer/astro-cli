@@ -3,6 +3,7 @@ package cloud
 import (
 	"errors"
 	"fmt"
+	roleClient "github.com/astronomer/astro-cli/cloud/role"
 	"io"
 	"os"
 	"strconv"
@@ -63,6 +64,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 		newOrganizationTeamRootCmd(out),
 		newOrganizationAuditLogs(out),
 		newOrganizationTokenRootCmd(out),
+		newOrganizationRoleRootCmd(out),
 	)
 	return cmd
 }
@@ -665,4 +667,36 @@ func selectOrganizationRole() (string, error) {
 		return "", errInvalidOrganizationRoleKey
 	}
 	return selected, nil
+}
+
+func newOrganizationRoleRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "role",
+		Aliases: []string{"te", "roles"},
+		Short:   "Manage roles in your Astro Organization",
+		Long:    "Manage roles in your Astro Organization.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newOrganizationRoleListCmd(out),
+	)
+	return cmd
+}
+
+func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the roles in your Astro Organization",
+		Long:    "List all the roles in your Astro Organization",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listRoles(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func listRoles(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return roleClient.ListOrgRoles(out, astroCoreClient)
 }

@@ -281,6 +281,72 @@ func (_m *ClientWithResponsesInterface) CreateClusterRouteWithResponse(ctx conte
 	return r0, r1
 }
 
+// CreateCustomRoleWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateCustomRoleWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateCustomRoleResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.CreateCustomRoleResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.CreateCustomRoleResponse, error)); ok {
+		return rf(ctx, organizationId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.CreateCustomRoleResponse); ok {
+		r0 = rf(ctx, organizationId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateCustomRoleResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreateCustomRoleWithResponse provides a mock function with given fields: ctx, organizationId, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateCustomRoleWithResponse(ctx context.Context, organizationId string, body astrocore.CreateCustomRoleRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateCustomRoleResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.CreateCustomRoleResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.CreateCustomRoleRequest, ...astrocore.RequestEditorFn) (*astrocore.CreateCustomRoleResponse, error)); ok {
+		return rf(ctx, organizationId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.CreateCustomRoleRequest, ...astrocore.RequestEditorFn) *astrocore.CreateCustomRoleResponse); ok {
+		r0 = rf(ctx, organizationId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateCustomRoleResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, astrocore.CreateCustomRoleRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateDeployWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, contentType, body, reqEditors
 func (_m *ClientWithResponsesInterface) CreateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateDeployResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -1073,6 +1139,39 @@ func (_m *ClientWithResponsesInterface) DeleteClusterWithResponse(ctx context.Co
 	return r0, r1
 }
 
+// DeleteCustomRoleWithResponse provides a mock function with given fields: ctx, organizationId, customRoleId, reqEditors
+func (_m *ClientWithResponsesInterface) DeleteCustomRoleWithResponse(ctx context.Context, organizationId string, customRoleId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.DeleteCustomRoleResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, customRoleId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.DeleteCustomRoleResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) (*astrocore.DeleteCustomRoleResponse, error)); ok {
+		return rf(ctx, organizationId, customRoleId, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) *astrocore.DeleteCustomRoleResponse); ok {
+		r0 = rf(ctx, organizationId, customRoleId, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.DeleteCustomRoleResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, customRoleId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DeleteDeploymentApiTokenWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, apiTokenId, reqEditors
 func (_m *ClientWithResponsesInterface) DeleteDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.DeleteDeploymentApiTokenResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -1627,6 +1726,39 @@ func (_m *ClientWithResponsesInterface) GetClusterWithResponse(ctx context.Conte
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, organizationId, clusterId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetCustomRoleWithResponse provides a mock function with given fields: ctx, organizationId, roleId, reqEditors
+func (_m *ClientWithResponsesInterface) GetCustomRoleWithResponse(ctx context.Context, organizationId string, roleId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetCustomRoleResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, roleId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.GetCustomRoleResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) (*astrocore.GetCustomRoleResponse, error)); ok {
+		return rf(ctx, organizationId, roleId, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) *astrocore.GetCustomRoleResponse); ok {
+		r0 = rf(ctx, organizationId, roleId, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.GetCustomRoleResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, roleId, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -2558,6 +2690,138 @@ func (_m *ClientWithResponsesInterface) ListOrganizationsWithResponse(ctx contex
 	return r0, r1
 }
 
+// ListRoleBindingsWithResponse provides a mock function with given fields: ctx, organizationId, roleId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ListRoleBindingsWithResponse(ctx context.Context, organizationId string, roleId string, params *astrocore.ListRoleBindingsParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListRoleBindingsResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, roleId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.ListRoleBindingsResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, *astrocore.ListRoleBindingsParams, ...astrocore.RequestEditorFn) (*astrocore.ListRoleBindingsResponse, error)); ok {
+		return rf(ctx, organizationId, roleId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, *astrocore.ListRoleBindingsParams, ...astrocore.RequestEditorFn) *astrocore.ListRoleBindingsResponse); ok {
+		r0 = rf(ctx, organizationId, roleId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ListRoleBindingsResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, *astrocore.ListRoleBindingsParams, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, roleId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListRoleTemplatesWithResponse provides a mock function with given fields: ctx, organizationId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ListRoleTemplatesWithResponse(ctx context.Context, organizationId string, params *astrocore.ListRoleTemplatesParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListRoleTemplatesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.ListRoleTemplatesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *astrocore.ListRoleTemplatesParams, ...astrocore.RequestEditorFn) (*astrocore.ListRoleTemplatesResponse, error)); ok {
+		return rf(ctx, organizationId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *astrocore.ListRoleTemplatesParams, ...astrocore.RequestEditorFn) *astrocore.ListRoleTemplatesResponse); ok {
+		r0 = rf(ctx, organizationId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ListRoleTemplatesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *astrocore.ListRoleTemplatesParams, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListRolesWithResponse provides a mock function with given fields: ctx, organizationId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ListRolesWithResponse(ctx context.Context, organizationId string, params *astrocore.ListRolesParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListRolesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.ListRolesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *astrocore.ListRolesParams, ...astrocore.RequestEditorFn) (*astrocore.ListRolesResponse, error)); ok {
+		return rf(ctx, organizationId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *astrocore.ListRolesParams, ...astrocore.RequestEditorFn) *astrocore.ListRolesResponse); ok {
+		r0 = rf(ctx, organizationId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ListRolesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *astrocore.ListRolesParams, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListSelfUserRepositoriesWithResponse provides a mock function with given fields: ctx, gitProvider, gitAccount, params, reqEditors
+func (_m *ClientWithResponsesInterface) ListSelfUserRepositoriesWithResponse(ctx context.Context, gitProvider astrocore.ListSelfUserRepositoriesParamsGitProvider, gitAccount string, params *astrocore.ListSelfUserRepositoriesParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListSelfUserRepositoriesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, gitProvider, gitAccount, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.ListSelfUserRepositoriesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.ListSelfUserRepositoriesParamsGitProvider, string, *astrocore.ListSelfUserRepositoriesParams, ...astrocore.RequestEditorFn) (*astrocore.ListSelfUserRepositoriesResponse, error)); ok {
+		return rf(ctx, gitProvider, gitAccount, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.ListSelfUserRepositoriesParamsGitProvider, string, *astrocore.ListSelfUserRepositoriesParams, ...astrocore.RequestEditorFn) *astrocore.ListSelfUserRepositoriesResponse); ok {
+		r0 = rf(ctx, gitProvider, gitAccount, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ListSelfUserRepositoriesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, astrocore.ListSelfUserRepositoriesParamsGitProvider, string, *astrocore.ListSelfUserRepositoriesParams, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, gitProvider, gitAccount, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListWorkspaceApiTokensWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, params, reqEditors
 func (_m *ClientWithResponsesInterface) ListWorkspaceApiTokensWithResponse(ctx context.Context, organizationId string, workspaceId string, params *astrocore.ListWorkspaceApiTokensParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListWorkspaceApiTokensResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -3475,6 +3739,72 @@ func (_m *ClientWithResponsesInterface) UpdateAzureClusterWithResponse(ctx conte
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, astrocore.UpdateAzureClusterRequest, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, organizationId, clusterId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateCustomRoleWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, customRoleId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateCustomRoleWithBodyWithResponse(ctx context.Context, organizationId string, customRoleId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateCustomRoleResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, customRoleId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.UpdateCustomRoleResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.UpdateCustomRoleResponse, error)); ok {
+		return rf(ctx, organizationId, customRoleId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.UpdateCustomRoleResponse); ok {
+		r0 = rf(ctx, organizationId, customRoleId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdateCustomRoleResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, customRoleId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateCustomRoleWithResponse provides a mock function with given fields: ctx, organizationId, customRoleId, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateCustomRoleWithResponse(ctx context.Context, organizationId string, customRoleId string, body astrocore.UpdateCustomRoleRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateCustomRoleResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, customRoleId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.UpdateCustomRoleResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.UpdateCustomRoleRequest, ...astrocore.RequestEditorFn) (*astrocore.UpdateCustomRoleResponse, error)); ok {
+		return rf(ctx, organizationId, customRoleId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.UpdateCustomRoleRequest, ...astrocore.RequestEditorFn) *astrocore.UpdateCustomRoleResponse); ok {
+		r0 = rf(ctx, organizationId, customRoleId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdateCustomRoleResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, astrocore.UpdateCustomRoleRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, customRoleId, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
