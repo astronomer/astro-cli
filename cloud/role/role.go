@@ -37,7 +37,7 @@ func GetOrgRoles(client astrocore.CoreClient) ([]astrocore.Role, []astrocore.Def
 			return nil, nil, err
 		}
 		defaultRoles = *resp.JSON200.DefaultRoles
-		
+
 		roles = append(roles, resp.JSON200.Roles...)
 
 		if resp.JSON200.TotalCount <= offset {
