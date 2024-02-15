@@ -2,9 +2,6 @@ package cloud
 
 import (
 	"fmt"
-	"github.com/astronomer/astro-cli/cloud/team"
-	"github.com/astronomer/astro-cli/cloud/user"
-	"github.com/astronomer/astro-cli/pkg/input"
 	"io"
 	"strings"
 
@@ -14,7 +11,10 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/fromfile"
 	"github.com/astronomer/astro-cli/cloud/organization"
+	"github.com/astronomer/astro-cli/cloud/team"
+	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

@@ -126,11 +126,13 @@ func IsRoleValid(role string) error {
 
 func SelectUser(users []astrocore.User, roleEntity string) (astrocore.User, error) {
 	roleColumn := "ORGANIZATION ROLE"
-	if roleEntity == "workspace" {
+	switch r := roleEntity; r {
+	case "workspace":
 		roleColumn = "WORKSPACE ROLE"
-	} else if roleEntity == "deployment" {
+	case "deployment":
 		roleColumn = "DEPLOYMENT ROLE"
 	}
+
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
@@ -142,7 +144,8 @@ func SelectUser(users []astrocore.User, roleEntity string) (astrocore.User, erro
 	userMap := map[string]astrocore.User{}
 	for i := range users {
 		index := i + 1
-		if roleEntity == "deployment" {
+		switch r := roleEntity; r {
+		case "deployment":
 			table.AddRow([]string{
 				strconv.Itoa(index),
 				users[i].FullName,
@@ -151,7 +154,7 @@ func SelectUser(users []astrocore.User, roleEntity string) (astrocore.User, erro
 				*users[i].DeploymentRole,
 				users[i].CreatedAt.Format(time.RFC3339),
 			}, false)
-		} else if roleEntity == "workspace" {
+		case "workspace":
 			table.AddRow([]string{
 				strconv.Itoa(index),
 				users[i].FullName,
@@ -160,7 +163,7 @@ func SelectUser(users []astrocore.User, roleEntity string) (astrocore.User, erro
 				*users[i].WorkspaceRole,
 				users[i].CreatedAt.Format(time.RFC3339),
 			}, false)
-		} else {
+		default:
 			table.AddRow([]string{
 				strconv.Itoa(index),
 				users[i].FullName,
@@ -170,6 +173,7 @@ func SelectUser(users []astrocore.User, roleEntity string) (astrocore.User, erro
 				users[i].CreatedAt.Format(time.RFC3339),
 			}, false)
 		}
+
 		userMap[strconv.Itoa(index)] = users[i]
 	}
 
@@ -387,6 +391,8 @@ func GetWorkspaceUsers(client astrocore.CoreClient, workspace string, limit int)
 }
 
 // Prints a list of all of a workspaces users
+//
+//nolint:dupl
 func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace string) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
@@ -606,6 +612,8 @@ func GetDeploymentUsers(client astrocore.CoreClient, deployment string, limit in
 }
 
 // Prints a list of all of an deployments users
+//
+//nolint:dupl
 func ListDeploymentUsers(out io.Writer, client astrocore.CoreClient, deployment string) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
