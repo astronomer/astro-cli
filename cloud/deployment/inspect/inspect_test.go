@@ -174,7 +174,6 @@ var (
 		ResourceQuotaMemory:    &resourceQuotaMemory,
 		SchedulerSize:          &schedulerTestSize,
 		CloudProvider:          &cloudProvider,
-		WorkloadIdentity:       &workloadIdentity,
 	}
 
 	getDeploymentResponse = astroplatformcore.GetDeploymentResponse{
@@ -434,6 +433,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 func TestGetDeploymentConfig(t *testing.T) {
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
 		sourceDeployment.Type = &hybridType
+		sourceDeployment.WorkloadIdentity = &workloadIdentity
 		cloudProvider := "aws"
 		sourceDeployment.CloudProvider = &cloudProvider
 		var actualDeploymentConfig deploymentConfig
@@ -458,6 +458,9 @@ func TestGetDeploymentConfig(t *testing.T) {
 		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
+
+		// clear workload identity
+		sourceDeployment.WorkloadIdentity = nil
 	})
 
 	t.Run("returns deployment config for the requested cloud standard deployment", func(t *testing.T) {
