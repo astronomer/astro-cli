@@ -174,6 +174,7 @@ var (
 		ResourceQuotaMemory:    &resourceQuotaMemory,
 		SchedulerSize:          &schedulerTestSize,
 		CloudProvider:          &cloudProvider,
+		WorkloadIdentity:       &workloadIdentity,
 	}
 
 	getDeploymentResponse = astroplatformcore.GetDeploymentResponse{
@@ -450,6 +451,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			Region:           *sourceDeployment.Region,
 			DeploymentType:   string(*sourceDeployment.Type),
 			CloudProvider:    *sourceDeployment.CloudProvider,
+			WorkloadIdentity: *sourceDeployment.WorkloadIdentity,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
