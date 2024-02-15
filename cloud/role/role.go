@@ -2,15 +2,14 @@ package role
 
 import (
 	httpContext "context"
+	"io"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"io"
 )
 
-var (
-	rolePagnationLimit = 100
-)
+var rolePagnationLimit = 100
 
 // Returns a list of all of an organizations roles
 func GetOrgRoles(client astrocore.CoreClient) ([]astrocore.Role, []astrocore.DefaultRole, error) {

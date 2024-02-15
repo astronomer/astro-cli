@@ -3,20 +3,18 @@ package cloud
 import (
 	"errors"
 	"fmt"
-	roleClient "github.com/astronomer/astro-cli/cloud/role"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/astronomer/astro-cli/pkg/printutil"
-
-	"github.com/spf13/cobra"
-
 	"github.com/astronomer/astro-cli/cloud/organization"
+	roleClient "github.com/astronomer/astro-cli/cloud/role"
 	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/spf13/cobra"
 )
 
 var (
