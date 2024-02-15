@@ -89,7 +89,7 @@ func UpdateUserRole(email, role string, out io.Writer, client astrocore.CoreClie
 			return ErrUserNotFound
 		}
 	} else {
-		user, err := SelectUser(users, false)
+		user, err := SelectUser(users, "organization")
 		userID = user.Id
 		email = user.Username
 		if err != nil {
@@ -124,10 +124,12 @@ func IsRoleValid(role string) error {
 	return ErrInvalidRole
 }
 
-func SelectUser(users []astrocore.User, workspace bool) (astrocore.User, error) {
+func SelectUser(users []astrocore.User, roleEntity string) (astrocore.User, error) {
 	roleColumn := "ORGANIZATION ROLE"
-	if workspace {
+	if roleEntity == "workspace" {
 		roleColumn = "WORKSPACE ROLE"
+	} else if roleEntity == "deployment" {
+		roleColumn = "DEPLOYMENT ROLE"
 	}
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
@@ -140,7 +142,16 @@ func SelectUser(users []astrocore.User, workspace bool) (astrocore.User, error) 
 	userMap := map[string]astrocore.User{}
 	for i := range users {
 		index := i + 1
-		if workspace {
+		if roleEntity == "deployment" {
+			table.AddRow([]string{
+				strconv.Itoa(index),
+				users[i].FullName,
+				users[i].Username,
+				users[i].Id,
+				*users[i].DeploymentRole,
+				users[i].CreatedAt.Format(time.RFC3339),
+			}, false)
+		} else if roleEntity == "workspace" {
 			table.AddRow([]string{
 				strconv.Itoa(index),
 				users[i].FullName,
@@ -254,7 +265,7 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 	if err != nil {
 		return err
 	}
-	userID, email, err := getUserID(email, users, false)
+	userID, email, err := getUserID(email, users, "organization")
 	if err != nil {
 		return err
 	}
@@ -290,7 +301,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 	if err != nil {
 		return err
 	}
-	userID, email, err := getUserID(email, users, true)
+	userID, email, err := getUserID(email, users, "workspace")
 	if err != nil {
 		return err
 	}
@@ -414,7 +425,7 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	if err != nil {
 		return err
 	}
-	userID, email, err := getUserID(email, users, true)
+	userID, email, err := getUserID(email, users, "workspace")
 	if err != nil {
 		return err
 	}
@@ -430,9 +441,9 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	return nil
 }
 
-func getUserID(email string, users []astrocore.User, workspace bool) (userID, newEmail string, err error) {
+func getUserID(email string, users []astrocore.User, roleEntity string) (userID, newEmail string, err error) {
 	if email == "" {
-		user, err := SelectUser(users, workspace)
+		user, err := SelectUser(users, roleEntity)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
@@ -479,7 +490,7 @@ func AddDeploymentUser(email, role, deployment string, out io.Writer, client ast
 	if err != nil {
 		return err
 	}
-	userID, email, err := getUserID(email, users, false)
+	userID, email, err := getUserID(email, users, "organization")
 	if err != nil {
 		return err
 	}
@@ -509,7 +520,7 @@ func UpdateDeploymentUserRole(email, role, deployment string, out io.Writer, cli
 	if err != nil {
 		return err
 	}
-	userID, email, err := getUserID(email, users, true)
+	userID, email, err := getUserID(email, users, "deployment")
 	if err != nil {
 		return err
 	}
@@ -542,7 +553,7 @@ func RemoveDeploymentUser(email, deployment string, out io.Writer, client astroc
 	if err != nil {
 		return err
 	}
-	userID, email, err := getUserID(email, users, true)
+	userID, email, err := getUserID(email, users, "deployment")
 	if err != nil {
 		return err
 	}

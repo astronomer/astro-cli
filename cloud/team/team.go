@@ -645,7 +645,7 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 		if len(users) == 0 {
 			return ErrNoUsersFoundInOrg
 		}
-		userSelection, err = user.SelectUser(users, false)
+		userSelection, err = user.SelectUser(users, "organization")
 		if err != nil {
 			return err
 		}
