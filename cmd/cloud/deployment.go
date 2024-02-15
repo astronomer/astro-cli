@@ -196,7 +196,7 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "w", "", "The Deployment's unique identifier")
-	cmd.Flags().StringVarP(&addDeploymentRole, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
+	cmd.Flags().StringVarP(&addDeploymentRole, "role", "r", "DEPLOYMENT_ADMIN", "The role for the "+
 		"new team. Possible values are DEPLOYMENT_ADMIN or the custom role name.")
 	return cmd
 }
@@ -278,7 +278,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 			return addDeploymentUser(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&addDeploymentRole, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
+	cmd.Flags().StringVarP(&addDeploymentRole, "role", "r", "DEPLOYMENT_ADMIN", "The role for the "+
 		"new user. Possible values are DEPLOYMENT_ADMIN or the custom role name.")
 	return cmd
 }
