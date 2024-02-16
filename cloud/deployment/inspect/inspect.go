@@ -18,18 +18,17 @@ import (
 )
 
 type deploymentMetadata struct {
-	DeploymentID     *string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
-	WorkspaceID      *string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
-	ClusterID        *string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
-	ReleaseName      *string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
-	AirflowVersion   *string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
-	CurrentTag       *string    `mapstructure:"current_tag" yaml:"current_tag" json:"current_tag"`
-	Status           *string    `mapstructure:"status" yaml:"status" json:"status"`
-	CreatedAt        *time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
-	UpdatedAt        *time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
-	DeploymentURL    *string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
-	WebserverURL     *string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
-	WorkloadIdentity *string    `mapstructure:"workload_identity" yaml:"workload_identity" json:"workload_identity"`
+	DeploymentID   *string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
+	WorkspaceID    *string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
+	ClusterID      *string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
+	ReleaseName    *string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
+	AirflowVersion *string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
+	CurrentTag     *string    `mapstructure:"current_tag" yaml:"current_tag" json:"current_tag"`
+	Status         *string    `mapstructure:"status" yaml:"status" json:"status"`
+	CreatedAt      *time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
+	UpdatedAt      *time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	DeploymentURL  *string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
+	WebserverURL   *string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
 }
 
 type deploymentConfig struct {
@@ -53,6 +52,7 @@ type deploymentConfig struct {
 	ResourceQuotaCPU      string `mapstructure:"resource_quota_cpu,omitempty" yaml:"resource_quota_cpu,omitempty" json:"resource_quota_cpu,omitempty"`
 	ResourceQuotaMemory   string `mapstructure:"resource_quota_memory,omitempty" yaml:"resource_quota_memory,omitempty" json:"resource_quota_memory,omitempty"`
 	DefaultWorkerType     string `mapstructure:"default_worker_type,omitempty" yaml:"default_worker_type,omitempty" json:"default_worker_type,omitempty"`
+	WorkloadIdentity      string `mapstructure:"workload_identity,omitempty" yaml:"workload_identity,omitempty" json:"workload_identity,omitempty"`
 }
 
 type Workerq struct {
@@ -157,9 +157,8 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCo
 
 func getDeploymentInfo(coreDeployment astroplatformcore.Deployment) (map[string]interface{}, error) { //nolint
 	var (
-		deploymentURL    string
-		workloadIdentity string
-		err              error
+		deploymentURL string
+		err           error
 	)
 
 	deploymentURL, err = deployment.GetDeploymentURL(coreDeployment.Id, coreDeployment.WorkspaceId)
@@ -177,22 +176,18 @@ func getDeploymentInfo(coreDeployment astroplatformcore.Deployment) (map[string]
 	if deployment.IsDeploymentStandard(*coreDeployment.Type) {
 		clusterID = notApplicable
 	}
-	if coreDeployment.WorkloadIdentity != nil {
-		workloadIdentity = *coreDeployment.WorkloadIdentity
-	}
 	return map[string]interface{}{
-		"deployment_id":     coreDeployment.Id,
-		"workspace_id":      coreDeployment.WorkspaceId,
-		"cluster_id":        clusterID,
-		"airflow_version":   coreDeployment.AirflowVersion,
-		"current_tag":       coreDeployment.ImageTag,
-		"release_name":      releaseName,
-		"deployment_url":    deploymentURL,
-		"webserver_url":     coreDeployment.WebServerUrl,
-		"created_at":        coreDeployment.CreatedAt,
-		"updated_at":        coreDeployment.UpdatedAt,
-		"workload_identity": workloadIdentity,
-		"status":            coreDeployment.Status,
+		"deployment_id":   coreDeployment.Id,
+		"workspace_id":    coreDeployment.WorkspaceId,
+		"cluster_id":      clusterID,
+		"airflow_version": coreDeployment.AirflowVersion,
+		"current_tag":     coreDeployment.ImageTag,
+		"release_name":    releaseName,
+		"deployment_url":  deploymentURL,
+		"webserver_url":   coreDeployment.WebServerUrl,
+		"created_at":      coreDeployment.CreatedAt,
+		"updated_at":      coreDeployment.UpdatedAt,
+		"status":          coreDeployment.Status,
 	}, nil
 }
 
@@ -247,6 +242,9 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	}
 	if coreDeployment.Region != nil {
 		deploymentMap["region"] = *coreDeployment.Region
+	}
+	if coreDeployment.WorkloadIdentity != nil {
+		deploymentMap["workload_identity"] = *coreDeployment.WorkloadIdentity
 	}
 
 	return deploymentMap, nil

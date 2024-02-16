@@ -433,6 +433,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 func TestGetDeploymentConfig(t *testing.T) {
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
 		sourceDeployment.Type = &hybridType
+		sourceDeployment.WorkloadIdentity = &workloadIdentity
 		cloudProvider := "aws"
 		sourceDeployment.CloudProvider = &cloudProvider
 		var actualDeploymentConfig deploymentConfig
@@ -450,12 +451,16 @@ func TestGetDeploymentConfig(t *testing.T) {
 			Region:           *sourceDeployment.Region,
 			DeploymentType:   string(*sourceDeployment.Type),
 			CloudProvider:    *sourceDeployment.CloudProvider,
+			WorkloadIdentity: *sourceDeployment.WorkloadIdentity,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
+
+		// clear workload identity
+		sourceDeployment.WorkloadIdentity = nil
 	})
 
 	t.Run("returns deployment config for the requested cloud standard deployment", func(t *testing.T) {
@@ -826,7 +831,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
         updated_at: 2023-02-01T12:00:00Z
         deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
         webserver_url: some-url
-        workload_identity: ""
     alert_emails:
         - email1
         - email2

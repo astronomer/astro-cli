@@ -727,6 +727,9 @@ type CreateDedicatedDeploymentRequest struct {
 	// WorkerQueues The list of worker queues configured for the Deployment. Applies only when `Executor` is `CELERY`. At least 1 worker queue is needed. All Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]WorkerQueueRequest `json:"workerQueues,omitempty"`
 
+	// WorkloadIdentity The Deployment's workload identity.
+	WorkloadIdentity *string `json:"workloadIdentity,omitempty"`
+
 	// WorkspaceId The ID of the workspace to which the Deployment belongs.
 	WorkspaceId string `json:"workspaceId"`
 }
@@ -832,6 +835,9 @@ type CreateHybridDeploymentRequest struct {
 	// WorkerQueues The list of worker queues configured for the Deployment. Applies only when `Executor` is `CELERY`. At least 1 worker queue is needed. All Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]HybridWorkerQueueRequest `json:"workerQueues,omitempty"`
 
+	// WorkloadIdentity The Deployment's workload identity.
+	WorkloadIdentity *string `json:"workloadIdentity,omitempty"`
+
 	// WorkspaceId The ID of the workspace to which the Deployment belongs.
 	WorkspaceId string `json:"workspaceId"`
 }
@@ -915,6 +921,9 @@ type CreateStandardDeploymentRequest struct {
 
 	// WorkerQueues The list of worker queues configured for the Deployment. Applies only when `Executor` is `CELERY`. At least 1 worker queue is needed. All Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]WorkerQueueRequest `json:"workerQueues,omitempty"`
+
+	// WorkloadIdentity The Deployment's workload identity.
+	WorkloadIdentity *string `json:"workloadIdentity,omitempty"`
 
 	// WorkspaceId The ID of the workspace to which the Deployment belongs.
 	WorkspaceId string `json:"workspaceId"`

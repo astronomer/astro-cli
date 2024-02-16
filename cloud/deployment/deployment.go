@@ -200,7 +200,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, warnLogs, errorLogs,
 	return nil
 }
 
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
 
@@ -450,6 +450,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			IsCicdEnforced:      isCicdEnforced,
 			IsDagDeployEnabled:  dagDeployEnabled,
 			ClusterId:           clusterID,
+			WorkloadIdentity:    &workloadIdentity,
 			WorkspaceId:         workspaceID,
 
 			Scheduler: astroplatformcore.DeploymentInstanceSpecRequest{
@@ -707,7 +708,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 	}
 }
 
-func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, schedulerAU, schedulerReplicas int, wQueueList []astroplatformcore.WorkerQueueRequest, hybridQueueList []astroplatformcore.HybridWorkerQueueRequest, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, force bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error { //nolint
+func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astroplatformcore.WorkerQueueRequest, hybridQueueList []astroplatformcore.HybridWorkerQueueRequest, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, force bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error { //nolint
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, platformCoreClient, coreClient)
@@ -1018,6 +1019,11 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if schedulerReplicas == 0 {
 			schedulerReplicas = currentDeployment.SchedulerReplicas
 		}
+		if workloadIdentity == "" {
+			if currentDeployment.WorkloadIdentity != nil {
+				workloadIdentity = *currentDeployment.WorkloadIdentity
+			}
+		}
 		// validate au resources requests
 		resourcesValid := validateHybridResources(schedulerAU, schedulerReplicas, configOption)
 		if !resourcesValid {
@@ -1049,6 +1055,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			},
 			Type:                 astroplatformcore.UpdateHybridDeploymentRequestTypeHYBRID,
 			EnvironmentVariables: deploymentEnvironmentVariablesRequest,
+			WorkloadIdentity:     &workloadIdentity,
 		}
 		cluster, err := CoreGetCluster("", *currentDeployment.ClusterId, platformCoreClient)
 		if err != nil {
@@ -1511,7 +1518,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 		} else {
 			coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 		}
-		err = createDeployment("", ws, "", "", runtimeVersion, disable, CeleryExecutor, "", "", "", "", "", cicdEnforcement, "", "", "", coreDeploymentType, 0, 0, platformCoreClient, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, disable, CeleryExecutor, "", "", "", "", "", cicdEnforcement, "", "", "", "", coreDeploymentType, 0, 0, platformCoreClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
