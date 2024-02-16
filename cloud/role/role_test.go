@@ -73,7 +73,16 @@ func TestListOrgRole(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListRolesResponseOK, nil).Twice()
-		err := ListOrgRoles(out, mockClient)
+		err := ListOrgRoles(out, mockClient, true)
+		assert.NoError(t, err)
+	})
+
+	t.Run("happy path TestListOrgRole - should include default roles false", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListRolesResponseOK, nil).Twice()
+		err := ListOrgRoles(out, mockClient, false)
 		assert.NoError(t, err)
 	})
 
@@ -82,7 +91,7 @@ func TestListOrgRole(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := ListOrgRoles(out, mockClient)
+		err := ListOrgRoles(out, mockClient, true)
 		assert.EqualError(t, err, "network error")
 	})
 
@@ -91,7 +100,7 @@ func TestListOrgRole(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListRolesResponseError, nil).Twice()
-		err := ListOrgRoles(out, mockClient)
+		err := ListOrgRoles(out, mockClient, true)
 		assert.EqualError(t, err, "failed to list roles")
 	})
 
@@ -100,7 +109,7 @@ func TestListOrgRole(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := ListOrgRoles(out, mockClient)
+		err := ListOrgRoles(out, mockClient, true)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})

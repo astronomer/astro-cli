@@ -37,6 +37,7 @@ var (
 	updateOrganizationRole             string
 	teamOrgRole                        string
 	validOrganizationRoles             []string
+	shouldIncludeDefaultRoles          bool
 )
 
 const (
@@ -691,10 +692,12 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 			return listRoles(cmd, out)
 		},
 	}
+	cmd.Flags().BoolVarP(&shouldIncludeDefaultRoles, "include-default-roles", "i", false, "Should include default roles in response")
+
 	return cmd
 }
 
 func listRoles(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return roleClient.ListOrgRoles(out, astroCoreClient)
+	return roleClient.ListOrgRoles(out, astroCoreClient, shouldIncludeDefaultRoles)
 }

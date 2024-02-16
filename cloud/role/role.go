@@ -12,7 +12,7 @@ import (
 var rolePagnationLimit = 100
 
 // Returns a list of all of an organizations roles
-func GetOrgRoles(client astrocore.CoreClient) ([]astrocore.Role, []astrocore.DefaultRole, error) {
+func GetOrgRoles(client astrocore.CoreClient, shouldIncludeDefaultRoles bool) ([]astrocore.Role, []astrocore.DefaultRole, error) {
 	offset := 0
 	var roles []astrocore.Role
 
@@ -24,7 +24,7 @@ func GetOrgRoles(client astrocore.CoreClient) ([]astrocore.Role, []astrocore.Def
 	var includeDefaultRoles bool
 
 	for {
-		if len(defaultRoles) == 0 {
+		if len(defaultRoles) == 0 && shouldIncludeDefaultRoles {
 			includeDefaultRoles = true
 		} else {
 			includeDefaultRoles = false
@@ -41,7 +41,7 @@ func GetOrgRoles(client astrocore.CoreClient) ([]astrocore.Role, []astrocore.Def
 		if err != nil {
 			return nil, nil, err
 		}
-		if len(defaultRoles) == 0 {
+		if len(defaultRoles) == 0 && shouldIncludeDefaultRoles {
 			defaultRoles = *resp.JSON200.DefaultRoles
 		}
 
@@ -58,13 +58,13 @@ func GetOrgRoles(client astrocore.CoreClient) ([]astrocore.Role, []astrocore.Def
 }
 
 // Prints a list of all of an organizations roles
-func ListOrgRoles(out io.Writer, client astrocore.CoreClient) error {
+func ListOrgRoles(out io.Writer, client astrocore.CoreClient, shouldIncludeDefaultRoles bool) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
 		Header:         []string{"NAME", "ID", "DESCRIPTION"},
 	}
-	roles, defaultRoles, err := GetOrgRoles(client)
+	roles, defaultRoles, err := GetOrgRoles(client, shouldIncludeDefaultRoles)
 	if err != nil {
 		return err
 	}
