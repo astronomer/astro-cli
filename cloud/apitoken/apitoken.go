@@ -53,40 +53,16 @@ func GetOrgApiTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, error) 
 	return apiTokens, nil
 }
 
-func CreateDeploymentApiToken(apiTokenID, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func CreateDeploymentApiToken(name, role, description, deployment string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	var apiToken *astrocore.ApiToken
 
-	if apiTokenID == "" {
-		// Get all org apiTokens. Setting limit to 1000 for now
-		apiTokens, err := GetOrgApiTokens(client)
-		if err != nil {
-			return err
-		}
-		apiToken, err = getApiToken(apiTokens)
-		if err != nil {
-			return err
-		}
-	} else {
-		resp, err := client.GetDeploymentApiTokenWithResponse(httpContext.Background(), ctx.Organization, deployment, apiTokenID)
-		if err != nil {
-			fmt.Println("error in GetDeploymentApiTokenWithResponse")
-			return err
-		}
-		err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-		if err != nil {
-			fmt.Println("error in NormalizeAPIError")
-			return err
-		}
-		apiToken = resp.JSON200
-	}
 	mutateApiTokenInput := astrocore.CreateDeploymentApiTokenRequest{
-		Role: role,
-		Name: apiToken.Name,
-		Description:
+		Role:        role,
+		Name:        name,
+		Description: &description,
 	}
 	resp, err := client.CreateDeploymentApiTokenWithResponse(httpContext.Background(), ctx.Organization, deployment, mutateApiTokenInput)
 	if err != nil {
@@ -96,7 +72,7 @@ func CreateDeploymentApiToken(apiTokenID, role, deployment string, out io.Writer
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "The apiToken %s was successfully added to the deployment with the role %s\n", apiToken.Id, role)
+	fmt.Fprintf(out, "The apiToken %s was successfully added to the deployment with the role %s\n", name, role)
 	return nil
 }
 
@@ -108,8 +84,8 @@ func UpdateDeploymentApiTokenRole(apiTokenID, role, deployment string, out io.Wr
 	var apiToken *astrocore.ApiToken
 
 	if apiTokenID == "" {
-		// Get all org apiTokens. Setting limit to 1000 for now
-		apiTokens, err := GetOrgApiTokens(client)
+		// Get all dep apiTokens. Setting limit to 1000 for now
+		apiTokens, err := GetDeploymentApiTokens(client, deployment, 1000)
 		if err != nil {
 			return err
 		}
@@ -151,7 +127,7 @@ func UpdateDeploymentApiTokenRole(apiTokenID, role, deployment string, out io.Wr
 }
 
 func getApiToken(apitokens []astrocore.ApiToken) (*astrocore.ApiToken, error) {
-	apiToken, err := SelectApiToken(apitokens)
+	apiToken, err := SelectDeploymentApiToken(apitokens)
 	if err != nil {
 		return nil, err
 	}
@@ -159,22 +135,29 @@ func getApiToken(apitokens []astrocore.ApiToken) (*astrocore.ApiToken, error) {
 	return &apiToken, nil
 }
 
-func SelectApiToken(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
-
+func SelectDeploymentApiToken(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"#", "NAME", "DESCRIPTION", "ID", "CREATE DATE", "UPDATE DATE"},
+		Header:         []string{"#", "NAME", "DEPLOYMENT_ROLE", "DESCRIPTION", "ID", "CREATE DATE", "UPDATE DATE"},
 	}
 
-	fmt.Println("\nPlease select the user:")
+	fmt.Println("\nPlease select the api token:")
 
 	apiTokenMap := map[string]astrocore.ApiToken{}
 	for i := range apiTokens {
 		index := i + 1
+		var role string
+		for _, tokenRole := range apiTokens[i].Roles {
+			if tokenRole.EntityType == "DEPLOYMENT" {
+				role = tokenRole.Role
+			}
+		}
+
 		table.AddRow([]string{
 			strconv.Itoa(index),
 			apiTokens[i].Name,
+			role,
 			apiTokens[i].Description,
 			apiTokens[i].Id,
 			apiTokens[i].CreatedAt.Format(time.RFC3339),

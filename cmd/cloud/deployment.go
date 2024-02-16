@@ -28,6 +28,9 @@ const (
 )
 
 var (
+	apiTokenName              string
+	apiTokenRole              string
+	apiTokenDescription       string
 	label                     string
 	runtimeVersion            string
 	deploymentID              string
@@ -858,23 +861,27 @@ func newDeploymentApiTokenRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentApiTokenListCmd(out),
 		newDeploymentApiTokenUpdateCmd(out),
 		newDeploymentApiTokenRemoveCmd(out),
-		newDeploymentApiTokenAddCmd(out),
+		newDeploymentApiTokenCreateCmd(out),
 	)
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment where you'd like to manage apiTokens")
 	return cmd
 }
 
-func newDeploymentApiTokenAddCmd(out io.Writer) *cobra.Command {
+func newDeploymentApiTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "add [apiTokenID]",
-		Short: "Add a apiToken to an Astro Deployment with a specific role",
-		Long:  "Add a apiToken to an Astro Deployment with a specific role\n$astro deployment apiToken add [apiTokenID] --role [ DEPLOYMENT_ADMIN or the custom role name ].",
+		Use:   "create [apiTokenID]",
+		Short: "Create a apiToken in an Astro Deployment with a specific role",
+		Long:  "Create a apiToken in an Astro Deployment with a specific role\n$astro deployment apiToken add [apiTokenID] --role [ DEPLOYMENT_ADMIN or the custom role name ].",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addDeploymentApiToken(cmd, args, out)
+			return createDeploymentApiToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&addDeploymentRole, "role", "r", "DEPLOYMENT_ADMIN", "The role for the "+
+	cmd.Flags().StringVarP(&apiTokenRole, "role", "r", "", "The role for the "+
 		"new apiToken. Possible values are DEPLOYMENT_ADMIN or the custom role name.")
+	cmd.Flags().StringVarP(&apiTokenName, "name", "n", "", "The unique name for the "+
+		"new apiToken.")
+	cmd.Flags().StringVarP(&apiTokenDescription, "description", "d", "", "A short description for the "+
+		"new apiToken.")
 	return cmd
 }
 
@@ -919,20 +926,23 @@ func newDeploymentApiTokenRemoveCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addDeploymentApiToken(cmd *cobra.Command, args []string, out io.Writer) error {
+func createDeploymentApiToken(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errors.New("flag --deployment-id is required")
 	}
-	var apiTokenID string
 
-	// if an apiTokenID was provided in the args we use it
-	if len(args) > 0 {
-		// make sure the apiTokenID is lowercase
-		apiTokenID = strings.ToLower(args[0])
+	if apiTokenName == "" {
+		// no name was provided so ask the user for it
+		apiTokenName = input.Text("Enter a unique name for the apiToken: ")
+	}
+
+	if apiTokenRole == "" {
+		// no role was provided so ask the user for it
+		apiTokenRole = input.Text("Enter a Deployment role or custom role name to update apiToken. Can be DEPLOYMENT_ADMIN or the id of a custom role: ")
 	}
 
 	cmd.SilenceUsage = true
-	return apitoken.AddDeploymentApiToken(apiTokenID, addDeploymentRole, deploymentID, out, astroCoreClient)
+	return apitoken.CreateDeploymentApiToken(apiTokenName, apiTokenRole, apiTokenDescription, deploymentID, out, astroCoreClient)
 }
 
 func listDeploymentApiToken(cmd *cobra.Command, out io.Writer) error {
