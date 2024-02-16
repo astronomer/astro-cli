@@ -19,7 +19,6 @@ var (
 	apiTokenPagnationLimit = 100
 )
 
-// Returns a list of all of an organizations apiTokens
 func GetOrgApiTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, error) {
 	offset := 0
 	var apiTokens []astrocore.ApiToken
