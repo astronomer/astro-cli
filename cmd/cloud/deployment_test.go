@@ -1495,7 +1495,7 @@ func TestDeploymentTeamUpdate(t *testing.T) {
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
-	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
+	t.Run("command asks for input when no team id is passed in as an arg", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1570,7 +1570,7 @@ func TestDeploymentTeamAdd(t *testing.T) {
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
-	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
+	t.Run("command asks for input when no team id is passed in as an arg", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
