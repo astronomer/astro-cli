@@ -21,8 +21,14 @@ func GetOrgRoles(client astrocore.CoreClient) ([]astrocore.Role, []astrocore.Def
 		return nil, nil, err
 	}
 	var defaultRoles []astrocore.DefaultRole
+	var includeDefaultRoles bool
+
 	for {
-		includeDefaultRoles := true
+		if len(defaultRoles) == 0 {
+			includeDefaultRoles = true
+		} else {
+			includeDefaultRoles = false
+		}
 		resp, err := client.ListRolesWithResponse(httpContext.Background(), ctx.Organization, &astrocore.ListRolesParams{
 			IncludeDefaultRoles: &includeDefaultRoles,
 			Offset:              &offset,
@@ -35,7 +41,9 @@ func GetOrgRoles(client astrocore.CoreClient) ([]astrocore.Role, []astrocore.Def
 		if err != nil {
 			return nil, nil, err
 		}
-		defaultRoles = *resp.JSON200.DefaultRoles
+		if len(defaultRoles) == 0 {
+			defaultRoles = *resp.JSON200.DefaultRoles
+		}
 
 		roles = append(roles, resp.JSON200.Roles...)
 

@@ -670,7 +670,7 @@ func selectOrganizationRole() (string, error) {
 func newOrganizationRoleRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "role",
-		Aliases: []string{"te", "roles"},
+		Aliases: []string{"ro", "roles"},
 		Short:   "Manage roles in your Astro Organization",
 		Long:    "Manage roles in your Astro Organization.",
 	}
