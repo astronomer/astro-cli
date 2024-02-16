@@ -53,7 +53,7 @@ func GetOrgApiTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, error) 
 	return apiTokens, nil
 }
 
-func AddDeploymentApiToken(apiTokenID, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func CreateDeploymentApiToken(apiTokenID, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -83,11 +83,12 @@ func AddDeploymentApiToken(apiTokenID, role, deployment string, out io.Writer, c
 		}
 		apiToken = resp.JSON200
 	}
-	mutateApiTokenInput := astrocore.UpdateDeploymentApiTokenRequest{
+	mutateApiTokenInput := astrocore.CreateDeploymentApiTokenRequest{
 		Role: role,
 		Name: apiToken.Name,
+		Description:
 	}
-	resp, err := client.UpdateDeploymentApiTokenWithResponse(httpContext.Background(), ctx.Organization, deployment, apiToken.Id, mutateApiTokenInput)
+	resp, err := client.CreateDeploymentApiTokenWithResponse(httpContext.Background(), ctx.Organization, deployment, mutateApiTokenInput)
 	if err != nil {
 		return err
 	}
