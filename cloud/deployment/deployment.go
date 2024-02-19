@@ -33,10 +33,9 @@ var (
 	ErrInvalidDeploymentKey   = errors.New("invalid Deployment selected")
 	ErrInvalidClusterKey      = errors.New("invalid Cluster selected")
 	ErrInvalidRegionKey       = errors.New("invalid Region selected")
-	errTimedOut               = errors.New("timed out waiting for the deployment to become healthy")
-	ErrWrongEnforceInput      = errors.New("the input to the `--enforce-cicd` flag")
-	ErrNoDeploymentExists     = errors.New("no deployment was found in this workspace")
-	ErrInvalidResourceRequest = errors.New("invaild resource request")
+	errTimedOut               = errors.New("timed out waiting for the Deployment to enter a Healthy state")
+	ErrWrongEnforceInput      = errors.New("the input to the `--enforce-cicd` flag is invalid. Make sure to use either 'enable' or 'disable'")
+	ErrInvalidResourceRequest = errors.New("invalid resource request")
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	canCiCdDeploy    = CanCiCdDeploy
