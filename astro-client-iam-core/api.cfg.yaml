@@ -1,0 +1,10 @@
+package: astroiamcore
+generate:
+  - types
+  - client
+include-tags:
+  - User
+  - Invite
+  - Team
+  - ApiToken
+output: ./astro-client-iam-core/api.gen.go
