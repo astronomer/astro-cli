@@ -353,11 +353,15 @@ func ListWorkspaceTeams(out io.Writer, client astrocore.CoreClient, workspace st
 				teamRole = role.Role
 			}
 		}
+		var teamDescription string
+		if teams[i].Description != nil {
+			teamDescription = *teams[i].Description
+		}
 		table.AddRow([]string{
 			teams[i].Id,
 			teamRole,
 			teams[i].Name,
-			*teams[i].Description,
+			teamDescription,
 			teams[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}
@@ -465,10 +469,14 @@ func ListOrgTeams(out io.Writer, client astrocore.CoreClient) error {
 	}
 
 	for i := range teams {
+		var teamDescription string
+		if teams[i].Description != nil {
+			teamDescription = *teams[i].Description
+		}
 		table.AddRow([]string{
 			teams[i].Id,
 			teams[i].Name,
-			*teams[i].Description,
+			teamDescription,
 			teams[i].OrganizationRole,
 			strconv.FormatBool(teams[i].IsIdpManaged),
 			teams[i].CreatedAt.Format(time.RFC3339),
@@ -766,9 +774,8 @@ func GetDeploymentTeams(client astrocore.CoreClient, deployment string, limit in
 	if err != nil {
 		return nil, err
 	}
-
+	includeDeploymentRoles := true
 	for {
-		includeDeploymentRoles := true
 		resp, err := client.ListDeploymentTeamsWithResponse(httpContext.Background(), ctx.Organization, deployment, &astrocore.ListDeploymentTeamsParams{
 			IncludeDeploymentRoles: &includeDeploymentRoles,
 			Offset:                 &offset,
@@ -806,6 +813,10 @@ func ListDeploymentTeams(out io.Writer, client astrocore.CoreClient, deployment 
 
 	for i := range teams {
 		var teamRole string
+		var teamDescription string
+		if teams[i].Description != nil {
+			teamDescription = *teams[i].Description
+		}
 		for _, role := range *teams[i].Roles {
 			if role.EntityType == "DEPLOYMENT" && role.EntityId == deployment {
 				teamRole = role.Role
@@ -815,7 +826,7 @@ func ListDeploymentTeams(out io.Writer, client astrocore.CoreClient, deployment 
 			teams[i].Id,
 			teamRole,
 			teams[i].Name,
-			*teams[i].Description,
+			teamDescription,
 			teams[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}
@@ -857,10 +868,10 @@ func AddDeploymentTeam(id, role, deployment string, out io.Writer, client astroc
 
 	teamID := team.Id
 
-	mutateUserInput := astrocore.MutateDeploymentTeamRoleRequest{
+	mutateDeploymentTeamInput := astrocore.MutateDeploymentTeamRoleRequest{
 		Role: role,
 	}
-	resp, err := client.MutateDeploymentTeamRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, teamID, mutateUserInput)
+	resp, err := client.MutateDeploymentTeamRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, teamID, mutateDeploymentTeamInput)
 	if err != nil {
 		return err
 	}

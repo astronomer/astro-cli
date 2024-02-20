@@ -179,7 +179,6 @@ func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
-		// make sure the email is lowercase
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
@@ -190,7 +189,7 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [id]",
 		Short: "Add a team to an Astro Deployment with a specific role",
-		Long:  "Add a team to an Astro Deployment with a specific role\n$astro deployment team add [id] --role [ DEPLOYMENT_ADMIN or the custom role name ].",
+		Long:  "Add a team to an Astro Deployment with a specific role\n$astro deployment team add [id] --role [DEPLOYMENT_ADMIN or the custom role name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addDeploymentTeam(cmd, args, out)
 		},
@@ -209,7 +208,6 @@ func addDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	// if an email was provided in the args we use it
 	if len(args) > 0 {
-		// make sure the email is lowercase
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
@@ -220,8 +218,8 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [id]",
 		Aliases: []string{"up"},
-		Short:   "Update a the role of a team in an Astro Deployment",
-		Long:    "Update the role of a team in an Astro Deployment\n$astro deployment team update [id] --role [ DEPLOYMENT_ADMIN or the custom role name ].",
+		Short:   "Update the role of a team in an Astro Deployment",
+		Long:    "Update the role of a team in an Astro Deployment\n$astro deployment team update [id] --role [DEPLOYMENT_ADMIN or the custom role name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateDeploymentTeam(cmd, args, out)
 		},
@@ -273,7 +271,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [email]",
 		Short: "Add a user to an Astro Deployment with a specific role",
-		Long:  "Add a user to an Astro Deployment with a specific role\n$astro deployment user add [email] --role [ DEPLOYMENT_ADMIN or the custom role name ].",
+		Long:  "Add a user to an Astro Deployment with a specific role\n$astro deployment user add [email] --role [DEPLOYMENT_ADMIN or the custom role name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addDeploymentUser(cmd, args, out)
 		},
@@ -301,7 +299,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [email]",
 		Aliases: []string{"up"},
 		Short:   "Update a the role of a user in an Astro Deployment",
-		Long:    "Update the role of a user in an Astro Deployment\n$astro deployment user update [email] --role [ DEPLOYMENT_ADMIN or the custom role name ].",
+		Long:    "Update the role of a user in an Astro Deployment\n$astro deployment user update [email] --role [DEPLOYMENT_ADMIN or the custom role name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateDeploymentUser(cmd, args, out)
 		},
@@ -334,7 +332,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 			return deploymentList(cmd, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all deployments")
+	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "List all Deployments running in your Astronomer Workspace")
 	return cmd
 }
 
