@@ -71,7 +71,7 @@ func CreateDeploymentApiToken(name, role, description, deployment string, out io
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "The apiToken %s was successfully added to the deployment with the role %s\n", name, role)
+	fmt.Fprintf(out, "The apiToken was successfully created with the role %s\n", role)
 	return nil
 }
 
@@ -92,6 +92,7 @@ func UpdateDeploymentApiTokenRole(apiTokenID, role, deployment string, out io.Wr
 		if err != nil {
 			return err
 		}
+		apiTokenID = apiToken.Id
 	} else {
 		resp, err := client.GetDeploymentApiTokenWithResponse(httpContext.Background(), ctx.Organization, deployment, apiTokenID)
 		if err != nil {
