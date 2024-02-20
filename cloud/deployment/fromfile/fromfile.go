@@ -763,8 +763,7 @@ func getWorkspaceIDFromName(workspaceName, organizationID string, client astroco
 			return existingWorkspaces[i].Id, nil
 		}
 	}
-	err = fmt.Errorf("workspace_name: %s %w in organization: %s", workspaceName, errNotFound, organizationID)
-	return "", err
+	return "", nil
 }
 
 // getNodePoolIDFromWorkerType maps the node pool id in nodePools to a worker type.
