@@ -332,7 +332,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 			return deploymentList(cmd, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "List all Deployments running in your Astronomer Workspace")
+	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 	return cmd
 }
 
