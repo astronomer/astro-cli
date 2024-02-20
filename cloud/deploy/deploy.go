@@ -343,7 +343,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		if fileExist {
 			err := removeDagsFromDockerIgnore(fullpath)
 			if err != nil {
-				return errors.New("Found dags entry in .dockerignore file. Remove this entry and try again")
+				return errors.Wrap(err, "Found dags entry in .dockerignore file. Remove this entry and try again")
 			}
 		}
 		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil)
