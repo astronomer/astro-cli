@@ -39,15 +39,15 @@ build:
 
 core_api_gen:
     ifeq (, $(shell which oapi-codegen))
-	go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest
+	go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4
     endif
-	oapi-codegen -include-tags=User,Organization,Invite,Workspace,Cluster,Options,Team,ApiToken,Deployment,Deploy,Environment -generate=types,client -package=astrocore "${CORE_OPENAPI_SPEC}" > ./astro-client-core/api.gen.go
+	oapi-codegen -include-tags=User,Organization,Invite,Workspace,Cluster,Options,Team,ApiToken,Deployment,Deploy,Environment,Role -generate=types,client -package=astrocore "${CORE_OPENAPI_SPEC}" > ./astro-client-core/api.gen.go
 	make mock_astro_core
 
 	oapi-codegen -include-tags=User,Invite,Team,ApiToken -generate=types,client -package=astroiamcore "${CORE_IAM_OPENAPI_SPEC}" > ./astro-client-iam-core/api.gen.go
 	make mock_astro_iam_core
 
-	oapi-codegen -include-tags=Organization,Workspace,Cluster,Options,Deployment -generate=types,client -package=astroplatformcore "${CORE_PLATFORM_OPENAPI_SPEC}" > ./astro-client-platform-core/api.gen.go
+	oapi-codegen -include-tags=Organization,Workspace,Cluster,Options,Deployment,Role -generate=types,client -package=astroplatformcore "${CORE_PLATFORM_OPENAPI_SPEC}" > ./astro-client-platform-core/api.gen.go
 	make mock_astro_platform_core
 
 test:

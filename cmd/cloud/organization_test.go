@@ -44,6 +44,15 @@ func TestOrganizationRootCommand(t *testing.T) {
 	assert.Contains(t, buf.String(), "organization")
 }
 
+func TestOrganizationRoleRootCommand(t *testing.T) {
+	expectedHelp := "Manage roles in your Astro Organization."
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	cmdArgs := []string{"role"}
+	resp, err := execOrganizationCmd(cmdArgs...)
+	assert.NoError(t, err)
+	assert.Contains(t, resp, expectedHelp)
+}
+
 func TestOrganizationUserRootCommand(t *testing.T) {
 	expectedHelp := "Manage users in your Astro Organization."
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -1497,6 +1506,68 @@ func TestOrganizationTokenListRoles(t *testing.T) {
 		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"token", "roles", mockTokenID}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+}
+
+var (
+	role1 = astrocore.Role{
+		Name:        "role 1",
+		Description: &description,
+		Id:          "role1-id",
+	}
+	role2 = astrocore.Role{
+		Name:        "role 2",
+		Description: &description,
+		Id:          "role2-id",
+	}
+	roles = []astrocore.Role{
+		role1,
+		role2,
+	}
+	defaultRole1 = astrocore.DefaultRole{
+		Name:        "default role 1",
+		Description: &description,
+	}
+	defaultRole2 = astrocore.DefaultRole{
+		Name:        "default role 2",
+		Description: &description,
+	}
+	defaultRoles = []astrocore.DefaultRole{
+		defaultRole1,
+		defaultRole2,
+	}
+	ListRolesResponseOK = astrocore.ListRolesResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.RolesPaginated{
+			Limit:        1,
+			Offset:       0,
+			TotalCount:   1,
+			Roles:        roles,
+			DefaultRoles: &defaultRoles,
+		},
+	}
+)
+
+func TestListOrganizationRoles(t *testing.T) {
+	expectedHelp := "organization role list [flags]"
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("-h prints invite help", func(t *testing.T) {
+		cmdArgs := []string{"role", "list", "-h"}
+		resp, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("can list org roles", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListRolesResponseOK, nil).Twice()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"role", "list"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)

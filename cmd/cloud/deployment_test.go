@@ -56,12 +56,12 @@ var (
 			Deployments: mockCoreDeploymentCreateResponse,
 		},
 	}
-	workloadIdentity                 = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
+	mockWorkloadIdentity             = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
 	mockCoreDeploymentCreateResponse = []astroplatformcore.Deployment{
 		{
 			Name:             "test-deployment-label",
 			Status:           "HEALTHY",
-			WorkloadIdentity: &workloadIdentity,
+			WorkloadIdentity: &mockWorkloadIdentity,
 			ClusterId:        &clusterID,
 			ClusterName:      &testCluster,
 			Id:               "test-id-1",

@@ -72,6 +72,7 @@ var (
 	testRegion                 = "region"
 	testProvider               = "provider"
 	testCluster                = "cluster"
+	testWorkloadIdentity       = "test-workload-identity"
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 		{
 			Id:            "test-id-1",
@@ -135,6 +136,7 @@ var (
 			ResourceQuotaMemory: &ResourceQuotaMemory,
 			SchedulerSize:       &schedulerSize,
 			WorkerQueues:        &[]astroplatformcore.WorkerQueue{},
+			WorkloadIdentity:    &testWorkloadIdentity,
 		},
 	}
 	GetDeploymentOptionsResponseOK = astrocore.GetDeploymentOptionsResponse{
@@ -392,7 +394,7 @@ func TestGetDeployment(t *testing.T) {
 		// Mock createDeployment
 		createDeployment = func(
 			name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement,
-			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
+			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
 			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
@@ -427,7 +429,7 @@ func TestGetDeployment(t *testing.T) {
 
 		// Mock createDeployment
 		createDeployment = func(
-			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
+			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
 			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
@@ -466,7 +468,7 @@ func TestGetDeployment(t *testing.T) {
 		// Mock createDeployment
 		createDeployment = func(
 			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement,
-			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string,
+			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
 			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
@@ -881,7 +883,7 @@ func TestCreate(t *testing.T) {
 		defer testUtil.MockUserInput(t, "1")()
 
 		// Call the Create function
-		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
 		// Assert expectations
@@ -901,15 +903,15 @@ func TestCreate(t *testing.T) {
 		defer testUtil.MockUserInput(t, "1")()
 
 		// Call the Create function
-		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", SmallScheduler, "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", SmallScheduler, "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
 		// Call the Create function
-		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", MediumScheduler, "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", MediumScheduler, "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
 		// Call the Create function
-		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", LargeScheduler, "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", LargeScheduler, "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
 		// Assert expectations
@@ -928,7 +930,7 @@ func TestCreate(t *testing.T) {
 		defer testUtil.MockUserInput(t, "test-name")()
 
 		// Call the Create function with ci-cd enforcement enabled
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "enable", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "enable", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
 		// Assert expectations
@@ -945,7 +947,33 @@ func TestCreate(t *testing.T) {
 		defer testUtil.MockUserInput(t, "test-name")()
 
 		// Call the Create function with deployment type as STANDARD, cloud provider, and region set
-		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "us-west-2", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "us-west-2", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		assert.NoError(t, err)
+
+		// Assert expectations
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("success with workload identity", func(t *testing.T) {
+		mockWorkloadIdentity := "workload-id-1"
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.CreateDeploymentRequest) bool {
+				request, _ := input.AsCreateHybridDeploymentRequest()
+				return *request.WorkloadIdentity == mockWorkloadIdentity
+			},
+		)).Return(&mockCreateDeploymentResponse, nil).Once()
+
+		// Mock user input for deployment name
+		defer testUtil.MockUserInput(t, "test-name")()
+
+		// Call the Create function with a non-empty workload ID
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "us-west-2", "", "", "", "", "", "", "", mockWorkloadIdentity, astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
 		// Assert expectations
@@ -963,24 +991,24 @@ func TestCreate(t *testing.T) {
 		// Mock user input for deployment name
 		defer testUtil.MockUserInput(t, "test-name")()
 		// Call the Create function with deployment type as STANDARD, cloud provider, and region set
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "us-west-2", SmallScheduler, "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "us-west-2", SmallScheduler, "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
-		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, azureCloud, "us-west-2", MediumScheduler, "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, azureCloud, "us-west-2", MediumScheduler, "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
 		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, KUBERNETES, gcpCloud,
-			"us-west-2", LargeScheduler, "enable", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+			"us-west-2", LargeScheduler, "enable", "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
 		// Call the Create function with deployment type as DEDICATED, cloud provider, and region set
-		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "us-west-2", SmallScheduler, "", "", "", "", "", "", astroplatformcore.DeploymentTypeDEDICATED, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "us-west-2", SmallScheduler, "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeDEDICATED, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
-		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CELERY, azureCloud, "us-west-2", MediumScheduler, "", "", "", "", "", "", astroplatformcore.DeploymentTypeDEDICATED, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CELERY, azureCloud, "us-west-2", MediumScheduler, "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeDEDICATED, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
-		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, KubeExecutor, gcpCloud, "us-west-2", LargeScheduler, "enable", "", "", "", "", "", astroplatformcore.DeploymentTypeDEDICATED, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, KubeExecutor, gcpCloud, "us-west-2", LargeScheduler, "enable", "", "", "", "", "", "", astroplatformcore.DeploymentTypeDEDICATED, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
 		// Assert expectations
@@ -998,7 +1026,7 @@ func TestCreate(t *testing.T) {
 		defer testUtil.MockUserInput(t, "1")()
 
 		// Call the Create function with region selection
-		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "aws", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
 		// Assert expectations
@@ -1018,7 +1046,7 @@ func TestCreate(t *testing.T) {
 		defer testUtil.MockUserInput(t, "2")()
 
 		// Call the Create function with Kube Executor
-		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, KubeExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, KubeExecutor, "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.NoError(t, err)
 
 		// Assert expectations
@@ -1042,7 +1070,7 @@ func TestCreate(t *testing.T) {
 		tickNum = 2
 
 		// Call the Create function with Dedicated Deployment and wait for status
-		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeDEDICATED, 0, 0, mockPlatformCoreClient, mockCoreClient, true)
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeDEDICATED, 0, 0, mockPlatformCoreClient, mockCoreClient, true)
 		assert.NoError(t, err)
 
 		// Assert expectations
@@ -1061,7 +1089,7 @@ func TestCreate(t *testing.T) {
 		defer testUtil.MockUserInput(t, "test-name")()
 
 		// Call the Create function with Hybrid Deployment that returns an error during creation
-		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create deployment")
 
@@ -1075,14 +1103,14 @@ func TestCreate(t *testing.T) {
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, errMock).Once()
 
-		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.ErrorIs(t, err, errMock)
 		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("failed to get default options", func(t *testing.T) {
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, errMock).Once()
 
-		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.ErrorIs(t, err, errMock)
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -1096,7 +1124,7 @@ func TestCreate(t *testing.T) {
 		defer testUtil.MockUserInput(t, "invalid-cluster-choice")()
 
 		// Call the Create function and expect an error due to invalid cluster choice
-		err := Create("test-name", ws, "test-desc", "", "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("test-name", ws, "test-desc", "", "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid Cluster selected")
 
@@ -1112,7 +1140,7 @@ func TestCreate(t *testing.T) {
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
 		// Call the Create function and expect an error due to invalid cluster choice
-		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 10, 10, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 10, 10, mockPlatformCoreClient, mockCoreClient, false)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ErrInvalidResourceRequest)
 
@@ -1125,7 +1153,7 @@ func TestCreate(t *testing.T) {
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
-		err := Create("test-name", "wrong-workspace", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		err := Create("test-name", "wrong-workspace", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		assert.ErrorContains(t, err, "no workspaces with id")
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -1285,7 +1313,7 @@ func TestUpdate(t *testing.T) { //nolint
 		defer testUtil.MockUserInput(t, "1")()
 
 		// success with hybrid type in this test nothing is being change just ensuring that dag deploy stays true. Addtionally no deployment id/name is given so user input is needed to select one
-		err := Update("", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, true, mockCoreClient, mockPlatformCoreClient)
+		err := Update("", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, true, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentResponse.JSON200.IsDagDeployEnabled, dagDeployEnabled)
 
@@ -1294,7 +1322,7 @@ func TestUpdate(t *testing.T) { //nolint
 		defer testUtil.MockUserInput(t, "y")()
 
 		// success updating the kubernetes executor on hybrid type. deployment name is given
-		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// change type to standard
@@ -1306,7 +1334,7 @@ func TestUpdate(t *testing.T) { //nolint
 		defer testUtil.MockUserInput(t, "y")()
 
 		// success with standard type and deployment name input and dag deploy stays the same
-		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentResponse.JSON200.IsDagDeployEnabled, dagDeployEnabled)
 
@@ -1314,7 +1342,7 @@ func TestUpdate(t *testing.T) { //nolint
 		defer testUtil.MockUserInput(t, "y")()
 
 		// success updating to kubernetes executor on standard type
-		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// change type to dedicatd
@@ -1324,7 +1352,7 @@ func TestUpdate(t *testing.T) { //nolint
 		// defer testUtil.MockUserInput(t, "1")()
 
 		// success with dedicated type no changes made asserts that dag deploy stays the same
-		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentResponse.JSON200.IsDagDeployEnabled, dagDeployEnabled)
 
@@ -1332,7 +1360,7 @@ func TestUpdate(t *testing.T) { //nolint
 		defer testUtil.MockUserInput(t, "y")()
 
 		// success with dedicated updating to kubernetes executor
-		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -1354,7 +1382,7 @@ func TestUpdate(t *testing.T) { //nolint
 		// Mock user input for deployment name
 		defer testUtil.MockUserInput(t, "1")()
 		// success with standard type with name
-		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "", "", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// change type to dedicatd
@@ -1365,12 +1393,12 @@ func TestUpdate(t *testing.T) { //nolint
 		defer testUtil.MockUserInput(t, "1")()
 
 		// success with dedicated type
-		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "enable", "disable", "", "", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "enable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// success with hybrid type with id
 		deploymentResponse.JSON200.Type = &hybridType
-		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// Mock user input for deployment name
@@ -1378,7 +1406,7 @@ func TestUpdate(t *testing.T) { //nolint
 
 		// success with hybrid type with id
 		deploymentResponse.JSON200.Executor = &executorKubernetes
-		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		deploymentResponse.JSON200.Executor = &executorKubernetes
 		mockCoreClient.AssertExpectations(t)
@@ -1390,12 +1418,12 @@ func TestUpdate(t *testing.T) { //nolint
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 
-		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errMock)
 
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		deploymentResponse.JSON200.Type = &hybridType
-		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "10Gi", "2CPU", "10Gi", 100, 100, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "10Gi", "2CPU", "10Gi", "", 100, 100, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorContains(t, err, "invaild resource request")
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -1404,7 +1432,7 @@ func TestUpdate(t *testing.T) { //nolint
 	t.Run("list deployments failure", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMock).Times(1)
 
-		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errMock)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -1413,16 +1441,16 @@ func TestUpdate(t *testing.T) { //nolint
 	t.Run("invalid deployment id", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMock).Times(1)
 		// list deployment error
-		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errMock)
 
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
 
 		// invalid id
-		err = Update("invalid-id", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("invalid-id", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorContains(t, err, "the Deployment specified was not found in this workspace.")
 		// invalid name
-		err = Update("", "", ws, "update", "invalid-name", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("", "", ws, "update", "invalid-name", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorContains(t, err, "the Deployment specified was not found in this workspace.")
 
 		// mock os.Stdin
@@ -1430,7 +1458,7 @@ func TestUpdate(t *testing.T) { //nolint
 		defer testUtil.MockUserInput(t, "0")()
 
 		// invalid selection
-		err = Update("", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorContains(t, err, "invalid Deployment selected")
 
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -1447,7 +1475,7 @@ func TestUpdate(t *testing.T) { //nolint
 		// Mock user input for deployment name
 		defer testUtil.MockUserInput(t, "n")()
 
-		err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -1460,7 +1488,7 @@ func TestUpdate(t *testing.T) { //nolint
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
-		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errMock)
 		assert.NotContains(t, err.Error(), organization.AstronomerConnectionErrMsg)
 		mockCoreClient.AssertExpectations(t)
@@ -1472,7 +1500,7 @@ func TestUpdate(t *testing.T) { //nolint
 		deploymentResponse.JSON200.IsDagDeployEnabled = true
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
-		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -1487,7 +1515,7 @@ func TestUpdate(t *testing.T) { //nolint
 		}
 
 		defer testUtil.MockUserInput(t, "n")()
-		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "enable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "enable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -1499,7 +1527,7 @@ func TestUpdate(t *testing.T) { //nolint
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
-		err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -1514,7 +1542,7 @@ func TestUpdate(t *testing.T) { //nolint
 
 		defer testUtil.MockUserInput(t, "y")()
 
-		err := Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// change type to standard
@@ -1522,7 +1550,7 @@ func TestUpdate(t *testing.T) { //nolint
 
 		defer testUtil.MockUserInput(t, "y")()
 		// test update with standard type
-		err = Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "disable", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// change type to standard
@@ -1530,7 +1558,7 @@ func TestUpdate(t *testing.T) { //nolint
 
 		defer testUtil.MockUserInput(t, "y")()
 		// test update with standard type
-		err = Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "disable", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 
 		assert.NoError(t, err)
 		assert.Equal(t, (*[]astroplatformcore.WorkerQueueRequest)(nil), dedicatedDeploymentRequest.WorkerQueues)
@@ -1552,7 +1580,7 @@ func TestUpdate(t *testing.T) { //nolint
 
 		defer testUtil.MockUserInput(t, "y")()
 		// test update with standard type
-		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		// change type to standard
@@ -1560,14 +1588,14 @@ func TestUpdate(t *testing.T) { //nolint
 
 		defer testUtil.MockUserInput(t, "y")()
 		// test update with standard type
-		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		defer testUtil.MockUserInput(t, "y")()
 
 		// test update with hybrid type
 		deploymentResponse.JSON200.Type = &hybridType
-		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 
 		mockCoreClient.AssertExpectations(t)
@@ -1584,7 +1612,7 @@ func TestUpdate(t *testing.T) { //nolint
 
 		defer testUtil.MockUserInput(t, "n")()
 
-		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
