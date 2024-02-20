@@ -102,7 +102,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 	if err != nil {
 		return err
 	}
-	workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, c.Organization, coreClient)
+	workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, coreClient)
 	if err != nil {
 		return err
 	}
@@ -745,10 +745,10 @@ func getClusterInfoFromName(clusterName, organizationID string, platformCoreClie
 	return "", nil, err
 }
 
-// getWorkspaceIDFromName takes workspaceName and organizationID as its arguments.
+// getWorkspaceIDFromName takes workspaceName as its argument.
 // It returns the workspaceID if the workspace is found in the organization.
 // It returns an errWorkspaceNotFound if the workspace does not exist in the organization.
-func getWorkspaceIDFromName(workspaceName, organizationID string, client astrocore.CoreClient) (string, error) {
+func getWorkspaceIDFromName(workspaceName string, client astrocore.CoreClient) (string, error) {
 	var (
 		existingWorkspaces []astrocore.Workspace
 		err                error
@@ -763,8 +763,7 @@ func getWorkspaceIDFromName(workspaceName, organizationID string, client astroco
 			return existingWorkspaces[i].Id, nil
 		}
 	}
-	err = fmt.Errorf("workspace_name: %s %w in organization: %s", workspaceName, errNotFound, organizationID)
-	return "", err
+	return "", nil
 }
 
 // getNodePoolIDFromWorkerType maps the node pool id in nodePools to a worker type.
