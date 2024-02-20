@@ -33,7 +33,7 @@ var (
 	ErrInvalidDeploymentKey   = errors.New("invalid Deployment selected")
 	ErrInvalidClusterKey      = errors.New("invalid Cluster selected")
 	ErrInvalidRegionKey       = errors.New("invalid Region selected")
-	errTimedOut               = errors.New("timed out waiting for the Deployment to enter a Healthy state")
+	ErrTimedOut               = errors.New("timed out waiting for the Deployment to enter a Healthy state")
 	ErrWrongEnforceInput      = errors.New("the input to the `--enforce-cicd` flag is invalid. Make sure to use either 'enable' or 'disable'")
 	ErrInvalidResourceRequest = errors.New("invalid resource request")
 	// Monkey patched to write unit tests
@@ -688,7 +688,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 		select {
 		// Got a timeout! fail with a timeout error
 		case <-timeout:
-			return errTimedOut
+			return ErrTimedOut
 		// Got a tick, we should check if deployment is healthy
 		case <-ticker.C:
 			buf.Reset()

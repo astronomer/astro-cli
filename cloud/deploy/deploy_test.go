@@ -15,6 +15,7 @@ import (
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -234,7 +235,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	sleepTime = 1
 	timeoutNum = 1
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
-	assert.ErrorContains(t, err, "timed out waiting for the deployment to become healthy")
+	assert.ErrorIs(t, err, deployment.ErrTimedOut)
 
 	mockCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
@@ -489,7 +490,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 	dagOnlyDeploySleepTime = 1
 	timeoutNum = 1
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
-	assert.ErrorContains(t, err, "timed out waiting for the deployment to become healthy")
+	assert.ErrorIs(t, err, deployment.ErrTimedOut)
 
 	defer os.RemoveAll("./testfiles/dags/")
 
