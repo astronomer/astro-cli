@@ -3204,34 +3204,24 @@ func TestGetClusterFromName(t *testing.T) {
 
 func TestGetWorkspaceIDFromName(t *testing.T) {
 	var (
-		workspaceName, expectedWorkspaceID, actualWorkspaceID, orgID string
-		err                                                          error
+		workspaceName, expectedWorkspaceID, actualWorkspaceID string
+		err                                                   error
 	)
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkspaceID = "test-ws-id"
 	workspaceName = "test-workspace"
-	orgID = "test-org-id"
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	t.Run("returns a workspace id if workspace exists in organization", func(t *testing.T) {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, orgID, mockCoreClient)
+		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, mockCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedWorkspaceID, actualWorkspaceID)
 		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns error from api if listing workspace fails", func(t *testing.T) {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errTest).Once()
-		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, orgID, mockCoreClient)
+		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, mockCoreClient)
 		assert.ErrorIs(t, err, errTest)
-		assert.Equal(t, "", actualWorkspaceID)
-		mockCoreClient.AssertExpectations(t)
-	})
-	t.Run("returns an error if workspace does not exist in organization", func(t *testing.T) {
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&EmptyListWorkspacesResponseOK, nil).Once()
-
-		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, orgID, mockCoreClient)
-		assert.ErrorIs(t, err, errNotFound)
-		assert.ErrorContains(t, err, "workspace_name: test-workspace does not exist in organization: test-org-id")
 		assert.Equal(t, "", actualWorkspaceID)
 		mockCoreClient.AssertExpectations(t)
 	})
