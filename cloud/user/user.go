@@ -624,11 +624,15 @@ func ListDeploymentUsers(out io.Writer, client astrocore.CoreClient, deployment 
 	}
 
 	for i := range users {
+		var deploymentRole string
+		if users[i].DeploymentRole != nil {
+			deploymentRole = *users[i].DeploymentRole
+		}
 		table.AddRow([]string{
 			users[i].FullName,
 			users[i].Username,
 			users[i].Id,
-			*users[i].DeploymentRole,
+			deploymentRole,
 			users[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}

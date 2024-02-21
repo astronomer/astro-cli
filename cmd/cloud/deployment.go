@@ -207,7 +207,6 @@ func addDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 	var id string
 
-	// if an email was provided in the args we use it
 	if len(args) > 0 {
 		id = args[0]
 	}
@@ -242,7 +241,7 @@ func updateDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 	if updateDeploymentRole == "" {
 		// no role was provided so ask the user for it
-		updateDeploymentRole = input.Text("Enter a user Deployment role or custom role name to update team: ")
+		updateDeploymentRole = input.Text("Enter a Deployment role or custom role name to update team: ")
 	}
 
 	cmd.SilenceUsage = true

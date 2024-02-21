@@ -348,7 +348,11 @@ func ListWorkspaceTeams(out io.Writer, client astrocore.CoreClient, workspace st
 
 	for i := range teams {
 		var teamRole string
-		for _, role := range *teams[i].Roles {
+		var roles []astrocore.TeamRole
+		if teams[i].Roles != nil {
+			roles = *teams[i].Roles
+		}
+		for _, role := range roles {
 			if role.EntityType == "WORKSPACE" && role.EntityId == workspace {
 				teamRole = role.Role
 			}
@@ -817,7 +821,11 @@ func ListDeploymentTeams(out io.Writer, client astrocore.CoreClient, deployment 
 		if teams[i].Description != nil {
 			teamDescription = *teams[i].Description
 		}
-		for _, role := range *teams[i].Roles {
+		var roles []astrocore.TeamRole
+		if teams[i].Roles != nil {
+			roles = *teams[i].Roles
+		}
+		for _, role := range roles {
 			if role.EntityType == "DEPLOYMENT" && role.EntityId == deployment {
 				teamRole = role.Role
 			}
