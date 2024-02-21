@@ -19,39 +19,6 @@ var (
 	apiTokenPagnationLimit = 100
 )
 
-func GetOrgApiTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, error) {
-	offset := 0
-	var apiTokens []astrocore.ApiToken
-
-	ctx, err := context.GetCurrentContext()
-	if err != nil {
-		return nil, err
-	}
-
-	for {
-		resp, err := client.ListOrganizationApiTokensWithResponse(httpContext.Background(), ctx.Organization, &astrocore.ListOrganizationApiTokensParams{
-			Offset: &offset,
-			Limit:  &apiTokenPagnationLimit,
-		})
-		if err != nil {
-			return nil, err
-		}
-		err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		apiTokens = append(apiTokens, resp.JSON200.ApiTokens...)
-
-		if resp.JSON200.TotalCount <= offset {
-			break
-		}
-
-		offset += apiTokenPagnationLimit
-	}
-
-	return apiTokens, nil
-}
-
 func CreateDeploymentApiToken(name, role, description, deployment string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
