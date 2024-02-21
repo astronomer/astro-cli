@@ -438,7 +438,7 @@ func getDeploymentInfo(
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, platformCoreClient, coreClient)
+		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, nil, platformCoreClient, coreClient)
 		if err != nil {
 			return deploymentInfo{}, err
 		}

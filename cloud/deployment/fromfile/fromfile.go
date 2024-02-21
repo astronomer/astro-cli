@@ -345,6 +345,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				Region:               &deploymentFromFile.Deployment.Configuration.Region,
 				IsDagDeployEnabled:   dagDeploy,
 				IsHighAvailability:   deploymentFromFile.Deployment.Configuration.IsHighAvailability,
+				IsDevelopmentMode:    &deploymentFromFile.Deployment.Configuration.IsDevelopmentMode,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.CreateStandardDeploymentRequestTypeSTANDARD,
 				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU,
@@ -386,6 +387,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				IsCicdEnforced:       deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments,
 				IsDagDeployEnabled:   dagDeploy,
 				IsHighAvailability:   deploymentFromFile.Deployment.Configuration.IsHighAvailability,
+				IsDevelopmentMode:    &deploymentFromFile.Deployment.Configuration.IsDevelopmentMode,
 				ClusterId:            clusterID,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.CreateDedicatedDeploymentRequestTypeDEDICATED,
@@ -487,6 +489,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory = *existingDeployment.ResourceQuotaMemory
 			}
 
+			hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
@@ -504,6 +507,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
+				ScalingSpec: &astroplatformcore.DeploymentScalingSpecRequest{
+					HibernationSpec: &astroplatformcore.DeploymentHibernationSpecRequest{
+						Schedules: &hibernationSchedules,
+					},
+				},
 			}
 			err := updateDeploymentRequest.FromUpdateStandardDeploymentRequest(standardDeploymentRequest)
 			if err != nil {
@@ -541,6 +549,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory = *existingDeployment.ResourceQuotaMemory
 			}
 
+			hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
 			dedicatedDeploymentRequest := astroplatformcore.UpdateDedicatedDeploymentRequest{
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
@@ -558,6 +567,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
+				ScalingSpec: &astroplatformcore.DeploymentScalingSpecRequest{
+					HibernationSpec: &astroplatformcore.DeploymentHibernationSpecRequest{
+						Schedules: &hibernationSchedules,
+					},
+				},
 			}
 			err := updateDeploymentRequest.FromUpdateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
 			if err != nil {
@@ -625,6 +639,19 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 	}
 	return nil
+}
+
+func ToDeploymentHibernationSchedules(hibernationSchedules []inspect.HibernationSchedule) []astroplatformcore.DeploymentHibernationSchedule {
+	schedules := make([]astroplatformcore.DeploymentHibernationSchedule, 0, len(hibernationSchedules))
+	for i := range hibernationSchedules {
+		var schedule astroplatformcore.DeploymentHibernationSchedule
+		schedule.HibernateAtCron = hibernationSchedules[i].HibernateAt
+		schedule.WakeAtCron = hibernationSchedules[i].WakeAt
+		schedule.Description = &hibernationSchedules[i].Description
+		schedule.IsEnabled = hibernationSchedules[i].Enabled
+		schedules = append(schedules, schedule)
+	}
+	return schedules
 }
 
 // checkRequiredFields ensures all required fields are present in inspect.FormattedDeployment.

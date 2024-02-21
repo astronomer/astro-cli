@@ -34,6 +34,7 @@ var (
 	clusterID              = "test-cluster-id"
 	clusterName            = "test-cluster"
 	highAvailability       = true
+	isDevelopmentMode      = true
 	region                 = "test-region"
 	cloudProvider          = "aws"
 	description            = "description 1"
@@ -43,7 +44,16 @@ var (
 	defaultTaskPodMemory   = "defaultTaskPodMemory"
 	resourceQuotaCPU       = "resourceQuotaCPU"
 	resourceQuotaMemory    = "ResourceQuotaMemory"
-	deploymentResponse     = astroplatformcore.GetDeploymentResponse{
+	hibernationDescription = "hibernation schedule 1"
+	hibernationSchedules   = []astroplatformcore.DeploymentHibernationSchedule{
+		{
+			HibernateAtCron: "1 * * * *",
+			WakeAtCron:      "2 * * * *",
+			Description:     &hibernationDescription,
+			IsEnabled:       true,
+		},
+	}
+	deploymentResponse = astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -61,6 +71,7 @@ var (
 			Executor:             &executorCelery,
 			ClusterName:          &clusterName,
 			IsHighAvailability:   &highAvailability,
+			IsDevelopmentMode:    &isDevelopmentMode,
 			SchedulerAu:          &schedulerAU,
 			DefaultTaskPodCpu:    &defaultTaskPodCPU,
 			DefaultTaskPodMemory: &defaultTaskPodMemory,
@@ -71,6 +82,11 @@ var (
 			IsCicdEnforced:       true,
 			Region:               &region,
 			CloudProvider:        &cloudProvider,
+			ScalingSpec: &astroplatformcore.DeploymentScalingSpec{
+				HibernationSpec: &astroplatformcore.DeploymentHibernationSpec{
+					Schedules: &hibernationSchedules,
+				},
+			},
 		},
 	}
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
@@ -1027,6 +1043,7 @@ deployment:
     deployment_type: DEDICATED
     cloud_provider: gcp
     is_high_availability: true
+    is_development_mode: true
     ci_cd_enforcement: true
   worker_queues:
     - name: default
@@ -1055,6 +1072,11 @@ deployment:
   alert_emails:
     - test1@test.com
     - test2@test.com
+  hibernation_schedules:
+    - hibernate_at: 1 * * * *
+      wake_at: 2 * * * *
+      description: hibernation schedule 1
+      enabled: true
 `
 		canCiCdDeploy = func(astroAPIToken string) bool {
 			return true
@@ -1077,6 +1099,8 @@ deployment:
 		assert.Contains(t, out.String(), "metadata:\n        deployment_id: test-deployment-id")
 		assert.Contains(t, out.String(), "ci_cd_enforcement: true")
 		assert.Contains(t, out.String(), "is_high_availability: true")
+		assert.Contains(t, out.String(), "is_development_mode: true")
+		assert.Contains(t, out.String(), "hibernation_schedules:\n        - hibernate_at: 1 * * * *\n          wake_at: 2 * * * *\n          description: hibernation schedule 1\n          enabled: true\n\n")
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -1203,7 +1227,8 @@ deployment:
             "workspace_name": "test-workspace",
 			"deployment_type": "STANDARD",
 			"region": "test-region",
-			"cloud_provider": "aws"
+			"cloud_provider": "aws",
+			"is_development_mode": true
         },
         "worker_queues": [
             {
@@ -1259,6 +1284,7 @@ deployment:
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
 		assert.Contains(t, out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
+		assert.Contains(t, out.String(), "\"is_development_mode\": true")
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -1738,6 +1764,11 @@ deployment:
   alert_emails:
     - test1@test.com
     - test2@test.com
+  hibernation_schedules:
+    - hibernate_at: 1 * * * *
+      wake_at: 2 * * * *
+      description: hibernation schedule 1
+      enabled: true
 `
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
@@ -1757,6 +1788,7 @@ deployment:
 		assert.Contains(t, out.String(), "configuration:\n        name: test-deployment-label")
 		assert.Contains(t, out.String(), "\n        description: description 1")
 		assert.Contains(t, out.String(), "metadata:\n        deployment_id: test-deployment-id")
+		assert.Contains(t, out.String(), "hibernation_schedules:\n        - hibernate_at: 1 * * * *\n          wake_at: 2 * * * *\n          description: hibernation schedule 1\n          enabled: true\n\n")
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
