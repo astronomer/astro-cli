@@ -12,7 +12,10 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/fromfile"
 	"github.com/astronomer/astro-cli/cloud/organization"
+	"github.com/astronomer/astro-cli/cloud/team"
+	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -62,6 +65,8 @@ var (
 	resourceQuotaCPU          string
 	resourceQuotaMemory       string
 	defaultTaskPodCPU         string
+	addDeploymentRole         string
+	updateDeploymentRole      string
 	workloadIdentity          string
 	until                     string
 	forDuration               string
@@ -113,9 +118,215 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentConnectionRootCmd(out),
 		newDeploymentAirflowVariableRootCmd(out),
 		newDeploymentPoolRootCmd(out),
+		newDeploymentUserRootCmd(out),
+		newDeploymentTeamRootCmd(out),
 		newDeploymentHibernateCmd(),
 		newDeploymentWakeUpCmd(),
 	)
+	return cmd
+}
+
+//nolint:dupl
+func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "team",
+		Aliases: []string{"te", "teams"},
+		Short:   "Manage teams in your Astro Deployment",
+		Long:    "Manage teams in your Astro Deployment.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newDeploymentTeamListCmd(out),
+		newDeploymentTeamUpdateCmd(out),
+		newDeploymentTeamRemoveCmd(out),
+		newDeploymentTeamAddCmd(out),
+	)
+	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment where you'd like to manage teams")
+	return cmd
+}
+
+//nolint:dupl
+func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the teams in an Astro Deployment",
+		Long:    "List all the teams in an Astro Deployment",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listDeploymentTeam(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "remove",
+		Aliases: []string{"rm"},
+		Short:   "Remove a team from an Astro Deployment",
+		Long:    "Remove a team from an Astro Deployment",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return removeDeploymentTeam(cmd, args, out)
+		},
+	}
+	return cmd
+}
+
+func listDeploymentTeam(cmd *cobra.Command, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	cmd.SilenceUsage = true
+	return team.ListDeploymentTeams(out, astroCoreClient, deploymentID)
+}
+
+func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	var id string
+
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		id = args[0]
+	}
+	cmd.SilenceUsage = true
+	return team.RemoveDeploymentTeam(id, deploymentID, out, astroCoreClient)
+}
+
+func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "add [id]",
+		Short: "Add a team to an Astro Deployment with a specific role",
+		Long:  "Add a team to an Astro Deployment with a specific role\n$astro deployment team add [id] --role [DEPLOYMENT_ADMIN or the custom role name].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return addDeploymentTeam(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "w", "", "The Deployment's unique identifier")
+	cmd.Flags().StringVarP(&addDeploymentRole, "role", "r", "DEPLOYMENT_ADMIN", "The role for the "+
+		"new team. Possible values are DEPLOYMENT_ADMIN or the custom role name.")
+	return cmd
+}
+
+func addDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	var id string
+
+	if len(args) > 0 {
+		id = args[0]
+	}
+	cmd.SilenceUsage = true
+	return team.AddDeploymentTeam(id, addDeploymentRole, deploymentID, out, astroCoreClient)
+}
+
+func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update [id]",
+		Aliases: []string{"up"},
+		Short:   "Update the role of a team in an Astro Deployment",
+		Long:    "Update the role of a team in an Astro Deployment\n$astro deployment team update [id] --role [DEPLOYMENT_ADMIN or the custom role name].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return updateDeploymentTeam(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&updateDeploymentRole, "role", "r", "", "The new role for the "+
+		"team. Possible values are DEPLOYMENT_ADMIN or the custom role name.")
+	return cmd
+}
+
+func updateDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	var id string
+
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		id = args[0]
+	}
+	if updateDeploymentRole == "" {
+		// no role was provided so ask the user for it
+		updateDeploymentRole = input.Text("Enter a Deployment role or custom role name to update team: ")
+	}
+
+	cmd.SilenceUsage = true
+	return team.UpdateDeploymentTeamRole(id, updateDeploymentRole, deploymentID, out, astroCoreClient)
+}
+
+func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "user",
+		Aliases: []string{"us", "users"},
+		Short:   "Manage users in your Astro Deployment",
+		Long:    "Manage users in your Astro Deployment.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newDeploymentUserListCmd(out),
+		newDeploymentUserUpdateCmd(out),
+		newDeploymentUserRemoveCmd(out),
+		newDeploymentUserAddCmd(out),
+	)
+	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment where you'd like to manage users")
+
+	return cmd
+}
+
+func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "add [email]",
+		Short: "Add a user to an Astro Deployment with a specific role",
+		Long:  "Add a user to an Astro Deployment with a specific role\n$astro deployment user add [email] --role [DEPLOYMENT_ADMIN or the custom role name].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return addDeploymentUser(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&addDeploymentRole, "role", "r", "DEPLOYMENT_ADMIN", "The role for the "+
+		"new user. Possible values are DEPLOYMENT_ADMIN or the custom role name.")
+	return cmd
+}
+
+func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the users in an Astro Deployment",
+		Long:    "List all the users in an Astro Deployment",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listDeploymentUser(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update [email]",
+		Aliases: []string{"up"},
+		Short:   "Update a the role of a user in an Astro Deployment",
+		Long:    "Update the role of a user in an Astro Deployment\n$astro deployment user update [email] --role [DEPLOYMENT_ADMIN or the custom role name].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return updateDeploymentUser(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&updateDeploymentRole, "role", "r", "", "The new role for the "+
+		"user. Possible values are DEPLOYMENT_ADMIN or the custom role name.")
+	return cmd
+}
+
+func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "remove",
+		Aliases: []string{"rm"},
+		Short:   "Remove a user from an Astro Deployment",
+		Long:    "Remove a user from an Astro Deployment",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return removeDeploymentUser(cmd, args, out)
+		},
+	}
 	return cmd
 }
 
@@ -643,6 +854,67 @@ func isValidExecutor(executor string) bool {
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.
 func isValidCloudProvider(cloudProvider astrocore.SharedClusterCloudProvider) bool {
 	return cloudProvider == astrocore.SharedClusterCloudProviderGcp || cloudProvider == astrocore.SharedClusterCloudProviderAws
+}
+
+func addDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	var email string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return user.AddDeploymentUser(email, addDeploymentRole, deploymentID, out, astroCoreClient)
+}
+
+func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	cmd.SilenceUsage = true
+	return user.ListDeploymentUsers(out, astroCoreClient, deploymentID)
+}
+
+func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	var email string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
+	}
+
+	if updateDeploymentRole == "" {
+		// no role was provided so ask the user for it
+		updateDeploymentRole = input.Text("Enter a user Deployment role or custom role name to update user: ")
+	}
+
+	cmd.SilenceUsage = true
+	return user.UpdateDeploymentUserRole(email, updateDeploymentRole, deploymentID, out, astroCoreClient)
+}
+
+func removeDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	var email string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return user.RemoveDeploymentUser(email, deploymentID, out, astroCoreClient)
 }
 
 func getOverrideUntil(until, forDuration string) (*time.Time, error) {
