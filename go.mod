@@ -38,6 +38,7 @@ require (
 	github.com/golangci/golangci-lint v1.55.2
 	github.com/google/go-github/v48 v48.2.0
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/oapi-codegen/runtime v1.1.1
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	github.com/vektra/mockery/v2 v2.32.0
 	github.com/whilp/git-urls v1.0.0
