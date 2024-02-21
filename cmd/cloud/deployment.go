@@ -440,7 +440,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
 	}
 	if clusterID != "" && deploymentType == standard {
-		return errors.New("flag --cluster-id cannot be used with standard deployments. If you want to create a dedicated deployment, use --type dedicated along with --cluster-id")
+		return errors.New("flag --cluster-id cannot be used to create a standard deployment. If you want to create a dedicated deployment, use --type dedicated along with --cluster-id")
 	}
 	if deploymentCreateEnforceCD {
 		cicdEnforcement = enable
