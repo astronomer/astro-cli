@@ -290,3 +290,16 @@ func TestStripOutKeysFromJSONByteArray(t *testing.T) {
 		assert.Equal(t, result, expectedResult)
 	})
 }
+
+func TestFilter(t *testing.T) {
+	t.Run("strings", func(t *testing.T) {
+		expectedResult := []string{"a"}
+		result := Filter([]string{"a", "b", "c"}, func(s string) bool { return s == "a" })
+		assert.Equal(t, result, expectedResult)
+	})
+	t.Run("ints", func(t *testing.T) {
+		expectedResult := []int{2}
+		result := Filter([]int{1, 2, 3}, func(s int) bool { return s%2 == 0 })
+		assert.Equal(t, result, expectedResult)
+	})
+}

@@ -39,6 +39,7 @@ type deploymentConfig struct {
 	APIKeyOnlyDeployments bool   `mapstructure:"ci_cd_enforcement" yaml:"ci_cd_enforcement" json:"ci_cd_enforcement"`
 	SchedulerSize         string `mapstructure:"scheduler_size,omitempty" yaml:"scheduler_size,omitempty" json:"scheduler_size,omitempty"`
 	IsHighAvailability    bool   `mapstructure:"is_high_availability" yaml:"is_high_availability" json:"is_high_availability"`
+	IsDevelopmentMode     bool   `mapstructure:"is_development_mode" yaml:"is_development_mode" json:"is_development_mode"`
 	Executor              string `mapstructure:"executor" yaml:"executor" json:"executor"`
 	SchedulerAU           int    `mapstructure:"scheduler_au,omitempty" yaml:"scheduler_au,omitempty" json:"scheduler_au,omitempty"`
 	SchedulerCount        int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
@@ -72,12 +73,20 @@ type EnvironmentVariable struct {
 	Value     string `mapstructure:"value" yaml:"value" json:"value"`
 }
 
+type HibernationSchedule struct {
+	HibernateAt string `mapstructure:"hibernate_at,omitempty" yaml:"hibernate_at,omitempty" json:"hibernate_at,omitempty"`
+	WakeAt      string `mapstructure:"wake_at,omitempty" yaml:"wake_at,omitempty" json:"wake_at,omitempty"`
+	Description string `mapstructure:"description,omitempty" yaml:"description,omitempty" json:"description,omitempty"`
+	Enabled     bool   `mapstructure:"enabled,omitempty" yaml:"enabled,omitempty" json:"enabled,omitempty"`
+}
+
 type orderedPieces struct {
-	EnvVars       []EnvironmentVariable `mapstructure:"environment_variables,omitempty" yaml:"environment_variables,omitempty" json:"environment_variables,omitempty"`
-	Configuration deploymentConfig      `mapstructure:"configuration" yaml:"configuration" json:"configuration"`
-	WorkerQs      []Workerq             `mapstructure:"worker_queues" yaml:"worker_queues" json:"worker_queues"`
-	Metadata      *deploymentMetadata   `mapstructure:"metadata,omitempty" yaml:"metadata,omitempty" json:"metadata,omitempty"`
-	AlertEmails   []string              `mapstructure:"alert_emails,omitempty" yaml:"alert_emails,omitempty" json:"alert_emails,omitempty"`
+	EnvVars              []EnvironmentVariable `mapstructure:"environment_variables,omitempty" yaml:"environment_variables,omitempty" json:"environment_variables,omitempty"`
+	Configuration        deploymentConfig      `mapstructure:"configuration" yaml:"configuration" json:"configuration"`
+	WorkerQs             []Workerq             `mapstructure:"worker_queues" yaml:"worker_queues" json:"worker_queues"`
+	Metadata             *deploymentMetadata   `mapstructure:"metadata,omitempty" yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	AlertEmails          []string              `mapstructure:"alert_emails,omitempty" yaml:"alert_emails,omitempty" json:"alert_emails,omitempty"`
+	HibernationSchedules []HibernationSchedule `mapstructure:"hibernation_schedules,omitempty" yaml:"hibernation_schedules,omitempty" json:"hibernation_schedules,omitempty"`
 }
 
 type FormattedDeployment struct {
@@ -104,7 +113,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCo
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, true, platformCoreClient, coreClient)
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, true, nil, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
@@ -234,6 +243,9 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	if coreDeployment.IsHighAvailability != nil {
 		deploymentMap["is_high_availability"] = *coreDeployment.IsHighAvailability
 	}
+	if coreDeployment.IsDevelopmentMode != nil {
+		deploymentMap["is_development_mode"] = coreDeployment.IsDevelopmentMode
+	}
 	if coreDeployment.SchedulerAu != nil {
 		deploymentMap["scheduler_au"] = *coreDeployment.SchedulerAu
 	}
@@ -256,10 +268,15 @@ func getAdditionalNullableFields(coreDeployment *astroplatformcore.Deployment, n
 	if coreDeployment.EnvironmentVariables != nil {
 		envVarList = *coreDeployment.EnvironmentVariables
 	}
+	var hibernationSchedulesList []astroplatformcore.DeploymentHibernationSchedule
+	if coreDeployment.ScalingSpec != nil && coreDeployment.ScalingSpec.HibernationSpec != nil && coreDeployment.ScalingSpec.HibernationSpec.Schedules != nil {
+		hibernationSchedulesList = *coreDeployment.ScalingSpec.HibernationSpec.Schedules
+	}
 	return map[string]interface{}{
 		"alert_emails":          coreDeployment.ContactEmails,
 		"worker_queues":         qList,
 		"environment_variables": getVariablesMap(envVarList), // API only returns values when !EnvironmentVariablesObject.isSecret
+		"hibernation_schedules": getHibernationSchedulesMap(hibernationSchedulesList),
 	}
 }
 
@@ -269,7 +286,7 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatfo
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, false, astroPlatformCore, coreClient)
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, false, nil, astroPlatformCore, coreClient)
 	if err != nil {
 		return nil, err
 	}
@@ -361,6 +378,20 @@ func getVariablesMap(sourceDeploymentVars []astroplatformcore.DeploymentEnvironm
 	return variablesMap
 }
 
+func getHibernationSchedulesMap(sourceHibernationSchedules []astroplatformcore.DeploymentHibernationSchedule) []map[string]interface{} {
+	hibernationSchedulesMap := make([]map[string]interface{}, 0, len(sourceHibernationSchedules))
+	for _, schedule := range sourceHibernationSchedules {
+		newSchedule := map[string]interface{}{
+			"hibernate_at": schedule.HibernateAtCron,
+			"wake_at":      schedule.WakeAtCron,
+			"description":  schedule.Description,
+			"enabled":      schedule.IsEnabled,
+		}
+		hibernationSchedulesMap = append(hibernationSchedulesMap, newSchedule)
+	}
+	return hibernationSchedulesMap
+}
+
 func formatPrintableDeployment(outputFormat string, template bool, printableDeployment map[string]interface{}) ([]byte, error) {
 	var (
 		infoToPrint     []byte
@@ -424,6 +455,7 @@ func getPrintableDeployment(infoMap, configMap, additionalMap map[string]interfa
 			"alert_emails":          additionalMap["alert_emails"],
 			"worker_queues":         additionalMap["worker_queues"],
 			"environment_variables": additionalMap["environment_variables"],
+			"hibernation_schedules": additionalMap["hibernation_schedules"],
 		},
 	}
 	return printableDeployment

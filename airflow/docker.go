@@ -626,7 +626,7 @@ func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCor
 		return err
 	}
 	ws := c.Workspace
-	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, platformCoreClient, nil)
+	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, nil, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}

@@ -29,7 +29,7 @@ func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string,
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, platformCoreClient, nil)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, platformCoreClient, nil)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}
