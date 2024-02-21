@@ -1215,3 +1215,625 @@ func TestIsValidCloudProvider(t *testing.T) {
 		assert.False(t, actual)
 	})
 }
+
+var (
+	mockDeploymentID = "ck05r3bor07h40d02y2hw4n4v"
+	deploymentRole   = "DEPLOYMENT_ADMIN"
+	deploymentUser1  = astrocore.User{
+		CreatedAt:      time.Now(),
+		FullName:       "user 1",
+		Id:             "user1-id",
+		DeploymentRole: &deploymentRole,
+		Username:       "user@1.com",
+	}
+	deploymentUsers = []astrocore.User{
+		deploymentUser1,
+	}
+
+	deploymentTeams = []astrocore.Team{
+		team1,
+	}
+	ListDeploymentUsersResponseOK = astrocore.ListDeploymentUsersResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.UsersPaginated{
+			Limit:      1,
+			Offset:     0,
+			TotalCount: 1,
+			Users:      deploymentUsers,
+		},
+	}
+	ListDeploymentUsersResponseError = astrocore.ListDeploymentUsersResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorBodyList,
+		JSON200: nil,
+	}
+	MutateDeploymentUserRoleResponseOK = astrocore.MutateDeploymentUserRoleResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.UserRole{
+			Role: "DEPLOYMENT_ADMIN",
+		},
+	}
+	MutateDeploymentUserRoleResponseError = astrocore.MutateDeploymentUserRoleResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorBodyUpdate,
+		JSON200: nil,
+	}
+	DeleteDeploymentUserResponseOK = astrocore.DeleteDeploymentUserResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+	}
+	DeleteDeploymentUserResponseError = astrocore.DeleteDeploymentUserResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body: errorBodyUpdate,
+	}
+	ListDeploymentTeamsResponseOK = astrocore.ListDeploymentTeamsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.TeamsPaginated{
+			Limit:      1,
+			Offset:     0,
+			TotalCount: 1,
+			Teams:      deploymentTeams,
+		},
+	}
+	ListDeploymentTeamsResponseError = astrocore.ListDeploymentTeamsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    teamRequestErrorBodyList,
+		JSON200: nil,
+	}
+	MutateDeploymentTeamRoleResponseOK = astrocore.MutateDeploymentTeamRoleResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.TeamRole{
+			Role: "DEPLOYMENT_ADMIN",
+		},
+	}
+	MutateDeploymentTeamRoleResponseError = astrocore.MutateDeploymentTeamRoleResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    teamRequestErrorBodyUpdate,
+		JSON200: nil,
+	}
+	DeleteDeploymentTeamResponseOK = astrocore.DeleteDeploymentTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+	}
+	DeleteDeploymentTeamResponseError = astrocore.DeleteDeploymentTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body: teamRequestErrorDelete,
+	}
+)
+
+func TestDeploymentUserList(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("-h prints list help", func(t *testing.T) {
+		cmdArgs := []string{"user", "list", "-h"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "list"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "flag --deployment-id is required")
+	})
+	t.Run("any errors from api are returned and users are not listed", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentUsersResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "list", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to list users")
+	})
+	t.Run("any context errors from api are returned and users are not listed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentUsersResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "list", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+}
+
+func TestDeploymentUserUpdate(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("-h prints update help", func(t *testing.T) {
+		cmdArgs := []string{"user", "update", "-h"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "update", "user@1.com", "--role", "DEPLOYMENT_ADMIN"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "flag --deployment-id is required")
+	})
+	t.Run("valid email with valid role updates user", func(t *testing.T) {
+		expectedOut := "The deployment user user@1.com role was successfully updated to DEPLOYMENT_ADMIN"
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentUsersResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentUserRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "update", "user@1.com", "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+
+	t.Run("any errors from api are returned and role is not updated", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentUsersResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentUserRoleResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "update", "user@1.com", "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to update user")
+	})
+
+	t.Run("any context errors from api are returned and role is not updated", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentUsersResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentUserRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "update", "user@1.com", "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentUsersResponseOK, nil).Twice()
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		expectedOut := "The deployment user user@1.com role was successfully updated to DEPLOYMENT_ADMIN"
+		mockClient.On("MutateDeploymentUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentUserRoleResponseOK, nil).Once()
+
+		cmdArgs := []string{"user", "update", "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+}
+
+func TestDeploymentUserAdd(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("-h prints add help", func(t *testing.T) {
+		cmdArgs := []string{"user", "add", "-h"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "add", "user@1.com", "--role", "DEPLOYMENT_ADMIN"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "flag --deployment-id is required")
+	})
+	t.Run("valid email with valid role adds user", func(t *testing.T) {
+		expectedOut := "The user user@1.com was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n"
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentUserRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "add", "user@1.com", "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+	t.Run("any errors from api are returned and user is not added", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentUserRoleResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "add", "user@1.com", "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to update user", "--deployment-id", mockDeploymentID)
+	})
+
+	t.Run("any context errors from api are returned and role is not added", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentUserRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "add", "user@1.com", "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		expectedOut := "The user user@1.com was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n"
+		mockClient.On("MutateDeploymentUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentUserRoleResponseOK, nil).Once()
+
+		cmdArgs := []string{"user", "add", "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+}
+
+func TestDeploymentUserRemove(t *testing.T) {
+	expectedHelp := "Remove a user from an Astro Deployment"
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("-h prints remove help", func(t *testing.T) {
+		cmdArgs := []string{"user", "remove", "-h"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "remove", "user@1.com"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "flag --deployment-id is required")
+	})
+	t.Run("valid email removes user", func(t *testing.T) {
+		expectedOut := "The user user@1.com was successfully removed from the deployment"
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentUsersResponseOK, nil).Twice()
+		mockClient.On("DeleteDeploymentUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentUserResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "remove", "user@1.com", "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+	t.Run("any errors from api are returned and user is not removed", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentUsersResponseOK, nil).Twice()
+		mockClient.On("DeleteDeploymentUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentUserResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "remove", "user@1.com", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to update user")
+	})
+	t.Run("any context errors from api are returned and the user is not removed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentUsersResponseOK, nil).Twice()
+		mockClient.On("DeleteDeploymentUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentUserResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"user", "remove", "user@1.com", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentUsersResponseOK, nil).Twice()
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		expectedOut := "The user user@1.com was successfully removed from the deployment"
+		mockClient.On("DeleteDeploymentUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentUserResponseOK, nil).Once()
+
+		cmdArgs := []string{"user", "remove", "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+}
+
+func TestDeploymentTeamList(t *testing.T) {
+	expectedHelp := "List all the teams in an Astro Deployment"
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("-h prints list help", func(t *testing.T) {
+		cmdArgs := []string{"team", "list", "-h"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "list"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "flag --deployment-id is required")
+	})
+	t.Run("any errors from api are returned and teams are not listed", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentTeamsResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "list", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to list teams")
+	})
+	t.Run("any context errors from api are returned and teams are not listed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentTeamsResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "list", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+}
+
+func TestDeploymentTeamUpdate(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("-h prints update help", func(t *testing.T) {
+		cmdArgs := []string{"team", "update", "-h"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "update", team1.Id, "--role", "DEPLOYMENT_ADMIN"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "flag --deployment-id is required")
+	})
+	t.Run("valid id with valid role updates team", func(t *testing.T) {
+		expectedOut := fmt.Sprintf("The deployment team %s role was successfully updated to DEPLOYMENT_ADMIN", team1.Id)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentTeamRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "update", team1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+	t.Run("any errors from api are returned and role is not updated", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentTeamRoleResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "update", team1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to update team")
+	})
+
+	t.Run("any context errors from api are returned and role is not updated", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentTeamRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "update", team1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("command asks for input when no team id is passed in as an arg", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentTeamsResponseOK, nil).Twice()
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		expectedOut := fmt.Sprintf("The deployment team %s role was successfully updated to DEPLOYMENT_ADMIN", team1.Id)
+		mockClient.On("MutateDeploymentTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentTeamRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+
+		cmdArgs := []string{"team", "update", "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+}
+
+func TestDeploymentTeamAdd(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("-h prints add help", func(t *testing.T) {
+		cmdArgs := []string{"team", "add", "-h"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("valid id with valid role adds team", func(t *testing.T) {
+		expectedOut := fmt.Sprintf("The team %s was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n", team1.Id)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentTeamRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "add", team1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+
+	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "add", team1.Id}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "flag --deployment-id is required")
+	})
+	t.Run("any errors from api are returned and team is not added", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentTeamRoleResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "add", team1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to update team")
+	})
+
+	t.Run("any context errors from api are returned and role is not added", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentTeamRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "add", team1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("command asks for input when no team id is passed in as an arg", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		expectedOut := fmt.Sprintf("The team %s was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n", team1.Id)
+		mockClient.On("MutateDeploymentTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentTeamRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
+
+		cmdArgs := []string{"team", "add", "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+}
+
+func TestDeploymentTeamRemove(t *testing.T) {
+	expectedHelp := "Remove a team from an Astro Deployment"
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("-h prints remove help", func(t *testing.T) {
+		cmdArgs := []string{"team", "remove", "-h"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "remove", team1.Id}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "flag --deployment-id is required")
+	})
+	t.Run("valid id removes team", func(t *testing.T) {
+		expectedOut := fmt.Sprintf("Astro Team %s was successfully removed from deployment %s\n", team1.Name, mockDeploymentID)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("DeleteDeploymentTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "remove", team1.Id, "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+	t.Run("any errors from api are returned and team is not removed", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("DeleteDeploymentTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentTeamResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "remove", team1.Id, "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to delete team")
+	})
+	t.Run("any context errors from api are returned and the team is not removed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("DeleteDeploymentTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "remove", team1.Id, "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("command asks for input when no id is passed in as an arg", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentTeamsResponseOK, nil).Twice()
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		expectedOut := fmt.Sprintf("Astro Team %s was successfully removed from deployment %s", team1.Name, mockDeploymentID)
+		mockClient.On("DeleteDeploymentTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
+
+		cmdArgs := []string{"team", "remove", "--deployment-id", mockDeploymentID}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+}

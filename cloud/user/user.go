@@ -89,7 +89,7 @@ func UpdateUserRole(email, role string, out io.Writer, client astrocore.CoreClie
 			return ErrUserNotFound
 		}
 	} else {
-		user, err := SelectUser(users, false)
+		user, err := SelectUser(users, "organization")
 		userID = user.Id
 		email = user.Username
 		if err != nil {
@@ -124,11 +124,15 @@ func IsRoleValid(role string) error {
 	return ErrInvalidRole
 }
 
-func SelectUser(users []astrocore.User, workspace bool) (astrocore.User, error) {
+func SelectUser(users []astrocore.User, roleEntity string) (astrocore.User, error) {
 	roleColumn := "ORGANIZATION ROLE"
-	if workspace {
+	switch r := roleEntity; r {
+	case "workspace":
 		roleColumn = "WORKSPACE ROLE"
+	case "deployment":
+		roleColumn = "DEPLOYMENT ROLE"
 	}
+
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
@@ -140,7 +144,17 @@ func SelectUser(users []astrocore.User, workspace bool) (astrocore.User, error) 
 	userMap := map[string]astrocore.User{}
 	for i := range users {
 		index := i + 1
-		if workspace {
+		switch r := roleEntity; r {
+		case "deployment":
+			table.AddRow([]string{
+				strconv.Itoa(index),
+				users[i].FullName,
+				users[i].Username,
+				users[i].Id,
+				*users[i].DeploymentRole,
+				users[i].CreatedAt.Format(time.RFC3339),
+			}, false)
+		case "workspace":
 			table.AddRow([]string{
 				strconv.Itoa(index),
 				users[i].FullName,
@@ -149,7 +163,7 @@ func SelectUser(users []astrocore.User, workspace bool) (astrocore.User, error) 
 				*users[i].WorkspaceRole,
 				users[i].CreatedAt.Format(time.RFC3339),
 			}, false)
-		} else {
+		default:
 			table.AddRow([]string{
 				strconv.Itoa(index),
 				users[i].FullName,
@@ -159,6 +173,7 @@ func SelectUser(users []astrocore.User, workspace bool) (astrocore.User, error) 
 				users[i].CreatedAt.Format(time.RFC3339),
 			}, false)
 		}
+
 		userMap[strconv.Itoa(index)] = users[i]
 	}
 
@@ -254,7 +269,7 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 	if err != nil {
 		return err
 	}
-	userID, email, err := getUserID(email, users, false)
+	userID, email, err := getUserID(email, users, "organization")
 	if err != nil {
 		return err
 	}
@@ -290,7 +305,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 	if err != nil {
 		return err
 	}
-	userID, email, err := getUserID(email, users, true)
+	userID, email, err := getUserID(email, users, "workspace")
 	if err != nil {
 		return err
 	}
@@ -338,7 +353,7 @@ func IsOrganizationRoleValid(role string) error {
 	return ErrInvalidOrganizationRole
 }
 
-// Returns a list of all of an organizations users
+// Returns a list of all of a worksapces users
 func GetWorkspaceUsers(client astrocore.CoreClient, workspace string, limit int) ([]astrocore.User, error) {
 	offset := 0
 	var users []astrocore.User
@@ -375,7 +390,9 @@ func GetWorkspaceUsers(client astrocore.CoreClient, workspace string, limit int)
 	return users, nil
 }
 
-// Prints a list of all of an organizations users
+// Prints a list of all of a workspaces users
+//
+//nolint:dupl
 func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace string) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
@@ -414,7 +431,7 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	if err != nil {
 		return err
 	}
-	userID, email, err := getUserID(email, users, true)
+	userID, email, err := getUserID(email, users, "workspace")
 	if err != nil {
 		return err
 	}
@@ -430,9 +447,9 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	return nil
 }
 
-func getUserID(email string, users []astrocore.User, workspace bool) (userID, newEmail string, err error) {
+func getUserID(email string, users []astrocore.User, roleEntity string) (userID, newEmail string, err error) {
 	if email == "" {
-		user, err := SelectUser(users, workspace)
+		user, err := SelectUser(users, roleEntity)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
@@ -466,4 +483,160 @@ func GetUser(client astrocore.CoreClient, userID string) (user astrocore.User, e
 	user = *resp.JSON200
 
 	return user, nil
+}
+
+func AddDeploymentUser(email, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	// Get all org users. Setting limit to 1000 for now
+	users, err := GetOrgUsers(client)
+	if err != nil {
+		return err
+	}
+	userID, email, err := getUserID(email, users, "organization")
+	if err != nil {
+		return err
+	}
+	mutateUserInput := astrocore.MutateDeploymentUserRoleRequest{
+		Role: role,
+	}
+	resp, err := client.MutateDeploymentUserRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, userID, mutateUserInput)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "The user %s was successfully added to the deployment with the role %s\n", email, role)
+	return nil
+}
+
+func UpdateDeploymentUserRole(email, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	// Get all org users. Setting limit to 1000 for now
+	users, err := GetDeploymentUsers(client, deployment, userPagnationLimit)
+	if err != nil {
+		return err
+	}
+	userID, email, err := getUserID(email, users, "deployment")
+	if err != nil {
+		return err
+	}
+	mutateUserInput := astrocore.MutateDeploymentUserRoleRequest{
+		Role: role,
+	}
+	resp, err := client.MutateDeploymentUserRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, userID, mutateUserInput)
+	if err != nil {
+		fmt.Println("error in MutateDeploymentUserRoleWithResponse")
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		fmt.Println("error in NormalizeAPIError")
+		return err
+	}
+	fmt.Fprintf(out, "The deployment user %s role was successfully updated to %s\n", email, role)
+	return nil
+}
+
+func RemoveDeploymentUser(email, deployment string, out io.Writer, client astrocore.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	// Get all org users. Setting limit to 1000 for now
+	users, err := GetDeploymentUsers(client, deployment, userPagnationLimit)
+	if err != nil {
+		return err
+	}
+	userID, email, err := getUserID(email, users, "deployment")
+	if err != nil {
+		return err
+	}
+	resp, err := client.DeleteDeploymentUserWithResponse(httpContext.Background(), ctx.Organization, deployment, userID)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "The user %s was successfully removed from the deployment\n", email)
+	return nil
+}
+
+// Returns a list of all of a deployments users
+func GetDeploymentUsers(client astrocore.CoreClient, deployment string, limit int) ([]astrocore.User, error) {
+	offset := 0
+	var users []astrocore.User
+
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return nil, err
+	}
+	includeDeploymentRoles := true
+	for {
+		resp, err := client.ListDeploymentUsersWithResponse(httpContext.Background(), ctx.Organization, deployment, &astrocore.ListDeploymentUsersParams{
+			IncludeDeploymentRoles: &includeDeploymentRoles,
+			Offset:                 &offset,
+			Limit:                  &limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+		err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, resp.JSON200.Users...)
+
+		if resp.JSON200.TotalCount <= offset {
+			break
+		}
+
+		offset += limit
+	}
+
+	return users, nil
+}
+
+// Prints a list of all of an deployments users
+//
+//nolint:dupl
+func ListDeploymentUsers(out io.Writer, client astrocore.CoreClient, deployment string) error {
+	table := printutil.Table{
+		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
+		DynamicPadding: true,
+		Header:         []string{"FULLNAME", "EMAIL", "ID", "DEPLOYMENT ROLE", "CREATE DATE"},
+	}
+	users, err := GetDeploymentUsers(client, deployment, userPagnationLimit)
+	if err != nil {
+		return err
+	}
+
+	for i := range users {
+		var deploymentRole string
+		if users[i].DeploymentRole != nil {
+			deploymentRole = *users[i].DeploymentRole
+		}
+		table.AddRow([]string{
+			users[i].FullName,
+			users[i].Username,
+			users[i].Id,
+			deploymentRole,
+			users[i].CreatedAt.Format(time.RFC3339),
+		}, false)
+	}
+
+	table.Print(out)
+	return nil
 }
