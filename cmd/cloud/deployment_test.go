@@ -441,6 +441,16 @@ func TestDeploymentCreate(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
+	t.Run("returns an error if cluster-id is provided with implicit standard deployment", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("returns an error if cluster-id is provided with explicit standard deployment", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", standard}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
 	t.Run("returns an error if dag-deploy flag has an incorrect value", func(t *testing.T) {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value"}
 		_, err = execDeploymentCmd(cmdArgs...)
