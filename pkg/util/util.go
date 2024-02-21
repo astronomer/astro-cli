@@ -140,3 +140,13 @@ func StripOutKeysFromJSONByteArray(jsonData []byte, keys []string) ([]byte, erro
 	resultJSON, _ := json.Marshal(jsonDataStruct)
 	return resultJSON, nil
 }
+
+// Filter returns a new slice holding only the elements of ss that satisfy test.
+func Filter[T any](ss []T, test func(T) bool) (ret []T) {
+	for _, s := range ss {
+		if test(s) {
+			ret = append(ret, s)
+		}
+	}
+	return
+}

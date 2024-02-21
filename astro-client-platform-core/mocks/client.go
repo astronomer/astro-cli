@@ -248,6 +248,39 @@ func (_m *ClientWithResponsesInterface) DeleteClusterWithResponse(ctx context.Co
 	return r0, r1
 }
 
+// DeleteDeploymentHibernationOverrideWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, reqEditors
+func (_m *ClientWithResponsesInterface) DeleteDeploymentHibernationOverrideWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.DeleteDeploymentHibernationOverrideResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.DeleteDeploymentHibernationOverrideResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.DeleteDeploymentHibernationOverrideResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astroplatformcore.RequestEditorFn) *astroplatformcore.DeleteDeploymentHibernationOverrideResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.DeleteDeploymentHibernationOverrideResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DeleteDeploymentWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, reqEditors
 func (_m *ClientWithResponsesInterface) DeleteDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.DeleteDeploymentResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -703,6 +736,72 @@ func (_m *ClientWithResponsesInterface) UpdateClusterWithResponse(ctx context.Co
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, astroplatformcore.UpdateClusterRequest, ...astroplatformcore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, organizationId, clusterId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateDeploymentHibernationOverrideWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateDeploymentHibernationOverrideWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.UpdateDeploymentHibernationOverrideResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.UpdateDeploymentHibernationOverrideResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.UpdateDeploymentHibernationOverrideResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) *astroplatformcore.UpdateDeploymentHibernationOverrideResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.UpdateDeploymentHibernationOverrideResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateDeploymentHibernationOverrideWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateDeploymentHibernationOverrideWithResponse(ctx context.Context, organizationId string, deploymentId string, body astroplatformcore.OverrideDeploymentHibernationBody, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.UpdateDeploymentHibernationOverrideResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.UpdateDeploymentHibernationOverrideResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astroplatformcore.OverrideDeploymentHibernationBody, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.UpdateDeploymentHibernationOverrideResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astroplatformcore.OverrideDeploymentHibernationBody, ...astroplatformcore.RequestEditorFn) *astroplatformcore.UpdateDeploymentHibernationOverrideResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.UpdateDeploymentHibernationOverrideResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, astroplatformcore.OverrideDeploymentHibernationBody, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}

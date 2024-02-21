@@ -139,13 +139,23 @@ var (
 		},
 		JSON200: &cluster,
 	}
-	defaultTaskPodCPU    = "defaultTaskPodCPU"
-	defaultTaskPodMemory = "defaultTaskPodMemory"
-	resourceQuotaCPU     = "resourceQuotaCPU"
-	resourceQuotaMemory  = "ResourceQuotaMemory"
-	cloudProvider        = "cloud-provider"
-	schedulerTestSize    = astroplatformcore.DeploymentSchedulerSizeSMALL
-	sourceDeployment     = astroplatformcore.Deployment{
+	defaultTaskPodCPU      = "defaultTaskPodCPU"
+	defaultTaskPodMemory   = "defaultTaskPodMemory"
+	resourceQuotaCPU       = "resourceQuotaCPU"
+	resourceQuotaMemory    = "ResourceQuotaMemory"
+	cloudProvider          = "cloud-provider"
+	schedulerTestSize      = astroplatformcore.DeploymentSchedulerSizeSMALL
+	hibernationDescription = "hibernation schedule 1"
+	hibernationSchedules   = []astroplatformcore.DeploymentHibernationSchedule{
+		{
+			HibernateAtCron: "1 * * * *",
+			WakeAtCron:      "2 * * * *",
+			Description:     &hibernationDescription,
+			IsEnabled:       true,
+		},
+	}
+	isDevelopmentMode = true
+	sourceDeployment  = astroplatformcore.Deployment{
 		Id:                     deploymentID,
 		Name:                   "test-deployment-label",
 		Description:            &description,
@@ -174,6 +184,12 @@ var (
 		ResourceQuotaMemory:    &resourceQuotaMemory,
 		SchedulerSize:          &schedulerTestSize,
 		CloudProvider:          &cloudProvider,
+		IsDevelopmentMode:      &isDevelopmentMode,
+		ScalingSpec: &astroplatformcore.DeploymentScalingSpec{
+			HibernationSpec: &astroplatformcore.DeploymentHibernationSpec{
+				Schedules: &hibernationSchedules,
+			},
+		},
 	}
 
 	getDeploymentResponse = astroplatformcore.GetDeploymentResponse{
@@ -439,19 +455,20 @@ func TestGetDeploymentConfig(t *testing.T) {
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedDeploymentConfig := deploymentConfig{
-			Name:             sourceDeployment.Name,
-			Description:      *sourceDeployment.Description,
-			WorkspaceName:    *sourceDeployment.WorkspaceName,
-			ClusterName:      *sourceDeployment.ClusterName,
-			RunTimeVersion:   sourceDeployment.RuntimeVersion,
-			SchedulerAU:      *sourceDeployment.SchedulerAu,
-			SchedulerCount:   sourceDeployment.SchedulerReplicas,
-			DagDeployEnabled: &sourceDeployment.IsDagDeployEnabled,
-			Executor:         string(*sourceDeployment.Executor),
-			Region:           *sourceDeployment.Region,
-			DeploymentType:   string(*sourceDeployment.Type),
-			CloudProvider:    *sourceDeployment.CloudProvider,
-			WorkloadIdentity: *sourceDeployment.WorkloadIdentity,
+			Name:              sourceDeployment.Name,
+			Description:       *sourceDeployment.Description,
+			WorkspaceName:     *sourceDeployment.WorkspaceName,
+			ClusterName:       *sourceDeployment.ClusterName,
+			RunTimeVersion:    sourceDeployment.RuntimeVersion,
+			SchedulerAU:       *sourceDeployment.SchedulerAu,
+			SchedulerCount:    sourceDeployment.SchedulerReplicas,
+			DagDeployEnabled:  &sourceDeployment.IsDagDeployEnabled,
+			Executor:          string(*sourceDeployment.Executor),
+			Region:            *sourceDeployment.Region,
+			DeploymentType:    string(*sourceDeployment.Type),
+			CloudProvider:     *sourceDeployment.CloudProvider,
+			WorkloadIdentity:  *sourceDeployment.WorkloadIdentity,
+			IsDevelopmentMode: *sourceDeployment.IsDevelopmentMode,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
@@ -488,6 +505,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			DefaultTaskPodMemory: *sourceDeployment.DefaultTaskPodMemory,
 			ResourceQuotaCPU:     *sourceDeployment.ResourceQuotaCpu,
 			ResourceQuotaMemory:  *sourceDeployment.ResourceQuotaMemory,
+			IsDevelopmentMode:    *sourceDeployment.IsDevelopmentMode,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
@@ -516,6 +534,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 				"alert_emails":          additional["alert_emails"],
 				"worker_queues":         additional["worker_queues"],
 				"environment_variables": additional["environment_variables"],
+				"hibernation_schedules": additional["hibernation_schedules"],
 			},
 		}
 		actualDeployment := getPrintableDeployment(info, config, additional)
@@ -549,6 +568,7 @@ func TestGetAdditionalNullableFields(t *testing.T) {
 			"alert_emails":          sourceDeployment.ContactEmails,
 			"worker_queues":         qList,
 			"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
+			"hibernation_schedules": getHibernationSchedulesMap(*sourceDeployment.ScalingSpec.HibernationSpec.Schedules),
 		}
 		rawAdditional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		err := decodeToStruct(rawAdditional, &actualAdditional)
@@ -579,6 +599,7 @@ func TestGetAdditionalNullableFields(t *testing.T) {
 			"alert_emails":          sourceDeployment.ContactEmails,
 			"worker_queues":         qList,
 			"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
+			"hibernation_schedules": getHibernationSchedulesMap(*sourceDeployment.ScalingSpec.HibernationSpec.Schedules),
 		}
 		rawAdditional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		err := decodeToStruct(rawAdditional, &actualAdditional)
@@ -713,6 +734,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         dag_deploy_enabled: true
         ci_cd_enforcement: false
         is_high_availability: false
+        is_development_mode: true
         executor: CELERY
         scheduler_au: 5
         scheduler_count: 3
@@ -797,6 +819,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         ci_cd_enforcement: false
         scheduler_size: SMALL
         is_high_availability: false
+        is_development_mode: true
         executor: CELERY
         scheduler_au: 5
         scheduler_count: 3
@@ -984,6 +1007,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "dag_deploy_enabled": true,
             "ci_cd_enforcement": false,
             "is_high_availability": false,
+            "is_development_mode": true,
             "executor": "KUBERNETES",
             "scheduler_au": 5,
             "scheduler_count": 3,
