@@ -384,7 +384,7 @@ func TestDeploymentCreate(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
-		cmdArgs := []string{"create", "--name", "test", "--workspace-id", ws, "--cluster-id", csID, "--type", dedicated, "--dag-deploy", "disable"}
+		cmdArgs := []string{"create", "--name", "test", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
 		astroCoreClient = mockCoreClient
 		platformCoreClient = mockPlatformCoreClient
 		_, err = execDeploymentCmd(cmdArgs...)
@@ -400,7 +400,7 @@ func TestDeploymentCreate(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", dedicated, "--dag-deploy", "enable"}
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
 		astroCoreClient = mockCoreClient
 		platformCoreClient = mockPlatformCoreClient
 		_, err = execDeploymentCmd(cmdArgs...)
@@ -416,7 +416,7 @@ func TestDeploymentCreate(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", dedicated, "--dag-deploy", "disable", "--executor", "KubernetesExecutor"}
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubernetesExecutor"}
 		astroCoreClient = mockCoreClient
 		platformCoreClient = mockPlatformCoreClient
 		_, err = execDeploymentCmd(cmdArgs...)
@@ -432,7 +432,7 @@ func TestDeploymentCreate(t *testing.T) {
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", dedicated, "--dag-deploy", "disable"}
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
 		astroCoreClient = mockCoreClient
 		platformCoreClient = mockPlatformCoreClient
 		_, err = execDeploymentCmd(cmdArgs...)
@@ -441,38 +441,28 @@ func TestDeploymentCreate(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
-	t.Run("returns an error if cluster-id is provided with implicit standard deployment", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-	})
-	t.Run("returns an error if cluster-id is provided with explicit standard deployment", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", standard}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-	})
 	t.Run("returns an error if dag-deploy flag has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", dedicated, "--dag-deploy", "some-value"}
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
 	t.Run("returns an error if cluster-type flag has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "some-value"}
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--cluster-type", "some-value"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
 	t.Run("returns an error if type flag has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--type", "some-value"}
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", "some-value"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
 	t.Run("returns an error if cicd-enforcement flag has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", dedicated, "--cicd-enforcement", "some-value"}
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--cicd-enforcement", "some-value"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
 	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", dedicated, "--dag-deploy", "disable", "--executor", "KubeExecutor"}
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubeExecutor"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
 	})
@@ -871,6 +861,28 @@ deployment:
 		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--high-availability", "some-value", "--force"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "Invalid --high-availability value")
+	})
+	t.Run("returns an error if cluster-id is provided with implicit standard deployment", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
+	})
+	t.Run("returns an error if cluster-id is provided with explicit standard deployment", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", standard}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
 	})
 }
 
