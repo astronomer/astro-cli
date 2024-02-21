@@ -8,4 +8,5 @@ include-tags:
   - Cluster
   - Options
   - Deployment
+  - Role
 output: ./astro-client-platform-core/api.gen.go
