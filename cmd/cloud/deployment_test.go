@@ -457,12 +457,12 @@ func TestDeploymentCreate(t *testing.T) {
 		assert.Error(t, err)
 	})
 	t.Run("returns an error if cluster-type flag has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", dedicated, "--cluster-type", "some-value"}
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "some-value"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
 	t.Run("returns an error if type flag has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", dedicated, "--type", "some-value"}
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--type", "some-value"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
