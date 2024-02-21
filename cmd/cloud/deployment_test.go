@@ -358,7 +358,6 @@ func TestDeploymentCreate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	ws := "workspace-id"
-	csID := "test-cluster-id"
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
