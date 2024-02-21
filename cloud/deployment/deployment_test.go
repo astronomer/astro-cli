@@ -1424,7 +1424,7 @@ func TestUpdate(t *testing.T) { //nolint
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		deploymentResponse.JSON200.Type = &hybridType
 		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "disable", "2CPU", "10Gi", "2CPU", "10Gi", "", 100, 100, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
-		assert.ErrorContains(t, err, "invaild resource request")
+		assert.ErrorIs(t, err, ErrInvalidResourceRequest)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
