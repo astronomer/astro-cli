@@ -53,7 +53,7 @@ type deploymentConfig struct {
 	ResourceQuotaCPU      string `mapstructure:"resource_quota_cpu,omitempty" yaml:"resource_quota_cpu,omitempty" json:"resource_quota_cpu,omitempty"`
 	ResourceQuotaMemory   string `mapstructure:"resource_quota_memory,omitempty" yaml:"resource_quota_memory,omitempty" json:"resource_quota_memory,omitempty"`
 	DefaultWorkerType     string `mapstructure:"default_worker_type,omitempty" yaml:"default_worker_type,omitempty" json:"default_worker_type,omitempty"`
-	WorkloadIdentity      string `mapstructure:"workload_identity,omitempty" yaml:"workload_identity,omitempty" json:"workload_identity,omitempty"`
+	WorkloadIdentity      string `mapstructure:"workload_identity" yaml:"workload_identity" json:"workload_identity"` // intentionally removing omitempty so we have an empty placeholder for this value if someone wants to set it
 }
 
 type Workerq struct {
@@ -254,9 +254,6 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	}
 	if coreDeployment.Region != nil {
 		deploymentMap["region"] = *coreDeployment.Region
-	}
-	if coreDeployment.WorkloadIdentity != nil {
-		deploymentMap["workload_identity"] = *coreDeployment.WorkloadIdentity
 	}
 
 	return deploymentMap, nil

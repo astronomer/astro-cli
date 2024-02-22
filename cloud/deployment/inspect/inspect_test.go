@@ -467,7 +467,6 @@ func TestGetDeploymentConfig(t *testing.T) {
 			Region:            *sourceDeployment.Region,
 			DeploymentType:    string(*sourceDeployment.Type),
 			CloudProvider:     *sourceDeployment.CloudProvider,
-			WorkloadIdentity:  *sourceDeployment.WorkloadIdentity,
 			IsDevelopmentMode: *sourceDeployment.IsDevelopmentMode,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
