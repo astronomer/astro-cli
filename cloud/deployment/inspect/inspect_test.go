@@ -742,6 +742,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         deployment_type: HYBRID
         cloud_provider: ""
         region: ""
+        workload_identity: ""
     worker_queues:
         - name: default
           max_worker_count: 130
@@ -830,6 +831,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         default_task_pod_memory: "1"
         resource_quota_cpu: "1"
         resource_quota_memory: "1"
+        workload_identity: ""
     worker_queues:
         - name: default
           max_worker_count: 130
@@ -1014,7 +1016,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "workspace_name": "test-ws",
             "deployment_type": "HYBRID",
             "cloud_provider": "",
-            "region": ""
+            "region": "",
+            "workload_identity": ""
         },
         "worker_queues": [],
         "alert_emails": [
