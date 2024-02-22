@@ -1,0 +1,12 @@
+package: astroplatformcore
+generate:
+  - types
+  - client
+include-tags:
+  - Organization
+  - Workspace
+  - Cluster
+  - Options
+  - Deployment
+  - Role
+output: ./astro-client-platform-core/api.gen.go

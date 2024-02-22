@@ -1,0 +1,18 @@
+package: astrocore
+generate:
+  - types
+  - client
+include-tags:
+  - User
+  - Organization
+  - Invite
+  - Workspace
+  - Cluster
+  - Options
+  - Team
+  - ApiToken
+  - Deployment
+  - Deploy
+  - Environment
+  - Role
+output: ./astro-client-core/api.gen.go
