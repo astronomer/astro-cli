@@ -20,5 +20,9 @@ test:
 temp-astro:
 	cd $(shell mktemp -d) && ${PWD}/astro dev init
 
+mock:
+	go run github.com/vektra/mockery/v2 --version
+	go run github.com/vektra/mockery/v2
+
 codecov:
 	@eval $$(curl -s https://codecov.io/bash)

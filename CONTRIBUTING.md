@@ -63,6 +63,6 @@ make test
 
 Astronomer uses [mockery](https://github.com/vektra/mockery) to generate mocks for Golang interfaces.
 
-To regenerate an existing interface mocks, run `make generate`.
+To regenerate an existing interface mocks, run `make mock`.
 
-To generate mocks for a new interface, add it to [.mockery.yml](.mockery.yml) and rerun `make generate`.
+To generate mocks for a new interface, add it to [.mockery.yml](.mockery.yml) and rerun `make mock`.

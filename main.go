@@ -14,9 +14,6 @@ import (
 //go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen --config ./astro-client-iam-core/api.cfg.yaml ../astro/apps/core/docs/iam/v1beta1/iam_v1beta1.yaml
 //go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen --config ./astro-client-platform-core/api.cfg.yaml ../astro/apps/core/docs/platform/v1beta1/platform_v1beta1.yaml
 
-//go:generate go run github.com/vektra/mockery/v2 --version
-//go:generate go run github.com/vektra/mockery/v2
-
 func main() {
 	// TODO: Remove this when version logic is implemented
 	fs := afero.NewOsFs()
