@@ -358,7 +358,6 @@ func TestDeploymentCreate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	ws := "workspace-id"
-	csID := "test-cluster-id"
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
@@ -861,6 +860,28 @@ deployment:
 		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--high-availability", "some-value", "--force"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "Invalid --high-availability value")
+	})
+	t.Run("returns an error if cluster-id is provided with implicit standard deployment", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
+	})
+	t.Run("returns an error if cluster-id is provided with explicit standard deployment", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", standard}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
 	})
 }
 
