@@ -6,29 +6,29 @@ The Astro CLI is a command-line interface for data orchestration. It allows you 
 
 1. Install `Go` 1.19 or later. See [Download and install Go](https://go.dev/doc/install).
 
-2. Run the following command to install `golangci-lint` and run linter locally:
+2. Clone and build:
 
-    ```brew install golangci-lint```
-
-    ```golangci-lint run .```
+    ```bash
+    cd $GOPATH/src/github.com/astronomer/astro-cli
+    git clone git@github.com:astronomer/astro-cli.git
+    cd astro-cli
+    make build
+    ```
 
 3. Run the following command to install `pre-commit` and run lint on every commit:
 
-    ```brew install pre-commit```
+    `brew install pre-commit`
 
-    ```pre-commit install```
+    `pre-commit install`
 
     Run lint locally:
 
-    ```pre-commit run --all-files```
+    `pre-commit run --all-files`
 
-4. Clone and build:
+4. Lint the `Go` code with the following command:
 
-    ```
-    $ cd $GOPATH/src/github.com/astronomer/astro-cli
-    $ git clone git@github.com:astronomer/astro-cli.git
-    $ cd astro-cli
-    $ make build
+    ```bash
+    make lint
     ```
 
 ## Test locally
@@ -61,10 +61,8 @@ make test
 
 ## Generate mocks
 
-Astronomer uses [mockery](https://github.com/vektra/mockery) to generate mocks for Golang interfaces. See the [mockery installation guide](https://github.com/vektra/mockery#installation).
+Astronomer uses [mockery](https://github.com/vektra/mockery) to generate mocks for Golang interfaces.
 
 To regenerate an existing interface mocks, run `make mock`.
 
-To generate mocks for a new interface, add the following command below `mock` rule in `Makefile`:
-
-`mockery --filename=<file_name_where_interface_is_present> --output=<output_dir_to store_mocks> --dir=<directory_where_to_search_for_interface_file> --outpkg=<mock_package_name> --name <name_of_the_interface>`
+To generate mocks for a new interface, add it to [.mockery.yml](.mockery.yml) and rerun `make mock`.

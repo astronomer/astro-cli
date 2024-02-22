@@ -1,0 +1,53 @@
+filename: "{{.InterfaceName}}.go"
+outpkg: "{{.PackageName}}_mocks"
+mockname: "{{.InterfaceName}}"
+with-expecter: false
+packages:
+  github.com/astronomer/astro-cli/houston:
+    config:
+      dir: houston/mocks
+    interfaces:
+      ClientInterface:
+  github.com/astronomer/astro-cli/airflow:
+    config:
+      dir: airflow/mocks
+      outpkg: mocks
+    interfaces:
+      RegistryHandler:
+      ImageHandler:
+      ContainerHandler:
+      DockerComposeAPI:
+      DockerRegistryAPI:
+      DockerCLIClient:
+  github.com/astronomer/astro-cli/airflow-client:
+    config:
+      dir: airflow-client/mocks
+      outpkg: airflow_mocks
+    interfaces:
+      Client:
+  github.com/astronomer/astro-cli/astro-client-core:
+    config:
+      dir: astro-client-core/mocks
+    interfaces:
+      ClientWithResponsesInterface:
+        config:
+          filename: client.go
+  github.com/astronomer/astro-cli/astro-client-iam-core:
+    config:
+      dir: astro-client-iam-core/mocks
+    interfaces:
+      ClientWithResponsesInterface:
+        config:
+          filename: client.go
+  github.com/astronomer/astro-cli/astro-client-platform-core:
+    config:
+      dir: astro-client-platform-core/mocks
+    interfaces:
+      ClientWithResponsesInterface:
+        config:
+          filename: client.go
+  github.com/astronomer/astro-cli/pkg/azure:
+    config:
+      dir: pkg/azure/mocks
+    interfaces:
+      Azure:
