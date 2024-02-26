@@ -1355,7 +1355,7 @@ var (
 		Role:       "custom role",
 	}
 
-	deploymentApiTokens = []astrocore.ApiToken{
+	deploymentAPITokens = []astrocore.ApiToken{
 		{
 			Name:        "mock name",
 			Description: "mock description",
@@ -1378,7 +1378,7 @@ var (
 		},
 	}
 
-	ListDeploymentApiTokensResponseOK = astrocore.ListDeploymentApiTokensResponse{
+	ListDeploymentAPITokensResponseOK = astrocore.ListDeploymentApiTokensResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -1386,52 +1386,52 @@ var (
 			Limit:      1,
 			Offset:     0,
 			TotalCount: 1,
-			ApiTokens:  deploymentApiTokens,
+			ApiTokens:  deploymentAPITokens,
 		},
 	}
 	apiTokenRequestErrorBodyList, _ = json.Marshal(astrocore.Error{
 		Message: "failed to list api tokens",
 	})
-	ListDeploymentApiTokensResponseError = astrocore.ListDeploymentApiTokensResponse{
+	ListDeploymentAPITokensResponseError = astrocore.ListDeploymentApiTokensResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
 		Body:    apiTokenRequestErrorBodyList,
 		JSON200: nil,
 	}
-	CreateDeploymentApiTokenRoleResponseOK = astrocore.CreateDeploymentApiTokenResponse{
+	CreateDeploymentAPITokenRoleResponseOK = astrocore.CreateDeploymentApiTokenResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &deploymentApiTokens[0],
+		JSON200: &deploymentAPITokens[0],
 	}
 	apiTokenRequestErrorBodyCreate, _ = json.Marshal(astrocore.Error{
 		Message: "failed to create api token",
 	})
-	CreateDeploymentApiTokenRoleResponseError = astrocore.CreateDeploymentApiTokenResponse{
+	CreateDeploymentAPITokenRoleResponseError = astrocore.CreateDeploymentApiTokenResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
 		Body:    apiTokenRequestErrorBodyCreate,
 		JSON200: nil,
 	}
-	MutateDeploymentApiTokenRoleResponseOK = astrocore.UpdateDeploymentApiTokenResponse{
+	MutateDeploymentAPITokenRoleResponseOK = astrocore.UpdateDeploymentApiTokenResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &deploymentApiTokens[0],
+		JSON200: &deploymentAPITokens[0],
 	}
 	apiTokenRequestErrorBodyUpdate, _ = json.Marshal(astrocore.Error{
 		Message: "failed to update api token",
 	})
-	MutateDeploymentApiTokenRoleResponseError = astrocore.UpdateDeploymentApiTokenResponse{
+	MutateDeploymentAPITokenRoleResponseError = astrocore.UpdateDeploymentApiTokenResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
 		Body:    apiTokenRequestErrorBodyUpdate,
 		JSON200: nil,
 	}
-	DeleteDeploymentApiTokenResponseOK = astrocore.DeleteDeploymentApiTokenResponse{
+	DeleteDeploymentAPITokenResponseOK = astrocore.DeleteDeploymentApiTokenResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -1440,17 +1440,17 @@ var (
 	apiTokenRequestErrorDelete, _ = json.Marshal(astrocore.Error{
 		Message: "failed to delete api token",
 	})
-	DeleteDeploymentApiTokenResponseError = astrocore.DeleteDeploymentApiTokenResponse{
+	DeleteDeploymentAPITokenResponseError = astrocore.DeleteDeploymentApiTokenResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
 		Body: apiTokenRequestErrorDelete,
 	}
-	GetDeploymentApiTokenWithResponseOK = astrocore.GetDeploymentApiTokenResponse{
+	GetDeploymentAPITokenWithResponseOK = astrocore.GetDeploymentApiTokenResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &deploymentApiTokens[0],
+		JSON200: &deploymentAPITokens[0],
 	}
 )
 
@@ -1991,7 +1991,7 @@ func TestDeploymentApiTokenList(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and apiTokens are not listed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentApiTokensResponseError, nil).Once()
+		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"api-token", "list", "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -2000,7 +2000,7 @@ func TestDeploymentApiTokenList(t *testing.T) {
 	t.Run("any context errors from api are returned and apiTokens are not listed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentApiTokensResponseError, nil).Once()
+		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"api-token", "list", "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -2026,8 +2026,8 @@ func TestDeploymentApiTokenUpdate(t *testing.T) {
 	t.Run("valid id with valid role updates apiToken", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("The deployment apiToken %s role was successfully updated to DEPLOYMENT_ADMIN", apiToken1.Id)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentApiTokenWithResponseOK, nil).Twice()
-		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentApiTokenRoleResponseOK, nil).Once()
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
+		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentAPITokenRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"api-token", "update", apiToken1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
 		resp, err := execDeploymentCmd(cmdArgs...)
@@ -2036,8 +2036,8 @@ func TestDeploymentApiTokenUpdate(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and role is not updated", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentApiTokenWithResponseOK, nil).Twice()
-		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentApiTokenRoleResponseError, nil).Once()
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
+		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentAPITokenRoleResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"api-token", "update", apiToken1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -2047,8 +2047,8 @@ func TestDeploymentApiTokenUpdate(t *testing.T) {
 	t.Run("any context errors from api are returned and role is not updated", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentApiTokenWithResponseOK, nil).Twice()
-		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentApiTokenRoleResponseOK, nil).Once()
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
+		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentAPITokenRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"api-token", "update", apiToken1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -2058,7 +2058,7 @@ func TestDeploymentApiTokenUpdate(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentApiTokensResponseOK, nil).Twice()
+		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Twice()
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
@@ -2071,8 +2071,8 @@ func TestDeploymentApiTokenUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOut := fmt.Sprintf("The deployment apiToken %s role was successfully updated to DEPLOYMENT_ADMIN", deploymentApiTokens[0].Id)
-		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentApiTokenRoleResponseOK, nil).Once()
+		expectedOut := fmt.Sprintf("The deployment apiToken %s role was successfully updated to DEPLOYMENT_ADMIN", deploymentAPITokens[0].Id)
+		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentAPITokenRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 
 		cmdArgs := []string{"api-token", "update", "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
@@ -2093,10 +2093,10 @@ func TestDeploymentApiTokenCreate(t *testing.T) {
 	t.Run("valid id with valid role adds apiToken", func(t *testing.T) {
 		expectedOut := "The apiToken was successfully created with the role DEPLOYMENT_ADMIN\n"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentApiTokenWithResponseOK, nil).Twice()
-		mockClient.On("CreateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateDeploymentApiTokenRoleResponseOK, nil).Once()
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
+		mockClient.On("CreateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateDeploymentAPITokenRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"api-token", "create", apiToken1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		cmdArgs := []string{"api-token", "create", apiToken1.Id, "--role", "DEPLOYMENT_ADMIN", "--name", "mockName", "--deployment-id", mockDeploymentID}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
@@ -2111,10 +2111,10 @@ func TestDeploymentApiTokenCreate(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and apiToken is not created", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentApiTokenWithResponseOK, nil).Twice()
-		mockClient.On("CreateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateDeploymentApiTokenRoleResponseError, nil).Once()
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
+		mockClient.On("CreateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateDeploymentAPITokenRoleResponseError, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"api-token", "create", apiToken1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
+		cmdArgs := []string{"api-token", "create", apiToken1.Id, "--role", "DEPLOYMENT_ADMIN", "--name", "mockName", "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.EqualError(t, err, "failed to create api token")
 	})
@@ -2122,8 +2122,8 @@ func TestDeploymentApiTokenCreate(t *testing.T) {
 	t.Run("any context errors from api are returned and role is not created", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentApiTokenWithResponseOK, nil).Twice()
-		mockClient.On("CreateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateDeploymentApiTokenRoleResponseOK, nil).Once()
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
+		mockClient.On("CreateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateDeploymentAPITokenRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"api-token", "create", apiToken1.Id, "--role", "DEPLOYMENT_ADMIN", "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -2149,10 +2149,10 @@ func TestDeploymentApiTokenRemove(t *testing.T) {
 		assert.EqualError(t, err, "flag --deployment-id is required")
 	})
 	t.Run("valid id removes apiToken", func(t *testing.T) {
-		expectedOut := fmt.Sprintf("The apiToken %s was successfully removed from the deployment\n", apiToken1.Id)
+		expectedOut := fmt.Sprintf("Astro ApiToken %s was successfully removed from deployment %s\n", apiToken1.Id, mockDeploymentID)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentApiTokenWithResponseOK, nil).Twice()
-		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentApiTokenResponseOK, nil).Once()
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
+		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"api-token", "remove", apiToken1.Id, "--deployment-id", mockDeploymentID}
 		resp, err := execDeploymentCmd(cmdArgs...)
@@ -2161,8 +2161,8 @@ func TestDeploymentApiTokenRemove(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and apiToken is not removed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentApiTokenWithResponseOK, nil).Twice()
-		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentApiTokenResponseError, nil).Once()
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
+		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"api-token", "remove", apiToken1.Id, "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -2171,8 +2171,8 @@ func TestDeploymentApiTokenRemove(t *testing.T) {
 	t.Run("any context errors from api are returned and the apiToken is not removed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentApiTokenWithResponseOK, nil).Twice()
-		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentApiTokenResponseOK, nil).Once()
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
+		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"api-token", "remove", apiToken1.Id, "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
@@ -2182,7 +2182,7 @@ func TestDeploymentApiTokenRemove(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentApiTokensResponseOK, nil).Twice()
+		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Twice()
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
@@ -2195,8 +2195,8 @@ func TestDeploymentApiTokenRemove(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOut := fmt.Sprintf("The apiToken %s was successfully removed from the deployment\n", deploymentApiTokens[0].Id)
-		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentApiTokenResponseOK, nil).Once()
+		expectedOut := fmt.Sprintf("Astro ApiToken %s was successfully removed from deployment %s\n", deploymentAPITokens[0].Id, mockDeploymentID)
+		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil).Once()
 		astroCoreClient = mockClient
 
 		cmdArgs := []string{"api-token", "remove", "--deployment-id", mockDeploymentID}

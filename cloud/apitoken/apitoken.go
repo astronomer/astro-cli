@@ -16,13 +16,13 @@ import (
 )
 
 var (
-	ErrInvalidApiTokenKey           = errors.New("invalid ApiToken selected")
-	ErrNoApiTokenNameProvided       = errors.New("you must give your ApiToken a name")
-	ErrNoApiTokensFoundInDeployment = errors.New("no ApiTokens found in your deployment")
+	ErrInvalidAPITokenKey           = errors.New("invalid ApiToken selected")
+	ErrNoAPITokenNameProvided       = errors.New("you must give your ApiToken a name")
+	ErrNoAPITokensFoundInDeployment = errors.New("no ApiTokens found in your deployment")
 	apiTokenPagnationLimit          = 100
 )
 
-func CreateDeploymentApiToken(name, role, description, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func CreateDeploymentAPIToken(name, role, description, deployment string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -32,16 +32,16 @@ func CreateDeploymentApiToken(name, role, description, deployment string, out io
 		fmt.Println("Please specify a name for your ApiToken")
 		name = input.Text(ansi.Bold("\nApiToken name: "))
 		if name == "" {
-			return ErrNoApiTokenNameProvided
+			return ErrNoAPITokenNameProvided
 		}
 	}
 
-	mutateApiTokenInput := astrocore.CreateDeploymentApiTokenRequest{
+	mutateAPITokenInput := astrocore.CreateDeploymentApiTokenRequest{
 		Role:        role,
 		Name:        name,
 		Description: &description,
 	}
-	resp, err := client.CreateDeploymentApiTokenWithResponse(httpContext.Background(), ctx.Organization, deployment, mutateApiTokenInput)
+	resp, err := client.CreateDeploymentApiTokenWithResponse(httpContext.Background(), ctx.Organization, deployment, mutateAPITokenInput)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func CreateDeploymentApiToken(name, role, description, deployment string, out io
 	return nil
 }
 
-func UpdateDeploymentApiTokenRole(apiTokenID, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func UpdateDeploymentAPITokenRole(apiTokenID, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -62,11 +62,12 @@ func UpdateDeploymentApiTokenRole(apiTokenID, role, deployment string, out io.Wr
 
 	if apiTokenID == "" {
 		// Get all dep apiTokens. Setting limit to 1000 for now
-		apiTokens, err := GetDeploymentApiTokens(client, deployment, 1000)
+		limit := 1000
+		apiTokens, err := GetDeploymentAPITokens(client, deployment, limit)
 		if err != nil {
 			return err
 		}
-		apiToken, err = getApiToken(apiTokens)
+		apiToken, err = getAPIToken(apiTokens)
 		if err != nil {
 			return err
 		}
@@ -85,12 +86,12 @@ func UpdateDeploymentApiTokenRole(apiTokenID, role, deployment string, out io.Wr
 		apiToken = resp.JSON200
 	}
 
-	mutateApiTokenInput := astrocore.UpdateDeploymentApiTokenRequest{
+	mutateAPITokenInput := astrocore.UpdateDeploymentApiTokenRequest{
 		Role: role,
 		Name: apiToken.Name,
 	}
 	fmt.Println("deployment: " + deployment)
-	resp, err := client.UpdateDeploymentApiTokenWithResponse(httpContext.Background(), ctx.Organization, deployment, apiToken.Id, mutateApiTokenInput)
+	resp, err := client.UpdateDeploymentApiTokenWithResponse(httpContext.Background(), ctx.Organization, deployment, apiToken.Id, mutateAPITokenInput)
 	if err != nil {
 		fmt.Println("error in MutateDeploymentApiTokenRoleWithResponse")
 		return err
@@ -104,11 +105,11 @@ func UpdateDeploymentApiTokenRole(apiTokenID, role, deployment string, out io.Wr
 	return nil
 }
 
-func getApiToken(apitokens []astrocore.ApiToken) (*astrocore.ApiToken, error) {
+func getAPIToken(apitokens []astrocore.ApiToken) (*astrocore.ApiToken, error) {
 	if len(apitokens) == 0 {
-		return nil, ErrNoApiTokensFoundInDeployment
+		return nil, ErrNoAPITokensFoundInDeployment
 	}
-	apiToken, err := SelectDeploymentApiToken(apitokens)
+	apiToken, err := SelectDeploymentAPIToken(apitokens)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +117,7 @@ func getApiToken(apitokens []astrocore.ApiToken) (*astrocore.ApiToken, error) {
 	return &apiToken, nil
 }
 
-func SelectDeploymentApiToken(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
+func SelectDeploymentAPIToken(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
@@ -152,12 +153,12 @@ func SelectDeploymentApiToken(apiTokens []astrocore.ApiToken) (astrocore.ApiToke
 	choice := input.Text("\n> ")
 	selected, ok := apiTokenMap[choice]
 	if !ok {
-		return astrocore.ApiToken{}, ErrInvalidApiTokenKey
+		return astrocore.ApiToken{}, ErrInvalidAPITokenKey
 	}
 	return selected, nil
 }
 
-func RemoveDeploymentApiToken(apiTokenID, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func RemoveDeploymentAPIToken(apiTokenID, deployment string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -165,11 +166,11 @@ func RemoveDeploymentApiToken(apiTokenID, deployment string, out io.Writer, clie
 
 	if apiTokenID == "" {
 		// Get all org apiTokens. Setting limit to 1000 for now
-		apiTokens, err := GetDeploymentApiTokens(client, deployment, apiTokenPagnationLimit)
+		apiTokens, err := GetDeploymentAPITokens(client, deployment, apiTokenPagnationLimit)
 		if err != nil {
 			return err
 		}
-		apiToken, err := getApiToken(apiTokens)
+		apiToken, err := getAPIToken(apiTokens)
 		if err != nil {
 			return err
 		}
@@ -189,7 +190,7 @@ func RemoveDeploymentApiToken(apiTokenID, deployment string, out io.Writer, clie
 }
 
 // Returns a list of all of a deployments apiTokens
-func GetDeploymentApiTokens(client astrocore.CoreClient, deployment string, limit int) ([]astrocore.ApiToken, error) {
+func GetDeploymentAPITokens(client astrocore.CoreClient, deployment string, limit int) ([]astrocore.ApiToken, error) {
 	offset := 0
 	var apiTokens []astrocore.ApiToken
 
@@ -225,13 +226,13 @@ func GetDeploymentApiTokens(client astrocore.CoreClient, deployment string, limi
 // Prints a list of all of an deployments apiTokens
 //
 //nolint:dupl
-func ListDeploymentApiTokens(out io.Writer, client astrocore.CoreClient, deployment string) error {
+func ListDeploymentAPITokens(out io.Writer, client astrocore.CoreClient, deployment string) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
 		Header:         []string{"NAME", "DESCRIPTION", "ID", "DEPLOYMENT ROLE", "CREATE DATE", "UPDATE DATE"},
 	}
-	apiTokens, err := GetDeploymentApiTokens(client, deployment, apiTokenPagnationLimit)
+	apiTokens, err := GetDeploymentAPITokens(client, deployment, apiTokenPagnationLimit)
 	if err != nil {
 		return err
 	}
