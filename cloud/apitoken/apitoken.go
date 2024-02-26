@@ -4,15 +4,16 @@ import (
 	httpContext "context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strconv"
+	"time"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"io"
-	"os"
-	"strconv"
-	"time"
 )
 
 var (
