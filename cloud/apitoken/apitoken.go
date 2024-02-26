@@ -166,7 +166,6 @@ func RemoveDeploymentAPIToken(apiTokenID, deployment string, out io.Writer, clie
 	}
 
 	if apiTokenID == "" {
-		// Get all org apiTokens. Setting limit to 1000 for now
 		apiTokens, err := GetDeploymentAPITokens(client, deployment, apiTokenPagnationLimit)
 		if err != nil {
 			return err
