@@ -6,6 +6,7 @@ import (
 	"fmt"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"io"
@@ -15,14 +16,24 @@ import (
 )
 
 var (
-	ErrInvalidApiTokenKey  = errors.New("invalid ApiToken selected")
-	apiTokenPagnationLimit = 100
+	ErrInvalidApiTokenKey           = errors.New("invalid ApiToken selected")
+	ErrNoApiTokenNameProvided       = errors.New("you must give your ApiToken a name")
+	ErrNoApiTokensFoundInDeployment = errors.New("no ApiTokens found in your deployment")
+	apiTokenPagnationLimit          = 100
 )
 
 func CreateDeploymentApiToken(name, role, description, deployment string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
+	}
+
+	if name == "" {
+		fmt.Println("Please specify a name for your ApiToken")
+		name = input.Text(ansi.Bold("\nApiToken name: "))
+		if name == "" {
+			return ErrNoApiTokenNameProvided
+		}
 	}
 
 	mutateApiTokenInput := astrocore.CreateDeploymentApiTokenRequest{
@@ -94,6 +105,9 @@ func UpdateDeploymentApiTokenRole(apiTokenID, role, deployment string, out io.Wr
 }
 
 func getApiToken(apitokens []astrocore.ApiToken) (*astrocore.ApiToken, error) {
+	if len(apitokens) == 0 {
+		return nil, ErrNoApiTokensFoundInDeployment
+	}
 	apiToken, err := SelectDeploymentApiToken(apitokens)
 	if err != nil {
 		return nil, err
@@ -170,7 +184,7 @@ func RemoveDeploymentApiToken(apiTokenID, deployment string, out io.Writer, clie
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "The apiToken %s was successfully removed from the deployment\n", apiTokenID)
+	fmt.Fprintf(out, "Astro ApiToken %s was successfully removed from deployment %s\n", apiTokenID, deployment)
 	return nil
 }
 
