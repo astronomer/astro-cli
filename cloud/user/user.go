@@ -533,7 +533,6 @@ func UpdateDeploymentUserRole(email, role, deployment string, out io.Writer, cli
 	mutateUserInput := astrocore.MutateDeploymentUserRoleRequest{
 		Role: role,
 	}
-
 	resp, err := client.MutateDeploymentUserRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, userID, mutateUserInput)
 	if err != nil {
 		fmt.Println("error in MutateDeploymentUserRoleWithResponse")
@@ -584,7 +583,6 @@ func GetDeploymentUsers(client astrocore.CoreClient, deployment string, limit in
 	if err != nil {
 		return nil, err
 	}
-
 	includeDeploymentRoles := true
 	for {
 		resp, err := client.ListDeploymentUsersWithResponse(httpContext.Background(), ctx.Organization, deployment, &astrocore.ListDeploymentUsersParams{

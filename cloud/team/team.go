@@ -778,7 +778,6 @@ func GetDeploymentTeams(client astrocore.CoreClient, deployment string, limit in
 	if err != nil {
 		return nil, err
 	}
-
 	includeDeploymentRoles := true
 	for {
 		resp, err := client.ListDeploymentTeamsWithResponse(httpContext.Background(), ctx.Organization, deployment, &astrocore.ListDeploymentTeamsParams{
@@ -881,7 +880,6 @@ func AddDeploymentTeam(id, role, deployment string, out io.Writer, client astroc
 		Role: role,
 	}
 	resp, err := client.MutateDeploymentTeamRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, teamID, mutateDeploymentTeamInput)
-
 	if err != nil {
 		return err
 	}
