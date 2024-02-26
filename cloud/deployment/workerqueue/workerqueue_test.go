@@ -96,7 +96,7 @@ var (
 		},
 	}
 	testRegion                 = "region"
-	testProvider               = "provider"
+	testProvider               = astroplatformcore.DeploymentCloudProviderAWS
 	testCluster                = "cluster"
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 		{
@@ -115,7 +115,7 @@ var (
 			ClusterName: &testCluster,
 		},
 	}
-	cloudProvider                = "test-provider"
+	cloudProvider                = astroplatformcore.DeploymentCloudProviderAWS
 	mockUpdateDeploymentResponse = astroplatformcore.UpdateDeploymentResponse{
 		JSON200: &astroplatformcore.Deployment{
 			Id:            "test-id",

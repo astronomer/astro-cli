@@ -93,7 +93,7 @@ func TestVariableList(t *testing.T) {
 
 func TestVariableModify(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	cloudProvider := "test-provider"
+	cloudProvider := astroplatformcore.DeploymentCloudProviderGCP
 	mockUpdateDeploymentResponse := astroplatformcore.UpdateDeploymentResponse{
 		JSON200: &astroplatformcore.Deployment{
 			Id:            "test-id",

@@ -964,7 +964,12 @@ const (
 
 // Defines values for ListSelfUserRepositoriesParamsGitProvider.
 const (
-	GITHUB ListSelfUserRepositoriesParamsGitProvider = "GITHUB"
+	ListSelfUserRepositoriesParamsGitProviderGITHUB ListSelfUserRepositoriesParamsGitProvider = "GITHUB"
+)
+
+// Defines values for GetSelfUserRepositoryBranchParamsGitProvider.
+const (
+	GetSelfUserRepositoryBranchParamsGitProviderGITHUB GetSelfUserRepositoryBranchParamsGitProvider = "GITHUB"
 )
 
 // AddTeamMembersRequest defines model for AddTeamMembersRequest.
@@ -1038,6 +1043,7 @@ type BasicSubjectProfileSubjectType string
 type Cluster struct {
 	AppliedTemplateVersion string               `json:"appliedTemplateVersion"`
 	CloudProvider          ClusterCloudProvider `json:"cloudProvider"`
+	Cohort                 *string              `json:"cohort,omitempty"`
 	CreatedAt              time.Time            `json:"createdAt"`
 	DbInstanceType         string               `json:"dbInstanceType"`
 	DeletedAt              *string              `json:"deletedAt,omitempty"`
@@ -1080,6 +1086,7 @@ type ClusterType string
 type ClusterDetailed struct {
 	AppliedTemplateVersion string                       `json:"appliedTemplateVersion"`
 	CloudProvider          ClusterDetailedCloudProvider `json:"cloudProvider"`
+	Cohort                 *string                      `json:"cohort,omitempty"`
 	CreatedAt              time.Time                    `json:"createdAt"`
 	CreatedBy              BasicSubjectProfile          `json:"createdBy"`
 	DbInstanceType         string                       `json:"dbInstanceType"`
@@ -1851,7 +1858,19 @@ type DeploymentEnvironmentVariableRequest struct {
 // DeploymentHibernationOverride defines model for DeploymentHibernationOverride.
 type DeploymentHibernationOverride struct {
 	// Hibernate Whether to go into hibernation or not via the override rule
-	Hibernate bool `json:"hibernate"`
+	Hibernate *bool `json:"hibernate,omitempty"`
+
+	// IsActive Whether the override is currently active or not
+	IsActive *bool `json:"isActive,omitempty"`
+
+	// OverrideUntil Timestamp till the override on the hibernation schedule is in effect
+	OverrideUntil *string `json:"overrideUntil,omitempty"`
+}
+
+// DeploymentHibernationOverrideRequest defines model for DeploymentHibernationOverrideRequest.
+type DeploymentHibernationOverrideRequest struct {
+	// Hibernate Whether to go into hibernation or not via the override rule
+	Hibernate *bool `json:"hibernate,omitempty"`
 
 	// OverrideUntil Timestamp till the override on the hibernation schedule is in effect
 	OverrideUntil *string `json:"overrideUntil,omitempty"`
@@ -1882,7 +1901,7 @@ type DeploymentHibernationSpec struct {
 
 // DeploymentHibernationSpecRequest defines model for DeploymentHibernationSpecRequest.
 type DeploymentHibernationSpecRequest struct {
-	Override *DeploymentHibernationOverride `json:"override,omitempty"`
+	Override *DeploymentHibernationOverrideRequest `json:"override,omitempty"`
 
 	// Schedules The list of schedules for the hibernation spec
 	Schedules *[]DeploymentHibernationSchedule `json:"schedules,omitempty"`
@@ -2108,11 +2127,11 @@ type GitHubAccountAccountType string
 
 // GitRepository defines model for GitRepository.
 type GitRepository struct {
+	Account           string `json:"account"`
 	FullName          string `json:"fullName"`
 	HasPullPermission bool   `json:"hasPullPermission"`
 	HasPushPermission bool   `json:"hasPushPermission"`
 	Name              string `json:"name"`
-	Owner             string `json:"owner"`
 	UserIsAdmin       bool   `json:"userIsAdmin"`
 }
 
@@ -2218,14 +2237,15 @@ type MutateOrgUserRoleRequest struct {
 
 // MutateWorkerQueueRequest defines model for MutateWorkerQueueRequest.
 type MutateWorkerQueueRequest struct {
-	AstroMachine      *MutateWorkerQueueRequestAstroMachine `json:"astroMachine,omitempty"`
-	Id                *string                               `json:"id,omitempty"`
-	IsDefault         bool                                  `json:"isDefault"`
-	MaxWorkerCount    int                                   `json:"maxWorkerCount"`
-	MinWorkerCount    int                                   `json:"minWorkerCount"`
-	Name              string                                `json:"name"`
-	NodePoolId        *string                               `json:"nodePoolId,omitempty"`
-	WorkerConcurrency int                                   `json:"workerConcurrency"`
+	AstroMachine        *MutateWorkerQueueRequestAstroMachine `json:"astroMachine,omitempty"`
+	Id                  *string                               `json:"id,omitempty"`
+	IsDefault           bool                                  `json:"isDefault"`
+	MaxWorkerCount      int                                   `json:"maxWorkerCount"`
+	MinWorkerCount      int                                   `json:"minWorkerCount"`
+	Name                string                                `json:"name"`
+	NodePoolId          *string                               `json:"nodePoolId,omitempty"`
+	PodEphemeralStorage *string                               `json:"podEphemeralStorage,omitempty"`
+	WorkerConcurrency   int                                   `json:"workerConcurrency"`
 }
 
 // MutateWorkerQueueRequestAstroMachine defines model for MutateWorkerQueueRequest.AstroMachine.
@@ -2353,6 +2373,11 @@ type RepositoriesPaginated struct {
 	Page         int             `json:"page"`
 	PerPage      int             `json:"perPage"`
 	Repositories []GitRepository `json:"repositories"`
+}
+
+// RepositoryBranch defines model for RepositoryBranch.
+type RepositoryBranch struct {
+	Name string `json:"name"`
 }
 
 // ResourceOption defines model for ResourceOption.
@@ -2506,6 +2531,7 @@ type SelfSignupType string
 // SharedCluster defines model for SharedCluster.
 type SharedCluster struct {
 	CloudProvider       SharedClusterCloudProvider `json:"cloudProvider"`
+	Cohort              *string                    `json:"cohort,omitempty"`
 	CreatedAt           time.Time                  `json:"createdAt"`
 	DbInstanceType      string                     `json:"dbInstanceType"`
 	Id                  string                     `json:"id"`
@@ -2983,16 +3009,17 @@ type WorkerMachineName string
 
 // WorkerQueue defines model for WorkerQueue.
 type WorkerQueue struct {
-	AstroMachine      *string `json:"astroMachine,omitempty"`
-	Id                string  `json:"id"`
-	IsDefault         bool    `json:"isDefault"`
-	MaxWorkerCount    int     `json:"maxWorkerCount"`
-	MinWorkerCount    int     `json:"minWorkerCount"`
-	Name              string  `json:"name"`
-	NodePoolId        *string `json:"nodePoolId,omitempty"`
-	PodCpu            string  `json:"podCpu"`
-	PodRam            string  `json:"podRam"`
-	WorkerConcurrency int     `json:"workerConcurrency"`
+	AstroMachine        *string `json:"astroMachine,omitempty"`
+	Id                  string  `json:"id"`
+	IsDefault           bool    `json:"isDefault"`
+	MaxWorkerCount      int     `json:"maxWorkerCount"`
+	MinWorkerCount      int     `json:"minWorkerCount"`
+	Name                string  `json:"name"`
+	NodePoolId          *string `json:"nodePoolId,omitempty"`
+	PodCpu              string  `json:"podCpu"`
+	PodEphemeralStorage *string `json:"podEphemeralStorage,omitempty"`
+	PodRam              string  `json:"podRam"`
+	WorkerConcurrency   int     `json:"workerConcurrency"`
 }
 
 // WorkerQueueOptions defines model for WorkerQueueOptions.
@@ -3625,6 +3652,9 @@ type ListSelfUserRepositoriesParams struct {
 
 // ListSelfUserRepositoriesParamsGitProvider defines parameters for ListSelfUserRepositories.
 type ListSelfUserRepositoriesParamsGitProvider string
+
+// GetSelfUserRepositoryBranchParamsGitProvider defines parameters for GetSelfUserRepositoryBranch.
+type GetSelfUserRepositoryBranchParamsGitProvider string
 
 // CreateOrganizationJSONRequestBody defines body for CreateOrganization for application/json ContentType.
 type CreateOrganizationJSONRequestBody = CreateOrganizationRequest
@@ -4392,6 +4422,9 @@ type ClientInterface interface {
 
 	// ListSelfUserRepositories request
 	ListSelfUserRepositories(ctx context.Context, gitProvider ListSelfUserRepositoriesParamsGitProvider, gitAccount string, params *ListSelfUserRepositoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSelfUserRepositoryBranch request
+	GetSelfUserRepositoryBranch(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateSelfUserInvite request with any body
 	UpdateSelfUserInviteWithBody(ctx context.Context, inviteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6009,6 +6042,18 @@ func (c *Client) GetSelfUser(ctx context.Context, params *GetSelfUserParams, req
 
 func (c *Client) ListSelfUserRepositories(ctx context.Context, gitProvider ListSelfUserRepositoriesParamsGitProvider, gitAccount string, params *ListSelfUserRepositoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListSelfUserRepositoriesRequest(c.Server, gitProvider, gitAccount, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetSelfUserRepositoryBranch(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSelfUserRepositoryBranchRequest(c.Server, gitProvider, gitAccount, gitRepository, gitBranch)
 	if err != nil {
 		return nil, err
 	}
@@ -12540,6 +12585,61 @@ func NewListSelfUserRepositoriesRequest(server string, gitProvider ListSelfUserR
 	return req, nil
 }
 
+// NewGetSelfUserRepositoryBranchRequest generates requests for GetSelfUserRepositoryBranch
+func NewGetSelfUserRepositoryBranchRequest(server string, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "gitProvider", runtime.ParamLocationPath, gitProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "gitAccount", runtime.ParamLocationPath, gitAccount)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "gitRepository", runtime.ParamLocationPath, gitRepository)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "gitBranch", runtime.ParamLocationPath, gitBranch)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/users/self/git-providers/%s/accounts/%s/repositories/%s/branches/%s", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewUpdateSelfUserInviteRequest calls the generic UpdateSelfUserInvite builder with application/json body
 func NewUpdateSelfUserInviteRequest(server string, inviteId string, body UpdateSelfUserInviteJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -12997,6 +13097,9 @@ type ClientWithResponsesInterface interface {
 
 	// ListSelfUserRepositories request
 	ListSelfUserRepositoriesWithResponse(ctx context.Context, gitProvider ListSelfUserRepositoriesParamsGitProvider, gitAccount string, params *ListSelfUserRepositoriesParams, reqEditors ...RequestEditorFn) (*ListSelfUserRepositoriesResponse, error)
+
+	// GetSelfUserRepositoryBranch request
+	GetSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*GetSelfUserRepositoryBranchResponse, error)
 
 	// UpdateSelfUserInvite request with any body
 	UpdateSelfUserInviteWithBodyWithResponse(ctx context.Context, inviteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSelfUserInviteResponse, error)
@@ -15622,6 +15725,32 @@ func (r ListSelfUserRepositoriesResponse) StatusCode() int {
 	return 0
 }
 
+type GetSelfUserRepositoryBranchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *RepositoryBranch
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSelfUserRepositoryBranchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSelfUserRepositoryBranchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UpdateSelfUserInviteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -16825,6 +16954,15 @@ func (c *ClientWithResponses) ListSelfUserRepositoriesWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseListSelfUserRepositoriesResponse(rsp)
+}
+
+// GetSelfUserRepositoryBranchWithResponse request returning *GetSelfUserRepositoryBranchResponse
+func (c *ClientWithResponses) GetSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*GetSelfUserRepositoryBranchResponse, error) {
+	rsp, err := c.GetSelfUserRepositoryBranch(ctx, gitProvider, gitAccount, gitRepository, gitBranch, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSelfUserRepositoryBranchResponse(rsp)
 }
 
 // UpdateSelfUserInviteWithBodyWithResponse request with arbitrary body returning *UpdateSelfUserInviteResponse
@@ -22613,6 +22751,60 @@ func ParseListSelfUserRepositoriesResponse(rsp *http.Response) (*ListSelfUserRep
 			return nil, err
 		}
 		response.JSON405 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSelfUserRepositoryBranchResponse parses an HTTP response from a GetSelfUserRepositoryBranchWithResponse call
+func ParseGetSelfUserRepositoryBranchResponse(rsp *http.Response) (*GetSelfUserRepositoryBranchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSelfUserRepositoryBranchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RepositoryBranch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

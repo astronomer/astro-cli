@@ -71,7 +71,7 @@ var (
 		JSON200: &astroplatformcore.Deployment{
 			Name:          "test-deployment-label",
 			Id:            "test-id-1",
-			CloudProvider: &cloudProvider,
+			CloudProvider: (*astroplatformcore.DeploymentCloudProvider)(&cloudProvider),
 			Type:          &hybridType,
 			ClusterId:     &clusterID,
 			Region:        &region,
@@ -112,7 +112,7 @@ var (
 			SchedulerSize:          &schedulerTestSize,
 			Region:                 &region,
 			WorkspaceName:          &workspaceName,
-			CloudProvider:          &cloudProvider,
+			CloudProvider:          (*astroplatformcore.DeploymentCloudProvider)(&cloudProvider),
 			DefaultTaskPodCpu:      &defaultTaskPodCPU,
 			DefaultTaskPodMemory:   &defaultTaskPodMemory,
 			WebServerAirflowApiUrl: "airflow-url",
@@ -138,7 +138,7 @@ var (
 			Status:            "HEALTHY",
 			Type:              &standardType,
 			Region:            &testRegion,
-			CloudProvider:     &testProvider,
+			CloudProvider:     (*astroplatformcore.DeploymentCloudProvider)(&testProvider),
 			WorkspaceName:     &workspaceName,
 			IsDevelopmentMode: &developmentModeTest,
 		},
@@ -258,7 +258,7 @@ var (
 	mockCreateDeploymentResponse = astroplatformcore.CreateDeploymentResponse{
 		JSON200: &astroplatformcore.Deployment{
 			Id:            "test-id",
-			CloudProvider: &cloudProvider,
+			CloudProvider: (*astroplatformcore.DeploymentCloudProvider)(&cloudProvider),
 			Type:          &hybridType,
 			Region:        &region,
 			ClusterName:   &cluster.Name,
@@ -1047,13 +1047,14 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 			platformCoreClient = mockPlatformCoreClient
 
+			isActive := true
 			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
 				HTTPResponse: &http.Response{
 					StatusCode: astrocore.HTTPStatus200,
 				},
 				JSON200: &astroplatformcore.DeploymentHibernationOverride{
-					IsHibernating: tt.IsHibernating,
-					IsActive:      true,
+					IsHibernating: &tt.IsHibernating,
+					IsActive:      &isActive,
 				},
 			}
 
@@ -1076,14 +1077,15 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			until := "2022-11-17T13:25:55.275697-08:00"
 			untilParsed, err := time.Parse(time.RFC3339, until)
 			assert.NoError(t, err)
+			isActive := true
 			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
 				HTTPResponse: &http.Response{
 					StatusCode: astrocore.HTTPStatus200,
 				},
 				JSON200: &astroplatformcore.DeploymentHibernationOverride{
-					IsHibernating: tt.IsHibernating,
+					IsHibernating: &tt.IsHibernating,
 					OverrideUntil: &untilParsed,
-					IsActive:      true,
+					IsActive:      &isActive,
 				},
 			}
 
@@ -1113,14 +1115,15 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			forDurationParsed, err := time.ParseDuration(forDuration)
 			overrideUntil := time.Now().Add(forDurationParsed)
 			assert.NoError(t, err)
+			isActive := true
 			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
 				HTTPResponse: &http.Response{
 					StatusCode: astrocore.HTTPStatus200,
 				},
 				JSON200: &astroplatformcore.DeploymentHibernationOverride{
-					IsHibernating: tt.IsHibernating,
+					IsHibernating: &tt.IsHibernating,
 					OverrideUntil: &overrideUntil,
-					IsActive:      true,
+					IsActive:      &isActive,
 				},
 			}
 
