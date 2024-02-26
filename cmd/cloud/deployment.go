@@ -5,6 +5,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/apitoken"
 	"io"
 	"strings"
+	"time"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -62,6 +63,7 @@ var (
 	region                    string
 	schedulerSize             string
 	highAvailability          string
+	developmentMode           string
 	cicdEnforcement           string
 	defaultTaskPodMemory      string
 	resourceQuotaCPU          string
@@ -69,6 +71,11 @@ var (
 	defaultTaskPodCPU         string
 	addDeploymentRole         string
 	updateDeploymentRole      string
+	workloadIdentity          string
+	until                     string
+	forDuration               string
+	removeOverride            bool
+	forceOverride             bool
 
 	deploymentType                = standard
 	deploymentVariableListExample = `
@@ -118,6 +125,8 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentUserRootCmd(out),
 		newDeploymentTeamRootCmd(out),
 		newDeploymentApiTokenRootCmd(out),
+		newDeploymentHibernateCmd(),
+		newDeploymentWakeUpCmd(),
 	)
 	return cmd
 }
@@ -184,7 +193,6 @@ func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
-		// make sure the email is lowercase
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
@@ -195,7 +203,7 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [id]",
 		Short: "Add a team to an Astro Deployment with a specific role",
-		Long:  "Add a team to an Astro Deployment with a specific role\n$astro deployment team add [id] --role [ DEPLOYMENT_ADMIN or the custom role name ].",
+		Long:  "Add a team to an Astro Deployment with a specific role\n$astro deployment team add [id] --role [DEPLOYMENT_ADMIN or the custom role name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addDeploymentTeam(cmd, args, out)
 		},
@@ -212,9 +220,7 @@ func addDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 	var id string
 
-	// if an email was provided in the args we use it
 	if len(args) > 0 {
-		// make sure the email is lowercase
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
@@ -225,8 +231,8 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [id]",
 		Aliases: []string{"up"},
-		Short:   "Update a the role of a team in an Astro Deployment",
-		Long:    "Update the role of a team in an Astro Deployment\n$astro deployment team update [id] --role [ DEPLOYMENT_ADMIN or the custom role name ].",
+		Short:   "Update the role of a team in an Astro Deployment",
+		Long:    "Update the role of a team in an Astro Deployment\n$astro deployment team update [id] --role [DEPLOYMENT_ADMIN or the custom role name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateDeploymentTeam(cmd, args, out)
 		},
@@ -248,7 +254,7 @@ func updateDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 	if updateDeploymentRole == "" {
 		// no role was provided so ask the user for it
-		updateDeploymentRole = input.Text("Enter a user Deployment role or custom role name to update team: ")
+		updateDeploymentRole = input.Text("Enter a Deployment role or custom role name to update team: ")
 	}
 
 	cmd.SilenceUsage = true
@@ -278,7 +284,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [email]",
 		Short: "Add a user to an Astro Deployment with a specific role",
-		Long:  "Add a user to an Astro Deployment with a specific role\n$astro deployment user add [email] --role [ DEPLOYMENT_ADMIN or the custom role name ].",
+		Long:  "Add a user to an Astro Deployment with a specific role\n$astro deployment user add [email] --role [DEPLOYMENT_ADMIN or the custom role name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addDeploymentUser(cmd, args, out)
 		},
@@ -306,7 +312,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [email]",
 		Aliases: []string{"up"},
 		Short:   "Update a the role of a user in an Astro Deployment",
-		Long:    "Update the role of a user in an Astro Deployment\n$astro deployment user update [email] --role [ DEPLOYMENT_ADMIN or the custom role name ].",
+		Long:    "Update the role of a user in an Astro Deployment\n$astro deployment user update [email] --role [DEPLOYMENT_ADMIN or the custom role name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateDeploymentUser(cmd, args, out)
 		},
@@ -400,9 +406,11 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the Deployment.")
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of scheduler for the Deployment. Possible values can be small, medium, large")
 		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "disable", "Enables High Availability for the Deployment")
+		cmd.Flags().StringVarP(&developmentMode, "development-mode", "m", "disable", "Set to 'enable' to enable development-only features such as hibernation. When enabled, the Deployment will not have guaranteed uptime SLAs.'")
 	} else {
 		cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", 0, "The Deployment's scheduler resources in AUs")
 		cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", 0, "The number of scheduler replicas for the Deployment")
+		cmd.Flags().StringVarP(&workloadIdentity, "workload-identity", "", "", "The Workload Identity to use for the Deployment")
 	}
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in")
 	return cmd
@@ -443,6 +451,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	} else {
 		cmd.Flags().IntVarP(&updateSchedulerAU, "scheduler-au", "s", 0, "The Deployment's Scheduler resources in AUs.")
 		cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment.")
+		cmd.Flags().StringVarP(&workloadIdentity, "workload-identity", "", "", "The Workload Identity to use for the Deployment")
 	}
 	return cmd
 }
@@ -544,6 +553,42 @@ func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
+func newDeploymentHibernateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "hibernate [DEPLOYMENT-ID]",
+		Aliases: []string{"hb"},
+		Short:   "Hibernate an Astro development Deployment",
+		Long:    "Hibernate an Astro development Deployment for a set amount of time. Overrides any existing hibernation schedule and sets the Deployment to hibernate for a specific duration or until a specific time. Use the '--remove-override' flag to remove any existing override and resume the regular hibernation schedule.",
+		RunE:    func(cmd *cobra.Command, args []string) error { return deploymentOverrideHibernation(cmd, args, true) },
+	}
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to hibernate")
+	cmd.Flags().StringVarP(&until, "until", "u", "", "Specify the hibernation period using an end date and time. Example value: 2021-01-01T00:00:00Z")
+	cmd.Flags().StringVarP(&forDuration, "for", "d", "", "Specify the hibernation period using a duration. Example value: 1h30m")
+	cmd.Flags().BoolVarP(&removeOverride, "remove-override", "r", false, "Remove any existing override and resume regular hibernation schedule.")
+	cmd.Flags().BoolVarP(&forceOverride, "force", "f", false, "Force hibernate. The CLI will not prompt to confirm before hibernating the Deployment.")
+	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
+	return cmd
+}
+
+//nolint:dupl
+func newDeploymentWakeUpCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "wake-up [DEPLOYMENT-ID]",
+		Aliases: []string{"wu"},
+		Short:   "Wake up an Astro development Deployment",
+		Long:    "Wake up an Astro development Deployment from hibernation. Overrides any existing hibernation schedule and sets the Deployment to run for a specific duration or until a specific time. Use the '--remove-override' flag to remove any existing override and resume the regular hibernation schedule.",
+		RunE:    func(cmd *cobra.Command, args []string) error { return deploymentOverrideHibernation(cmd, args, false) },
+	}
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to wake up.")
+	cmd.Flags().StringVarP(&until, "until", "u", "", "Specify the awake period using an end date. Example value: 2021-01-01T00:00:00Z")
+	cmd.Flags().StringVarP(&forDuration, "for", "d", "", "Specify the awake period using a duration. Example value: 1h30m")
+	cmd.Flags().BoolVarP(&removeOverride, "remove-override", "r", false, "Remove any existing override and resume the regular hibernation schedule.")
+	cmd.Flags().BoolVarP(&forceOverride, "force", "f", false, "Force wake up. The CLI will not prompt to confirm before waking up the Deployment.")
+	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
+	return cmd
+}
+
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -598,6 +643,9 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
 	}
+	if developmentMode != "" && !(developmentMode == enable || developmentMode == disable) {
+		return errors.New("Invalid --development-mode value")
+	}
 	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared || deploymentType == fromfile.HostedDedicated) {
 		return errors.New("Invalid --type value")
 	}
@@ -606,6 +654,9 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 	if deploymentCreateEnforceCD && cicdEnforcement == disable {
 		return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
+	}
+	if organization.IsOrgHosted() && clusterID != "" && (deploymentType == standard || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared) {
+		return errors.New("flag --cluster-id cannot be used to create a standard deployment. If you want to create a dedicated deployment, use --type dedicated along with --cluster-id")
 	}
 	if deploymentCreateEnforceCD {
 		cicdEnforcement = enable
@@ -659,7 +710,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, coreDeploymentType, schedulerAU, schedulerReplicas, platformCoreClient, astroCoreClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
@@ -718,7 +769,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
@@ -776,6 +827,32 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 	cmd.SilenceUsage = true
 
 	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroCoreClient, platformCoreClient, out)
+}
+
+func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernating bool) error {
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+	}
+
+	// Get deploymentId from args, if passed
+	if len(args) > 0 {
+		deploymentID = args[0]
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	if removeOverride {
+		return deployment.DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName, forceOverride, platformCoreClient)
+	}
+
+	overrideUntil, err := getOverrideUntil(until, forDuration)
+	if err != nil {
+		return err
+	}
+
+	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, platformCoreClient)
 }
 
 func isValidExecutor(executor string) bool {
@@ -988,4 +1065,23 @@ func removeDeploymentApiToken(cmd *cobra.Command, args []string, out io.Writer) 
 
 	cmd.SilenceUsage = true
 	return apitoken.RemoveDeploymentApiToken(apiTokenID, deploymentID, out, astroCoreClient)
+}
+
+func getOverrideUntil(until, forDuration string) (*time.Time, error) {
+	if until != "" {
+		untilParsed, err := time.Parse(time.RFC3339, until)
+		if err != nil {
+			return nil, err
+		}
+		return &untilParsed, nil
+	}
+	if forDuration != "" {
+		forDurationParsed, err := time.ParseDuration(forDuration)
+		if err != nil {
+			return nil, err
+		}
+		overrideUntil := time.Now().Add(forDurationParsed)
+		return &overrideUntil, nil
+	}
+	return nil, nil
 }

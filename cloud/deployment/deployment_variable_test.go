@@ -10,6 +10,7 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -148,8 +149,6 @@ func TestVariableModify(t *testing.T) {
 	})
 
 	t.Run("success with secret value", func(t *testing.T) {
-		printValue = "****"
-
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
@@ -297,13 +296,23 @@ func TestAddVariableFromFile(t *testing.T) {
 
 func TestWriteVarToFile(t *testing.T) {
 	testFile := "temp-test-env-file"
-	defer func() { os.Remove(testFile) }()
 
-	err := writeVarToFile([]astroplatformcore.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue1}}, "test-key-1", testFile)
-	assert.NoError(t, err)
-
-	err = writeVarToFile([]astroplatformcore.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue1}}, "", testFile)
-	assert.NoError(t, err)
+	for _, tc := range []struct {
+		Var      astroplatformcore.DeploymentEnvironmentVariable
+		Expected string
+	}{
+		{astroplatformcore.DeploymentEnvironmentVariable{Key: "test-key-1", Value: &testValue1}, "test-key-1=" + testValue1},
+		{astroplatformcore.DeploymentEnvironmentVariable{Key: "test-key-1", Value: nil, IsSecret: true}, "test-key-1= # secret"},
+	} {
+		t.Run(tc.Var.Key, func(t *testing.T) {
+			defer func() { os.Remove(testFile) }()
+			err := writeVarToFile([]astroplatformcore.DeploymentEnvironmentVariable{tc.Var}, testFile)
+			assert.NoError(t, err)
+			contents, err := os.ReadFile(testFile)
+			require.NoError(t, err)
+			assert.Equal(t, "\n"+tc.Expected, string(contents))
+		})
+	}
 }
 
 func TestAddVariable(t *testing.T) {

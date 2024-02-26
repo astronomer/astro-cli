@@ -55,7 +55,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		defaultOptions                       astroplatformcore.WorkerQueueOptions
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, platformCoreClient, coreClient)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, nil, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
@@ -240,7 +240,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 	}
 	// update the deployment with the new list of worker queues
-	err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToCreate, hybridListToCreate, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
+	err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToCreate, hybridListToCreate, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
 	if err != nil {
 		return err
 	}
@@ -511,7 +511,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 		hybridWorkerQueuesToKeep []astroplatformcore.HybridWorkerQueueRequest
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, platformCoreClient, coreClient)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, nil, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
@@ -571,7 +571,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 				}
 			}
 			// update the deployment with the new list
-			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
+			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -593,7 +593,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 				}
 			}
 			// update the deployment with the new list
-			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
+			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
 			if err != nil {
 				return err
 			}

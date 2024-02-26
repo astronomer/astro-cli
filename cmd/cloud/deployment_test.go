@@ -56,12 +56,12 @@ var (
 			Deployments: mockCoreDeploymentCreateResponse,
 		},
 	}
-	workloadIdentity                 = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
+	mockWorkloadIdentity             = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
 	mockCoreDeploymentCreateResponse = []astroplatformcore.Deployment{
 		{
 			Name:             "test-deployment-label",
 			Status:           "HEALTHY",
-			WorkloadIdentity: &workloadIdentity,
+			WorkloadIdentity: &mockWorkloadIdentity,
 			ClusterId:        &clusterID,
 			ClusterName:      &testCluster,
 			Id:               "test-id-1",
@@ -83,6 +83,7 @@ var (
 	}
 	executorCelery       = astroplatformcore.DeploymentExecutorCELERY
 	highAvailabilityTest = true
+	developmentModeTest  = true
 	ResourceQuotaMemory  = "1"
 	schedulerTestSize    = astroplatformcore.DeploymentSchedulerSizeSMALL
 	deploymentResponse   = astroplatformcore.GetDeploymentResponse{
@@ -105,6 +106,7 @@ var (
 			ClusterName:            &testCluster,
 			Executor:               &executorCelery,
 			IsHighAvailability:     &highAvailabilityTest,
+			IsDevelopmentMode:      &developmentModeTest,
 			ResourceQuotaCpu:       &resourceQuotaCPU,
 			ResourceQuotaMemory:    &ResourceQuotaMemory,
 			SchedulerSize:          &schedulerTestSize,
@@ -131,13 +133,14 @@ var (
 	testProvider               = "provider"
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 		{
-			Id:            "test-id-1",
-			Name:          "test",
-			Status:        "HEALTHY",
-			Type:          &standardType,
-			Region:        &testRegion,
-			CloudProvider: &testProvider,
-			WorkspaceName: &workspaceName,
+			Id:                "test-id-1",
+			Name:              "test",
+			Status:            "HEALTHY",
+			Type:              &standardType,
+			Region:            &testRegion,
+			CloudProvider:     &testProvider,
+			WorkspaceName:     &workspaceName,
+			IsDevelopmentMode: &developmentModeTest,
 		},
 		{
 			Id:            "test-id-2",
@@ -355,7 +358,6 @@ func TestDeploymentCreate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	ws := "workspace-id"
-	csID := "test-cluster-id"
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
@@ -584,6 +586,20 @@ deployment:
 		}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "Invalid --high-availability value")
+	})
+	t.Run("returns an error with incorrect development-mode value", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization_short_name", "test-org")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
+			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--development-mode", "some-value",
+		}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "Invalid --development-mode value")
 	})
 	t.Run("returns an error if cloud provider is not valid", func(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
@@ -845,6 +861,28 @@ deployment:
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "Invalid --high-availability value")
 	})
+	t.Run("returns an error if cluster-id is provided with implicit standard deployment", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
+	})
+	t.Run("returns an error if cluster-id is provided with explicit standard deployment", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", standard}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
+	})
 }
 
 func TestDeploymentDelete(t *testing.T) {
@@ -991,6 +1029,154 @@ func TestDeploymentVariableUpdate(t *testing.T) {
 	assert.Contains(t, resp, "test-value-2-update")
 	mockPlatformCoreClient.AssertExpectations(t)
 	mockCoreClient.AssertExpectations(t)
+}
+
+func TestDeploymentHibernateAndWakeUp(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	tests := []struct {
+		IsHibernating bool
+		command       string
+	}{
+		{true, "hibernate"},
+		{false, "wake-up"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.command, func(t *testing.T) {
+			mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+			platformCoreClient = mockPlatformCoreClient
+
+			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
+				HTTPResponse: &http.Response{
+					StatusCode: astrocore.HTTPStatus200,
+				},
+				JSON200: &astroplatformcore.DeploymentHibernationOverride{
+					IsHibernating: tt.IsHibernating,
+					IsActive:      true,
+				},
+			}
+
+			mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+			mockPlatformCoreClient.On("UpdateDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockResponse, nil).Once()
+
+			defer testUtil.MockUserInput(t, "1")()
+
+			cmdArgs := []string{tt.command, "", "--force"}
+			_, err := execDeploymentCmd(cmdArgs...)
+			assert.NoError(t, err)
+			mockPlatformCoreClient.AssertExpectations(t)
+		})
+
+		t.Run(fmt.Sprintf("%s with until", tt.command), func(t *testing.T) {
+			mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+			platformCoreClient = mockPlatformCoreClient
+
+			until := "2022-11-17T13:25:55.275697-08:00"
+			untilParsed, err := time.Parse(time.RFC3339, until)
+			assert.NoError(t, err)
+			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
+				HTTPResponse: &http.Response{
+					StatusCode: astrocore.HTTPStatus200,
+				},
+				JSON200: &astroplatformcore.DeploymentHibernationOverride{
+					IsHibernating: tt.IsHibernating,
+					OverrideUntil: &untilParsed,
+					IsActive:      true,
+				},
+			}
+
+			mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+			mockPlatformCoreClient.On("UpdateDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockResponse, nil).Once()
+
+			cmdArgs := []string{tt.command, "test-id-1", "--until", until, "--force"}
+			_, err = execDeploymentCmd(cmdArgs...)
+			assert.NoError(t, err)
+			mockPlatformCoreClient.AssertExpectations(t)
+		})
+
+		t.Run(fmt.Sprintf("%s with until returns an error if invalid", tt.command), func(t *testing.T) {
+			until := "invalid-duration"
+
+			cmdArgs := []string{tt.command, "test-id-1", "--until", until, "--force"}
+			_, err := execDeploymentCmd(cmdArgs...)
+			assert.Error(t, err)
+		})
+
+		t.Run(fmt.Sprintf("%s with for", tt.command), func(t *testing.T) {
+			mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+			platformCoreClient = mockPlatformCoreClient
+
+			forDuration := "1h"
+			forDurationParsed, err := time.ParseDuration(forDuration)
+			overrideUntil := time.Now().Add(forDurationParsed)
+			assert.NoError(t, err)
+			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
+				HTTPResponse: &http.Response{
+					StatusCode: astrocore.HTTPStatus200,
+				},
+				JSON200: &astroplatformcore.DeploymentHibernationOverride{
+					IsHibernating: tt.IsHibernating,
+					OverrideUntil: &overrideUntil,
+					IsActive:      true,
+				},
+			}
+
+			mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+			mockPlatformCoreClient.On("UpdateDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockResponse, nil).Once()
+
+			cmdArgs := []string{tt.command, "test-id-1", "--for", forDuration, "--force"}
+			_, err = execDeploymentCmd(cmdArgs...)
+			assert.NoError(t, err)
+			mockPlatformCoreClient.AssertExpectations(t)
+		})
+
+		t.Run(fmt.Sprintf("%s with for returns an error if invalid", tt.command), func(t *testing.T) {
+			forDuration := "invalid-duration"
+
+			cmdArgs := []string{tt.command, "test-id-1", "--for", forDuration, "--force"}
+			_, err := execDeploymentCmd(cmdArgs...)
+			assert.Error(t, err)
+		})
+
+		t.Run(fmt.Sprintf("%s with remove override", tt.command), func(t *testing.T) {
+			mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+			platformCoreClient = mockPlatformCoreClient
+
+			mockResponse := astroplatformcore.DeleteDeploymentHibernationOverrideResponse{
+				HTTPResponse: &http.Response{
+					StatusCode: astrocore.HTTPStatus204,
+				},
+			}
+
+			mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+			mockPlatformCoreClient.On("DeleteDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockResponse, nil).Once()
+
+			cmdArgs := []string{tt.command, "test-id-1", "--remove-override", "--force"}
+			_, err := execDeploymentCmd(cmdArgs...)
+			assert.NoError(t, err)
+			mockPlatformCoreClient.AssertExpectations(t)
+		})
+
+		t.Run(fmt.Sprintf("%s returns an error when getting workspace fails", tt.command), func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			ctx, err := config.GetCurrentContext()
+			assert.NoError(t, err)
+			ctx.Workspace = ""
+			err = ctx.SetContext()
+			assert.NoError(t, err)
+			defer testUtil.InitTestConfig(testUtil.LocalPlatform)
+			expectedOut := "Usage:\n"
+			cmdArgs := []string{tt.command, "-n", "doesnotexist"}
+			resp, err := execDeploymentCmd(cmdArgs...)
+			assert.ErrorContains(t, err, "failed to find a valid workspace")
+			assert.Contains(t, resp, expectedOut)
+		})
+	}
 }
 
 func TestIsValidExecutor(t *testing.T) {
@@ -1605,7 +1791,8 @@ func TestDeploymentTeamUpdate(t *testing.T) {
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
-	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
+
+	t.Run("command asks for input when no team id is passed in as an arg", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1680,7 +1867,8 @@ func TestDeploymentTeamAdd(t *testing.T) {
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
-	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
+
+	t.Run("command asks for input when no team id is passed in as an arg", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)

@@ -185,6 +185,12 @@ const (
 	DeploymentTypeSTANDARD  DeploymentType = "STANDARD"
 )
 
+// Defines values for DeploymentHibernationStatusNextEventType.
+const (
+	HIBERNATE DeploymentHibernationStatusNextEventType = "HIBERNATE"
+	WAKE      DeploymentHibernationStatusNextEventType = "WAKE"
+)
+
 // Defines values for ManagedDomainStatus.
 const (
 	PENDING  ManagedDomainStatus = "PENDING"
@@ -706,6 +712,9 @@ type CreateDedicatedDeploymentRequest struct {
 	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
 
+	// IsDevelopmentMode If true, deployment will be able to use development-only features, such as hibernation, but will not have guaranteed uptime SLAs
+	IsDevelopmentMode *bool `json:"isDevelopmentMode,omitempty"`
+
 	// IsHighAvailability Whether the Deployment is configured for high availability. If `true`, multiple scheduler pods will be online.
 	IsHighAvailability bool `json:"isHighAvailability"`
 
@@ -716,7 +725,8 @@ type CreateDedicatedDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize The size of the scheduler pod.
 	SchedulerSize CreateDedicatedDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -726,6 +736,9 @@ type CreateDedicatedDeploymentRequest struct {
 
 	// WorkerQueues The list of worker queues configured for the Deployment. Applies only when `Executor` is `CELERY`. At least 1 worker queue is needed. All Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]WorkerQueueRequest `json:"workerQueues,omitempty"`
+
+	// WorkloadIdentity The Deployment's workload identity.
+	WorkloadIdentity *string `json:"workloadIdentity,omitempty"`
 
 	// WorkspaceId The ID of the workspace to which the Deployment belongs.
 	WorkspaceId string `json:"workspaceId"`
@@ -832,6 +845,9 @@ type CreateHybridDeploymentRequest struct {
 	// WorkerQueues The list of worker queues configured for the Deployment. Applies only when `Executor` is `CELERY`. At least 1 worker queue is needed. All Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]HybridWorkerQueueRequest `json:"workerQueues,omitempty"`
 
+	// WorkloadIdentity The Deployment's workload identity.
+	WorkloadIdentity *string `json:"workloadIdentity,omitempty"`
+
 	// WorkspaceId The ID of the workspace to which the Deployment belongs.
 	WorkspaceId string `json:"workspaceId"`
 }
@@ -892,6 +908,9 @@ type CreateStandardDeploymentRequest struct {
 	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
 
+	// IsDevelopmentMode If true, deployment will be able to use development-only features, such as hibernation, but will not have guaranteed uptime SLAs
+	IsDevelopmentMode *bool `json:"isDevelopmentMode,omitempty"`
+
 	// IsHighAvailability Whether the Deployment is configured for high availability. If `true`, multiple scheduler pods will be online.
 	IsHighAvailability bool `json:"isHighAvailability"`
 
@@ -905,7 +924,8 @@ type CreateStandardDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize The size of the scheduler pod.
 	SchedulerSize CreateStandardDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -915,6 +935,9 @@ type CreateStandardDeploymentRequest struct {
 
 	// WorkerQueues The list of worker queues configured for the Deployment. Applies only when `Executor` is `CELERY`. At least 1 worker queue is needed. All Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]WorkerQueueRequest `json:"workerQueues,omitempty"`
+
+	// WorkloadIdentity The Deployment's workload identity.
+	WorkloadIdentity *string `json:"workloadIdentity,omitempty"`
 
 	// WorkspaceId The ID of the workspace to which the Deployment belongs.
 	WorkspaceId string `json:"workspaceId"`
@@ -1010,6 +1033,9 @@ type Deployment struct {
 	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
 
+	// IsDevelopmentMode If true, deployment will be able to use development-only features, such as hibernation, but will not have guaranteed uptime SLAs
+	IsDevelopmentMode *bool `json:"isDevelopmentMode,omitempty"`
+
 	// IsHighAvailability Whether the Deployment has high availability (HA) enabled. If `true`, multiple scheduler Pods will run at once.
 	IsHighAvailability *bool `json:"isHighAvailability,omitempty"`
 
@@ -1035,7 +1061,9 @@ type Deployment struct {
 	ResourceQuotaMemory *string `json:"resourceQuotaMemory,omitempty"`
 
 	// RuntimeVersion Deprecated: runtimeVersion has been replaced with astroRuntimeVersion
-	RuntimeVersion string `json:"runtimeVersion"`
+	RuntimeVersion string                   `json:"runtimeVersion"`
+	ScalingSpec    *DeploymentScalingSpec   `json:"scalingSpec,omitempty"`
+	ScalingStatus  *DeploymentScalingStatus `json:"scalingStatus,omitempty"`
 
 	// SchedulerAu The number of Astronomer units (AU) for the Deployment's scheduler. Applies only to Deployments hosted on Hybrid clusters.
 	SchedulerAu *int `json:"schedulerAu,omitempty"`
@@ -1138,6 +1166,76 @@ type DeploymentEnvironmentVariableRequest struct {
 	Value *string `json:"value,omitempty"`
 }
 
+// DeploymentHibernationOverride defines model for DeploymentHibernationOverride.
+type DeploymentHibernationOverride struct {
+	// IsActive Whether the override is currently active or not
+	IsActive bool `json:"isActive"`
+
+	// IsHibernating Whether to go into hibernation or not via the override rule
+	IsHibernating bool `json:"isHibernating"`
+
+	// OverrideUntil Timestamp till the override on the hibernation schedule is in effect
+	OverrideUntil *time.Time `json:"overrideUntil,omitempty"`
+}
+
+// DeploymentHibernationOverrideRequest defines model for DeploymentHibernationOverrideRequest.
+type DeploymentHibernationOverrideRequest struct {
+	// IsHibernating Whether to go into hibernation or not via the override rule
+	IsHibernating bool `json:"isHibernating"`
+
+	// OverrideUntil Timestamp till the override on the hibernation schedule is in effect
+	OverrideUntil *string `json:"overrideUntil,omitempty"`
+}
+
+// DeploymentHibernationSchedule defines model for DeploymentHibernationSchedule.
+type DeploymentHibernationSchedule struct {
+	// Description A brief description of the schedule
+	Description *string `json:"description,omitempty"`
+
+	// HibernateAtCron A 5-part cron expression defining the times at which the deployment should hibernate
+	HibernateAtCron string `json:"hibernateAtCron"`
+
+	// IsEnabled Toggle this schedule on or off. If set to false, this schedule will have no effect on hibernation.
+	IsEnabled bool `json:"isEnabled"`
+
+	// WakeAtCron A 5-part cron expression definingh the times at which the deployment should wake from hibernation
+	WakeAtCron string `json:"wakeAtCron"`
+}
+
+// DeploymentHibernationSpec defines model for DeploymentHibernationSpec.
+type DeploymentHibernationSpec struct {
+	Override *DeploymentHibernationOverride `json:"override,omitempty"`
+
+	// Schedules The list of schedules for deployment hibernation
+	Schedules *[]DeploymentHibernationSchedule `json:"schedules,omitempty"`
+}
+
+// DeploymentHibernationSpecRequest defines model for DeploymentHibernationSpecRequest.
+type DeploymentHibernationSpecRequest struct {
+	Override *DeploymentHibernationOverrideRequest `json:"override,omitempty"`
+
+	// Schedules The list of schedules for deployment hibernation
+	Schedules *[]DeploymentHibernationSchedule `json:"schedules,omitempty"`
+}
+
+// DeploymentHibernationStatus defines model for DeploymentHibernationStatus.
+type DeploymentHibernationStatus struct {
+	// IsHibernating If the deployment is currently in hibernating state or not
+	IsHibernating bool `json:"isHibernating"`
+
+	// NextEventAt Timestamp of the next scheduled hibernation event for the deployment
+	NextEventAt *string `json:"nextEventAt,omitempty"`
+
+	// NextEventType The type of the next scheduled event for the deployment. Either HIBERNATE or WAKE
+	NextEventType *DeploymentHibernationStatusNextEventType `json:"nextEventType,omitempty"`
+
+	// Reason Reason for the current hibernation state of the deployment
+	Reason *string `json:"reason,omitempty"`
+}
+
+// DeploymentHibernationStatusNextEventType The type of the next scheduled event for the deployment. Either HIBERNATE or WAKE
+type DeploymentHibernationStatusNextEventType string
+
 // DeploymentInstanceSpecRequest defines model for DeploymentInstanceSpecRequest.
 type DeploymentInstanceSpecRequest struct {
 	// Au The number of Astro unit allocated to the Deployment pod. Minimum `5`, Maximum `24`.
@@ -1165,6 +1263,21 @@ type DeploymentOptions struct {
 
 	// WorkloadIdentityOptions The available workload identity options.
 	WorkloadIdentityOptions *[]WorkloadIdentityOption `json:"workloadIdentityOptions,omitempty"`
+}
+
+// DeploymentScalingSpec defines model for DeploymentScalingSpec.
+type DeploymentScalingSpec struct {
+	HibernationSpec *DeploymentHibernationSpec `json:"hibernationSpec,omitempty"`
+}
+
+// DeploymentScalingSpecRequest defines model for DeploymentScalingSpecRequest.
+type DeploymentScalingSpecRequest struct {
+	HibernationSpec *DeploymentHibernationSpecRequest `json:"hibernationSpec,omitempty"`
+}
+
+// DeploymentScalingStatus defines model for DeploymentScalingStatus.
+type DeploymentScalingStatus struct {
+	HibernationStatus *DeploymentHibernationStatus `json:"hibernationStatus,omitempty"`
 }
 
 // DeploymentsPaginated defines model for DeploymentsPaginated.
@@ -1359,6 +1472,15 @@ type OrganizationsPaginated struct {
 	TotalCount int `json:"totalCount"`
 }
 
+// OverrideDeploymentHibernationBody defines model for OverrideDeploymentHibernationBody.
+type OverrideDeploymentHibernationBody struct {
+	// IsHibernating The type of override to perform. Set this value to 'true' to have the Deployment hibernate regardless of its hibernation schedule. Set the value to 'false' to have the Deployment wake up regardless of its hibernation schedule. Use 'OverrideUntil' to define the length of the override.
+	IsHibernating bool `json:"isHibernating"`
+
+	// OverrideUntil The end of the override time in UTC, formatted as 'YYYY-MM-DDTHH:MM:SSZ'. If this value isn't specified, the override persists until you end it through the Cloud UI or another API call.
+	OverrideUntil *time.Time `json:"overrideUntil,omitempty"`
+}
+
 // ProviderInstanceType defines model for ProviderInstanceType.
 type ProviderInstanceType struct {
 	// Cpu The number of CPUs. Units are in number of CPU cores.
@@ -1515,7 +1637,8 @@ type UpdateDedicatedDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize The size of the scheduler pod.
 	SchedulerSize UpdateDedicatedDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -1671,7 +1794,8 @@ type UpdateStandardDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize The size of the scheduler pod.
 	SchedulerSize UpdateStandardDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -1988,6 +2112,9 @@ type CreateDeploymentJSONRequestBody = CreateDeploymentRequest
 
 // UpdateDeploymentJSONRequestBody defines body for UpdateDeployment for application/json ContentType.
 type UpdateDeploymentJSONRequestBody = UpdateDeploymentRequest
+
+// UpdateDeploymentHibernationOverrideJSONRequestBody defines body for UpdateDeploymentHibernationOverride for application/json ContentType.
+type UpdateDeploymentHibernationOverrideJSONRequestBody = OverrideDeploymentHibernationBody
 
 // CreateWorkspaceJSONRequestBody defines body for CreateWorkspace for application/json ContentType.
 type CreateWorkspaceJSONRequestBody = CreateWorkspaceRequest
@@ -2449,6 +2576,14 @@ type ClientInterface interface {
 
 	UpdateDeployment(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteDeploymentHibernationOverride request
+	DeleteDeploymentHibernationOverride(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateDeploymentHibernationOverride request with any body
+	UpdateDeploymentHibernationOverrideWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateDeploymentHibernationOverride(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentHibernationOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListWorkspaces request
 	ListWorkspaces(ctx context.Context, organizationId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -2699,6 +2834,42 @@ func (c *Client) UpdateDeploymentWithBody(ctx context.Context, organizationId st
 
 func (c *Client) UpdateDeployment(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateDeploymentRequest(c.Server, organizationId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteDeploymentHibernationOverride(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteDeploymentHibernationOverrideRequest(c.Server, organizationId, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeploymentHibernationOverrideWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeploymentHibernationOverrideRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeploymentHibernationOverride(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentHibernationOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeploymentHibernationOverrideRequest(c.Server, organizationId, deploymentId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3759,6 +3930,101 @@ func NewUpdateDeploymentRequestWithBody(server string, organizationId string, de
 	return req, nil
 }
 
+// NewDeleteDeploymentHibernationOverrideRequest generates requests for DeleteDeploymentHibernationOverride
+func NewDeleteDeploymentHibernationOverrideRequest(server string, organizationId string, deploymentId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/hibernation-override", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateDeploymentHibernationOverrideRequest calls the generic UpdateDeploymentHibernationOverride builder with application/json body
+func NewUpdateDeploymentHibernationOverrideRequest(server string, organizationId string, deploymentId string, body UpdateDeploymentHibernationOverrideJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateDeploymentHibernationOverrideRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
+}
+
+// NewUpdateDeploymentHibernationOverrideRequestWithBody generates requests for UpdateDeploymentHibernationOverride with any type of body
+func NewUpdateDeploymentHibernationOverrideRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/hibernation-override", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListWorkspacesRequest generates requests for ListWorkspaces
 func NewListWorkspacesRequest(server string, organizationId string, params *ListWorkspacesParams) (*http.Request, error) {
 	var err error
@@ -4141,6 +4407,14 @@ type ClientWithResponsesInterface interface {
 	UpdateDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error)
 
 	UpdateDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error)
+
+	// DeleteDeploymentHibernationOverride request
+	DeleteDeploymentHibernationOverrideWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentHibernationOverrideResponse, error)
+
+	// UpdateDeploymentHibernationOverride request with any body
+	UpdateDeploymentHibernationOverrideWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentHibernationOverrideResponse, error)
+
+	UpdateDeploymentHibernationOverrideWithResponse(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentHibernationOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentHibernationOverrideResponse, error)
 
 	// ListWorkspaces request
 	ListWorkspacesWithResponse(ctx context.Context, organizationId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*ListWorkspacesResponse, error)
@@ -4562,6 +4836,53 @@ func (r UpdateDeploymentResponse) StatusCode() int {
 	return 0
 }
 
+type DeleteDeploymentHibernationOverrideResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON4XX      *Error
+	JSON5XX      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteDeploymentHibernationOverrideResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteDeploymentHibernationOverrideResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateDeploymentHibernationOverrideResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentHibernationOverride
+	JSON4XX      *Error
+	JSON5XX      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateDeploymentHibernationOverrideResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateDeploymentHibernationOverrideResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListWorkspacesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4868,6 +5189,32 @@ func (c *ClientWithResponses) UpdateDeploymentWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseUpdateDeploymentResponse(rsp)
+}
+
+// DeleteDeploymentHibernationOverrideWithResponse request returning *DeleteDeploymentHibernationOverrideResponse
+func (c *ClientWithResponses) DeleteDeploymentHibernationOverrideWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentHibernationOverrideResponse, error) {
+	rsp, err := c.DeleteDeploymentHibernationOverride(ctx, organizationId, deploymentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteDeploymentHibernationOverrideResponse(rsp)
+}
+
+// UpdateDeploymentHibernationOverrideWithBodyWithResponse request with arbitrary body returning *UpdateDeploymentHibernationOverrideResponse
+func (c *ClientWithResponses) UpdateDeploymentHibernationOverrideWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentHibernationOverrideResponse, error) {
+	rsp, err := c.UpdateDeploymentHibernationOverrideWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeploymentHibernationOverrideResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateDeploymentHibernationOverrideWithResponse(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentHibernationOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentHibernationOverrideResponse, error) {
+	rsp, err := c.UpdateDeploymentHibernationOverride(ctx, organizationId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeploymentHibernationOverrideResponse(rsp)
 }
 
 // ListWorkspacesWithResponse request returning *ListWorkspacesResponse
@@ -5805,6 +6152,79 @@ func ParseUpdateDeploymentResponse(rsp *http.Response) (*UpdateDeploymentRespons
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteDeploymentHibernationOverrideResponse parses an HTTP response from a DeleteDeploymentHibernationOverrideWithResponse call
+func ParseDeleteDeploymentHibernationOverrideResponse(rsp *http.Response) (*DeleteDeploymentHibernationOverrideResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteDeploymentHibernationOverrideResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 5:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON5XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateDeploymentHibernationOverrideResponse parses an HTTP response from a UpdateDeploymentHibernationOverrideWithResponse call
+func ParseUpdateDeploymentHibernationOverrideResponse(rsp *http.Response) (*UpdateDeploymentHibernationOverrideResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateDeploymentHibernationOverrideResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentHibernationOverride
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 5:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON5XX = &dest
 
 	}
 

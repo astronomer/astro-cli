@@ -8,14 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/astronomer/astro-cli/pkg/printutil"
-
-	"github.com/spf13/cobra"
-
 	"github.com/astronomer/astro-cli/cloud/organization"
+	roleClient "github.com/astronomer/astro-cli/cloud/role"
 	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -38,6 +37,7 @@ var (
 	updateOrganizationRole             string
 	teamOrgRole                        string
 	validOrganizationRoles             []string
+	shouldIncludeDefaultRoles          bool
 )
 
 const (
@@ -63,6 +63,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 		newOrganizationTeamRootCmd(out),
 		newOrganizationAuditLogs(out),
 		newOrganizationTokenRootCmd(out),
+		newOrganizationRoleRootCmd(out),
 	)
 	return cmd
 }
@@ -665,4 +666,38 @@ func selectOrganizationRole() (string, error) {
 		return "", errInvalidOrganizationRoleKey
 	}
 	return selected, nil
+}
+
+func newOrganizationRoleRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "role",
+		Aliases: []string{"ro", "roles"},
+		Short:   "Manage roles in your Astro Organization",
+		Long:    "Manage roles in your Astro Organization.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newOrganizationRoleListCmd(out),
+	)
+	return cmd
+}
+
+func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the roles in your Astro Organization",
+		Long:    "List all the roles in your Astro Organization",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listRoles(cmd, out)
+		},
+	}
+	cmd.Flags().BoolVarP(&shouldIncludeDefaultRoles, "include-default-roles", "i", false, "Should include default roles in response")
+
+	return cmd
+}
+
+func listRoles(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return roleClient.ListOrgRoles(out, astroCoreClient, shouldIncludeDefaultRoles)
 }

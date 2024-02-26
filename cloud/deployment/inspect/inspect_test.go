@@ -139,13 +139,23 @@ var (
 		},
 		JSON200: &cluster,
 	}
-	defaultTaskPodCPU    = "defaultTaskPodCPU"
-	defaultTaskPodMemory = "defaultTaskPodMemory"
-	resourceQuotaCPU     = "resourceQuotaCPU"
-	resourceQuotaMemory  = "ResourceQuotaMemory"
-	cloudProvider        = "cloud-provider"
-	schedulerTestSize    = astroplatformcore.DeploymentSchedulerSizeSMALL
-	sourceDeployment     = astroplatformcore.Deployment{
+	defaultTaskPodCPU      = "defaultTaskPodCPU"
+	defaultTaskPodMemory   = "defaultTaskPodMemory"
+	resourceQuotaCPU       = "resourceQuotaCPU"
+	resourceQuotaMemory    = "ResourceQuotaMemory"
+	cloudProvider          = "cloud-provider"
+	schedulerTestSize      = astroplatformcore.DeploymentSchedulerSizeSMALL
+	hibernationDescription = "hibernation schedule 1"
+	hibernationSchedules   = []astroplatformcore.DeploymentHibernationSchedule{
+		{
+			HibernateAtCron: "1 * * * *",
+			WakeAtCron:      "2 * * * *",
+			Description:     &hibernationDescription,
+			IsEnabled:       true,
+		},
+	}
+	isDevelopmentMode = true
+	sourceDeployment  = astroplatformcore.Deployment{
 		Id:                     deploymentID,
 		Name:                   "test-deployment-label",
 		Description:            &description,
@@ -174,6 +184,12 @@ var (
 		ResourceQuotaMemory:    &resourceQuotaMemory,
 		SchedulerSize:          &schedulerTestSize,
 		CloudProvider:          &cloudProvider,
+		IsDevelopmentMode:      &isDevelopmentMode,
+		ScalingSpec: &astroplatformcore.DeploymentScalingSpec{
+			HibernationSpec: &astroplatformcore.DeploymentHibernationSpec{
+				Schedules: &hibernationSchedules,
+			},
+		},
 	}
 
 	getDeploymentResponse = astroplatformcore.GetDeploymentResponse{
@@ -433,29 +449,34 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 func TestGetDeploymentConfig(t *testing.T) {
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
 		sourceDeployment.Type = &hybridType
+		sourceDeployment.WorkloadIdentity = &workloadIdentity
 		cloudProvider := "aws"
 		sourceDeployment.CloudProvider = &cloudProvider
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedDeploymentConfig := deploymentConfig{
-			Name:             sourceDeployment.Name,
-			Description:      *sourceDeployment.Description,
-			WorkspaceName:    *sourceDeployment.WorkspaceName,
-			ClusterName:      *sourceDeployment.ClusterName,
-			RunTimeVersion:   sourceDeployment.RuntimeVersion,
-			SchedulerAU:      *sourceDeployment.SchedulerAu,
-			SchedulerCount:   sourceDeployment.SchedulerReplicas,
-			DagDeployEnabled: &sourceDeployment.IsDagDeployEnabled,
-			Executor:         string(*sourceDeployment.Executor),
-			Region:           *sourceDeployment.Region,
-			DeploymentType:   string(*sourceDeployment.Type),
-			CloudProvider:    *sourceDeployment.CloudProvider,
+			Name:              sourceDeployment.Name,
+			Description:       *sourceDeployment.Description,
+			WorkspaceName:     *sourceDeployment.WorkspaceName,
+			ClusterName:       *sourceDeployment.ClusterName,
+			RunTimeVersion:    sourceDeployment.RuntimeVersion,
+			SchedulerAU:       *sourceDeployment.SchedulerAu,
+			SchedulerCount:    sourceDeployment.SchedulerReplicas,
+			DagDeployEnabled:  &sourceDeployment.IsDagDeployEnabled,
+			Executor:          string(*sourceDeployment.Executor),
+			Region:            *sourceDeployment.Region,
+			DeploymentType:    string(*sourceDeployment.Type),
+			CloudProvider:     *sourceDeployment.CloudProvider,
+			IsDevelopmentMode: *sourceDeployment.IsDevelopmentMode,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
+
+		// clear workload identity
+		sourceDeployment.WorkloadIdentity = nil
 	})
 
 	t.Run("returns deployment config for the requested cloud standard deployment", func(t *testing.T) {
@@ -483,6 +504,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			DefaultTaskPodMemory: *sourceDeployment.DefaultTaskPodMemory,
 			ResourceQuotaCPU:     *sourceDeployment.ResourceQuotaCpu,
 			ResourceQuotaMemory:  *sourceDeployment.ResourceQuotaMemory,
+			IsDevelopmentMode:    *sourceDeployment.IsDevelopmentMode,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
@@ -511,6 +533,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 				"alert_emails":          additional["alert_emails"],
 				"worker_queues":         additional["worker_queues"],
 				"environment_variables": additional["environment_variables"],
+				"hibernation_schedules": additional["hibernation_schedules"],
 			},
 		}
 		actualDeployment := getPrintableDeployment(info, config, additional)
@@ -544,6 +567,7 @@ func TestGetAdditionalNullableFields(t *testing.T) {
 			"alert_emails":          sourceDeployment.ContactEmails,
 			"worker_queues":         qList,
 			"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
+			"hibernation_schedules": getHibernationSchedulesMap(*sourceDeployment.ScalingSpec.HibernationSpec.Schedules),
 		}
 		rawAdditional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		err := decodeToStruct(rawAdditional, &actualAdditional)
@@ -574,6 +598,7 @@ func TestGetAdditionalNullableFields(t *testing.T) {
 			"alert_emails":          sourceDeployment.ContactEmails,
 			"worker_queues":         qList,
 			"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
+			"hibernation_schedules": getHibernationSchedulesMap(*sourceDeployment.ScalingSpec.HibernationSpec.Schedules),
 		}
 		rawAdditional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		err := decodeToStruct(rawAdditional, &actualAdditional)
@@ -708,6 +733,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         dag_deploy_enabled: true
         ci_cd_enforcement: false
         is_high_availability: false
+        is_development_mode: true
         executor: CELERY
         scheduler_au: 5
         scheduler_count: 3
@@ -716,6 +742,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         deployment_type: HYBRID
         cloud_provider: ""
         region: ""
+        workload_identity: ""
     worker_queues:
         - name: default
           max_worker_count: 130
@@ -792,6 +819,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         ci_cd_enforcement: false
         scheduler_size: SMALL
         is_high_availability: false
+        is_development_mode: true
         executor: CELERY
         scheduler_au: 5
         scheduler_count: 3
@@ -803,6 +831,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         default_task_pod_memory: "1"
         resource_quota_cpu: "1"
         resource_quota_memory: "1"
+        workload_identity: ""
     worker_queues:
         - name: default
           max_worker_count: 130
@@ -826,7 +855,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
         updated_at: 2023-02-01T12:00:00Z
         deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
         webserver_url: some-url
-        workload_identity: ""
     alert_emails:
         - email1
         - email2
@@ -980,6 +1008,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "dag_deploy_enabled": true,
             "ci_cd_enforcement": false,
             "is_high_availability": false,
+            "is_development_mode": true,
             "executor": "KUBERNETES",
             "scheduler_au": 5,
             "scheduler_count": 3,
@@ -987,7 +1016,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "workspace_name": "test-ws",
             "deployment_type": "HYBRID",
             "cloud_provider": "",
-            "region": ""
+            "region": "",
+            "workload_identity": ""
         },
         "worker_queues": [],
         "alert_emails": [

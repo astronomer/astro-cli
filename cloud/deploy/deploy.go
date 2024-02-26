@@ -343,7 +343,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		if fileExist {
 			err := removeDagsFromDockerIgnore(fullpath)
 			if err != nil {
-				return errors.New("Found dags entry in .dockerignore file. Remove this entry and try again")
+				return errors.Wrap(err, "Found dags entry in .dockerignore file. Remove this entry and try again")
 			}
 		}
 		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil)
@@ -438,7 +438,7 @@ func getDeploymentInfo(
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, platformCoreClient, coreClient)
+		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, nil, platformCoreClient, coreClient)
 		if err != nil {
 			return deploymentInfo{}, err
 		}

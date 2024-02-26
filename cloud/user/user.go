@@ -533,7 +533,7 @@ func UpdateDeploymentUserRole(email, role, deployment string, out io.Writer, cli
 	mutateUserInput := astrocore.MutateDeploymentUserRoleRequest{
 		Role: role,
 	}
-	fmt.Println("deployment: " + deployment)
+
 	resp, err := client.MutateDeploymentUserRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, userID, mutateUserInput)
 	if err != nil {
 		fmt.Println("error in MutateDeploymentUserRoleWithResponse")
@@ -585,8 +585,8 @@ func GetDeploymentUsers(client astrocore.CoreClient, deployment string, limit in
 		return nil, err
 	}
 
+	includeDeploymentRoles := true
 	for {
-		includeDeploymentRoles := true
 		resp, err := client.ListDeploymentUsersWithResponse(httpContext.Background(), ctx.Organization, deployment, &astrocore.ListDeploymentUsersParams{
 			IncludeDeploymentRoles: &includeDeploymentRoles,
 			Offset:                 &offset,
@@ -626,11 +626,15 @@ func ListDeploymentUsers(out io.Writer, client astrocore.CoreClient, deployment 
 	}
 
 	for i := range users {
+		var deploymentRole string
+		if users[i].DeploymentRole != nil {
+			deploymentRole = *users[i].DeploymentRole
+		}
 		table.AddRow([]string{
 			users[i].FullName,
 			users[i].Username,
 			users[i].Id,
-			*users[i].DeploymentRole,
+			deploymentRole,
 			users[i].CreatedAt.Format(time.RFC3339),
 		}, false)
 	}

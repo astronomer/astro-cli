@@ -34,6 +34,7 @@ var (
 	clusterID              = "test-cluster-id"
 	clusterName            = "test-cluster"
 	highAvailability       = true
+	isDevelopmentMode      = true
 	region                 = "test-region"
 	cloudProvider          = "aws"
 	description            = "description 1"
@@ -43,7 +44,16 @@ var (
 	defaultTaskPodMemory   = "defaultTaskPodMemory"
 	resourceQuotaCPU       = "resourceQuotaCPU"
 	resourceQuotaMemory    = "ResourceQuotaMemory"
-	deploymentResponse     = astroplatformcore.GetDeploymentResponse{
+	hibernationDescription = "hibernation schedule 1"
+	hibernationSchedules   = []astroplatformcore.DeploymentHibernationSchedule{
+		{
+			HibernateAtCron: "1 * * * *",
+			WakeAtCron:      "2 * * * *",
+			Description:     &hibernationDescription,
+			IsEnabled:       true,
+		},
+	}
+	deploymentResponse = astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -61,6 +71,7 @@ var (
 			Executor:             &executorCelery,
 			ClusterName:          &clusterName,
 			IsHighAvailability:   &highAvailability,
+			IsDevelopmentMode:    &isDevelopmentMode,
 			SchedulerAu:          &schedulerAU,
 			DefaultTaskPodCpu:    &defaultTaskPodCPU,
 			DefaultTaskPodMemory: &defaultTaskPodMemory,
@@ -71,6 +82,11 @@ var (
 			IsCicdEnforced:       true,
 			Region:               &region,
 			CloudProvider:        &cloudProvider,
+			ScalingSpec: &astroplatformcore.DeploymentScalingSpec{
+				HibernationSpec: &astroplatformcore.DeploymentHibernationSpec{
+					Schedules: &hibernationSchedules,
+				},
+			},
 		},
 	}
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
@@ -1027,6 +1043,7 @@ deployment:
     deployment_type: DEDICATED
     cloud_provider: gcp
     is_high_availability: true
+    is_development_mode: true
     ci_cd_enforcement: true
   worker_queues:
     - name: default
@@ -1055,6 +1072,11 @@ deployment:
   alert_emails:
     - test1@test.com
     - test2@test.com
+  hibernation_schedules:
+    - hibernate_at: 1 * * * *
+      wake_at: 2 * * * *
+      description: hibernation schedule 1
+      enabled: true
 `
 		canCiCdDeploy = func(astroAPIToken string) bool {
 			return true
@@ -1077,6 +1099,8 @@ deployment:
 		assert.Contains(t, out.String(), "metadata:\n        deployment_id: test-deployment-id")
 		assert.Contains(t, out.String(), "ci_cd_enforcement: true")
 		assert.Contains(t, out.String(), "is_high_availability: true")
+		assert.Contains(t, out.String(), "is_development_mode: true")
+		assert.Contains(t, out.String(), "hibernation_schedules:\n        - hibernate_at: 1 * * * *\n          wake_at: 2 * * * *\n          description: hibernation schedule 1\n          enabled: true\n\n")
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -1203,7 +1227,8 @@ deployment:
             "workspace_name": "test-workspace",
 			"deployment_type": "STANDARD",
 			"region": "test-region",
-			"cloud_provider": "aws"
+			"cloud_provider": "aws",
+			"is_development_mode": true
         },
         "worker_queues": [
             {
@@ -1259,72 +1284,9 @@ deployment:
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
 		assert.Contains(t, out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
+		assert.Contains(t, out.String(), "\"is_development_mode\": true")
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
-	})
-	t.Run("returns an error if workspace does not exist", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		filePath = "./deployment.yaml"
-		data = `
-deployment:
-  environment_variables:
-    - is_secret: false
-      key: foo
-      updated_at: NOW
-      value: bar
-    - is_secret: true
-      key: bar
-      updated_at: NOW+1
-      value: baz
-  configuration:
-    name: test-deployment-label
-    description: description
-    runtime_version: 6.0.0
-    dag_deploy_enabled: true
-    executor: CeleryExecutor
-    scheduler_au: 5
-    scheduler_count: 3
-    cluster_name: test-cluster
-    workspace_name: test-workspace
-    deployment_type: HYBRID
-  worker_queues:
-    - name: default
-      is_default: true
-      max_worker_count: 130
-      min_worker_count: 12
-      worker_concurrency: 180
-      worker_type: test-worker-1
-    - name: test-queue-1
-      is_default: false
-      max_worker_count: 175
-      min_worker_count: 8
-      worker_concurrency: 176
-      worker_type: test-worker-2
-  metadata:
-    deployment_id: test-deployment-id
-    workspace_id: test-ws-id
-    cluster_id: cluster-id
-    release_name: great-release-name
-    airflow_version: 2.4.0
-    status: UNHEALTHY
-    created_at: 2022-11-17T13:25:55.275697-08:00
-    updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
-    webserver_url: some-url
-  alert_emails:
-    - test1@test.com
-    - test2@test.com
-`
-		fileutil.WriteStringToFile(filePath, data)
-		defer afero.NewOsFs().Remove(filePath)
-		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&EmptyListWorkspacesResponseOK, nil).Times(1)
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
-		assert.ErrorIs(t, err, errNotFound)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if listing workspace fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -1802,6 +1764,11 @@ deployment:
   alert_emails:
     - test1@test.com
     - test2@test.com
+  hibernation_schedules:
+    - hibernate_at: 1 * * * *
+      wake_at: 2 * * * *
+      description: hibernation schedule 1
+      enabled: true
 `
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
@@ -1821,6 +1788,7 @@ deployment:
 		assert.Contains(t, out.String(), "configuration:\n        name: test-deployment-label")
 		assert.Contains(t, out.String(), "\n        description: description 1")
 		assert.Contains(t, out.String(), "metadata:\n        deployment_id: test-deployment-id")
+		assert.Contains(t, out.String(), "hibernation_schedules:\n        - hibernate_at: 1 * * * *\n          wake_at: 2 * * * *\n          description: hibernation schedule 1\n          enabled: true\n\n")
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -3204,34 +3172,24 @@ func TestGetClusterFromName(t *testing.T) {
 
 func TestGetWorkspaceIDFromName(t *testing.T) {
 	var (
-		workspaceName, expectedWorkspaceID, actualWorkspaceID, orgID string
-		err                                                          error
+		workspaceName, expectedWorkspaceID, actualWorkspaceID string
+		err                                                   error
 	)
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkspaceID = "test-ws-id"
 	workspaceName = "test-workspace"
-	orgID = "test-org-id"
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	t.Run("returns a workspace id if workspace exists in organization", func(t *testing.T) {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, orgID, mockCoreClient)
+		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, mockCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedWorkspaceID, actualWorkspaceID)
 		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns error from api if listing workspace fails", func(t *testing.T) {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errTest).Once()
-		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, orgID, mockCoreClient)
+		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, mockCoreClient)
 		assert.ErrorIs(t, err, errTest)
-		assert.Equal(t, "", actualWorkspaceID)
-		mockCoreClient.AssertExpectations(t)
-	})
-	t.Run("returns an error if workspace does not exist in organization", func(t *testing.T) {
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&EmptyListWorkspacesResponseOK, nil).Once()
-
-		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, orgID, mockCoreClient)
-		assert.ErrorIs(t, err, errNotFound)
-		assert.ErrorContains(t, err, "workspace_name: test-workspace does not exist in organization: test-org-id")
 		assert.Equal(t, "", actualWorkspaceID)
 		mockCoreClient.AssertExpectations(t)
 	})

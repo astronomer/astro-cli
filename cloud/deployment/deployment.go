@@ -29,14 +29,14 @@ import (
 )
 
 var (
-	errInvalidDeployment      = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
-	ErrInvalidDeploymentKey   = errors.New("invalid Deployment selected")
-	ErrInvalidClusterKey      = errors.New("invalid Cluster selected")
-	ErrInvalidRegionKey       = errors.New("invalid Region selected")
-	errTimedOut               = errors.New("timed out waiting for the deployment to become healthy")
-	ErrWrongEnforceInput      = errors.New("the input to the `--enforce-cicd` flag")
-	ErrNoDeploymentExists     = errors.New("no deployment was found in this workspace")
-	ErrInvalidResourceRequest = errors.New("invaild resource request")
+	errInvalidDeployment         = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
+	ErrInvalidDeploymentKey      = errors.New("invalid Deployment selected")
+	ErrInvalidClusterKey         = errors.New("invalid Cluster selected")
+	ErrInvalidRegionKey          = errors.New("invalid Region selected")
+	ErrTimedOut                  = errors.New("timed out waiting for the Deployment to enter a Healthy state")
+	ErrWrongEnforceInput         = errors.New("the input to the `--enforce-cicd` flag is invalid. Make sure to use either 'enable' or 'disable'")
+	ErrInvalidResourceRequest    = errors.New("invalid resource request")
+	ErrNotADevelopmentDeployment = errors.New("the Deployment specified is not a development Deployment")
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	canCiCdDeploy    = CanCiCdDeploy
@@ -162,7 +162,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, warnLogs, errorLogs,
 	}
 
 	// get deployment
-	deployment, err := GetDeployment(ws, deploymentID, deploymentName, false, platformCoreClient, nil)
+	deployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, warnLogs, errorLogs,
 	return nil
 }
 
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
 
@@ -281,6 +281,12 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		} else {
 			highAvailabilityValue = false
 		}
+		var developmentModeValue bool
+		if developmentMode == enable { //nolint: goconst
+			developmentModeValue = true
+		} else {
+			developmentModeValue = false
+		}
 		var workerConcurrency int
 		for i := range configOption.WorkerMachines {
 			if strings.EqualFold(configOption.DefaultValues.WorkerMachineName, string(configOption.WorkerMachines[i].Name)) {
@@ -335,6 +341,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				Region:               &region,
 				IsDagDeployEnabled:   dagDeployEnabled,
 				IsHighAvailability:   highAvailabilityValue,
+				IsDevelopmentMode:    &developmentModeValue,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.CreateStandardDeploymentRequestTypeSTANDARD,
 				DefaultTaskPodCpu:    defaultTaskPodCpu,
@@ -380,6 +387,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				IsCicdEnforced:       isCicdEnforced,
 				IsDagDeployEnabled:   dagDeployEnabled,
 				IsHighAvailability:   highAvailabilityValue,
+				IsDevelopmentMode:    &developmentModeValue,
 				ClusterId:            clusterID,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.CreateDedicatedDeploymentRequestTypeDEDICATED,
@@ -450,6 +458,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			IsCicdEnforced:      isCicdEnforced,
 			IsDagDeployEnabled:  dagDeployEnabled,
 			ClusterId:           clusterID,
+			WorkloadIdentity:    &workloadIdentity,
 			WorkspaceId:         workspaceID,
 
 			Scheduler: astroplatformcore.DeploymentInstanceSpecRequest{
@@ -688,7 +697,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 		select {
 		// Got a timeout! fail with a timeout error
 		case <-timeout:
-			return errTimedOut
+			return ErrTimedOut
 		// Got a tick, we should check if deployment is healthy
 		case <-ticker.C:
 			buf.Reset()
@@ -707,10 +716,10 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 	}
 }
 
-func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory string, schedulerAU, schedulerReplicas int, wQueueList []astroplatformcore.WorkerQueueRequest, hybridQueueList []astroplatformcore.HybridWorkerQueueRequest, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, force bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error { //nolint
+func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astroplatformcore.WorkerQueueRequest, hybridQueueList []astroplatformcore.HybridWorkerQueueRequest, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, force bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error { //nolint
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, platformCoreClient, coreClient)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
@@ -1018,6 +1027,11 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if schedulerReplicas == 0 {
 			schedulerReplicas = currentDeployment.SchedulerReplicas
 		}
+		if workloadIdentity == "" {
+			if currentDeployment.WorkloadIdentity != nil {
+				workloadIdentity = *currentDeployment.WorkloadIdentity
+			}
+		}
 		// validate au resources requests
 		resourcesValid := validateHybridResources(schedulerAU, schedulerReplicas, configOption)
 		if !resourcesValid {
@@ -1049,6 +1063,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			},
 			Type:                 astroplatformcore.UpdateHybridDeploymentRequestTypeHYBRID,
 			EnvironmentVariables: deploymentEnvironmentVariablesRequest,
+			WorkloadIdentity:     &workloadIdentity,
 		}
 		cluster, err := CoreGetCluster("", *currentDeployment.ClusterId, platformCoreClient)
 		if err != nil {
@@ -1134,7 +1149,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 
 func Delete(deploymentID, ws, deploymentName string, forceDelete bool, platformCoreClient astroplatformcore.CoreClient) error {
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, true, platformCoreClient, nil)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, true, nil, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}
@@ -1165,12 +1180,149 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, platformC
 	return nil
 }
 
+func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string, isHibernating bool, overrideUntil *time.Time, force bool, platformCoreClient astroplatformcore.CoreClient) error {
+	// Set wording based on the hibernation action
+	var action string
+	if isHibernating {
+		action = "hibernate"
+	} else {
+		action = "wake up"
+	}
+
+	// get deployment
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, true, isDevelopmentDeployment, platformCoreClient, nil)
+	if err != nil {
+		return err
+	}
+	if currentDeployment.Id == "" {
+		fmt.Printf("No Deployments found in workspace %s to %s\n", ansi.Bold(ws), action)
+		return nil
+	}
+
+	if currentDeployment.IsDevelopmentMode == nil || !*currentDeployment.IsDevelopmentMode {
+		return ErrNotADevelopmentDeployment
+	}
+
+	// prompt user
+	if !force {
+		i, _ := input.Confirm(
+			fmt.Sprintf("\nAre you sure you want to override to %s for %s Deployment?", ansi.Bold(action), ansi.Bold(currentDeployment.Name)))
+
+		if !i {
+			fmt.Printf("\nCanceling %s override", action)
+			return nil
+		}
+	}
+
+	overrideDeploymentHibernationBody := astroplatformcore.OverrideDeploymentHibernationBody{
+		IsHibernating: isHibernating,
+		OverrideUntil: overrideUntil,
+	}
+
+	deploymentHibernationOverride, err := CoreUpdateDeploymentHibernationOverride(currentDeployment.OrganizationId, currentDeployment.Id, overrideDeploymentHibernationBody, platformCoreClient)
+	if err != nil {
+		return err
+	}
+
+	if deploymentHibernationOverride.OverrideUntil != nil {
+		fmt.Printf("\nSuccessfully overrode to %s until %s\n", ansi.Bold(action), ansi.Bold(deploymentHibernationOverride.OverrideUntil.Format(time.RFC3339)))
+		fmt.Printf("If set, hibernation schedule will resume in %s.\n", ansi.Bold(time.Until(*deploymentHibernationOverride.OverrideUntil).Round(time.Second).String()))
+	} else {
+		fmt.Printf("\nSuccessfully overrode to %s until further notice\n", ansi.Bold(action))
+		fmt.Println("Any configured hibernation schedules will not resume until override is removed.")
+	}
+
+	return nil
+}
+
+func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string, force bool, platformCoreClient astroplatformcore.CoreClient) error {
+	// get deployment
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, true, isDevelopmentDeployment, platformCoreClient, nil)
+	if err != nil {
+		return err
+	}
+	if currentDeployment.Id == "" {
+		fmt.Printf("No Deployments with a hibernation override that can be removed found in Workspace %s\n", ansi.Bold(ws))
+		return nil
+	}
+
+	if currentDeployment.IsDevelopmentMode == nil || !*currentDeployment.IsDevelopmentMode {
+		return ErrNotADevelopmentDeployment
+	}
+
+	// prompt user
+	if !force {
+		i, _ := input.Confirm(
+			fmt.Sprintf("\nAre you sure you want to remove the hibernation override and resume schedule for %s Deployment?", ansi.Bold(currentDeployment.Name)))
+
+		if !i {
+			fmt.Println("Canceling hibernation override removal")
+			return nil
+		}
+	}
+
+	err = CoreDeleteDeploymentHibernationOverride(currentDeployment.OrganizationId, currentDeployment.Id, platformCoreClient)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("\nSuccessfully removed hibernation override")
+	fmt.Println("If set, hibernation schedule will resume immediately.")
+
+	return nil
+}
+
 func IsDeploymentStandard(deploymentType astroplatformcore.DeploymentType) bool {
 	return deploymentType == astroplatformcore.DeploymentTypeSTANDARD
 }
 
 func IsDeploymentDedicated(deploymentType astroplatformcore.DeploymentType) bool {
 	return deploymentType == astroplatformcore.DeploymentTypeDEDICATED
+}
+
+// CoreUpdateDeploymentHibernationOverride updates a deployment hibernation override with the core API
+//
+//nolint:dupl
+var CoreUpdateDeploymentHibernationOverride = func(orgID, deploymentID string, overrideDeploymentHibernationRequest astroplatformcore.OverrideDeploymentHibernationBody, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.DeploymentHibernationOverride, error) {
+	if orgID == "" {
+		c, err := config.GetCurrentContext()
+		if err != nil {
+			return astroplatformcore.DeploymentHibernationOverride{}, err
+		}
+		orgID = c.Organization
+	}
+	resp, err := platformCoreClient.UpdateDeploymentHibernationOverrideWithResponse(context.Background(), orgID, deploymentID, overrideDeploymentHibernationRequest)
+	if err != nil {
+		return astroplatformcore.DeploymentHibernationOverride{}, err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return astroplatformcore.DeploymentHibernationOverride{}, err
+	}
+	deploymentHibernationOverride := *resp.JSON200
+	return deploymentHibernationOverride, nil
+}
+
+// CoreDeleteDeploymentHibernationOverride deletes a deployment hibernation override with the core API
+//
+//nolint:dupl
+var CoreDeleteDeploymentHibernationOverride = func(orgID, deploymentID string, platformCoreClient astroplatformcore.CoreClient) error {
+	if orgID == "" {
+		c, err := config.GetCurrentContext()
+		if err != nil {
+			return err
+		}
+		orgID = c.Organization
+	}
+	resp, err := platformCoreClient.DeleteDeploymentHibernationOverrideWithResponse(context.Background(), orgID, deploymentID)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 var CoreGetDeployments = func(ws, orgID string, platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Deployment, error) {
@@ -1274,6 +1426,8 @@ var CoreCreateDeployment = func(orgID string, createDeploymentRequest astroplatf
 }
 
 // CoreUpdateDeployment updates a deployment with the core API
+//
+//nolint:dupl
 var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequest astroplatformcore.UpdateDeploymentJSONRequestBody, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
@@ -1430,7 +1584,7 @@ var SelectDeployment = func(deployments []astroplatformcore.Deployment, message 
 	return selected, nil
 }
 
-func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) { //nolint:gocognit
+func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bool, selectionFilter func(deployment astroplatformcore.Deployment) bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) { //nolint:gocognit
 	deployments, err := CoreGetDeployments(ws, "", platformCoreClient)
 	if err != nil {
 		return astroplatformcore.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
@@ -1469,7 +1623,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 
 	// select deployment if deploymentID is empty
 	if deploymentID == "" {
-		currentDeployment, err = deploymentSelectionProcess(ws, deployments, platformCoreClient, coreClient)
+		currentDeployment, err = deploymentSelectionProcess(ws, deployments, selectionFilter, platformCoreClient, coreClient)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
@@ -1491,7 +1645,11 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 	return currentDeployment, nil
 }
 
-func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deployment, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) {
+func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deployment, deploymentFilter func(deployment astroplatformcore.Deployment) bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) {
+	// filter deployments
+	if deploymentFilter != nil {
+		deployments = util.Filter(deployments, deploymentFilter)
+	}
 	currentDeployment, err := SelectDeployment(deployments, "Select a Deployment")
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
@@ -1511,7 +1669,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 		} else {
 			coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 		}
-		err = createDeployment("", ws, "", "", runtimeVersion, disable, CeleryExecutor, "", "", "", "", "", cicdEnforcement, "", "", "", coreDeploymentType, 0, 0, platformCoreClient, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, disable, CeleryExecutor, "", "", "", "", "", "", cicdEnforcement, "", "", "", "", coreDeploymentType, 0, 0, platformCoreClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
@@ -1585,4 +1743,8 @@ func GetCoreCloudProvider(cloudProvider string) astrocore.GetDeploymentOptionsPa
 		coreCloudProvider = astrocore.GetDeploymentOptionsParamsCloudProvider("AZURE")
 	}
 	return coreCloudProvider
+}
+
+func isDevelopmentDeployment(deployment astroplatformcore.Deployment) bool { //nolint:gocritic
+	return deployment.IsDevelopmentMode != nil && *deployment.IsDevelopmentMode
 }
