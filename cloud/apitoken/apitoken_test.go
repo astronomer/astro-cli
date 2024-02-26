@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/stretchr/testify/mock"

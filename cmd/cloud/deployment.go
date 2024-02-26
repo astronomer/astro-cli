@@ -2,6 +2,10 @@ package cloud
 
 import (
 	"fmt"
+	"io"
+	"strings"
+	"time"
+
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -15,9 +19,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"io"
-	"strings"
-	"time"
 )
 
 const (
