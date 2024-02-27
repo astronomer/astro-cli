@@ -62,10 +62,9 @@ func TestRootCompletionCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	completionShellMapSha := map[string]string{"bash": "291b774846025599cd10107324f8a776", "fish": "44b594d5d9e4203e1089396732832061", "zsh": "b9baad5816441d010ca622974699274b", "powershell": "8e03321aa8fa1b18756662efd3fca6d5"}
 	for shell, sha := range completionShellMapSha {
-		cmd1 := exec.Command("astro", "completion", shell)
-		output1, _ := cmd1.Output()
+		output1, _ := executeCommand("completion", shell)
 		cmd2 := exec.Command("openssl", "md5")
-		cmd2.Stdin = strings.NewReader(string(output1))
+		cmd2.Stdin = strings.NewReader(output1)
 		output2, _ := cmd2.Output()
 		cmd3 := exec.Command("sed", "s/^.*= //")
 		cmd3.Stdin = strings.NewReader(string(output2))
