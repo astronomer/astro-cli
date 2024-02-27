@@ -155,6 +155,13 @@ const (
 	CreateStandardDeploymentRequestTypeSTANDARD  CreateStandardDeploymentRequestType = "STANDARD"
 )
 
+// Defines values for DeploymentCloudProvider.
+const (
+	DeploymentCloudProviderAWS   DeploymentCloudProvider = "AWS"
+	DeploymentCloudProviderAZURE DeploymentCloudProvider = "AZURE"
+	DeploymentCloudProviderGCP   DeploymentCloudProvider = "GCP"
+)
+
 // Defines values for DeploymentExecutor.
 const (
 	DeploymentExecutorCELERY     DeploymentExecutor = "CELERY"
@@ -397,9 +404,9 @@ const (
 
 // Defines values for GetDeploymentOptionsParamsCloudProvider.
 const (
-	GetDeploymentOptionsParamsCloudProviderAWS   GetDeploymentOptionsParamsCloudProvider = "AWS"
-	GetDeploymentOptionsParamsCloudProviderAZURE GetDeploymentOptionsParamsCloudProvider = "AZURE"
-	GetDeploymentOptionsParamsCloudProviderGCP   GetDeploymentOptionsParamsCloudProvider = "GCP"
+	AWS   GetDeploymentOptionsParamsCloudProvider = "AWS"
+	AZURE GetDeploymentOptionsParamsCloudProvider = "AZURE"
+	GCP   GetDeploymentOptionsParamsCloudProvider = "GCP"
 )
 
 // Defines values for ListDeploymentsParamsSorts.
@@ -694,7 +701,7 @@ type CreateDedicatedDeploymentRequest struct {
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
 
-	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi`. This value must always be twice the value of `DefaultTaskPodCpu`.
+	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `DefaultTaskPodCpu`.
 	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
 
 	// Description The Deployment's description.
@@ -724,7 +731,7 @@ type CreateDedicatedDeploymentRequest struct {
 	// ResourceQuotaCpu The CPU quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current CPU usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in number of CPU cores.
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
-	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
+	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
 	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
 	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
@@ -890,7 +897,7 @@ type CreateStandardDeploymentRequest struct {
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
 
-	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi`. This value must always be twice the value of `DefaultTaskPodCpu`.
+	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `DefaultTaskPodCpu`.
 	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
 
 	// Description The Deployment's description.
@@ -923,7 +930,7 @@ type CreateStandardDeploymentRequest struct {
 	// ResourceQuotaCpu The CPU quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current CPU usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in number of CPU cores.
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
-	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
+	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
 	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
 	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
@@ -976,7 +983,7 @@ type Deployment struct {
 	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
 
 	// CloudProvider The cloud provider of the cluster. Only for Standard Deployment.
-	CloudProvider *string `json:"cloudProvider,omitempty"`
+	CloudProvider *DeploymentCloudProvider `json:"cloudProvider,omitempty"`
 
 	// ClusterId The ID of the cluster where the Deployment is hosted.
 	ClusterId *string `json:"clusterId,omitempty"`
@@ -1127,6 +1134,9 @@ type Deployment struct {
 	WorkspaceName *string `json:"workspaceName,omitempty"`
 }
 
+// DeploymentCloudProvider The cloud provider of the cluster. Only for Standard Deployment.
+type DeploymentCloudProvider string
+
 // DeploymentExecutor The Deployment's executor type.
 type DeploymentExecutor string
 
@@ -1169,10 +1179,10 @@ type DeploymentEnvironmentVariableRequest struct {
 // DeploymentHibernationOverride defines model for DeploymentHibernationOverride.
 type DeploymentHibernationOverride struct {
 	// IsActive Whether the override is currently active or not
-	IsActive bool `json:"isActive"`
+	IsActive *bool `json:"isActive,omitempty"`
 
 	// IsHibernating Whether to go into hibernation or not via the override rule
-	IsHibernating bool `json:"isHibernating"`
+	IsHibernating *bool `json:"isHibernating,omitempty"`
 
 	// OverrideUntil Timestamp till the override on the hibernation schedule is in effect
 	OverrideUntil *time.Time `json:"overrideUntil,omitempty"`
@@ -1181,7 +1191,7 @@ type DeploymentHibernationOverride struct {
 // DeploymentHibernationOverrideRequest defines model for DeploymentHibernationOverrideRequest.
 type DeploymentHibernationOverrideRequest struct {
 	// IsHibernating Whether to go into hibernation or not via the override rule
-	IsHibernating bool `json:"isHibernating"`
+	IsHibernating *bool `json:"isHibernating,omitempty"`
 
 	// OverrideUntil Timestamp till the override on the hibernation schedule is in effect
 	OverrideUntil *string `json:"overrideUntil,omitempty"`
@@ -1609,7 +1619,7 @@ type UpdateDedicatedDeploymentRequest struct {
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
 
-	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi`. This value must always be twice the value of `DefaultTaskPodCpu`.
+	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `DefaultTaskPodCpu`.
 	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
 
 	// Description The Deployment's description.
@@ -1636,7 +1646,7 @@ type UpdateDedicatedDeploymentRequest struct {
 	// ResourceQuotaCpu The CPU quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current CPU usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in number of CPU cores.
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
-	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
+	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
 	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
 	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
@@ -1766,7 +1776,7 @@ type UpdateStandardDeploymentRequest struct {
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
 
-	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi`. This value must always be twice the value of `DefaultTaskPodCpu`.
+	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `DefaultTaskPodCpu`.
 	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
 
 	// Description The Deployment's description.
@@ -1793,7 +1803,7 @@ type UpdateStandardDeploymentRequest struct {
 	// ResourceQuotaCpu The CPU quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current CPU usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in number of CPU cores.
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
-	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
+	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
 	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
 	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 

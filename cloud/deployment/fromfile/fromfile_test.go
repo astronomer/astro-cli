@@ -36,7 +36,7 @@ var (
 	highAvailability       = true
 	isDevelopmentMode      = true
 	region                 = "test-region"
-	cloudProvider          = "aws"
+	cloudProvider          = astroplatformcore.DeploymentCloudProviderAWS
 	description            = "description 1"
 	schedulerAU            = 5
 	schedulerTestSize      = astroplatformcore.DeploymentSchedulerSizeSMALL

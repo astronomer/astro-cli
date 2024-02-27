@@ -72,7 +72,7 @@ var (
 	dedicatedType              = astroplatformcore.DeploymentTypeDEDICATED
 	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
 	testRegion                 = "region"
-	testProvider               = "provider"
+	testProvider               = astroplatformcore.DeploymentCloudProviderGCP
 	testCluster                = "cluster"
 	testWorkloadIdentity       = "test-workload-identity"
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
@@ -862,7 +862,7 @@ func TestCreate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	csID := "test-cluster-id"
 	var (
-		cloudProvider                = "test-provider"
+		cloudProvider                = astroplatformcore.DeploymentCloudProviderAWS
 		mockCreateDeploymentResponse = astroplatformcore.CreateDeploymentResponse{
 			JSON200: &astroplatformcore.Deployment{
 				Id:            "test-id",
@@ -1324,7 +1324,7 @@ func TestCanCiCdDeploy(t *testing.T) {
 
 func TestUpdate(t *testing.T) { //nolint
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	cloudProvider := "test-provider"
+	cloudProvider := astroplatformcore.DeploymentCloudProviderAZURE
 	astroMachine := "test-machine"
 	nodeID := "test-id"
 	varValue := "VALUE"
@@ -1873,13 +1873,14 @@ func TestUpdateDeploymentHibernationOverride(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.command, func(t *testing.T) {
+			isActive := true
 			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
 				HTTPResponse: &http.Response{
 					StatusCode: astrocore.HTTPStatus200,
 				},
 				JSON200: &astroplatformcore.DeploymentHibernationOverride{
-					IsHibernating: tt.IsHibernating,
-					IsActive:      true,
+					IsHibernating: &tt.IsHibernating,
+					IsActive:      &isActive,
 				},
 			}
 
@@ -1897,14 +1898,15 @@ func TestUpdateDeploymentHibernationOverride(t *testing.T) {
 
 		t.Run(fmt.Sprintf("%s with OverrideUntil", tt.command), func(t *testing.T) {
 			overrideUntil := time.Now().Add(time.Hour)
+			isActive := true
 			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
 				HTTPResponse: &http.Response{
 					StatusCode: astrocore.HTTPStatus200,
 				},
 				JSON200: &astroplatformcore.DeploymentHibernationOverride{
-					IsHibernating: tt.IsHibernating,
+					IsHibernating: &tt.IsHibernating,
 					OverrideUntil: &overrideUntil,
-					IsActive:      true,
+					IsActive:      &isActive,
 				},
 			}
 
