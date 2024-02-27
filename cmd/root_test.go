@@ -60,7 +60,7 @@ func TestRootCommandCloudContext(t *testing.T) {
 
 func TestRootCompletionCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	var completionShellMapSha = map[string]string{"bash": "291b774846025599cd10107324f8a776", "fish": "44b594d5d9e4203e1089396732832061", "zsh": "b9baad5816441d010ca622974699274b", "powershell": "8e03321aa8fa1b18756662efd3fca6d5"}
+	completionShellMapSha := map[string]string{"bash": "291b774846025599cd10107324f8a776", "fish": "44b594d5d9e4203e1089396732832061", "zsh": "b9baad5816441d010ca622974699274b", "powershell": "8e03321aa8fa1b18756662efd3fca6d5"}
 	for shell, sha := range completionShellMapSha {
 		cmd1 := exec.Command("astro", "completion", shell)
 		output1, _ := cmd1.Output()
