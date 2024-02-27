@@ -524,7 +524,7 @@ func deploymentToTableRow(table *printutil.Table, d *astroplatformcore.Deploymen
 	clusterName := notApplicable
 	region := notApplicable
 	if d.CloudProvider != nil {
-		cloudProvider = *d.CloudProvider
+		cloudProvider = string(*d.CloudProvider)
 	}
 	if d.Region != nil {
 		region = *d.Region
@@ -1132,7 +1132,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		cloudProvider := notApplicable
 		region := notApplicable
 		if d.CloudProvider != nil {
-			cloudProvider = *d.CloudProvider
+			cloudProvider = string(*d.CloudProvider)
 		}
 		if d.Region != nil {
 			region = *d.Region

@@ -143,7 +143,7 @@ var (
 	defaultTaskPodMemory   = "defaultTaskPodMemory"
 	resourceQuotaCPU       = "resourceQuotaCPU"
 	resourceQuotaMemory    = "ResourceQuotaMemory"
-	cloudProvider          = "cloud-provider"
+	cloudProvider          = astroplatformcore.DeploymentCloudProviderAWS
 	schedulerTestSize      = astroplatformcore.DeploymentSchedulerSizeSMALL
 	hibernationDescription = "hibernation schedule 1"
 	hibernationSchedules   = []astroplatformcore.DeploymentHibernationSchedule{
@@ -405,7 +405,7 @@ func TestInspect(t *testing.T) {
 func TestGetDeploymentInspectInfo(t *testing.T) {
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	description = ""
-	cloudProvider := "gcp"
+	cloudProvider := astroplatformcore.DeploymentCloudProviderGCP
 	sourceDeployment.Description = &description
 	sourceDeployment.CloudProvider = &cloudProvider
 	sourceDeployment.Executor = &executorCelery
@@ -450,7 +450,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
 		sourceDeployment.Type = &hybridType
 		sourceDeployment.WorkloadIdentity = &workloadIdentity
-		cloudProvider := "aws"
+		cloudProvider := astroplatformcore.DeploymentCloudProviderAWS
 		sourceDeployment.CloudProvider = &cloudProvider
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -466,7 +466,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			Executor:          string(*sourceDeployment.Executor),
 			Region:            *sourceDeployment.Region,
 			DeploymentType:    string(*sourceDeployment.Type),
-			CloudProvider:     *sourceDeployment.CloudProvider,
+			CloudProvider:     string(*sourceDeployment.CloudProvider),
 			IsDevelopmentMode: *sourceDeployment.IsDevelopmentMode,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
@@ -483,7 +483,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 		sourceDeployment.Type = &standardType
 		taskPodNodePoolID := "task_node_id"
 		sourceDeployment.TaskPodNodePoolId = &taskPodNodePoolID
-		cloudProvider := "azure"
+		cloudProvider := astroplatformcore.DeploymentCloudProviderAZURE
 		sourceDeployment.CloudProvider = &cloudProvider
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -499,7 +499,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			Executor:             string(*sourceDeployment.Executor),
 			Region:               *sourceDeployment.Region,
 			DeploymentType:       string(*sourceDeployment.Type),
-			CloudProvider:        *sourceDeployment.CloudProvider,
+			CloudProvider:        string(*sourceDeployment.CloudProvider),
 			DefaultTaskPodCPU:    *sourceDeployment.DefaultTaskPodCpu,
 			DefaultTaskPodMemory: *sourceDeployment.DefaultTaskPodMemory,
 			ResourceQuotaCPU:     *sourceDeployment.ResourceQuotaCpu,
@@ -703,7 +703,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		description = "description"
 		sourceDeployment2.Description = &description
 		empty := ""
-		sourceDeployment2.CloudProvider = &empty
+		sourceDeployment2.CloudProvider = nil
 		sourceDeployment2.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
@@ -782,7 +782,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.WebServerUrl = "some-url"
 		sourceDeployment2.UpdatedAt = time.Date(2023, time.February, 1, 12, 0, 0, 0, time.UTC)
 		sourceDeployment2.CreatedAt = time.Date(2023, time.February, 1, 12, 0, 0, 0, time.UTC)
-		provider := "azure"
+		provider := astroplatformcore.DeploymentCloudProviderAZURE
 		sourceDeployment2.CloudProvider = &provider
 		sourceDeployment2.ImageTag = "some-tag"
 		sourceDeployment2.Status = "UNHEALTHY"
@@ -825,7 +825,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         scheduler_count: 3
         workspace_name: test-ws
         deployment_type: STANDARD
-        cloud_provider: azure
+        cloud_provider: AZURE
         region: us-central1
         default_task_pod_cpu: "1"
         default_task_pod_memory: "1"
@@ -872,7 +872,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		description = "description"
 		sourceDeployment2.Description = &description
 		empty := ""
-		sourceDeployment2.CloudProvider = &empty
+		sourceDeployment2.CloudProvider = nil
 		sourceDeployment2.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
@@ -974,7 +974,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment.Executor = &executorKubernetes
 		sourceDeployment.WorkerQueues = nil
 		empty := ""
-		sourceDeployment.CloudProvider = &empty
+		sourceDeployment.CloudProvider = nil
 		sourceDeployment.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment)

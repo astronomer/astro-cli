@@ -2063,6 +2063,39 @@ func (_m *ClientWithResponsesInterface) GetOrganizationWithResponse(ctx context.
 	return r0, r1
 }
 
+// GetSelfUserRepositoryBranchWithResponse provides a mock function with given fields: ctx, gitProvider, gitAccount, gitRepository, gitBranch, reqEditors
+func (_m *ClientWithResponsesInterface) GetSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider astrocore.GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetSelfUserRepositoryBranchResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, gitProvider, gitAccount, gitRepository, gitBranch)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.GetSelfUserRepositoryBranchResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.GetSelfUserRepositoryBranchParamsGitProvider, string, string, string, ...astrocore.RequestEditorFn) (*astrocore.GetSelfUserRepositoryBranchResponse, error)); ok {
+		return rf(ctx, gitProvider, gitAccount, gitRepository, gitBranch, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.GetSelfUserRepositoryBranchParamsGitProvider, string, string, string, ...astrocore.RequestEditorFn) *astrocore.GetSelfUserRepositoryBranchResponse); ok {
+		r0 = rf(ctx, gitProvider, gitAccount, gitRepository, gitBranch, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.GetSelfUserRepositoryBranchResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, astrocore.GetSelfUserRepositoryBranchParamsGitProvider, string, string, string, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, gitProvider, gitAccount, gitRepository, gitBranch, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetSelfUserWithResponse provides a mock function with given fields: ctx, params, reqEditors
 func (_m *ClientWithResponsesInterface) GetSelfUserWithResponse(ctx context.Context, params *astrocore.GetSelfUserParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetSelfUserResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
