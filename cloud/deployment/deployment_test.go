@@ -1934,6 +1934,33 @@ func TestUpdateDeploymentHibernationOverride(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
+	t.Run("returns an error if none of the deployments are in development mode", func(t *testing.T) {
+		mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		var deploymentList []astroplatformcore.Deployment
+		for _, deployment := range mockCoreDeploymentResponse {
+			if deployment.IsDevelopmentMode != nil && *deployment.IsDevelopmentMode == true {
+				continue
+			}
+			deploymentList = append(deploymentList, deployment)
+		}
+		mockDeploymentListResponse := astroplatformcore.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astroplatformcore.DeploymentsPaginated{
+				Deployments: deploymentList,
+			},
+		}
+
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockDeploymentListResponse, nil).Once()
+
+		err := UpdateDeploymentHibernationOverride("", ws, "", true, nil, false, mockPlatformCoreClient)
+		assert.Error(t, err)
+		assert.Equal(t, err.Error(), "No Deployments found in workspace workspace-id")
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
 	t.Run("cancels if requested", func(t *testing.T) {
 		mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
