@@ -37,6 +37,7 @@ var (
 	ErrWrongEnforceInput         = errors.New("the input to the `--enforce-cicd` flag is invalid. Make sure to use either 'enable' or 'disable'")
 	ErrInvalidResourceRequest    = errors.New("invalid resource request")
 	ErrNotADevelopmentDeployment = errors.New("the Deployment specified is not a development Deployment")
+	errNoDeploymentInWSMsg       = "No Deployments found in workspace %s"
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	canCiCdDeploy    = CanCiCdDeploy
@@ -1651,7 +1652,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 		deployments = util.Filter(deployments, deploymentFilter)
 	}
 	if len(deployments) == 0 && disableCreateFlow {
-		return astroplatformcore.Deployment{}, fmt.Errorf("No Deployments found in workspace %s", ws)
+		return astroplatformcore.Deployment{}, fmt.Errorf(errNoDeploymentInWSMsg, ws) //nolint:goerr113
 	}
 	currentDeployment, err := SelectDeployment(deployments, "Select a Deployment")
 	if err != nil {
