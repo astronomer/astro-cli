@@ -1590,11 +1590,6 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 		return astroplatformcore.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
 	}
 
-	// filter deployments
-	if selectionFilter != nil {
-		deployments = util.Filter(deployments, selectionFilter)
-	}
-
 	if len(deployments) == 0 && disableCreateFlow {
 		return astroplatformcore.Deployment{}, nil
 	}
@@ -1625,9 +1620,10 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 	}
 
 	var currentDeployment astroplatformcore.Deployment
+
 	// select deployment if deploymentID is empty
 	if deploymentID == "" {
-		currentDeployment, err = deploymentSelectionProcess(ws, deployments, platformCoreClient, coreClient)
+		currentDeployment, err = deploymentSelectionProcess(ws, deployments, selectionFilter, platformCoreClient, coreClient, disableCreateFlow)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
@@ -1649,7 +1645,14 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 	return currentDeployment, nil
 }
 
-func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deployment, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) {
+func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deployment, deploymentFilter func(deployment astroplatformcore.Deployment) bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, disableCreateFlow bool) (astroplatformcore.Deployment, error) {
+	// filter deployments
+	if deploymentFilter != nil {
+		deployments = util.Filter(deployments, deploymentFilter)
+	}
+	if len(deployments) == 0 && disableCreateFlow {
+		return astroplatformcore.Deployment{}, fmt.Errorf("No Deployments found in workspace %s", ws)
+	}
 	currentDeployment, err := SelectDeployment(deployments, "Select a Deployment")
 	if err != nil {
 		return astroplatformcore.Deployment{}, err
