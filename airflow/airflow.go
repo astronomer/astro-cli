@@ -13,13 +13,10 @@ import (
 var perm os.FileMode = 0o777
 
 var (
-	//go:embed include/advancedexampledag.py
-	ExampleDagAdvanced string
-
 	//go:embed include/astronomermonitoringdag.py
 	MonitoringDag string
 
-	//go:embed include/basicexampledag.py
+	//go:embed include/exampledag.py
 	ExampleDagBasic string
 
 	//go:embed include/composeyml.yml
