@@ -1214,7 +1214,7 @@ func TestCreate(t *testing.T) {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		err := Create("test-name", "wrong-workspace", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
-		assert.ErrorContains(t, err, "no workspaces with id")
+		assert.ErrorContains(t, err, "no Workspace with id")
 		mockCoreClient.AssertExpectations(t)
 	})
 }
