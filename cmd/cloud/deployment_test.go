@@ -2131,12 +2131,12 @@ func TestDeploymentApiTokenCreate(t *testing.T) {
 	})
 }
 
-func TestDeploymentApiTokenRemove(t *testing.T) {
-	expectedHelp := "Remove a apiToken from an Astro Deployment"
+func TestDeploymentApiTokenDelete(t *testing.T) {
+	expectedHelp := "Delete a apiToken from an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints remove help", func(t *testing.T) {
-		cmdArgs := []string{"api-token", "remove", "-h"}
+	t.Run("-h prints delete help", func(t *testing.T) {
+		cmdArgs := []string{"api-token", "delete", "-h"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedHelp)
@@ -2144,37 +2144,37 @@ func TestDeploymentApiTokenRemove(t *testing.T) {
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
-		cmdArgs := []string{"api-token", "remove", apiToken1.Id}
+		cmdArgs := []string{"api-token", "delete", apiToken1.Id}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.EqualError(t, err, "flag --deployment-id is required")
 	})
-	t.Run("valid id removes apiToken", func(t *testing.T) {
-		expectedOut := fmt.Sprintf("Astro ApiToken %s was successfully removed from deployment %s\n", apiToken1.Id, mockDeploymentID)
+	t.Run("valid id deletes apiToken", func(t *testing.T) {
+		expectedOut := fmt.Sprintf("Astro ApiToken %s was successfully deleted from deployment %s\n", apiToken1.Id, mockDeploymentID)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
 		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"api-token", "remove", apiToken1.Id, "--deployment-id", mockDeploymentID}
+		cmdArgs := []string{"api-token", "delete", apiToken1.Id, "--deployment-id", mockDeploymentID}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
 	})
-	t.Run("any errors from api are returned and apiToken is not removed", func(t *testing.T) {
+	t.Run("any errors from api are returned and apiToken is not deleted", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
 		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseError, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"api-token", "remove", apiToken1.Id, "--deployment-id", mockDeploymentID}
+		cmdArgs := []string{"api-token", "delete", apiToken1.Id, "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.EqualError(t, err, "failed to delete api token")
 	})
-	t.Run("any context errors from api are returned and the apiToken is not removed", func(t *testing.T) {
+	t.Run("any context errors from api are returned and the apiToken is not deleted", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil).Twice()
 		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"api-token", "remove", apiToken1.Id, "--deployment-id", mockDeploymentID}
+		cmdArgs := []string{"api-token", "delete", apiToken1.Id, "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
@@ -2195,11 +2195,11 @@ func TestDeploymentApiTokenRemove(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOut := fmt.Sprintf("Astro ApiToken %s was successfully removed from deployment %s\n", deploymentAPITokens[0].Id, mockDeploymentID)
+		expectedOut := fmt.Sprintf("Astro ApiToken %s was successfully deleted from deployment %s\n", deploymentAPITokens[0].Id, mockDeploymentID)
 		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil).Once()
 		astroCoreClient = mockClient
 
-		cmdArgs := []string{"api-token", "remove", "--deployment-id", mockDeploymentID}
+		cmdArgs := []string{"api-token", "delete", "--deployment-id", mockDeploymentID}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)

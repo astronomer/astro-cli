@@ -937,7 +937,7 @@ func newDeploymentAPITokenRootCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newDeploymentAPITokenListCmd(out),
 		newDeploymentAPITokenUpdateCmd(out),
-		newDeploymentAPITokenRemoveCmd(out),
+		newDeploymentAPITokenDeleteCmd(out),
 		newDeploymentAPITokenCreateCmd(out),
 	)
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment where you'd like to manage apiTokens")
@@ -990,14 +990,14 @@ func newDeploymentAPITokenUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newDeploymentAPITokenRemoveCmd(out io.Writer) *cobra.Command {
+func newDeploymentAPITokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove",
-		Aliases: []string{"rm"},
-		Short:   "Remove a apiToken from an Astro Deployment",
-		Long:    "Remove a apiToken from an Astro Deployment",
+		Use:     "delete",
+		Aliases: []string{"d"},
+		Short:   "Delete a apiToken from an Astro Deployment",
+		Long:    "Delete a apiToken from an Astro Deployment",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return removeDeploymentAPIToken(cmd, args, out)
+			return deleteDeploymentAPIToken(cmd, args, out)
 		},
 	}
 	return cmd
@@ -1051,7 +1051,7 @@ func updateDeploymentAPIToken(cmd *cobra.Command, args []string, out io.Writer) 
 	return apitoken.UpdateDeploymentAPITokenRole(apiTokenID, updateDeploymentRole, deploymentID, out, astroCoreClient)
 }
 
-func removeDeploymentAPIToken(cmd *cobra.Command, args []string, out io.Writer) error {
+func deleteDeploymentAPIToken(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errors.New("flag --deployment-id is required")
 	}
@@ -1064,7 +1064,7 @@ func removeDeploymentAPIToken(cmd *cobra.Command, args []string, out io.Writer) 
 	}
 
 	cmd.SilenceUsage = true
-	return apitoken.RemoveDeploymentAPIToken(apiTokenID, deploymentID, out, astroCoreClient)
+	return apitoken.DeleteDeploymentAPIToken(apiTokenID, deploymentID, out, astroCoreClient)
 }
 
 func getOverrideUntil(until, forDuration string) (*time.Time, error) {

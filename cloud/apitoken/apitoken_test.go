@@ -270,14 +270,14 @@ func TestUpdateDeploymentAPITokenRole(t *testing.T) {
 	})
 }
 
-func TestRemoveDeploymentAPIToken(t *testing.T) {
+func TestDeleteDeploymentAPIToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path DeleteDeploymentApiToken", func(t *testing.T) {
-		expectedOutMessage := fmt.Sprintf("Astro ApiToken %s was successfully removed from deployment %s\n", deploymentAPIToken1.Id, deploymentID)
+		expectedOutMessage := fmt.Sprintf("Astro ApiToken %s was successfully deleted from deployment %s\n", deploymentAPIToken1.Id, deploymentID)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil).Once()
-		err := RemoveDeploymentAPIToken(deploymentAPIToken1.Id, deploymentID, out, mockClient)
+		err := DeleteDeploymentAPIToken(deploymentAPIToken1.Id, deploymentID, out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -286,7 +286,7 @@ func TestRemoveDeploymentAPIToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := RemoveDeploymentAPIToken(deploymentAPIToken1.Id, "", out, mockClient)
+		err := DeleteDeploymentAPIToken(deploymentAPIToken1.Id, "", out, mockClient)
 		assert.EqualError(t, err, "network error")
 	})
 
@@ -294,7 +294,7 @@ func TestRemoveDeploymentAPIToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseError, nil).Once()
-		err := RemoveDeploymentAPIToken(deploymentAPIToken1.Id, "", out, mockClient)
+		err := DeleteDeploymentAPIToken(deploymentAPIToken1.Id, "", out, mockClient)
 		assert.EqualError(t, err, "failed to delete apiToken")
 	})
 
@@ -303,7 +303,7 @@ func TestRemoveDeploymentAPIToken(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := RemoveDeploymentAPIToken(deploymentAPIToken1.Id, "", out, mockClient)
+		err := DeleteDeploymentAPIToken(deploymentAPIToken1.Id, "", out, mockClient)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -326,10 +326,10 @@ func TestRemoveDeploymentAPIToken(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOutMessage := fmt.Sprintf("Astro ApiToken %s was successfully removed from deployment %s\n", deploymentAPIToken1.Id, deploymentID)
+		expectedOutMessage := fmt.Sprintf("Astro ApiToken %s was successfully deleted from deployment %s\n", deploymentAPIToken1.Id, deploymentID)
 		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil).Once()
 
-		err = RemoveDeploymentAPIToken("", deploymentID, out, mockClient)
+		err = DeleteDeploymentAPIToken("", deploymentID, out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -341,7 +341,7 @@ func TestRemoveDeploymentAPIToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseError, nil).Twice()
 
-		err := RemoveDeploymentAPIToken("", deploymentID, out, mockClient)
+		err := DeleteDeploymentAPIToken("", deploymentID, out, mockClient)
 		assert.EqualError(t, err, "failed to list deployment apiTokens")
 	})
 }

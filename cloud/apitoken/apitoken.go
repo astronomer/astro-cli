@@ -159,7 +159,7 @@ func SelectDeploymentAPIToken(apiTokens []astrocore.ApiToken) (astrocore.ApiToke
 	return selected, nil
 }
 
-func RemoveDeploymentAPIToken(apiTokenID, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func DeleteDeploymentAPIToken(apiTokenID, deployment string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func RemoveDeploymentAPIToken(apiTokenID, deployment string, out io.Writer, clie
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro ApiToken %s was successfully removed from deployment %s\n", apiTokenID, deployment)
+	fmt.Fprintf(out, "Astro ApiToken %s was successfully deleted from deployment %s\n", apiTokenID, deployment)
 	return nil
 }
 
