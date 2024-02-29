@@ -320,7 +320,6 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		fmt.Println("error in NormalizeAPIError")
 		return err
 	}
 	fmt.Fprintf(out, "The workspace user %s role was successfully updated to %s\n", email, role)
@@ -540,7 +539,6 @@ func UpdateDeploymentUserRole(email, role, deployment string, out io.Writer, cli
 	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		fmt.Println("error in NormalizeAPIError")
 		return err
 	}
 	fmt.Fprintf(out, "The deployment user %s role was successfully updated to %s\n", email, role)

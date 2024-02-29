@@ -81,7 +81,6 @@ func UpdateDeploymentAPITokenRole(apiTokenID, role, deployment string, out io.Wr
 		}
 		err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 		if err != nil {
-			fmt.Println("error in NormalizeAPIError")
 			return err
 		}
 		apiToken = resp.JSON200
@@ -99,7 +98,6 @@ func UpdateDeploymentAPITokenRole(apiTokenID, role, deployment string, out io.Wr
 	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		fmt.Println("error in NormalizeAPIError")
 		return err
 	}
 	fmt.Fprintf(out, "The deployment apiToken %s role was successfully updated to %s\n", apiTokenID, role)
