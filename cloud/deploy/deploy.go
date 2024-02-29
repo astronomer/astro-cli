@@ -44,13 +44,14 @@ const (
 	warningInvaildImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	warningInvalidImageTagMsg  = "WARNING! You are about to push an image using the '%s' runtime tag. This is not supported.\nConsider using one of the following supported tags: %s"
 
-	message            = "DAGs uploaded successfully"
-	action             = "UPLOAD"
-	allTests           = "all-tests"
-	parseAndPytest     = "parse-and-all-tests"
-	enableDagDeployMsg = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys."
-	dagDeployDisabled  = "dag deploy is not enabled for deployment"
-	invalidWorkspaceID = "Invalid workspace id %s was provided through the --workspace-id flag\n"
+	message                  = "DAGs uploaded successfully"
+	action                   = "UPLOAD"
+	allTests                 = "all-tests"
+	parseAndPytest           = "parse-and-all-tests"
+	enableDagDeployMsg       = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys."
+	dagDeployDisabled        = "dag deploy is not enabled for deployment"
+	invalidWorkspaceID       = "Invalid workspace id %s was provided through the --workspace-id flag\n"
+	errCiCdEnforcementUpdate = "cannot deploy since ci/cd enforcement is enabled for the deployment %s. Please use API Tokens or API Keys instead"
 )
 
 var (
@@ -72,7 +73,6 @@ var (
 var (
 	errDagsParseFailed        = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
 	envFileMissing            = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
-	errCiCdEnforcementUpdate  = errors.New("cannot update dag deploy since ci/cd enforcement is enabled for this deployment. Please use API Tokens or API Keys instead")
 	errImageDeployNoPriorDags = errors.New("cannot do image only deploy with no prior DAGs deployed. Please deploy DAGs to your deployment first")
 )
 
@@ -95,6 +95,7 @@ type deploymentInfo struct {
 	desiredDagTarballVersion string
 	dagDeployEnabled         bool
 	cicdEnforcement          bool
+	name                     string
 }
 
 type InputDeploy struct {
@@ -233,7 +234,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	}
 	if deployInfo.cicdEnforcement {
 		if !canCiCdDeploy(c.Token) {
-			return errCiCdEnforcementUpdate
+			return fmt.Errorf(errCiCdEnforcementUpdate, deployInfo.name)
 		}
 	}
 
@@ -465,6 +466,7 @@ func getDeploymentInfo(
 			desiredDagTarballVersion,
 			currentDeployment.IsDagDeployEnabled,
 			currentDeployment.IsCicdEnforced,
+			currentDeployment.Name,
 		}, nil
 	}
 	c, err := config.GetCurrentContext()

@@ -35,6 +35,7 @@ var (
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 		{
 			Id:     deploymentID,
+			Name:   "test-deployment",
 			Status: "HEALTHY",
 			Type:   &hybridType,
 		},
@@ -122,6 +123,7 @@ var (
 			IsDagDeployEnabled: false,
 			IsCicdEnforced:     true,
 			Type:               &hybridType,
+			Name:               "test-deployment",
 		},
 	}
 	deploymentResponseDags = astroplatformcore.GetDeploymentResponse{
@@ -272,7 +274,7 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "1")()
 	err := Deploy(deployInput, mockPlatformCoreClient, nil)
-	assert.ErrorIs(t, err, errCiCdEnforcementUpdate)
+	assert.Contains(t, err.Error(), "cannot deploy since ci/cd enforcement is enabled for the deployment test-deployment. Please use API Tokens or API Keys instead")
 
 	defer os.RemoveAll("./testfiles/dags/")
 
