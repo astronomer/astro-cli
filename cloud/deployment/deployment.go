@@ -37,7 +37,6 @@ var (
 	ErrWrongEnforceInput         = errors.New("the input to the `--enforce-cicd` flag is invalid. Make sure to use either 'enable' or 'disable'")
 	ErrInvalidResourceRequest    = errors.New("invalid resource request")
 	ErrNotADevelopmentDeployment = errors.New("the Deployment specified is not a development Deployment")
-	errNoDeploymentInWSMsg       = "No Deployments found in workspace %s"
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	canCiCdDeploy    = CanCiCdDeploy
@@ -46,24 +45,25 @@ var (
 )
 
 const (
-	noWorkspaceMsg  = "no workspaces with id (%s) found"
-	KubeExecutor    = "KubernetesExecutor"
-	CeleryExecutor  = "CeleryExecutor"
-	KUBERNETES      = "KUBERNETES"
-	CELERY          = "CELERY"
-	notApplicable   = "N/A"
-	gcpCloud        = "gcp"
-	awsCloud        = "aws"
-	azureCloud      = "azure"
-	standard        = "standard"
-	LargeScheduler  = "large"
-	MediumScheduler = "medium"
-	SmallScheduler  = "small"
-	SMALL           = "SMALL"
-	MEDIUM          = "MEDIUM"
-	LARGE           = "LARGE"
-	disable         = "disable"
-	enable          = "enable"
+	NoDeploymentInWSMsg = "No Deployments found in workspace"
+	noWorkspaceMsg      = "no workspaces with id (%s) found"
+	KubeExecutor        = "KubernetesExecutor"
+	CeleryExecutor      = "CeleryExecutor"
+	KUBERNETES          = "KUBERNETES"
+	CELERY              = "CELERY"
+	notApplicable       = "N/A"
+	gcpCloud            = "gcp"
+	awsCloud            = "aws"
+	azureCloud          = "azure"
+	standard            = "standard"
+	LargeScheduler      = "large"
+	MediumScheduler     = "medium"
+	SmallScheduler      = "small"
+	SMALL               = "SMALL"
+	MEDIUM              = "MEDIUM"
+	LARGE               = "LARGE"
+	disable             = "disable"
+	enable              = "enable"
 )
 
 var (
@@ -125,7 +125,7 @@ func List(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcor
 	}
 
 	if len(deployments) == 0 {
-		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(ws))
+		fmt.Printf("%s %s\n", NoDeploymentInWSMsg, ansi.Bold(ws))
 		return nil
 	}
 
@@ -1156,7 +1156,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, platformC
 	}
 
 	if currentDeployment.Id == "" {
-		fmt.Printf("No Deployments found in workspace %s to delete\n", ansi.Bold(ws))
+		fmt.Printf("%s %s to delete\n", NoDeploymentInWSMsg, ansi.Bold(ws))
 		return nil
 	}
 
@@ -1196,7 +1196,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 		return err
 	}
 	if currentDeployment.Id == "" {
-		fmt.Printf("No Deployments found in workspace %s to %s\n", ansi.Bold(ws), action)
+		fmt.Printf("%s %s to %s\n", NoDeploymentInWSMsg, ansi.Bold(ws), action)
 		return nil
 	}
 
@@ -1652,7 +1652,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 		deployments = util.Filter(deployments, deploymentFilter)
 	}
 	if len(deployments) == 0 && disableCreateFlow {
-		return astroplatformcore.Deployment{}, fmt.Errorf(errNoDeploymentInWSMsg, ws) //nolint:goerr113
+		return astroplatformcore.Deployment{}, fmt.Errorf("%s %s", NoDeploymentInWSMsg, ws) //nolint:goerr113
 	}
 	currentDeployment, err := SelectDeployment(deployments, "Select a Deployment")
 	if err != nil {

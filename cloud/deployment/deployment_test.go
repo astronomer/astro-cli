@@ -1957,7 +1957,7 @@ func TestUpdateDeploymentHibernationOverride(t *testing.T) {
 
 		err := UpdateDeploymentHibernationOverride("", ws, "", true, nil, false, mockPlatformCoreClient)
 		assert.Error(t, err)
-		assert.Equal(t, err.Error(), "No Deployments found in workspace workspace-id")
+		assert.Equal(t, err.Error(), fmt.Sprintf("%s %s", NoDeploymentInWSMsg, ws))
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
