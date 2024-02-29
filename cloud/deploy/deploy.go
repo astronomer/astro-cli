@@ -234,7 +234,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	}
 	if deployInfo.cicdEnforcement {
 		if !canCiCdDeploy(c.Token) {
-			return fmt.Errorf(errCiCdEnforcementUpdate, deployInfo.name)
+			return fmt.Errorf(errCiCdEnforcementUpdate, deployInfo.name) //nolint
 		}
 	}
 
