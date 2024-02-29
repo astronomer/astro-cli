@@ -45,7 +45,7 @@ var (
 )
 
 const (
-	NoDeploymentInWSMsg = "No Deployments found in workspace"
+	NoDeploymentInWSMsg = "no Deployments found in workspace"
 	noWorkspaceMsg      = "no workspaces with id (%s) found"
 	KubeExecutor        = "KubernetesExecutor"
 	CeleryExecutor      = "CeleryExecutor"
