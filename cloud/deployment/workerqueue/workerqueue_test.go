@@ -254,6 +254,22 @@ func TestCreate(t *testing.T) {
 		assert.ErrorIs(t, err, deployment.ErrInvalidDeploymentKey)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
+	t.Run("exit early when no deployments in the workspace", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		defer testUtil.MockUserInput(t, "test-invalid-deployment-id")()
+		mockDeploymentListResponse := astroplatformcore.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astroplatformcore.DeploymentsPaginated{
+				Deployments: []astroplatformcore.Deployment{},
+			},
+		}
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockDeploymentListResponse, nil).Times(1)
+		err := CreateOrUpdate("test-ws-id", "", "", "", "", "", 0, 0, 0, false, mockPlatformCoreClient, mockCoreClient, out)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
 	t.Run("returns an error when selecting a node pool fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil).Times(1)

@@ -119,7 +119,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCo
 	}
 
 	if requestedDeployment.Id == "" {
-		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(wsID))
+		fmt.Printf("%s %s\n", deployment.NoDeploymentInWSMsg, ansi.Bold(wsID))
 		return nil
 	}
 	// create a map for deployment.information

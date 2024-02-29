@@ -355,6 +355,14 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
 			}
+			if standardDeploymentRequest.IsDevelopmentMode != nil && *standardDeploymentRequest.IsDevelopmentMode {
+				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
+				standardDeploymentRequest.ScalingSpec = &astroplatformcore.DeploymentScalingSpecRequest{
+					HibernationSpec: &astroplatformcore.DeploymentHibernationSpecRequest{
+						Schedules: &hibernationSchedules,
+					},
+				}
+			}
 			err := createDeploymentRequest.FromCreateStandardDeploymentRequest(standardDeploymentRequest)
 			if err != nil {
 				return err
@@ -397,6 +405,14 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				ResourceQuotaMemory:  deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory,
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
+			}
+			if dedicatedDeploymentRequest.IsDevelopmentMode != nil && *dedicatedDeploymentRequest.IsDevelopmentMode {
+				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
+				dedicatedDeploymentRequest.ScalingSpec = &astroplatformcore.DeploymentScalingSpecRequest{
+					HibernationSpec: &astroplatformcore.DeploymentHibernationSpecRequest{
+						Schedules: &hibernationSchedules,
+					},
+				}
 			}
 			err := createDeploymentRequest.FromCreateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
 			if err != nil {
@@ -489,7 +505,6 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory = *existingDeployment.ResourceQuotaMemory
 			}
 
-			hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
@@ -507,11 +522,14 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
-				ScalingSpec: &astroplatformcore.DeploymentScalingSpecRequest{
+			}
+			if existingDeployment.IsDevelopmentMode != nil && *existingDeployment.IsDevelopmentMode {
+				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
+				standardDeploymentRequest.ScalingSpec = &astroplatformcore.DeploymentScalingSpecRequest{
 					HibernationSpec: &astroplatformcore.DeploymentHibernationSpecRequest{
 						Schedules: &hibernationSchedules,
 					},
-				},
+				}
 			}
 			err := updateDeploymentRequest.FromUpdateStandardDeploymentRequest(standardDeploymentRequest)
 			if err != nil {
@@ -549,7 +567,6 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory = *existingDeployment.ResourceQuotaMemory
 			}
 
-			hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
 			dedicatedDeploymentRequest := astroplatformcore.UpdateDedicatedDeploymentRequest{
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
@@ -567,11 +584,14 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
-				ScalingSpec: &astroplatformcore.DeploymentScalingSpecRequest{
+			}
+			if existingDeployment.IsDevelopmentMode != nil && *existingDeployment.IsDevelopmentMode {
+				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
+				dedicatedDeploymentRequest.ScalingSpec = &astroplatformcore.DeploymentScalingSpecRequest{
 					HibernationSpec: &astroplatformcore.DeploymentHibernationSpecRequest{
 						Schedules: &hibernationSchedules,
 					},
-				},
+				}
 			}
 			err := updateDeploymentRequest.FromUpdateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
 			if err != nil {

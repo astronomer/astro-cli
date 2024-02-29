@@ -45,24 +45,25 @@ var (
 )
 
 const (
-	noWorkspaceMsg  = "no workspaces with id (%s) found"
-	KubeExecutor    = "KubernetesExecutor"
-	CeleryExecutor  = "CeleryExecutor"
-	KUBERNETES      = "KUBERNETES"
-	CELERY          = "CELERY"
-	notApplicable   = "N/A"
-	gcpCloud        = "gcp"
-	awsCloud        = "aws"
-	azureCloud      = "azure"
-	standard        = "standard"
-	LargeScheduler  = "large"
-	MediumScheduler = "medium"
-	SmallScheduler  = "small"
-	SMALL           = "SMALL"
-	MEDIUM          = "MEDIUM"
-	LARGE           = "LARGE"
-	disable         = "disable"
-	enable          = "enable"
+	NoDeploymentInWSMsg = "no Deployments found in workspace"
+	noWorkspaceMsg      = "no Workspace with id (%s) found"
+	KubeExecutor        = "KubernetesExecutor"
+	CeleryExecutor      = "CeleryExecutor"
+	KUBERNETES          = "KUBERNETES"
+	CELERY              = "CELERY"
+	notApplicable       = "N/A"
+	gcpCloud            = "gcp"
+	awsCloud            = "aws"
+	azureCloud          = "azure"
+	standard            = "standard"
+	LargeScheduler      = "large"
+	MediumScheduler     = "medium"
+	SmallScheduler      = "small"
+	SMALL               = "SMALL"
+	MEDIUM              = "MEDIUM"
+	LARGE               = "LARGE"
+	disable             = "disable"
+	enable              = "enable"
 )
 
 var (
@@ -124,7 +125,7 @@ func List(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcor
 	}
 
 	if len(deployments) == 0 {
-		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(ws))
+		fmt.Printf("%s %s\n", NoDeploymentInWSMsg, ansi.Bold(ws))
 		return nil
 	}
 
@@ -1155,7 +1156,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, platformC
 	}
 
 	if currentDeployment.Id == "" {
-		fmt.Printf("No Deployments found in workspace %s to delete\n", ansi.Bold(ws))
+		fmt.Printf("%s %s to delete\n", NoDeploymentInWSMsg, ansi.Bold(ws))
 		return nil
 	}
 
@@ -1195,7 +1196,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 		return err
 	}
 	if currentDeployment.Id == "" {
-		fmt.Printf("No Deployments found in workspace %s to %s\n", ansi.Bold(ws), action)
+		fmt.Printf("%s %s to %s\n", NoDeploymentInWSMsg, ansi.Bold(ws), action)
 		return nil
 	}
 
@@ -1623,7 +1624,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 
 	// select deployment if deploymentID is empty
 	if deploymentID == "" {
-		currentDeployment, err = deploymentSelectionProcess(ws, deployments, selectionFilter, platformCoreClient, coreClient)
+		currentDeployment, err = deploymentSelectionProcess(ws, deployments, selectionFilter, platformCoreClient, coreClient, disableCreateFlow)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
@@ -1645,10 +1646,13 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 	return currentDeployment, nil
 }
 
-func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deployment, deploymentFilter func(deployment astroplatformcore.Deployment) bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) (astroplatformcore.Deployment, error) {
+func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deployment, deploymentFilter func(deployment astroplatformcore.Deployment) bool, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, disableCreateFlow bool) (astroplatformcore.Deployment, error) {
 	// filter deployments
 	if deploymentFilter != nil {
 		deployments = util.Filter(deployments, deploymentFilter)
+	}
+	if len(deployments) == 0 && disableCreateFlow {
+		return astroplatformcore.Deployment{}, fmt.Errorf("%s %s", NoDeploymentInWSMsg, ws) //nolint:goerr113
 	}
 	currentDeployment, err := SelectDeployment(deployments, "Select a Deployment")
 	if err != nil {
