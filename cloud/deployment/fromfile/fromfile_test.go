@@ -12,12 +12,11 @@ import (
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-
-	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
 const (
@@ -1089,9 +1088,23 @@ deployment:
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.CreateDeploymentRequest) bool {
+				request, _ := input.AsCreateDedicatedDeploymentRequest()
+				schedules := *request.ScalingSpec.HibernationSpec.Schedules
+				schedule := schedules[0]
+				return request.Name == "test-deployment-label" && request.IsCicdEnforced && request.IsHighAvailability && *request.IsDevelopmentMode && schedule.IsEnabled && *schedule.Description == "hibernation schedule 1" && schedule.HibernateAtCron == "1 * * * *" && schedule.WakeAtCron == "2 * * * *"
+			},
+		)).Return(&mockCreateDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.UpdateDeploymentRequest) bool {
+				request, _ := input.AsUpdateDedicatedDeploymentRequest()
+				schedules := *request.ScalingSpec.HibernationSpec.Schedules
+				schedule := schedules[0]
+				return request.Name == "test-deployment-label" && request.IsCicdEnforced && request.IsHighAvailability && schedule.IsEnabled && *schedule.Description == "hibernation schedule 1" && schedule.HibernateAtCron == "1 * * * *" && schedule.WakeAtCron == "2 * * * *"
+			},
+		)).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
 		assert.NoError(t, err)
