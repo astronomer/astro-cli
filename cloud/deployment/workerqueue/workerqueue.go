@@ -61,7 +61,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 
 	if requestedDeployment.Id == "" {
-		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(ws))
+		fmt.Printf("%s %s\n", deployment.NoDeploymentInWSMsg, ansi.Bold(ws))
 		return nil
 	}
 
@@ -517,7 +517,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 	}
 
 	if requestedDeployment.Id == "" {
-		fmt.Printf("No Deployments found in workspace %s\n", ansi.Bold(ws))
+		fmt.Printf("%s %s\n", deployment.NoDeploymentInWSMsg, ansi.Bold(ws))
 		return nil
 	}
 

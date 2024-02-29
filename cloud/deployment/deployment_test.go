@@ -1214,7 +1214,7 @@ func TestCreate(t *testing.T) {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		err := Create("test-name", "wrong-workspace", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
-		assert.ErrorContains(t, err, "no workspaces with id")
+		assert.ErrorContains(t, err, "no Workspace with id")
 		mockCoreClient.AssertExpectations(t)
 	})
 }
@@ -1931,6 +1931,33 @@ func TestUpdateDeploymentHibernationOverride(t *testing.T) {
 		err := UpdateDeploymentHibernationOverride("test-id-1", ws, "", true, nil, false, mockPlatformCoreClient)
 		assert.Error(t, err)
 		assert.Equal(t, err, ErrNotADevelopmentDeployment)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("returns an error if none of the deployments are in development mode", func(t *testing.T) {
+		mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		var deploymentList []astroplatformcore.Deployment
+		for _, deployment := range mockCoreDeploymentResponse {
+			if deployment.IsDevelopmentMode != nil && *deployment.IsDevelopmentMode == true {
+				continue
+			}
+			deploymentList = append(deploymentList, deployment)
+		}
+		mockDeploymentListResponse := astroplatformcore.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astroplatformcore.DeploymentsPaginated{
+				Deployments: deploymentList,
+			},
+		}
+
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockDeploymentListResponse, nil).Once()
+
+		err := UpdateDeploymentHibernationOverride("", ws, "", true, nil, false, mockPlatformCoreClient)
+		assert.Error(t, err)
+		assert.Equal(t, err.Error(), fmt.Sprintf("%s %s", NoDeploymentInWSMsg, ws))
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
