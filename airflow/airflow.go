@@ -13,14 +13,11 @@ import (
 var perm os.FileMode = 0o777
 
 var (
-	//go:embed include/advancedexampledag.py
-	ExampleDagAdvanced string
-
 	//go:embed include/astronomermonitoringdag.py
 	MonitoringDag string
 
-	//go:embed include/basicexampledag.py
-	ExampleDagBasic string
+	//go:embed include/exampledag.py
+	ExampleDag string
 
 	//go:embed include/composeyml.yml
 	Composeyml string
@@ -113,8 +110,7 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 		"requirements.txt":                     RequirementsTxt,
 		".env":                                 "",
 		"airflow_settings.yaml":                Settingsyml,
-		"dags/example_dag_basic.py":            ExampleDagBasic,
-		"dags/example_dag_advanced.py":         ExampleDagAdvanced,
+		"dags/exampledag.py":                   ExampleDag,
 		"dags/.airflowignore":                  "",
 		"README.md":                            Readme,
 		"tests/dags/test_dag_example.py":       DagExampleTest,
