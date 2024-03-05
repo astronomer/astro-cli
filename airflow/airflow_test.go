@@ -76,8 +76,7 @@ func TestInit(t *testing.T) {
 		"requirements.txt",
 		".env",
 		"airflow_settings.yaml",
-		"dags/example_dag_basic.py",
-		"dags/example_dag_advanced.py",
+		"dags/exampledag.py",
 		"dags/.airflowignore",
 		"README.md",
 	}

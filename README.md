@@ -167,8 +167,7 @@ If you encounter issues when installing the Astro CLI:
     ```
     .
     ├── dags
-    │   ├── example_dag_advanced.py
-    │   ├── example_dag_basic.py
+    │   ├── exampledag.py
     ├── tests
     │   ├── dags
     │       ├── test_dag_example.py
