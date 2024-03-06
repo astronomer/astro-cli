@@ -1668,12 +1668,15 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 		cicdEnforcement := disable
 		// walk user through creating a deployment
 		var coreDeploymentType astroplatformcore.DeploymentType
+		var dagDeploy string
 		if !organization.IsOrgHosted() {
 			coreDeploymentType = astroplatformcore.DeploymentTypeHYBRID
+			dagDeploy = disable
 		} else {
 			coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
+			dagDeploy = enable
 		}
-		err = createDeployment("", ws, "", "", runtimeVersion, disable, CeleryExecutor, "", "", "", "", "", "", cicdEnforcement, "", "", "", "", coreDeploymentType, 0, 0, platformCoreClient, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "gcp", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, platformCoreClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
