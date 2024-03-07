@@ -10,9 +10,9 @@ var (
 	5. task dependency inconsistencies
 	6. non-static start_date
 	7. retries not set
-	
+
 	Format the reply as a JSON object, with boolean key/value pairs for each of the five issues mentioned above, and further suggestions provided in a "context" object. Finally, a "corrected_dag" object should include a DAG that addresses any issues encountered. Make sure only DAG code is in "corrected_dag" section. Below is an example of the format required. Both "context" and "corrected_dag" must be parseble by a JSON parser. This means in those obejects use "//n" and "//t" for new line and tab:
-	
+
 	{
 	  "health_check_values":
 	  {
@@ -27,9 +27,9 @@ var (
 	  "context": "Here are some potential issues with your DAG:\\n\\nIdempotency issues: Your DAG is not idempotent because the SQL insert query will insert new records every time the DAG is run. If the DAG is rerun for the same execution date, it will duplicate the records in the purchase_order table. A better approach would be to design your SQL query to handle duplicates, for example by using the INSERT ... ON CONFLICT DO NOTHING syntax in PostgreSQL.\\n\\nNon-atomic tasks: Your DAG seems to have a single task that inserts all records into the purchase_order table. If there's a failure partway through, there's no way to rerun just the failed inserts. Consider breaking this up into separate tasks for each insert, or using a single task that can handle partial failures.\n\nRepeated code: The code to generate the SQL queries is repeated for each record in the grocery_list table. This could be simplified by using a single SQL query with a SELECT ... INTO clause to insert the records directly from one table to another.\n\nLack of fields, variables or macros: You're not using any Airflow template fields, variables or macros in your DAG. These could be used to make your DAG more flexible and reusable. For example, you could use a template field for the table name, or a variable for the database connection ID.\n\nTop level code: You're running code to fetch records from the grocery_list table and generate SQL queries at the top level of your DAG file. This code will be run every time the DAG is parsed, which can cause performance issues. It's better to move this code into a function that's called from within a task. This way, the code is only run when the task is executed, not when the DAG is parsed.",
 	  "corrected_dag": "<dag-code>"
 	}
-	
+
 	Here is the DAG to evaluate:
-	
+
 	%s`
 
 	dagReviewPrompt2 = `Review the DAG and identify any potential issues that should be corrected. In particular, flag anything related to the following:
