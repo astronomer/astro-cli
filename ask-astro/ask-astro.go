@@ -1,12 +1,14 @@
 package askastro
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/mitchellh/go-wordwrap"
 	"github.com/pkg/errors"
 )
 
@@ -55,45 +57,43 @@ func DAGReview(dagFilePath string, CICD bool) error {
 	if err != nil {
 		return err
 	}
-
-	// fmt.Printf("%q\n", response)
-
 	// Define a variable to hold the unmarshaled data
-	// var data ResponseData
-	// // Unmarshal the JSON string into the MyData struct
-	// err = json.Unmarshal([]byte(fakeResponse), &data)
-	// if err != nil {
-	// 	return err
-	// }
-	// if err != nil {
-	// 	fmt.Println("Unable to parse reponse from Ask Astro:")
-	// 	fmt.Println("\n" + response)
-	// 	return err
-	// }
+	var data ResponseData
+	// Unmarshal the JSON string into the MyData struct
+	err = json.Unmarshal([]byte(response), &data)
+	if err != nil {
+		return err
+	}
+	if err != nil {
+		fmt.Println("Unable to parse reponse from Ask Astro:")
+		fmt.Println("\n" + response)
+		return err
+	}
 
-	// fmt.Println("Review Results:")
-	// fmt.Println("\tIdempotency: " + passedBool(data.HealthCheckValues.Idempotency))
-	// fmt.Println("\tAtomic Tasks: " + passedBool(data.HealthCheckValues.AtomicTasks))
-	// fmt.Println("\tUnique Code: " + passedBool(data.HealthCheckValues.UniqueCode))
-	// fmt.Println("\tNo Top Level Code: " + passedBool(data.HealthCheckValues.NoTopLevelCode))
-	// fmt.Println("\tTask Dependency Consistency: " + passedBool(data.HealthCheckValues.TaskDependencyConsistency))
-	// fmt.Println("\tStatic Start Date: " + passedBool(data.HealthCheckValues.StaticStartDate))
-	// fmt.Println("\tRetries Set: " + passedBool(data.HealthCheckValues.RetriesSet) + "\n")
+	fmt.Println("Review Results:")
+	fmt.Println("\tIdempotency: " + passedBool(data.HealthCheckValues.Idempotency))
+	fmt.Println("\tAtomic Tasks: " + passedBool(data.HealthCheckValues.AtomicTasks))
+	fmt.Println("\tUnique Code: " + passedBool(data.HealthCheckValues.UniqueCode))
+	fmt.Println("\tNo Top Level Code: " + passedBool(data.HealthCheckValues.NoTopLevelCode))
+	fmt.Println("\tTask Dependency Consistency: " + passedBool(data.HealthCheckValues.TaskDependencyConsistency))
+	fmt.Println("\tStatic Start Date: " + passedBool(data.HealthCheckValues.StaticStartDate))
+	fmt.Println("\tRetries Set: " + passedBool(data.HealthCheckValues.RetriesSet) + "\n")
 
-	// wrappedString := wordwrap.WrapString(data.Context, 80) // 80 is the desired width
+	wrappedString := wordwrap.WrapString(data.Context, 80) // 80 is the desired width
 
-	fmt.Println(response)
-	// testFailed, err := checkReview(data, CICD)
-	// if err != nil {
-	// 	return err
-	// }
+	fmt.Println(wrappedString)
 
-	// if testFailed {
-	// 	err = dagUpdate(data.CorrectedDAG, dagFilePath)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
+	testFailed, err := checkReview(data, CICD)
+	if err != nil {
+		return err
+	}
+
+	if testFailed {
+		err = dagUpdate(data.CorrectedDAG, dagFilePath)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -124,7 +124,7 @@ func checkReview(data ResponseData, CICD bool) (bool, error) {
 func dagUpdate(correctedDAG, dagFilePath string) error {
 	fmt.Printf("\n%s to see a DAG file that contains the suggested changes to your DAG or %s to quit…", ansi.Green("Press Enter"), ansi.Red("^C"))
 	fmt.Scanln()
-	fmt.Println("\n" + fakeResponse2)
+	fmt.Println("\n" + correctedDAG)
 
 	i, _ := input.Confirm(
 		fmt.Sprintf("\nWould you like to apply these changes to the file %s", filepath.Base(dagFilePath)))
