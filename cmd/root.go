@@ -104,6 +104,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
+		newDAGReviewCommand(),
 	)
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
