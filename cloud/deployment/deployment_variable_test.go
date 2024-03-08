@@ -2,6 +2,8 @@ package deployment
 
 import (
 	"bytes"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/context"
 	"net/http"
 	"os"
 	"testing"
@@ -149,8 +151,10 @@ func TestVariableModify(t *testing.T) {
 	})
 
 	t.Run("create deployment and add variable when no deployment exists", func(t *testing.T) {
-		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
-		//mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Once()
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListDeploymentsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
@@ -159,37 +163,140 @@ func TestVariableModify(t *testing.T) {
 				Deployments: []astroplatformcore.Deployment{},
 			},
 		}, nil).Once()
+
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+
+		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
+		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
+			Provider: &provider,
+			Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
+		}
+		mockOKRegionResponse := &astrocore.GetClusterOptionsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &[]astrocore.ClusterOptions{
+				{Regions: []astrocore.ProviderRegion{{Name: region}}},
+			},
+		}
+
+		mockCoreClient.On("GetClusterOptionsWithResponse", mock.Anything, getSharedClusterOptionsParams).Return(mockOKRegionResponse, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.CreateDeploymentResponse{
+			JSON200: &astroplatformcore.Deployment{
+				Id:                 "test-id",
+				Name:               "test-name",
+				CloudProvider:      &cloudProvider,
+				Type:               &standardType,
+				ClusterName:        &cluster.Name,
+				Region:             &cluster.Region,
+				IsHighAvailability: &highAvailability,
+			},
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+		}, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astroplatformcore.DeploymentsPaginated{
+				Deployments: []astroplatformcore.Deployment{
+					{
+						Id:                  "test-id",
+						Name:                "test-name",
+						CloudProvider:       &cloudProvider,
+						Type:                &standardType,
+						ClusterName:         &cluster.Name,
+						Region:              &cluster.Region,
+						IsHighAvailability:  &highAvailability,
+						ResourceQuotaCpu:    &resourceQuotaCPU,
+						ResourceQuotaMemory: &ResourceQuotaMemory,
+						Executor:            &executorCelery,
+						SchedulerSize:       &schedulerSize,
+						WorkerQueues:        &[]astroplatformcore.WorkerQueue{},
+					},
+				},
+			},
+		}, nil).Times(2)
+
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.GetDeploymentResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
-			JSON200: &astroplatformcore.Deployment{}}, nil).Once()
-		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		//mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+			JSON200: &astroplatformcore.Deployment{
+				Id:                  "test-id",
+				Name:                "test-name",
+				CloudProvider:       &cloudProvider,
+				Type:                &standardType,
+				ClusterName:         &cluster.Name,
+				Region:              &cluster.Region,
+				IsHighAvailability:  &highAvailability,
+				ResourceQuotaCpu:    &resourceQuotaCPU,
+				ResourceQuotaMemory: &ResourceQuotaMemory,
+				Executor:            &executorCelery,
+				SchedulerSize:       &schedulerSize,
+				WorkerQueues:        &[]astroplatformcore.WorkerQueue{},
+			}}, nil).Times(2)
 
-		//deploymentResponse.JSON200.EnvironmentVariables = &[]astroplatformcore.DeploymentEnvironmentVariable{
-		//	{
-		//		Key:      "test-key-1",
-		//		Value:    &testValue1,
-		//		IsSecret: false,
-		//	},
-		//	{
-		//		Key:      "test-key-2",
-		//		Value:    &testValue2,
-		//		IsSecret: false,
-		//	},
-		//}
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.UpdateDeploymentResponse{
+			JSON200: &astroplatformcore.Deployment{
+				Id:                  "test-id",
+				Name:                "test-name",
+				CloudProvider:       &cloudProvider,
+				Type:                &standardType,
+				ClusterName:         &cluster.Name,
+				Region:              &cluster.Region,
+				IsHighAvailability:  &highAvailability,
+				ResourceQuotaCpu:    &resourceQuotaCPU,
+				ResourceQuotaMemory: &ResourceQuotaMemory,
+				Executor:            &executorCelery,
+				SchedulerSize:       &schedulerSize,
+				WorkerQueues:        &[]astroplatformcore.WorkerQueue{},
+				EnvironmentVariables: &[]astroplatformcore.DeploymentEnvironmentVariable{
+					{
+						Key:   "test-key-2",
+						Value: &testValue2,
+					},
+				},
+			},
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+		}, nil).Once()
 
-		// mock user inputs
-		defer testUtil.MockUserInputs(t, []string{"test-name", "1"})()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.GetDeploymentResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astroplatformcore.Deployment{
+				Id:                  "test-id",
+				Name:                "test-name",
+				CloudProvider:       &cloudProvider,
+				Type:                &standardType,
+				ClusterName:         &cluster.Name,
+				Region:              &cluster.Region,
+				IsHighAvailability:  &highAvailability,
+				ResourceQuotaCpu:    &resourceQuotaCPU,
+				ResourceQuotaMemory: &ResourceQuotaMemory,
+				Executor:            &executorCelery,
+				SchedulerSize:       &schedulerSize,
+				WorkerQueues:        &[]astroplatformcore.WorkerQueue{},
+				EnvironmentVariables: &[]astroplatformcore.DeploymentEnvironmentVariable{
+					{
+						Key:   "test-key-2",
+						Value: &testValue2,
+					},
+				},
+			}}, nil).Times(1)
+
+		// mock user inputs deployment name, select region, select deployment
+		defer testUtil.MockUserInputs(t, []string{"test-name", "1", "1"})()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockCoreClient, mockPlatformCoreClient, buf)
+		err = VariableModify("", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockCoreClient, mockPlatformCoreClient, buf)
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "test-key-1")
 		assert.Contains(t, buf.String(), "test-key-2")
-		assert.Contains(t, buf.String(), "test-value-1")
 		assert.Contains(t, buf.String(), "test-value-2")
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)

@@ -2,15 +2,14 @@ package testing
 
 import (
 	"fmt"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/spf13/afero"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/spf13/afero"
 )
 
 const (
