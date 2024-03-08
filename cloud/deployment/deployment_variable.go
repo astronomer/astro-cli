@@ -91,7 +91,7 @@ func VariableModify(
 	environmentVariablesObjects := []astroplatformcore.DeploymentEnvironmentVariable{}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, nil)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
