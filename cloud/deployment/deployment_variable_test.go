@@ -148,6 +148,53 @@ func TestVariableModify(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
+	t.Run("create deployment and add variable when no deployment exists", func(t *testing.T) {
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		//mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astroplatformcore.DeploymentsPaginated{
+				Deployments: []astroplatformcore.Deployment{},
+			},
+		}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.GetDeploymentResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astroplatformcore.Deployment{}}, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		//mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+
+		//deploymentResponse.JSON200.EnvironmentVariables = &[]astroplatformcore.DeploymentEnvironmentVariable{
+		//	{
+		//		Key:      "test-key-1",
+		//		Value:    &testValue1,
+		//		IsSecret: false,
+		//	},
+		//	{
+		//		Key:      "test-key-2",
+		//		Value:    &testValue2,
+		//		IsSecret: false,
+		//	},
+		//}
+
+		// mock user inputs
+		defer testUtil.MockUserInput(t, "test-name\n1")()
+
+		buf := new(bytes.Buffer)
+		err := VariableModify("", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockCoreClient, mockPlatformCoreClient, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "test-key-1")
+		assert.Contains(t, buf.String(), "test-key-2")
+		assert.Contains(t, buf.String(), "test-value-1")
+		assert.Contains(t, buf.String(), "test-value-2")
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
 	t.Run("success with secret value", func(t *testing.T) {
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)

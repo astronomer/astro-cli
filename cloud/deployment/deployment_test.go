@@ -932,7 +932,7 @@ func TestCreate(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
-	t.Run("success with Celery Executor and differen schedulers", func(t *testing.T) {
+	t.Run("success with Celery Executor and different schedulers", func(t *testing.T) {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(3)
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Times(3)
