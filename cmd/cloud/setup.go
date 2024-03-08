@@ -243,7 +243,7 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, isDeploymentF
 	}
 	if !isDeploymentFile {
 		fmt.Println("Using an Astro API key")
-		fmt.Println("\nWarning: Starting November 1st, 2023, you will no longer be able to create new Deployment API keys. To ensure uninterrupted access to our services, we strongly recommend transitioning to Deployment API tokens. See https://docs.astronomer.io/astro/deployment-api-tokens.")
+		fmt.Println("\nWarning: Starting June 1st, 2024, Deployment API Keys will stop working. To ensure uninterrupted access to our services, we strongly recommend transitioning to Deployment API tokens. See https://docs.astronomer.io/astro/deployment-api-tokens.")
 	}
 
 	// get authConfig

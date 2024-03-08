@@ -51,7 +51,7 @@ const (
 	enableDagDeployMsg       = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys."
 	dagDeployDisabled        = "dag deploy is not enabled for deployment"
 	invalidWorkspaceID       = "Invalid workspace id %s was provided through the --workspace-id flag\n"
-	errCiCdEnforcementUpdate = "cannot deploy since ci/cd enforcement is enabled for the deployment %s. Please use API Tokens or API Keys instead"
+	errCiCdEnforcementUpdate = "cannot deploy since ci/cd enforcement is enabled for the deployment %s. Please use API Tokens instead"
 )
 
 var (

@@ -274,7 +274,7 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "1")()
 	err := Deploy(deployInput, mockPlatformCoreClient, nil)
-	assert.Contains(t, err.Error(), "cannot deploy since ci/cd enforcement is enabled for the deployment test-deployment. Please use API Tokens or API Keys instead")
+	assert.Contains(t, err.Error(), "cannot deploy since ci/cd enforcement is enabled for the deployment test-deployment. Please use API Tokens instead")
 
 	defer os.RemoveAll("./testfiles/dags/")
 
