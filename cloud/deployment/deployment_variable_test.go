@@ -182,7 +182,7 @@ func TestVariableModify(t *testing.T) {
 		//}
 
 		// mock user inputs
-		defer testUtil.MockUserInput(t, "test-name\n1")()
+		defer testUtil.MockUserInputs(t, []string{"test-name", "1"})()
 
 		buf := new(bytes.Buffer)
 		err := VariableModify("", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockCoreClient, mockPlatformCoreClient, buf)

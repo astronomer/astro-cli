@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -117,6 +118,31 @@ func StringContains(tt []string, t string) bool {
 		}
 	}
 	return true
+}
+
+func MockUserInputs(t *testing.T, inputs []string) func() {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	realStdin := os.Stdin
+	os.Stdin = r
+
+	// Start a goroutine to write inputs to the pipe sequentially
+	go func() {
+		defer w.Close() // Ensure the write end is closed after writing all inputs
+		for _, input := range inputs {
+			_, err := w.Write([]byte(input + "\n")) // Simulate pressing Enter after each input
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			time.Sleep(100 * time.Millisecond) // Slight delay to simulate user typing
+		}
+	}()
+
+	return func() { os.Stdin = realStdin }
 }
 
 func MockUserInput(t *testing.T, i string) func() {
