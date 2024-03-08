@@ -644,7 +644,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 			if !canCiCdDeploy(c.Token) {
 				fmt.Printf("\nWarning: You are trying to update dag deploy setting on a deployment with ci-cd enforcement enabled. You will not be able to deploy your dags using the CLI and that dags will not be visible in the UI and new tasks will not start." +
-					"\nEither disable ci-cd enforcement or please cancel this operation and use API Tokens or API Keys instead.")
+					"\nEither disable ci-cd enforcement or please cancel this operation and use API Tokens instead.")
 				y, _ := input.Confirm("\n\nAre you sure you want to continue?")
 
 				if !y {
