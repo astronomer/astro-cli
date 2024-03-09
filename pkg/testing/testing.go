@@ -2,14 +2,15 @@ package testing
 
 import (
 	"fmt"
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/spf13/afero"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/spf13/afero"
 )
 
 const (
@@ -22,6 +23,7 @@ const (
 	SoftwarePlatform      = "software"
 	Initial               = "initial"
 	ErrorReturningContext = "error"
+	userInputSleep        = 100
 )
 
 var perm os.FileMode = 0o777
@@ -132,12 +134,12 @@ func MockUserInputs(t *testing.T, inputs []string) func() {
 	go func() {
 		defer w.Close() // Ensure the write end is closed after writing all inputs
 		for _, input := range inputs {
-			_, err := w.Write([]byte(input + "\n")) // Simulate pressing Enter after each input
+			_, err := w.WriteString(input + "\n") // Simulate pressing Enter after each input
 			if err != nil {
 				t.Error(err)
 				return
 			}
-			time.Sleep(100 * time.Millisecond) // Slight delay to simulate user typing
+			time.Sleep(userInputSleep * time.Millisecond) // Slight delay to simulate user typing
 		}
 	}()
 

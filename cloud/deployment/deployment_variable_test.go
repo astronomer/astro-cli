@@ -2,11 +2,12 @@ package deployment
 
 import (
 	"bytes"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	"github.com/astronomer/astro-cli/context"
 	"net/http"
 	"os"
 	"testing"
+
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/context"
 
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -237,7 +238,8 @@ func TestVariableModify(t *testing.T) {
 				Executor:            &executorCelery,
 				SchedulerSize:       &schedulerSize,
 				WorkerQueues:        &[]astroplatformcore.WorkerQueue{},
-			}}, nil).Times(2)
+			},
+		}, nil).Times(2)
 
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.UpdateDeploymentResponse{
 			JSON200: &astroplatformcore.Deployment{
@@ -288,7 +290,8 @@ func TestVariableModify(t *testing.T) {
 						Value: &testValue2,
 					},
 				},
-			}}, nil).Times(1)
+			},
+		}, nil).Times(1)
 
 		// mock user inputs deployment name, select region, select deployment
 		defer testUtil.MockUserInputs(t, []string{"test-name", "1", "1"})()
