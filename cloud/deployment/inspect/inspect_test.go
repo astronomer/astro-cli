@@ -154,6 +154,14 @@ var (
 			IsEnabled:       true,
 		},
 	}
+	hibernationIsActive      = true
+	hibernationIsHibernating = true
+	hibernationOverrideUntil = time.Now()
+	hibernationOverride      = astroplatformcore.DeploymentHibernationOverride{
+		IsActive:      &hibernationIsActive,
+		IsHibernating: &hibernationIsHibernating,
+		OverrideUntil: &hibernationOverrideUntil,
+	}
 	isDevelopmentMode = true
 	sourceDeployment  = astroplatformcore.Deployment{
 		Id:                     deploymentID,
@@ -187,6 +195,7 @@ var (
 		IsDevelopmentMode:      &isDevelopmentMode,
 		ScalingSpec: &astroplatformcore.DeploymentScalingSpec{
 			HibernationSpec: &astroplatformcore.DeploymentHibernationSpec{
+				Override:  &hibernationOverride,
 				Schedules: &hibernationSchedules,
 			},
 		},
@@ -674,6 +683,9 @@ func TestFormatPrintableDeployment(t *testing.T) {
         updated_at: 2022-11-17T13:25:55.275697-08:00
         deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
         webserver_url: some-url
+        hibernation_override:
+            is_hibernating: true
+            override_until: 2022-11-17T13:25:55.275697-08:00
     alert_emails:
         - email1
         - email2
@@ -786,6 +798,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.CloudProvider = &provider
 		sourceDeployment2.ImageTag = "some-tag"
 		sourceDeployment2.Status = "UNHEALTHY"
+		overrideUntil := time.Date(2023, time.February, 1, 12, 0, 0, 0, time.UTC)
+		sourceDeployment2.ScalingSpec.HibernationSpec.Override.OverrideUntil = &overrideUntil
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
 		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
@@ -855,6 +869,9 @@ func TestFormatPrintableDeployment(t *testing.T) {
         updated_at: 2023-02-01T12:00:00Z
         deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
         webserver_url: some-url
+        hibernation_override:
+            is_hibernating: true
+            override_until: 2023-02-01T12:00:00Z
     alert_emails:
         - email1
         - email2
@@ -944,7 +961,11 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
             "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
-            "webserver_url": "some-url"
+            "webserver_url": "some-url",
+			"hibernation_override": {
+				"is_hibernating": true,
+				"override_until": "2022-11-17T12:26:45.362983-08:00"
+			}
         },
         "alert_emails": [
             "email1",
