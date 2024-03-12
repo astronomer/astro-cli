@@ -48,7 +48,7 @@ repos:
     hooks:
       - id: yamllint
   - repo: https://github.com/astronomer/pre-commit-hooks
-    rev: bd325c947efcba13c03b4f4c93d882f2f83ed6ff
+    rev: 8b2d969bd549cd7c9454cc8bb54eec5b35c2e5e6
     hooks:
       - id: CVE-2017-18342
       - id: remove-en-dashes
