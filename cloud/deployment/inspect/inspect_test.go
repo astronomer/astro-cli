@@ -636,6 +636,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 				"alert_emails":          additional["alert_emails"],
 				"worker_queues":         additional["worker_queues"],
 				"environment_variables": additional["environment_variables"],
+				"hibernation_schedules": additional["hibernation_schedules"],
 			},
 		}
 		expectedDeployment := `deployment:
@@ -730,6 +731,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 				"alert_emails":          additional["alert_emails"],
 				"worker_queues":         additional["worker_queues"],
 				"environment_variables": additional["environment_variables"],
+				"hibernation_schedules": additional["hibernation_schedules"],
 			},
 		}
 		expectedDeployment := `deployment:
@@ -769,6 +771,11 @@ func TestFormatPrintableDeployment(t *testing.T) {
     alert_emails:
         - email1
         - email2
+    hibernation_schedules:
+        - hibernate_at: 1 * * * *
+          wake_at: 2 * * * *
+          description: hibernation schedule 1
+          enabled: true
 `
 		var orderedAndTaggedDeployment FormattedDeployment
 		actualPrintableDeployment, err := formatPrintableDeployment("", true, printableDeployment)
@@ -813,6 +820,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 				"alert_emails":          additional["alert_emails"],
 				"worker_queues":         additional["worker_queues"],
 				"environment_variables": additional["environment_variables"],
+				"hibernation_schedules": additional["hibernation_schedules"],
 			},
 		}
 		expectedDeployment := `deployment:
@@ -875,6 +883,11 @@ func TestFormatPrintableDeployment(t *testing.T) {
     alert_emails:
         - email1
         - email2
+    hibernation_schedules:
+        - hibernate_at: 1 * * * *
+          wake_at: 2 * * * *
+          description: hibernation schedule 1
+          enabled: true
 `
 		var orderedAndTaggedDeployment FormattedDeployment
 		actualPrintableDeployment, err := formatPrintableDeployment("", false, printableDeployment)
@@ -903,6 +916,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 				"alert_emails":          additional["alert_emails"],
 				"worker_queues":         additional["worker_queues"],
 				"environment_variables": additional["environment_variables"],
+				"hibernation_schedules": additional["hibernation_schedules"],
 			},
 		}
 		expectedDeployment := `{
@@ -1009,6 +1023,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 				"alert_emails":          additional["alert_emails"],
 				"worker_queues":         additional["worker_queues"],
 				"environment_variables": additional["environment_variables"],
+				"hibernation_schedules": additional["hibernation_schedules"],
 			},
 		}
 
@@ -1044,6 +1059,14 @@ func TestFormatPrintableDeployment(t *testing.T) {
         "alert_emails": [
             "email1",
             "email2"
+        ],
+        "hibernation_schedules": [
+            {
+                "hibernate_at": "1 * * * *",
+                "wake_at": "2 * * * *",
+                "description": "hibernation schedule 1",
+                "enabled": true
+            }
         ]
     }
 }`
@@ -1103,136 +1126,71 @@ func TestGetSpecificField(t *testing.T) {
 	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 	assert.NoError(t, err)
 	additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
+	printableDeployment := map[string]interface{}{
+		"deployment": map[string]interface{}{
+			"metadata":              info,
+			"configuration":         config,
+			"alert_emails":          additional["alert_emails"],
+			"worker_queues":         additional["worker_queues"],
+			"environment_variables": additional["environment_variables"],
+			"hibernation_schedules": additional["hibernation_schedules"],
+		},
+	}
 	t.Run("returns a value if key is found in deployment.metadata", func(t *testing.T) {
 		requestedField := "metadata.workspace_id"
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["environment_variables"],
-			},
-		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, sourceDeployment.WorkspaceId, actual)
 	})
 	t.Run("returns a value if key is found in deployment.configuration", func(t *testing.T) {
 		requestedField := "configuration.scheduler_count"
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["environment_variables"],
-			},
-		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, sourceDeployment.SchedulerReplicas, actual)
 	})
 	t.Run("returns a value if key is alert_emails", func(t *testing.T) {
 		requestedField := "alert_emails"
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["environment_variables"],
-			},
-		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, sourceDeployment.ContactEmails, actual)
 	})
 	t.Run("returns a value if key is environment_variables", func(t *testing.T) {
 		requestedField := "environment_variables"
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["environment_variables"],
-			},
-		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, getVariablesMap(*sourceDeployment.EnvironmentVariables), actual)
 	})
 	t.Run("returns a value if key is worker_queues", func(t *testing.T) {
 		requestedField := "worker_queues"
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["environment_variables"],
-			},
-		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, getQMap(&sourceDeployment, nodePools), actual)
 	})
+	t.Run("returns a value if key is hibernation_schedules", func(t *testing.T) {
+		requestedField := "hibernation_schedules"
+		actual, err := getSpecificField(printableDeployment, requestedField)
+		assert.NoError(t, err)
+		assert.Equal(t, getHibernationSchedulesMap(*sourceDeployment.ScalingSpec.HibernationSpec.Schedules), actual)
+	})
 	t.Run("returns a value if key is metadata", func(t *testing.T) {
 		requestedField := "metadata"
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["environment_variables"],
-			},
-		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, info, actual)
 	})
 	t.Run("returns value regardless of upper or lower case key", func(t *testing.T) {
 		requestedField := "Configuration.Cluster_NAME"
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["environment_variables"],
-			},
-		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, *sourceDeployment.ClusterName, actual)
 	})
 	t.Run("returns error if no value is found", func(t *testing.T) {
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["astronomer_variables"],
-			},
-		}
 		requestedField := "does-not-exist"
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.ErrorContains(t, err, "requested key "+requestedField+" not found in deployment")
 		assert.Equal(t, nil, actual)
 	})
 	t.Run("returns error if incorrect field is requested", func(t *testing.T) {
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["astronomer_variables"],
-			},
-		}
 		requestedField := "configuration.does-not-exist"
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.ErrorIs(t, err, errKeyNotFound)
