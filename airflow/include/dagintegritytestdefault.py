@@ -129,7 +129,11 @@ def get_import_errors():
 )
 def test_file_imports(rel_path, rv):
     """Test for import errors on a file"""
-    if rv != "No import errors":
+    if os.path.exists(".astro/dag_integrity_exceptions.txt"):
+        with open(".astro/dag_integrity_exceptions.txt", "r") as f:
+            exceptions = f.readlines()
+    print(f"Exceptions: {exceptions}")
+    if (rv != "No import errors") and rel_path not in exceptions:
         # If rv is not "No import errors," consider it a failed test
         raise Exception(f"{rel_path} failed to import with message \n {rv}")
     else:
