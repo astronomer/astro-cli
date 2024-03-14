@@ -51,7 +51,7 @@ repos:
     rev: 8b2d969bd549cd7c9454cc8bb54eec5b35c2e5e6
     hooks:
       - id: CVE-2017-18342
-      - id: remove-en-dashes
-      - id: remove-unicode-non-breaking-spaces
+      - id: replace-en-dashes
+      - id: replace-unicode-non-breaking-spaces
       - id: remove-unicode-zero-width-non-breaking-spaces
       - id: remove-unicode-zero-width-space
