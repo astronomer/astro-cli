@@ -51,6 +51,7 @@ func CreateDeploymentAPIToken(name, role, description, deployment string, out io
 		return err
 	}
 	fmt.Fprintf(out, "The apiToken was successfully created with the role %s\n", role)
+	fmt.Fprintf(out, "Token: %s\n", *resp.JSON200.Token)
 	return nil
 }
 
@@ -234,24 +235,27 @@ func ListDeploymentAPITokens(out io.Writer, client astrocore.CoreClient, deploym
 	if err != nil {
 		return err
 	}
-
-	for i := range apiTokens {
-		var deploymentRole string
-		for _, role := range apiTokens[i].Roles {
-			if role.EntityId == deployment {
-				deploymentRole = role.Role
+	if len(apiTokens) > 0 {
+		for i := range apiTokens {
+			var deploymentRole string
+			for _, role := range apiTokens[i].Roles {
+				if role.EntityId == deployment {
+					deploymentRole = role.Role
+				}
 			}
+			table.AddRow([]string{
+				apiTokens[i].Name,
+				apiTokens[i].Description,
+				apiTokens[i].Id,
+				deploymentRole,
+				apiTokens[i].CreatedAt.Format(time.RFC3339),
+				apiTokens[i].UpdatedAt.Format(time.RFC3339),
+			}, false)
 		}
-		table.AddRow([]string{
-			apiTokens[i].Name,
-			apiTokens[i].Description,
-			apiTokens[i].Id,
-			deploymentRole,
-			apiTokens[i].CreatedAt.Format(time.RFC3339),
-			apiTokens[i].UpdatedAt.Format(time.RFC3339),
-		}, false)
+		table.Print(out)
+		return nil
 	}
 
-	table.Print(out)
+	fmt.Println("The selected deployment has no api tokens")
 	return nil
 }

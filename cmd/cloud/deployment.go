@@ -953,7 +953,7 @@ func newDeploymentAPITokenCreateCmd(out io.Writer) *cobra.Command {
 			return createDeploymentAPIToken(cmd, nil, out)
 		},
 	}
-	cmd.Flags().StringVarP(&apiTokenRole, "role", "r", "", "The role for the "+
+	cmd.Flags().StringVarP(&apiTokenRole, "role", "r", "DEPLOYMENT_ADMIN", "The role for the "+
 		"new apiToken. Possible values are DEPLOYMENT_ADMIN or the custom role name.")
 	cmd.Flags().StringVarP(&apiTokenName, "name", "n", "", "The unique name for the "+
 		"new apiToken.")
