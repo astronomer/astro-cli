@@ -105,6 +105,9 @@ func ParseAPIToken(astroAPIToken string) (*CustomClaims, error) {
 	// Parse the token to peek at the custom claims
 	jwtParser := jwt.NewParser()
 	parsedToken, _, err := jwtParser.ParseUnverified(astroAPIToken, &CustomClaims{})
+	if err != nil {
+		return nil, errors.Wrap(err, "token is invalid or malformed")
+	}
 	claims, ok := parsedToken.Claims.(*CustomClaims)
 	if !ok {
 		return nil, errors.Wrap(err, "failed to parse auth token")

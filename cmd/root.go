@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/astronomer/astro-cli/cmd/registry"
@@ -83,6 +85,9 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 			if isCloudCtx {
 				err = cloudCmd.Setup(cmd, platformCoreClient, astroCoreClient)
 				if err != nil {
+					if strings.Contains(err.Error(), "token is invalid or malformed") {
+						return errors.New("API Token is invalid or malformed") //nolint
+					}
 					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 				}
 			}

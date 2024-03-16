@@ -218,6 +218,23 @@ func TestCheckEnvBool(t *testing.T) {
 	}
 }
 
+func TestParseAPIToken(t *testing.T) {
+	t.Run("throw error is token is invalid", func(t *testing.T) {
+		token := "invalid-token"
+		_, err := ParseAPIToken(token)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "token is invalid or malformed")
+	})
+
+	t.Run("returns token claims if token is valid", func(t *testing.T) {
+		// dummy token
+		token := "eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0K.eyJ1c2VybmFtZSI6ImFkbWluaW5pc3RyYXRvciIsImlzX2FkbWluIjp0cnVlLCJpYXQiOjE1MTYyMzkwMjIsImV4cCI6MTUxNjI0MjYyMn0."
+		claims, err := ParseAPIToken(token)
+		assert.NotNil(t, claims)
+		assert.Nil(t, err)
+	})
+}
+
 func TestIsM1(t *testing.T) {
 	t.Run("returns true if running on arm architecture", func(t *testing.T) {
 		assert.True(t, IsM1("darwin", "arm64"))
