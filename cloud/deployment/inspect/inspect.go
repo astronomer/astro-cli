@@ -18,17 +18,23 @@ import (
 )
 
 type deploymentMetadata struct {
-	DeploymentID   *string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
-	WorkspaceID    *string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
-	ClusterID      *string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
-	ReleaseName    *string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
-	AirflowVersion *string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
-	CurrentTag     *string    `mapstructure:"current_tag" yaml:"current_tag" json:"current_tag"`
-	Status         *string    `mapstructure:"status" yaml:"status" json:"status"`
-	CreatedAt      *time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
-	UpdatedAt      *time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
-	DeploymentURL  *string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
-	WebserverURL   *string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
+	DeploymentID        *string              `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
+	WorkspaceID         *string              `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
+	ClusterID           *string              `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
+	ReleaseName         *string              `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
+	AirflowVersion      *string              `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
+	CurrentTag          *string              `mapstructure:"current_tag" yaml:"current_tag" json:"current_tag"`
+	Status              *string              `mapstructure:"status" yaml:"status" json:"status"`
+	CreatedAt           *time.Time           `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
+	UpdatedAt           *time.Time           `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	DeploymentURL       *string              `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
+	WebserverURL        *string              `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
+	HibernationOverride *HibernationOverride `mapstructure:"hibernation_override,omitempty" yaml:"hibernation_override,omitempty" json:"hibernation_override,omitempty"`
+}
+
+type HibernationOverride struct {
+	IsHibernating *bool      `mapstructure:"is_hibernating,omitempty" yaml:"is_hibernating,omitempty" json:"is_hibernating,omitempty"`
+	OverrideUntil *time.Time `mapstructure:"override_until,omitempty" yaml:"override_until,omitempty" json:"override_until,omitempty"`
 }
 
 type deploymentConfig struct {
@@ -185,7 +191,7 @@ func getDeploymentInfo(coreDeployment astroplatformcore.Deployment) (map[string]
 	if deployment.IsDeploymentStandard(*coreDeployment.Type) {
 		clusterID = notApplicable
 	}
-	return map[string]interface{}{
+	metadata := map[string]interface{}{
 		"deployment_id":   coreDeployment.Id,
 		"workspace_id":    coreDeployment.WorkspaceId,
 		"cluster_id":      clusterID,
@@ -197,7 +203,16 @@ func getDeploymentInfo(coreDeployment astroplatformcore.Deployment) (map[string]
 		"created_at":      coreDeployment.CreatedAt,
 		"updated_at":      coreDeployment.UpdatedAt,
 		"status":          coreDeployment.Status,
-	}, nil
+	}
+	if coreDeployment.ScalingSpec != nil && coreDeployment.ScalingSpec.HibernationSpec != nil {
+		if override := coreDeployment.ScalingSpec.HibernationSpec.Override; override != nil && override.IsActive != nil && *override.IsActive {
+			metadata["hibernation_override"] = HibernationOverride{
+				IsHibernating: override.IsHibernating,
+				OverrideUntil: override.OverrideUntil,
+			}
+		}
+	}
+	return metadata, nil
 }
 
 func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, platformCoreClient astroplatformcore.CoreClient) (map[string]interface{}, error) {
