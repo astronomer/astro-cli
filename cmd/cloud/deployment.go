@@ -28,9 +28,6 @@ const (
 )
 
 var (
-	apiTokenName              string
-	apiTokenRole              string
-	apiTokenDescription       string
 	label                     string
 	runtimeVersion            string
 	deploymentID              string

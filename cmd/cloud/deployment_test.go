@@ -1359,8 +1359,8 @@ var (
 		Role:       "custom role",
 	}
 
-	deploymentApiToken1 = astrocore.ApiToken{Id: "token1", Name: tokenName1, Token: &token, Description: description1, Type: "Type 1", Roles: []astrocore.ApiTokenRole{tokenDeploymentRole}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName1}}
-	deploymentApiTokens = []astrocore.ApiToken{
+	deploymentAPIToken1 = astrocore.ApiToken{Id: "token1", Name: tokenName1, Token: &token, Description: description1, Type: "Type 1", Roles: []astrocore.ApiTokenRole{tokenDeploymentRole}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName1}}
+	deploymentAPITokens = []astrocore.ApiToken{
 		apiToken1,
 		{Id: "token2", Name: "Token 2", Description: description2, Type: "Type 2", Roles: []astrocore.ApiTokenRole{tokenDeploymentRole2}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName2}},
 	}
@@ -1373,7 +1373,7 @@ var (
 			Limit:      1,
 			Offset:     0,
 			TotalCount: 1,
-			ApiTokens:  deploymentApiTokens,
+			ApiTokens:  deploymentAPITokens,
 		},
 	}
 	apiTokenRequestErrorBodyList, _ = json.Marshal(astrocore.Error{
@@ -1390,7 +1390,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &deploymentApiToken1,
+		JSON200: &deploymentAPIToken1,
 	}
 	apiTokenRequestErrorBodyCreate, _ = json.Marshal(astrocore.Error{
 		Message: "failed to create api token",
@@ -1406,7 +1406,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &deploymentApiToken1,
+		JSON200: &deploymentAPIToken1,
 	}
 	apiTokenRequestErrorBodyUpdate, _ = json.Marshal(astrocore.Error{
 		Message: "failed to update api token",
@@ -1438,7 +1438,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &deploymentApiToken1,
+		JSON200: &deploymentAPIToken1,
 	}
 
 	apiTokenRequestErrorRotate, _ = json.Marshal(astrocore.Error{
@@ -1454,7 +1454,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &deploymentApiToken1,
+		JSON200: &deploymentAPIToken1,
 	}
 )
 
