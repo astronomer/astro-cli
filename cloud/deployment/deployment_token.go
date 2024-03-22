@@ -253,26 +253,14 @@ func DeleteToken(id, name, deployment string, force bool, out io.Writer, client 
 		}
 	}
 	apiTokenID := token.Id
-	if string(token.Type) == deploymentEntity {
-		if !force {
-			fmt.Println("WARNING: API token deletion cannot be undone.")
-			i, _ := input.Confirm(
-				fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name)))
+	if !force {
+		fmt.Println("WARNING: API token deletion cannot be undone.")
+		i, _ := input.Confirm(
+			fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name)))
 
-			if !i {
-				fmt.Println("Canceling API Token deletion")
-				return nil
-			}
-		}
-	} else {
-		if !force {
-			i, _ := input.Confirm(
-				fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Deployment?", ansi.Bold(token.Name)))
-
-			if !i {
-				fmt.Println("Canceling API Token removal")
-				return nil
-			}
+		if !i {
+			fmt.Println("Canceling API Token deletion")
+			return nil
 		}
 	}
 
@@ -284,11 +272,8 @@ func DeleteToken(id, name, deployment string, force bool, out io.Writer, client 
 	if err != nil {
 		return err
 	}
-	if string(token.Type) == deploymentEntity {
-		fmt.Fprintf(out, "Astro Deployment API token %s was successfully deleted\n", token.Name)
-	} else {
-		fmt.Fprintf(out, "Astro Organization API token %s was successfully removed from the Deployment\n", token.Name)
-	}
+	fmt.Fprintf(out, "Astro Deployment API token %s was successfully deleted\n", token.Name)
+
 	return nil
 }
 
