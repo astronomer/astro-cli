@@ -28,6 +28,7 @@ import (
 )
 
 var (
+	mockTokenID              = "ck05r3bor07h40d02y2hw4n4t"
 	csID                     = "test-cluster-id"
 	testCluster              = "test-cluster"
 	mockListClustersResponse = astroplatformcore.ListClustersResponse{
@@ -2172,7 +2173,8 @@ func TestDeploymentTokenUpdate(t *testing.T) {
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
-	t.Run("token is created with no ID provided", func(t *testing.T) {
+
+	t.Run("token is updated with no ID provided", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil)
@@ -2193,9 +2195,21 @@ func TestDeploymentTokenUpdate(t *testing.T) {
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
+
+	t.Run("token is updated with id provided", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil)
+		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentAPITokenRoleResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "update", mockTokenID, "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDeploymentTokenRotate(t *testing.T) {
+	tokenID = ""
 	expectedHelp := "Rotate a Deployment API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
@@ -2234,7 +2248,7 @@ func TestDeploymentTokenRotate(t *testing.T) {
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
-	t.Run("token is rotated", func(t *testing.T) {
+	t.Run("token is rotated with name provided", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil)
@@ -2244,7 +2258,8 @@ func TestDeploymentTokenRotate(t *testing.T) {
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
-	t.Run("token is rotated with no ID provided", func(t *testing.T) {
+
+	t.Run("token is rotated with no ID or name provided", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil)
@@ -2286,9 +2301,21 @@ func TestDeploymentTokenRotate(t *testing.T) {
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
+
+	t.Run("token is rotated with id provided", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil)
+		mockClient.On("RotateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateDeploymentAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "rotate", mockTokenID, "--force", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDeploymentTokenDelete(t *testing.T) {
+	tokenID = ""
 	expectedHelp := "Delete a Deployment API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
@@ -2335,6 +2362,7 @@ func TestDeploymentTokenDelete(t *testing.T) {
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
+
 	t.Run("token is deleted with no ID provided", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -2375,6 +2403,16 @@ func TestDeploymentTokenDelete(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"token", "delete", "--name", tokenName1, "--deployment-id", mockDeploymentID}
 		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("token is deleted with id provided", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenWithResponseOK, nil)
+		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "delete", mockTokenID, "--force", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
 }
