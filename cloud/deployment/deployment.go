@@ -70,6 +70,7 @@ var (
 	sleepTime                  = 180
 	tickNum                    = 10
 	timeoutNum                 = 180
+	listLimit                  = 1000
 	dedicatedDeploymentRequest = astroplatformcore.UpdateDedicatedDeploymentRequest{}
 	dagDeployEnabled           bool
 )
@@ -1334,7 +1335,9 @@ var CoreGetDeployments = func(ws, orgID string, platformCoreClient astroplatform
 		}
 		orgID = c.Organization
 	}
-	deploymentListParams := &astroplatformcore.ListDeploymentsParams{}
+	deploymentListParams := &astroplatformcore.ListDeploymentsParams{
+		Limit: &listLimit,
+	}
 	if ws != "" {
 		deploymentListParams.WorkspaceIds = &[]string{ws}
 	}
