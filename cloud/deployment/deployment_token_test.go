@@ -268,7 +268,7 @@ func TestUpdateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentAPITokenResponseOK, nil).Twice()
 		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateDeploymentAPITokenResponseOK, nil)
-		err := UpdateToken("token1", "", "", "", "", "", out, mockClient)
+		err := UpdateToken("token1", "", "mockNewName", "mockDescription", "", "", out, mockClient)
 		assert.NoError(t, err)
 	})
 
