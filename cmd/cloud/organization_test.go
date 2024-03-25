@@ -1231,6 +1231,7 @@ func TestOrganizationTokenCreate(t *testing.T) {
 }
 
 func TestOrganizationTokenUpdate(t *testing.T) {
+	tokenID = ""
 	expectedHelp := "Update a Organization or Organaization API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
