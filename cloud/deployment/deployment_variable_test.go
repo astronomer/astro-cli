@@ -17,6 +17,7 @@ var (
 	testValue1 = "test-value-1"
 	testValue2 = "test-value-2"
 	testValue3 = "test-value-3"
+	testValue4 = "test-value=4"
 )
 
 func TestVariableList(t *testing.T) {
@@ -355,4 +356,11 @@ func TestAddVariablesFromArgs(t *testing.T) {
 		[]string{"test-key-2=test-value-3", "test-key-3=", "test-key-3"}, false, false, buf,
 	)
 	assert.Equal(t, []astroplatformcore.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue3}}, resp)
+
+	resp = addVariablesFromArgs([]string{"test-key-1"},
+		[]astroplatformcore.DeploymentEnvironmentVariable{},
+		[]astroplatformcore.DeploymentEnvironmentVariableRequest{},
+		[]string{"test-key-2=test-value=4", "test-key-3=", "test-key-3"}, false, false, buf,
+	)
+	assert.Equal(t, []astroplatformcore.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue4}}, resp)
 }
