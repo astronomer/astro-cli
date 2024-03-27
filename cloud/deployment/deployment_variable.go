@@ -250,8 +250,8 @@ func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astropl
 	// validate each key-value pair and add it to the new variables list
 	for i := range variableList {
 		// split pair
-		pair := strings.Split(variableList[i], "=")
-		if len(pair) > 1 {
+		pair := strings.SplitN(variableList[i], "=", 2)
+		if len(pair) == 2 {
 			key = pair[0]
 			val = pair[1]
 			if key == "" || val == "" {
