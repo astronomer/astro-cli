@@ -374,6 +374,22 @@ func TestJsonString(t *testing.T) {
 		assert.Equal(t, result["key2"], "value2")
 	})
 
+	t.Run("string-keyed map", func(t *testing.T) {
+		conn := Connection{ConnExtra: map[string]interface{}{"key1": "value1", "key2": "value2"}}
+		res := jsonString(&conn)
+		var result map[string]interface{}
+		json.Unmarshal([]byte(res), &result)
+
+		assert.Equal(t, result["key1"], "value1")
+		assert.Equal(t, result["key2"], "value2")
+	})
+
+	t.Run("unexpected type", func(t *testing.T) {
+		conn := Connection{ConnExtra: []string{"key1", "value1", "key2", "value2"}}
+		res := jsonString(&conn)
+		assert.Equal(t, res, "")
+	})
+
 	t.Run("empty extra", func(t *testing.T) {
 		conn := Connection{ConnExtra: ""}
 		res := jsonString(&conn)
