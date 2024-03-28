@@ -114,7 +114,7 @@ func TestAddConnectionsAirflowTwoWithEnvConns(t *testing.T) {
 	expectedDelCmd := "airflow connections delete   \"test-id\""
 	expectedListCmd := "airflow connections list -o plain"
 
-	expectedEnvAddCmd := "airflow connections add   'test-env-id' --conn-type 'test-env-type' --conn-extra '{\"test-extra-key\": \"test-extra-value\"}' --conn-host 'test-env-host' --conn-login 'test-env-login' --conn-password 'test-env-password' --conn-schema 'test-env-schema' --conn-port 2"
+	expectedEnvAddCmd := "airflow connections add   'test-env-id' --conn-type 'test-env-type' --conn-extra '{\"test-extra-key\":\"test-extra-value\"}' --conn-host 'test-env-host' --conn-login 'test-env-login' --conn-password 'test-env-password' --conn-schema 'test-env-schema' --conn-port 2"
 
 	execAirflowCommand = func(id, airflowCommand string) string {
 		assert.Contains(t, []string{expectedAddCmd, expectedEnvAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)

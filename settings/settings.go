@@ -475,9 +475,12 @@ func ExportConnections(id string) error {
 	}
 	// add connections to settings file
 	for i := range connections {
-		port, err := strconv.Atoi(connections[i].ConnPort)
-		if err != nil {
-			fmt.Printf("Issue with parsing port number: %s", err.Error())
+		var port int
+		if connections[i].ConnPort != "" {
+			port, err = strconv.Atoi(connections[i].ConnPort)
+			if err != nil {
+				fmt.Printf("Issue with parsing port number: %s", err.Error())
+			}
 		}
 		for j := range settings.Airflow.Connections {
 			if settings.Airflow.Connections[j].ConnID == connections[i].ConnID {
@@ -604,32 +607,40 @@ func ExportPools(id string) error {
 }
 
 func jsonString(conn *Connection) string {
-	var extraString string
-	connExtra, ok := conn.ConnExtra.(map[interface{}]interface{})
-	if !ok {
-		t, ok := conn.ConnExtra.(string)
-		if ok {
-			extraString = t
-		}
-		return extraString
-	}
-	i := 0
-	for k, v := range connExtra {
-		key, ok := k.(string)
-		value, ok2 := v.(string)
-		if ok && ok2 {
-			if i == 0 {
-				extraString = extraString + "\"" + key + "\": \"" + value + "\""
-			} else {
-				extraString = extraString + ", \"" + key + "\": \"" + value + "\""
+	var extraMap map[string]any
+
+	switch connExtra := conn.ConnExtra.(type) {
+	case string:
+		// if extra is already a string we assume it is a JSON-encoded extra string
+		return connExtra
+	case map[any]any:
+		// the extra map is loaded as a map[any]any, but it needs to be map[string]any to be
+		// marshaled to JSON, and for it to be a valid Airflow connection extra, so we convert it
+		extraMap = make(map[string]any)
+		for k, v := range connExtra {
+			kStr, ok := k.(string)
+			if !ok {
+				fmt.Printf("Error asserting extra key as string for %s, found type: %T\n", conn.ConnID, k)
+				continue
 			}
-			i++
+			extraMap[kStr] = v
 		}
+	case map[string]any:
+		// if some future code provides a map[string]any, we can use that directly
+		extraMap = connExtra
+	default:
+		// if the extra type is something else entirely, we log a warning and proceed with an empty extra
+		fmt.Printf("Error converting extra to map for %s, found type: %T\n", conn.ConnID, conn.ConnExtra)
+		return ""
 	}
-	if extraString != "" {
-		extraString = "{" + extraString + "}"
+
+	// marshal the extra map to a JSON string
+	extraBytes, err := json.Marshal(extraMap)
+	if err != nil {
+		fmt.Printf("Error marshaling extra for %s: %s\n", conn.ConnID, err.Error())
+		return ""
 	}
-	return extraString
+	return string(extraBytes)
 }
 
 func WriteAirflowSettingstoYAML(settingsFile string) error {
