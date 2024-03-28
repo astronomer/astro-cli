@@ -114,7 +114,7 @@ func TestAddConnectionsAirflowTwoWithEnvConns(t *testing.T) {
 	expectedDelCmd := "airflow connections delete   \"test-id\""
 	expectedListCmd := "airflow connections list -o plain"
 
-	expectedEnvAddCmd := "airflow connections add   'test-env-id' --conn-type 'test-env-type' --conn-extra '{\"test-extra-key\": \"test-extra-value\"}' --conn-host 'test-env-host' --conn-login 'test-env-login' --conn-password 'test-env-password' --conn-schema 'test-env-schema' --conn-port 2"
+	expectedEnvAddCmd := "airflow connections add   'test-env-id' --conn-type 'test-env-type' --conn-extra '{\"test-extra-key\":\"test-extra-value\"}' --conn-host 'test-env-host' --conn-login 'test-env-login' --conn-password 'test-env-password' --conn-schema 'test-env-schema' --conn-port 2"
 
 	execAirflowCommand = func(id, airflowCommand string) string {
 		assert.Contains(t, []string{expectedAddCmd, expectedEnvAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
@@ -372,6 +372,22 @@ func TestJsonString(t *testing.T) {
 
 		assert.Equal(t, result["key1"], "value1")
 		assert.Equal(t, result["key2"], "value2")
+	})
+
+	t.Run("string-keyed map", func(t *testing.T) {
+		conn := Connection{ConnExtra: map[string]interface{}{"key1": "value1", "key2": "value2"}}
+		res := jsonString(&conn)
+		var result map[string]interface{}
+		json.Unmarshal([]byte(res), &result)
+
+		assert.Equal(t, result["key1"], "value1")
+		assert.Equal(t, result["key2"], "value2")
+	})
+
+	t.Run("unexpected type", func(t *testing.T) {
+		conn := Connection{ConnExtra: []string{"key1", "value1", "key2", "value2"}}
+		res := jsonString(&conn)
+		assert.Equal(t, res, "")
 	})
 
 	t.Run("empty extra", func(t *testing.T) {
