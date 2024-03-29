@@ -32,6 +32,7 @@ var (
 	orgTokenName               string
 	tokenID                    string
 	orgTokenID                 string
+	workspaceTokenID           string
 	cleanTokenOutput           bool
 	forceRotate                bool
 	tokenExpiration            int
@@ -230,7 +231,7 @@ func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceTokenUpdateCmd(out),
 		newWorkspaceTokenRotateCmd(out),
 		newWorkspaceTokenDeleteCmd(out),
-		newWorkspaceTokenAddCmd(out),
+		newWorkspaceTokenAddOrgTokenCmd(out),
 	)
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace where you would like to manage tokens")
 	return cmd
@@ -357,7 +358,7 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 //nolint:dupl
-func newWorkspaceTokenAddCmd(out io.Writer) *cobra.Command {
+func newWorkspaceTokenAddOrgTokenCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [ORG_TOKEN_ID]",
 		Short: "Add an Organization API token to an Astro Workspace",
