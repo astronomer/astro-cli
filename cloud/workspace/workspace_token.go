@@ -156,6 +156,8 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 		}
 	}
 
+	apiTokenDeploymentRoles := []astrocore.ApiTokenDeploymentRoleRequest{}
+
 	for i := range token.Roles {
 		if token.Roles[i].EntityId == workspace {
 			if token.Roles[i].Role == role {
@@ -163,10 +165,6 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 			} else {
 				continue
 			}
-		}
-
-		if token.Roles[i].EntityId == ctx.Workspace {
-			workspaceRole = token.Roles[i].Role
 		}
 
 		if token.Roles[i].EntityType == deploymentEntity {
@@ -180,7 +178,9 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 	apiTokenID := token.Id
 
 	UpdateWorkspaceAPITokenRequest := astrocore.UpdateWorkspaceApiTokenJSONRequestBody{
-		Roles: &astrocore.UpdateWorkspaceApiTokenRolesRequest{},
+		Roles: &astrocore.UpdateWorkspaceApiTokenRolesRequest{
+			Deployment: &apiTokenDeploymentRoles,
+		},
 	}
 
 	if newName == "" {
@@ -525,6 +525,7 @@ func AddWorkspaceTokenToDeployment(id, name, role, workspace string, deployment 
 		Role:     role,
 	}
 	apiTokenDeploymentRoles := []astrocore.ApiTokenDeploymentRoleRequest{apiTokenDeploymentRole}
+
 	for i := range token.Roles {
 		if token.Roles[i].EntityId == deployment {
 			if token.Roles[i].Role == role {
@@ -545,7 +546,6 @@ func AddWorkspaceTokenToDeployment(id, name, role, workspace string, deployment 
 			})
 		}
 	}
-
 	updateWorkspaceAPITokenRoles := astrocore.UpdateWorkspaceApiTokenRolesRequest{
 		Deployment: &apiTokenDeploymentRoles,
 		Workspace:  &workspaceRole,
