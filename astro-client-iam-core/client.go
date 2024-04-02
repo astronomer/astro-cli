@@ -2,14 +2,17 @@ package astroiamcore
 
 import (
 	"bytes"
+	httpContext "context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/version"
 	"net/http"
+	"net/url"
+	"runtime"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
-
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 )
 
 var (
@@ -24,7 +27,7 @@ type CoreClient = ClientWithResponsesInterface
 
 func NewIamCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
 	// we append base url in request editor, so set to an empty string here
-	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(astrocore.CoreRequestEditor))
+	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(CoreRequestEditor))
 	return cl
 }
 
@@ -37,5 +40,26 @@ func NormalizeAPIError(httpResp *http.Response, body []byte) error {
 		}
 		return errors.New(decode.Message) //nolint:goerr113
 	}
+	return nil
+}
+
+func CoreRequestEditor(ctx httpContext.Context, req *http.Request) error {
+	currentCtx, err := context.GetCurrentContext()
+	if err != nil {
+		return nil
+	}
+	os := runtime.GOOS
+	arch := runtime.GOARCH
+	baseURL := currentCtx.GetPublicRESTAPIURL("iam/v1beta1")
+	requestURL, err := url.Parse(baseURL + req.URL.String())
+	if err != nil {
+		return fmt.Errorf("%w, %s", ErrorBaseURL, baseURL)
+	}
+	req.URL = requestURL
+	req.Header.Add("authorization", currentCtx.Token)
+	req.Header.Add("x-astro-client-identifier", "cli")
+	req.Header.Add("x-astro-client-version", version.CurrVersion)
+	req.Header.Add("x-client-os-identifier", os+"-"+arch)
+	req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.CurrVersion))
 	return nil
 }

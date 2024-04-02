@@ -584,7 +584,7 @@ func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer
 		tokenID = strings.ToLower(args[0])
 	}
 	cmd.SilenceUsage = true
-	return organization.ListTokenRoles(tokenID, astroCoreClient, out)
+	return organization.ListTokenRoles(tokenID, astroCoreClient, astroCoreIamClient, out)
 }
 
 //nolint:dupl
@@ -616,7 +616,7 @@ func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, out, astroCoreClient)
+	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, out, astroCoreClient, astroCoreIamClient)
 }
 
 //nolint:dupl
@@ -628,7 +628,7 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.RotateToken(tokenID, name, cleanTokenOutput, forceRotate, out, astroCoreClient)
+	return organization.RotateToken(tokenID, name, cleanTokenOutput, forceRotate, out, astroCoreClient, astroCoreIamClient)
 }
 
 //nolint:dupl
@@ -640,7 +640,7 @@ func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.DeleteToken(tokenID, name, forceDelete, out, astroCoreClient)
+	return organization.DeleteToken(tokenID, name, forceDelete, out, astroCoreClient, astroCoreIamClient)
 }
 
 //nolint:dupl

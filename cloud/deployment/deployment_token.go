@@ -4,6 +4,7 @@ import (
 	httpContext "context"
 	"errors"
 	"fmt"
+	astrocoreiam "github.com/astronomer/astro-cli/astro-client-iam-core"
 	"io"
 	"os"
 	"strconv"
@@ -37,6 +38,7 @@ var (
 
 const (
 	deploymentEntity = "DEPLOYMENT"
+	workspaceEntity  = "WORKSPACE"
 )
 
 // List all deployment Tokens
@@ -112,28 +114,18 @@ func CreateToken(name, description, role, deployment string, expiration int, cle
 }
 
 // Update a deployment token
-func UpdateToken(id, name, newName, description, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func UpdateToken(id, name, newName, description, role, deployment string, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	var token astrocore.ApiToken
-	if id == "" {
-		tokens, err := getDeploymentTokens(deployment, client)
-		if err != nil {
-			return err
-		}
-		token, err = getDeploymentToken(id, name, deployment, "\nPlease select the Deployment API token you would like to update:", tokens)
-		if err != nil {
-			return err
-		}
-	} else {
-		token, err = getDeploymentTokenByID(id, deployment, ctx.Organization, client)
-		if err != nil {
-			return err
-		}
+	organization := ctx.Organization
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, client, iamClient)
+	if err != nil {
+		return err
 	}
+	roles := *token.Roles
 
 	apiTokenID := token.Id
 
@@ -152,9 +144,9 @@ func UpdateToken(id, name, newName, description, role, deployment string, out io
 	}
 
 	if role == "" {
-		for i := range token.Roles {
-			if token.Roles[i].EntityType == deploymentEntity && token.Roles[i].EntityId == deployment {
-				role = token.Roles[i].Role
+		for i := range roles {
+			if roles[i].EntityType == deploymentEntity && roles[i].EntityId == deployment {
+				role = roles[i].Role
 			}
 		}
 		UpdateDeploymentAPITokenRequest.Role = role
@@ -175,27 +167,16 @@ func UpdateToken(id, name, newName, description, role, deployment string, out io
 }
 
 // rotate a deployment API token
-func RotateToken(id, name, deployment string, cleanOutput, force bool, out io.Writer, client astrocore.CoreClient) error {
+func RotateToken(id, name, deployment string, cleanOutput, force bool, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	var token astrocore.ApiToken
-	if id == "" {
-		tokens, err := getDeploymentTokens(deployment, client)
-		if err != nil {
-			return err
-		}
-		token, err = getDeploymentToken(id, name, deployment, "\nPlease select the Deployment API token you would like to update:", tokens)
-		if err != nil {
-			return err
-		}
-	} else {
-		token, err = getDeploymentTokenByID(id, deployment, ctx.Organization, client)
-		if err != nil {
-			return err
-		}
+	organization := ctx.Organization
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, client, iamClient)
+	if err != nil {
+		return err
 	}
 	apiTokenID := token.Id
 
@@ -230,27 +211,16 @@ func RotateToken(id, name, deployment string, cleanOutput, force bool, out io.Wr
 }
 
 // delete a deployments api token
-func DeleteToken(id, name, deployment string, force bool, out io.Writer, client astrocore.CoreClient) error {
+func DeleteToken(id, name, deployment string, force bool, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	var token astrocore.ApiToken
-	if id == "" {
-		tokens, err := getDeploymentTokens(deployment, client)
-		if err != nil {
-			return err
-		}
-		token, err = getDeploymentToken(id, name, deployment, "\nPlease select the Deployment API token you would like to update:", tokens)
-		if err != nil {
-			return err
-		}
-	} else {
-		token, err = getDeploymentTokenByID(id, deployment, ctx.Organization, client)
-		if err != nil {
-			return err
-		}
+	organization := ctx.Organization
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, client, iamClient)
+	if err != nil {
+		return err
 	}
 	apiTokenID := token.Id
 	if !force {
@@ -403,14 +373,160 @@ func TimeAgo(date time.Time) string {
 	}
 }
 
-func getDeploymentTokenByID(id, deploymentID, orgID string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
-	resp, err := client.GetDeploymentApiTokenWithResponse(httpContext.Background(), orgID, deploymentID, id)
+func getTokenByID(id, orgID string, client astrocoreiam.CoreClient) (token astrocoreiam.ApiToken, err error) {
+	resp, err := client.GetApiTokenWithResponse(httpContext.Background(), orgID, id)
 	if err != nil {
-		return astrocore.ApiToken{}, err
+		return astrocoreiam.ApiToken{}, err
+	}
+	err = astrocoreiam.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return astrocoreiam.ApiToken{}, err
+	}
+	return *resp.JSON200, nil
+}
+
+func GetDeploymentTokenFromInputOrUser(id, name, deployment, organization string, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) (token astrocoreiam.ApiToken, err error) {
+	if id == "" {
+		tokens, err := getDeploymentTokens(deployment, client)
+		if err != nil {
+			return token, err
+		}
+		tokenFromList, err := getDeploymentToken(id, name, deployment, "\nPlease select the Organization API token you would like to remove from the Deployment:", tokens)
+
+		if err != nil {
+			return token, err
+		}
+		token, err = getTokenByID(tokenFromList.Id, organization, iamClient)
+		if err != nil {
+			return token, err
+		}
+	} else {
+		token, err = getTokenByID(id, organization, iamClient)
+		if err != nil {
+			return token, err
+		}
+	}
+	return token, err
+}
+
+func RemoveOrgTokenDeploymentRole(id, name, deployment string, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	organization := ctx.Organization
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, client, iamClient)
+	if err != nil {
+		return err
+	}
+	roles := *token.Roles
+
+	apiTokenID := token.Id
+	var orgRole string
+	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRoleRequest{}
+	apiTokenDeploymentRoles := []astrocore.ApiTokenDeploymentRoleRequest{}
+	for i := range roles {
+		if roles[i].EntityId == deployment {
+			continue // this removes the role in question
+		}
+
+		if roles[i].EntityId == ctx.Organization {
+			orgRole = roles[i].Role
+		}
+
+		if roles[i].EntityType == workspaceEntity {
+			apiTokenWorkspaceRoles = append(apiTokenWorkspaceRoles, astrocore.ApiTokenWorkspaceRoleRequest{
+				EntityId: roles[i].EntityId,
+				Role:     roles[i].Role,
+			})
+		}
+
+		if roles[i].EntityType == deploymentEntity {
+			apiTokenDeploymentRoles = append(apiTokenDeploymentRoles, astrocore.ApiTokenDeploymentRoleRequest{
+				EntityId: roles[i].EntityId,
+				Role:     roles[i].Role,
+			})
+		}
+	}
+
+	updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRolesRequest{
+		Organization: orgRole,
+		Deployment:   &apiTokenDeploymentRoles,
+		Workspace:    &apiTokenWorkspaceRoles,
+	}
+	updateOrganizationAPITokenRequest := astrocore.UpdateOrganizationApiTokenRequest{
+		Name:        token.Name,
+		Description: token.Description,
+		Roles:       updateOrganizationAPITokenRoles,
+	}
+	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.Organization, apiTokenID, updateOrganizationAPITokenRequest)
+	if err != nil {
+		return err
 	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return astrocore.ApiToken{}, err
+		return err
 	}
-	return *resp.JSON200, nil
+	fmt.Fprintf(out, "Astro Organization API token %s was successfully added to the Deployment\n", token.Name)
+	return nil
+}
+
+func RemoveWorkspaceTokenDeploymentRole(id, name, workspace string, deployment string, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	organization := ctx.Organization
+
+	if workspace == "" {
+		workspace = ctx.Workspace
+	}
+
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, client, iamClient)
+	if err != nil {
+		return err
+	}
+	roles := *token.Roles
+
+	apiTokenID := token.Id
+	var workspaceRole string
+	apiTokenDeploymentRoles := []astrocore.ApiTokenDeploymentRoleRequest{}
+
+	for i := range roles {
+		if roles[i].EntityId == deployment {
+			continue // this removes the role in question
+		}
+
+		if roles[i].EntityId == ctx.Workspace {
+			workspaceRole = roles[i].Role
+		}
+
+		if roles[i].EntityType == deploymentEntity {
+			apiTokenDeploymentRoles = append(apiTokenDeploymentRoles, astrocore.ApiTokenDeploymentRoleRequest{
+				EntityId: roles[i].EntityId,
+				Role:     roles[i].Role,
+			})
+		}
+	}
+	updateWorkspaceAPITokenRoles := astrocore.UpdateWorkspaceApiTokenRolesRequest{
+		Deployment: &apiTokenDeploymentRoles,
+		Workspace:  &workspaceRole,
+	}
+	updateWorkspaceAPITokenRequest := astrocore.UpdateWorkspaceApiTokenRequest{
+		Name:        token.Name,
+		Description: token.Description,
+		Roles:       &updateWorkspaceAPITokenRoles,
+	}
+
+	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), organization, workspace, apiTokenID, updateWorkspaceAPITokenRequest)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Astro Workspace API token %s was successfully added to the Deployment\n", token.Name)
+	return nil
 }

@@ -589,7 +589,7 @@ func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return workspace.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID, out, astroCoreClient)
+	return workspace.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID, out, astroCoreClient, astroCoreIamClient)
 }
 
 func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -599,7 +599,7 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 		tokenID = strings.ToLower(args[0])
 	}
 	cmd.SilenceUsage = true
-	return workspace.RotateToken(tokenID, name, workspaceID, cleanTokenOutput, forceRotate, out, astroCoreClient)
+	return workspace.RotateToken(tokenID, name, workspaceID, cleanTokenOutput, forceRotate, out, astroCoreClient, astroCoreIamClient)
 }
 
 func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -610,7 +610,7 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return workspace.DeleteToken(tokenID, name, workspaceID, forceDelete, out, astroCoreClient)
+	return workspace.DeleteToken(tokenID, name, workspaceID, forceDelete, out, astroCoreClient, astroCoreIamClient)
 }
 
 func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -629,7 +629,7 @@ func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) er
 		}
 	}
 	cmd.SilenceUsage = true
-	return organization.AddOrgTokenToWorkspace(orgTokenID, orgTokenName, tokenRole, workspaceID, out, astroCoreClient)
+	return organization.AddOrgTokenToWorkspace(orgTokenID, orgTokenName, tokenRole, workspaceID, out, astroCoreClient, astroCoreIamClient)
 }
 
 func coalesceWorkspace() (string, error) {
