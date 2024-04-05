@@ -228,14 +228,15 @@ const (
 const (
 	DefaultRoleScopeTypeDEPLOYMENT   DefaultRoleScopeType = "DEPLOYMENT"
 	DefaultRoleScopeTypeORGANIZATION DefaultRoleScopeType = "ORGANIZATION"
+	DefaultRoleScopeTypeSYSTEM       DefaultRoleScopeType = "SYSTEM"
 	DefaultRoleScopeTypeWORKSPACE    DefaultRoleScopeType = "WORKSPACE"
 )
 
 // Defines values for DeployStatus.
 const (
-	DEPLOYED    DeployStatus = "DEPLOYED"
-	FAILED      DeployStatus = "FAILED"
-	INITIALIZED DeployStatus = "INITIALIZED"
+	DeployStatusDEPLOYED    DeployStatus = "DEPLOYED"
+	DeployStatusFAILED      DeployStatus = "FAILED"
+	DeployStatusINITIALIZED DeployStatus = "INITIALIZED"
 )
 
 // Defines values for DeployType.
@@ -247,6 +248,14 @@ const (
 // Defines values for DeployGitProvider.
 const (
 	DeployGitProviderGITHUB DeployGitProvider = "GITHUB"
+)
+
+// Defines values for DeployStepStatus.
+const (
+	DeployStepStatusCOMPLETED DeployStepStatus = "COMPLETED"
+	DeployStepStatusFAILED    DeployStepStatus = "FAILED"
+	DeployStepStatusPENDING   DeployStepStatus = "PENDING"
+	DeployStepStatusRUNNING   DeployStepStatus = "RUNNING"
 )
 
 // Defines values for DeploymentClusterCloudProvider.
@@ -289,6 +298,14 @@ const (
 const (
 	HIBERNATE DeploymentHibernationStatusNextEventType = "HIBERNATE"
 	WAKE      DeploymentHibernationStatusNextEventType = "WAKE"
+)
+
+// Defines values for DeploymentIncidentSeverity.
+const (
+	Critical   DeploymentIncidentSeverity = "critical"
+	Info       DeploymentIncidentSeverity = "info"
+	Operations DeploymentIncidentSeverity = "operations"
+	Warning    DeploymentIncidentSeverity = "warning"
 )
 
 // Defines values for DeploymentLogEntrySource.
@@ -420,6 +437,7 @@ const (
 const (
 	RoleTemplateScopeTypeDEPLOYMENT   RoleTemplateScopeType = "DEPLOYMENT"
 	RoleTemplateScopeTypeORGANIZATION RoleTemplateScopeType = "ORGANIZATION"
+	RoleTemplateScopeTypeSYSTEM       RoleTemplateScopeType = "SYSTEM"
 	RoleTemplateScopeTypeWORKSPACE    RoleTemplateScopeType = "WORKSPACE"
 )
 
@@ -737,6 +755,13 @@ const (
 	ListDeploymentsParamsSortsWorkspaceIdDesc    ListDeploymentsParamsSorts = "workspaceId:desc"
 )
 
+// Defines values for ListDeploymentApiTokensParamsTokenTypes.
+const (
+	ListDeploymentApiTokensParamsTokenTypesDEPLOYMENT   ListDeploymentApiTokensParamsTokenTypes = "DEPLOYMENT"
+	ListDeploymentApiTokensParamsTokenTypesORGANIZATION ListDeploymentApiTokensParamsTokenTypes = "ORGANIZATION"
+	ListDeploymentApiTokensParamsTokenTypesWORKSPACE    ListDeploymentApiTokensParamsTokenTypes = "WORKSPACE"
+)
+
 // Defines values for ListDeploymentApiTokensParamsSorts.
 const (
 	ListDeploymentApiTokensParamsSortsCreatedAtAsc     ListDeploymentApiTokensParamsSorts = "createdAt:asc"
@@ -757,6 +782,22 @@ const (
 	ListDeploymentApiTokensParamsSortsUpdatedAtDesc    ListDeploymentApiTokensParamsSorts = "updatedAt:desc"
 	ListDeploymentApiTokensParamsSortsUpdatedByIdAsc   ListDeploymentApiTokensParamsSorts = "updatedById:asc"
 	ListDeploymentApiTokensParamsSortsUpdatedByIdDesc  ListDeploymentApiTokensParamsSorts = "updatedById:desc"
+)
+
+// Defines values for ListDeployStepsParamsSorts.
+const (
+	ListDeployStepsParamsSortsCreatedAtAsc  ListDeployStepsParamsSorts = "createdAt:asc"
+	ListDeployStepsParamsSortsCreatedAtDesc ListDeployStepsParamsSorts = "createdAt:desc"
+	ListDeployStepsParamsSortsEndedAtAsc    ListDeployStepsParamsSorts = "endedAt:asc"
+	ListDeployStepsParamsSortsEndedAtDesc   ListDeployStepsParamsSorts = "endedAt:desc"
+	ListDeployStepsParamsSortsStartedAtAsc  ListDeployStepsParamsSorts = "startedAt:asc"
+	ListDeployStepsParamsSortsStartedAtDesc ListDeployStepsParamsSorts = "startedAt:desc"
+	ListDeployStepsParamsSortsStatusAsc     ListDeployStepsParamsSorts = "status:asc"
+	ListDeployStepsParamsSortsStatusDesc    ListDeployStepsParamsSorts = "status:desc"
+	ListDeployStepsParamsSortsTypeAsc       ListDeployStepsParamsSorts = "type:asc"
+	ListDeployStepsParamsSortsTypeDesc      ListDeployStepsParamsSorts = "type:desc"
+	ListDeployStepsParamsSortsUpdatedAtAsc  ListDeployStepsParamsSorts = "updatedAt:asc"
+	ListDeployStepsParamsSortsUpdatedAtDesc ListDeployStepsParamsSorts = "updatedAt:desc"
 )
 
 // Defines values for GetDeploymentLogsParamsSources.
@@ -824,9 +865,9 @@ const (
 
 // Defines values for ListRolesParamsScopeTypes.
 const (
-	DEPLOYMENT   ListRolesParamsScopeTypes = "DEPLOYMENT"
-	ORGANIZATION ListRolesParamsScopeTypes = "ORGANIZATION"
-	WORKSPACE    ListRolesParamsScopeTypes = "WORKSPACE"
+	ListRolesParamsScopeTypesDEPLOYMENT   ListRolesParamsScopeTypes = "DEPLOYMENT"
+	ListRolesParamsScopeTypesORGANIZATION ListRolesParamsScopeTypes = "ORGANIZATION"
+	ListRolesParamsScopeTypesWORKSPACE    ListRolesParamsScopeTypes = "WORKSPACE"
 )
 
 // Defines values for ListRolesParamsSorts.
@@ -910,6 +951,12 @@ const (
 	ListWorkspacesParamsSortsUpdatedAtDesc      ListWorkspacesParamsSorts = "updatedAt:desc"
 )
 
+// Defines values for ListWorkspaceApiTokensParamsTokenTypes.
+const (
+	ORGANIZATION ListWorkspaceApiTokensParamsTokenTypes = "ORGANIZATION"
+	WORKSPACE    ListWorkspaceApiTokensParamsTokenTypes = "WORKSPACE"
+)
+
 // Defines values for ListWorkspaceApiTokensParamsSorts.
 const (
 	ListWorkspaceApiTokensParamsSortsCreatedAtAsc     ListWorkspaceApiTokensParamsSorts = "createdAt:asc"
@@ -948,18 +995,18 @@ const (
 
 // Defines values for ListWorkspaceUsersParamsSorts.
 const (
-	CreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
-	CreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
-	FullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
-	FullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
-	StatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
-	StatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
-	UpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
-	UpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
-	UsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
-	UsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
-	WorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
-	WorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
+	ListWorkspaceUsersParamsSortsCreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
+	ListWorkspaceUsersParamsSortsCreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
+	ListWorkspaceUsersParamsSortsFullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
+	ListWorkspaceUsersParamsSortsFullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
+	ListWorkspaceUsersParamsSortsStatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
+	ListWorkspaceUsersParamsSortsStatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
+	ListWorkspaceUsersParamsSortsUpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
+	ListWorkspaceUsersParamsSortsUpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
+	ListWorkspaceUsersParamsSortsUsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
+	ListWorkspaceUsersParamsSortsUsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
+	ListWorkspaceUsersParamsSortsWorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
+	ListWorkspaceUsersParamsSortsWorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
 )
 
 // Defines values for ListSelfUserRepositoriesParamsGitProvider.
@@ -970,6 +1017,16 @@ const (
 // Defines values for GetSelfUserRepositoryBranchParamsGitProvider.
 const (
 	GetSelfUserRepositoryBranchParamsGitProviderGITHUB GetSelfUserRepositoryBranchParamsGitProvider = "GITHUB"
+)
+
+// Defines values for GetSelfUserGitAppAuthorizationParamsGitProvider.
+const (
+	GetSelfUserGitAppAuthorizationParamsGitProviderGITHUB GetSelfUserGitAppAuthorizationParamsGitProvider = "GITHUB"
+)
+
+// Defines values for GetSelfUserGitAppInstallationParamsGitProvider.
+const (
+	GetSelfUserGitAppInstallationParamsGitProviderGITHUB GetSelfUserGitAppInstallationParamsGitProvider = "GITHUB"
 )
 
 // AddTeamMembersRequest defines model for AddTeamMembersRequest.
@@ -1041,12 +1098,15 @@ type BasicSubjectProfileSubjectType string
 
 // Cluster defines model for Cluster.
 type Cluster struct {
+	AppliedHarmonyVersion  *string              `json:"appliedHarmonyVersion,omitempty"`
 	AppliedTemplateVersion string               `json:"appliedTemplateVersion"`
 	CloudProvider          ClusterCloudProvider `json:"cloudProvider"`
 	Cohort                 *string              `json:"cohort,omitempty"`
 	CreatedAt              time.Time            `json:"createdAt"`
 	DbInstanceType         string               `json:"dbInstanceType"`
+	DbInstanceVersion      string               `json:"dbInstanceVersion"`
 	DeletedAt              *string              `json:"deletedAt,omitempty"`
+	HarmonyVersion         *string              `json:"harmonyVersion,omitempty"`
 	Id                     string               `json:"id"`
 	IsCordoned             *bool                `json:"isCordoned,omitempty"`
 	IsDryRun               bool                 `json:"isDryRun"`
@@ -1084,13 +1144,16 @@ type ClusterType string
 
 // ClusterDetailed defines model for ClusterDetailed.
 type ClusterDetailed struct {
+	AppliedHarmonyVersion  *string                      `json:"appliedHarmonyVersion,omitempty"`
 	AppliedTemplateVersion string                       `json:"appliedTemplateVersion"`
 	CloudProvider          ClusterDetailedCloudProvider `json:"cloudProvider"`
 	Cohort                 *string                      `json:"cohort,omitempty"`
 	CreatedAt              time.Time                    `json:"createdAt"`
 	CreatedBy              BasicSubjectProfile          `json:"createdBy"`
 	DbInstanceType         string                       `json:"dbInstanceType"`
+	DbInstanceVersion      string                       `json:"dbInstanceVersion"`
 	DeletedAt              *string                      `json:"deletedAt,omitempty"`
+	HarmonyVersion         *string                      `json:"harmonyVersion,omitempty"`
 	Id                     string                       `json:"id"`
 	IsCordoned             *bool                        `json:"isCordoned,omitempty"`
 	IsDryRun               bool                         `json:"isDryRun"`
@@ -1280,10 +1343,11 @@ type CreateClusterRouteRequestTargetType string
 
 // CreateCustomRoleRequest defines model for CreateCustomRoleRequest.
 type CreateCustomRoleRequest struct {
-	Description *string                          `json:"description,omitempty"`
-	Name        string                           `json:"name"`
-	Permissions []string                         `json:"permissions"`
-	ScopeType   CreateCustomRoleRequestScopeType `json:"scopeType"`
+	Description            *string                          `json:"description,omitempty"`
+	Name                   string                           `json:"name"`
+	Permissions            []string                         `json:"permissions"`
+	RestrictedWorkspaceIds *[]string                        `json:"restrictedWorkspaceIds,omitempty"`
+	ScopeType              CreateCustomRoleRequestScopeType `json:"scopeType"`
 }
 
 // CreateCustomRoleRequestScopeType defines model for CreateCustomRoleRequest.ScopeType.
@@ -1300,6 +1364,9 @@ type CreateDedicatedDeploymentRequest struct {
 
 	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
+
+	// DefaultTaskPodEphemeralStorage Must be valid kubernetes ephemeral storage resource string, in terms of Gibibytes (GiB)
+	DefaultTaskPodEphemeralStorage *string `json:"defaultTaskPodEphemeralStorage,omitempty"`
 
 	// DefaultTaskPodMemory Must be valid kubernetes memory resource string, at least 0.5Gi in terms of Gibibytes (GiB)
 	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
@@ -1561,6 +1628,9 @@ type CreateStandardDeploymentRequest struct {
 	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
 
+	// DefaultTaskPodEphemeralStorage Must be valid kubernetes ephemeral storage resource string, in terms of Gibibytes (GiB)
+	DefaultTaskPodEphemeralStorage *string `json:"defaultTaskPodEphemeralStorage,omitempty"`
+
 	// DefaultTaskPodMemory Must be valid kubernetes memory resource string, at least 0.5Gi in terms of Gibibytes (GiB)
 	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
 
@@ -1719,6 +1789,7 @@ type Deploy struct {
 	RollbackFromId     *string              `json:"rollbackFromId,omitempty"`
 	RuntimeVersion     *string              `json:"runtimeVersion,omitempty"`
 	Status             DeployStatus         `json:"status"`
+	Steps              *[]DeployStep        `json:"steps,omitempty"`
 	Type               DeployType           `json:"type"`
 	UpdatedAt          *time.Time           `json:"updatedAt,omitempty"`
 	UpdatedBySubject   *BasicSubjectProfile `json:"updatedBySubject,omitempty"`
@@ -1739,7 +1810,7 @@ type DeployGit struct {
 	Branch         string            `json:"branch"`
 	CommitSha      string            `json:"commitSha"`
 	CommitUrl      string            `json:"commitUrl"`
-	Path           string            `json:"path"`
+	Path           *string           `json:"path,omitempty"`
 	Provider       DeployGitProvider `json:"provider"`
 	Repo           string            `json:"repo"`
 }
@@ -1753,64 +1824,103 @@ type DeployRollbackRequest struct {
 	Description *string `json:"description,omitempty"`
 }
 
+// DeployStep defines model for DeployStep.
+type DeployStep struct {
+	CreatedAt time.Time        `json:"createdAt"`
+	EmitsLogs *bool            `json:"emitsLogs,omitempty"`
+	EndedAt   *string          `json:"endedAt,omitempty"`
+	Id        string           `json:"id"`
+	Label     *string          `json:"label,omitempty"`
+	StartedAt *string          `json:"startedAt,omitempty"`
+	Status    DeployStepStatus `json:"status"`
+	UpdatedAt time.Time        `json:"updatedAt"`
+}
+
+// DeployStepStatus defines model for DeployStep.Status.
+type DeployStepStatus string
+
+// DeployStepLogEntry defines model for DeployStepLogEntry.
+type DeployStepLogEntry struct {
+	Message   string    `json:"message"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// DeployStepLogsPaginated defines model for DeployStepLogsPaginated.
+type DeployStepLogsPaginated struct {
+	Entries    []DeployStepLogEntry `json:"entries"`
+	Limit      int                  `json:"limit"`
+	Offset     int                  `json:"offset"`
+	SearchId   string               `json:"searchId"`
+	TotalCount int                  `json:"totalCount"`
+}
+
+// DeployStepsPaginated defines model for DeployStepsPaginated.
+type DeployStepsPaginated struct {
+	DeploySteps []DeployStep `json:"deploySteps"`
+	Limit       int          `json:"limit"`
+	Offset      int          `json:"offset"`
+	TotalCount  int          `json:"totalCount"`
+}
+
 // Deployment defines model for Deployment.
 type Deployment struct {
-	AirflowVersion               string                           `json:"airflowVersion"`
-	ClusterCloudProvider         *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
-	ClusterId                    string                           `json:"clusterId"`
-	ClusterName                  *string                          `json:"clusterName,omitempty"`
-	ClusterRegion                *string                          `json:"clusterRegion,omitempty"`
-	ContactEmails                []string                         `json:"contactEmails"`
-	CreatedAt                    time.Time                        `json:"createdAt"`
-	CreatedBy                    *BasicSubjectProfile             `json:"createdBy,omitempty"`
-	CurrentDagTarballVersion     *string                          `json:"currentDagTarballVersion,omitempty"`
-	CurrentEnvironmentSignatures *EnvironmentSignatures           `json:"currentEnvironmentSignatures,omitempty"`
-	CurrentImageVersion          *string                          `json:"currentImageVersion,omitempty"`
-	DefaultTaskPodCpu            *string                          `json:"defaultTaskPodCpu,omitempty"`
-	DefaultTaskPodMemory         *string                          `json:"defaultTaskPodMemory,omitempty"`
-	DeletedAt                    *time.Time                       `json:"deletedAt,omitempty"`
-	DeployId                     string                           `json:"deployId"`
-	Description                  *string                          `json:"description,omitempty"`
-	DesiredDagTarballVersion     *string                          `json:"desiredDagTarballVersion,omitempty"`
-	DesiredEnvironmentSignatures *EnvironmentSignatures           `json:"desiredEnvironmentSignatures,omitempty"`
-	DesiredImageVersion          *string                          `json:"desiredImageVersion,omitempty"`
-	EnvironmentVariables         *[]DeploymentEnvironmentVariable `json:"environmentVariables,omitempty"`
-	Executor                     *DeploymentExecutor              `json:"executor,omitempty"`
-	ExternalIPs                  *[]string                        `json:"externalIPs,omitempty"`
-	Id                           string                           `json:"id"`
-	ImageId                      string                           `json:"imageId"`
-	ImageRepository              string                           `json:"imageRepository"`
-	ImageTag                     string                           `json:"imageTag"`
-	IsCicdEnforced               bool                             `json:"isCicdEnforced"`
-	IsDagDeployEnabled           bool                             `json:"isDagDeployEnabled"`
-	IsDevelopmentOnly            bool                             `json:"isDevelopmentOnly"`
-	IsHighAvailability           *bool                            `json:"isHighAvailability,omitempty"`
-	LaminarHealthStatus          *LaminarHealthStatus             `json:"laminarHealthStatus,omitempty"`
-	Name                         string                           `json:"name"`
-	OidcIssuerUrl                *string                          `json:"oidcIssuerUrl,omitempty"`
-	OrganizationId               string                           `json:"organizationId"`
-	OrganizationName             string                           `json:"organizationName"`
-	OrganizationShortName        string                           `json:"organizationShortName"`
-	ReleaseName                  string                           `json:"releaseName"`
-	RepositoryBranch             *string                          `json:"repositoryBranch,omitempty"`
-	RepositoryPathDetails        *DeploymentRepositoryPath        `json:"repositoryPathDetails,omitempty"`
-	RepositoryPathId             *string                          `json:"repositoryPathId,omitempty"`
-	ResourceQuotaCpu             *string                          `json:"resourceQuotaCpu,omitempty"`
-	ResourceQuotaMemory          *string                          `json:"resourceQuotaMemory,omitempty"`
-	RuntimeVersion               string                           `json:"runtimeVersion"`
-	ScalingSpec                  *DeploymentScalingSpec           `json:"scalingSpec,omitempty"`
-	ScalingStatus                *DeploymentScalingStatus         `json:"scalingStatus,omitempty"`
-	SchedulerAu                  *int                             `json:"schedulerAu,omitempty"`
-	SchedulerCpu                 string                           `json:"schedulerCpu"`
-	SchedulerMemory              string                           `json:"schedulerMemory"`
-	SchedulerReplicas            int                              `json:"schedulerReplicas"`
-	SchedulerSize                *DeploymentSchedulerSize         `json:"schedulerSize,omitempty"`
-	Status                       DeploymentStatus                 `json:"status"`
-	StatusReason                 *string                          `json:"statusReason,omitempty"`
-	TaskPodNodePoolId            *string                          `json:"taskPodNodePoolId,omitempty"`
-	Type                         *DeploymentType                  `json:"type,omitempty"`
-	UpdatedAt                    time.Time                        `json:"updatedAt"`
-	UpdatedBy                    *BasicSubjectProfile             `json:"updatedBy,omitempty"`
+	AirflowVersion                 string                           `json:"airflowVersion"`
+	ClusterCloudProvider           *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
+	ClusterId                      string                           `json:"clusterId"`
+	ClusterName                    *string                          `json:"clusterName,omitempty"`
+	ClusterRegion                  *string                          `json:"clusterRegion,omitempty"`
+	ContactEmails                  []string                         `json:"contactEmails"`
+	CreatedAt                      time.Time                        `json:"createdAt"`
+	CreatedBy                      *BasicSubjectProfile             `json:"createdBy,omitempty"`
+	CurrentDagTarballVersion       *string                          `json:"currentDagTarballVersion,omitempty"`
+	CurrentEnvironmentSignatures   *EnvironmentSignatures           `json:"currentEnvironmentSignatures,omitempty"`
+	CurrentImageVersion            *string                          `json:"currentImageVersion,omitempty"`
+	DefaultTaskPodCpu              *string                          `json:"defaultTaskPodCpu,omitempty"`
+	DefaultTaskPodEphemeralStorage *string                          `json:"defaultTaskPodEphemeralStorage,omitempty"`
+	DefaultTaskPodMemory           *string                          `json:"defaultTaskPodMemory,omitempty"`
+	DeletedAt                      *time.Time                       `json:"deletedAt,omitempty"`
+	DeployId                       string                           `json:"deployId"`
+	DeploymentHealthStatus         *DeploymentHealthStatus          `json:"deploymentHealthStatus,omitempty"`
+	Description                    *string                          `json:"description,omitempty"`
+	DesiredDagTarballVersion       *string                          `json:"desiredDagTarballVersion,omitempty"`
+	DesiredEnvironmentSignatures   *EnvironmentSignatures           `json:"desiredEnvironmentSignatures,omitempty"`
+	DesiredImageVersion            *string                          `json:"desiredImageVersion,omitempty"`
+	EnvironmentVariables           *[]DeploymentEnvironmentVariable `json:"environmentVariables,omitempty"`
+	Executor                       *DeploymentExecutor              `json:"executor,omitempty"`
+	ExternalIPs                    *[]string                        `json:"externalIPs,omitempty"`
+	Id                             string                           `json:"id"`
+	ImageId                        string                           `json:"imageId"`
+	ImageRepository                string                           `json:"imageRepository"`
+	ImageTag                       string                           `json:"imageTag"`
+	IsCicdEnforced                 bool                             `json:"isCicdEnforced"`
+	IsDagDeployEnabled             bool                             `json:"isDagDeployEnabled"`
+	IsDevelopmentOnly              bool                             `json:"isDevelopmentOnly"`
+	IsHighAvailability             *bool                            `json:"isHighAvailability,omitempty"`
+	Name                           string                           `json:"name"`
+	OidcIssuerUrl                  *string                          `json:"oidcIssuerUrl,omitempty"`
+	OrganizationId                 string                           `json:"organizationId"`
+	OrganizationName               string                           `json:"organizationName"`
+	OrganizationShortName          string                           `json:"organizationShortName"`
+	ReleaseName                    string                           `json:"releaseName"`
+	RepositoryBranch               *string                          `json:"repositoryBranch,omitempty"`
+	RepositoryPathDetails          *DeploymentRepositoryPath        `json:"repositoryPathDetails,omitempty"`
+	RepositoryPathId               *string                          `json:"repositoryPathId,omitempty"`
+	ResourceQuotaCpu               *string                          `json:"resourceQuotaCpu,omitempty"`
+	ResourceQuotaMemory            *string                          `json:"resourceQuotaMemory,omitempty"`
+	RuntimeVersion                 string                           `json:"runtimeVersion"`
+	ScalingSpec                    *DeploymentScalingSpec           `json:"scalingSpec,omitempty"`
+	ScalingStatus                  *DeploymentScalingStatus         `json:"scalingStatus,omitempty"`
+	SchedulerAu                    *int                             `json:"schedulerAu,omitempty"`
+	SchedulerCpu                   string                           `json:"schedulerCpu"`
+	SchedulerMemory                string                           `json:"schedulerMemory"`
+	SchedulerReplicas              int                              `json:"schedulerReplicas"`
+	SchedulerSize                  *DeploymentSchedulerSize         `json:"schedulerSize,omitempty"`
+	Status                         DeploymentStatus                 `json:"status"`
+	StatusReason                   *string                          `json:"statusReason,omitempty"`
+	TaskPodNodePoolId              *string                          `json:"taskPodNodePoolId,omitempty"`
+	Type                           *DeploymentType                  `json:"type,omitempty"`
+	UpdatedAt                      time.Time                        `json:"updatedAt"`
+	UpdatedBy                      *BasicSubjectProfile             `json:"updatedBy,omitempty"`
 
 	// WebServerAirflowApiUrl The Deployment's webserver's base url to directly access the Airflow api.
 	WebServerAirflowApiUrl   string         `json:"webServerAirflowApiUrl"`
@@ -1853,6 +1963,13 @@ type DeploymentEnvironmentVariableRequest struct {
 	IsSecret bool    `json:"isSecret"`
 	Key      string  `json:"key"`
 	Value    *string `json:"value,omitempty"`
+}
+
+// DeploymentHealthStatus defines model for DeploymentHealthStatus.
+type DeploymentHealthStatus struct {
+	HibernationStatus *HibernationStatus    `json:"hibernationStatus,omitempty"`
+	Incidents         *[]DeploymentIncident `json:"incidents,omitempty"`
+	Info              *DeploymentInfo       `json:"info,omitempty"`
 }
 
 // DeploymentHibernationOverride defines model for DeploymentHibernationOverride.
@@ -1925,6 +2042,30 @@ type DeploymentHibernationStatus struct {
 // DeploymentHibernationStatusNextEventType Represents the type of the scheduled event for the deployment, one of HIBERNATE or WAKE
 type DeploymentHibernationStatusNextEventType string
 
+// DeploymentIncident defines model for DeploymentIncident.
+type DeploymentIncident struct {
+	CreatedAt     time.Time                  `json:"createdAt"`
+	DeploymentId  string                     `json:"deploymentId"`
+	Description   string                     `json:"description"`
+	EnabledForOrg bool                       `json:"enabledForOrg"`
+	IncidentData  *map[string]interface{}    `json:"incidentData,omitempty"`
+	IncidentType  string                     `json:"incidentType"`
+	ResolvedAt    *time.Time                 `json:"resolvedAt,omitempty"`
+	Severity      DeploymentIncidentSeverity `json:"severity"`
+	Subject       string                     `json:"subject"`
+	UpdatedAt     *time.Time                 `json:"updatedAt,omitempty"`
+	WorkspaceId   *string                    `json:"workspaceId,omitempty"`
+}
+
+// DeploymentIncidentSeverity defines model for DeploymentIncident.Severity.
+type DeploymentIncidentSeverity string
+
+// DeploymentInfo defines model for DeploymentInfo.
+type DeploymentInfo struct {
+	AirflowStatus *map[string]interface{} `json:"airflowStatus,omitempty"`
+	Scaling       *map[string]interface{} `json:"scaling,omitempty"`
+}
+
 // DeploymentInstanceSpecRequest defines model for DeploymentInstanceSpecRequest.
 type DeploymentInstanceSpecRequest struct {
 	Au       int `json:"au"`
@@ -1967,7 +2108,7 @@ type DeploymentOptions struct {
 // DeploymentRepositoryPath defines model for DeploymentRepositoryPath.
 type DeploymentRepositoryPath struct {
 	GitAccount    string                              `json:"gitAccount"`
-	GitPath       string                              `json:"gitPath"`
+	GitPath       *string                             `json:"gitPath,omitempty"`
 	GitProvider   DeploymentRepositoryPathGitProvider `json:"gitProvider"`
 	GitRepository string                              `json:"gitRepository"`
 }
@@ -2113,6 +2254,16 @@ type FeatureFlag struct {
 // GenericJSON defines model for GenericJSON.
 type GenericJSON map[string]interface{}
 
+// GitApplicationAuthorization defines model for GitApplicationAuthorization.
+type GitApplicationAuthorization struct {
+	Url string `json:"url"`
+}
+
+// GitApplicationInstallation defines model for GitApplicationInstallation.
+type GitApplicationInstallation struct {
+	Url string `json:"url"`
+}
+
 // GitHubAccount defines model for GitHubAccount.
 type GitHubAccount struct {
 	AccountName string                   `json:"accountName"`
@@ -2135,6 +2286,14 @@ type GitRepository struct {
 	UserIsAdmin       bool   `json:"userIsAdmin"`
 }
 
+// HibernationStatus defines model for HibernationStatus.
+type HibernationStatus struct {
+	IsHibernating *bool      `json:"isHibernating,omitempty"`
+	NextEventAt   *time.Time `json:"nextEventAt,omitempty"`
+	NextEventType *string    `json:"nextEventType,omitempty"`
+	Reason        *string    `json:"reason,omitempty"`
+}
+
 // Invite defines model for Invite.
 type Invite struct {
 	ExpiresAt     string              `json:"expiresAt"`
@@ -2153,13 +2312,6 @@ type Invite struct {
 	OrganizationShortName *string `json:"organizationShortName,omitempty"`
 	TicketId              *string `json:"ticketId,omitempty"`
 	UserId                *string `json:"userId,omitempty"`
-}
-
-// LaminarHealthStatus defines model for LaminarHealthStatus.
-type LaminarHealthStatus struct {
-	Incidents  *[]map[string]interface{} `json:"incidents,omitempty"`
-	Info       *map[string]interface{}   `json:"info,omitempty"`
-	Operations *map[string]interface{}   `json:"operations,omitempty"`
 }
 
 // LegacyAstroOptions defines model for LegacyAstroOptions.
@@ -2289,6 +2441,7 @@ type Organization struct {
 	EnvironmentSecretsShowable bool                       `json:"environmentSecretsShowable"`
 	Id                         string                     `json:"id"`
 	IsAzureManaged             *bool                      `json:"isAzureManaged,omitempty"`
+	IsEgressChargebackEnabled  *bool                      `json:"isEgressChargebackEnabled,omitempty"`
 	IsScimEnabled              bool                       `json:"isScimEnabled"`
 	ManagedDomains             *[]ManagedDomain           `json:"managedDomains,omitempty"`
 	MetronomeId                *string                    `json:"metronomeId,omitempty"`
@@ -2401,14 +2554,15 @@ type ResourceRange struct {
 
 // Role defines model for Role.
 type Role struct {
-	CreatedAt   string              `json:"createdAt"`
-	CreatedBy   BasicSubjectProfile `json:"createdBy"`
-	Description *string             `json:"description,omitempty"`
-	Id          string              `json:"id"`
-	Name        string              `json:"name"`
-	ScopeType   RoleScopeType       `json:"scopeType"`
-	UpdatedAt   string              `json:"updatedAt"`
-	UpdatedBy   BasicSubjectProfile `json:"updatedBy"`
+	CreatedAt              string              `json:"createdAt"`
+	CreatedBy              BasicSubjectProfile `json:"createdBy"`
+	Description            *string             `json:"description,omitempty"`
+	Id                     string              `json:"id"`
+	Name                   string              `json:"name"`
+	RestrictedWorkspaceIds []string            `json:"restrictedWorkspaceIds"`
+	ScopeType              RoleScopeType       `json:"scopeType"`
+	UpdatedAt              string              `json:"updatedAt"`
+	UpdatedBy              BasicSubjectProfile `json:"updatedBy"`
 }
 
 // RoleScopeType defines model for Role.ScopeType.
@@ -2456,15 +2610,16 @@ type RoleTemplateScopeType string
 
 // RoleWithPermission defines model for RoleWithPermission.
 type RoleWithPermission struct {
-	CreatedAt   string                      `json:"createdAt"`
-	CreatedBy   BasicSubjectProfile         `json:"createdBy"`
-	Description *string                     `json:"description,omitempty"`
-	Id          string                      `json:"id"`
-	Name        string                      `json:"name"`
-	Permissions []string                    `json:"permissions"`
-	ScopeType   RoleWithPermissionScopeType `json:"scopeType"`
-	UpdatedAt   string                      `json:"updatedAt"`
-	UpdatedBy   BasicSubjectProfile         `json:"updatedBy"`
+	CreatedAt              string                      `json:"createdAt"`
+	CreatedBy              BasicSubjectProfile         `json:"createdBy"`
+	Description            *string                     `json:"description,omitempty"`
+	Id                     string                      `json:"id"`
+	Name                   string                      `json:"name"`
+	Permissions            []string                    `json:"permissions"`
+	RestrictedWorkspaceIds []string                    `json:"restrictedWorkspaceIds"`
+	ScopeType              RoleWithPermissionScopeType `json:"scopeType"`
+	UpdatedAt              string                      `json:"updatedAt"`
+	UpdatedBy              BasicSubjectProfile         `json:"updatedBy"`
 }
 
 // RoleWithPermissionScopeType defines model for RoleWithPermission.ScopeType.
@@ -2534,6 +2689,7 @@ type SharedCluster struct {
 	Cohort              *string                    `json:"cohort,omitempty"`
 	CreatedAt           time.Time                  `json:"createdAt"`
 	DbInstanceType      string                     `json:"dbInstanceType"`
+	DbInstanceVersion   string                     `json:"dbInstanceVersion"`
 	Id                  string                     `json:"id"`
 	IsCordoned          *bool                      `json:"isCordoned,omitempty"`
 	IsDryRun            bool                       `json:"isDryRun"`
@@ -2637,29 +2793,32 @@ type TransferDeploymentRequest struct {
 
 // UpdateAwsClusterRequest defines model for UpdateAwsClusterRequest.
 type UpdateAwsClusterRequest struct {
-	DbInstanceType  string                  `json:"dbInstanceType"`
-	K8sTags         []ClusterTag            `json:"k8sTags"`
-	Name            string                  `json:"name"`
-	NodePools       []UpdateNodePoolRequest `json:"nodePools"`
-	TemplateVersion string                  `json:"templateVersion"`
-	Workspaces      *[]string               `json:"workspaces,omitempty"`
+	DbInstanceType    string                  `json:"dbInstanceType"`
+	DbInstanceVersion *string                 `json:"dbInstanceVersion,omitempty"`
+	K8sTags           []ClusterTag            `json:"k8sTags"`
+	Name              string                  `json:"name"`
+	NodePools         []UpdateNodePoolRequest `json:"nodePools"`
+	TemplateVersion   string                  `json:"templateVersion"`
+	Workspaces        *[]string               `json:"workspaces,omitempty"`
 }
 
 // UpdateAzureClusterRequest defines model for UpdateAzureClusterRequest.
 type UpdateAzureClusterRequest struct {
-	DbInstanceType  string                  `json:"dbInstanceType"`
-	K8sTags         []ClusterTag            `json:"k8sTags"`
-	Name            string                  `json:"name"`
-	NodePools       []UpdateNodePoolRequest `json:"nodePools"`
-	TemplateVersion string                  `json:"templateVersion"`
-	Workspaces      *[]string               `json:"workspaces,omitempty"`
+	DbInstanceType    string                  `json:"dbInstanceType"`
+	DbInstanceVersion *string                 `json:"dbInstanceVersion,omitempty"`
+	K8sTags           []ClusterTag            `json:"k8sTags"`
+	Name              string                  `json:"name"`
+	NodePools         []UpdateNodePoolRequest `json:"nodePools"`
+	TemplateVersion   string                  `json:"templateVersion"`
+	Workspaces        *[]string               `json:"workspaces,omitempty"`
 }
 
 // UpdateCustomRoleRequest defines model for UpdateCustomRoleRequest.
 type UpdateCustomRoleRequest struct {
-	Description *string  `json:"description,omitempty"`
-	Name        string   `json:"name"`
-	Permissions []string `json:"permissions"`
+	Description            *string   `json:"description,omitempty"`
+	Name                   string    `json:"name"`
+	Permissions            []string  `json:"permissions"`
+	RestrictedWorkspaceIds *[]string `json:"restrictedWorkspaceIds,omitempty"`
 }
 
 // UpdateDeployRequest defines model for UpdateDeployRequest.
@@ -2749,12 +2908,13 @@ type UpdateEnvironmentObjectRequestScope string
 
 // UpdateGcpClusterRequest defines model for UpdateGcpClusterRequest.
 type UpdateGcpClusterRequest struct {
-	DbInstanceType  string                  `json:"dbInstanceType"`
-	K8sTags         []ClusterTag            `json:"k8sTags"`
-	Name            string                  `json:"name"`
-	NodePools       []UpdateNodePoolRequest `json:"nodePools"`
-	TemplateVersion string                  `json:"templateVersion"`
-	Workspaces      *[]string               `json:"workspaces,omitempty"`
+	DbInstanceType    string                  `json:"dbInstanceType"`
+	DbInstanceVersion *string                 `json:"dbInstanceVersion,omitempty"`
+	K8sTags           []ClusterTag            `json:"k8sTags"`
+	Name              string                  `json:"name"`
+	NodePools         []UpdateNodePoolRequest `json:"nodePools"`
+	TemplateVersion   string                  `json:"templateVersion"`
+	Workspaces        *[]string               `json:"workspaces,omitempty"`
 }
 
 // UpdateHostedDeploymentRequest defines model for UpdateHostedDeploymentRequest.
@@ -2763,6 +2923,9 @@ type UpdateHostedDeploymentRequest struct {
 
 	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
+
+	// DefaultTaskPodEphemeralStorage Must be valid kubernetes ephemeral storage resource string, in terms of Gibibytes (GiB)
+	DefaultTaskPodEphemeralStorage *string `json:"defaultTaskPodEphemeralStorage,omitempty"`
 
 	// DefaultTaskPodMemory Must be valid kubernetes memory resource string, at least 0.5Gi in terms of Gibibytes (GiB)
 	DefaultTaskPodMemory string  `json:"defaultTaskPodMemory"`
@@ -3256,6 +3419,9 @@ type ListDeploymentsParams struct {
 	// WorkspaceIds IDs that define the workspaces where deployments belong to
 	WorkspaceIds *[]string `form:"workspaceIds,omitempty" json:"workspaceIds,omitempty"`
 
+	// Names deployment names to filter on
+	Names *[]string `form:"names,omitempty" json:"names,omitempty"`
+
 	// Offset offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
@@ -3271,6 +3437,9 @@ type ListDeploymentsParamsSorts string
 
 // ListDeploymentApiTokensParams defines parameters for ListDeploymentApiTokens.
 type ListDeploymentApiTokensParams struct {
+	// TokenTypes filters result set to the passed in token types
+	TokenTypes *[]ListDeploymentApiTokensParamsTokenTypes `form:"tokenTypes,omitempty" json:"tokenTypes,omitempty"`
+
 	// Offset Offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
@@ -3280,6 +3449,9 @@ type ListDeploymentApiTokensParams struct {
 	// Sorts Sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
 	Sorts *[]ListDeploymentApiTokensParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
 }
+
+// ListDeploymentApiTokensParamsTokenTypes defines parameters for ListDeploymentApiTokens.
+type ListDeploymentApiTokensParamsTokenTypes string
 
 // ListDeploymentApiTokensParamsSorts defines parameters for ListDeploymentApiTokens.
 type ListDeploymentApiTokensParamsSorts string
@@ -3297,6 +3469,39 @@ type ListDeploysParams struct {
 
 	// SubjectId ID of the subject for the deploys
 	SubjectId *string `form:"subjectId,omitempty" json:"subjectId,omitempty"`
+}
+
+// GetDeployParams defines parameters for GetDeploy.
+type GetDeployParams struct {
+	// IncludeSteps whether to include the deploy steps
+	IncludeSteps *bool `form:"includeSteps,omitempty" json:"includeSteps,omitempty"`
+}
+
+// ListDeployStepsParams defines parameters for ListDeploySteps.
+type ListDeployStepsParams struct {
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListDeployStepsParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+}
+
+// ListDeployStepsParamsSorts defines parameters for ListDeploySteps.
+type ListDeployStepsParamsSorts string
+
+// ListDeployStepLogsParams defines parameters for ListDeployStepLogs.
+type ListDeployStepLogsParams struct {
+	// Limit limit of the count of the logs
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset offset of the log entries
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// SearchId searchId to get logs from
+	SearchId *string `form:"searchId,omitempty" json:"searchId,omitempty"`
 }
 
 // GetDeploymentLogsParams defines parameters for GetDeploymentLogs.
@@ -3520,6 +3725,9 @@ type ListWorkspacesParams struct {
 	// WorkspaceIds list of workspace ids to get detail of
 	WorkspaceIds *[]string `form:"workspaceIds,omitempty" json:"workspaceIds,omitempty"`
 
+	// Names names to filter on
+	Names *[]string `form:"names,omitempty" json:"names,omitempty"`
+
 	// Offset offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
@@ -3538,6 +3746,9 @@ type ListWorkspacesParamsSorts string
 
 // ListWorkspaceApiTokensParams defines parameters for ListWorkspaceApiTokens.
 type ListWorkspaceApiTokensParams struct {
+	// TokenTypes filters result set to the passed in token types
+	TokenTypes *[]ListWorkspaceApiTokensParamsTokenTypes `form:"tokenTypes,omitempty" json:"tokenTypes,omitempty"`
+
 	// Offset Offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
@@ -3547,6 +3758,9 @@ type ListWorkspaceApiTokensParams struct {
 	// Sorts Sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
 	Sorts *[]ListWorkspaceApiTokensParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
 }
+
+// ListWorkspaceApiTokensParamsTokenTypes defines parameters for ListWorkspaceApiTokens.
+type ListWorkspaceApiTokensParamsTokenTypes string
 
 // ListWorkspaceApiTokensParamsSorts defines parameters for ListWorkspaceApiTokens.
 type ListWorkspaceApiTokensParamsSorts string
@@ -3655,6 +3869,12 @@ type ListSelfUserRepositoriesParamsGitProvider string
 
 // GetSelfUserRepositoryBranchParamsGitProvider defines parameters for GetSelfUserRepositoryBranch.
 type GetSelfUserRepositoryBranchParamsGitProvider string
+
+// GetSelfUserGitAppAuthorizationParamsGitProvider defines parameters for GetSelfUserGitAppAuthorization.
+type GetSelfUserGitAppAuthorizationParamsGitProvider string
+
+// GetSelfUserGitAppInstallationParamsGitProvider defines parameters for GetSelfUserGitAppInstallation.
+type GetSelfUserGitAppInstallationParamsGitProvider string
 
 // CreateOrganizationJSONRequestBody defines body for CreateOrganization for application/json ContentType.
 type CreateOrganizationJSONRequestBody = CreateOrganizationRequest
@@ -4212,10 +4432,19 @@ type ClientInterface interface {
 
 	CreateDeploy(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetDeploy request
+	GetDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, params *GetDeployParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UpdateDeploy request with any body
 	UpdateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDeploySteps request
+	ListDeploySteps(ctx context.Context, organizationId string, deploymentId string, deployId string, params *ListDeployStepsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDeployStepLogs request
+	ListDeployStepLogs(ctx context.Context, organizationId string, deploymentId string, deployId string, deployStepId string, params *ListDeployStepLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetDeploymentHealth request
 	GetDeploymentHealth(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4425,6 +4654,12 @@ type ClientInterface interface {
 
 	// GetSelfUserRepositoryBranch request
 	GetSelfUserRepositoryBranch(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSelfUserGitAppAuthorization request
+	GetSelfUserGitAppAuthorization(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSelfUserGitAppInstallation request
+	GetSelfUserGitAppInstallation(ctx context.Context, gitProvider GetSelfUserGitAppInstallationParamsGitProvider, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateSelfUserInvite request with any body
 	UpdateSelfUserInviteWithBody(ctx context.Context, inviteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5128,6 +5363,18 @@ func (c *Client) CreateDeploy(ctx context.Context, organizationId string, deploy
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, params *GetDeployParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeployRequest(c.Server, organizationId, deploymentId, deployId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) UpdateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateDeployRequestWithBody(c.Server, organizationId, deploymentId, deployId, contentType, body)
 	if err != nil {
@@ -5142,6 +5389,30 @@ func (c *Client) UpdateDeployWithBody(ctx context.Context, organizationId string
 
 func (c *Client) UpdateDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateDeployRequest(c.Server, organizationId, deploymentId, deployId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDeploySteps(ctx context.Context, organizationId string, deploymentId string, deployId string, params *ListDeployStepsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDeployStepsRequest(c.Server, organizationId, deploymentId, deployId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDeployStepLogs(ctx context.Context, organizationId string, deploymentId string, deployId string, deployStepId string, params *ListDeployStepLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDeployStepLogsRequest(c.Server, organizationId, deploymentId, deployId, deployStepId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -6054,6 +6325,30 @@ func (c *Client) ListSelfUserRepositories(ctx context.Context, gitProvider ListS
 
 func (c *Client) GetSelfUserRepositoryBranch(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSelfUserRepositoryBranchRequest(c.Server, gitProvider, gitAccount, gitRepository, gitBranch)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetSelfUserGitAppAuthorization(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSelfUserGitAppAuthorizationRequest(c.Server, gitProvider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetSelfUserGitAppInstallation(ctx context.Context, gitProvider GetSelfUserGitAppInstallationParamsGitProvider, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSelfUserGitAppInstallationRequest(c.Server, gitProvider)
 	if err != nil {
 		return nil, err
 	}
@@ -7744,6 +8039,22 @@ func NewListDeploymentsRequest(server string, organizationId string, params *Lis
 
 	}
 
+	if params.Names != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "names", runtime.ParamLocationQuery, *params.Names); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
 	if params.Offset != nil {
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
@@ -8019,6 +8330,22 @@ func NewListDeploymentApiTokensRequest(server string, organizationId string, dep
 	}
 
 	queryValues := queryURL.Query()
+
+	if params.TokenTypes != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "tokenTypes", runtime.ParamLocationQuery, *params.TokenTypes); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
 
 	if params.Offset != nil {
 
@@ -8554,6 +8881,74 @@ func NewCreateDeployRequestWithBody(server string, organizationId string, deploy
 	return req, nil
 }
 
+// NewGetDeployRequest generates requests for GetDeploy
+func NewGetDeployRequest(server string, organizationId string, deploymentId string, deployId string, params *GetDeployParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deployId", runtime.ParamLocationPath, deployId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.IncludeSteps != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeSteps", runtime.ParamLocationQuery, *params.IncludeSteps); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewUpdateDeployRequest calls the generic UpdateDeploy builder with application/json body
 func NewUpdateDeployRequest(server string, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -8611,6 +9006,213 @@ func NewUpdateDeployRequestWithBody(server string, organizationId string, deploy
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListDeployStepsRequest generates requests for ListDeploySteps
+func NewListDeployStepsRequest(server string, organizationId string, deploymentId string, deployId string, params *ListDeployStepsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deployId", runtime.ParamLocationPath, deployId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s/steps", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListDeployStepLogsRequest generates requests for ListDeployStepLogs
+func NewListDeployStepLogsRequest(server string, organizationId string, deploymentId string, deployId string, deployStepId string, params *ListDeployStepLogsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deployId", runtime.ParamLocationPath, deployId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "deployStepId", runtime.ParamLocationPath, deployStepId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s/steps/%s/logs", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.SearchId != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "searchId", runtime.ParamLocationQuery, *params.SearchId); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -11029,6 +11631,22 @@ func NewListWorkspacesRequest(server string, organizationId string, params *List
 
 	}
 
+	if params.Names != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "names", runtime.ParamLocationQuery, *params.Names); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
 	if params.Offset != nil {
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
@@ -11320,6 +11938,22 @@ func NewListWorkspaceApiTokensRequest(server string, organizationId string, work
 	}
 
 	queryValues := queryURL.Query()
+
+	if params.TokenTypes != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "tokenTypes", runtime.ParamLocationQuery, *params.TokenTypes); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
 
 	if params.Offset != nil {
 
@@ -12640,6 +13274,74 @@ func NewGetSelfUserRepositoryBranchRequest(server string, gitProvider GetSelfUse
 	return req, nil
 }
 
+// NewGetSelfUserGitAppAuthorizationRequest generates requests for GetSelfUserGitAppAuthorization
+func NewGetSelfUserGitAppAuthorizationRequest(server string, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "gitProvider", runtime.ParamLocationPath, gitProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/users/self/git-providers/%s/authorization", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetSelfUserGitAppInstallationRequest generates requests for GetSelfUserGitAppInstallation
+func NewGetSelfUserGitAppInstallationRequest(server string, gitProvider GetSelfUserGitAppInstallationParamsGitProvider) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "gitProvider", runtime.ParamLocationPath, gitProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/users/self/git-providers/%s/installation", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewUpdateSelfUserInviteRequest calls the generic UpdateSelfUserInvite builder with application/json body
 func NewUpdateSelfUserInviteRequest(server string, inviteId string, body UpdateSelfUserInviteJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -12887,10 +13589,19 @@ type ClientWithResponsesInterface interface {
 
 	CreateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error)
 
+	// GetDeploy request
+	GetDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, params *GetDeployParams, reqEditors ...RequestEditorFn) (*GetDeployResponse, error)
+
 	// UpdateDeploy request with any body
 	UpdateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeployResponse, error)
 
 	UpdateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeployResponse, error)
+
+	// ListDeploySteps request
+	ListDeployStepsWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, params *ListDeployStepsParams, reqEditors ...RequestEditorFn) (*ListDeployStepsResponse, error)
+
+	// ListDeployStepLogs request
+	ListDeployStepLogsWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, deployStepId string, params *ListDeployStepLogsParams, reqEditors ...RequestEditorFn) (*ListDeployStepLogsResponse, error)
 
 	// GetDeploymentHealth request
 	GetDeploymentHealthWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*GetDeploymentHealthResponse, error)
@@ -13100,6 +13811,12 @@ type ClientWithResponsesInterface interface {
 
 	// GetSelfUserRepositoryBranch request
 	GetSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*GetSelfUserRepositoryBranchResponse, error)
+
+	// GetSelfUserGitAppAuthorization request
+	GetSelfUserGitAppAuthorizationWithResponse(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, reqEditors ...RequestEditorFn) (*GetSelfUserGitAppAuthorizationResponse, error)
+
+	// GetSelfUserGitAppInstallation request
+	GetSelfUserGitAppInstallationWithResponse(ctx context.Context, gitProvider GetSelfUserGitAppInstallationParamsGitProvider, reqEditors ...RequestEditorFn) (*GetSelfUserGitAppInstallationResponse, error)
 
 	// UpdateSelfUserInvite request with any body
 	UpdateSelfUserInviteWithBodyWithResponse(ctx context.Context, inviteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSelfUserInviteResponse, error)
@@ -14205,6 +14922,33 @@ func (r CreateDeployResponse) StatusCode() int {
 	return 0
 }
 
+type GetDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UpdateDeployResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -14225,6 +14969,60 @@ func (r UpdateDeployResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UpdateDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListDeployStepsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeployStepsPaginated
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON405      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDeployStepsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDeployStepsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListDeployStepLogsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeployStepLogsPaginated
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON405      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDeployStepLogsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDeployStepLogsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -15751,6 +16549,60 @@ func (r GetSelfUserRepositoryBranchResponse) StatusCode() int {
 	return 0
 }
 
+type GetSelfUserGitAppAuthorizationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GitApplicationAuthorization
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON405      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSelfUserGitAppAuthorizationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSelfUserGitAppAuthorizationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetSelfUserGitAppInstallationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GitApplicationInstallation
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON405      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSelfUserGitAppInstallationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSelfUserGitAppInstallationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UpdateSelfUserInviteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -16283,6 +17135,15 @@ func (c *ClientWithResponses) CreateDeployWithResponse(ctx context.Context, orga
 	return ParseCreateDeployResponse(rsp)
 }
 
+// GetDeployWithResponse request returning *GetDeployResponse
+func (c *ClientWithResponses) GetDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, params *GetDeployParams, reqEditors ...RequestEditorFn) (*GetDeployResponse, error) {
+	rsp, err := c.GetDeploy(ctx, organizationId, deploymentId, deployId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeployResponse(rsp)
+}
+
 // UpdateDeployWithBodyWithResponse request with arbitrary body returning *UpdateDeployResponse
 func (c *ClientWithResponses) UpdateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeployResponse, error) {
 	rsp, err := c.UpdateDeployWithBody(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
@@ -16298,6 +17159,24 @@ func (c *ClientWithResponses) UpdateDeployWithResponse(ctx context.Context, orga
 		return nil, err
 	}
 	return ParseUpdateDeployResponse(rsp)
+}
+
+// ListDeployStepsWithResponse request returning *ListDeployStepsResponse
+func (c *ClientWithResponses) ListDeployStepsWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, params *ListDeployStepsParams, reqEditors ...RequestEditorFn) (*ListDeployStepsResponse, error) {
+	rsp, err := c.ListDeploySteps(ctx, organizationId, deploymentId, deployId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDeployStepsResponse(rsp)
+}
+
+// ListDeployStepLogsWithResponse request returning *ListDeployStepLogsResponse
+func (c *ClientWithResponses) ListDeployStepLogsWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, deployStepId string, params *ListDeployStepLogsParams, reqEditors ...RequestEditorFn) (*ListDeployStepLogsResponse, error) {
+	rsp, err := c.ListDeployStepLogs(ctx, organizationId, deploymentId, deployId, deployStepId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDeployStepLogsResponse(rsp)
 }
 
 // GetDeploymentHealthWithResponse request returning *GetDeploymentHealthResponse
@@ -16963,6 +17842,24 @@ func (c *ClientWithResponses) GetSelfUserRepositoryBranchWithResponse(ctx contex
 		return nil, err
 	}
 	return ParseGetSelfUserRepositoryBranchResponse(rsp)
+}
+
+// GetSelfUserGitAppAuthorizationWithResponse request returning *GetSelfUserGitAppAuthorizationResponse
+func (c *ClientWithResponses) GetSelfUserGitAppAuthorizationWithResponse(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, reqEditors ...RequestEditorFn) (*GetSelfUserGitAppAuthorizationResponse, error) {
+	rsp, err := c.GetSelfUserGitAppAuthorization(ctx, gitProvider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSelfUserGitAppAuthorizationResponse(rsp)
+}
+
+// GetSelfUserGitAppInstallationWithResponse request returning *GetSelfUserGitAppInstallationResponse
+func (c *ClientWithResponses) GetSelfUserGitAppInstallationWithResponse(ctx context.Context, gitProvider GetSelfUserGitAppInstallationParamsGitProvider, reqEditors ...RequestEditorFn) (*GetSelfUserGitAppInstallationResponse, error) {
+	rsp, err := c.GetSelfUserGitAppInstallation(ctx, gitProvider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSelfUserGitAppInstallationResponse(rsp)
 }
 
 // UpdateSelfUserInviteWithBodyWithResponse request with arbitrary body returning *UpdateSelfUserInviteResponse
@@ -19420,6 +20317,67 @@ func ParseCreateDeployResponse(rsp *http.Response) (*CreateDeployResponse, error
 	return response, nil
 }
 
+// ParseGetDeployResponse parses an HTTP response from a GetDeployWithResponse call
+func ParseGetDeployResponse(rsp *http.Response) (*GetDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseUpdateDeployResponse parses an HTTP response from a UpdateDeployWithResponse call
 func ParseUpdateDeployResponse(rsp *http.Response) (*UpdateDeployResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -19461,6 +20419,128 @@ func ParseUpdateDeployResponse(rsp *http.Response) (*UpdateDeployResponse, error
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDeployStepsResponse parses an HTTP response from a ListDeployStepsWithResponse call
+func ParseListDeployStepsResponse(rsp *http.Response) (*ListDeployStepsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDeployStepsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeployStepsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDeployStepLogsResponse parses an HTTP response from a ListDeployStepLogsWithResponse call
+func ParseListDeployStepLogsResponse(rsp *http.Response) (*ListDeployStepLogsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDeployStepLogsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeployStepLogsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -22805,6 +23885,128 @@ func ParseGetSelfUserRepositoryBranchResponse(rsp *http.Response) (*GetSelfUserR
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSelfUserGitAppAuthorizationResponse parses an HTTP response from a GetSelfUserGitAppAuthorizationWithResponse call
+func ParseGetSelfUserGitAppAuthorizationResponse(rsp *http.Response) (*GetSelfUserGitAppAuthorizationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSelfUserGitAppAuthorizationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GitApplicationAuthorization
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSelfUserGitAppInstallationResponse parses an HTTP response from a GetSelfUserGitAppInstallationWithResponse call
+func ParseGetSelfUserGitAppInstallationResponse(rsp *http.Response) (*GetSelfUserGitAppInstallationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSelfUserGitAppInstallationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GitApplicationInstallation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

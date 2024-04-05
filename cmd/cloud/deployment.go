@@ -1043,6 +1043,7 @@ func newOrgTokenManageCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newUpsertOrganizationTokenDeploymentRole(out),
 		newRemoveOrganizationTokenDeploymentRole(out),
+		newListOrganizationTokensInDeployment(out),
 	)
 	return cmd
 }
@@ -1058,6 +1059,7 @@ func newWorkspaceTokenManageCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newUpsertWorkspaceTokenDeploymentRole(out),
 		newRemoveWorkspaceTokenDeploymentRole(out),
+		newListWorkspaceTokensInDeployment(out),
 	)
 	return cmd
 }
@@ -1183,12 +1185,62 @@ func removeWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out i
 	return deployment.RemoveWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, workspaceID, deploymentID, out, astroCoreClient, astroCoreIamClient)
 }
 
+func newListOrganizationTokensInDeployment(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all Organization API tokens in a deployment",
+		Long:  "List all Organization API tokens in a deployment\n$astro deployment token organization-token list",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listOrganizationTokensInDeployment(cmd, args, out)
+		},
+	}
+	return cmd
+}
+
+func newListWorkspaceTokensInDeployment(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all Workspace API tokens in a deployment",
+		Long:  "List all Workspace API tokens in a deployment\n$astro deployment token workspace-token list",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listWorkspaceTokensInDeployment(cmd, args, out)
+		},
+	}
+	return cmd
+}
+
+func listOrganizationTokensInDeployment(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	// if an id was provided in the args we use it
+
+	cmd.SilenceUsage = true
+	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
+		"ORGANIZATION",
+	}
+	return deployment.ListTokens(astroCoreClient, deploymentID, &tokenTypes, out)
+}
+
+func listWorkspaceTokensInDeployment(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	// if an id was provided in the args we use it
+
+	cmd.SilenceUsage = true
+	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
+		"WORKSPACE",
+	}
+	return deployment.ListTokens(astroCoreClient, deploymentID, &tokenTypes, out)
+}
+
 func listDeploymentToken(cmd *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errors.New("flag --deployment-id is required")
 	}
 	cmd.SilenceUsage = true
-	return deployment.ListTokens(astroCoreClient, deploymentID, out)
+	return deployment.ListTokens(astroCoreClient, deploymentID, nil, out)
 }
 
 func createDeploymentToken(cmd *cobra.Command, out io.Writer) error {

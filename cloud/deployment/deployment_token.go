@@ -42,8 +42,8 @@ const (
 )
 
 // List all deployment Tokens
-func ListTokens(client astrocore.CoreClient, deployment string, out io.Writer) error {
-	apiTokens, err := getDeploymentTokens(deployment, client)
+func ListTokens(client astrocore.CoreClient, deployment string, tokenTypes *[]astrocore.ListDeploymentApiTokensParamsTokenTypes, out io.Writer) error {
+	apiTokens, err := getDeploymentTokens(deployment, tokenTypes, client)
 	if err != nil {
 		return err
 	}
@@ -119,9 +119,11 @@ func UpdateToken(id, name, newName, description, role, deployment string, out io
 	if err != nil {
 		return err
 	}
-
+	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
+		"DEPLOYMENT",
+	}
 	organization := ctx.Organization
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, client, iamClient)
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -172,9 +174,11 @@ func RotateToken(id, name, deployment string, cleanOutput, force bool, out io.Wr
 	if err != nil {
 		return err
 	}
-
+	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
+		"DEPLOYMENT",
+	}
 	organization := ctx.Organization
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, client, iamClient)
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -218,7 +222,12 @@ func DeleteToken(id, name, deployment string, force bool, out io.Writer, client 
 	}
 
 	organization := ctx.Organization
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, client, iamClient)
+
+	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
+		"DEPLOYMENT",
+	}
+
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -295,13 +304,13 @@ func selectTokens(deployment string, apiTokens []astrocore.ApiToken) (astrocore.
 }
 
 // get all deployment tokens
-func getDeploymentTokens(deployment string, client astrocore.CoreClient) ([]astrocore.ApiToken, error) {
+func getDeploymentTokens(deployment string, tokenTypes *[]astrocore.ListDeploymentApiTokensParamsTokenTypes, client astrocore.CoreClient) ([]astrocore.ApiToken, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return []astrocore.ApiToken{}, err
 	}
 
-	resp, err := client.ListDeploymentApiTokensWithResponse(httpContext.Background(), ctx.Organization, deployment, &astrocore.ListDeploymentApiTokensParams{})
+	resp, err := client.ListDeploymentApiTokensWithResponse(httpContext.Background(), ctx.Organization, deployment, &astrocore.ListDeploymentApiTokensParams{TokenTypes: tokenTypes})
 	if err != nil {
 		return []astrocore.ApiToken{}, err
 	}
@@ -385,9 +394,9 @@ func getTokenByID(id, orgID string, client astrocoreiam.CoreClient) (token astro
 	return *resp.JSON200, nil
 }
 
-func GetDeploymentTokenFromInputOrUser(id, name, deployment, organization string, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) (token astrocoreiam.ApiToken, err error) {
+func GetDeploymentTokenFromInputOrUser(id, name, deployment, organization string, tokenTypes *[]astrocore.ListDeploymentApiTokensParamsTokenTypes, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) (token astrocoreiam.ApiToken, err error) {
 	if id == "" {
-		tokens, err := getDeploymentTokens(deployment, client)
+		tokens, err := getDeploymentTokens(deployment, tokenTypes, client)
 		if err != nil {
 			return token, err
 		}
@@ -415,7 +424,10 @@ func RemoveOrgTokenDeploymentRole(id, name, deployment string, out io.Writer, cl
 		return err
 	}
 	organization := ctx.Organization
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, client, iamClient)
+	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
+		"ORGANIZATION",
+	}
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -482,8 +494,10 @@ func RemoveWorkspaceTokenDeploymentRole(id, name, workspace string, deployment s
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
-
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, client, iamClient)
+	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
+		"WORKSPACE",
+	}
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
