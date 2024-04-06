@@ -180,7 +180,7 @@ var (
 		AirflowVersion:         "2.4.0",
 		SchedulerAu:            &schedulerAU,
 		SchedulerReplicas:      schedulerReplicas,
-		WebServerAirflowApiUrl: "some-url",
+		WebServerAirflowApiUrl: "some-url/api/v1",
 		EnvironmentVariables:   &deploymentEnvironmentVariable,
 		WorkerQueues:           &workerqueue,
 		UpdatedAt:              time.Now(),
@@ -877,6 +877,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         updated_at: 2023-02-01T12:00:00Z
         deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
         webserver_url: some-url
+        api_url: some-url/api/v1
         hibernation_override:
             is_hibernating: true
             override_until: 2023-02-01T12:00:00Z
@@ -976,6 +977,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
             "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url",
+            "api_url": "some-url/api/v1"
 			"hibernation_override": {
 				"is_hibernating": true,
 				"override_until": "2022-11-17T12:26:45.362983-08:00"
