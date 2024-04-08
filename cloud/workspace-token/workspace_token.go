@@ -553,7 +553,7 @@ func RemoveOrgTokenWorkspaceRole(id, name, workspace string, out io.Writer, clie
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Organization API token %s was successfully added to the Deployment\n", token.Name)
+	fmt.Fprintf(out, "Astro Organization API token %s was successfully removed from the Deployment\n", token.Name)
 	return nil
 }
 

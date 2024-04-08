@@ -78,6 +78,7 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 	}
 	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRoleRequest{apiTokenWorkspaceRole}
 	roles := *token.Roles
+
 	for i := range roles {
 		if roles[i].EntityId == workspace {
 			if roles[i].Role == role {
@@ -302,6 +303,9 @@ func GetTokenFromInputOrUser(id, name, organization string, client astrocore.Cor
 // List all roles for a given organization Token
 func ListTokenRoles(id string, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient, out io.Writer) (err error) {
 	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
 	apiToken, err := GetTokenFromInputOrUser(id, "", ctx.Organization, client, iamClient)
 	if err != nil {
 		return err

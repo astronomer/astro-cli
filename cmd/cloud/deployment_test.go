@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
 	"io"
 	"net/http"
 	"os"
@@ -2124,7 +2125,7 @@ func TestDeploymentTokenCreate(t *testing.T) {
 }
 
 func TestDeploymentTokenUpdate(t *testing.T) {
-	expectedHelp := "Update a Deployment or Organaization API token"
+	expectedHelp := "Update a Deployment API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	tokenID = ""
 
@@ -2149,6 +2150,11 @@ func TestDeploymentTokenUpdate(t *testing.T) {
 		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil)
 		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentAPITokenRoleResponseError, nil)
 		astroCoreClient = mockClient
+
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOK, nil)
+		astroCoreIamClient = mockIamClient
+
 		cmdArgs := []string{"token", "update", "--name", tokenName1, "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "failed to update api token")
