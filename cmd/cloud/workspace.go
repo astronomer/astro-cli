@@ -2,17 +2,17 @@ package cloud
 
 import (
 	"fmt"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	"github.com/astronomer/astro-cli/cloud/workspace-token"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/cloud/workspace"
+	"github.com/astronomer/astro-cli/cloud/workspace-token"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 
@@ -418,7 +418,7 @@ func newUpdateOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization API token you want to update in a Workspace. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Workspace role to grant to the "+
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Workspace role to update the "+
 		"Organization API token. Possible values are"+allowedWorkspaceRoleNamesProse)
 	return cmd
 }
@@ -435,7 +435,7 @@ func createOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 	}
 	cmd.SilenceUsage = true
 
-	return workspace_token.UpsertOrgTokenWorkspaceRole(orgTokenID, orgTokenName, tokenRole, workspaceID, "create", out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.UpsertOrgTokenWorkspaceRole(orgTokenID, orgTokenName, tokenRole, workspaceID, "create", out, astroCoreClient, astroCoreIamClient)
 }
 
 func updateOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -450,7 +450,7 @@ func updateOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 	}
 	cmd.SilenceUsage = true
 
-	return workspace_token.UpsertOrgTokenWorkspaceRole(orgTokenID, orgTokenName, tokenRole, workspaceID, "update", out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.UpsertOrgTokenWorkspaceRole(orgTokenID, orgTokenName, tokenRole, workspaceID, "update", out, astroCoreClient, astroCoreIamClient)
 }
 
 func newRemoveOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
@@ -474,7 +474,7 @@ func removeWorkspaceTokenFromDeploymentRole(cmd *cobra.Command, args []string, o
 	}
 
 	cmd.SilenceUsage = true
-	return workspace_token.RemoveOrgTokenWorkspaceRole(orgTokenID, orgTokenName, workspaceID, out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.RemoveOrgTokenWorkspaceRole(orgTokenID, orgTokenName, workspaceID, out, astroCoreClient, astroCoreIamClient)
 }
 
 func newListOrganizationTokensInWorkspace(out io.Writer) *cobra.Command {
@@ -483,18 +483,18 @@ func newListOrganizationTokensInWorkspace(out io.Writer) *cobra.Command {
 		Short: "List all Organization API tokens in a workspace",
 		Long:  "List all Organization API tokens in a workspace\n$astro workspace token organization-token list",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listOrganizationTokensInWorkspace(cmd, args, out)
+			return listOrganizationTokensInWorkspace(cmd, out)
 		},
 	}
 	return cmd
 }
 
-func listOrganizationTokensInWorkspace(cmd *cobra.Command, args []string, out io.Writer) error {
+func listOrganizationTokensInWorkspace(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 	tokenTypes := []astrocore.ListWorkspaceApiTokensParamsTokenTypes{
 		"ORGANIZATION",
 	}
-	return workspace_token.ListTokens(astroCoreClient, deploymentID, &tokenTypes, out)
+	return workspacetoken.ListTokens(astroCoreClient, deploymentID, &tokenTypes, out)
 }
 
 func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
@@ -683,7 +683,7 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 
 func listWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return workspace_token.ListTokens(astroCoreClient, workspaceID, nil, out)
+	return workspacetoken.ListTokens(astroCoreClient, workspaceID, nil, out)
 }
 
 func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
@@ -702,7 +702,7 @@ func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	return workspace_token.CreateToken(tokenName, tokenDescription, tokenRole, workspaceID, tokenExpiration, cleanTokenOutput, out, astroCoreClient)
+	return workspacetoken.CreateToken(tokenName, tokenDescription, tokenRole, workspaceID, tokenExpiration, cleanTokenOutput, out, astroCoreClient)
 }
 
 func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -713,7 +713,7 @@ func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return workspace_token.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID, out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID, out, astroCoreClient, astroCoreIamClient)
 }
 
 func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -723,7 +723,7 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 		tokenID = strings.ToLower(args[0])
 	}
 	cmd.SilenceUsage = true
-	return workspace_token.RotateToken(tokenID, name, workspaceID, cleanTokenOutput, forceRotate, out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.RotateToken(tokenID, name, workspaceID, cleanTokenOutput, forceRotate, out, astroCoreClient, astroCoreIamClient)
 }
 
 func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -734,7 +734,7 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return workspace_token.DeleteToken(tokenID, name, workspaceID, forceDelete, out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.DeleteToken(tokenID, name, workspaceID, forceDelete, out, astroCoreClient, astroCoreIamClient)
 }
 
 func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) error {

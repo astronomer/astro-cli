@@ -4,13 +4,13 @@ import (
 	httpContext "context"
 	"errors"
 	"fmt"
-	astrocoreiam "github.com/astronomer/astro-cli/astro-client-iam-core"
 	"io"
 	"os"
 	"strconv"
 	"time"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocoreiam "github.com/astronomer/astro-cli/astro-client-iam-core"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -23,7 +23,6 @@ var (
 	errInvalidOrganizationTokenKey = errors.New("invalid Organization API token selection")
 	errOrganizationTokenNotFound   = errors.New("organization token specified was not found")
 	errOrgTokenInWorkspace         = errors.New("this Organization API token has already been added to the Workspace with that role")
-	errOrgTokenInDeployment        = errors.New("this Organization API token has already been added to the Deployment with that role")
 )
 
 const (

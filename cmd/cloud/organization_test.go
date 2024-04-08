@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
 	"io"
 	"net/http"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"

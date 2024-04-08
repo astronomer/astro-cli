@@ -4,15 +4,15 @@ import (
 	httpContext "context"
 	"errors"
 	"fmt"
-	astrocoreiam "github.com/astronomer/astro-cli/astro-client-iam-core"
-	"github.com/astronomer/astro-cli/cloud/organization"
-	workspace2 "github.com/astronomer/astro-cli/cloud/workspace-token"
 	"io"
 	"os"
 	"strconv"
 	"time"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocoreiam "github.com/astronomer/astro-cli/astro-client-iam-core"
+	"github.com/astronomer/astro-cli/cloud/organization"
+	workspace2 "github.com/astronomer/astro-cli/cloud/workspace-token"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -126,8 +126,8 @@ func UpdateToken(id, name, newName, description, role, deployment string, out io
 	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
 		"DEPLOYMENT",
 	}
-	organization := ctx.Organization
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, &tokenTypes, client, iamClient)
+	organizationID := ctx.Organization
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organizationID, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -181,8 +181,8 @@ func RotateToken(id, name, deployment string, cleanOutput, force bool, out io.Wr
 	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
 		"DEPLOYMENT",
 	}
-	organization := ctx.Organization
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, &tokenTypes, client, iamClient)
+	organizationID := ctx.Organization
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organizationID, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -225,13 +225,13 @@ func DeleteToken(id, name, deployment string, force bool, out io.Writer, client 
 		return err
 	}
 
-	organization := ctx.Organization
+	organizationID := ctx.Organization
 
 	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
 		"DEPLOYMENT",
 	}
 
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, &tokenTypes, client, iamClient)
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organizationID, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -247,7 +247,7 @@ func DeleteToken(id, name, deployment string, force bool, out io.Writer, client 
 		}
 	}
 
-	resp, err := client.DeleteDeploymentApiTokenWithResponse(httpContext.Background(), ctx.Organization, deployment, apiTokenID)
+	resp, err := client.DeleteDeploymentApiTokenWithResponse(httpContext.Background(), organizationID, deployment, apiTokenID)
 	if err != nil {
 		return err
 	}
@@ -398,7 +398,7 @@ func getTokenByID(id, orgID string, client astrocoreiam.CoreClient) (token astro
 	return *resp.JSON200, nil
 }
 
-func GetDeploymentTokenFromInputOrUser(id, name, deployment, organization string, tokenTypes *[]astrocore.ListDeploymentApiTokensParamsTokenTypes, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) (token astrocoreiam.ApiToken, err error) {
+func GetDeploymentTokenFromInputOrUser(id, name, deployment, organizationID string, tokenTypes *[]astrocore.ListDeploymentApiTokensParamsTokenTypes, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) (token astrocoreiam.ApiToken, err error) {
 	if id == "" {
 		tokens, err := getDeploymentTokens(deployment, tokenTypes, client)
 		if err != nil {
@@ -409,12 +409,12 @@ func GetDeploymentTokenFromInputOrUser(id, name, deployment, organization string
 		if err != nil {
 			return token, err
 		}
-		token, err = getTokenByID(tokenFromList.Id, organization, iamClient)
+		token, err = getTokenByID(tokenFromList.Id, organizationID, iamClient)
 		if err != nil {
 			return token, err
 		}
 	} else {
-		token, err = getTokenByID(id, organization, iamClient)
+		token, err = getTokenByID(id, organizationID, iamClient)
 		if err != nil {
 			return token, err
 		}
@@ -427,11 +427,11 @@ func RemoveOrgTokenDeploymentRole(id, name, deployment string, out io.Writer, cl
 	if err != nil {
 		return err
 	}
-	organization := ctx.Organization
+	organizationID := ctx.Organization
 	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
 		"ORGANIZATION",
 	}
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, &tokenTypes, client, iamClient)
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organizationID, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -475,7 +475,7 @@ func RemoveOrgTokenDeploymentRole(id, name, deployment string, out io.Writer, cl
 		Description: token.Description,
 		Roles:       updateOrganizationAPITokenRoles,
 	}
-	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.Organization, apiTokenID, updateOrganizationAPITokenRequest)
+	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), organizationID, apiTokenID, updateOrganizationAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -487,13 +487,13 @@ func RemoveOrgTokenDeploymentRole(id, name, deployment string, out io.Writer, cl
 	return nil
 }
 
-func RemoveWorkspaceTokenDeploymentRole(id, name, workspace string, deployment string, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
+func RemoveWorkspaceTokenDeploymentRole(id, name, workspace, deployment string, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	organization := ctx.Organization
+	organizationID := ctx.Organization
 
 	if workspace == "" {
 		workspace = ctx.Workspace
@@ -501,7 +501,7 @@ func RemoveWorkspaceTokenDeploymentRole(id, name, workspace string, deployment s
 	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
 		"WORKSPACE",
 	}
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, &tokenTypes, client, iamClient)
+	token, err := GetDeploymentTokenFromInputOrUser(id, name, deployment, organizationID, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -537,7 +537,7 @@ func RemoveWorkspaceTokenDeploymentRole(id, name, workspace string, deployment s
 		Roles:       &updateWorkspaceAPITokenRoles,
 	}
 
-	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), organization, workspace, apiTokenID, updateWorkspaceAPITokenRequest)
+	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), organizationID, workspace, apiTokenID, updateWorkspaceAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -555,7 +555,7 @@ func UpsertWorkspaceTokenDeploymentRole(id, name, role, workspace, deployment, o
 		return err
 	}
 
-	organization := ctx.Organization
+	organizationID := ctx.Organization
 
 	if workspace == "" {
 		workspace = ctx.Workspace
@@ -564,13 +564,16 @@ func UpsertWorkspaceTokenDeploymentRole(id, name, role, workspace, deployment, o
 	var token astrocoreiam.ApiToken
 	if operation == "create" {
 		tokenTypes := []astrocore.ListWorkspaceApiTokensParamsTokenTypes{"WORKSPACE"}
-		token, err = workspace2.GetTokenFromInputOrUser(id, name, workspace, organization, &tokenTypes, client, iamClient)
+		token, err = workspace2.GetTokenFromInputOrUser(id, name, workspace, organizationID, &tokenTypes, client, iamClient)
 		if err != nil {
 			return err
 		}
 	} else {
 		tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{"WORKSPACE"}
-		token, err = GetDeploymentTokenFromInputOrUser(id, name, deployment, organization, &tokenTypes, client, iamClient)
+		token, err = GetDeploymentTokenFromInputOrUser(id, name, deployment, organizationID, &tokenTypes, client, iamClient)
+		if err != nil {
+			return err
+		}
 	}
 
 	apiTokenID := token.Id
@@ -612,7 +615,7 @@ func UpsertWorkspaceTokenDeploymentRole(id, name, role, workspace, deployment, o
 		Roles:       &updateWorkspaceAPITokenRoles,
 	}
 
-	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), organization, workspace, apiTokenID, updateWorkspaceAPITokenRequest)
+	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), organizationID, workspace, apiTokenID, updateWorkspaceAPITokenRequest)
 	if err != nil {
 		return err
 	}

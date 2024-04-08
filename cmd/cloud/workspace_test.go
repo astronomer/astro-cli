@@ -1031,12 +1031,12 @@ var (
 		apiToken1,
 		{Id: "token2", Name: "Token 2", Description: description2, Type: "Type 2", Roles: []astrocore.ApiTokenRole{{EntityId: mockWorkspaceID, EntityType: "WORKSPACE", Role: "WORKSPACE_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName2}},
 	}
-	iamApiToken            = astroiamcore.ApiToken{Id: "token1", Name: tokenName1, Token: &token, Description: description1, Type: "Type 1", Roles: &[]astroiamcore.ApiTokenRole{{EntityId: mockWorkspaceID, EntityType: "WORKSPACE", Role: "WORKSPACE_AUTHOR"}}, CreatedAt: time.Now(), CreatedBy: &astroiamcore.BasicSubjectProfile{FullName: &fullName1}}
+	iamAPIToken            = astroiamcore.ApiToken{Id: "token1", Name: tokenName1, Token: &token, Description: description1, Type: "Type 1", Roles: &[]astroiamcore.ApiTokenRole{{EntityId: mockWorkspaceID, EntityType: "WORKSPACE", Role: "WORKSPACE_AUTHOR"}}, CreatedAt: time.Now(), CreatedBy: &astroiamcore.BasicSubjectProfile{FullName: &fullName1}}
 	GetAPITokensResponseOK = astroiamcore.GetApiTokenResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &iamApiToken,
+		JSON200: &iamAPIToken,
 	}
 	errorTokenGet, _ = json.Marshal(astroiamcore.Error{
 		Message: "failed to get token",

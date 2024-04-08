@@ -3,8 +3,6 @@ package organization
 import (
 	"bytes"
 	"encoding/json"
-	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
-	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
 	"net/http"
 	"os"
 	"testing"
@@ -12,6 +10,8 @@ import (
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
+	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
 	"github.com/astronomer/astro-cli/cloud/user"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
@@ -25,12 +25,12 @@ var (
 	fullName2              = "User 2"
 	token                  = "token"
 	workspaceID            = "ck05r3bor07h40d02y2hw4n4v"
-	iamApiToken            = astroiamcore.ApiToken{Id: "token1", Name: "Token 1", Token: &token, Description: description1, Type: "Type 1", Roles: &[]astroiamcore.ApiTokenRole{{EntityType: "ORGANIZATION", EntityId: "ORGANIZATION", Role: "ORGANIZATION_MEMBER"}, {EntityType: "WORKSAPCE", EntityId: workspaceID, Role: "WORKSPACE_AUTHOR"}}, CreatedAt: time.Now(), CreatedBy: &astroiamcore.BasicSubjectProfile{FullName: &fullName1}}
+	iamAPIToken            = astroiamcore.ApiToken{Id: "token1", Name: "Token 1", Token: &token, Description: description1, Type: "Type 1", Roles: &[]astroiamcore.ApiTokenRole{{EntityType: "ORGANIZATION", EntityId: "ORGANIZATION", Role: "ORGANIZATION_MEMBER"}, {EntityType: "WORKSAPCE", EntityId: workspaceID, Role: "WORKSPACE_AUTHOR"}}, CreatedAt: time.Now(), CreatedBy: &astroiamcore.BasicSubjectProfile{FullName: &fullName1}}
 	GetAPITokensResponseOK = astroiamcore.GetApiTokenResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &iamApiToken,
+		JSON200: &iamAPIToken,
 	}
 	errorTokenGet, _ = json.Marshal(astroiamcore.Error{
 		Message: "failed to get token",

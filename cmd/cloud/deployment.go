@@ -1075,7 +1075,7 @@ func newCreateOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to grant to the "+
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to add to the "+
 		"Organization API token. Possible values are DEPLOYMENT_ADMIN or a custom role name.")
 	return cmd
 }
@@ -1090,7 +1090,7 @@ func newUpdateOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to grant to the "+
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to update the "+
 		"Organization API token. Possible values are DEPLOYMENT_ADMIN or a custom role name.")
 	return cmd
 }
@@ -1259,7 +1259,7 @@ func newListOrganizationTokensInDeployment(out io.Writer) *cobra.Command {
 		Short: "List all Organization API tokens in a deployment",
 		Long:  "List all Organization API tokens in a deployment\n$astro deployment token organization-token list",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listOrganizationTokensInDeployment(cmd, args, out)
+			return listOrganizationTokensInDeployment(cmd, out)
 		},
 	}
 	return cmd
@@ -1271,13 +1271,13 @@ func newListWorkspaceTokensInDeployment(out io.Writer) *cobra.Command {
 		Short: "List all Workspace API tokens in a deployment",
 		Long:  "List all Workspace API tokens in a deployment\n$astro deployment token workspace-token list",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listWorkspaceTokensInDeployment(cmd, args, out)
+			return listWorkspaceTokensInDeployment(cmd, out)
 		},
 	}
 	return cmd
 }
 
-func listOrganizationTokensInDeployment(cmd *cobra.Command, args []string, out io.Writer) error {
+func listOrganizationTokensInDeployment(cmd *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errors.New("flag --deployment-id is required")
 	}
@@ -1290,7 +1290,7 @@ func listOrganizationTokensInDeployment(cmd *cobra.Command, args []string, out i
 	return deployment.ListTokens(astroCoreClient, deploymentID, &tokenTypes, out)
 }
 
-func listWorkspaceTokensInDeployment(cmd *cobra.Command, args []string, out io.Writer) error {
+func listWorkspaceTokensInDeployment(cmd *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errors.New("flag --deployment-id is required")
 	}

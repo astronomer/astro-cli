@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/astronomer/astro-cli/context"
-	"github.com/astronomer/astro-cli/version"
 	"net/http"
 	"net/url"
 	"runtime"
 
+	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/version"
 )
 
 var (
