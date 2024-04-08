@@ -1540,8 +1540,8 @@ var (
 
 func TestWorkspaceTokenAdd(t *testing.T) {
 	expectedHelp := "Add an Organization API token to an Astro Workspace"
+	orgTokenID = ""
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
 	t.Run("-h prints list help", func(t *testing.T) {
 		cmdArgs := []string{"token", "add", "-h"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
@@ -1553,7 +1553,7 @@ func TestWorkspaceTokenAdd(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseError, nil)
 		astroCoreClient = mockClient
-		cmdArgs := []string{"token", "add", "--role", "WORKSPACE_MEMBER"}
+		cmdArgs := []string{"token", "add", "--org-token-name", tokenName1, "--role", "WORKSPACE_MEMBER"}
 		_, err := execWorkspaceCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "failed to list tokens")
 	})
