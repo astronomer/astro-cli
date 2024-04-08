@@ -1,8 +1,9 @@
-package workspace
+package workspace_token
 
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/astronomer/astro-cli/cloud/workspace"
 	"net/http"
 	"os"
 	"testing"
@@ -88,7 +89,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
-		Body:    errorBodyCreate,
+		Body:    workspace.errorBodyCreate,
 		JSON200: nil,
 	}
 	UpdateWorkspaceAPITokenResponseOK = astrocore.UpdateWorkspaceApiTokenResponse{
@@ -101,7 +102,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
-		Body:    errorBodyUpdate,
+		Body:    workspace.errorBodyUpdate,
 		JSON200: nil,
 	}
 	RotateWorkspaceAPITokenResponseOK = astrocore.RotateWorkspaceApiTokenResponse{
@@ -114,7 +115,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
-		Body:    errorBodyUpdate,
+		Body:    workspace.errorBodyUpdate,
 		JSON200: nil,
 	}
 	DeleteWorkspaceAPITokenResponseOK = astrocore.DeleteWorkspaceApiTokenResponse{
@@ -126,7 +127,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
-		Body: errorBodyUpdate,
+		Body: workspace.errorBodyUpdate,
 	}
 )
 
@@ -209,7 +210,7 @@ func TestCreateToken(t *testing.T) {
 
 		err := CreateToken("", "Description 1", "WORKSPACE_MEMBER", "", 0, true, out, mockClient)
 
-		assert.Equal(t, ErrInvalidTokenName, err)
+		assert.Equal(t, workspace.ErrInvalidTokenName, err)
 	})
 }
 
