@@ -44,7 +44,7 @@ const (
 )
 
 // List all workspace Tokens
-func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) error {
+func ListTokens(client astrocore.CoreClient, workspace string, tokenTypes *[]astrocore.ListWorkspaceApiTokensParamsTokenTypes, out io.Writer) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -54,7 +54,7 @@ func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) er
 		workspace = ctx.Workspace
 	}
 
-	apiTokens, err := getWorkspaceTokens(workspace, nil, client)
+	apiTokens, err := getWorkspaceTokens(workspace, tokenTypes, client)
 	if err != nil {
 		return err
 	}
@@ -551,4 +551,98 @@ func UpsertWorkspaceTokenDeploymentRole(id, name, role, workspace string, deploy
 	}
 	fmt.Fprintf(out, "Astro Workspace API token %s was successfully added to the Deployment\n", token.Name)
 	return nil
+}
+
+func RemoveOrgTokenWorkspaceRole(id, name, workspace string, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	if workspace == "" {
+		workspace = ctx.Workspace
+	}
+
+	organization := ctx.Organization
+	tokenTypes := []astrocore.ListWorkspaceApiTokensParamsTokenTypes{
+		"ORGANIZATION",
+	}
+	token, err := GetWorkspaceTokenFromInputOrUser(id, name, workspace, organization, &tokenTypes, client, iamClient)
+	if err != nil {
+		return err
+	}
+	roles := *token.Roles
+
+	apiTokenID := token.Id
+	var orgRole string
+	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRoleRequest{}
+	apiTokenDeploymentRoles := []astrocore.ApiTokenDeploymentRoleRequest{}
+	for i := range roles {
+		if roles[i].EntityId == workspace {
+			continue // this removes the role in question
+		}
+
+		if roles[i].EntityId == ctx.Organization {
+			orgRole = roles[i].Role
+		}
+
+		if roles[i].EntityType == workspaceEntity {
+			apiTokenWorkspaceRoles = append(apiTokenWorkspaceRoles, astrocore.ApiTokenWorkspaceRoleRequest{
+				EntityId: roles[i].EntityId,
+				Role:     roles[i].Role,
+			})
+		}
+
+		if roles[i].EntityType == deploymentEntity {
+			apiTokenDeploymentRoles = append(apiTokenDeploymentRoles, astrocore.ApiTokenDeploymentRoleRequest{
+				EntityId: roles[i].EntityId,
+				Role:     roles[i].Role,
+			})
+		}
+	}
+
+	updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRolesRequest{
+		Organization: orgRole,
+		Deployment:   &apiTokenDeploymentRoles,
+		Workspace:    &apiTokenWorkspaceRoles,
+	}
+	updateOrganizationAPITokenRequest := astrocore.UpdateOrganizationApiTokenRequest{
+		Name:        token.Name,
+		Description: token.Description,
+		Roles:       updateOrganizationAPITokenRoles,
+	}
+	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.Organization, apiTokenID, updateOrganizationAPITokenRequest)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Astro Organization API token %s was successfully added to the Deployment\n", token.Name)
+	return nil
+}
+
+func GetWorkspaceTokenFromInputOrUser(id, name, workspace, organization string, tokenTypes *[]astrocore.ListWorkspaceApiTokensParamsTokenTypes, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) (token astrocoreiam.ApiToken, err error) {
+	if id == "" {
+		tokens, err := getWorkspaceTokens(workspace, tokenTypes, client)
+		if err != nil {
+			return token, err
+		}
+		tokenFromList, err := getWorkspaceToken(id, name, workspace, "\nPlease select the Organization API token you would like to update:", tokens)
+
+		if err != nil {
+			return token, err
+		}
+		token, err = getTokenByID(tokenFromList.Id, organization, iamClient)
+		if err != nil {
+			return token, err
+		}
+	} else {
+		token, err = getTokenByID(id, organization, iamClient)
+		if err != nil {
+			return token, err
+		}
+	}
+	return token, err
 }

@@ -198,6 +198,81 @@ func UpsertOrgTokenDeploymentRole(id, name, role, deployment string, out io.Writ
 	return nil
 }
 
+func UpsertOrgTokenWorkspaceRole(id, name, role, workspace string, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	if workspace == "" {
+		workspace = ctx.Workspace
+	}
+
+	token, err := GetTokenFromInputOrUser(id, name, ctx.Organization, client, iamClient)
+	if err != nil {
+		return err
+	}
+	apiTokenID := token.Id
+	var orgRole string
+	apiTokenWorkspaceRole := astrocore.ApiTokenWorkspaceRoleRequest{
+		EntityId: workspace,
+		Role:     role,
+	}
+	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRoleRequest{apiTokenWorkspaceRole}
+
+	apiTokenDeploymentRoles := []astrocore.ApiTokenDeploymentRoleRequest{}
+	roles := *token.Roles
+	for i := range roles {
+		if roles[i].EntityId == workspace {
+			if roles[i].Role == role {
+				return errOrgTokenInDeployment
+			} else {
+				continue
+			}
+		}
+
+		if roles[i].EntityId == ctx.Organization {
+			orgRole = roles[i].Role
+		}
+
+		if roles[i].EntityType == workspaceEntity {
+			apiTokenWorkspaceRoles = append(apiTokenWorkspaceRoles, astrocore.ApiTokenWorkspaceRoleRequest{
+				EntityId: roles[i].EntityId,
+				Role:     roles[i].Role,
+			})
+		}
+
+		if roles[i].EntityType == deploymentEntity {
+			apiTokenDeploymentRoles = append(apiTokenDeploymentRoles, astrocore.ApiTokenDeploymentRoleRequest{
+				EntityId: roles[i].EntityId,
+				Role:     roles[i].Role,
+			})
+		}
+	}
+
+	updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRolesRequest{
+		Organization: orgRole,
+		Deployment:   &apiTokenDeploymentRoles,
+		Workspace:    &apiTokenWorkspaceRoles,
+	}
+	updateOrganizationAPITokenRequest := astrocore.UpdateOrganizationApiTokenRequest{
+		Name:        token.Name,
+		Description: token.Description,
+		Roles:       updateOrganizationAPITokenRoles,
+	}
+
+	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.Organization, apiTokenID, updateOrganizationAPITokenRequest)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Astro Organization API token %s was successfully added to the Workspace\n", token.Name)
+	return nil
+}
+
 func selectTokens(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 	apiTokensMap := map[string]astrocore.ApiToken{}
 	tab := newTokenSelectionTableOut()

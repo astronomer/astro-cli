@@ -400,7 +400,7 @@ func GetDeploymentTokenFromInputOrUser(id, name, deployment, organization string
 		if err != nil {
 			return token, err
 		}
-		tokenFromList, err := getDeploymentToken(id, name, deployment, "\nPlease select the Organization API token you would like to remove from the Deployment:", tokens)
+		tokenFromList, err := getDeploymentToken(id, name, deployment, "\nPlease select the Organization API token you would like to update:", tokens)
 
 		if err != nil {
 			return token, err
