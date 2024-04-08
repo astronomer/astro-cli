@@ -482,7 +482,7 @@ func RemoveOrgTokenDeploymentRole(id, name, deployment string, out io.Writer, cl
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Organization API token %s was successfully added to the Deployment\n", token.Name)
+	fmt.Fprintf(out, "Astro Organization API token %s was successfully removed from the Deployment\n", token.Name)
 	return nil
 }
 
@@ -544,7 +544,7 @@ func RemoveWorkspaceTokenDeploymentRole(id, name, workspace, deployment string, 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Workspace API token %s was successfully added to the Deployment\n", token.Name)
+	fmt.Fprintf(out, "Astro Workspace API token %s was successfully removed from the Deployment\n", token.Name)
 	return nil
 }
 
@@ -622,7 +622,7 @@ func UpsertWorkspaceTokenDeploymentRole(id, name, role, workspace, deployment, o
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Workspace API token %s was successfully added to the Deployment\n", token.Name)
+	fmt.Fprintf(out, "Astro Workspace API token %s was successfully added/updated to the Deployment\n", token.Name)
 	return nil
 }
 
@@ -701,6 +701,6 @@ func UpsertOrgTokenDeploymentRole(id, name, role, deployment, operation string, 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Organization API token %s was successfully added to the Deployment\n", token.Name)
+	fmt.Fprintf(out, "Astro Organization API token %s was successfully added/updated to the Deployment\n", token.Name)
 	return nil
 }
