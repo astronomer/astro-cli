@@ -379,7 +379,6 @@ func getWorkspaceTokens(workspace string, tokenTypes *[]astrocore.ListWorkspaceA
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
-
 	resp, err := client.ListWorkspaceApiTokensWithResponse(httpContext.Background(), ctx.Organization, workspace, &astrocore.ListWorkspaceApiTokensParams{TokenTypes: tokenTypes})
 	if err != nil {
 		return []astrocore.ApiToken{}, err
