@@ -282,7 +282,6 @@ func GetTokenFromInputOrUser(id, name, organization string, client astrocore.Cor
 			return token, err
 		}
 		tokenFromList, err := getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to update:", tokens)
-
 		if err != nil {
 			return token, err
 		}
