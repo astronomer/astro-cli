@@ -445,6 +445,18 @@ func TestUpdateToken(t *testing.T) {
 		err := UpdateToken("", apiToken1.Name, "", "", "DEPLOYMENT_MEMBER", "", out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 	})
+
+	t.Run("error path wrong token type provided", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateDeploymentAPITokenResponseOK, nil)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil)
+
+		err := UpdateToken("token1", "", "", "", "", "", out, mockClient, mockIamClient)
+		assert.ErrorContains(t, err, "the token selected is not of the type you are trying to modify")
+	})
 }
 
 func TestRotateToken(t *testing.T) {
@@ -1156,6 +1168,27 @@ func TestUpsertOrgTokenDeploymentRole(t *testing.T) {
 		err = UpsertOrgTokenDeploymentRole("token-id", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
+
+	t.Run("error path with token id passed in - wrong token type", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil).Once()
+		// mock os.Stdin
+		expectedInput := []byte("2")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err = UpsertOrgTokenDeploymentRole("token-id", "", "", deploymentID, "create", out, mockClient, mockIamClient)
+		assert.ErrorContains(t, err, "the token selected is not of the type you are trying to modify")
+	})
 }
 
 func TestUpsertWorkspaceTokenDeploymentRole(t *testing.T) {
@@ -1332,5 +1365,26 @@ func TestUpsertWorkspaceTokenDeploymentRole(t *testing.T) {
 		os.Stdin = r
 		err = UpsertWorkspaceTokenDeploymentRole("token-id", "", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to get token")
+	})
+
+	t.Run("error path with token id passed in - wrong token type", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
+		// mock os.Stdin
+		expectedInput := []byte("2")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err = UpsertWorkspaceTokenDeploymentRole("token-id", "", "", "", deploymentID, "create", out, mockClient, mockIamClient)
+		assert.ErrorContains(t, err, "the token selected is not of the type you are trying to modify")
 	})
 }

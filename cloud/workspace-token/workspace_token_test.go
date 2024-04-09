@@ -853,6 +853,27 @@ func TestUpsertOrgTokenWorkspaceRole(t *testing.T) {
 		err = UpsertOrgTokenWorkspaceRole("token-id", "", "", "", "create", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
+
+	t.Run("error path with token id passed in - wrong token type", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil).Once()
+		// mock os.Stdin
+		expectedInput := []byte("2")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err = UpsertOrgTokenWorkspaceRole("token-id", "", "", "", "create", out, mockClient, mockIamClient)
+		assert.ErrorContains(t, err, "the token selected is not of the type you are trying to modify")
+	})
 }
 
 func TestRemoveOrgTokenWorkspaceRole(t *testing.T) {

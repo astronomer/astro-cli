@@ -1267,7 +1267,7 @@ func TestOrganizationTokenUpdate(t *testing.T) {
 		assert.Error(t, err)
 		mockClient.AssertExpectations(t)
 	})
-	t.Run("token is updated", func(t *testing.T) {
+	t.Run("token is updated -- name provided", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
@@ -1278,6 +1278,7 @@ func TestOrganizationTokenUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
+
 	t.Run("token is created with no ID provided", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
