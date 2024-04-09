@@ -880,6 +880,15 @@ func TestUpdateDeploymentUserRole(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOut, out.String())
 	})
+
+	t.Run("error path UpdateDeploymentUserRole user not found", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentUsersResponseOK, nil).Twice()
+		mockClient.On("MutateDeploymentUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentUserRoleResponseOK, nil).Once()
+		err := UpdateDeploymentUserRole("notfound@1.com", "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		assert.EqualError(t, err, "no user was found for the email you provided")
+	})
 }
 
 func TestAddDeploymentUser(t *testing.T) {
