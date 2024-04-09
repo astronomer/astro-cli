@@ -461,6 +461,9 @@ func getUserID(email string, users []astrocore.User, roleEntity string) (userID,
 			}
 		}
 	}
+	if userID == "" {
+		return userID, email, ErrUserNotFound
+	}
 	return userID, email, nil
 }
 
