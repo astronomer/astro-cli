@@ -877,7 +877,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         updated_at: 2023-02-01T12:00:00Z
         deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
         webserver_url: some-url
-        api_url: some-url/api/v1
+        airflow_api_url: some-url/api/v1
         hibernation_override:
             is_hibernating: true
             override_until: 2023-02-01T12:00:00Z
@@ -977,7 +977,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
             "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
             "webserver_url": "some-url",
-            "api_url": "some-url/api/v1"
+            "airflow_api_url": "some-url/api/v1"
 			"hibernation_override": {
 				"is_hibernating": true,
 				"override_until": "2022-11-17T12:26:45.362983-08:00"
