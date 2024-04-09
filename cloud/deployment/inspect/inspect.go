@@ -29,7 +29,7 @@ type deploymentMetadata struct {
 	UpdatedAt           *time.Time           `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
 	DeploymentURL       *string              `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
 	WebserverURL        *string              `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
-	AirflowAPIURL              *string              `mapstructure:"airflow_api_url" yaml:"airflow_api_url" json:"airflow_api_url"`
+	AirflowAPIURL       *string              `mapstructure:"airflow_api_url" yaml:"airflow_api_url" json:"airflow_api_url"`
 	HibernationOverride *HibernationOverride `mapstructure:"hibernation_override,omitempty" yaml:"hibernation_override,omitempty" json:"hibernation_override,omitempty"`
 }
 
@@ -201,7 +201,7 @@ func getDeploymentInfo(coreDeployment astroplatformcore.Deployment) (map[string]
 		"release_name":    releaseName,
 		"deployment_url":  deploymentURL,
 		"webserver_url":   coreDeployment.WebServerUrl,
-		"airflow_api_url":         coreDeployment.WebServerAirflowApiUrl,
+		"airflow_api_url": coreDeployment.WebServerAirflowApiUrl,
 		"created_at":      coreDeployment.CreatedAt,
 		"updated_at":      coreDeployment.UpdatedAt,
 		"status":          coreDeployment.Status,
