@@ -718,7 +718,7 @@ func TestRemoveOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveOrgTokenDeploymentRole("", "", "", out, mockClient, mockIamClient)
+		err = RemoveOrgTokenDeploymentRole("", "", deploymentID, out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -739,7 +739,7 @@ func TestRemoveOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveOrgTokenDeploymentRole("", "", "", out, mockClient, mockIamClient)
+		err = RemoveOrgTokenDeploymentRole("", "", deploymentID, out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to list tokens")
 	})
 
@@ -760,7 +760,7 @@ func TestRemoveOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveOrgTokenDeploymentRole("", "", "", out, mockClient, mockIamClient)
+		err = RemoveOrgTokenDeploymentRole("", "", deploymentID, out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
 
@@ -782,7 +782,7 @@ func TestRemoveOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveOrgTokenDeploymentRole("", "", "", out, mockClient, mockIamClient)
+		err = RemoveOrgTokenDeploymentRole("", "", deploymentID, out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to update token")
 	})
 
@@ -804,7 +804,7 @@ func TestRemoveOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveOrgTokenDeploymentRole("token-id", "", "", out, mockClient, mockIamClient)
+		err = RemoveOrgTokenDeploymentRole("token-id", "", deploymentID, out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -825,7 +825,7 @@ func TestRemoveOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveOrgTokenDeploymentRole("token-id", "", "", out, mockClient, mockIamClient)
+		err = RemoveOrgTokenDeploymentRole("token-id", "", deploymentID, out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
 }
@@ -851,7 +851,7 @@ func TestRemoveWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveWorkspaceTokenDeploymentRole("", "", "", "", out, mockClient, mockIamClient)
+		err = RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -872,7 +872,7 @@ func TestRemoveWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveWorkspaceTokenDeploymentRole("", "", "", "", out, mockClient, mockIamClient)
+		err = RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to list tokens")
 	})
 
@@ -893,7 +893,7 @@ func TestRemoveWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveWorkspaceTokenDeploymentRole("", "", "", "", out, mockClient, mockIamClient)
+		err = RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
 
@@ -915,7 +915,7 @@ func TestRemoveWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveWorkspaceTokenDeploymentRole("", "", "", "", out, mockClient, mockIamClient)
+		err = RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to update token")
 	})
 
@@ -937,7 +937,7 @@ func TestRemoveWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveWorkspaceTokenDeploymentRole("token-id", "", "", "", out, mockClient, mockIamClient)
+		err = RemoveWorkspaceTokenDeploymentRole("token-id", "", "", deploymentID, out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -958,7 +958,7 @@ func TestRemoveWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = RemoveWorkspaceTokenDeploymentRole("token-id", "", "", "", out, mockClient, mockIamClient)
+		err = RemoveWorkspaceTokenDeploymentRole("token-id", "", "", deploymentID, out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
 }
@@ -984,7 +984,7 @@ func TestUpsertOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertOrgTokenDeploymentRole("", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertOrgTokenDeploymentRole("", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -1005,7 +1005,7 @@ func TestUpsertOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertOrgTokenDeploymentRole("", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertOrgTokenDeploymentRole("", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to list tokens")
 	})
 
@@ -1028,7 +1028,7 @@ func TestUpsertOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertOrgTokenDeploymentRole("", "", "", "", "update", out, mockClient, mockIamClient)
+		err = UpsertOrgTokenDeploymentRole("", "", "", deploymentID, "update", out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -1049,7 +1049,7 @@ func TestUpsertOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertOrgTokenDeploymentRole("", "", "", "", "update", out, mockClient, mockIamClient)
+		err = UpsertOrgTokenDeploymentRole("", "", "", deploymentID, "update", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to list tokens")
 	})
 
@@ -1070,7 +1070,7 @@ func TestUpsertOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertOrgTokenDeploymentRole("", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertOrgTokenDeploymentRole("", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
 
@@ -1092,7 +1092,7 @@ func TestUpsertOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertOrgTokenDeploymentRole("", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertOrgTokenDeploymentRole("", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to update token")
 	})
 
@@ -1114,7 +1114,7 @@ func TestUpsertOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertOrgTokenDeploymentRole("token-id", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertOrgTokenDeploymentRole("token-id", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -1135,7 +1135,7 @@ func TestUpsertOrgTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertOrgTokenDeploymentRole("token-id", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertOrgTokenDeploymentRole("token-id", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
 }
@@ -1161,7 +1161,7 @@ func TestUpsertWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -1182,7 +1182,7 @@ func TestUpsertWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to list tokens")
 	})
 
@@ -1205,7 +1205,7 @@ func TestUpsertWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", "", "update", out, mockClient, mockIamClient)
+		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", deploymentID, "update", out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -1226,7 +1226,7 @@ func TestUpsertWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", "", "update", out, mockClient, mockIamClient)
+		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", deploymentID, "update", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to list tokens")
 	})
 
@@ -1247,7 +1247,7 @@ func TestUpsertWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
 
@@ -1269,7 +1269,7 @@ func TestUpsertWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertWorkspaceTokenDeploymentRole("", "", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to update token")
 	})
 
@@ -1291,7 +1291,7 @@ func TestUpsertWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertWorkspaceTokenDeploymentRole("token-id", "", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertWorkspaceTokenDeploymentRole("token-id", "", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -1312,7 +1312,7 @@ func TestUpsertWorkspaceTokenDeploymentRole(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpsertWorkspaceTokenDeploymentRole("token-id", "", "", "", "", "create", out, mockClient, mockIamClient)
+		err = UpsertWorkspaceTokenDeploymentRole("token-id", "", "", "", deploymentID, "create", out, mockClient, mockIamClient)
 		assert.ErrorContains(t, err, "failed to get token")
 	})
 }
