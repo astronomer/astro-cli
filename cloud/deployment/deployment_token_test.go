@@ -19,13 +19,14 @@ import (
 
 var (
 	deploymentID = "ck05r3bor07h40d02y2hw4n4v"
+	workspaceID  = "ck05r3bor07h40d02y2hw4n4w"
 	description1 = "Description 1"
 	description2 = "Description 2"
 	fullName1    = "User 1"
 	fullName2    = "User 2"
 	token        = "token"
 
-	iamAPIToken            = astroiamcore.ApiToken{Id: "token1", Name: "Token 1", Token: &token, Description: description1, Type: "DEPLOYMENT", Roles: &[]astroiamcore.ApiTokenRole{{EntityId: deploymentID, EntityType: "DEPLOYMENT", Role: "DEPLOYMENT_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astroiamcore.BasicSubjectProfile{FullName: &fullName1}}
+	iamAPIToken            = astroiamcore.ApiToken{Id: "token1", Name: "Token 1", Token: &token, Description: description1, Type: "ORGANIZATION", Roles: &[]astroiamcore.ApiTokenRole{{EntityType: "ORGANIZATION", EntityId: "test-org-id", Role: "ORGANIZATION_MEMBER"}, {EntityType: "WORKSPACE", EntityId: workspaceID, Role: "WORKSPACE_AUTHOR"}, {EntityType: "WORKSPACE", EntityId: "WORKSPACE", Role: "WORKSPACE_AUTHOR"}, {EntityType: "DEPLOYMENT", EntityId: "DEPLOYMENT", Role: "DEPLOYMENT_ADMIN"}}, CreatedAt: time.Now(), CreatedBy: &astroiamcore.BasicSubjectProfile{FullName: &fullName1}}
 	GetAPITokensResponseOK = astroiamcore.GetApiTokenResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
