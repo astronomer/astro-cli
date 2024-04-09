@@ -4,7 +4,6 @@ import (
 	httpContext "context"
 	"errors"
 	"fmt"
-	"golang.org/x/exp/slices"
 	"io"
 	"os"
 	"strconv"
@@ -18,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"golang.org/x/exp/slices"
 )
 
 func newTokenTableOut() *printutil.Table {
