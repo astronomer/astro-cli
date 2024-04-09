@@ -1250,7 +1250,7 @@ func TestOrganizationTokenUpdate(t *testing.T) {
 		astroCoreClient = mockClient
 
 		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
-		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOK, nil)
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil)
 		astroCoreIamClient = mockIamClient
 
 		cmdArgs := []string{"token", "update", "--name", tokenName1}
@@ -1513,7 +1513,7 @@ func TestOrganizationTokenListRoles(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
-		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOK, nil)
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil)
 		astroCoreIamClient = mockIamClient
 		cmdArgs := []string{"token", "roles", mockTokenID}
 		_, err := execOrganizationCmd(cmdArgs...)

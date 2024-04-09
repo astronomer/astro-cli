@@ -4,6 +4,7 @@ import (
 	httpContext "context"
 	"errors"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"io"
 	"os"
 	"strconv"
@@ -38,11 +39,13 @@ var (
 	ErrDeploymentTokenNotFound    = errors.New("no Deployment API token was found for the API token name you provided")
 	errWorkspaceTokenInDeployment = errors.New("this Workspace API token has already been added to the Deployment with that role")
 	errOrgTokenInDeployment       = errors.New("this Organization API token has already been added to the Deployment with that role")
+	errWrongTokenTypeSelected     = errors.New("the token selected is not of the type you are trying to modify")
 )
 
 const (
-	deploymentEntity = "DEPLOYMENT"
-	workspaceEntity  = "WORKSPACE"
+	deploymentEntity   = "DEPLOYMENT"
+	workspaceEntity    = "WORKSPACE"
+	organizationEntity = "ORGANIZATION"
 )
 
 // List all deployment Tokens
@@ -418,6 +421,19 @@ func GetDeploymentTokenFromInputOrUser(id, name, deployment, organizationID stri
 			return token, err
 		}
 	}
+
+	if tokenTypes != nil { // verify the user has passed in an id that matches the operations expected token type
+		if len(*tokenTypes) > 0 {
+			stringTokenTypes := []string{}
+			for _, tokenType := range *tokenTypes {
+				stringTokenTypes = append(stringTokenTypes, string(tokenType))
+			}
+			if !slices.Contains(stringTokenTypes, string(token.Type)) {
+				return token, errWrongTokenTypeSelected
+			}
+		}
+	}
+
 	return token, err
 }
 
@@ -445,7 +461,7 @@ func RemoveOrgTokenDeploymentRole(id, name, deployment string, out io.Writer, cl
 			continue // this removes the role in question
 		}
 
-		if roles[i].EntityId == ctx.Organization {
+		if roles[i].EntityType == organizationEntity {
 			orgRole = roles[i].Role
 		}
 
@@ -515,7 +531,7 @@ func RemoveWorkspaceTokenDeploymentRole(id, name, workspace, deployment string, 
 			continue // this removes the role in question
 		}
 
-		if roles[i].EntityId == ctx.Workspace {
+		if roles[i].EntityType == workspaceEntity {
 			workspaceRole = roles[i].Role
 		}
 
@@ -593,7 +609,7 @@ func UpsertWorkspaceTokenDeploymentRole(id, name, role, workspace, deployment, o
 			}
 		}
 
-		if roles[i].EntityId == ctx.Workspace {
+		if roles[i].EntityType == workspaceEntity {
 			workspaceRole = roles[i].Role
 		}
 
@@ -663,7 +679,7 @@ func UpsertOrgTokenDeploymentRole(id, name, role, deployment, operation string, 
 			}
 		}
 
-		if roles[i].EntityId == ctx.Organization {
+		if roles[i].EntityType == organizationEntity {
 			orgRole = roles[i].Role
 		}
 

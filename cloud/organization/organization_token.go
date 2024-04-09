@@ -23,6 +23,7 @@ var (
 	errInvalidOrganizationTokenKey = errors.New("invalid Organization API token selection")
 	errOrganizationTokenNotFound   = errors.New("organization token specified was not found")
 	errOrgTokenInWorkspace         = errors.New("this Organization API token has already been added to the Workspace with that role")
+	errWrongTokenTypeSelected      = errors.New("the token selected is not of the type you are trying to modify")
 )
 
 const (
@@ -294,6 +295,9 @@ func GetTokenFromInputOrUser(id, name, organization string, client astrocore.Cor
 		if err != nil {
 			return token, err
 		}
+	}
+	if token.Type != organizationEntity {
+		return token, errWrongTokenTypeSelected
 	}
 	return token, err
 }

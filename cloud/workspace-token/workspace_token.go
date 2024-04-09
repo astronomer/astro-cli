@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"time"
 
@@ -39,11 +40,13 @@ var (
 	errWorkspaceTokenInDeployment = errors.New("this Workspace API token has already been added to the Deployment with that role")
 	ErrWorkspaceTokenNotFound     = errors.New("no Workspace API token was found for the API token name you provided")
 	errOrgTokenInWorkspace        = errors.New("this Organization API token has already been added to the Workspace with that role")
+	errWrongTokenTypeSelected     = errors.New("the token selected is not of the type you are trying to modify")
 )
 
 const (
-	workspaceEntity  = "WORKSPACE"
-	deploymentEntity = "DEPLOYMENT"
+	workspaceEntity    = "WORKSPACE"
+	deploymentEntity   = "DEPLOYMENT"
+	organizationEntity = "ORGANIZATION"
 )
 
 // List all workspace Tokens
@@ -483,6 +486,17 @@ func GetTokenFromInputOrUser(id, name, workspace, organizationID string, tokenTy
 			return token, err
 		}
 	}
+	if tokenTypes != nil { // verify the user has passed in an id that matches the operations expected token type
+		if len(*tokenTypes) > 0 {
+			stringTokenTypes := []string{}
+			for _, tokenType := range *tokenTypes {
+				stringTokenTypes = append(stringTokenTypes, string(tokenType))
+			}
+			if !slices.Contains(stringTokenTypes, string(token.Type)) {
+				return token, errWrongTokenTypeSelected
+			}
+		}
+	}
 	return token, err
 }
 
@@ -515,7 +529,7 @@ func RemoveOrgTokenWorkspaceRole(id, name, workspace string, out io.Writer, clie
 			continue // this removes the role in question
 		}
 
-		if roles[i].EntityId == organizationID {
+		if roles[i].EntityType == organizationEntity {
 			orgRole = roles[i].Role
 		}
 
@@ -598,7 +612,7 @@ func UpsertOrgTokenWorkspaceRole(id, name, role, workspace, operation string, ou
 			}
 		}
 
-		if roles[i].EntityId == ctx.Organization {
+		if roles[i].EntityType == organizationEntity {
 			orgRole = roles[i].Role
 		}
 
