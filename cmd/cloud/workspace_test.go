@@ -1629,7 +1629,7 @@ func TestWorkspaceTokenAdd(t *testing.T) {
 	})
 }
 
-func TestCreateOrganizationTokenWorkspaceRole(t *testing.T) {
+func TestAddOrganizationTokenWorkspaceRole(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path Create", func(t *testing.T) {
 		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
@@ -1642,7 +1642,7 @@ func TestCreateOrganizationTokenWorkspaceRole(t *testing.T) {
 		astroCoreClient = mockClient
 		astroCoreIamClient = mockIamClient
 
-		cmdArgs := []string{"token", "organization-token", "create", "--role", "DEPLOYMENT_ADMIN"}
+		cmdArgs := []string{"token", "organization-token", "add", "--role", "DEPLOYMENT_ADMIN"}
 		_, err := execWorkspaceCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
@@ -1656,7 +1656,7 @@ func TestCreateOrganizationTokenWorkspaceRole(t *testing.T) {
 		defer testUtil.MockUserInput(t, "DEPLOYMENT_ADMIN")()
 		astroCoreClient = mockClient
 		astroCoreIamClient = mockIamClient
-		cmdArgs := []string{"token", "organization-token", "create", "token-id"}
+		cmdArgs := []string{"token", "organization-token", "add", "token-id"}
 		_, err := execWorkspaceCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})

@@ -2423,7 +2423,7 @@ func TestDeploymentTokenDelete(t *testing.T) {
 	})
 }
 
-func TestCreateWorkspaceTokenDeploymentRole(t *testing.T) {
+func TestAddWorkspaceTokenDeploymentRole(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path Create", func(t *testing.T) {
 		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
@@ -2436,7 +2436,7 @@ func TestCreateWorkspaceTokenDeploymentRole(t *testing.T) {
 		astroCoreClient = mockClient
 		astroCoreIamClient = mockIamClient
 
-		cmdArgs := []string{"token", "workspace-token", "create", "--deployment-id", mockDeploymentID, "--role", "DEPLOYMENT_ADMIN"}
+		cmdArgs := []string{"token", "workspace-token", "add", "--deployment-id", mockDeploymentID, "--role", "DEPLOYMENT_ADMIN"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
@@ -2450,7 +2450,7 @@ func TestCreateWorkspaceTokenDeploymentRole(t *testing.T) {
 		defer testUtil.MockUserInput(t, "DEPLOYMENT_ADMIN")()
 		astroCoreClient = mockClient
 		astroCoreIamClient = mockIamClient
-		cmdArgs := []string{"token", "workspace-token", "create", "token-id", "--deployment-id", mockDeploymentID}
+		cmdArgs := []string{"token", "workspace-token", "add", "token-id", "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
@@ -2489,7 +2489,7 @@ func TestUpdateWorkspaceTokenDeploymentRole(t *testing.T) {
 	})
 }
 
-func TestCreateOrganizationTokenDeploymentRole(t *testing.T) {
+func TestAddOrganizationTokenDeploymentRole(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path Create", func(t *testing.T) {
 		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
@@ -2502,7 +2502,7 @@ func TestCreateOrganizationTokenDeploymentRole(t *testing.T) {
 		astroCoreClient = mockClient
 		astroCoreIamClient = mockIamClient
 
-		cmdArgs := []string{"token", "organization-token", "create", "--deployment-id", mockDeploymentID, "--role", "DEPLOYMENT_ADMIN"}
+		cmdArgs := []string{"token", "organization-token", "add", "--deployment-id", mockDeploymentID, "--role", "DEPLOYMENT_ADMIN"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
@@ -2516,7 +2516,7 @@ func TestCreateOrganizationTokenDeploymentRole(t *testing.T) {
 		defer testUtil.MockUserInput(t, "DEPLOYMENT_ADMIN")()
 		astroCoreClient = mockClient
 		astroCoreIamClient = mockIamClient
-		cmdArgs := []string{"token", "organization-token", "create", "token-id", "--deployment-id", mockDeploymentID}
+		cmdArgs := []string{"token", "organization-token", "add", "token-id", "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})

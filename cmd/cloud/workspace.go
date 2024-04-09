@@ -385,7 +385,7 @@ func newWorkspaceOrgTokenManageCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.SetOut(out)
 	cmd.AddCommand(
-		newCreateOrganizationTokenWorkspaceRole(out),
+		newAddOrganizationTokenWorkspaceRole(out),
 		newUpdateOrganizationTokenWorkspaceRole(out),
 		newRemoveOrganizationTokenWorkspaceRole(out),
 		newListOrganizationTokensInWorkspace(out),
@@ -393,13 +393,13 @@ func newWorkspaceOrgTokenManageCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newCreateOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
+func newAddOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create [ORG_TOKEN_ID]",
-		Short: "Create an Organization API token's Workspace Role",
-		Long:  "Create an Organization API token's Workspace Role\n$astro workspace token organization-token create [ORG_TOKEN_ID] --name [token name] --role [" + allowedWorkspaceRoleNames + "].",
+		Use:   "add [ORG_TOKEN_ID]",
+		Short: "Add an Organization API token to a Workspace",
+		Long:  "Add an Organization API token to a Workspace\n$astro workspace token organization-token add [ORG_TOKEN_ID] --name [token name] --role [" + allowedWorkspaceRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createOrgTokenWorkspaceRole(cmd, args, out)
+			return addOrgTokenWorkspaceRole(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization API token you want to add to a Workspace. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -423,7 +423,7 @@ func newUpdateOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func createOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer) error {
+func addOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer) error {
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
 		// make sure the id is lowercase
@@ -431,7 +431,7 @@ func createOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 	}
 	if tokenRole == "" {
 		// no role was provided so ask the user for it
-		tokenRole = input.Text("Enter a role for the new Workspace API token. Possible values are " + allowedWorkspaceRoleNamesProse + ": ")
+		tokenRole = input.Text("Enter a role for the API token. Possible values are " + allowedWorkspaceRoleNamesProse + ": ")
 	}
 	cmd.SilenceUsage = true
 
