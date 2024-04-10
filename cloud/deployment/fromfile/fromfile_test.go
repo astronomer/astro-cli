@@ -3278,7 +3278,7 @@ func TestCreateEnvVars(t *testing.T) {
 		deploymentFromFile inspect.FormattedDeployment
 		err                error
 	)
-	t.Run("creates env vars if they were requested in a formatted deployment", func(t *testing.T) {
+	t.Run("creates env vars if they were requested in a formatted deployment with create", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
 		list := []inspect.EnvironmentVariable{
 			{
@@ -3309,7 +3309,54 @@ func TestCreateEnvVars(t *testing.T) {
 			},
 		}
 		deploymentFromFile.Deployment.EnvVars = list
-		actualEnvVars = createEnvVarsRequest(&deploymentFromFile)
+		actualEnvVars = createEnvVarsRequest(&deploymentFromFile, createAction)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedList, actualEnvVars)
+	})
+
+	t.Run("creates env vars if they were requested in a formatted deployment with update and with a secret env var with empty string", func(t *testing.T) {
+		deploymentFromFile = inspect.FormattedDeployment{}
+		list := []inspect.EnvironmentVariable{
+			{
+				IsSecret:  false,
+				Key:       "key-1",
+				UpdatedAt: "",
+				Value:     "val-1",
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-2",
+				UpdatedAt: "",
+				Value:     "val-2",
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-3",
+				UpdatedAt: "",
+				Value:     "",
+			},
+		}
+		val1 := "val-1"
+		val2 := "val-2"
+		expectedList := []astroplatformcore.DeploymentEnvironmentVariableRequest{
+			{
+				IsSecret: false,
+				Key:      "key-1",
+				Value:    &val1,
+			},
+			{
+				IsSecret: true,
+				Key:      "key-2",
+				Value:    &val2,
+			},
+			{
+				IsSecret: true,
+				Key:      "key-3",
+				Value:    nil,
+			},
+		}
+		deploymentFromFile.Deployment.EnvVars = list
+		actualEnvVars = createEnvVarsRequest(&deploymentFromFile, updateAction)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedList, actualEnvVars)
 	})

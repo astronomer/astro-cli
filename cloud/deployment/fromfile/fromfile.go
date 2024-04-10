@@ -164,7 +164,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 			clusterID = *existingDeployment.ClusterId
 		}
 		// create environment variables
-		envVars = createEnvVarsRequest(&formattedDeployment)
+		envVars = createEnvVarsRequest(&formattedDeployment, action)
 		if err != nil {
 			return fmt.Errorf("%w \n failed to %s alert emails", err, action)
 		}
@@ -951,13 +951,16 @@ func checkEnvVars(deploymentFromFile *inspect.FormattedDeployment, action string
 	return nil
 }
 
-func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment) (envVars []astroplatformcore.DeploymentEnvironmentVariableRequest) {
+func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment, action string) (envVars []astroplatformcore.DeploymentEnvironmentVariableRequest) {
 	envVars = []astroplatformcore.DeploymentEnvironmentVariableRequest{}
 	for i := range deploymentFromFile.Deployment.EnvVars {
 		var envVar astroplatformcore.DeploymentEnvironmentVariableRequest
 		envVar.IsSecret = deploymentFromFile.Deployment.EnvVars[i].IsSecret
 		envVar.Key = deploymentFromFile.Deployment.EnvVars[i].Key
-		envVar.Value = &deploymentFromFile.Deployment.EnvVars[i].Value
+		// If the action is update, isSecret is true and value is empty, then the value should be left as nil
+		if !(action == updateAction && deploymentFromFile.Deployment.EnvVars[i].IsSecret && deploymentFromFile.Deployment.EnvVars[i].Value == "") {
+			envVar.Value = &deploymentFromFile.Deployment.EnvVars[i].Value
+		}
 		envVars = append(envVars, envVar)
 	}
 	return envVars
