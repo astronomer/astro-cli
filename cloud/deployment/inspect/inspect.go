@@ -73,10 +73,10 @@ type Workerq struct {
 }
 
 type EnvironmentVariable struct {
-	IsSecret  bool   `mapstructure:"is_secret" yaml:"is_secret" json:"is_secret"`
-	Key       string `mapstructure:"key" yaml:"key" json:"key"`
-	UpdatedAt string `mapstructure:"updated_at,omitempty" yaml:"updated_at,omitempty" json:"updated_at,omitempty"`
-	Value     string `mapstructure:"value" yaml:"value" json:"value"`
+	IsSecret  bool    `mapstructure:"is_secret" yaml:"is_secret" json:"is_secret"`
+	Key       string  `mapstructure:"key" yaml:"key" json:"key"`
+	UpdatedAt string  `mapstructure:"updated_at,omitempty" yaml:"updated_at,omitempty" json:"updated_at,omitempty"`
+	Value     *string `mapstructure:"value" yaml:"value" json:"value"`
 }
 
 type HibernationSchedule struct {
