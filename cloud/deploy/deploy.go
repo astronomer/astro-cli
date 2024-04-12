@@ -461,7 +461,7 @@ func getDeploymentInfo(
 			currentDeployment.RuntimeVersion,
 			currentDeployment.OrganizationId,
 			currentDeployment.WorkspaceId,
-			currentDeployment.WebServerAirflowApiUrl,
+			currentDeployment.WebServerUrl,
 			string(*currentDeployment.Type),
 			desiredDagTarballVersion,
 			currentDeployment.IsDagDeployEnabled,
