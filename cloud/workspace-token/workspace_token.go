@@ -11,10 +11,10 @@ import (
 	"time"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocoreiam "github.com/astronomer/astro-cli/astro-client-iam-core"
+	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/user"
-	workspace2 "github.com/astronomer/astro-cli/cloud/workspace"
+	workspaceService "github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -50,17 +50,17 @@ const (
 )
 
 // List all workspace Tokens
-func ListTokens(client astrocore.CoreClient, workspace string, tokenTypes *[]astrocore.ListWorkspaceApiTokensParamsTokenTypes, out io.Writer) error {
+func ListTokens(client astrocore.CoreClient, workspaceID string, tokenTypes *[]astrocore.ListWorkspaceApiTokensParamsTokenTypes, out io.Writer) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 
-	apiTokens, err := getWorkspaceTokens(workspace, tokenTypes, client)
+	apiTokens, err := getWorkspaceTokens(workspaceID, tokenTypes, client)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func ListTokens(client astrocore.CoreClient, workspace string, tokenTypes *[]ast
 		scope := apiTokens[i].Type
 		var role string
 		for j := range apiTokens[i].Roles {
-			if apiTokens[i].Roles[j].EntityId == workspace {
+			if apiTokens[i].Roles[j].EntityId == workspaceID {
 				role = apiTokens[i].Roles[j].Role
 			}
 		}
@@ -93,20 +93,20 @@ func ListTokens(client astrocore.CoreClient, workspace string, tokenTypes *[]ast
 }
 
 // create a workspace token
-func CreateToken(name, description, role, workspace string, expiration int, cleanOutput bool, out io.Writer, client astrocore.CoreClient) error {
+func CreateToken(name, description, role, workspaceID string, expiration int, cleanOutput bool, out io.Writer, client astrocore.CoreClient) error {
 	err := user.IsWorkspaceRoleValid(role)
 	if err != nil {
 		return err
 	}
 	if name == "" {
-		return workspace2.ErrInvalidTokenName
+		return workspaceService.ErrInvalidTokenName
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 	CreateWorkspaceAPITokenRequest := astrocore.CreateWorkspaceApiTokenJSONRequestBody{
 		Description: &description,
@@ -116,7 +116,7 @@ func CreateToken(name, description, role, workspace string, expiration int, clea
 	if expiration != 0 {
 		CreateWorkspaceAPITokenRequest.TokenExpiryPeriodInDays = &expiration
 	}
-	resp, err := client.CreateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.Organization, workspace, CreateWorkspaceAPITokenRequest)
+	resp, err := client.CreateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.Organization, workspaceID, CreateWorkspaceAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -137,27 +137,27 @@ func CreateToken(name, description, role, workspace string, expiration int, clea
 }
 
 // Update a workspace token
-func UpdateToken(id, name, newName, description, role, workspace string, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
+func UpdateToken(id, name, newName, description, role, workspaceID string, out io.Writer, client astrocore.CoreClient, iamClient astroiamcore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 
 	organizationID := ctx.Organization
 
 	tokenTypes := []astrocore.ListWorkspaceApiTokensParamsTokenTypes{"WORKSPACE"}
 
-	token, err := GetTokenFromInputOrUser(id, name, workspace, organizationID, &tokenTypes, client, iamClient)
+	token, err := GetTokenFromInputOrUser(id, name, workspaceID, organizationID, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
 	apiTokenDeploymentRoles := []astrocore.ApiTokenDeploymentRoleRequest{}
 	roles := *token.Roles
 	for i := range roles {
-		if roles[i].EntityId == workspace {
+		if roles[i].EntityId == workspaceID {
 			if roles[i].Role == role {
 				return errWorkspaceTokenInDeployment
 			} else {
@@ -195,7 +195,7 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 
 	if role == "" {
 		for i := range roles {
-			if roles[i].EntityType == workspaceEntity && roles[i].EntityId == workspace {
+			if roles[i].EntityType == workspaceEntity && roles[i].EntityId == workspaceID {
 				role = roles[i].Role
 			}
 		}
@@ -212,7 +212,7 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 		UpdateWorkspaceAPITokenRequest.Roles.Workspace = &role
 	}
 
-	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), organizationID, workspace, apiTokenID, UpdateWorkspaceAPITokenRequest)
+	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), organizationID, workspaceID, apiTokenID, UpdateWorkspaceAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -225,18 +225,18 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 }
 
 // rotate a workspace API token
-func RotateToken(id, name, workspace string, cleanOutput, force bool, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
+func RotateToken(id, name, workspaceID string, cleanOutput, force bool, out io.Writer, client astrocore.CoreClient, iamClient astroiamcore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 	organizationID := ctx.Organization
 	tokenTypes := []astrocore.ListWorkspaceApiTokensParamsTokenTypes{"WORKSPACE"}
 
-	token, err := GetTokenFromInputOrUser(id, name, workspace, organizationID, &tokenTypes, client, iamClient)
+	token, err := GetTokenFromInputOrUser(id, name, workspaceID, organizationID, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func RotateToken(id, name, workspace string, cleanOutput, force bool, out io.Wri
 			return nil
 		}
 	}
-	resp, err := client.RotateWorkspaceApiTokenWithResponse(httpContext.Background(), organizationID, workspace, apiTokenID)
+	resp, err := client.RotateWorkspaceApiTokenWithResponse(httpContext.Background(), organizationID, workspaceID, apiTokenID)
 	if err != nil {
 		return err
 	}
@@ -273,16 +273,16 @@ func RotateToken(id, name, workspace string, cleanOutput, force bool, out io.Wri
 }
 
 // delete a workspaces api token
-func DeleteToken(id, name, workspace string, force bool, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
+func DeleteToken(id, name, workspaceID string, force bool, out io.Writer, client astrocore.CoreClient, iamClient astroiamcore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 	organizationID := ctx.Organization
-	token, err := GetTokenFromInputOrUser(id, name, workspace, organizationID, nil, client, iamClient)
+	token, err := GetTokenFromInputOrUser(id, name, workspaceID, organizationID, nil, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -310,7 +310,7 @@ func DeleteToken(id, name, workspace string, force bool, out io.Writer, client a
 		}
 	}
 
-	resp, err := client.DeleteWorkspaceApiTokenWithResponse(httpContext.Background(), organizationID, workspace, apiTokenID)
+	resp, err := client.DeleteWorkspaceApiTokenWithResponse(httpContext.Background(), organizationID, workspaceID, apiTokenID)
 	if err != nil {
 		return err
 	}
@@ -326,7 +326,7 @@ func DeleteToken(id, name, workspace string, force bool, out io.Writer, client a
 	return nil
 }
 
-func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
+func selectTokens(workspaceID string, apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 	apiTokensMap := map[string]astrocore.ApiToken{}
 	tab := newTokenSelectionTableOut()
 	for i := range apiTokens {
@@ -336,7 +336,7 @@ func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.A
 		scope := apiTokens[i].Type
 		var role string
 		for j := range apiTokens[i].Roles {
-			if apiTokens[i].Roles[j].EntityId == workspace {
+			if apiTokens[i].Roles[j].EntityId == workspaceID {
 				role = apiTokens[i].Roles[j].Role
 			}
 		}
@@ -374,15 +374,15 @@ func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.A
 }
 
 // get all workspace tokens
-func getWorkspaceTokens(workspace string, tokenTypes *[]astrocore.ListWorkspaceApiTokensParamsTokenTypes, client astrocore.CoreClient) ([]astrocore.ApiToken, error) {
+func getWorkspaceTokens(workspaceID string, tokenTypes *[]astrocore.ListWorkspaceApiTokensParamsTokenTypes, client astrocore.CoreClient) ([]astrocore.ApiToken, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return []astrocore.ApiToken{}, err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
-	resp, err := client.ListWorkspaceApiTokensWithResponse(httpContext.Background(), ctx.Organization, workspace, &astrocore.ListWorkspaceApiTokensParams{TokenTypes: tokenTypes})
+	resp, err := client.ListWorkspaceApiTokensWithResponse(httpContext.Background(), ctx.Organization, workspaceID, &astrocore.ListWorkspaceApiTokensParams{TokenTypes: tokenTypes})
 	if err != nil {
 		return []astrocore.ApiToken{}, err
 	}
@@ -396,11 +396,11 @@ func getWorkspaceTokens(workspace string, tokenTypes *[]astrocore.ListWorkspaceA
 	return APITokens, nil
 }
 
-func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) { //nolint:gocognit
+func getWorkspaceToken(id, name, workspaceID, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) { //nolint:gocognit
 	switch {
 	case id == "" && name == "":
 		fmt.Println(message)
-		token, err = selectTokens(workspace, tokens)
+		token, err = selectTokens(workspaceID, tokens)
 		if err != nil {
 			return astrocore.ApiToken{}, err
 		}
@@ -424,7 +424,7 @@ func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.A
 			token = matchedTokens[0]
 		} else if len(matchedTokens) > 1 {
 			fmt.Printf("\nThere are more than one API tokens with name %s. Please select an API token:\n", name)
-			token, err = selectTokens(workspace, matchedTokens)
+			token, err = selectTokens(workspaceID, matchedTokens)
 			if err != nil {
 				return astrocore.ApiToken{}, err
 			}
@@ -454,25 +454,25 @@ func TimeAgo(date time.Time) string {
 	}
 }
 
-func getTokenByID(id, orgID string, client astrocoreiam.CoreClient) (token astrocoreiam.ApiToken, err error) {
+func getTokenByID(id, orgID string, client astroiamcore.CoreClient) (token astroiamcore.ApiToken, err error) {
 	resp, err := client.GetApiTokenWithResponse(httpContext.Background(), orgID, id)
 	if err != nil {
-		return astrocoreiam.ApiToken{}, err
+		return astroiamcore.ApiToken{}, err
 	}
-	err = astrocoreiam.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astroiamcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return astrocoreiam.ApiToken{}, err
+		return astroiamcore.ApiToken{}, err
 	}
 	return *resp.JSON200, nil
 }
 
-func GetTokenFromInputOrUser(id, name, workspace, organizationID string, tokenTypes *[]astrocore.ListWorkspaceApiTokensParamsTokenTypes, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) (token astrocoreiam.ApiToken, err error) {
+func GetTokenFromInputOrUser(id, name, workspaceID, organizationID string, tokenTypes *[]astrocore.ListWorkspaceApiTokensParamsTokenTypes, client astrocore.CoreClient, iamClient astroiamcore.CoreClient) (token astroiamcore.ApiToken, err error) {
 	if id == "" {
-		tokens, err := getWorkspaceTokens(workspace, tokenTypes, client)
+		tokens, err := getWorkspaceTokens(workspaceID, tokenTypes, client)
 		if err != nil {
 			return token, err
 		}
-		tokenFromList, err := getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to add to the Deployment:", tokens)
+		tokenFromList, err := getWorkspaceToken(id, name, workspaceID, "\nPlease select the Workspace API token you would like to add to the Deployment:", tokens)
 		if err != nil {
 			return token, err
 		}
@@ -486,35 +486,33 @@ func GetTokenFromInputOrUser(id, name, workspace, organizationID string, tokenTy
 			return token, err
 		}
 	}
-	if tokenTypes != nil { // verify the user has passed in an id that matches the operations expected token type
-		if len(*tokenTypes) > 0 {
-			stringTokenTypes := []string{}
-			for _, tokenType := range *tokenTypes {
-				stringTokenTypes = append(stringTokenTypes, string(tokenType))
-			}
-			if !slices.Contains(stringTokenTypes, string(token.Type)) {
-				return token, errWrongTokenTypeSelected
-			}
+	if tokenTypes != nil && len(*tokenTypes) > 0 { // verify the user has passed in an id that matches the operations expected token type
+		stringTokenTypes := []string{}
+		for _, tokenType := range *tokenTypes {
+			stringTokenTypes = append(stringTokenTypes, string(tokenType))
+		}
+		if !slices.Contains(stringTokenTypes, string(token.Type)) {
+			return token, errWrongTokenTypeSelected
 		}
 	}
 	return token, err
 }
 
-func RemoveOrgTokenWorkspaceRole(id, name, workspace string, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
+func RemoveOrgTokenWorkspaceRole(id, name, workspaceID string, out io.Writer, client astrocore.CoreClient, iamClient astroiamcore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 
 	organizationID := ctx.Organization
 	tokenTypes := []astrocore.ListWorkspaceApiTokensParamsTokenTypes{
 		"ORGANIZATION",
 	}
-	token, err := GetTokenFromInputOrUser(id, name, workspace, organizationID, &tokenTypes, client, iamClient)
+	token, err := GetTokenFromInputOrUser(id, name, workspaceID, organizationID, &tokenTypes, client, iamClient)
 	if err != nil {
 		return err
 	}
@@ -525,7 +523,7 @@ func RemoveOrgTokenWorkspaceRole(id, name, workspace string, out io.Writer, clie
 	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRoleRequest{}
 	apiTokenDeploymentRoles := []astrocore.ApiTokenDeploymentRoleRequest{}
 	for i := range roles {
-		if roles[i].EntityId == workspace {
+		if roles[i].EntityId == workspaceID {
 			continue // this removes the role in question
 		}
 
@@ -570,16 +568,16 @@ func RemoveOrgTokenWorkspaceRole(id, name, workspace string, out io.Writer, clie
 	return nil
 }
 
-func UpsertOrgTokenWorkspaceRole(id, name, role, workspace, operation string, out io.Writer, client astrocore.CoreClient, iamClient astrocoreiam.CoreClient) error {
+func UpsertOrgTokenWorkspaceRole(id, name, role, workspaceID, operation string, out io.Writer, client astrocore.CoreClient, iamClient astroiamcore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
-	var token astrocoreiam.ApiToken
+	var token astroiamcore.ApiToken
 	if operation == "create" {
 		token, err = organization.GetTokenFromInputOrUser(id, name, ctx.Organization, client, iamClient)
 		if err != nil {
@@ -587,7 +585,7 @@ func UpsertOrgTokenWorkspaceRole(id, name, role, workspace, operation string, ou
 		}
 	} else {
 		tokenTypes := []astrocore.ListWorkspaceApiTokensParamsTokenTypes{"ORGANIZATION"}
-		token, err = GetTokenFromInputOrUser(id, name, workspace, ctx.Organization, &tokenTypes, client, iamClient)
+		token, err = GetTokenFromInputOrUser(id, name, workspaceID, ctx.Organization, &tokenTypes, client, iamClient)
 		if err != nil {
 			return err
 		}
@@ -596,7 +594,7 @@ func UpsertOrgTokenWorkspaceRole(id, name, role, workspace, operation string, ou
 	apiTokenID := token.Id
 	var orgRole string
 	apiTokenWorkspaceRole := astrocore.ApiTokenWorkspaceRoleRequest{
-		EntityId: workspace,
+		EntityId: workspaceID,
 		Role:     role,
 	}
 	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRoleRequest{apiTokenWorkspaceRole}
@@ -604,7 +602,7 @@ func UpsertOrgTokenWorkspaceRole(id, name, role, workspace, operation string, ou
 	apiTokenDeploymentRoles := []astrocore.ApiTokenDeploymentRoleRequest{}
 	roles := *token.Roles
 	for i := range roles {
-		if roles[i].EntityId == workspace {
+		if roles[i].EntityId == workspaceID {
 			if roles[i].Role == role {
 				return errOrgTokenInWorkspace
 			} else {

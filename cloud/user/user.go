@@ -252,7 +252,7 @@ func ListOrgUsers(out io.Writer, client astrocore.CoreClient) error {
 	return nil
 }
 
-func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astrocore.CoreClient) error {
+func AddWorkspaceUser(email, role, workspaceID string, out io.Writer, client astrocore.CoreClient) error {
 	err := IsWorkspaceRoleValid(role)
 	if err != nil {
 		return err
@@ -261,8 +261,8 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 	if err != nil {
 		return err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 	// Get all org users. Setting limit to 1000 for now
 	users, err := GetOrgUsers(client)
@@ -276,7 +276,7 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 	mutateUserInput := astrocore.MutateWorkspaceUserRoleRequest{
 		Role: role,
 	}
-	resp, err := client.MutateWorkspaceUserRoleWithResponse(httpContext.Background(), ctx.Organization, workspace, userID, mutateUserInput)
+	resp, err := client.MutateWorkspaceUserRoleWithResponse(httpContext.Background(), ctx.Organization, workspaceID, userID, mutateUserInput)
 	if err != nil {
 		return err
 	}
@@ -288,7 +288,7 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 	return nil
 }
 
-func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, client astrocore.CoreClient) error {
+func UpdateWorkspaceUserRole(email, role, workspaceID string, out io.Writer, client astrocore.CoreClient) error {
 	err := IsWorkspaceRoleValid(role)
 	if err != nil {
 		return err
@@ -297,11 +297,11 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 	if err != nil {
 		return err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 	// Get all org users. Setting limit to 1000 for now
-	users, err := GetWorkspaceUsers(client, workspace, userPagnationLimit)
+	users, err := GetWorkspaceUsers(client, workspaceID, userPagnationLimit)
 	if err != nil {
 		return err
 	}
@@ -312,8 +312,8 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 	mutateUserInput := astrocore.MutateWorkspaceUserRoleRequest{
 		Role: role,
 	}
-	fmt.Println("workspace: " + workspace)
-	resp, err := client.MutateWorkspaceUserRoleWithResponse(httpContext.Background(), ctx.Organization, workspace, userID, mutateUserInput)
+	fmt.Println("workspace: " + workspaceID)
+	resp, err := client.MutateWorkspaceUserRoleWithResponse(httpContext.Background(), ctx.Organization, workspaceID, userID, mutateUserInput)
 	if err != nil {
 		fmt.Println("error in MutateWorkspaceUserRoleWithResponse")
 		return err
@@ -353,7 +353,7 @@ func IsOrganizationRoleValid(role string) error {
 }
 
 // Returns a list of all of a worksapces users
-func GetWorkspaceUsers(client astrocore.CoreClient, workspace string, limit int) ([]astrocore.User, error) {
+func GetWorkspaceUsers(client astrocore.CoreClient, workspaceID string, limit int) ([]astrocore.User, error) {
 	offset := 0
 	var users []astrocore.User
 
@@ -362,11 +362,11 @@ func GetWorkspaceUsers(client astrocore.CoreClient, workspace string, limit int)
 		return nil, err
 	}
 
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 	for {
-		resp, err := client.ListWorkspaceUsersWithResponse(httpContext.Background(), ctx.Organization, workspace, &astrocore.ListWorkspaceUsersParams{
+		resp, err := client.ListWorkspaceUsersWithResponse(httpContext.Background(), ctx.Organization, workspaceID, &astrocore.ListWorkspaceUsersParams{
 			Offset: &offset,
 			Limit:  &limit,
 		})
@@ -392,13 +392,13 @@ func GetWorkspaceUsers(client astrocore.CoreClient, workspace string, limit int)
 // Prints a list of all of a workspaces users
 //
 //nolint:dupl
-func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace string) error {
+func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspaceID string) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
 		Header:         []string{"FULLNAME", "EMAIL", "ID", "WORKSPACE ROLE", "CREATE DATE"},
 	}
-	users, err := GetWorkspaceUsers(client, workspace, userPagnationLimit)
+	users, err := GetWorkspaceUsers(client, workspaceID, userPagnationLimit)
 	if err != nil {
 		return err
 	}
@@ -417,16 +417,16 @@ func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace st
 	return nil
 }
 
-func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocore.CoreClient) error {
+func RemoveWorkspaceUser(email, workspaceID string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 	// Get all org users. Setting limit to 1000 for now
-	users, err := GetWorkspaceUsers(client, workspace, userPagnationLimit)
+	users, err := GetWorkspaceUsers(client, workspaceID, userPagnationLimit)
 	if err != nil {
 		return err
 	}
@@ -434,7 +434,7 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	if err != nil {
 		return err
 	}
-	resp, err := client.DeleteWorkspaceUserWithResponse(httpContext.Background(), ctx.Organization, workspace, userID)
+	resp, err := client.DeleteWorkspaceUserWithResponse(httpContext.Background(), ctx.Organization, workspaceID, userID)
 	if err != nil {
 		return err
 	}
@@ -484,7 +484,7 @@ func GetUser(client astrocore.CoreClient, userID string) (user astrocore.User, e
 	return user, nil
 }
 
-func AddDeploymentUser(email, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func AddDeploymentUser(email, role, deploymentID string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -502,7 +502,7 @@ func AddDeploymentUser(email, role, deployment string, out io.Writer, client ast
 	mutateUserInput := astrocore.MutateDeploymentUserRoleRequest{
 		Role: role,
 	}
-	resp, err := client.MutateDeploymentUserRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, userID, mutateUserInput)
+	resp, err := client.MutateDeploymentUserRoleWithResponse(httpContext.Background(), ctx.Organization, deploymentID, userID, mutateUserInput)
 	if err != nil {
 		return err
 	}
@@ -514,14 +514,14 @@ func AddDeploymentUser(email, role, deployment string, out io.Writer, client ast
 	return nil
 }
 
-func UpdateDeploymentUserRole(email, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func UpdateDeploymentUserRole(email, role, deploymentID string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
 	// Get all org users. Setting limit to 1000 for now
-	users, err := GetDeploymentUsers(client, deployment, userPagnationLimit)
+	users, err := GetDeploymentUsers(client, deploymentID, userPagnationLimit)
 	if err != nil {
 		return err
 	}
@@ -532,7 +532,7 @@ func UpdateDeploymentUserRole(email, role, deployment string, out io.Writer, cli
 	mutateUserInput := astrocore.MutateDeploymentUserRoleRequest{
 		Role: role,
 	}
-	resp, err := client.MutateDeploymentUserRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, userID, mutateUserInput)
+	resp, err := client.MutateDeploymentUserRoleWithResponse(httpContext.Background(), ctx.Organization, deploymentID, userID, mutateUserInput)
 	if err != nil {
 		fmt.Println("error in MutateDeploymentUserRoleWithResponse")
 		return err
@@ -545,14 +545,14 @@ func UpdateDeploymentUserRole(email, role, deployment string, out io.Writer, cli
 	return nil
 }
 
-func RemoveDeploymentUser(email, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func RemoveDeploymentUser(email, deploymentID string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
 	// Get all org users. Setting limit to 1000 for now
-	users, err := GetDeploymentUsers(client, deployment, userPagnationLimit)
+	users, err := GetDeploymentUsers(client, deploymentID, userPagnationLimit)
 	if err != nil {
 		return err
 	}
@@ -560,7 +560,7 @@ func RemoveDeploymentUser(email, deployment string, out io.Writer, client astroc
 	if err != nil {
 		return err
 	}
-	resp, err := client.DeleteDeploymentUserWithResponse(httpContext.Background(), ctx.Organization, deployment, userID)
+	resp, err := client.DeleteDeploymentUserWithResponse(httpContext.Background(), ctx.Organization, deploymentID, userID)
 	if err != nil {
 		return err
 	}
@@ -573,7 +573,7 @@ func RemoveDeploymentUser(email, deployment string, out io.Writer, client astroc
 }
 
 // Returns a list of all of a deployments users
-func GetDeploymentUsers(client astrocore.CoreClient, deployment string, limit int) ([]astrocore.User, error) {
+func GetDeploymentUsers(client astrocore.CoreClient, deploymentID string, limit int) ([]astrocore.User, error) {
 	offset := 0
 	var users []astrocore.User
 
@@ -583,7 +583,7 @@ func GetDeploymentUsers(client astrocore.CoreClient, deployment string, limit in
 	}
 	includeDeploymentRoles := true
 	for {
-		resp, err := client.ListDeploymentUsersWithResponse(httpContext.Background(), ctx.Organization, deployment, &astrocore.ListDeploymentUsersParams{
+		resp, err := client.ListDeploymentUsersWithResponse(httpContext.Background(), ctx.Organization, deploymentID, &astrocore.ListDeploymentUsersParams{
 			IncludeDeploymentRoles: &includeDeploymentRoles,
 			Offset:                 &offset,
 			Limit:                  &limit,
@@ -610,13 +610,13 @@ func GetDeploymentUsers(client astrocore.CoreClient, deployment string, limit in
 // Prints a list of all of an deployments users
 //
 //nolint:dupl
-func ListDeploymentUsers(out io.Writer, client astrocore.CoreClient, deployment string) error {
+func ListDeploymentUsers(out io.Writer, client astrocore.CoreClient, deploymentID string) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
 		Header:         []string{"FULLNAME", "EMAIL", "ID", "DEPLOYMENT ROLE", "CREATE DATE"},
 	}
-	users, err := GetDeploymentUsers(client, deployment, userPagnationLimit)
+	users, err := GetDeploymentUsers(client, deploymentID, userPagnationLimit)
 	if err != nil {
 		return err
 	}

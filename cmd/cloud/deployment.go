@@ -983,7 +983,7 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
 		Short:   "Update a Deployment API token",
-		Long:    "Update a Deployment API token that has a role in an Astro Deployment\n$astro workspace token update [TOKEN_ID] --name [new token name] --role [Possible values are DEPLOYMENT_ADMIN or a custom role name].",
+		Long:    "Update a Deployment API token that has a role in an Astro Deployment\n$astro deployment token update [TOKEN_ID] --name [new token name] --role [Possible values are DEPLOYMENT_ADMIN or a custom role name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateDeploymentToken(cmd, args, out)
 		},
