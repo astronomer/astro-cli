@@ -29,6 +29,8 @@ var (
 	errTest                = errors.New("test error")
 	poolID                 = "test-pool-id"
 	poolID2                = "test-pool-id-2"
+	val1                   = "val-1"
+	val2                   = "val-2"
 	workloadIdentity       = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
 	clusterID              = "test-cluster-id"
 	clusterName            = "test-cluster"
@@ -3017,13 +3019,13 @@ func TestCheckRequiredFields(t *testing.T) {
 				IsSecret:  false,
 				Key:       "",
 				UpdatedAt: "",
-				Value:     "val-1",
+				Value:     &val1,
 			},
 			{
 				IsSecret:  true,
 				Key:       "key-2",
 				UpdatedAt: "",
-				Value:     "val-2",
+				Value:     &val2,
 			},
 		}
 		input.Deployment.EnvVars = list
@@ -3252,13 +3254,13 @@ func TestHasEnvVars(t *testing.T) {
 				IsSecret:  false,
 				Key:       "key-1",
 				UpdatedAt: "",
-				Value:     "val-1",
+				Value:     &val1,
 			},
 			{
 				IsSecret:  true,
 				Key:       "key-2",
 				UpdatedAt: "",
-				Value:     "val-2",
+				Value:     &val2,
 			},
 		}
 		deploymentFromFile.Deployment.EnvVars = list
@@ -3278,6 +3280,7 @@ func TestCreateEnvVars(t *testing.T) {
 		deploymentFromFile inspect.FormattedDeployment
 		err                error
 	)
+
 	t.Run("creates env vars if they were requested in a formatted deployment", func(t *testing.T) {
 		deploymentFromFile = inspect.FormattedDeployment{}
 		list := []inspect.EnvironmentVariable{
@@ -3285,17 +3288,20 @@ func TestCreateEnvVars(t *testing.T) {
 				IsSecret:  false,
 				Key:       "key-1",
 				UpdatedAt: "",
-				Value:     "val-1",
+				Value:     &val1,
 			},
 			{
 				IsSecret:  true,
 				Key:       "key-2",
 				UpdatedAt: "",
-				Value:     "val-2",
+				Value:     &val2,
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-3",
+				UpdatedAt: "",
 			},
 		}
-		val1 := "val-1"
-		val2 := "val-2"
 		expectedList := []astroplatformcore.DeploymentEnvironmentVariableRequest{
 			{
 				IsSecret: false,
@@ -3306,6 +3312,11 @@ func TestCreateEnvVars(t *testing.T) {
 				IsSecret: true,
 				Key:      "key-2",
 				Value:    &val2,
+			},
+			{
+				IsSecret: true,
+				Key:      "key-3",
+				Value:    nil,
 			},
 		}
 		deploymentFromFile.Deployment.EnvVars = list
@@ -3716,13 +3727,13 @@ func TestCheckEnvVars(t *testing.T) {
 				IsSecret:  false,
 				Key:       "",
 				UpdatedAt: "",
-				Value:     "val-1",
+				Value:     &val1,
 			},
 			{
 				IsSecret:  true,
 				Key:       "key-2",
 				UpdatedAt: "",
-				Value:     "val-2",
+				Value:     &val2,
 			},
 		}
 		input.Deployment.EnvVars = list
@@ -3738,13 +3749,12 @@ func TestCheckEnvVars(t *testing.T) {
 				IsSecret:  false,
 				Key:       "key-1",
 				UpdatedAt: "",
-				Value:     "val-1",
+				Value:     &val1,
 			},
 			{
 				IsSecret:  true,
 				Key:       "key-2",
 				UpdatedAt: "",
-				Value:     "",
 			},
 		}
 		input.Deployment.EnvVars = list
@@ -3760,13 +3770,13 @@ func TestCheckEnvVars(t *testing.T) {
 				IsSecret:  false,
 				Key:       "key-1",
 				UpdatedAt: "",
-				Value:     "val-1",
+				Value:     &val1,
 			},
 			{
 				IsSecret:  true,
 				Key:       "",
 				UpdatedAt: "",
-				Value:     "val-2",
+				Value:     &val2,
 			},
 		}
 		input.Deployment.EnvVars = list
@@ -3774,7 +3784,7 @@ func TestCheckEnvVars(t *testing.T) {
 		assert.ErrorIs(t, err, errRequiredField)
 		assert.ErrorContains(t, err, "missing required field: deployment.environment_variables[1].key")
 	})
-	t.Run("returns nil if env var values are missing on update", func(t *testing.T) {
+	t.Run("returns an error if env var values are missing on update for non-secret env var", func(t *testing.T) {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster-id"
 		list := []inspect.EnvironmentVariable{
@@ -3782,13 +3792,33 @@ func TestCheckEnvVars(t *testing.T) {
 				IsSecret:  false,
 				Key:       "key-1",
 				UpdatedAt: "",
-				Value:     "val-1",
+			},
+		}
+		input.Deployment.EnvVars = list
+		err = checkEnvVars(&input, "update")
+		assert.ErrorIs(t, err, errRequiredField)
+		assert.ErrorContains(t, err, "missing required field: deployment.environment_variables[0].value")
+	})
+	t.Run("returns nil if env var values are valid on update", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		list := []inspect.EnvironmentVariable{
+			{
+				IsSecret:  false,
+				Key:       "key-1",
+				UpdatedAt: "",
+				Value:     &val1,
 			},
 			{
 				IsSecret:  true,
 				Key:       "key-2",
 				UpdatedAt: "",
-				Value:     "",
+				Value:     &val2,
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-3",
+				UpdatedAt: "",
 			},
 		}
 		input.Deployment.EnvVars = list
