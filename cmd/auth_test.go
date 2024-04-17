@@ -58,16 +58,9 @@ func TestLogin(t *testing.T) {
 	login(&cobra.Command{}, []string{}, nil, nil, buf)
 
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	defer testUtil.MockUserInput(t, "n")()
-	login(&cobra.Command{}, []string{"fail.astronomer.io"}, nil, nil, buf)
-	assert.Contains(t, buf.String(), "fail.astronomer.io is an invalid domain to login into Astro.\n")
-
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	softwareDomain = "software.astronomer.io"
-	buf = new(bytes.Buffer)
-	defer testUtil.MockUserInput(t, "y")()
-	login(&cobra.Command{}, []string{"software.astronomer.io"}, nil, nil, buf)
-	assert.Contains(t, buf.String(), "software.astronomer.io is an invalid domain to login into Astro.\n")
+	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, buf)
+	assert.Contains(t, buf.String(), "To login to Astronomer Software follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 }
 
 func TestLogout(t *testing.T) {
