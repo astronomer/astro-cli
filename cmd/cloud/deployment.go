@@ -936,6 +936,8 @@ func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentTokenUpdateCmd(out),
 		newDeploymentTokenRotateCmd(out),
 		newDeploymentTokenDeleteCmd(out),
+		newWorkspaceTokenManageCmd(out),
+		newOrgTokenManageCmd(out),
 	)
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment where you would like to manage tokens")
 	return cmd
@@ -980,8 +982,8 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
-		Short:   "Update a Deployment or Organaization API token",
-		Long:    "Update a Deployment or Organaization API token that has a role in an Astro Deployment\n$astro workspace token update [TOKEN_ID] --name [new token name] --role [Possible values are DEPLOYMENT_ADMIN or a custom role name].",
+		Short:   "Update a Deployment API token",
+		Long:    "Update a Deployment API token that has a role in an Astro Deployment\n$astro deployment token update [TOKEN_ID] --name [new token name] --role [Possible values are DEPLOYMENT_ADMIN or a custom role name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateDeploymentToken(cmd, args, out)
 		},
@@ -1029,12 +1031,284 @@ func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
+func newOrgTokenManageCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "organization-token",
+		Short: "Manage organization tokens in a deployment",
+		Long:  "Manage organization tokens in a deployment",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newAddOrganizationTokenDeploymentRole(out),
+		newUpdateOrganizationTokenDeploymentRole(out),
+		newRemoveOrganizationTokenDeploymentRole(out),
+		newListOrganizationTokensInDeployment(out),
+	)
+	return cmd
+}
+
+//nolint:dupl
+func newWorkspaceTokenManageCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "workspace-token",
+		Short: "Manage workspace tokens in a deployment",
+		Long:  "Manage workspace tokens in a deployment",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newAddWorkspaceTokenDeploymentRole(out),
+		newUpdateWorkspaceTokenDeploymentRole(out),
+		newRemoveWorkspaceTokenDeploymentRole(out),
+		newListWorkspaceTokensInDeployment(out),
+	)
+	return cmd
+}
+
+func newAddOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "add [ORG_TOKEN_ID]",
+		Short: "Add an Organization API token to a Deployment",
+		Long:  "Add an Organization API token to a Deployment\n$astro deployment token organization-token add [ORG_TOKEN_ID] --name [token name] --role [DEPLOYMENT_ADMIN or a custom role name].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return addOrgTokenToDeploymentRole(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to add to the "+
+		"Organization API token. Possible values are DEPLOYMENT_ADMIN or a custom role name.")
+	return cmd
+}
+
+func newUpdateOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "update [ORG_TOKEN_ID]",
+		Short: "Update an Organization API token's Deployment Role",
+		Long:  "Update an Organization API token's Deployment Role\n$astro deployment token organization-token update [ORG_TOKEN_ID] --name [token name] --role [DEPLOYMENT_ADMIN or a custom role name].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return updateOrgTokenToDeploymentRole(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to update the "+
+		"Organization API token. Possible values are DEPLOYMENT_ADMIN or a custom role name.")
+	return cmd
+}
+
+func newAddWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "add [WORKSPACE_TOKEN_ID]",
+		Short: "Add a Workspace API token's Deployment Role",
+		Long:  "Add a Workspace API token's Deployment Role\n$astro deployment token workspace-token add [WORKSPACE_TOKEN_ID] --name [token name] --role [DEPLOYMENT_ADMIN or a custom role name].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return addWorkspaceTokenDeploymentRole(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&orgTokenName, "workspace-token-name", "n", "", "The name of the WORKSPACE API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to grant to the "+
+		"Workspace API token. Possible values are DEPLOYMENT_ADMIN or a custom role name.")
+	return cmd
+}
+
+func newUpdateWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "update [WORKSPACE_TOKEN_ID]",
+		Short: "Update a Workspace API token's Deployment Role",
+		Long:  "Update a Workspace API token's Deployment Role\n$astro deployment token workspace-token update [WORKSPACE_TOKEN_ID] --name [token name] --role [DEPLOYMENT_ADMIN or a custom role name].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return updateWorkspaceTokenDeploymentRole(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&orgTokenName, "workspace-token-name", "n", "", "The name of the WORKSPACE API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to grant to the "+
+		"Workspace API token. Possible values are DEPLOYMENT_ADMIN or a custom role name.")
+	return cmd
+}
+
+func addOrgTokenToDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		orgTokenID = strings.ToLower(args[0])
+	}
+	if tokenRole == "" {
+		// no role was provided so ask the user for it
+		tokenRole = input.Text("Enter a role for the API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ")
+	}
+	cmd.SilenceUsage = true
+
+	return deployment.UpsertOrgTokenDeploymentRole(orgTokenID, orgTokenName, tokenRole, deploymentID, "create", out, astroCoreClient, astroCoreIamClient)
+}
+
+func updateOrgTokenToDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		orgTokenID = strings.ToLower(args[0])
+	}
+	if tokenRole == "" {
+		// no role was provided so ask the user for it
+		tokenRole = input.Text("Enter a role for the new Deployment API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ")
+	}
+	cmd.SilenceUsage = true
+
+	return deployment.UpsertOrgTokenDeploymentRole(orgTokenID, orgTokenName, tokenRole, deploymentID, "update", out, astroCoreClient, astroCoreIamClient)
+}
+
+func addWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		workspaceTokenID = strings.ToLower(args[0])
+	}
+
+	if tokenRole == "" {
+		// no role was provided so ask the user for it
+		tokenRole = input.Text("Enter a role for the API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ")
+	}
+
+	cmd.SilenceUsage = true
+	return deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, tokenRole, workspaceID, deploymentID, "create", out, astroCoreClient, astroCoreIamClient)
+}
+
+func updateWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		workspaceTokenID = strings.ToLower(args[0])
+	}
+
+	if tokenRole == "" {
+		// no role was provided so ask the user for it
+		tokenRole = input.Text("Enter a role for the new Deployment API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ")
+	}
+
+	cmd.SilenceUsage = true
+	return deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, tokenRole, workspaceID, deploymentID, "update", out, astroCoreClient, astroCoreIamClient)
+}
+
+func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "remove [ORG_TOKEN_ID]",
+		Short: "Remove an Organization API token's Deployment Role",
+		Long:  "Remove an Organization API token's Deployment Role\n$astro deployment token organization-token remove [ORG_TOKEN_ID] --name [token name].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return removeOrgTokenFromDeploymentRole(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	return cmd
+}
+
+func newRemoveWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "remove [WORKSPACE_TOKEN_ID]",
+		Short: "Remove a Workspace API token's Deployment Role",
+		Long:  "Remove a Workspace API token's Deployment Role\n$astro deployment token workspace-token remove [WORKSPACE_TOKEN_ID] --name [token name].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return removeWorkspaceTokenDeploymentRole(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&orgTokenName, "workspace-token-name", "n", "", "The name of the WORKSPACE API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	return cmd
+}
+
+func removeOrgTokenFromDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		orgTokenID = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return deployment.RemoveOrgTokenDeploymentRole(orgTokenID, orgTokenName, deploymentID, out, astroCoreClient, astroCoreIamClient)
+}
+
+func removeWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		workspaceTokenID = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return deployment.RemoveWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, workspaceID, deploymentID, out, astroCoreClient, astroCoreIamClient)
+}
+
+func newListOrganizationTokensInDeployment(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all Organization API tokens in a deployment",
+		Long:  "List all Organization API tokens in a deployment\n$astro deployment token organization-token list",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listOrganizationTokensInDeployment(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func newListWorkspaceTokensInDeployment(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all Workspace API tokens in a deployment",
+		Long:  "List all Workspace API tokens in a deployment\n$astro deployment token workspace-token list",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listWorkspaceTokensInDeployment(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func listOrganizationTokensInDeployment(cmd *cobra.Command, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	// if an id was provided in the args we use it
+
+	cmd.SilenceUsage = true
+	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
+		"ORGANIZATION",
+	}
+	return deployment.ListTokens(astroCoreClient, deploymentID, &tokenTypes, out)
+}
+
+func listWorkspaceTokensInDeployment(cmd *cobra.Command, out io.Writer) error {
+	if deploymentID == "" {
+		return errors.New("flag --deployment-id is required")
+	}
+	// if an id was provided in the args we use it
+
+	cmd.SilenceUsage = true
+	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
+		"WORKSPACE",
+	}
+	return deployment.ListTokens(astroCoreClient, deploymentID, &tokenTypes, out)
+}
+
 func listDeploymentToken(cmd *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errors.New("flag --deployment-id is required")
 	}
 	cmd.SilenceUsage = true
-	return deployment.ListTokens(astroCoreClient, deploymentID, out)
+	return deployment.ListTokens(astroCoreClient, deploymentID, nil, out)
 }
 
 func createDeploymentToken(cmd *cobra.Command, out io.Writer) error {
@@ -1066,7 +1340,7 @@ func updateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 	}
 
 	cmd.SilenceUsage = true
-	return deployment.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, deploymentID, out, astroCoreClient)
+	return deployment.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, deploymentID, out, astroCoreClient, astroCoreIamClient)
 }
 
 func rotateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1079,7 +1353,7 @@ func rotateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 		tokenID = strings.ToLower(args[0])
 	}
 	cmd.SilenceUsage = true
-	return deployment.RotateToken(tokenID, name, deploymentID, cleanTokenOutput, forceRotate, out, astroCoreClient)
+	return deployment.RotateToken(tokenID, name, deploymentID, cleanTokenOutput, forceRotate, out, astroCoreClient, astroCoreIamClient)
 }
 
 func deleteDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1093,7 +1367,7 @@ func deleteDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 	}
 
 	cmd.SilenceUsage = true
-	return deployment.DeleteToken(tokenID, name, deploymentID, forceDelete, out, astroCoreClient)
+	return deployment.DeleteToken(tokenID, name, deploymentID, forceDelete, out, astroCoreClient, astroCoreIamClient)
 }
 
 func getOverrideUntil(until, forDuration string) (*time.Time, error) {

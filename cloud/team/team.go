@@ -90,7 +90,7 @@ func GetTeam(client astrocore.CoreClient, teamID string) (team astrocore.Team, e
 	return team, nil
 }
 
-func UpdateWorkspaceTeamRole(id, role, workspace string, out io.Writer, client astrocore.CoreClient) error {
+func UpdateWorkspaceTeamRole(id, role, workspaceID string, out io.Writer, client astrocore.CoreClient) error {
 	err := user.IsWorkspaceRoleValid(role)
 	if err != nil {
 		return err
@@ -99,13 +99,13 @@ func UpdateWorkspaceTeamRole(id, role, workspace string, out io.Writer, client a
 	if err != nil {
 		return err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 
 	var team astrocore.Team
 	if id == "" {
-		teams, err := GetWorkspaceTeams(client, workspace, teamPagnationLimit)
+		teams, err := GetWorkspaceTeams(client, workspaceID, teamPagnationLimit)
 		if err != nil {
 			return err
 		}
@@ -129,7 +129,7 @@ func UpdateWorkspaceTeamRole(id, role, workspace string, out io.Writer, client a
 	teamID := team.Id
 
 	teamMutateRequest := astrocore.MutateWorkspaceTeamRoleRequest{Role: role}
-	resp, err := client.MutateWorkspaceTeamRoleWithResponse(httpContext.Background(), ctx.Organization, workspace, teamID, teamMutateRequest)
+	resp, err := client.MutateWorkspaceTeamRoleWithResponse(httpContext.Background(), ctx.Organization, workspaceID, teamID, teamMutateRequest)
 	if err != nil {
 		return err
 	}
@@ -220,18 +220,18 @@ func UpdateTeam(id, name, description, role string, out io.Writer, client astroc
 	return nil
 }
 
-func RemoveWorkspaceTeam(id, workspace string, out io.Writer, client astrocore.CoreClient) error {
+func RemoveWorkspaceTeam(id, workspaceID string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 
 	var team astrocore.Team
 	if id == "" {
-		teams, err := GetWorkspaceTeams(client, workspace, teamPagnationLimit)
+		teams, err := GetWorkspaceTeams(client, workspaceID, teamPagnationLimit)
 		if err != nil {
 			return err
 		}
@@ -293,7 +293,7 @@ func selectTeam(teams []astrocore.Team) (astrocore.Team, error) {
 	return selected, nil
 }
 
-func GetWorkspaceTeams(client astrocore.CoreClient, workspace string, limit int) ([]astrocore.Team, error) {
+func GetWorkspaceTeams(client astrocore.CoreClient, workspaceID string, limit int) ([]astrocore.Team, error) {
 	offset := 0
 	var teams []astrocore.Team
 
@@ -301,11 +301,11 @@ func GetWorkspaceTeams(client astrocore.CoreClient, workspace string, limit int)
 	if err != nil {
 		return nil, err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 	for {
-		resp, err := client.ListWorkspaceTeamsWithResponse(httpContext.Background(), ctx.Organization, workspace, &astrocore.ListWorkspaceTeamsParams{
+		resp, err := client.ListWorkspaceTeamsWithResponse(httpContext.Background(), ctx.Organization, workspaceID, &astrocore.ListWorkspaceTeamsParams{
 			Offset: &offset,
 			Limit:  &limit,
 		})
@@ -329,19 +329,19 @@ func GetWorkspaceTeams(client astrocore.CoreClient, workspace string, limit int)
 }
 
 // Prints a list of all of an organizations teams
-func ListWorkspaceTeams(out io.Writer, client astrocore.CoreClient, workspace string) error {
+func ListWorkspaceTeams(out io.Writer, client astrocore.CoreClient, workspaceID string) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 	table := printutil.Table{
 		DynamicPadding: true,
 		Header:         []string{"ID", "Role", "Name", "Description", "Create Date"},
 	}
-	teams, err := GetWorkspaceTeams(client, workspace, teamPagnationLimit)
+	teams, err := GetWorkspaceTeams(client, workspaceID, teamPagnationLimit)
 	if err != nil {
 		return err
 	}
@@ -353,7 +353,7 @@ func ListWorkspaceTeams(out io.Writer, client astrocore.CoreClient, workspace st
 			roles = *teams[i].Roles
 		}
 		for _, role := range roles {
-			if role.EntityType == "WORKSPACE" && role.EntityId == workspace {
+			if role.EntityType == "WORKSPACE" && role.EntityId == workspaceID {
 				teamRole = role.Role
 			}
 		}
@@ -374,7 +374,7 @@ func ListWorkspaceTeams(out io.Writer, client astrocore.CoreClient, workspace st
 	return nil
 }
 
-func AddWorkspaceTeam(id, role, workspace string, out io.Writer, client astrocore.CoreClient) error {
+func AddWorkspaceTeam(id, role, workspaceID string, out io.Writer, client astrocore.CoreClient) error {
 	err := user.IsWorkspaceRoleValid(role)
 	if err != nil {
 		return err
@@ -383,8 +383,8 @@ func AddWorkspaceTeam(id, role, workspace string, out io.Writer, client astrocor
 	if err != nil {
 		return err
 	}
-	if workspace == "" {
-		workspace = ctx.Workspace
+	if workspaceID == "" {
+		workspaceID = ctx.Workspace
 	}
 	var team astrocore.Team
 	if id == "" {
@@ -416,7 +416,7 @@ func AddWorkspaceTeam(id, role, workspace string, out io.Writer, client astrocor
 	mutateUserInput := astrocore.MutateWorkspaceTeamRoleRequest{
 		Role: role,
 	}
-	resp, err := client.MutateWorkspaceTeamRoleWithResponse(httpContext.Background(), ctx.Organization, workspace, teamID, mutateUserInput)
+	resp, err := client.MutateWorkspaceTeamRoleWithResponse(httpContext.Background(), ctx.Organization, workspaceID, teamID, mutateUserInput)
 	if err != nil {
 		return err
 	}
@@ -771,7 +771,7 @@ func ListTeamUsers(teamID string, out io.Writer, client astrocore.CoreClient) (e
 	return nil
 }
 
-func GetDeploymentTeams(client astrocore.CoreClient, deployment string, limit int) ([]astrocore.Team, error) {
+func GetDeploymentTeams(client astrocore.CoreClient, deploymentID string, limit int) ([]astrocore.Team, error) {
 	offset := 0
 	var teams []astrocore.Team
 	ctx, err := context.GetCurrentContext()
@@ -780,7 +780,7 @@ func GetDeploymentTeams(client astrocore.CoreClient, deployment string, limit in
 	}
 	includeDeploymentRoles := true
 	for {
-		resp, err := client.ListDeploymentTeamsWithResponse(httpContext.Background(), ctx.Organization, deployment, &astrocore.ListDeploymentTeamsParams{
+		resp, err := client.ListDeploymentTeamsWithResponse(httpContext.Background(), ctx.Organization, deploymentID, &astrocore.ListDeploymentTeamsParams{
 			IncludeDeploymentRoles: &includeDeploymentRoles,
 			Offset:                 &offset,
 			Limit:                  &limit,
@@ -805,12 +805,12 @@ func GetDeploymentTeams(client astrocore.CoreClient, deployment string, limit in
 }
 
 // Prints a list of all of an organizations teams
-func ListDeploymentTeams(out io.Writer, client astrocore.CoreClient, deployment string) error {
+func ListDeploymentTeams(out io.Writer, client astrocore.CoreClient, deploymentID string) error {
 	table := printutil.Table{
 		DynamicPadding: true,
 		Header:         []string{"ID", "Role", "Name", "Description", "Create Date"},
 	}
-	teams, err := GetDeploymentTeams(client, deployment, teamPagnationLimit)
+	teams, err := GetDeploymentTeams(client, deploymentID, teamPagnationLimit)
 	if err != nil {
 		return err
 	}
@@ -826,7 +826,7 @@ func ListDeploymentTeams(out io.Writer, client astrocore.CoreClient, deployment 
 			roles = *teams[i].Roles
 		}
 		for _, role := range roles {
-			if role.EntityType == "DEPLOYMENT" && role.EntityId == deployment {
+			if role.EntityType == "DEPLOYMENT" && role.EntityId == deploymentID {
 				teamRole = role.Role
 			}
 		}
@@ -843,7 +843,7 @@ func ListDeploymentTeams(out io.Writer, client astrocore.CoreClient, deployment 
 	return nil
 }
 
-func AddDeploymentTeam(id, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func AddDeploymentTeam(id, role, deploymentID string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -879,7 +879,7 @@ func AddDeploymentTeam(id, role, deployment string, out io.Writer, client astroc
 	mutateDeploymentTeamInput := astrocore.MutateDeploymentTeamRoleRequest{
 		Role: role,
 	}
-	resp, err := client.MutateDeploymentTeamRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, teamID, mutateDeploymentTeamInput)
+	resp, err := client.MutateDeploymentTeamRoleWithResponse(httpContext.Background(), ctx.Organization, deploymentID, teamID, mutateDeploymentTeamInput)
 	if err != nil {
 		return err
 	}
@@ -891,7 +891,7 @@ func AddDeploymentTeam(id, role, deployment string, out io.Writer, client astroc
 	return nil
 }
 
-func UpdateDeploymentTeamRole(id, role, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func UpdateDeploymentTeamRole(id, role, deploymentID string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -899,7 +899,7 @@ func UpdateDeploymentTeamRole(id, role, deployment string, out io.Writer, client
 
 	var team astrocore.Team
 	if id == "" {
-		teams, err := GetDeploymentTeams(client, deployment, teamPagnationLimit)
+		teams, err := GetDeploymentTeams(client, deploymentID, teamPagnationLimit)
 		if err != nil {
 			return err
 		}
@@ -923,7 +923,7 @@ func UpdateDeploymentTeamRole(id, role, deployment string, out io.Writer, client
 	teamID := team.Id
 
 	teamMutateRequest := astrocore.MutateDeploymentTeamRoleRequest{Role: role}
-	resp, err := client.MutateDeploymentTeamRoleWithResponse(httpContext.Background(), ctx.Organization, deployment, teamID, teamMutateRequest)
+	resp, err := client.MutateDeploymentTeamRoleWithResponse(httpContext.Background(), ctx.Organization, deploymentID, teamID, teamMutateRequest)
 	if err != nil {
 		return err
 	}
@@ -935,7 +935,7 @@ func UpdateDeploymentTeamRole(id, role, deployment string, out io.Writer, client
 	return nil
 }
 
-func RemoveDeploymentTeam(id, deployment string, out io.Writer, client astrocore.CoreClient) error {
+func RemoveDeploymentTeam(id, deploymentID string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -943,7 +943,7 @@ func RemoveDeploymentTeam(id, deployment string, out io.Writer, client astrocore
 
 	var team astrocore.Team
 	if id == "" {
-		teams, err := GetDeploymentTeams(client, deployment, teamPagnationLimit)
+		teams, err := GetDeploymentTeams(client, deploymentID, teamPagnationLimit)
 		if err != nil {
 			return err
 		}
@@ -965,7 +965,7 @@ func RemoveDeploymentTeam(id, deployment string, out io.Writer, client astrocore
 		}
 	}
 	teamID := team.Id
-	resp, err := client.DeleteDeploymentTeamWithResponse(httpContext.Background(), ctx.Organization, deployment, teamID)
+	resp, err := client.DeleteDeploymentTeamWithResponse(httpContext.Background(), ctx.Organization, deploymentID, teamID)
 	if err != nil {
 		return err
 	}
@@ -973,6 +973,6 @@ func RemoveDeploymentTeam(id, deployment string, out io.Writer, client astrocore
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Team %s was successfully removed from deployment %s\n", team.Name, deployment)
+	fmt.Fprintf(out, "Astro Team %s was successfully removed from deployment %s\n", team.Name, deploymentID)
 	return nil
 }

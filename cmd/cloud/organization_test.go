@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -1247,6 +1248,11 @@ func TestOrganizationTokenUpdate(t *testing.T) {
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
 		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseError, nil)
 		astroCoreClient = mockClient
+
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil)
+		astroCoreIamClient = mockIamClient
+
 		cmdArgs := []string{"token", "update", "--name", tokenName1}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "failed to update token")
@@ -1261,7 +1267,7 @@ func TestOrganizationTokenUpdate(t *testing.T) {
 		assert.Error(t, err)
 		mockClient.AssertExpectations(t)
 	})
-	t.Run("token is updated", func(t *testing.T) {
+	t.Run("token is updated -- name provided", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
@@ -1483,13 +1489,15 @@ func TestOrganizationTokenListRoles(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and token roles are not listed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseError, nil).Once()
-		astroCoreClient = mockClient
+
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseError, nil)
+		astroCoreIamClient = mockIamClient
+
 		cmdArgs := []string{"token", "roles", mockTokenID}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "failed to get token")
-		mockClient.AssertExpectations(t)
+		mockIamClient.AssertExpectations(t)
 	})
 	t.Run("any context errors from api are returned and token roles are not listed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
@@ -1503,13 +1511,14 @@ func TestOrganizationTokenListRoles(t *testing.T) {
 
 	t.Run("token roles are listed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil).Once()
-		astroCoreClient = mockClient
+
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil)
+		astroCoreIamClient = mockIamClient
 		cmdArgs := []string{"token", "roles", mockTokenID}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		mockIamClient.AssertExpectations(t)
 	})
 }
 

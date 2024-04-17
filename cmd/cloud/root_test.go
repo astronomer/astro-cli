@@ -9,7 +9,7 @@ import (
 
 func TestAddCmds(t *testing.T) {
 	buf := new(bytes.Buffer)
-	cmds := AddCmds(nil, nil, nil, buf)
+	cmds := AddCmds(nil, nil, nil, nil, buf)
 	for cmdIdx := range cmds {
 		assert.Contains(t, []string{"deployment", "deploy DEPLOYMENT-ID", "workspace", "user", "organization"}, cmds[cmdIdx].Use)
 	}

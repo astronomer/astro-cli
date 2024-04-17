@@ -13,6 +13,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 
@@ -2124,7 +2125,7 @@ func TestDeploymentTokenCreate(t *testing.T) {
 }
 
 func TestDeploymentTokenUpdate(t *testing.T) {
-	expectedHelp := "Update a Deployment or Organaization API token"
+	expectedHelp := "Update a Deployment API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	tokenID = ""
 
@@ -2149,6 +2150,11 @@ func TestDeploymentTokenUpdate(t *testing.T) {
 		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil)
 		mockClient.On("UpdateDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateDeploymentAPITokenRoleResponseError, nil)
 		astroCoreClient = mockClient
+
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKDeploymentToken, nil)
+		astroCoreIamClient = mockIamClient
+
 		cmdArgs := []string{"token", "update", "--name", tokenName1, "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "failed to update api token")
@@ -2412,6 +2418,226 @@ func TestDeploymentTokenDelete(t *testing.T) {
 		mockClient.On("DeleteDeploymentApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"token", "delete", mockTokenID, "--force", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+
+func TestAddWorkspaceTokenDeploymentRole(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Run("happy path Create", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Once()
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil).Once()
+
+		defer testUtil.MockUserInput(t, "1")()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+
+		cmdArgs := []string{"token", "workspace-token", "add", "--deployment-id", mockDeploymentID, "--role", "DEPLOYMENT_ADMIN"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+
+	t.Run("happy path with token id passed in", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil).Once()
+		// mock os.Stdin
+		defer testUtil.MockUserInput(t, "DEPLOYMENT_ADMIN")()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "workspace-token", "add", "token-id", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+
+func TestUpdateWorkspaceTokenDeploymentRole(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("happy path Update", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Once()
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil).Once()
+		defer testUtil.MockUserInput(t, "1")()
+
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "workspace-token", "update", "--deployment-id", mockDeploymentID, "--role", "DEPLOYMENT_ADMIN"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+
+	t.Run("happy path with token id passed in", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil).Once()
+		// mock os.Stdin
+		defer testUtil.MockUserInput(t, "DEPLOYMENT_ADMIN")()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "workspace-token", "update", "token-id", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+
+func TestAddOrganizationTokenDeploymentRole(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Run("happy path Create", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil).Once()
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
+
+		defer testUtil.MockUserInput(t, "1")()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+
+		cmdArgs := []string{"token", "organization-token", "add", "--deployment-id", mockDeploymentID, "--role", "DEPLOYMENT_ADMIN"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+
+	t.Run("happy path with token id passed in", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
+		// mock os.Stdin
+		defer testUtil.MockUserInput(t, "DEPLOYMENT_ADMIN")()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "organization-token", "add", "token-id", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+
+func TestUpdateOrganizationTokenDeploymentRole(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("happy path Update", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Once()
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
+		defer testUtil.MockUserInput(t, "1")()
+
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "organization-token", "update", "--deployment-id", mockDeploymentID, "--role", "DEPLOYMENT_ADMIN"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+
+	t.Run("happy path with token id passed in", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
+		// mock os.Stdin
+		defer testUtil.MockUserInput(t, "DEPLOYMENT_ADMIN")()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "organization-token", "update", "token-id", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+
+func TestRemoveWorkspaceTokenDeploymentRole(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Run("happy path", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Once()
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil).Once()
+		defer testUtil.MockUserInput(t, "1")()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "workspace-token", "remove", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+
+	t.Run("happy path with token id passed in", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil).Once()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "workspace-token", "remove", "token-id", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+
+func TestRemoveOrganizationTokenDeploymentRole(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Run("happy path", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Once()
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
+		defer testUtil.MockUserInput(t, "1")()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "organization-token", "remove", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+
+	t.Run("happy path with token id passed in", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
+		mockIamClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "organization-token", "remove", "token-id", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+
+func TestListOrganizationTokenDeploymentRoles(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Run("happy path", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Once()
+		defer testUtil.MockUserInput(t, "1")()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "organization-token", "list", "--deployment-id", mockDeploymentID}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+
+func TestListWorkspaceTokenDeploymentRoles(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Run("happy path", func(t *testing.T) {
+		mockIamClient := new(astroiamcore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListDeploymentApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Once()
+		defer testUtil.MockUserInput(t, "1")()
+		astroCoreClient = mockClient
+		astroCoreIamClient = mockIamClient
+		cmdArgs := []string{"token", "workspace-token", "list", "--deployment-id", mockDeploymentID}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
