@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -62,6 +63,11 @@ func login(cmd *cobra.Command, args []string, coreClient astrocore.CoreClient, p
 	if len(args) == 1 {
 		// check if user provided a valid cloud domain
 		if !context.IsCloudDomain(args[0]) {
+			// get the domain from context as an extra check
+			ctx, _ := context.GetCurrentContext()
+			if context.IsCloudDomain(ctx.Domain) {
+				fmt.Fprintf(out, "To login to Astronomer Software follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
+			}
 			return softwareLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
 		}
 		return cloudLogin(args[0], token, coreClient, platformCoreClient, out, shouldDisplayLoginLink)

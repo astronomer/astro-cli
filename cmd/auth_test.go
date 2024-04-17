@@ -60,6 +60,7 @@ func TestLogin(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	softwareDomain = "software.astronomer.io"
 	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, buf)
+	assert.Contains(t, buf.String(), "To login to Astronomer Software follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 }
 
 func TestLogout(t *testing.T) {
