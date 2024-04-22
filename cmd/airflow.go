@@ -579,16 +579,6 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersionsUpgrade
 	}
-	// error if both custom image and deployment id is used
-	if deploymentID != "" && customImageName != "" {
-		return errInvalidBothDeploymentIDandCustomImage
-	}
-	if airflowVersion != "" && deploymentID != "" {
-		return errInvalidBothDeploymentIDandVersion
-	}
-	if runtimeVersion != "" && deploymentID != "" {
-		return errInvalidBothDeploymentIDandVersion
-	}
 	if runtimeVersion != "" && customImageName != "" {
 		return errInvalidBothCustomImageandVersion
 	}
