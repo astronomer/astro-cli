@@ -456,8 +456,8 @@ func updateOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 func newRemoveOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remove [ORG_TOKEN_ID]",
-		Short: "Remove an Workspace API token's Deployment Role",
-		Long:  "Remove an Workspace API token's Deployment Role\n$astro workspace token organization-token remove [ORG_TOKEN_ID] --org-token-name [token name].",
+		Short: "Remove an Organization API token's Workspace Role",
+		Long:  "Remove an Organization API token's Workspace Role\n$astro workspace token organization-token remove [ORG_TOKEN_ID] --org-token-name [token name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeWorkspaceTokenFromDeploymentRole(cmd, args, out)
 		},
