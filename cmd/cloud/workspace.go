@@ -397,7 +397,7 @@ func newAddOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [ORG_TOKEN_ID]",
 		Short: "Add an Organization API token to a Workspace",
-		Long:  "Add an Organization API token to a Workspace\n$astro workspace token organization-token add [ORG_TOKEN_ID] --name [token name] --role [" + allowedWorkspaceRoleNames + "].",
+		Long:  "Add an Organization API token to a Workspace\n$astro workspace token organization-token add [ORG_TOKEN_ID] --org-token-name [token name] --role [" + allowedWorkspaceRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addOrgTokenWorkspaceRole(cmd, args, out)
 		},
@@ -412,7 +412,7 @@ func newUpdateOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update [ORG_TOKEN_ID]",
 		Short: "Update an Organization API token's Workspace Role",
-		Long:  "Update an Organization API token's Workspace Role\n$astro workspace token organization-token update [ORG_TOKEN_ID] --name [token name] --role [" + allowedWorkspaceRoleNames + "].",
+		Long:  "Update an Organization API token's Workspace Role\n$astro workspace token organization-token update [ORG_TOKEN_ID] --org-token-name [token name] --role [" + allowedWorkspaceRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateOrgTokenWorkspaceRole(cmd, args, out)
 		},
@@ -457,7 +457,7 @@ func newRemoveOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remove [ORG_TOKEN_ID]",
 		Short: "Remove an Workspace API token's Deployment Role",
-		Long:  "Remove an Workspace API token's Deployment Role\n$astro workspace token organization-token remove [ORG_TOKEN_ID] --name [token name].",
+		Long:  "Remove an Workspace API token's Deployment Role\n$astro workspace token organization-token remove [ORG_TOKEN_ID] --org-token-name [token name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeWorkspaceTokenFromDeploymentRole(cmd, args, out)
 		},
