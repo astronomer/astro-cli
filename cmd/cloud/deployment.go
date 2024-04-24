@@ -363,10 +363,10 @@ func newDeploymentLogsCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&logsKeyword, "keyword", "k", "", "Show logs that contain this exact keyword or phrase.")
 	cmd.Flags().IntVarP(&logCount, "log-count", "c", logCount, "Number of logs to show")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to show logs of")
-	cmd.Flags().BoolVarP(&logWebserver, "webserver", "r", false, "Show logs from the webserver")
-	cmd.Flags().BoolVarP(&logScheduler, "scheduler", "s", false, "Show logs from the scheduler")
-	cmd.Flags().BoolVarP(&logWorkers, "workers", "o", false, "Show logs from the workers")
-	cmd.Flags().BoolVarP(&logTriggerer, "triggerer", "t", false, "Show logs from the triggerer")
+	cmd.Flags().BoolVar(&logWebserver, "webserver", false, "Show logs from the webserver")
+	cmd.Flags().BoolVar(&logScheduler, "scheduler", false, "Show logs from the scheduler")
+	cmd.Flags().BoolVar(&logWorkers, "workers", false, "Show logs from the workers")
+	cmd.Flags().BoolVar(&logTriggerer, "triggerer", false, "Show logs from the triggerer")
 	return cmd
 }
 
