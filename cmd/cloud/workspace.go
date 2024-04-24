@@ -365,7 +365,7 @@ func newWorkspaceTokenAddOrgTokenCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [ORG_TOKEN_ID]",
 		Short: "Add an Organization API token to an Astro Workspace",
-		Long:  "Add an Organization API token to an Astro Workspace\n$astro workspace token add [ORG_TOKEN_NAME] --name [new token name] --role [" + allowedWorkspaceRoleNames + "].",
+		Long:  "Add an Organization API token to an Astro Workspace\n$astro workspace token add [ORG_TOKEN_NAME] --org-token-name [token name] --role [" + allowedWorkspaceRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addOrgTokenToWorkspace(cmd, args, out)
 		},
