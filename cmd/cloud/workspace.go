@@ -459,14 +459,14 @@ func newRemoveOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 		Short: "Remove an Organization API token's Workspace Role",
 		Long:  "Remove an Organization API token's Workspace Role\n$astro workspace token organization-token remove [ORG_TOKEN_ID] --org-token-name [token name].",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return removeWorkspaceTokenFromDeploymentRole(cmd, args, out)
+			return removeOrganizationTokenWorkspaceRole(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Workspace API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
 	return cmd
 }
 
-func removeWorkspaceTokenFromDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
+func removeOrganizationTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer) error {
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
 		// make sure the id is lowercase
