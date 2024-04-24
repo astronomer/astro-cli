@@ -998,7 +998,7 @@ type Deployment struct {
 	CreatedAt time.Time           `json:"createdAt"`
 	CreatedBy BasicSubjectProfile `json:"createdBy"`
 
-	// DagTarballVersion The Deployment's current DAG tarball version, also known as the Bundle Version in the Cloud UI. If no deploys are currently processing, this value should be the same as DesiredDagTarballVersion.
+	// DagTarballVersion The Deployment's current DAG tarball version, also known as the Bundle Version in the Astro UI. If no deploys are currently processing, this value should be the same as DesiredDagTarballVersion.
 	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
 
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
@@ -1487,7 +1487,7 @@ type OverrideDeploymentHibernationBody struct {
 	// IsHibernating The type of override to perform. Set this value to 'true' to have the Deployment hibernate regardless of its hibernation schedule. Set the value to 'false' to have the Deployment wake up regardless of its hibernation schedule. Use 'OverrideUntil' to define the length of the override.
 	IsHibernating bool `json:"isHibernating"`
 
-	// OverrideUntil The end of the override time in UTC, formatted as 'YYYY-MM-DDTHH:MM:SSZ'. If this value isn't specified, the override persists until you end it through the Cloud UI or another API call.
+	// OverrideUntil The end of the override time in UTC, formatted as 'YYYY-MM-DDTHH:MM:SSZ'. If this value isn't specified, the override persists until you end it through the Astro UI or another API call.
 	OverrideUntil *time.Time `json:"overrideUntil,omitempty"`
 }
 
@@ -1636,6 +1636,9 @@ type UpdateDedicatedDeploymentRequest struct {
 
 	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
+
+	// IsDevelopmentMode Whether the Deployment is for development only. If `false`, the Deployment can be considered production for the purposes of support case priority, but development-only features such as hibernation will not be available. You can't update this value to `true` for existing non-development Deployments.
+	IsDevelopmentMode *bool `json:"isDevelopmentMode,omitempty"`
 
 	// IsHighAvailability Whether the Deployment is configured for high availability. If `true`, multiple scheduler pods will be online.
 	IsHighAvailability bool `json:"isHighAvailability"`
@@ -1793,6 +1796,9 @@ type UpdateStandardDeploymentRequest struct {
 
 	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
+
+	// IsDevelopmentMode Whether the Deployment is for development only. If `false`, the Deployment can be considered production for the purposes of support case priority, but development-only features such as hibernation will not be available. You can't update this value to `true` for existing non-development Deployments.
+	IsDevelopmentMode *bool `json:"isDevelopmentMode,omitempty"`
 
 	// IsHighAvailability Whether the Deployment is configured for high availability. If `true`, multiple scheduler pods will be online.
 	IsHighAvailability bool `json:"isHighAvailability"`
@@ -2026,6 +2032,9 @@ type GetClusterOptionsParamsType string
 
 // ListClustersParams defines parameters for ListClusters.
 type ListClustersParams struct {
+	// Names A list of names for Clusters to filter by. The API returns details only for the specified Clusters.
+	Names *[]string `form:"names,omitempty" json:"names,omitempty"`
+
 	// Provider The cloud provider to list clusters for. Clusters from other providers will be filtered out of the results.
 	Provider *ListClustersParamsProvider `form:"provider,omitempty" json:"provider,omitempty"`
 
@@ -2074,6 +2083,9 @@ type ListDeploymentsParams struct {
 	// DeploymentIds A list of IDs for Deployments to show. The API returns details only for the specified Deployments.
 	DeploymentIds *[]string `form:"deploymentIds,omitempty" json:"deploymentIds,omitempty"`
 
+	// Names A list of names for Deployments to filter by. The API returns details only for the specified Deployments.
+	Names *[]string `form:"names,omitempty" json:"names,omitempty"`
+
 	// WorkspaceIds A list of IDs for Workspaces to filter on. The API returns details for all Deployments belonging only to the specified Workspaces.
 	WorkspaceIds *[]string `form:"workspaceIds,omitempty" json:"workspaceIds,omitempty"`
 
@@ -2094,6 +2106,9 @@ type ListDeploymentsParamsSorts string
 type ListWorkspacesParams struct {
 	// WorkspaceIds A list of IDs for specific Workspaces to list. The API will list information only for Workspaces which have been specified in this list.
 	WorkspaceIds *[]string `form:"workspaceIds,omitempty" json:"workspaceIds,omitempty"`
+
+	// Names A list of names for specific Workspaces to filter by. The API will list information only for Workspaces which have been specified in this list.
+	Names *[]string `form:"names,omitempty" json:"names,omitempty"`
 
 	// Offset The number of results to skip before returning values.
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
@@ -3280,6 +3295,22 @@ func NewListClustersRequest(server string, organizationId string, params *ListCl
 
 	queryValues := queryURL.Query()
 
+	if params.Names != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "names", runtime.ParamLocationQuery, *params.Names); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
 	if params.Provider != nil {
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "provider", runtime.ParamLocationQuery, *params.Provider); err != nil {
@@ -3683,6 +3714,22 @@ func NewListDeploymentsRequest(server string, organizationId string, params *Lis
 
 	}
 
+	if params.Names != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "names", runtime.ParamLocationQuery, *params.Names); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
 	if params.WorkspaceIds != nil {
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "workspaceIds", runtime.ParamLocationQuery, *params.WorkspaceIds); err != nil {
@@ -4066,6 +4113,22 @@ func NewListWorkspacesRequest(server string, organizationId string, params *List
 	if params.WorkspaceIds != nil {
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "workspaceIds", runtime.ParamLocationQuery, *params.WorkspaceIds); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Names != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "names", runtime.ParamLocationQuery, *params.Names); err != nil {
 			return nil, err
 		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 			return nil, err
