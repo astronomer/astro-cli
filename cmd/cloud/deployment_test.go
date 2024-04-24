@@ -177,6 +177,40 @@ var (
 			StatusCode: 200,
 		},
 	}
+	mockGetDeploymentLogsMultipleComponentsResponse = astrocore.GetDeploymentLogsResponse{
+		JSON200: &astrocore.DeploymentLog{
+			Limit:         logCount,
+			MaxNumResults: 10,
+			Offset:        0,
+			ResultCount:   1,
+			Results: []astrocore.DeploymentLogEntry{
+				{
+					Raw:       "test log line",
+					Timestamp: 1,
+					Source:    astrocore.DeploymentLogEntrySourceWebserver,
+				},
+				{
+					Raw:       "test log line 2",
+					Timestamp: 2,
+					Source:    astrocore.DeploymentLogEntrySourceTriggerer,
+				},
+				{
+					Raw:       "test log line 3",
+					Timestamp: 2,
+					Source:    astrocore.DeploymentLogEntrySourceScheduler,
+				},
+				{
+					Raw:       "test log line 4",
+					Timestamp: 2,
+					Source:    astrocore.DeploymentLogEntrySourceWorker,
+				},
+			},
+			SearchId: "search-id",
+		},
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+	}
 	GetDeploymentOptionsResponseAlphaOK = astrocore.GetDeploymentOptionsResponse{
 		JSON200: &astrocore.DeploymentOptions{
 			DefaultValues: astrocore.DefaultValueOptions{},
@@ -350,6 +384,32 @@ func TestDeploymentLogs(t *testing.T) {
 	assert.NoError(t, err)
 
 	cmdArgs = []string{"logs", "test-id-1", "", "", "-i"}
+	_, err = execDeploymentCmd(cmdArgs...)
+	assert.NoError(t, err)
+	mockPlatformCoreClient.AssertExpectations(t)
+	mockCoreClient.AssertExpectations(t)
+}
+
+func TestDeploymentLogsMultipleComponents(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
+	mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsMultipleComponentsResponse, nil).Times(3)
+	platformCoreClient = mockPlatformCoreClient
+	astroCoreClient = mockCoreClient
+
+	cmdArgs := []string{"logs", "test-id-1", "-r", "-s", "-o", "-t", "-w", "", ""}
+	_, err := execDeploymentCmd(cmdArgs...)
+	assert.NoError(t, err)
+
+	cmdArgs = []string{"logs", "test-id-1", "-r", "-s", "-o", "-t", "", "-e", ""}
+	_, err = execDeploymentCmd(cmdArgs...)
+	assert.NoError(t, err)
+
+	cmdArgs = []string{"logs", "test-id-1", "-r", "-s", "-o", "-t", "", "", "-i"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	mockPlatformCoreClient.AssertExpectations(t)
