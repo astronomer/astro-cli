@@ -375,15 +375,15 @@ func TestDeploymentLogs(t *testing.T) {
 	platformCoreClient = mockPlatformCoreClient
 	astroCoreClient = mockCoreClient
 
-	cmdArgs := []string{"logs", "test-id-1", "-w", "", ""}
+	cmdArgs := []string{"logs", "test-id-1", "-w"}
 	_, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "", "-e", ""}
+	cmdArgs = []string{"logs", "test-id-1", "-e"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "", "", "-i"}
+	cmdArgs = []string{"logs", "test-id-1", "-i"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	mockPlatformCoreClient.AssertExpectations(t)
@@ -401,15 +401,15 @@ func TestDeploymentLogsMultipleComponents(t *testing.T) {
 	platformCoreClient = mockPlatformCoreClient
 	astroCoreClient = mockCoreClient
 
-	cmdArgs := []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "-w", "", ""}
+	cmdArgs := []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "-w"}
 	_, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "", "-e", ""}
+	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "-e"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "", "", "-i"}
+	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "-i"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	mockPlatformCoreClient.AssertExpectations(t)
