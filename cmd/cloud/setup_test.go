@@ -356,7 +356,7 @@ func TestCheckAPIToken(t *testing.T) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Set expiration date 24 hours from now
 			NotBefore: jwt.NewNumericDate(time.Now()),                     // Set not before to current time
 			IssuedAt:  jwt.NewNumericDate(time.Now()),                     // Set issued at to current time
-			ID:        "your-id",
+			ID:        "test-id",
 		},
 	}
 
@@ -421,6 +421,10 @@ func TestCheckAPIToken(t *testing.T) {
 	})
 
 	t.Run("expired token", func(t *testing.T) {
+		permissions = []string{
+			"workspaceId:workspace-id",
+			"organizationId:org-ID",
+		}
 		mockClaims = util.CustomClaims{
 			Permissions: permissions,
 			RegisteredClaims: jwt.RegisteredClaims{
