@@ -3,6 +3,7 @@ package version
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 
@@ -72,11 +73,11 @@ func CompareVersions(client *github.Client, owner, repo string) error {
 	// Compare the versions and print a message to the user if the current version is outdated
 	if currentSemver.LessThan(latestSemver) {
 		if runtime.GOOS == "darwin" {
-			fmt.Printf("\nA newer version of Astro CLI is available: %s\nPlease update to the latest version using 'brew upgrade astro'\n\n", latestSemver)
+			fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease update to the latest version using 'brew upgrade astro'\n\n", latestSemver)
 		} else {
-			fmt.Printf("\nA newer version of Astro CLI is available: %s\nPlease see https://docs.astronomer.io/astro/cli/install-cli#upgrade-the-cli for information on how to update the Astro CLI\n\n", latestSemver)
+			fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease see https://docs.astronomer.io/astro/cli/install-cli#upgrade-the-cli for information on how to update the Astro CLI\n\n", latestSemver)
 		}
-		fmt.Printf("If you don't want to see this message again run 'astro config set -g upgrade_message false'\n\n")
+		fmt.Fprintf(os.Stderr, "If you don't want to see this message again run 'astro config set -g upgrade_message false'\n\n")
 	}
 
 	return nil
