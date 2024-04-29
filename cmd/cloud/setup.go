@@ -223,7 +223,6 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 	var tokenRes TokenResponse
 
 	err = json.NewDecoder(res.Body).Decode(&tokenRes)
-
 	if err != nil {
 		return TokenResponse{}, fmt.Errorf("cannot decode response: %w", err)
 	}
@@ -308,7 +307,6 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, isDeploymentF
 	var tokenRes TokenResponse
 
 	err = json.NewDecoder(res.Body).Decode(&tokenRes)
-
 	if err != nil {
 		return false, fmt.Errorf("cannot decode response: %w", err)
 	}

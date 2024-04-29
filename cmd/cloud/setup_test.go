@@ -3,11 +3,12 @@ package cloud
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/golang-jwt/jwt/v4"
 	"io"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
 
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
