@@ -138,7 +138,7 @@ func VariableModify(
 	}
 
 	// update deployment
-	err = Update(currentDeployment.Id, "", "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, newEnvironmentVariables, false, coreClient, platformCoreClient)
+	err = Update(currentDeployment.Id, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, newEnvironmentVariables, false, coreClient, platformCoreClient)
 	if err != nil {
 		return err
 	}

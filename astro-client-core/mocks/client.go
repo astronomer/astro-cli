@@ -2096,32 +2096,32 @@ func (_m *ClientWithResponsesInterface) GetOrganizationWithResponse(ctx context.
 	return r0, r1
 }
 
-// GetSelfUserGitAppAuthorizationWithResponse provides a mock function with given fields: ctx, gitProvider, reqEditors
-func (_m *ClientWithResponsesInterface) GetSelfUserGitAppAuthorizationWithResponse(ctx context.Context, gitProvider astrocore.GetSelfUserGitAppAuthorizationParamsGitProvider, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetSelfUserGitAppAuthorizationResponse, error) {
+// GetSelfUserGitAppAuthorizationWithResponse provides a mock function with given fields: ctx, gitProvider, params, reqEditors
+func (_m *ClientWithResponsesInterface) GetSelfUserGitAppAuthorizationWithResponse(ctx context.Context, gitProvider astrocore.GetSelfUserGitAppAuthorizationParamsGitProvider, params *astrocore.GetSelfUserGitAppAuthorizationParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetSelfUserGitAppAuthorizationResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, ctx, gitProvider)
+	_ca = append(_ca, ctx, gitProvider, params)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	var r0 *astrocore.GetSelfUserGitAppAuthorizationResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, astrocore.GetSelfUserGitAppAuthorizationParamsGitProvider, ...astrocore.RequestEditorFn) (*astrocore.GetSelfUserGitAppAuthorizationResponse, error)); ok {
-		return rf(ctx, gitProvider, reqEditors...)
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.GetSelfUserGitAppAuthorizationParamsGitProvider, *astrocore.GetSelfUserGitAppAuthorizationParams, ...astrocore.RequestEditorFn) (*astrocore.GetSelfUserGitAppAuthorizationResponse, error)); ok {
+		return rf(ctx, gitProvider, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, astrocore.GetSelfUserGitAppAuthorizationParamsGitProvider, ...astrocore.RequestEditorFn) *astrocore.GetSelfUserGitAppAuthorizationResponse); ok {
-		r0 = rf(ctx, gitProvider, reqEditors...)
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.GetSelfUserGitAppAuthorizationParamsGitProvider, *astrocore.GetSelfUserGitAppAuthorizationParams, ...astrocore.RequestEditorFn) *astrocore.GetSelfUserGitAppAuthorizationResponse); ok {
+		r0 = rf(ctx, gitProvider, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*astrocore.GetSelfUserGitAppAuthorizationResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, astrocore.GetSelfUserGitAppAuthorizationParamsGitProvider, ...astrocore.RequestEditorFn) error); ok {
-		r1 = rf(ctx, gitProvider, reqEditors...)
+	if rf, ok := ret.Get(1).(func(context.Context, astrocore.GetSelfUserGitAppAuthorizationParamsGitProvider, *astrocore.GetSelfUserGitAppAuthorizationParams, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, gitProvider, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -2980,6 +2980,39 @@ func (_m *ClientWithResponsesInterface) ListRolesWithResponse(ctx context.Contex
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, *astrocore.ListRolesParams, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, organizationId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListSelfUserGitAccountsWithResponse provides a mock function with given fields: ctx, gitProvider, reqEditors
+func (_m *ClientWithResponsesInterface) ListSelfUserGitAccountsWithResponse(ctx context.Context, gitProvider astrocore.ListSelfUserGitAccountsParamsGitProvider, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListSelfUserGitAccountsResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, gitProvider)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.ListSelfUserGitAccountsResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.ListSelfUserGitAccountsParamsGitProvider, ...astrocore.RequestEditorFn) (*astrocore.ListSelfUserGitAccountsResponse, error)); ok {
+		return rf(ctx, gitProvider, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.ListSelfUserGitAccountsParamsGitProvider, ...astrocore.RequestEditorFn) *astrocore.ListSelfUserGitAccountsResponse); ok {
+		r0 = rf(ctx, gitProvider, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ListSelfUserGitAccountsResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, astrocore.ListSelfUserGitAccountsParamsGitProvider, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, gitProvider, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}

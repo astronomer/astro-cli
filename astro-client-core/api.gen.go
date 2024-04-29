@@ -165,10 +165,23 @@ const (
 	CreateEnvironmentObjectLinkRequestScopeDEPLOYMENT CreateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
 )
 
+// Defines values for CreateEnvironmentObjectMetricsExportOverridesRequestExporterType.
+const (
+	CreateEnvironmentObjectMetricsExportOverridesRequestExporterTypeOTLP       CreateEnvironmentObjectMetricsExportOverridesRequestExporterType = "OTLP"
+	CreateEnvironmentObjectMetricsExportOverridesRequestExporterTypePROMETHEUS CreateEnvironmentObjectMetricsExportOverridesRequestExporterType = "PROMETHEUS"
+)
+
+// Defines values for CreateEnvironmentObjectMetricsExportRequestExporterType.
+const (
+	CreateEnvironmentObjectMetricsExportRequestExporterTypeOTLP       CreateEnvironmentObjectMetricsExportRequestExporterType = "OTLP"
+	CreateEnvironmentObjectMetricsExportRequestExporterTypePROMETHEUS CreateEnvironmentObjectMetricsExportRequestExporterType = "PROMETHEUS"
+)
+
 // Defines values for CreateEnvironmentObjectRequestObjectType.
 const (
 	CreateEnvironmentObjectRequestObjectTypeAIRFLOWVARIABLE CreateEnvironmentObjectRequestObjectType = "AIRFLOW_VARIABLE"
 	CreateEnvironmentObjectRequestObjectTypeCONNECTION      CreateEnvironmentObjectRequestObjectType = "CONNECTION"
+	CreateEnvironmentObjectRequestObjectTypeMETRICSEXPORT   CreateEnvironmentObjectRequestObjectType = "METRICS_EXPORT"
 )
 
 // Defines values for CreateEnvironmentObjectRequestScope.
@@ -353,6 +366,18 @@ const (
 	EnvironmentObjectLinkScopeDEPLOYMENT EnvironmentObjectLinkScope = "DEPLOYMENT"
 )
 
+// Defines values for EnvironmentObjectMetricsExportExporterType.
+const (
+	EnvironmentObjectMetricsExportExporterTypeOTLP       EnvironmentObjectMetricsExportExporterType = "OTLP"
+	EnvironmentObjectMetricsExportExporterTypePROMETHEUS EnvironmentObjectMetricsExportExporterType = "PROMETHEUS"
+)
+
+// Defines values for EnvironmentObjectMetricsExportOverridesExporterType.
+const (
+	EnvironmentObjectMetricsExportOverridesExporterTypeOTLP       EnvironmentObjectMetricsExportOverridesExporterType = "OTLP"
+	EnvironmentObjectMetricsExportOverridesExporterTypePROMETHEUS EnvironmentObjectMetricsExportOverridesExporterType = "PROMETHEUS"
+)
+
 // Defines values for GitHubAccountAccountType.
 const (
 	GitHubAccountAccountTypeORGANIZATION GitHubAccountAccountType = "ORGANIZATION"
@@ -486,10 +511,23 @@ const (
 	UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT UpdateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
 )
 
+// Defines values for UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType.
+const (
+	UpdateEnvironmentObjectMetricsExportOverridesRequestExporterTypeOTLP       UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType = "OTLP"
+	UpdateEnvironmentObjectMetricsExportOverridesRequestExporterTypePROMETHEUS UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType = "PROMETHEUS"
+)
+
+// Defines values for UpdateEnvironmentObjectMetricsExportRequestExporterType.
+const (
+	UpdateEnvironmentObjectMetricsExportRequestExporterTypeOTLP       UpdateEnvironmentObjectMetricsExportRequestExporterType = "OTLP"
+	UpdateEnvironmentObjectMetricsExportRequestExporterTypePROMETHEUS UpdateEnvironmentObjectMetricsExportRequestExporterType = "PROMETHEUS"
+)
+
 // Defines values for UpdateEnvironmentObjectRequestObjectType.
 const (
 	UpdateEnvironmentObjectRequestObjectTypeAIRFLOWVARIABLE UpdateEnvironmentObjectRequestObjectType = "AIRFLOW_VARIABLE"
 	UpdateEnvironmentObjectRequestObjectTypeCONNECTION      UpdateEnvironmentObjectRequestObjectType = "CONNECTION"
+	UpdateEnvironmentObjectRequestObjectTypeMETRICSEXPORT   UpdateEnvironmentObjectRequestObjectType = "METRICS_EXPORT"
 )
 
 // Defines values for UpdateEnvironmentObjectRequestScope.
@@ -854,6 +892,7 @@ const (
 const (
 	ListEnvironmentObjectsParamsObjectTypeAIRFLOWVARIABLE ListEnvironmentObjectsParamsObjectType = "AIRFLOW_VARIABLE"
 	ListEnvironmentObjectsParamsObjectTypeCONNECTION      ListEnvironmentObjectsParamsObjectType = "CONNECTION"
+	ListEnvironmentObjectsParamsObjectTypeMETRICSEXPORT   ListEnvironmentObjectsParamsObjectType = "METRICS_EXPORT"
 )
 
 // Defines values for ListRoleTemplatesParamsScopeTypes.
@@ -1009,6 +1048,11 @@ const (
 	ListWorkspaceUsersParamsSortsWorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
 )
 
+// Defines values for ListSelfUserGitAccountsParamsGitProvider.
+const (
+	ListSelfUserGitAccountsParamsGitProviderGITHUB ListSelfUserGitAccountsParamsGitProvider = "GITHUB"
+)
+
 // Defines values for ListSelfUserRepositoriesParamsGitProvider.
 const (
 	ListSelfUserRepositoriesParamsGitProviderGITHUB ListSelfUserRepositoriesParamsGitProvider = "GITHUB"
@@ -1026,7 +1070,7 @@ const (
 
 // Defines values for GetSelfUserGitAppInstallationParamsGitProvider.
 const (
-	GetSelfUserGitAppInstallationParamsGitProviderGITHUB GetSelfUserGitAppInstallationParamsGitProvider = "GITHUB"
+	GITHUB GetSelfUserGitAppInstallationParamsGitProvider = "GITHUB"
 )
 
 // AddTeamMembersRequest defines model for AddTeamMembersRequest.
@@ -1502,10 +1546,31 @@ type CreateEnvironmentObjectLinkRequest struct {
 // CreateEnvironmentObjectLinkRequestScope defines model for CreateEnvironmentObjectLinkRequest.Scope.
 type CreateEnvironmentObjectLinkRequestScope string
 
+// CreateEnvironmentObjectMetricsExportOverridesRequest defines model for CreateEnvironmentObjectMetricsExportOverridesRequest.
+type CreateEnvironmentObjectMetricsExportOverridesRequest struct {
+	BasicToken   *string                                                           `json:"basicToken,omitempty"`
+	Endpoint     *string                                                           `json:"endpoint,omitempty"`
+	ExporterType *CreateEnvironmentObjectMetricsExportOverridesRequestExporterType `json:"exporterType,omitempty"`
+}
+
+// CreateEnvironmentObjectMetricsExportOverridesRequestExporterType defines model for CreateEnvironmentObjectMetricsExportOverridesRequest.ExporterType.
+type CreateEnvironmentObjectMetricsExportOverridesRequestExporterType string
+
+// CreateEnvironmentObjectMetricsExportRequest defines model for CreateEnvironmentObjectMetricsExportRequest.
+type CreateEnvironmentObjectMetricsExportRequest struct {
+	BasicToken   string                                                  `json:"basicToken"`
+	Endpoint     string                                                  `json:"endpoint"`
+	ExporterType CreateEnvironmentObjectMetricsExportRequestExporterType `json:"exporterType"`
+}
+
+// CreateEnvironmentObjectMetricsExportRequestExporterType defines model for CreateEnvironmentObjectMetricsExportRequest.ExporterType.
+type CreateEnvironmentObjectMetricsExportRequestExporterType string
+
 // CreateEnvironmentObjectOverridesRequest defines model for CreateEnvironmentObjectOverridesRequest.
 type CreateEnvironmentObjectOverridesRequest struct {
 	AirflowVariable *CreateEnvironmentObjectAirflowVariableOverridesRequest `json:"airflowVariable,omitempty"`
 	Connection      *CreateEnvironmentObjectConnectionOverridesRequest      `json:"connection,omitempty"`
+	MetricsExport   *CreateEnvironmentObjectMetricsExportOverridesRequest   `json:"metricsExport,omitempty"`
 }
 
 // CreateEnvironmentObjectRequest defines model for CreateEnvironmentObjectRequest.
@@ -1514,6 +1579,7 @@ type CreateEnvironmentObjectRequest struct {
 	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
 	Connection          *CreateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
 	Links               *[]CreateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
+	MetricsExport       *CreateEnvironmentObjectMetricsExportRequest   `json:"metricsExport,omitempty"`
 	ObjectKey           string                                         `json:"objectKey"`
 	ObjectType          CreateEnvironmentObjectRequestObjectType       `json:"objectType"`
 	Scope               CreateEnvironmentObjectRequestScope            `json:"scope"`
@@ -2165,6 +2231,7 @@ type EnvironmentObject struct {
 	CreatedBy           *BasicSubjectProfile              `json:"createdBy,omitempty"`
 	Id                  *string                           `json:"id,omitempty"`
 	Links               *[]EnvironmentObjectLink          `json:"links,omitempty"`
+	MetricsExport       *EnvironmentObjectMetricsExport   `json:"metricsExport,omitempty"`
 	ObjectKey           string                            `json:"objectKey"`
 	ObjectType          EnvironmentObjectObjectType       `json:"objectType"`
 	Scope               EnvironmentObjectScope            `json:"scope"`
@@ -2217,12 +2284,33 @@ type EnvironmentObjectConnectionOverrides struct {
 type EnvironmentObjectLink struct {
 	AirflowVariableOverrides *EnvironmentObjectAirflowVariableOverrides `json:"airflowVariableOverrides,omitempty"`
 	ConnectionOverrides      *EnvironmentObjectConnectionOverrides      `json:"connectionOverrides,omitempty"`
+	MetricsExportOverrides   *EnvironmentObjectMetricsExportOverrides   `json:"metricsExportOverrides,omitempty"`
 	Scope                    EnvironmentObjectLinkScope                 `json:"scope"`
 	ScopeEntityId            string                                     `json:"scopeEntityId"`
 }
 
 // EnvironmentObjectLinkScope defines model for EnvironmentObjectLink.Scope.
 type EnvironmentObjectLinkScope string
+
+// EnvironmentObjectMetricsExport defines model for EnvironmentObjectMetricsExport.
+type EnvironmentObjectMetricsExport struct {
+	BasicToken   *string                                    `json:"basicToken,omitempty"`
+	Endpoint     string                                     `json:"endpoint"`
+	ExporterType EnvironmentObjectMetricsExportExporterType `json:"exporterType"`
+}
+
+// EnvironmentObjectMetricsExportExporterType defines model for EnvironmentObjectMetricsExport.ExporterType.
+type EnvironmentObjectMetricsExportExporterType string
+
+// EnvironmentObjectMetricsExportOverrides defines model for EnvironmentObjectMetricsExportOverrides.
+type EnvironmentObjectMetricsExportOverrides struct {
+	BasicToken   *string                                             `json:"basicToken,omitempty"`
+	Endpoint     string                                              `json:"endpoint"`
+	ExporterType EnvironmentObjectMetricsExportOverridesExporterType `json:"exporterType"`
+}
+
+// EnvironmentObjectMetricsExportOverridesExporterType defines model for EnvironmentObjectMetricsExportOverrides.ExporterType.
+type EnvironmentObjectMetricsExportOverridesExporterType string
 
 // EnvironmentObjectsPaginated defines model for EnvironmentObjectsPaginated.
 type EnvironmentObjectsPaginated struct {
@@ -2236,6 +2324,7 @@ type EnvironmentObjectsPaginated struct {
 type EnvironmentSignatures struct {
 	AirflowVariables *string `json:"airflowVariables,omitempty"`
 	Connections      *string `json:"connections,omitempty"`
+	MetricsExports   *string `json:"metricsExports,omitempty"`
 }
 
 // Error defines model for Error.
@@ -2254,9 +2343,15 @@ type FeatureFlag struct {
 // GenericJSON defines model for GenericJSON.
 type GenericJSON map[string]interface{}
 
+// GitAccounts defines model for GitAccounts.
+type GitAccounts struct {
+	GitHub *[]GitHubAccount `json:"gitHub,omitempty"`
+}
+
 // GitApplicationAuthorization defines model for GitApplicationAuthorization.
 type GitApplicationAuthorization struct {
-	Url string `json:"url"`
+	IsAuthorized bool   `json:"isAuthorized"`
+	Url          string `json:"url"`
 }
 
 // GitApplicationInstallation defines model for GitApplicationInstallation.
@@ -2662,22 +2757,21 @@ type Scope struct {
 
 // Self defines model for Self.
 type Self struct {
-	AvatarUrl           string           `json:"avatarUrl"`
-	ColorModePreference *string          `json:"colorModePreference,omitempty"`
-	CreatedAt           time.Time        `json:"createdAt"`
-	FeatureFlags        *[]FeatureFlag   `json:"featureFlags,omitempty"`
-	FullName            string           `json:"fullName"`
-	GitHubAccounts      *[]GitHubAccount `json:"gitHubAccounts,omitempty"`
-	Id                  string           `json:"id"`
-	IntercomUserHash    *string          `json:"intercomUserHash,omitempty"`
-	Invites             *[]Invite        `json:"invites,omitempty"`
-	OrganizationId      *string          `json:"organizationId,omitempty"`
-	Roles               *[]UserRole      `json:"roles,omitempty"`
-	SignupType          *SelfSignupType  `json:"signupType,omitempty"`
-	Status              string           `json:"status"`
-	SystemRole          *string          `json:"systemRole,omitempty"`
-	UpdatedAt           time.Time        `json:"updatedAt"`
-	Username            string           `json:"username"`
+	AvatarUrl           string          `json:"avatarUrl"`
+	ColorModePreference *string         `json:"colorModePreference,omitempty"`
+	CreatedAt           time.Time       `json:"createdAt"`
+	FeatureFlags        *[]FeatureFlag  `json:"featureFlags,omitempty"`
+	FullName            string          `json:"fullName"`
+	Id                  string          `json:"id"`
+	IntercomUserHash    *string         `json:"intercomUserHash,omitempty"`
+	Invites             *[]Invite       `json:"invites,omitempty"`
+	OrganizationId      *string         `json:"organizationId,omitempty"`
+	Roles               *[]UserRole     `json:"roles,omitempty"`
+	SignupType          *SelfSignupType `json:"signupType,omitempty"`
+	Status              string          `json:"status"`
+	SystemRole          *string         `json:"systemRole,omitempty"`
+	UpdatedAt           time.Time       `json:"updatedAt"`
+	Username            string          `json:"username"`
 }
 
 // SelfSignupType defines model for Self.SignupType.
@@ -2882,10 +2976,31 @@ type UpdateEnvironmentObjectLinkRequest struct {
 // UpdateEnvironmentObjectLinkRequestScope defines model for UpdateEnvironmentObjectLinkRequest.Scope.
 type UpdateEnvironmentObjectLinkRequestScope string
 
+// UpdateEnvironmentObjectMetricsExportOverridesRequest defines model for UpdateEnvironmentObjectMetricsExportOverridesRequest.
+type UpdateEnvironmentObjectMetricsExportOverridesRequest struct {
+	BasicToken   *string                                                           `json:"basicToken,omitempty"`
+	Endpoint     *string                                                           `json:"endpoint,omitempty"`
+	ExporterType *UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType `json:"exporterType,omitempty"`
+}
+
+// UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType defines model for UpdateEnvironmentObjectMetricsExportOverridesRequest.ExporterType.
+type UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType string
+
+// UpdateEnvironmentObjectMetricsExportRequest defines model for UpdateEnvironmentObjectMetricsExportRequest.
+type UpdateEnvironmentObjectMetricsExportRequest struct {
+	BasicToken   *string                                                  `json:"basicToken,omitempty"`
+	Endpoint     *string                                                  `json:"endpoint,omitempty"`
+	ExporterType *UpdateEnvironmentObjectMetricsExportRequestExporterType `json:"exporterType,omitempty"`
+}
+
+// UpdateEnvironmentObjectMetricsExportRequestExporterType defines model for UpdateEnvironmentObjectMetricsExportRequest.ExporterType.
+type UpdateEnvironmentObjectMetricsExportRequestExporterType string
+
 // UpdateEnvironmentObjectOverridesRequest defines model for UpdateEnvironmentObjectOverridesRequest.
 type UpdateEnvironmentObjectOverridesRequest struct {
 	AirflowVariable *UpdateEnvironmentObjectAirflowVariableOverridesRequest `json:"airflowVariable,omitempty"`
 	Connection      *UpdateEnvironmentObjectConnectionOverridesRequest      `json:"connection,omitempty"`
+	MetricsExport   *UpdateEnvironmentObjectMetricsExportOverridesRequest   `json:"metricsExport,omitempty"`
 }
 
 // UpdateEnvironmentObjectRequest defines model for UpdateEnvironmentObjectRequest.
@@ -2894,6 +3009,7 @@ type UpdateEnvironmentObjectRequest struct {
 	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
 	Connection          *UpdateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
 	Links               *[]UpdateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
+	MetricsExport       *UpdateEnvironmentObjectMetricsExportRequest   `json:"metricsExport,omitempty"`
 	ObjectKey           string                                         `json:"objectKey"`
 	ObjectType          UpdateEnvironmentObjectRequestObjectType       `json:"objectType"`
 	Scope               UpdateEnvironmentObjectRequestScope            `json:"scope"`
@@ -2938,6 +3054,9 @@ type UpdateHostedDeploymentRequest struct {
 	Executor           UpdateHostedDeploymentRequestExecutor `json:"executor"`
 	IsCicdEnforced     bool                                  `json:"isCicdEnforced"`
 	IsDagDeployEnabled bool                                  `json:"isDagDeployEnabled"`
+
+	// IsDevelopmentOnly Whether the Deployment is for development only. If `false`, the Deployment can be considered production for the purposes of support case priority, but development-only features such as hibernation will not be available. You can't update this value to `true` for existing non-development Deployments.
+	IsDevelopmentOnly *bool `json:"isDevelopmentOnly,omitempty"`
 
 	// IsHighAvailability If true, deployment will have backup components
 	IsHighAvailability bool   `json:"isHighAvailability"`
@@ -3430,6 +3549,9 @@ type ListDeploymentsParams struct {
 
 	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
 	Sorts *[]ListDeploymentsParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+
+	// Search string to search for when listing deployments
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
 }
 
 // ListDeploymentsParamsSorts defines parameters for ListDeployments.
@@ -3850,10 +3972,10 @@ type ListWorkspaceUsersParamsSorts string
 type GetSelfUserParams struct {
 	// CreateIfNotExist create self user if it does not already exist
 	CreateIfNotExist *bool `form:"createIfNotExist,omitempty" json:"createIfNotExist,omitempty"`
-
-	// IncludeGitHubAccounts determines if GitHub accounts affiliated with the user are included in the response
-	IncludeGitHubAccounts *bool `form:"includeGitHubAccounts,omitempty" json:"includeGitHubAccounts,omitempty"`
 }
+
+// ListSelfUserGitAccountsParamsGitProvider defines parameters for ListSelfUserGitAccounts.
+type ListSelfUserGitAccountsParamsGitProvider string
 
 // ListSelfUserRepositoriesParams defines parameters for ListSelfUserRepositories.
 type ListSelfUserRepositoriesParams struct {
@@ -3869,6 +3991,15 @@ type ListSelfUserRepositoriesParamsGitProvider string
 
 // GetSelfUserRepositoryBranchParamsGitProvider defines parameters for GetSelfUserRepositoryBranch.
 type GetSelfUserRepositoryBranchParamsGitProvider string
+
+// GetSelfUserGitAppAuthorizationParams defines parameters for GetSelfUserGitAppAuthorization.
+type GetSelfUserGitAppAuthorizationParams struct {
+	// SuccessRedirectUrl success redirect URL
+	SuccessRedirectUrl string `form:"successRedirectUrl" json:"successRedirectUrl"`
+
+	// ErrorRedirectUrl error redirect URL
+	ErrorRedirectUrl string `form:"errorRedirectUrl" json:"errorRedirectUrl"`
+}
 
 // GetSelfUserGitAppAuthorizationParamsGitProvider defines parameters for GetSelfUserGitAppAuthorization.
 type GetSelfUserGitAppAuthorizationParamsGitProvider string
@@ -4649,6 +4780,9 @@ type ClientInterface interface {
 	// GetSelfUser request
 	GetSelfUser(ctx context.Context, params *GetSelfUserParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListSelfUserGitAccounts request
+	ListSelfUserGitAccounts(ctx context.Context, gitProvider ListSelfUserGitAccountsParamsGitProvider, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListSelfUserRepositories request
 	ListSelfUserRepositories(ctx context.Context, gitProvider ListSelfUserRepositoriesParamsGitProvider, gitAccount string, params *ListSelfUserRepositoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -4656,7 +4790,7 @@ type ClientInterface interface {
 	GetSelfUserRepositoryBranch(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSelfUserGitAppAuthorization request
-	GetSelfUserGitAppAuthorization(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetSelfUserGitAppAuthorization(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, params *GetSelfUserGitAppAuthorizationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSelfUserGitAppInstallation request
 	GetSelfUserGitAppInstallation(ctx context.Context, gitProvider GetSelfUserGitAppInstallationParamsGitProvider, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6311,6 +6445,18 @@ func (c *Client) GetSelfUser(ctx context.Context, params *GetSelfUserParams, req
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListSelfUserGitAccounts(ctx context.Context, gitProvider ListSelfUserGitAccountsParamsGitProvider, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSelfUserGitAccountsRequest(c.Server, gitProvider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListSelfUserRepositories(ctx context.Context, gitProvider ListSelfUserRepositoriesParamsGitProvider, gitAccount string, params *ListSelfUserRepositoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListSelfUserRepositoriesRequest(c.Server, gitProvider, gitAccount, params)
 	if err != nil {
@@ -6335,8 +6481,8 @@ func (c *Client) GetSelfUserRepositoryBranch(ctx context.Context, gitProvider Ge
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetSelfUserGitAppAuthorization(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetSelfUserGitAppAuthorizationRequest(c.Server, gitProvider)
+func (c *Client) GetSelfUserGitAppAuthorization(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, params *GetSelfUserGitAppAuthorizationParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSelfUserGitAppAuthorizationRequest(c.Server, gitProvider, params)
 	if err != nil {
 		return nil, err
 	}
@@ -8090,6 +8236,22 @@ func NewListDeploymentsRequest(server string, organizationId string, params *Lis
 	if params.Sorts != nil {
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Search != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
 			return nil, err
 		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 			return nil, err
@@ -13116,23 +13278,41 @@ func NewGetSelfUserRequest(server string, params *GetSelfUserParams) (*http.Requ
 
 	}
 
-	if params.IncludeGitHubAccounts != nil {
+	queryURL.RawQuery = queryValues.Encode()
 
-		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeGitHubAccounts", runtime.ParamLocationQuery, *params.IncludeGitHubAccounts); err != nil {
-			return nil, err
-		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-			return nil, err
-		} else {
-			for k, v := range parsed {
-				for _, v2 := range v {
-					queryValues.Add(k, v2)
-				}
-			}
-		}
-
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
 	}
 
-	queryURL.RawQuery = queryValues.Encode()
+	return req, nil
+}
+
+// NewListSelfUserGitAccountsRequest generates requests for ListSelfUserGitAccounts
+func NewListSelfUserGitAccountsRequest(server string, gitProvider ListSelfUserGitAccountsParamsGitProvider) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "gitProvider", runtime.ParamLocationPath, gitProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/users/self/git-providers/%s/accounts", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
@@ -13275,7 +13455,7 @@ func NewGetSelfUserRepositoryBranchRequest(server string, gitProvider GetSelfUse
 }
 
 // NewGetSelfUserGitAppAuthorizationRequest generates requests for GetSelfUserGitAppAuthorization
-func NewGetSelfUserGitAppAuthorizationRequest(server string, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider) (*http.Request, error) {
+func NewGetSelfUserGitAppAuthorizationRequest(server string, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, params *GetSelfUserGitAppAuthorizationParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -13299,6 +13479,34 @@ func NewGetSelfUserGitAppAuthorizationRequest(server string, gitProvider GetSelf
 	if err != nil {
 		return nil, err
 	}
+
+	queryValues := queryURL.Query()
+
+	if queryFrag, err := runtime.StyleParamWithLocation("form", true, "successRedirectUrl", runtime.ParamLocationQuery, params.SuccessRedirectUrl); err != nil {
+		return nil, err
+	} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+		return nil, err
+	} else {
+		for k, v := range parsed {
+			for _, v2 := range v {
+				queryValues.Add(k, v2)
+			}
+		}
+	}
+
+	if queryFrag, err := runtime.StyleParamWithLocation("form", true, "errorRedirectUrl", runtime.ParamLocationQuery, params.ErrorRedirectUrl); err != nil {
+		return nil, err
+	} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+		return nil, err
+	} else {
+		for k, v := range parsed {
+			for _, v2 := range v {
+				queryValues.Add(k, v2)
+			}
+		}
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
@@ -13806,6 +14014,9 @@ type ClientWithResponsesInterface interface {
 	// GetSelfUser request
 	GetSelfUserWithResponse(ctx context.Context, params *GetSelfUserParams, reqEditors ...RequestEditorFn) (*GetSelfUserResponse, error)
 
+	// ListSelfUserGitAccounts request
+	ListSelfUserGitAccountsWithResponse(ctx context.Context, gitProvider ListSelfUserGitAccountsParamsGitProvider, reqEditors ...RequestEditorFn) (*ListSelfUserGitAccountsResponse, error)
+
 	// ListSelfUserRepositories request
 	ListSelfUserRepositoriesWithResponse(ctx context.Context, gitProvider ListSelfUserRepositoriesParamsGitProvider, gitAccount string, params *ListSelfUserRepositoriesParams, reqEditors ...RequestEditorFn) (*ListSelfUserRepositoriesResponse, error)
 
@@ -13813,7 +14024,7 @@ type ClientWithResponsesInterface interface {
 	GetSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*GetSelfUserRepositoryBranchResponse, error)
 
 	// GetSelfUserGitAppAuthorization request
-	GetSelfUserGitAppAuthorizationWithResponse(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, reqEditors ...RequestEditorFn) (*GetSelfUserGitAppAuthorizationResponse, error)
+	GetSelfUserGitAppAuthorizationWithResponse(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, params *GetSelfUserGitAppAuthorizationParams, reqEditors ...RequestEditorFn) (*GetSelfUserGitAppAuthorizationResponse, error)
 
 	// GetSelfUserGitAppInstallation request
 	GetSelfUserGitAppInstallationWithResponse(ctx context.Context, gitProvider GetSelfUserGitAppInstallationParamsGitProvider, reqEditors ...RequestEditorFn) (*GetSelfUserGitAppInstallationResponse, error)
@@ -16496,6 +16707,33 @@ func (r GetSelfUserResponse) StatusCode() int {
 	return 0
 }
 
+type ListSelfUserGitAccountsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GitAccounts
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON405      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSelfUserGitAccountsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSelfUserGitAccountsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListSelfUserRepositoriesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -17826,6 +18064,15 @@ func (c *ClientWithResponses) GetSelfUserWithResponse(ctx context.Context, param
 	return ParseGetSelfUserResponse(rsp)
 }
 
+// ListSelfUserGitAccountsWithResponse request returning *ListSelfUserGitAccountsResponse
+func (c *ClientWithResponses) ListSelfUserGitAccountsWithResponse(ctx context.Context, gitProvider ListSelfUserGitAccountsParamsGitProvider, reqEditors ...RequestEditorFn) (*ListSelfUserGitAccountsResponse, error) {
+	rsp, err := c.ListSelfUserGitAccounts(ctx, gitProvider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSelfUserGitAccountsResponse(rsp)
+}
+
 // ListSelfUserRepositoriesWithResponse request returning *ListSelfUserRepositoriesResponse
 func (c *ClientWithResponses) ListSelfUserRepositoriesWithResponse(ctx context.Context, gitProvider ListSelfUserRepositoriesParamsGitProvider, gitAccount string, params *ListSelfUserRepositoriesParams, reqEditors ...RequestEditorFn) (*ListSelfUserRepositoriesResponse, error) {
 	rsp, err := c.ListSelfUserRepositories(ctx, gitProvider, gitAccount, params, reqEditors...)
@@ -17845,8 +18092,8 @@ func (c *ClientWithResponses) GetSelfUserRepositoryBranchWithResponse(ctx contex
 }
 
 // GetSelfUserGitAppAuthorizationWithResponse request returning *GetSelfUserGitAppAuthorizationResponse
-func (c *ClientWithResponses) GetSelfUserGitAppAuthorizationWithResponse(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, reqEditors ...RequestEditorFn) (*GetSelfUserGitAppAuthorizationResponse, error) {
-	rsp, err := c.GetSelfUserGitAppAuthorization(ctx, gitProvider, reqEditors...)
+func (c *ClientWithResponses) GetSelfUserGitAppAuthorizationWithResponse(ctx context.Context, gitProvider GetSelfUserGitAppAuthorizationParamsGitProvider, params *GetSelfUserGitAppAuthorizationParams, reqEditors ...RequestEditorFn) (*GetSelfUserGitAppAuthorizationResponse, error) {
+	rsp, err := c.GetSelfUserGitAppAuthorization(ctx, gitProvider, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -23770,6 +24017,67 @@ func ParseGetSelfUserResponse(rsp *http.Response) (*GetSelfUserResponse, error) 
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSelfUserGitAccountsResponse parses an HTTP response from a ListSelfUserGitAccountsWithResponse call
+func ParseListSelfUserGitAccountsResponse(rsp *http.Response) (*ListSelfUserGitAccountsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSelfUserGitAccountsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GitAccounts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

@@ -923,6 +923,16 @@ deployment:
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "Invalid --high-availability value")
 	})
+	t.Run("returns an error with incorrect development-mode value", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--development-mode", "some-value", "--force"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "Invalid --development-mode value")
+	})
 	t.Run("returns an error if cluster-id is provided with implicit standard deployment", func(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
