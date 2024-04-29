@@ -77,7 +77,7 @@ func CompareVersions(client *github.Client, owner, repo string) error {
 		} else {
 			fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease see https://docs.astronomer.io/astro/cli/install-cli#upgrade-the-cli for information on how to update the Astro CLI\n\n", latestSemver)
 		}
-		fmt.Fprintf(os.Stderr, "If you don't want to see this message again run 'astro config set -g upgrade_message false'\n\n")
+		fmt.Fprintf(os.Stderr, "If you don't want to see this message again run 'astro config set -g upgrade_message false'or pass '2>/dev/null | head' to print this text to stderr\n\n")
 	}
 
 	return nil
