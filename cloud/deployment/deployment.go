@@ -141,7 +141,7 @@ func List(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcor
 	return nil
 }
 
-func Logs(deploymentID, ws, deploymentName, keyword string, warnLogs, errorLogs, infoLogs bool, logCount int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
+func Logs(deploymentID, ws, deploymentName, keyword string, logWebserver, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs bool, logCount int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 	var logLevel string
 	var i int
 	// log level
@@ -174,13 +174,27 @@ func Logs(deploymentID, ws, deploymentName, keyword string, warnLogs, errorLogs,
 	deploymentID = deployment.Id
 	timeRange := 86400
 	offset := 0
+
+	// get log source
+	var componentSources []astrocore.GetDeploymentLogsParamsSources
+	if logWebserver {
+		componentSources = append(componentSources, "webserver")
+	}
+	if logScheduler {
+		componentSources = append(componentSources, "scheduler")
+	}
+	if logTriggerer {
+		componentSources = append(componentSources, "triggerer")
+	}
+	if logWorkers {
+		componentSources = append(componentSources, "worker")
+	}
+	if len(componentSources) == 0 {
+		componentSources = append(componentSources, "webserver", "scheduler", "triggerer", "worker")
+	}
+
 	getDeploymentLogsParams := astrocore.GetDeploymentLogsParams{
-		Sources: []astrocore.GetDeploymentLogsParamsSources{
-			"scheduler",
-			"webserver",
-			"triggerer",
-			"worker",
-		},
+		Sources:       componentSources,
 		MaxNumResults: &logCount,
 		Range:         &timeRange,
 		Offset:        &offset,
@@ -720,7 +734,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 	}
 }
 
-func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astroplatformcore.WorkerQueueRequest, hybridQueueList []astroplatformcore.HybridWorkerQueueRequest, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, force bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error { //nolint
+func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astroplatformcore.WorkerQueueRequest, hybridQueueList []astroplatformcore.HybridWorkerQueueRequest, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, force bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error { //nolint
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, coreClient)
@@ -862,6 +876,17 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		default:
 			return errors.New("Invalid --high-availability value")
 		}
+		var developmentModeValue bool
+		switch developmentMode {
+		case "":
+			developmentModeValue = *currentDeployment.IsDevelopmentMode
+		case enable:
+			developmentModeValue = true
+		case disable:
+			developmentModeValue = false
+		default:
+			return errors.New("Invalid --development-mode value")
+		}
 		if defaultTaskPodCpu == "" {
 			if currentDeployment.DefaultTaskPodCpu != nil {
 				defaultTaskPodCpu = *currentDeployment.DefaultTaskPodCpu
@@ -904,6 +929,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				IsCicdEnforced:       isCicdEnforced,
 				IsDagDeployEnabled:   dagDeployEnabled,
 				IsHighAvailability:   highAvailabilityValue,
+				IsDevelopmentMode:    &developmentModeValue,
 				WorkspaceId:          currentDeployment.WorkspaceId,
 				Type:                 astroplatformcore.UpdateStandardDeploymentRequestTypeSTANDARD,
 				ResourceQuotaCpu:     resourceQuotaCpu,
@@ -963,6 +989,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				IsCicdEnforced:       isCicdEnforced,
 				IsDagDeployEnabled:   dagDeployEnabled,
 				IsHighAvailability:   highAvailabilityValue,
+				IsDevelopmentMode:    &developmentModeValue,
 				WorkspaceId:          currentDeployment.WorkspaceId,
 				Type:                 astroplatformcore.UpdateDedicatedDeploymentRequestTypeDEDICATED,
 				DefaultTaskPodCpu:    defaultTaskPodCpu,
