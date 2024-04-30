@@ -90,6 +90,9 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 					if strings.Contains(err.Error(), "token is invalid or malformed") {
 						return errors.New("API Token is invalid or malformed") //nolint
 					}
+					if strings.Contains(err.Error(), "the API token given has expired") {
+						return errors.New("API Token is expired") //nolint
+					}
 					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 				}
 			}

@@ -27,12 +27,13 @@ import (
 )
 
 var (
-	authLogin        = auth.Login
-	defaultDomain    = "astronomer.io"
-	client           = httputil.NewHTTPClient()
-	isDeploymentFile = false
-	parseAPIToken    = util.ParseAPIToken
-	errNotAPIToken   = errors.New("the API token given does not appear to be an Astro API Token")
+	authLogin          = auth.Login
+	defaultDomain      = "astronomer.io"
+	client             = httputil.NewHTTPClient()
+	isDeploymentFile   = false
+	parseAPIToken      = util.ParseAPIToken
+	errNotAPIToken     = errors.New("the API token given does not appear to be an Astro API Token")
+	errExpiredAPIToken = errors.New("the API token given has expired")
 )
 
 const (
@@ -222,7 +223,6 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 	var tokenRes TokenResponse
 
 	err = json.NewDecoder(res.Body).Decode(&tokenRes)
-
 	if err != nil {
 		return TokenResponse{}, fmt.Errorf("cannot decode response: %w", err)
 	}
@@ -307,7 +307,6 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, isDeploymentF
 	var tokenRes TokenResponse
 
 	err = json.NewDecoder(res.Body).Decode(&tokenRes)
-
 	if err != nil {
 		return false, fmt.Errorf("cannot decode response: %w", err)
 	}
@@ -406,6 +405,10 @@ func checkAPIToken(isDeploymentFile bool, platformCoreClient astroplatformcore.C
 	}
 	if len(claims.Permissions) == 0 {
 		return false, errNotAPIToken
+	}
+	if claims.ExpiresAt.Before(time.Now()) {
+		fmt.Printf("The given API Token %s has expired \n", claims.APITokenID)
+		return false, errExpiredAPIToken
 	}
 
 	var wsID, orgID string

@@ -6,6 +6,9 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v4"
 
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
@@ -328,6 +331,8 @@ func TestCheckToken(t *testing.T) {
 }
 
 func TestCheckAPIToken(t *testing.T) {
+	var mockClaims util.CustomClaims
+	var permissions []string
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
 		HTTPResponse: &http.Response{
@@ -339,16 +344,24 @@ func TestCheckAPIToken(t *testing.T) {
 			},
 		},
 	}
+	permissions = []string{
+		"workspaceId:workspace-id",
+		"organizationId:org-ID",
+	}
+	mockClaims = util.CustomClaims{
+		Permissions: permissions,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "test-issuer",
+			Subject:   "test-subject",
+			Audience:  jwt.ClaimStrings{"audience1", "audience2"},         // Audience can be a single string or an array of strings
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Set expiration date 24 hours from now
+			NotBefore: jwt.NewNumericDate(time.Now()),                     // Set not before to current time
+			IssuedAt:  jwt.NewNumericDate(time.Now()),                     // Set issued at to current time
+			ID:        "test-id",
+		},
+	}
 
 	t.Run("test context switch", func(t *testing.T) {
-		permissions := []string{
-			"workspaceId:workspace-id",
-			"organizationId:org-ID",
-		}
-		mockClaims := util.CustomClaims{
-			Permissions: permissions,
-		}
-
 		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
@@ -372,9 +385,18 @@ func TestCheckAPIToken(t *testing.T) {
 	})
 
 	t.Run("bad claims", func(t *testing.T) {
-		permissions := []string{}
-		mockClaims := util.CustomClaims{
+		permissions = []string{}
+		mockClaims = util.CustomClaims{
 			Permissions: permissions,
+			RegisteredClaims: jwt.RegisteredClaims{
+				Issuer:    "test-issuer",
+				Subject:   "test-subject",
+				Audience:  jwt.ClaimStrings{"audience1", "audience2"},
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+				NotBefore: jwt.NewNumericDate(time.Now()),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+				ID:        "test-id",
+			},
 		}
 
 		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
@@ -397,5 +419,45 @@ func TestCheckAPIToken(t *testing.T) {
 		// run CheckAPIKeys
 		_, err = checkAPIToken(true, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errNotAPIToken)
+	})
+
+	t.Run("expired token", func(t *testing.T) {
+		permissions = []string{
+			"workspaceId:workspace-id",
+			"organizationId:org-ID",
+		}
+		mockClaims = util.CustomClaims{
+			Permissions: permissions,
+			RegisteredClaims: jwt.RegisteredClaims{
+				Issuer:    "test-issuer",
+				Subject:   "test-subject",
+				Audience:  jwt.ClaimStrings{"audience1", "audience2"},
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
+				NotBefore: jwt.NewNumericDate(time.Now()),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+				ID:        "test-id",
+			},
+		}
+
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+
+		t.Setenv("ASTRO_API_TOKEN", "token")
+
+		// Switch context
+		domain := "astronomer-dev.io"
+		err := context.Switch(domain)
+		assert.NoError(t, err)
+
+		// run CheckAPIKeys
+		_, err = checkAPIToken(true, mockPlatformCoreClient)
+		assert.ErrorIs(t, err, errExpiredAPIToken)
 	})
 }
