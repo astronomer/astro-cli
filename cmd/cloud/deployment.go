@@ -72,6 +72,10 @@ var (
 	forDuration               string
 	removeOverride            bool
 	forceOverride             bool
+	logWebserver              bool
+	logScheduler              bool
+	logWorkers                bool
+	logTriggerer              bool
 
 	deploymentType                = standard
 	deploymentVariableListExample = `
@@ -359,6 +363,10 @@ func newDeploymentLogsCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&logsKeyword, "keyword", "k", "", "Show logs that contain this exact keyword or phrase.")
 	cmd.Flags().IntVarP(&logCount, "log-count", "c", logCount, "Number of logs to show")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to show logs of")
+	cmd.Flags().BoolVar(&logWebserver, "webserver", false, "Show logs from the webserver")
+	cmd.Flags().BoolVar(&logScheduler, "scheduler", false, "Show logs from the scheduler")
+	cmd.Flags().BoolVar(&logWorkers, "workers", false, "Show logs from the workers")
+	cmd.Flags().BoolVar(&logTriggerer, "triggerer", false, "Show logs from the triggerer")
 	return cmd
 }
 
@@ -444,6 +452,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVarP(&defaultTaskPodMemory, "default-task-pod-memory", "", "", "The Default Taks Pod Memory to use for the Deployment. Example value: 0.5Gi")
 		cmd.Flags().StringVarP(&resourceQuotaCPU, "resource-quota-cpu", "", "", "The Resource Quota CPU to use for the Deployment. Example value: 10")
 		cmd.Flags().StringVarP(&resourceQuotaMemory, "resource-quota-memory", "", "", "The Resource Quota Memory to use for the Deployment. Example value: 20Gi")
+		cmd.Flags().StringVarP(&developmentMode, "development-mode", "m", "", "Whether the Deployment is for development only. If 'disable', the Deployment can be considered production for the purposes of support case priority, but development-only features such as hibernation will not be available. You can't update this value to `enable` for existing non-development Deployments.'")
 	} else {
 		cmd.Flags().IntVarP(&updateSchedulerAU, "scheduler-au", "s", 0, "The Deployment's Scheduler resources in AUs.")
 		cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment.")
@@ -613,7 +622,7 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid Workspace")
 	}
 
-	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroCoreClient)
+	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logWebserver, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroCoreClient)
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo
@@ -742,6 +751,9 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
 	}
+	if developmentMode != "" && !(developmentMode == enable || developmentMode == disable) {
+		return errors.New("Invalid --development-mode value")
+	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
 		return errors.New("Invalid --cicd-enforcment value")
 	}
@@ -765,7 +777,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
