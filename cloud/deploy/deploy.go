@@ -256,7 +256,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	if err != nil {
 		return err
 	}
-	resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, deployInput.Description, "", deployInput.Dags, coreClient)
+	resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, deployInput.Description, deployInput.Dags, platformCoreClient)
 	if err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		// finish deploy
-		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
+		err = finalizeDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -400,7 +400,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		if deployInput.Image {
 			dagTarballVersion = deployInfo.desiredDagTarballVersion
 		}
-		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
+		err = finalizeDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -744,13 +744,13 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 	return version, nil
 }
 
-// update deploy
-func updateDeploy(deployID, deploymentID, organizationID, dagTarballVersion string, dagDeploy bool, coreClient astrocore.CoreClient) error {
-	UpdateDeployRequest := astrocore.UpdateDeployRequest{}
+// finalize deploy
+func finalizeDeploy(deployID, deploymentID, organizationID, dagTarballVersion string, dagDeploy bool, platformCoreClient astroplatformcore.CoreClient) error {
+	finalizeDeployRequest := astroplatformcore.FinalizeDeployRequest{}
 	if dagDeploy {
-		UpdateDeployRequest.DagTarballVersion = &dagTarballVersion
+		finalizeDeployRequest.DagTarballVersion = &dagTarballVersion
 	}
-	resp, err := coreClient.UpdateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, deployID, UpdateDeployRequest)
+	resp, err := platformCoreClient.FinalizeDeployWithResponse(httpContext.Background(), organizationID, deploymentID, deployID, finalizeDeployRequest)
 	if err != nil {
 		return err
 	}
@@ -768,26 +768,23 @@ func updateDeploy(deployID, deploymentID, organizationID, dagTarballVersion stri
 }
 
 // create deploy
-func createDeploy(organizationID, deploymentID, description, tag string, dagDeploy bool, coreClient astrocore.CoreClient) (astrocore.CreateDeployResponse, error) {
-	createDeployRequest := astrocore.CreateDeployRequest{
+func createDeploy(organizationID, deploymentID, description string, dagDeploy bool, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.CreateDeployResponse, error) {
+	createDeployRequest := astroplatformcore.CreateDeployRequest{
 		Description: &description,
 	}
 	if dagDeploy {
-		createDeployRequest.Type = astrocore.CreateDeployRequestTypeDAG
+		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeDAGONLY
 	} else {
-		createDeployRequest.Type = astrocore.CreateDeployRequestTypeIMAGE
-	}
-	if tag != "" {
-		createDeployRequest.ImageTag = &tag
+		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEANDDAG
 	}
 
-	resp, err := coreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, createDeployRequest)
+	resp, err := platformCoreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, createDeployRequest)
 	if err != nil {
-		return astrocore.CreateDeployResponse{}, err
+		return astroplatformcore.CreateDeployResponse{}, err
 	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return astrocore.CreateDeployResponse{}, err
+		return astroplatformcore.CreateDeployResponse{}, err
 	}
 	return *resp, err
 }

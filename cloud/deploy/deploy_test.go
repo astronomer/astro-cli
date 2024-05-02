@@ -11,7 +11,6 @@ import (
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
@@ -64,22 +63,22 @@ var (
 			Deployments: mockCoreDeploymentResponseCICD,
 		},
 	}
-	createDeployResponse = astrocore.CreateDeployResponse{
+	createDeployResponse = astroplatformcore.CreateDeployResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.Deploy{
+		JSON200: &astroplatformcore.Deploy{
 			Id:                "test-id",
 			DagTarballVersion: &dagTarballVersionTest,
 			ImageRepository:   "test-repository",
 			DagsUploadUrl:     &dagsUploadTestURL,
 		},
 	}
-	updateDeployResponse = astrocore.UpdateDeployResponse{
+	finalizeDeployResponse = astroplatformcore.FinalizeDeployResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.Deploy{
+		JSON200: &astroplatformcore.Deploy{
 			Id:                "test-id",
 			DagTarballVersion: &dagTarballVersionTest,
 			ImageTag:          "test-tag",
@@ -166,8 +165,8 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(5)
-	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)
-	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(5)
+	mockPlatformCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)
+	mockPlatformCoreClient.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&finalizeDeployResponse, nil).Times(5)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -306,8 +305,8 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(9)
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(7)
-	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(7)
-	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(7)
+	mockPlatformCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(7)
+	mockPlatformCoreClient.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&finalizeDeployResponse, nil).Times(7)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -437,8 +436,8 @@ func TestDagsDeploySuccess(t *testing.T) {
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(6)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(12)
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(4)
-	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(6)
-	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(6)
+	mockPlatformCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(6)
+	mockPlatformCoreClient.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&finalizeDeployResponse, nil).Times(6)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -514,7 +513,7 @@ func TestNoDagsDeploy(t *testing.T) {
 
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(2)
-	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(1)
+	mockPlatformCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(1)
 
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
@@ -557,7 +556,7 @@ func TestDagsDeployFailed(t *testing.T) {
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(2)
-	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(3)
+	mockPlatformCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(3)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
@@ -626,7 +625,7 @@ func TestDeployFailure(t *testing.T) {
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(1)
-	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(2)
+	mockPlatformCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(2)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -708,8 +707,8 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(8)
-	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
-	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
+	mockPlatformCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
+	mockPlatformCoreClient.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&finalizeDeployResponse, nil).Times(4)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		_, err = os.Stat("./testfiles/dags/astronomer_monitoring_dag.py")
@@ -786,8 +785,8 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(3)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(8)
-	mockCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
-	mockCoreClient.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&updateDeployResponse, nil).Times(4)
+	mockPlatformCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(4)
+	mockPlatformCoreClient.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&finalizeDeployResponse, nil).Times(4)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		_, err = os.Stat("./testfiles/dags/astronomer_monitoring_dag.py")

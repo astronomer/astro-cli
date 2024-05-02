@@ -83,6 +83,72 @@ func (_m *ClientWithResponsesInterface) CreateClusterWithResponse(ctx context.Co
 	return r0, r1
 }
 
+// CreateDeployWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.CreateDeployResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.CreateDeployResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.CreateDeployResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) *astroplatformcore.CreateDeployResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.CreateDeployResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreateDeployWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body astroplatformcore.CreateDeployRequest, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.CreateDeployResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.CreateDeployResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astroplatformcore.CreateDeployRequest, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.CreateDeployResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astroplatformcore.CreateDeployRequest, ...astroplatformcore.RequestEditorFn) *astroplatformcore.CreateDeployResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.CreateDeployResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, astroplatformcore.CreateDeployRequest, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateDeploymentWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, contentType, body, reqEditors
 func (_m *ClientWithResponsesInterface) CreateDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.CreateDeploymentResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -347,6 +413,138 @@ func (_m *ClientWithResponsesInterface) DeleteWorkspaceWithResponse(ctx context.
 	return r0, r1
 }
 
+// DeployRollbackWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) DeployRollbackWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.DeployRollbackResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, deployId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.DeployRollbackResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.DeployRollbackResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) *astroplatformcore.DeployRollbackResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.DeployRollbackResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DeployRollbackWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, deployId, body, reqEditors
+func (_m *ClientWithResponsesInterface) DeployRollbackWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body astroplatformcore.DeployRollbackRequest, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.DeployRollbackResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, deployId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.DeployRollbackResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astroplatformcore.DeployRollbackRequest, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.DeployRollbackResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astroplatformcore.DeployRollbackRequest, ...astroplatformcore.RequestEditorFn) *astroplatformcore.DeployRollbackResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.DeployRollbackResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astroplatformcore.DeployRollbackRequest, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FinalizeDeployWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) FinalizeDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.FinalizeDeployResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, deployId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.FinalizeDeployResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.FinalizeDeployResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) *astroplatformcore.FinalizeDeployResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.FinalizeDeployResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FinalizeDeployWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, deployId, body, reqEditors
+func (_m *ClientWithResponsesInterface) FinalizeDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body astroplatformcore.FinalizeDeployRequest, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.FinalizeDeployResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, deployId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.FinalizeDeployResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astroplatformcore.FinalizeDeployRequest, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.FinalizeDeployResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astroplatformcore.FinalizeDeployRequest, ...astroplatformcore.RequestEditorFn) *astroplatformcore.FinalizeDeployResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.FinalizeDeployResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astroplatformcore.FinalizeDeployRequest, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetClusterOptionsWithResponse provides a mock function with given fields: ctx, organizationId, params, reqEditors
 func (_m *ClientWithResponsesInterface) GetClusterOptionsWithResponse(ctx context.Context, organizationId string, params *astroplatformcore.GetClusterOptionsParams, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.GetClusterOptionsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -406,6 +604,39 @@ func (_m *ClientWithResponsesInterface) GetClusterWithResponse(ctx context.Conte
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astroplatformcore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, organizationId, clusterId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetDeployWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, deployId, reqEditors
+func (_m *ClientWithResponsesInterface) GetDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.GetDeployResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, deployId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.GetDeployResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.GetDeployResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, deployId, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, ...astroplatformcore.RequestEditorFn) *astroplatformcore.GetDeployResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, deployId, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.GetDeployResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, deployId, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -611,6 +842,39 @@ func (_m *ClientWithResponsesInterface) ListDeploymentsWithResponse(ctx context.
 	return r0, r1
 }
 
+// ListDeploysWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ListDeploysWithResponse(ctx context.Context, organizationId string, deploymentId string, params *astroplatformcore.ListDeploysParams, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.ListDeploysResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.ListDeploysResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, *astroplatformcore.ListDeploysParams, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.ListDeploysResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, *astroplatformcore.ListDeploysParams, ...astroplatformcore.RequestEditorFn) *astroplatformcore.ListDeploysResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.ListDeploysResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, *astroplatformcore.ListDeploysParams, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListOrganizationsWithResponse provides a mock function with given fields: ctx, params, reqEditors
 func (_m *ClientWithResponsesInterface) ListOrganizationsWithResponse(ctx context.Context, params *astroplatformcore.ListOrganizationsParams, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.ListOrganizationsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -736,6 +1000,72 @@ func (_m *ClientWithResponsesInterface) UpdateClusterWithResponse(ctx context.Co
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, astroplatformcore.UpdateClusterRequest, ...astroplatformcore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, organizationId, clusterId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateDeployWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.UpdateDeployResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, deployId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.UpdateDeployResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.UpdateDeployResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) *astroplatformcore.UpdateDeployResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.UpdateDeployResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, io.Reader, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateDeployWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, deployId, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body astroplatformcore.UpdateDeployRequest, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.UpdateDeployResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, deployId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astroplatformcore.UpdateDeployResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astroplatformcore.UpdateDeployRequest, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.UpdateDeployResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astroplatformcore.UpdateDeployRequest, ...astroplatformcore.RequestEditorFn) *astroplatformcore.UpdateDeployResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.UpdateDeployResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astroplatformcore.UpdateDeployRequest, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
