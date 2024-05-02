@@ -79,4 +79,19 @@ func TestDeploy(t *testing.T) {
 		err := execDeployCmd([]string{"test-deployment-id", "--dags", "--force"}...)
 		assert.ErrorIs(t, err, deploy.ErrDagOnlyDeployDisabledInConfig)
 	})
+
+	t.Run("error should be returned if BYORegistryEnabled is true but BYORegistryDomain is empty", func(t *testing.T) {
+		appConfig = &houston.AppConfig{
+			BYORegistryDomain: "",
+			Flags: houston.FeatureFlags{
+				BYORegistryEnabled: true,
+			},
+		}
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+			return deploy.ErrNoWorkspaceID
+		}
+		err := execDeployCmd([]string{"-f"}...)
+		assert.ErrorIs(t, err, deploy.ErrBYORegistryDomainNotSet)
+		DagsOnlyDeploy = deploy.DagsOnlyDeploy
+	})
 }
