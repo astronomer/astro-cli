@@ -96,6 +96,9 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	if appConfig != nil && appConfig.Flags.BYORegistryEnabled {
 		byoRegistryEnabled = true
 		byoRegistryDomain = appConfig.BYORegistryDomain
+		if byoRegistryDomain == "" {
+			return deploy.ErrBYORegistryDomainNotSet
+		}
 	}
 	if isDagOnlyDeploy {
 		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true)
