@@ -499,6 +499,59 @@ func TestDagsDeploySuccess(t *testing.T) {
 	mockPlatformCoreClient.AssertExpectations(t)
 }
 
+func TestImageOnlyDeploySuccess(t *testing.T) {
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+	deployInput := InputDeploy{
+		Path:           "./testfiles/",
+		RuntimeID:      "",
+		WsID:           ws,
+		Pytest:         "",
+		EnvFile:        "./testfiles/.env",
+		ImageName:      "",
+		DeploymentName: "",
+		Prompt:         true,
+		Dags:           false,
+		Image:          true,
+		WaitForStatus:  false,
+		DagsPath:       "./testfiles/dags",
+	}
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(2)
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(1)
+	mockPlatformCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(1)
+	mockPlatformCoreClient.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&finalizeDeployResponse, nil).Times(1)
+
+	// Test pytest with dags deploy
+	mockImageHandler := new(mocks.ImageHandler)
+	airflowImageHandler = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
+		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
+		return mockImageHandler
+	}
+
+	mockContainerHandler := new(mocks.ContainerHandler)
+	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		return mockContainerHandler, nil
+	}
+
+	defer testUtil.MockUserInput(t, "1")()
+	err := Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
+	assert.NoError(t, err)
+
+	defer os.RemoveAll("./testfiles/dags/")
+
+	mockCoreClient.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
+}
+
 func TestNoDagsDeploy(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("true")
