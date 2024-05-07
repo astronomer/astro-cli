@@ -102,6 +102,13 @@ const (
 	CreateDedicatedDeploymentRequestTypeSTANDARD  CreateDedicatedDeploymentRequestType = "STANDARD"
 )
 
+// Defines values for CreateDeployRequestType.
+const (
+	CreateDeployRequestTypeDAGONLY     CreateDeployRequestType = "DAG_ONLY"
+	CreateDeployRequestTypeIMAGEANDDAG CreateDeployRequestType = "IMAGE_AND_DAG"
+	CreateDeployRequestTypeIMAGEONLY   CreateDeployRequestType = "IMAGE_ONLY"
+)
+
 // Defines values for CreateGcpClusterRequestCloudProvider.
 const (
 	CreateGcpClusterRequestCloudProviderAWS   CreateGcpClusterRequestCloudProvider = "AWS"
@@ -153,6 +160,20 @@ const (
 	CreateStandardDeploymentRequestTypeDEDICATED CreateStandardDeploymentRequestType = "DEDICATED"
 	CreateStandardDeploymentRequestTypeHYBRID    CreateStandardDeploymentRequestType = "HYBRID"
 	CreateStandardDeploymentRequestTypeSTANDARD  CreateStandardDeploymentRequestType = "STANDARD"
+)
+
+// Defines values for DeployStatus.
+const (
+	DEPLOYED    DeployStatus = "DEPLOYED"
+	FAILED      DeployStatus = "FAILED"
+	INITIALIZED DeployStatus = "INITIALIZED"
+)
+
+// Defines values for DeployType.
+const (
+	DeployTypeDAGONLY     DeployType = "DAG_ONLY"
+	DeployTypeIMAGEANDDAG DeployType = "IMAGE_AND_DAG"
+	DeployTypeIMAGEONLY   DeployType = "IMAGE_ONLY"
 )
 
 // Defines values for DeploymentCloudProvider.
@@ -760,6 +781,18 @@ type CreateDedicatedDeploymentRequestSchedulerSize string
 // CreateDedicatedDeploymentRequestType The type of the Deployment.
 type CreateDedicatedDeploymentRequestType string
 
+// CreateDeployRequest defines model for CreateDeployRequest.
+type CreateDeployRequest struct {
+	// Description The Deploy's description.
+	Description *string `json:"description,omitempty"`
+
+	// Type The type of the Deploy.
+	Type CreateDeployRequestType `json:"type"`
+}
+
+// CreateDeployRequestType The type of the Deploy.
+type CreateDeployRequestType string
+
 // CreateDeploymentRequest defines model for CreateDeploymentRequest.
 type CreateDeploymentRequest struct {
 	union json.RawMessage
@@ -972,6 +1005,67 @@ type CreateWorkspaceRequest struct {
 
 	// Name The Workspace's name.
 	Name string `json:"name"`
+}
+
+// Deploy defines model for Deploy.
+type Deploy struct {
+	// AirflowVersion The Deploy's Airflow version.
+	AirflowVersion *string `json:"airflowVersion,omitempty"`
+
+	// AstroRuntimeVersion The Deploy's Astro Runtime version.
+	AstroRuntimeVersion *string `json:"astroRuntimeVersion,omitempty"`
+
+	// CreatedAt The time when the Deploy was created in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
+	CreatedAt        time.Time            `json:"createdAt"`
+	CreatedBySubject *BasicSubjectProfile `json:"createdBySubject,omitempty"`
+
+	// DagTarballVersion The Deploy's DAG tarball version, also known as the Bundle Version in the Astro UI.
+	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
+
+	// DagsUploadUrl The Deploy's upload URL to upload DAG bundles. Appears only if dag deploy is enabled on the Deployment.
+	DagsUploadUrl *string `json:"dagsUploadUrl,omitempty"`
+
+	// DeploymentId The Deployment's ID.
+	DeploymentId string `json:"deploymentId"`
+
+	// Description The Deploy's description.
+	Description *string `json:"description,omitempty"`
+
+	// Id The Deploy's ID.
+	Id string `json:"id"`
+
+	// ImageRepository The URL of the Deploy's image repository.
+	ImageRepository string `json:"imageRepository"`
+
+	// ImageTag The Deploy's image tag. Appears only if specified in the most recent deploy.
+	ImageTag string `json:"imageTag"`
+
+	// IsDagDeployEnabled Whether the Deploy has DAG deploys enabled.
+	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
+
+	// RollbackFromId The Deploy's ID which was Rollback from. Appears only if a rollback as been performed.
+	RollbackFromId *string `json:"rollbackFromId,omitempty"`
+
+	// Status The status of the Deploy.
+	Status DeployStatus `json:"status"`
+
+	// Type The type of Deploy.
+	Type DeployType `json:"type"`
+
+	// UpdatedAt The time when the Deploy was last updated in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
+	UpdatedAt        *time.Time           `json:"updatedAt,omitempty"`
+	UpdatedBySubject *BasicSubjectProfile `json:"updatedBySubject,omitempty"`
+}
+
+// DeployStatus The status of the Deploy.
+type DeployStatus string
+
+// DeployType The type of Deploy.
+type DeployType string
+
+// DeployRollbackRequest defines model for DeployRollbackRequest.
+type DeployRollbackRequest struct {
+	Description *string `json:"description,omitempty"`
 }
 
 // Deployment defines model for Deployment.
@@ -1305,11 +1399,32 @@ type DeploymentsPaginated struct {
 	TotalCount int `json:"totalCount"`
 }
 
+// DeploysPaginated defines model for DeploysPaginated.
+type DeploysPaginated struct {
+	// Deploys A list of Deploys in the current page.
+	Deploys []Deploy `json:"deploys"`
+
+	// Limit The maximum number of Deploys in one page.
+	Limit int `json:"limit"`
+
+	// Offset The offset of the current page of Deploys.
+	Offset int `json:"offset"`
+
+	// TotalCount The total number of Deploys.
+	TotalCount int `json:"totalCount"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	Message    string `json:"message"`
 	RequestId  string `json:"requestId"`
 	StatusCode int    `json:"statusCode"`
+}
+
+// FinalizeDeployRequest defines model for FinalizeDeployRequest.
+type FinalizeDeployRequest struct {
+	// DagTarballVersion The Deploy's DAG tarball version, also known as the Bundle Version in the Astro UI. Required if DAG deploy is enabled on the deployment and deploy type is IMAGE_AND_DAG or DAG_ONLY
+	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
 }
 
 // HybridWorkerQueueRequest defines model for HybridWorkerQueueRequest.
@@ -1677,6 +1792,12 @@ type UpdateDedicatedDeploymentRequestSchedulerSize string
 
 // UpdateDedicatedDeploymentRequestType The type of the Deployment.
 type UpdateDedicatedDeploymentRequestType string
+
+// UpdateDeployRequest defines model for UpdateDeployRequest.
+type UpdateDeployRequest struct {
+	// Description The Deploy's description.
+	Description *string `json:"description,omitempty"`
+}
 
 // UpdateDeploymentRequest defines model for UpdateDeploymentRequest.
 type UpdateDeploymentRequest struct {
@@ -2102,6 +2223,15 @@ type ListDeploymentsParams struct {
 // ListDeploymentsParamsSorts defines parameters for ListDeployments.
 type ListDeploymentsParamsSorts string
 
+// ListDeploysParams defines parameters for ListDeploys.
+type ListDeploysParams struct {
+	// Offset The number of results to skip before returning values.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit The maximum number of results to return.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListWorkspacesParams defines parameters for ListWorkspaces.
 type ListWorkspacesParams struct {
 	// WorkspaceIds A list of IDs for specific Workspaces to list. The API will list information only for Workspaces which have been specified in this list.
@@ -2137,6 +2267,18 @@ type CreateDeploymentJSONRequestBody = CreateDeploymentRequest
 
 // UpdateDeploymentJSONRequestBody defines body for UpdateDeployment for application/json ContentType.
 type UpdateDeploymentJSONRequestBody = UpdateDeploymentRequest
+
+// CreateDeployJSONRequestBody defines body for CreateDeploy for application/json ContentType.
+type CreateDeployJSONRequestBody = CreateDeployRequest
+
+// UpdateDeployJSONRequestBody defines body for UpdateDeploy for application/json ContentType.
+type UpdateDeployJSONRequestBody = UpdateDeployRequest
+
+// FinalizeDeployJSONRequestBody defines body for FinalizeDeploy for application/json ContentType.
+type FinalizeDeployJSONRequestBody = FinalizeDeployRequest
+
+// DeployRollbackJSONRequestBody defines body for DeployRollback for application/json ContentType.
+type DeployRollbackJSONRequestBody = DeployRollbackRequest
 
 // UpdateDeploymentHibernationOverrideJSONRequestBody defines body for UpdateDeploymentHibernationOverride for application/json ContentType.
 type UpdateDeploymentHibernationOverrideJSONRequestBody = OverrideDeploymentHibernationBody
@@ -2601,6 +2743,32 @@ type ClientInterface interface {
 
 	UpdateDeployment(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListDeploys request
+	ListDeploys(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateDeploy request with any body
+	CreateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateDeploy(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDeploy request
+	GetDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateDeploy request with any body
+	UpdateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FinalizeDeploy request with any body
+	FinalizeDeployWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	FinalizeDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, body FinalizeDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeployRollback request with any body
+	DeployRollbackWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DeployRollback(ctx context.Context, organizationId string, deploymentId string, deployId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteDeploymentHibernationOverride request
 	DeleteDeploymentHibernationOverride(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -2859,6 +3027,126 @@ func (c *Client) UpdateDeploymentWithBody(ctx context.Context, organizationId st
 
 func (c *Client) UpdateDeployment(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateDeploymentRequest(c.Server, organizationId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDeploys(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDeploysRequest(c.Server, organizationId, deploymentId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeployRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateDeploy(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeployRequest(c.Server, organizationId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeployRequest(c.Server, organizationId, deploymentId, deployId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeployRequestWithBody(c.Server, organizationId, deploymentId, deployId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeployRequest(c.Server, organizationId, deploymentId, deployId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) FinalizeDeployWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFinalizeDeployRequestWithBody(c.Server, organizationId, deploymentId, deployId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) FinalizeDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, body FinalizeDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFinalizeDeployRequest(c.Server, organizationId, deploymentId, deployId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeployRollbackWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeployRollbackRequestWithBody(c.Server, organizationId, deploymentId, deployId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeployRollback(ctx context.Context, organizationId string, deploymentId string, deployId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeployRollbackRequest(c.Server, organizationId, deploymentId, deployId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3987,6 +4275,368 @@ func NewUpdateDeploymentRequestWithBody(server string, organizationId string, de
 	return req, nil
 }
 
+// NewListDeploysRequest generates requests for ListDeploys
+func NewListDeploysRequest(server string, organizationId string, deploymentId string, params *ListDeploysParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateDeployRequest calls the generic CreateDeploy builder with application/json body
+func NewCreateDeployRequest(server string, organizationId string, deploymentId string, body CreateDeployJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateDeployRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
+}
+
+// NewCreateDeployRequestWithBody generates requests for CreateDeploy with any type of body
+func NewCreateDeployRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetDeployRequest generates requests for GetDeploy
+func NewGetDeployRequest(server string, organizationId string, deploymentId string, deployId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deployId", runtime.ParamLocationPath, deployId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateDeployRequest calls the generic UpdateDeploy builder with application/json body
+func NewUpdateDeployRequest(server string, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateDeployRequestWithBody(server, organizationId, deploymentId, deployId, "application/json", bodyReader)
+}
+
+// NewUpdateDeployRequestWithBody generates requests for UpdateDeploy with any type of body
+func NewUpdateDeployRequestWithBody(server string, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deployId", runtime.ParamLocationPath, deployId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewFinalizeDeployRequest calls the generic FinalizeDeploy builder with application/json body
+func NewFinalizeDeployRequest(server string, organizationId string, deploymentId string, deployId string, body FinalizeDeployJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewFinalizeDeployRequestWithBody(server, organizationId, deploymentId, deployId, "application/json", bodyReader)
+}
+
+// NewFinalizeDeployRequestWithBody generates requests for FinalizeDeploy with any type of body
+func NewFinalizeDeployRequestWithBody(server string, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deployId", runtime.ParamLocationPath, deployId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s/finalize", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeployRollbackRequest calls the generic DeployRollback builder with application/json body
+func NewDeployRollbackRequest(server string, organizationId string, deploymentId string, deployId string, body DeployRollbackJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeployRollbackRequestWithBody(server, organizationId, deploymentId, deployId, "application/json", bodyReader)
+}
+
+// NewDeployRollbackRequestWithBody generates requests for DeployRollback with any type of body
+func NewDeployRollbackRequestWithBody(server string, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deployId", runtime.ParamLocationPath, deployId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s/rollback", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDeleteDeploymentHibernationOverrideRequest generates requests for DeleteDeploymentHibernationOverride
 func NewDeleteDeploymentHibernationOverrideRequest(server string, organizationId string, deploymentId string) (*http.Request, error) {
 	var err error
@@ -4481,6 +5131,32 @@ type ClientWithResponsesInterface interface {
 
 	UpdateDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error)
 
+	// ListDeploys request
+	ListDeploysWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*ListDeploysResponse, error)
+
+	// CreateDeploy request with any body
+	CreateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error)
+
+	CreateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error)
+
+	// GetDeploy request
+	GetDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, reqEditors ...RequestEditorFn) (*GetDeployResponse, error)
+
+	// UpdateDeploy request with any body
+	UpdateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeployResponse, error)
+
+	UpdateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeployResponse, error)
+
+	// FinalizeDeploy request with any body
+	FinalizeDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FinalizeDeployResponse, error)
+
+	FinalizeDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body FinalizeDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*FinalizeDeployResponse, error)
+
+	// DeployRollback request with any body
+	DeployRollbackWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error)
+
+	DeployRollbackWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error)
+
 	// DeleteDeploymentHibernationOverride request
 	DeleteDeploymentHibernationOverrideWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentHibernationOverrideResponse, error)
 
@@ -4909,6 +5585,167 @@ func (r UpdateDeploymentResponse) StatusCode() int {
 	return 0
 }
 
+type ListDeploysResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploysPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDeploysResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDeploysResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type FinalizeDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r FinalizeDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FinalizeDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeployRollbackResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeployRollbackResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeployRollbackResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type DeleteDeploymentHibernationOverrideResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -5262,6 +6099,92 @@ func (c *ClientWithResponses) UpdateDeploymentWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseUpdateDeploymentResponse(rsp)
+}
+
+// ListDeploysWithResponse request returning *ListDeploysResponse
+func (c *ClientWithResponses) ListDeploysWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*ListDeploysResponse, error) {
+	rsp, err := c.ListDeploys(ctx, organizationId, deploymentId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDeploysResponse(rsp)
+}
+
+// CreateDeployWithBodyWithResponse request with arbitrary body returning *CreateDeployResponse
+func (c *ClientWithResponses) CreateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error) {
+	rsp, err := c.CreateDeployWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDeployResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error) {
+	rsp, err := c.CreateDeploy(ctx, organizationId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDeployResponse(rsp)
+}
+
+// GetDeployWithResponse request returning *GetDeployResponse
+func (c *ClientWithResponses) GetDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, reqEditors ...RequestEditorFn) (*GetDeployResponse, error) {
+	rsp, err := c.GetDeploy(ctx, organizationId, deploymentId, deployId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeployResponse(rsp)
+}
+
+// UpdateDeployWithBodyWithResponse request with arbitrary body returning *UpdateDeployResponse
+func (c *ClientWithResponses) UpdateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeployResponse, error) {
+	rsp, err := c.UpdateDeployWithBody(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeployResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeployResponse, error) {
+	rsp, err := c.UpdateDeploy(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeployResponse(rsp)
+}
+
+// FinalizeDeployWithBodyWithResponse request with arbitrary body returning *FinalizeDeployResponse
+func (c *ClientWithResponses) FinalizeDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FinalizeDeployResponse, error) {
+	rsp, err := c.FinalizeDeployWithBody(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFinalizeDeployResponse(rsp)
+}
+
+func (c *ClientWithResponses) FinalizeDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body FinalizeDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*FinalizeDeployResponse, error) {
+	rsp, err := c.FinalizeDeploy(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFinalizeDeployResponse(rsp)
+}
+
+// DeployRollbackWithBodyWithResponse request with arbitrary body returning *DeployRollbackResponse
+func (c *ClientWithResponses) DeployRollbackWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error) {
+	rsp, err := c.DeployRollbackWithBody(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeployRollbackResponse(rsp)
+}
+
+func (c *ClientWithResponses) DeployRollbackWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error) {
+	rsp, err := c.DeployRollback(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeployRollbackResponse(rsp)
 }
 
 // DeleteDeploymentHibernationOverrideWithResponse request returning *DeleteDeploymentHibernationOverrideResponse
@@ -6186,6 +7109,365 @@ func ParseUpdateDeploymentResponse(rsp *http.Response) (*UpdateDeploymentRespons
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest Deployment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDeploysResponse parses an HTTP response from a ListDeploysWithResponse call
+func ParseListDeploysResponse(rsp *http.Response) (*ListDeploysResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDeploysResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploysPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateDeployResponse parses an HTTP response from a CreateDeployWithResponse call
+func ParseCreateDeployResponse(rsp *http.Response) (*CreateDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDeployResponse parses an HTTP response from a GetDeployWithResponse call
+func ParseGetDeployResponse(rsp *http.Response) (*GetDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateDeployResponse parses an HTTP response from a UpdateDeployWithResponse call
+func ParseUpdateDeployResponse(rsp *http.Response) (*UpdateDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseFinalizeDeployResponse parses an HTTP response from a FinalizeDeployWithResponse call
+func ParseFinalizeDeployResponse(rsp *http.Response) (*FinalizeDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FinalizeDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeployRollbackResponse parses an HTTP response from a DeployRollbackWithResponse call
+func ParseDeployRollbackResponse(rsp *http.Response) (*DeployRollbackResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeployRollbackResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

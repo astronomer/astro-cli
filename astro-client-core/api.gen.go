@@ -1257,6 +1257,7 @@ type ClusterOptions struct {
 	DefaultServicePeeringRange *string                `json:"defaultServicePeeringRange,omitempty"`
 	DefaultServiceSubnetRange  *string                `json:"defaultServiceSubnetRange,omitempty"`
 	DefaultVpcSubnetRange      string                 `json:"defaultVpcSubnetRange"`
+	HarmonyVersions            *[]string              `json:"harmonyVersions,omitempty"`
 	NodeCountDefault           int                    `json:"nodeCountDefault"`
 	NodeCountMax               int                    `json:"nodeCountMax"`
 	NodeCountMin               int                    `json:"nodeCountMin"`
@@ -1335,16 +1336,18 @@ type ConnectionAuthTypeParameter struct {
 
 // CreateAwsClusterRequest defines model for CreateAwsClusterRequest.
 type CreateAwsClusterRequest struct {
-	DbInstanceType  string                      `json:"dbInstanceType"`
-	IsDryRun        *bool                       `json:"isDryRun,omitempty"`
-	K8sTags         *[]ClusterTag               `json:"k8sTags,omitempty"`
-	Name            string                      `json:"name"`
-	NodePools       *[]CreateNodePoolRequest    `json:"nodePools,omitempty"`
-	ProviderAccount *string                     `json:"providerAccount,omitempty"`
-	Region          string                      `json:"region"`
-	TemplateVersion string                      `json:"templateVersion"`
-	Type            CreateAwsClusterRequestType `json:"type"`
-	VpcSubnetRange  string                      `json:"vpcSubnetRange"`
+	DbInstanceType                string                      `json:"dbInstanceType"`
+	DisableHarmonyVersionUpgrades *bool                       `json:"disableHarmonyVersionUpgrades,omitempty"`
+	HarmonyVersion                *string                     `json:"harmonyVersion,omitempty"`
+	IsDryRun                      *bool                       `json:"isDryRun,omitempty"`
+	K8sTags                       *[]ClusterTag               `json:"k8sTags,omitempty"`
+	Name                          string                      `json:"name"`
+	NodePools                     *[]CreateNodePoolRequest    `json:"nodePools,omitempty"`
+	ProviderAccount               *string                     `json:"providerAccount,omitempty"`
+	Region                        string                      `json:"region"`
+	TemplateVersion               string                      `json:"templateVersion"`
+	Type                          CreateAwsClusterRequestType `json:"type"`
+	VpcSubnetRange                string                      `json:"vpcSubnetRange"`
 }
 
 // CreateAwsClusterRequestType defines model for CreateAwsClusterRequest.Type.
@@ -1352,17 +1355,19 @@ type CreateAwsClusterRequestType string
 
 // CreateAzureClusterRequest defines model for CreateAzureClusterRequest.
 type CreateAzureClusterRequest struct {
-	DbInstanceType  string                        `json:"dbInstanceType"`
-	IsDryRun        *bool                         `json:"isDryRun,omitempty"`
-	K8sTags         *[]ClusterTag                 `json:"k8sTags,omitempty"`
-	Name            string                        `json:"name"`
-	NodePools       *[]CreateNodePoolRequest      `json:"nodePools,omitempty"`
-	ProviderAccount *string                       `json:"providerAccount,omitempty"`
-	Region          string                        `json:"region"`
-	TemplateVersion string                        `json:"templateVersion"`
-	TenantId        *string                       `json:"tenantId,omitempty"`
-	Type            CreateAzureClusterRequestType `json:"type"`
-	VpcSubnetRange  string                        `json:"vpcSubnetRange"`
+	DbInstanceType                string                        `json:"dbInstanceType"`
+	DisableHarmonyVersionUpgrades *bool                         `json:"disableHarmonyVersionUpgrades,omitempty"`
+	HarmonyVersion                *string                       `json:"harmonyVersion,omitempty"`
+	IsDryRun                      *bool                         `json:"isDryRun,omitempty"`
+	K8sTags                       *[]ClusterTag                 `json:"k8sTags,omitempty"`
+	Name                          string                        `json:"name"`
+	NodePools                     *[]CreateNodePoolRequest      `json:"nodePools,omitempty"`
+	ProviderAccount               *string                       `json:"providerAccount,omitempty"`
+	Region                        string                        `json:"region"`
+	TemplateVersion               string                        `json:"templateVersion"`
+	TenantId                      *string                       `json:"tenantId,omitempty"`
+	Type                          CreateAzureClusterRequestType `json:"type"`
+	VpcSubnetRange                string                        `json:"vpcSubnetRange"`
 }
 
 // CreateAzureClusterRequestType defines model for CreateAzureClusterRequest.Type.
@@ -1594,19 +1599,21 @@ type CreateEnvironmentObjectRequestScope string
 
 // CreateGcpClusterRequest defines model for CreateGcpClusterRequest.
 type CreateGcpClusterRequest struct {
-	DbInstanceType      string                      `json:"dbInstanceType"`
-	IsDryRun            *bool                       `json:"isDryRun,omitempty"`
-	K8sTags             *[]ClusterTag               `json:"k8sTags,omitempty"`
-	Name                string                      `json:"name"`
-	NodePools           *[]CreateNodePoolRequest    `json:"nodePools,omitempty"`
-	PodSubnetRange      string                      `json:"podSubnetRange"`
-	ProviderAccount     *string                     `json:"providerAccount,omitempty"`
-	Region              string                      `json:"region"`
-	ServicePeeringRange string                      `json:"servicePeeringRange"`
-	ServiceSubnetRange  string                      `json:"serviceSubnetRange"`
-	TemplateVersion     string                      `json:"templateVersion"`
-	Type                CreateGcpClusterRequestType `json:"type"`
-	VpcSubnetRange      string                      `json:"vpcSubnetRange"`
+	DbInstanceType                string                      `json:"dbInstanceType"`
+	DisableHarmonyVersionUpgrades *bool                       `json:"disableHarmonyVersionUpgrades,omitempty"`
+	HarmonyVersion                *string                     `json:"harmonyVersion,omitempty"`
+	IsDryRun                      *bool                       `json:"isDryRun,omitempty"`
+	K8sTags                       *[]ClusterTag               `json:"k8sTags,omitempty"`
+	Name                          string                      `json:"name"`
+	NodePools                     *[]CreateNodePoolRequest    `json:"nodePools,omitempty"`
+	PodSubnetRange                string                      `json:"podSubnetRange"`
+	ProviderAccount               *string                     `json:"providerAccount,omitempty"`
+	Region                        string                      `json:"region"`
+	ServicePeeringRange           string                      `json:"servicePeeringRange"`
+	ServiceSubnetRange            string                      `json:"serviceSubnetRange"`
+	TemplateVersion               string                      `json:"templateVersion"`
+	Type                          CreateGcpClusterRequestType `json:"type"`
+	VpcSubnetRange                string                      `json:"vpcSubnetRange"`
 }
 
 // CreateGcpClusterRequestType defines model for CreateGcpClusterRequest.Type.
@@ -2887,24 +2894,26 @@ type TransferDeploymentRequest struct {
 
 // UpdateAwsClusterRequest defines model for UpdateAwsClusterRequest.
 type UpdateAwsClusterRequest struct {
-	DbInstanceType    string                  `json:"dbInstanceType"`
-	DbInstanceVersion *string                 `json:"dbInstanceVersion,omitempty"`
-	K8sTags           []ClusterTag            `json:"k8sTags"`
-	Name              string                  `json:"name"`
-	NodePools         []UpdateNodePoolRequest `json:"nodePools"`
-	TemplateVersion   string                  `json:"templateVersion"`
-	Workspaces        *[]string               `json:"workspaces,omitempty"`
+	DbInstanceType                string                  `json:"dbInstanceType"`
+	DbInstanceVersion             *string                 `json:"dbInstanceVersion,omitempty"`
+	DisableHarmonyVersionUpgrades *bool                   `json:"disableHarmonyVersionUpgrades,omitempty"`
+	K8sTags                       []ClusterTag            `json:"k8sTags"`
+	Name                          string                  `json:"name"`
+	NodePools                     []UpdateNodePoolRequest `json:"nodePools"`
+	TemplateVersion               string                  `json:"templateVersion"`
+	Workspaces                    *[]string               `json:"workspaces,omitempty"`
 }
 
 // UpdateAzureClusterRequest defines model for UpdateAzureClusterRequest.
 type UpdateAzureClusterRequest struct {
-	DbInstanceType    string                  `json:"dbInstanceType"`
-	DbInstanceVersion *string                 `json:"dbInstanceVersion,omitempty"`
-	K8sTags           []ClusterTag            `json:"k8sTags"`
-	Name              string                  `json:"name"`
-	NodePools         []UpdateNodePoolRequest `json:"nodePools"`
-	TemplateVersion   string                  `json:"templateVersion"`
-	Workspaces        *[]string               `json:"workspaces,omitempty"`
+	DbInstanceType                string                  `json:"dbInstanceType"`
+	DbInstanceVersion             *string                 `json:"dbInstanceVersion,omitempty"`
+	DisableHarmonyVersionUpgrades *bool                   `json:"disableHarmonyVersionUpgrades,omitempty"`
+	K8sTags                       []ClusterTag            `json:"k8sTags"`
+	Name                          string                  `json:"name"`
+	NodePools                     []UpdateNodePoolRequest `json:"nodePools"`
+	TemplateVersion               string                  `json:"templateVersion"`
+	Workspaces                    *[]string               `json:"workspaces,omitempty"`
 }
 
 // UpdateCustomRoleRequest defines model for UpdateCustomRoleRequest.
@@ -3024,13 +3033,14 @@ type UpdateEnvironmentObjectRequestScope string
 
 // UpdateGcpClusterRequest defines model for UpdateGcpClusterRequest.
 type UpdateGcpClusterRequest struct {
-	DbInstanceType    string                  `json:"dbInstanceType"`
-	DbInstanceVersion *string                 `json:"dbInstanceVersion,omitempty"`
-	K8sTags           []ClusterTag            `json:"k8sTags"`
-	Name              string                  `json:"name"`
-	NodePools         []UpdateNodePoolRequest `json:"nodePools"`
-	TemplateVersion   string                  `json:"templateVersion"`
-	Workspaces        *[]string               `json:"workspaces,omitempty"`
+	DbInstanceType                string                  `json:"dbInstanceType"`
+	DbInstanceVersion             *string                 `json:"dbInstanceVersion,omitempty"`
+	DisableHarmonyVersionUpgrades *bool                   `json:"disableHarmonyVersionUpgrades,omitempty"`
+	K8sTags                       []ClusterTag            `json:"k8sTags"`
+	Name                          string                  `json:"name"`
+	NodePools                     []UpdateNodePoolRequest `json:"nodePools"`
+	TemplateVersion               string                  `json:"templateVersion"`
+	Workspaces                    *[]string               `json:"workspaces,omitempty"`
 }
 
 // UpdateHostedDeploymentRequest defines model for UpdateHostedDeploymentRequest.

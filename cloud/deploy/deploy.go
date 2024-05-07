@@ -71,9 +71,8 @@ var (
 )
 
 var (
-	errDagsParseFailed        = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	envFileMissing            = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
-	errImageDeployNoPriorDags = errors.New("cannot do image only deploy with no prior DAGs deployed. Please deploy DAGs to your deployment first")
+	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
 )
 
 var (
@@ -247,16 +246,13 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		if !deployInfo.dagDeployEnabled {
 			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 		}
-		if deployInfo.desiredDagTarballVersion == "" {
-			return errImageDeployNoPriorDags
-		}
 	}
 
 	deploymentURL, err := deployment.GetDeploymentURL(deployInfo.deploymentID, deployInfo.workspaceID)
 	if err != nil {
 		return err
 	}
-	resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, deployInput.Description, "", deployInput.Dags, coreClient)
+	resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, deployInput.Description, deployInput.Dags, deployInput.Image, platformCoreClient)
 	if err != nil {
 		return err
 	}
@@ -308,7 +304,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		// finish deploy
-		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
+		err = finalizeDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -397,10 +393,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			}
 		}
 		// finish deploy
-		if deployInput.Image {
-			dagTarballVersion = deployInfo.desiredDagTarballVersion
-		}
-		err = updateDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, coreClient)
+		err = finalizeDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -412,7 +405,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			}
 		}
 
-		fmt.Println("Successfully pushed image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
+		fmt.Println("Successfully pushed image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful. To deploy dags only run astro deploy --dags." +
 			fmt.Sprintf(accessYourDeploymentFmt, ansi.Bold("https://"+deploymentURL), ansi.Bold("https://"+deployInfo.webserverURL)))
 	}
 
@@ -744,13 +737,13 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 	return version, nil
 }
 
-// update deploy
-func updateDeploy(deployID, deploymentID, organizationID, dagTarballVersion string, dagDeploy bool, coreClient astrocore.CoreClient) error {
-	UpdateDeployRequest := astrocore.UpdateDeployRequest{}
+// finalize deploy
+func finalizeDeploy(deployID, deploymentID, organizationID, dagTarballVersion string, dagDeploy bool, platformCoreClient astroplatformcore.CoreClient) error {
+	finalizeDeployRequest := astroplatformcore.FinalizeDeployRequest{}
 	if dagDeploy {
-		UpdateDeployRequest.DagTarballVersion = &dagTarballVersion
+		finalizeDeployRequest.DagTarballVersion = &dagTarballVersion
 	}
-	resp, err := coreClient.UpdateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, deployID, UpdateDeployRequest)
+	resp, err := platformCoreClient.FinalizeDeployWithResponse(httpContext.Background(), organizationID, deploymentID, deployID, finalizeDeployRequest)
 	if err != nil {
 		return err
 	}
@@ -768,26 +761,26 @@ func updateDeploy(deployID, deploymentID, organizationID, dagTarballVersion stri
 }
 
 // create deploy
-func createDeploy(organizationID, deploymentID, description, tag string, dagDeploy bool, coreClient astrocore.CoreClient) (astrocore.CreateDeployResponse, error) {
-	createDeployRequest := astrocore.CreateDeployRequest{
+func createDeploy(organizationID, deploymentID, description string, dagDeploy, imageOnlyDeploy bool, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.CreateDeployResponse, error) {
+	createDeployRequest := astroplatformcore.CreateDeployRequest{
 		Description: &description,
 	}
-	if dagDeploy {
-		createDeployRequest.Type = astrocore.CreateDeployRequestTypeDAG
-	} else {
-		createDeployRequest.Type = astrocore.CreateDeployRequestTypeIMAGE
-	}
-	if tag != "" {
-		createDeployRequest.ImageTag = &tag
+	switch {
+	case dagDeploy:
+		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeDAGONLY
+	case imageOnlyDeploy:
+		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEONLY
+	default:
+		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEANDDAG
 	}
 
-	resp, err := coreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, createDeployRequest)
+	resp, err := platformCoreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, createDeployRequest)
 	if err != nil {
-		return astrocore.CreateDeployResponse{}, err
+		return astroplatformcore.CreateDeployResponse{}, err
 	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return astrocore.CreateDeployResponse{}, err
+		return astroplatformcore.CreateDeployResponse{}, err
 	}
 	return *resp, err
 }
