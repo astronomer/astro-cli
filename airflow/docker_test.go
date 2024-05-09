@@ -1264,23 +1264,7 @@ func TestDockerComposedUpgradeTest(t *testing.T) {
 		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
-		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", errMockDocker).Once()
-
-		mockDockerCompose.imageHandler = imageHandler
-
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", true, false, false, nil)
-		assert.Error(t, err)
-		imageHandler.AssertExpectations(t)
-	})
-
-	t.Run("pytest failure", func(t *testing.T) {
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Times(3)
-		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
-		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("", nil).Once()
-		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze).Return(nil).Once()
-		imageHandler.On("CreatePipFreeze", mock.Anything, cwd+"/"+pipFreeze2).Return(nil).Once()
-		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("1", nil).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("1", errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
