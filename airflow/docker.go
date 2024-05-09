@@ -599,8 +599,9 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 			return err
 		}
 	}
+	var errorCode string
 	if dagTest {
-		err := d.dagTest(testHomeDirectory, newAirflowVersion, newDockerFile, customImage, buildSecretString)
+		errorCode, err = d.dagTest(testHomeDirectory, newAirflowVersion, newDockerFile, customImage, buildSecretString)
 		if err != nil {
 			return err
 		}
@@ -615,6 +616,9 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 	}
 	if dagTest {
 		fmt.Printf("\tDAG Parse Test HTML Report: %s\n", "dag-test-report.html")
+	}
+	if errorCode == "1" {
+		return errors.New("one of the tests run above failed")
 	}
 
 	return nil
@@ -703,13 +707,13 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, de
 	return nil
 }
 
-func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerFile, customImage, buildSecretString string) error {
+func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerFile, customImage, buildSecretString string) (string, error) {
 	fmt.Printf("\nChecking the DAGs in this project for errors against the new Airflow version %s\n", newAirflowVersion)
 
 	// build image with the new runtime version
 	err := upgradeDockerfile(d.dockerfile, newDockerFile, newAirflowVersion, customImage)
 	if err != nil {
-		return err
+		return "1", err
 	}
 
 	// add pytest-html to the requirements
@@ -726,19 +730,18 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerF
 		fmt.Printf("Removing package 'pytest-html' from requirements.txt unsuccessful: %s\n", err.Error())
 	}
 	if imageBuildErr != nil {
-		return imageBuildErr
+		return "1", imageBuildErr
 	}
 	// check for file
 	path := d.airflowHome + "/" + DefaultTestPath
 
 	fileExist, err := util.Exists(path)
 	if err != nil {
-		return err
+		return "1", err
 	}
 	if !fileExist {
 		fmt.Println("\nThe file " + path + " which is needed for the parse test does not exist. Please run `astro dev init` to create it")
-
-		return err
+		return "1", err
 	}
 	// run parse test
 	pytestFile := DefaultTestPath
@@ -750,13 +753,14 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerF
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			fmt.Println("See above for errors detected in your DAGs")
+			return "1", nil
 		} else {
-			return errors.Wrap(err, "something went wrong while parsing your DAGs")
+			return "1", errors.Wrap(err, "something went wrong while parsing your DAGs")
 		}
 	} else {
 		fmt.Println("\n" + ansi.Green("✔") + " no errors detected in your DAGs ")
 	}
-	return nil
+	return "", nil
 }
 
 func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage string) error { //nolint:gocognit
