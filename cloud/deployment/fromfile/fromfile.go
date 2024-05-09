@@ -98,11 +98,11 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 			return err
 		}
 	}
-	existingDeployments, err = deployment.CoreGetDeployments(workspaceID, c.Organization, astroPlatformCore)
+	workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, coreClient)
 	if err != nil {
 		return err
 	}
-	workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, coreClient)
+	existingDeployments, err = deployment.CoreGetDeployments(workspaceID, c.Organization, astroPlatformCore)
 	if err != nil {
 		return err
 	}
