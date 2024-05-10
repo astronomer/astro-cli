@@ -628,6 +628,9 @@ func jsonString(conn *Connection) string {
 	case map[string]any:
 		// if some future code provides a map[string]any, we can use that directly
 		extraMap = connExtra
+	case nil:
+		// if the extra is nil, we proceed with an empty extra
+		return ""
 	default:
 		// if the extra type is something else entirely, we log a warning and proceed with an empty extra
 		fmt.Printf("Error converting extra to map for %s, found type: %T\n", conn.ConnID, conn.ConnExtra)
