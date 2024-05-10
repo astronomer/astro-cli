@@ -115,6 +115,7 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 		"README.md":                            Readme,
 		"tests/dags/test_dag_example.py":       DagExampleTest,
 		".astro/test_dag_integrity_default.py": DagIntegrityTestDefault,
+		".astro/dag_integrity_exceptions.txt":  "# Add dag files to exempt from parse test below. ex: dags/<test-file>",
 	}
 
 	// Initailize directories
