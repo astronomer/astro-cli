@@ -395,6 +395,12 @@ func TestJsonString(t *testing.T) {
 		res := jsonString(&conn)
 		assert.Equal(t, "", res)
 	})
+
+	t.Run("nil extra", func(t *testing.T) {
+		conn := Connection{ConnExtra: nil}
+		res := jsonString(&conn)
+		assert.Equal(t, "", res)
+	})
 }
 
 func TestWriteAirflowSettingstoYAML(t *testing.T) {
