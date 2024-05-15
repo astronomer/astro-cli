@@ -5,87 +5,109 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/pkg/errors"
 )
 
 var (
 	errVarBool         = false
-	errVarCreateUpdate = errors.New("there was an error while creating or updating one or more of the environment variables. Check the logs above for more information")
+	errVarCreateUpdate = errors.New(
+		"there was an error while creating or updating one or more of the environment variables. Check the command output above for more information",
+	)
 )
 
-func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string, useEnvFile bool, client astro.Client, out io.Writer) error {
-	varTab := printutil.Table{
-		Padding:        []int{5, 30, 30, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "KEY", "VALUE", "SECRET"},
-	}
+const maskedSecret = "****"
+
+func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string, useEnvFile bool, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+	environmentVariablesObjects := []astroplatformcore.DeploymentEnvironmentVariable{}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, client, nil)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}
 
-	environmentVariablesObjects := currentDeployment.DeploymentSpec.EnvironmentVariablesObjects
+	if currentDeployment.EnvironmentVariables != nil {
+		environmentVariablesObjects = *currentDeployment.EnvironmentVariables
+	}
+	if variableKey != "" {
+		environmentVariablesObjects = slices.DeleteFunc(environmentVariablesObjects, func(v astroplatformcore.DeploymentEnvironmentVariable) bool {
+			return v.Key != variableKey
+		})
+	}
 
 	// open env file
 	if useEnvFile {
-		err = writeVarToFile(environmentVariablesObjects, variableKey, envFile)
+		err = writeVarToFile(environmentVariablesObjects, envFile)
 		if err != nil {
 			fmt.Fprintln(out, errors.Wrap(err, "unable to write environment variables to file"))
 		}
 	}
-
-	var nbEnvVarFound int
-	for i := range environmentVariablesObjects {
-		if environmentVariablesObjects[i].Key == variableKey {
-			nbEnvVarFound++
-			varTab.AddRow([]string{strconv.Itoa(nbEnvVarFound), environmentVariablesObjects[i].Key, environmentVariablesObjects[i].Value, strconv.FormatBool(environmentVariablesObjects[i].IsSecret)}, false)
-			break
-		} else if variableKey == "" {
-			nbEnvVarFound++
-			varTab.AddRow([]string{strconv.Itoa(nbEnvVarFound), environmentVariablesObjects[i].Key, environmentVariablesObjects[i].Value, strconv.FormatBool(environmentVariablesObjects[i].IsSecret)}, false)
-		}
-	}
-
-	if nbEnvVarFound == 0 {
+	if len(environmentVariablesObjects) == 0 {
 		fmt.Fprintln(out, "\nNo variables found")
 		return nil
 	}
-	varTab.Print(out)
+
+	makeVarTable(environmentVariablesObjects).Print(out)
 
 	return nil
 }
 
-// this function modifies a deployment's environment variable object
-// it is used to create and update deployment's environment variables
-func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName string, variableList []string, useEnvFile, makeSecret, updateVars bool, client astro.Client, out io.Writer) error {
-	varTab := printutil.Table{
+func makeVarTable(vars []astroplatformcore.DeploymentEnvironmentVariable) *printutil.Table {
+	table := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
 		Header:         []string{"#", "KEY", "VALUE", "SECRET"},
 	}
+	for i, variable := range vars {
+		var value string
+
+		if variable.IsSecret {
+			value = maskedSecret
+		} else if variable.Value != nil {
+			value = *variable.Value
+		}
+		table.AddRow([]string{strconv.Itoa(i + 1), variable.Key, value, strconv.FormatBool(variable.IsSecret)}, false)
+	}
+	return &table
+}
+
+// this function modifies a deployment's environment variable object
+// it is used to create and update deployment's environment variables
+func VariableModify(
+	deploymentID, variableKey, variableValue, ws, envFile, deploymentName string,
+	variableList []string,
+	useEnvFile, makeSecret, updateVars bool,
+	coreClient astrocore.CoreClient,
+	platformCoreClient astroplatformcore.CoreClient,
+	out io.Writer,
+) error {
+	environmentVariablesObjects := []astroplatformcore.DeploymentEnvironmentVariable{}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, client, nil)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, coreClient)
 	if err != nil {
 		return err
 	}
 
 	// build query input
-	oldEnvironmentVariables := currentDeployment.DeploymentSpec.EnvironmentVariablesObjects
+	oldEnvironmentVariables := []astroplatformcore.DeploymentEnvironmentVariable{}
+	if currentDeployment.EnvironmentVariables != nil {
+		oldEnvironmentVariables = *currentDeployment.EnvironmentVariables
+	}
 
-	newEnvironmentVariables := make([]astro.EnvironmentVariable, 0)
+	newEnvironmentVariables := make([]astroplatformcore.DeploymentEnvironmentVariableRequest, 0)
 	oldKeyList := make([]string, 0)
 
 	// add old variables to update
 	for i := range oldEnvironmentVariables {
-		oldEnvironmentVariable := astro.EnvironmentVariable{
+		oldEnvironmentVariable := astroplatformcore.DeploymentEnvironmentVariableRequest{
 			IsSecret: oldEnvironmentVariables[i].IsSecret,
 			Key:      oldEnvironmentVariables[i].Key,
 			Value:    oldEnvironmentVariables[i].Value,
@@ -115,30 +137,24 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deplo
 		newEnvironmentVariables = addVariablesFromFile(envFile, oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, updateVars, makeSecret)
 	}
 
-	// create variable input
-	variablesCreateInput := astro.EnvironmentVariablesInput{
-		DeploymentID:         currentDeployment.ID,
-		EnvironmentVariables: newEnvironmentVariables,
-	}
-
 	// update deployment
-	environmentVariablesObjects, err := client.ModifyDeploymentVariable(variablesCreateInput)
+	err = Update(currentDeployment.Id, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, newEnvironmentVariables, false, coreClient, platformCoreClient)
 	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return err
+	}
+	deployment, err := CoreGetDeployment("", currentDeployment.Id, platformCoreClient)
+	if err != nil {
+		return err
+	}
+	if deployment.EnvironmentVariables != nil {
+		environmentVariablesObjects = *deployment.EnvironmentVariables
 	}
 
-	// make variables table
-	var index int
-	for i := range environmentVariablesObjects {
-		index = i + 1
-		varTab.AddRow([]string{strconv.Itoa(index), environmentVariablesObjects[i].Key, environmentVariablesObjects[i].Value, strconv.FormatBool(environmentVariablesObjects[i].IsSecret)}, false)
-	}
-
-	if index == 0 {
+	if len(environmentVariablesObjects) == 0 {
 		fmt.Fprintln(out, "\nNo variables for this Deployment")
 	} else {
 		fmt.Fprintln(out, "\nUpdated list of your Deployment's variables:")
-		varTab.Print(out)
+		makeVarTable(environmentVariablesObjects).Print(out)
 	}
 	if errVarBool {
 		return errVarCreateUpdate
@@ -173,7 +189,7 @@ func readLines(path string) ([]string, error) {
 }
 
 // writes vars from cloud into a file
-func writeVarToFile(environmentVariablesObjects []astro.EnvironmentVariablesObject, variableKey, envFile string) error {
+func writeVarToFile(environmentVariablesObjects []astroplatformcore.DeploymentEnvironmentVariable, envFile string) error {
 	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
 	if err != nil {
 		return err
@@ -181,28 +197,25 @@ func writeVarToFile(environmentVariablesObjects []astro.EnvironmentVariablesObje
 
 	defer f.Close()
 
-	for i := range environmentVariablesObjects {
-		if environmentVariablesObjects[i].Key == variableKey {
-			_, err := f.WriteString("\n" + environmentVariablesObjects[i].Key + "=" + environmentVariablesObjects[i].Value)
-			if err != nil {
-				fmt.Println("unable to write variable " + environmentVariablesObjects[i].Key + " to file:")
-				fmt.Println(err)
-			}
-		} else if variableKey == "" {
-			_, err := f.WriteString("\n" + environmentVariablesObjects[i].Key + "=" + environmentVariablesObjects[i].Value)
-			if err != nil {
-				fmt.Println("unable to write variable " + environmentVariablesObjects[i].Key + " to file:")
-				fmt.Println(err)
-			}
+	for _, variable := range environmentVariablesObjects {
+		var value string
+		if variable.IsSecret {
+			value = " # secret"
+		} else if variable.Value != nil {
+			value = *variable.Value
+		}
+		_, err := f.WriteString("\n" + variable.Key + "=" + value)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to write variable %s to file:\n%s\n", variable.Key, err)
 		}
 	}
-	fmt.Println("\nThe following environment variables were saved to the file " + envFile + ",\nsecret environment variables were saved only with a key:\n")
+	fmt.Printf("\nThe following environment variables were saved to the file %s,\nsecret environment variables were saved only with a key:\n\n", envFile)
 	return nil
 }
 
 // Add variables
-func addVariable(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableKey, variableValue string, updateVars, makeSecret bool, out io.Writer) []astro.EnvironmentVariable {
-	var newEnvironmentVariable astro.EnvironmentVariable
+func addVariable(oldKeyList []string, oldEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariable, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, variableKey, variableValue string, updateVars, makeSecret bool, out io.Writer) []astroplatformcore.DeploymentEnvironmentVariableRequest {
+	var newEnvironmentVariable astroplatformcore.DeploymentEnvironmentVariableRequest
 	exist, num := contains(oldKeyList, variableKey)
 	switch {
 	case exist && !updateVars: // don't update variable
@@ -213,17 +226,17 @@ func addVariable(oldKeyList []string, oldEnvironmentVariables []astro.Environmen
 		if !makeSecret { // you can only make variables secret a user can't make them not secret
 			secret = oldEnvironmentVariables[num].IsSecret
 		}
-		newEnvironmentVariable = astro.EnvironmentVariable{
+		newEnvironmentVariable = astroplatformcore.DeploymentEnvironmentVariableRequest{
 			IsSecret: secret,
 			Key:      oldEnvironmentVariables[num].Key,
-			Value:    variableValue,
+			Value:    &variableValue,
 		}
 		newEnvironmentVariables[num] = newEnvironmentVariable
 	default:
-		newFileEnvironmentVariable := astro.EnvironmentVariable{
+		newFileEnvironmentVariable := astroplatformcore.DeploymentEnvironmentVariableRequest{
 			IsSecret: makeSecret,
 			Key:      variableKey,
-			Value:    variableValue,
+			Value:    &variableValue,
 		}
 		newEnvironmentVariables = append(newEnvironmentVariables, newFileEnvironmentVariable)
 		fmt.Printf("adding variable %s\n", variableKey)
@@ -231,14 +244,14 @@ func addVariable(oldKeyList []string, oldEnvironmentVariables []astro.Environmen
 	return newEnvironmentVariables
 }
 
-func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableList []string, updateVars, makeSecret bool, out io.Writer) []astro.EnvironmentVariable {
+func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariable, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, variableList []string, updateVars, makeSecret bool, out io.Writer) []astroplatformcore.DeploymentEnvironmentVariableRequest {
 	var key string
 	var val string
 	// validate each key-value pair and add it to the new variables list
 	for i := range variableList {
 		// split pair
-		pair := strings.Split(variableList[i], "=")
-		if len(pair) > 1 {
+		pair := strings.SplitN(variableList[i], "=", 2)
+		if len(pair) == 2 {
 			key = pair[0]
 			val = pair[1]
 			if key == "" || val == "" {
@@ -257,7 +270,7 @@ func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astro.E
 }
 
 // Add variables from file
-func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, updateVars, makeSecret bool) []astro.EnvironmentVariable {
+func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariable, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, updateVars, makeSecret bool) []astroplatformcore.DeploymentEnvironmentVariableRequest {
 	newKeyList := make([]string, 0)
 	vars, err := readLines(envFile)
 	if err != nil {
@@ -279,7 +292,7 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 		key := strings.SplitN(vars[i], "=", 2)[0]   //nolint:gomnd
 		value := strings.SplitN(vars[i], "=", 2)[1] //nolint:gomnd
 		if key == "" {
-			fmt.Printf("empty key! skipping creating variable with value: %s\n", value)
+			fmt.Printf("empty key! skipping creating variable with key: %s\n", key)
 			errVarBool = true
 			continue
 		}
@@ -296,7 +309,7 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 			continue
 		}
 
-		fmt.Printf("Cleaning quotes and whitespaces from variable value - %s", value)
+		fmt.Printf("Cleaning quotes and whitespaces from variable %s", key)
 		value = strings.Trim(value, `"`)
 		value = strings.Trim(value, `'`)
 		value = strings.TrimSpace(value)
@@ -316,18 +329,18 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 				secret = oldEnvironmentVariables[num].IsSecret
 			}
 
-			newEnvironmentVariables[num] = astro.EnvironmentVariable{
+			newEnvironmentVariables[num] = astroplatformcore.DeploymentEnvironmentVariableRequest{
 				IsSecret: secret,
 				Key:      oldEnvironmentVariables[num].Key,
-				Value:    value,
+				Value:    &value,
 			}
 			newKeyList = append(newKeyList, key)
 			continue
 		}
-		newFileEnvironmentVariable := astro.EnvironmentVariable{
+		newFileEnvironmentVariable := astroplatformcore.DeploymentEnvironmentVariableRequest{
 			IsSecret: makeSecret,
 			Key:      key,
-			Value:    value,
+			Value:    &value,
 		}
 		newEnvironmentVariables = append(newEnvironmentVariables, newFileEnvironmentVariable)
 		newKeyList = append(newKeyList, key)

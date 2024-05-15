@@ -3,13 +3,20 @@ package fileutil
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
+	"compress/gzip"
+	http_context "context"
 	"fmt"
 	"io"
+	"mime/multipart"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
+	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -17,10 +24,23 @@ import (
 const openPermissions = 0o777
 
 var (
-	perm     os.FileMode = 0o777
-	openFile             = os.OpenFile
-	readFile             = os.ReadFile
+	perm                  os.FileMode = 0o777
+	openFile                          = os.OpenFile
+	readFile                          = os.ReadFile
+	ioCopy                            = io.Copy
+	newRequestWithContext             = http.NewRequestWithContext
 )
+
+type UploadFileArguments struct {
+	FilePath            string
+	TargetURL           string
+	FormFileFieldName   string
+	Headers             map[string]string
+	MaxTries            int
+	InitialDelayInMS    int
+	BackoffFactor       int
+	RetryDisplayMessage string
+}
 
 // Exists returns a boolean indicating if the given path already exists
 func Exists(path string, fs afero.Fs) (bool, error) {
@@ -235,4 +255,111 @@ func CreateFile(p string) (*os.File, error) {
 		return nil, err
 	}
 	return os.Create(p)
+}
+
+func backOff(retryDelayInMS, backoffFactor int) int {
+	// exponential backoff
+	time.Sleep(time.Duration(retryDelayInMS) * time.Millisecond)
+	retryDelayInMS *= backoffFactor
+	return retryDelayInMS
+}
+
+func UploadFile(args *UploadFileArguments) error {
+	file, err := os.Open(args.FilePath)
+	if err != nil {
+		return fmt.Errorf("error opening file: %w", err)
+	}
+	defer file.Close()
+
+	retryDelayInMS := args.InitialDelayInMS
+	currentUploadError := err
+
+	for i := 1; i <= args.MaxTries; i++ {
+		// Create a new buffer to store the multipart/form-data request
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		// Create a form field for the file
+		fileWriter, err := writer.CreateFormFile(args.FormFileFieldName, args.FilePath)
+		if err != nil {
+			return fmt.Errorf("error creating form file: %w", err)
+		}
+		// Copy the file content into the form field
+		_, err = ioCopy(fileWriter, file)
+		if err != nil {
+			return fmt.Errorf("error copying file content: %w", err)
+		}
+		// Close the multipart writer to finalize the request
+		writer.Close()
+
+		headers := args.Headers
+		headers["Content-Type"] = writer.FormDataContentType()
+		fmt.Println(args.RetryDisplayMessage)
+		req, err := newRequestWithContext(http_context.Background(), "POST", args.TargetURL, body)
+		if err != nil {
+			currentUploadError = err
+			if i < args.MaxTries {
+				retryDelayInMS = backOff(retryDelayInMS, args.BackoffFactor)
+			}
+			continue
+		}
+
+		// set headers
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		client := &http.Client{}
+		response, err := client.Do(req)
+		if err != nil {
+			currentUploadError = err
+			// If we have a dial tcp error, we should retry with exponential backoff
+			if i < args.MaxTries {
+				retryDelayInMS = backOff(retryDelayInMS, args.BackoffFactor)
+			}
+			continue
+		}
+		data, _ := io.ReadAll(response.Body)
+		responseStatusCode := response.StatusCode
+		response.Body.Close()
+
+		// Return success for 2xx status code
+		if response.StatusCode == http.StatusOK {
+			currentUploadError = nil
+			fmt.Println("upload successful")
+			break
+		}
+
+		strippedOutData, _ := util.StripOutKeysFromJSONByteArray(data, []string{"exceptions", "args", "path", "status"})
+		currentUploadError = fmt.Errorf("file upload failed. Status code: %d and Message: %s", responseStatusCode, string(strippedOutData)) //nolint
+
+		// don't retry for 4xx since it is a client side error
+		if responseStatusCode >= http.StatusBadRequest && responseStatusCode < http.StatusInternalServerError {
+			break
+		}
+		if i < args.MaxTries {
+			retryDelayInMS = backOff(retryDelayInMS, args.BackoffFactor)
+		}
+	}
+	return currentUploadError
+}
+
+func GzipFile(srcFilePath, destFilePath string) error {
+	srcFile, err := os.Open(srcFilePath)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	destFile, err := os.Create(destFilePath)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	// Create a gzip writer on top of file writer
+	gzipWriter := gzip.NewWriter(destFile)
+	defer gzipWriter.Close()
+
+	// Copy contents of the file to the gzip writer
+	_, err = io.Copy(gzipWriter, srcFile)
+	return err
 }

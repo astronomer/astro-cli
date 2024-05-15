@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -152,7 +151,7 @@ func Switch(id string, client astrocore.CoreClient, out io.Writer) error {
 		return err
 	}
 
-	err = c.SetOrganizationContext(c.Organization, c.OrganizationShortName, c.OrganizationProduct)
+	err = c.SetOrganizationContext(c.Organization, c.OrganizationProduct)
 	if err != nil {
 		return err
 	}
@@ -186,9 +185,6 @@ func Create(name, description, enforceCD string, out io.Writer, client astrocore
 	if err != nil {
 		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
-	}
 	enforce, err := validateEnforceCD(enforceCD)
 	if err != nil {
 		return err
@@ -198,7 +194,7 @@ func Create(name, description, enforceCD string, out io.Writer, client astrocore
 		Description:                  &description,
 		Name:                         name,
 	}
-	resp, err := client.CreateWorkspaceWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceCreateRequest)
+	resp, err := client.CreateWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceCreateRequest)
 	if err != nil {
 		return err
 	}
@@ -214,9 +210,6 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
 	}
 	workspaces, err := GetWorkspaces(client)
 	if err != nil {
@@ -265,7 +258,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 		}
 		workspaceUpdateRequest.ApiKeyOnlyDeploymentsDefault = enforce
 	}
-	resp, err := client.UpdateWorkspaceWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceID, workspaceUpdateRequest)
+	resp, err := client.UpdateWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceID, workspaceUpdateRequest)
 	if err != nil {
 		return err
 	}
@@ -281,9 +274,6 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
-	}
-	if ctx.OrganizationShortName == "" {
-		return user.ErrNoShortName
 	}
 	workspaces, err := GetWorkspaces(client)
 	if err != nil {
@@ -309,7 +299,7 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 		}
 	}
 	workspaceID := workspace.Id
-	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceID)
+	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceID)
 	if err != nil {
 		return err
 	}
@@ -368,9 +358,6 @@ func GetWorkspaces(client astrocore.CoreClient) ([]astrocore.Workspace, error) {
 	if err != nil {
 		return []astrocore.Workspace{}, err
 	}
-	if ctx.OrganizationShortName == "" {
-		return []astrocore.Workspace{}, user.ErrNoShortName
-	}
 
 	sorts := []astrocore.ListWorkspacesParamsSorts{"name:asc"}
 	limit := 1000
@@ -379,7 +366,7 @@ func GetWorkspaces(client astrocore.CoreClient) ([]astrocore.Workspace, error) {
 		Sorts: &sorts,
 	}
 
-	resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceListParams)
+	resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.Organization, workspaceListParams)
 	if err != nil {
 		return []astrocore.Workspace{}, err
 	}

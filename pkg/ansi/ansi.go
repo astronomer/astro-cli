@@ -43,6 +43,11 @@ func Blue(text string) string {
 	return color.Sprintf(color.Blue(text))
 }
 
+// Cyan returns text colored blue
+func Cyan(text string) string {
+	return color.Sprintf(color.Cyan(text))
+}
+
 func shouldUseColors() bool {
 	if EnvironmentOverrideColors {
 		force, ok := os.LookupEnv(cliColorForce)

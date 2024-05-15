@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/organization"
@@ -27,12 +27,13 @@ import (
 )
 
 var (
-	authLogin        = auth.Login
-	defaultDomain    = "astronomer.io"
-	client           = httputil.NewHTTPClient()
-	isDeploymentFile = false
-	parseAPIToken    = util.ParseAPIToken
-	errNotAPIToken   = errors.New("the API token given does not appear to be an Astro API Token")
+	authLogin          = auth.Login
+	defaultDomain      = "astronomer.io"
+	client             = httputil.NewHTTPClient()
+	isDeploymentFile   = false
+	parseAPIToken      = util.ParseAPIToken
+	errNotAPIToken     = errors.New("the API token given does not appear to be an Astro API Token")
+	errExpiredAPIToken = errors.New("the API token given has expired")
 )
 
 const (
@@ -63,16 +64,18 @@ type CustomClaims struct {
 }
 
 //nolint:gocognit
-func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreClient) error {
+func Setup(cmd *cobra.Command, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil
 	}
 
-	// If the user is using dev commands no need to go through auth setup.
-	if cmd.CalledAs() == "dev" && cmd.Parent().Use == topLvlCmd {
+	// If the user is using dev commands no need to go through auth setup,
+	// unless the workspace or deployment ID flag is set.
+	if cmd.CalledAs() == "dev" && cmd.Parent().Use == topLvlCmd && !workspaceOrDeploymentIDFlagSet(cmd) {
 		return nil
 	}
+
 	// If the user is using flow commands no need to go through auth setup.
 	if cmd.CalledAs() == "flow" && cmd.Parent().Use == topLvlCmd {
 		return nil
@@ -105,7 +108,7 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, coreClient)
+	apiToken, err := checkAPIToken(isDeploymentFile, platformCoreClient)
 	if err != nil {
 		return err
 	}
@@ -114,14 +117,14 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	}
 
 	// run auth setup for any command that requires auth
-	apiKey, err := checkAPIKeys(client, coreClient, isDeploymentFile)
+	apiKey, err := checkAPIKeys(platformCoreClient, isDeploymentFile)
 	if err != nil {
 		return err
 	}
 	if apiKey {
 		return nil
 	}
-	err = checkToken(client, coreClient, os.Stdout)
+	err = checkToken(coreClient, platformCoreClient, os.Stdout)
 	if err != nil {
 		return err
 	}
@@ -129,7 +132,7 @@ func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreCli
 	return nil
 }
 
-func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func checkToken(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		return err
@@ -138,7 +141,7 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 	// check if user is logged in
 	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
 		// guide the user through the login process if not logged in
-		err := authLogin(c.Domain, "", client, coreClient, out, false)
+		err := authLogin(c.Domain, "", coreClient, platformCoreClient, out, false)
 		if err != nil {
 			return err
 		}
@@ -152,7 +155,7 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 		res, err := refresh(c.RefreshToken, authConfig)
 		if err != nil {
 			// guide the user through the login process if refresh doesn't work
-			err := authLogin(c.Domain, "", client, coreClient, out, false)
+			err := authLogin(c.Domain, "", coreClient, platformCoreClient, out, false)
 			if err != nil {
 				return err
 			}
@@ -178,10 +181,6 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 		if err != nil {
 			return err
 		}
-		err = c.SetContextKey("organization_short_name", c.OrganizationShortName)
-		if err != nil {
-			return err
-		}
 		err = c.SetContextKey("organization_product", c.OrganizationProduct)
 		if err != nil {
 			return err
@@ -197,7 +196,7 @@ func isExpired(t time.Time, threshold time.Duration) bool {
 
 // Refresh gets a new access token from the provided refresh token,
 // The request is used the default client_id and endpoint for device authentication.
-func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, error) {
+func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error) {
 	addr := authConfig.DomainURL + "oauth/token"
 	data := url.Values{
 		"client_id":     {authConfig.ClientID},
@@ -224,7 +223,6 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	var tokenRes TokenResponse
 
 	err = json.NewDecoder(res.Body).Decode(&tokenRes)
-
 	if err != nil {
 		return TokenResponse{}, fmt.Errorf("cannot decode response: %w", err)
 	}
@@ -236,7 +234,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isDeploymentFile bool) (bool, error) {
+func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, isDeploymentFile bool) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -245,13 +243,17 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 	}
 	if !isDeploymentFile {
 		fmt.Println("Using an Astro API key")
+		fmt.Println("\nWarning: Starting June 1st, 2024, Deployment API Keys will stop working. To ensure uninterrupted access to our services, we strongly recommend transitioning to Deployment API tokens. See https://docs.astronomer.io/astro/deployment-api-tokens.")
 	}
 
 	// get authConfig
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		// set context
-		domain := defaultDomain
+		var domain string
+		if domain = os.Getenv("ASTRO_DOMAIN"); domain == "" {
+			domain = defaultDomain
+		}
 		if !context.Exists(domain) {
 			err := context.SetContext(domain)
 			if err != nil {
@@ -305,7 +307,6 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 	var tokenRes TokenResponse
 
 	err = json.NewDecoder(res.Body).Decode(&tokenRes)
-
 	if err != nil {
 		return false, fmt.Errorf("cannot decode response: %w", err)
 	}
@@ -323,36 +324,35 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 	if err != nil {
 		return false, err
 	}
-	orgs, err := organization.ListOrganizations(coreClient)
+	orgs, err := organization.ListOrganizations(platformCoreClient)
 	if err != nil {
 		return false, err
 	}
 
 	org := orgs[0]
 	orgID := org.Id
-	orgShortName := org.ShortName
 	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
 	// get workspace ID
-	deployments, err := deployment.GetDeployments("", orgID, astroClient)
+	deployments, err := deployment.CoreGetDeployments("", orgID, platformCoreClient)
 	if err != nil {
-		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return false, errors.Wrap(err, organization.AstronomerConnectionErrMsg)
 	}
-	workspaceID = deployments[0].Workspace.ID
+	workspaceID = deployments[0].WorkspaceId
 
 	err = c.SetContextKey("workspace", workspaceID) // c.Workspace
 	if err != nil {
 		fmt.Println("no workspace set")
 	}
 
-	err = c.SetOrganizationContext(orgID, orgShortName, orgProduct)
+	err = c.SetOrganizationContext(orgID, orgProduct)
 	if err != nil {
 		fmt.Println("no organization context set")
 	}
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool, error) {
+func checkAPIToken(isDeploymentFile bool, platformCoreClient astroplatformcore.CoreClient) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
@@ -366,7 +366,10 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		// set context
-		domain := defaultDomain
+		var domain string
+		if domain = os.Getenv("ASTRO_DOMAIN"); domain == "" {
+			domain = defaultDomain
+		}
 		if !context.Exists(domain) {
 			err := context.SetContext(domain)
 			if err != nil {
@@ -403,8 +406,12 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 	if len(claims.Permissions) == 0 {
 		return false, errNotAPIToken
 	}
+	if claims.ExpiresAt.Before(time.Now()) {
+		fmt.Printf("The given API Token %s has expired \n", claims.APITokenID)
+		return false, errExpiredAPIToken
+	}
 
-	var wsID, orgID, orgShortName string
+	var wsID, orgID string
 	for _, permission := range claims.Permissions {
 		splitPermission := strings.Split(permission, ":")
 		permissionType := splitPermission[0]
@@ -414,12 +421,10 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 			wsID = id
 		case "organizationId":
 			orgID = id
-		case "orgShortName":
-			orgShortName = id
 		}
 	}
 
-	orgs, err := organization.ListOrganizations(coreClient)
+	orgs, err := organization.ListOrganizations(platformCoreClient)
 	if err != nil {
 		return false, err
 	}
@@ -435,9 +440,15 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 	if err != nil {
 		fmt.Println("no workspace set")
 	}
-	err = c.SetOrganizationContext(orgID, orgShortName, orgProduct)
+	err = c.SetOrganizationContext(orgID, orgProduct)
 	if err != nil {
 		fmt.Println("no organization context set")
 	}
 	return true, nil
+}
+
+func workspaceOrDeploymentIDFlagSet(cmd *cobra.Command) bool {
+	wsID, _ := cmd.Flags().GetString("workspace-id")
+	depID, _ := cmd.Flags().GetString("deployment-id")
+	return wsID != "" || depID != ""
 }

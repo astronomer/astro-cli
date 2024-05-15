@@ -7,6 +7,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/git"
+	"github.com/astronomer/astro-cli/pkg/util"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -20,6 +21,7 @@ var (
 	parse             bool
 	dags              bool
 	waitForDeploy     bool
+	image             bool
 	dagsPath          string
 	pytestFile        string
 	envFile           string
@@ -38,6 +40,7 @@ Menu will be presented if you do not specify a deployment ID:
 
 	DeployImage      = cloud.Deploy
 	EnsureProjectDir = utils.EnsureProjectDir
+	buildSecrets     = []string{}
 )
 
 const (
@@ -63,12 +66,14 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
+	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have DAG Deploy enabled your DAGs will not be affected.")
 	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
+	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
 	return cmd
 }
 
@@ -104,6 +109,10 @@ func deploy(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if dags && image {
+		return errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
+	}
+
 	// Save deploymentId in config if specified
 	if len(deploymentID) > 0 && saveDeployConfig {
 		err := config.CFG.ProjectDeployment.SetProjectString(deploymentID)
@@ -127,20 +136,24 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	BuildSecretString := util.GetbuildSecretString(buildSecrets)
+
 	deployInput := cloud.InputDeploy{
-		Path:           config.WorkingPath,
-		RuntimeID:      deploymentID,
-		WsID:           workspaceID,
-		Pytest:         pytestFile,
-		EnvFile:        envFile,
-		ImageName:      imageName,
-		DeploymentName: deploymentName,
-		Prompt:         forcePrompt,
-		Dags:           dags,
-		WaitForStatus:  waitForDeploy,
-		DagsPath:       dagsPath,
-		Description:    deployDescription,
+		Path:              config.WorkingPath,
+		RuntimeID:         deploymentID,
+		WsID:              workspaceID,
+		Pytest:            pytestFile,
+		EnvFile:           envFile,
+		ImageName:         imageName,
+		DeploymentName:    deploymentName,
+		Prompt:            forcePrompt,
+		Dags:              dags,
+		Image:             image,
+		WaitForStatus:     waitForDeploy,
+		DagsPath:          dagsPath,
+		Description:       deployDescription,
+		BuildSecretString: BuildSecretString,
 	}
 
-	return DeployImage(deployInput, astroClient, astroCoreClient)
+	return DeployImage(deployInput, platformCoreClient, astroCoreClient)
 }

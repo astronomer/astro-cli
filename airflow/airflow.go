@@ -13,20 +13,17 @@ import (
 var perm os.FileMode = 0o777
 
 var (
-	//go:embed include/advancedexampledag.py
-	ExampleDagAdvanced string
-
 	//go:embed include/astronomermonitoringdag.py
 	MonitoringDag string
 
-	//go:embed include/basicexampledag.py
-	ExampleDagBasic string
+	//go:embed include/exampledag.py
+	ExampleDag string
 
 	//go:embed include/composeyml.yml
 	Composeyml string
 
-	//go:embed include/dagintegritytest.py
-	DagIntegrityTest string
+	//go:embed include/dagexampletest.py
+	DagExampleTest string
 
 	//go:embed include/dagintegritytestdefault.py
 	DagIntegrityTestDefault string
@@ -113,12 +110,12 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 		"requirements.txt":                     RequirementsTxt,
 		".env":                                 "",
 		"airflow_settings.yaml":                Settingsyml,
-		"dags/example_dag_basic.py":            ExampleDagBasic,
-		"dags/example_dag_advanced.py":         ExampleDagAdvanced,
+		"dags/exampledag.py":                   ExampleDag,
 		"dags/.airflowignore":                  "",
 		"README.md":                            Readme,
-		"tests/dags/test_dag_integrity.py":     DagIntegrityTest,
+		"tests/dags/test_dag_example.py":       DagExampleTest,
 		".astro/test_dag_integrity_default.py": DagIntegrityTestDefault,
+		".astro/dag_integrity_exceptions.txt":  "# Add dag files to exempt from parse test below. ex: dags/<test-file>",
 	}
 
 	// Initailize directories

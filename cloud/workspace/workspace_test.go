@@ -10,7 +10,6 @@ import (
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
@@ -70,7 +69,7 @@ func TestListError(t *testing.T) {
 }
 
 func TestGetWorkspaceSelection(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	t.Run("success", func(t *testing.T) {
@@ -144,7 +143,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 }
 
 func TestSwitch(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	t.Run("success", func(t *testing.T) {
@@ -229,7 +228,7 @@ func TestSwitch(t *testing.T) {
 }
 
 func TestGetCurrentWorkspace(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	resp, err := GetCurrentWorkspace()
 	assert.NoError(t, err)
@@ -274,7 +273,7 @@ var (
 )
 
 func TestCreate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path Create", func(t *testing.T) {
 		expectedOutMessage := "Astro Workspace workspace-test was successfully created\n"
 		out := new(bytes.Buffer)
@@ -309,18 +308,6 @@ func TestCreate(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = Create("workspace-test", "a test workspace", "on", out, mockClient)
-		assert.ErrorIs(t, err, user.ErrNoShortName)
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -352,7 +339,7 @@ var (
 )
 
 func TestDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path Delete", func(t *testing.T) {
 		expectedOutMessage := "Astro Workspace test-workspace was successfully deleted\n"
 		out := new(bytes.Buffer)
@@ -403,18 +390,6 @@ func TestDelete(t *testing.T) {
 		assert.EqualError(t, err, "failed to delete workspace")
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = Delete("workspace-id", out, mockClient)
-		assert.ErrorIs(t, err, user.ErrNoShortName)
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -426,7 +401,7 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("DeleteWorkspace no workspace id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -476,7 +451,7 @@ var (
 )
 
 func TestUpdate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("happy path Update", func(t *testing.T) {
 		expectedOutMessage := "Astro Workspace test-workspace was successfully updated\n"
 		out := new(bytes.Buffer)
@@ -562,18 +537,6 @@ func TestUpdate(t *testing.T) {
 		assert.EqualError(t, err, "failed to update workspace")
 	})
 
-	t.Run("error path when no organization shortname found", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("organization_short_name", "")
-		assert.NoError(t, err)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = Update("workspace-id", "", "", "", out, mockClient)
-		assert.ErrorIs(t, err, user.ErrNoShortName)
-	})
-
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
@@ -585,7 +548,7 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("UpdateWorkspace no workspace id passed", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)

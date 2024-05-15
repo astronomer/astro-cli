@@ -123,6 +123,39 @@ contexts:
 	assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", ctx.Workspace)
 }
 
+func TestGetCurrentContext_WithDomainOverride(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	configRaw := []byte(`cloud:
+  api:
+    port: "443"
+    protocol: https
+    ws_protocol: wss
+local:
+  enabled: true
+  host: http://example.com:8871/v1
+context: example_com
+contexts:
+  example_com:
+    domain: example.com
+    token: token
+    last_used_workspace: ck05r3bor07h40d02y2hw4n4v
+    workspace: ck05r3bor07h40d02y2hw4n4v
+  stage_example_com:
+    domain: stage.example.com
+    token: token
+    last_used_workspace: ck05r3bor07h40d02y2hw4n4w
+    workspace: ck05r3bor07h40d02y2hw4n4w
+`)
+	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	InitConfig(fs)
+	t.Setenv("ASTRO_DOMAIN", "stage.example.com")
+	ctx, err := GetCurrentContext()
+	assert.NoError(t, err)
+	assert.Equal(t, "stage.example.com", ctx.Domain)
+	assert.Equal(t, "token", ctx.Token)
+	assert.Equal(t, "ck05r3bor07h40d02y2hw4n4w", ctx.Workspace)
+}
+
 func TestDeleteContext(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`
@@ -165,7 +198,7 @@ func TestGetContexts(t *testing.T) {
 	initTestConfig()
 	ctxs, err := GetContexts()
 	assert.NoError(t, err)
-	assert.Equal(t, Contexts{Contexts: map[string]Context{"test_com": {"test.com", "test-org-id", "test-org-short-name", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}, "example_com": {"example.com", "test-org-id", "test-org-short-name", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}}}, ctxs)
+	assert.Equal(t, Contexts{Contexts: map[string]Context{"test_com": {"test.com", "test-org-id", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}, "example_com": {"example.com", "test-org-id", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}}}, ctxs)
 }
 
 func TestSetContextKey(t *testing.T) {
@@ -181,18 +214,17 @@ func TestSetOrganizationContext(t *testing.T) {
 	initTestConfig()
 	t.Run("set organization context", func(t *testing.T) {
 		ctx := Context{Domain: "localhost"}
-		ctx.SetOrganizationContext("org1", "org_short_name_1", "HYBRID")
+		ctx.SetOrganizationContext("org1", "HYBRID")
 		outCtx, err := ctx.GetContext()
 		assert.NoError(t, err)
 		assert.Equal(t, "org1", outCtx.Organization)
-		assert.Equal(t, "org_short_name_1", outCtx.OrganizationShortName)
 		assert.Equal(t, "HYBRID", outCtx.OrganizationProduct)
 	})
 
 	t.Run("set organization context error", func(t *testing.T) {
 		ctx := Context{Domain: ""}
 		assert.NoError(t, err)
-		err = ctx.SetOrganizationContext("org1", "org_short_name_1", "HYBRID")
+		err = ctx.SetOrganizationContext("org1", "HYBRID")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "context config invalid, no domain specified")
 	})

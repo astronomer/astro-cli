@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 )
@@ -25,29 +26,36 @@ type Contexts struct {
 
 // Context represents a single context
 type Context struct {
-	Domain                string `mapstructure:"domain"`
-	Organization          string `mapstructure:"organization"`
-	OrganizationShortName string `mapstructure:"organization_short_name"`
-	OrganizationProduct   string `mapstructure:"organization_product"`
-	Workspace             string `mapstructure:"workspace"`
-	LastUsedWorkspace     string `mapstructure:"last_used_workspace"`
-	Token                 string `mapstructure:"token"`
-	RefreshToken          string `mapstructure:"refreshtoken"`
-	UserEmail             string `mapstructure:"user_email"`
+	Domain              string `mapstructure:"domain"`
+	Organization        string `mapstructure:"organization"`
+	OrganizationProduct string `mapstructure:"organization_product"`
+	Workspace           string `mapstructure:"workspace"`
+	LastUsedWorkspace   string `mapstructure:"last_used_workspace"`
+	Token               string `mapstructure:"token"`
+	RefreshToken        string `mapstructure:"refreshtoken"`
+	UserEmail           string `mapstructure:"user_email"`
 }
 
 // GetCurrentContext looks up current context and gets corresponding Context struct
 func GetCurrentContext() (Context, error) {
 	c := Context{}
-
-	domain := CFG.Context.GetHomeString()
-	if domain == "" {
-		return Context{}, ErrGetHomeString
+	var err error
+	c.Domain, err = GetCurrentDomain()
+	if err != nil {
+		return Context{}, err
 	}
-
-	c.Domain = domain
-
 	return c.GetContext()
+}
+
+// Get CurrentDonain returns the currently configured astro domain, or an error if one is not set
+func GetCurrentDomain() (string, error) {
+	var domain string
+	if domain = os.Getenv("ASTRO_DOMAIN"); domain == "" {
+		if domain = CFG.Context.GetHomeString(); domain == "" {
+			return "", ErrGetHomeString
+		}
+	}
+	return domain, nil
 }
 
 // ResetCurrentContext reset the current context and is used when someone logs out
@@ -74,7 +82,7 @@ func (c *Context) ContextExists() bool {
 		return false
 	}
 
-	return viperHome.IsSet("contexts" + "." + key)
+	return viperHome.IsSet(contextsKey + "." + key)
 }
 
 // GetContext gets the full context from the specified Context receiver struct
@@ -88,7 +96,7 @@ func (c *Context) GetContext() (Context, error) {
 	if !c.ContextExists() {
 		return *c, errNotConnected
 	}
-	err = viperHome.UnmarshalKey("contexts"+"."+key, &c)
+	err = viperHome.UnmarshalKey(contextsKey+"."+key, &c)
 	if err != nil {
 		return *c, err
 	}
@@ -115,18 +123,17 @@ func (c *Context) SetContext() error {
 	}
 
 	context := map[string]string{
-		"token":                   c.Token,
-		"domain":                  c.Domain,
-		"organization":            c.Organization,
-		"organization_short_name": c.OrganizationShortName,
-		"organization_product":    c.OrganizationProduct,
-		"workspace":               c.Workspace,
-		"last_used_workspace":     c.Workspace,
-		"refreshtoken":            c.RefreshToken,
-		"user_email":              c.UserEmail,
+		"token":                c.Token,
+		"domain":               c.Domain,
+		"organization":         c.Organization,
+		"organization_product": c.OrganizationProduct,
+		"workspace":            c.Workspace,
+		"last_used_workspace":  c.Workspace,
+		"refreshtoken":         c.RefreshToken,
+		"user_email":           c.UserEmail,
 	}
 
-	viperHome.Set("contexts"+"."+key, context)
+	viperHome.Set(contextsKey+"."+key, context)
 	err = saveConfig(viperHome, HomeConfigFile)
 	if err != nil {
 		return err
@@ -142,7 +149,7 @@ func (c *Context) SetContextKey(key, value string) error {
 		return err
 	}
 
-	cfgPath := fmt.Sprintf("contexts.%s.%s", cKey, key)
+	cfgPath := fmt.Sprintf("%s.%s.%s", contextsKey, cKey, key)
 	viperHome.Set(cfgPath, value)
 	err = saveConfig(viperHome, HomeConfigFile)
 	if err != nil {
@@ -153,12 +160,8 @@ func (c *Context) SetContextKey(key, value string) error {
 }
 
 // set organization id and short name in context config
-func (c *Context) SetOrganizationContext(orgID, orgShortName, orgProduct string) error {
+func (c *Context) SetOrganizationContext(orgID, orgProduct string) error {
 	err := c.SetContextKey("organization", orgID) // c.Organization
-	if err != nil {
-		return err
-	}
-	err = c.SetContextKey("organization_short_name", orgShortName)
 	if err != nil {
 		return err
 	}
@@ -212,7 +215,7 @@ func (c *Context) SetExpiresIn(value int64) error {
 
 	expiretime := time.Now().Add(time.Duration(value) * time.Second)
 
-	cfgPath := fmt.Sprintf("contexts.%s.%s", cKey, "ExpiresIn")
+	cfgPath := fmt.Sprintf("%s.%s.%s", contextsKey, cKey, "ExpiresIn")
 	viperHome.Set(cfgPath, expiretime)
 	err = saveConfig(viperHome, HomeConfigFile)
 	if err != nil {
@@ -228,6 +231,6 @@ func (c *Context) GetExpiresIn() (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	cfgPath := fmt.Sprintf("contexts.%s.%s", cKey, "ExpiresIn")
+	cfgPath := fmt.Sprintf("%s.%s.%s", contextsKey, cKey, "ExpiresIn")
 	return viperHome.GetTime(cfgPath), nil
 }

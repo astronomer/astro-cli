@@ -10,7 +10,8 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow/types"
-	"github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -21,7 +22,7 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration) error
+	Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error
 	Stop(waitForExit bool) error
 	PS() error
 	Kill() error
@@ -32,9 +33,9 @@ type ContainerHandler interface {
 	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
 	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error
 	ComposeExport(settingsFile, composeFile string) error
-	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string) (string, error)
-	Parse(customImageName, deployImageName string) error
-	UpgradeTest(runtimeVersion, deploymentID, newImageName, customImageName string, dependencyTest, versionTest, dagTest bool, client astro.Client) error
+	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString string) (string, error)
+	Parse(customImageName, deployImageName, buildSecretString string) error
+	UpgradeTest(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString string, dependencyTest, versionTest, dagTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -44,10 +45,11 @@ type RegistryHandler interface {
 
 // ImageHandler defines methods require to handle all operations on/for container images
 type ImageHandler interface {
-	Build(dockerfile string, config types.ImageBuildConfig) error
-	Push(registry, username, token, remoteImage string) error
-	Pull(registry, username, token, remoteImage string) error
+	Build(dockerfile, buildSecretString string, config types.ImageBuildConfig) error
+	Push(remoteImage, username, token string) error
+	Pull(remoteImage, username, token string) error
 	GetLabel(altImageName, labelName string) (string, error)
+	DoesImageExist(image string) error
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
 	Run(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error

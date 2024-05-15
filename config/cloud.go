@@ -63,12 +63,12 @@ func (c *Context) GetPublicGraphQLAPIURL() string {
 }
 
 // GetPublicRESTAPIURL returns full core API Url for the provided Context
-func (c *Context) GetPublicRESTAPIURL() string {
+func (c *Context) GetPublicRESTAPIURL(version string) string {
 	if c.Domain == localhostDomain || c.Domain == astrohubDomain {
 		return CFG.LocalCore.GetString()
 	}
 
 	domain := domainutil.FormatDomain(c.Domain)
-	addr := domainutil.GetURLToEndpoint(CFG.CloudAPIProtocol.GetString(), domain, "v1alpha1")
+	addr := domainutil.GetURLToEndpoint(CFG.CloudAPIProtocol.GetString(), domain, version)
 	return domainutil.TransformToCoreAPIEndpoint(addr)
 }

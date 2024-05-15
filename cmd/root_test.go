@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"bytes"
+	"os/exec"
+	"strings"
 	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -40,7 +42,7 @@ func TestRootCommandLocal(t *testing.T) {
 }
 
 func TestRootCommandCloudContext(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	version.CurrVersion = "1.0.0"
 	output, err := executeCommand("help")
 	assert.NoError(t, err)
@@ -54,6 +56,21 @@ func TestRootCommandCloudContext(t *testing.T) {
 	assert.Contains(t, output, "workspace")
 	assert.Contains(t, output, "run")
 	assert.NotContains(t, output, "Run flow commands")
+}
+
+func TestRootCompletionCommand(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	completionShellMapSha := map[string]string{"bash": "291b774846025599cd10107324f8a776", "fish": "44b594d5d9e4203e1089396732832061", "zsh": "b9baad5816441d010ca622974699274b", "powershell": "8e03321aa8fa1b18756662efd3fca6d5"}
+	for shell, sha := range completionShellMapSha {
+		output1, _ := executeCommand("completion", shell)
+		cmd2 := exec.Command("openssl", "md5")
+		cmd2.Stdin = strings.NewReader(output1)
+		output2, _ := cmd2.Output()
+		cmd3 := exec.Command("sed", "s/^.*= //")
+		cmd3.Stdin = strings.NewReader(string(output2))
+		output, _ := cmd3.Output()
+		assert.Contains(t, string(output), sha)
+	}
 }
 
 func TestRootCommandSoftwareContext(t *testing.T) {

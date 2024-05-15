@@ -47,7 +47,7 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be deleted.")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment where the worker queue should be deleted.")
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue. Queue names must not exceed 63 characters and contain only lowercase alphanumeric characters or '-' and start with an alphabetical character.")
-	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", -1, "The min worker count of the worker queue.")
+	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", 0, "The min worker count of the worker queue.")
 	cmd.Flags().IntVarP(&maxWorkerCount, "max-count", "", 0, "The max worker count of the worker queue.")
 	cmd.Flags().IntVarP(&concurrency, "concurrency", "", 0, "The concurrency(number of slots) of the worker queue.")
 	cmd.Flags().StringVarP(&workerType, "worker-type", "t", "", "The worker type of the worker queue.")
@@ -69,7 +69,7 @@ func newDeploymentWorkerQueueUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment where the worker queue should be created.")
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue. Queue names must not exceed 63 characters and contain only lowercase alphanumeric characters or '-' and start with an alphabetical character.")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force update: Don't prompt a user for confirmation")
-	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", -1, "The min worker count of the worker queue.")
+	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", 0, "The min worker count of the worker queue.")
 	cmd.Flags().IntVarP(&maxWorkerCount, "max-count", "", 0, "The max worker count of the worker queue.")
 	cmd.Flags().IntVarP(&concurrency, "concurrency", "", 0, "The concurrency(number of slots) of the worker queue.")
 	cmd.Flags().StringVarP(&workerType, "worker-type", "t", "", "The worker type of the worker queue.")
@@ -106,7 +106,11 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 		return errZeroConcurrency
 	}
 
-	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroClient, astroCoreClient, out)
+	if minWorkerCount == 0 && !cmd.Flags().Changed("min-count") {
+		minWorkerCount = -1
+	}
+
+	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, platformCoreClient, astroCoreClient, out)
 }
 
 func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -116,5 +120,5 @@ func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	return workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroClient, astroCoreClient, out)
+	return workerqueue.Delete(ws, deploymentID, deploymentName, name, force, platformCoreClient, astroCoreClient, out)
 }

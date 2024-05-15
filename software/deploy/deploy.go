@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -25,14 +26,22 @@ var (
 	dockerfile = "Dockerfile"
 
 	deployImagePlatformSupport = []string{"linux/amd64"}
+
+	gzipFile = fileutil.GzipFile
+
+	getDeploymentIDForCurrentCommandVar = getDeploymentIDForCurrentCommand
 )
 
 var (
-	errNoWorkspaceID             = errors.New("no workspace id provided")
-	errNoDomainSet               = errors.New("no domain set, re-authenticate")
-	errInvalidDeploymentID       = errors.New("please specify a valid deployment ID")
-	errDeploymentNotFound        = errors.New("no airflow deployments found")
-	errInvalidDeploymentSelected = errors.New("invalid deployment selection\n") //nolint
+	ErrNoWorkspaceID                        = errors.New("no workspace id provided")
+	errNoDomainSet                          = errors.New("no domain set, re-authenticate")
+	errInvalidDeploymentID                  = errors.New("please specify a valid deployment ID")
+	errDeploymentNotFound                   = errors.New("no airflow deployments found")
+	errInvalidDeploymentSelected            = errors.New("invalid deployment selection\n") //nolint
+	ErrDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your Astronomer cluster")
+	ErrDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
+	ErrEmptyDagFolderUserCancelledOperation = errors.New("no DAGs found in the dags folder. User canceled the operation")
+	ErrBYORegistryDomainNotSet              = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
 )
 
 const (
@@ -57,72 +66,14 @@ var tab = printutil.Table{
 	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
 }
 
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) error {
-	if wsID == "" {
-		return errNoWorkspaceID
-	}
-
-	// Validate workspace
-	currentWorkspace, err := houston.Call(houstonClient.GetWorkspace)(wsID)
+func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
+	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
-		return err
+		return deploymentID, err
 	}
 
-	// Get Deployments from workspace ID
-	request := houston.ListDeploymentsRequest{
-		WorkspaceID: currentWorkspace.ID,
-	}
-	deployments, err := houston.Call(houstonClient.ListDeployments)(request)
-	if err != nil {
-		return err
-	}
-
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-
+	c, _ := config.GetCurrentContext()
 	cloudDomain := c.Domain
-	if cloudDomain == "" {
-		return errNoDomainSet
-	}
-
-	// Use config deployment if provided
-	if deploymentID == "" {
-		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
-	}
-
-	if deploymentID != "" && !deploymentExists(deploymentID, deployments) {
-		return errInvalidDeploymentID
-	}
-
-	// Prompt user for deployment if no deployment passed in
-	if deploymentID == "" || prompt {
-		if len(deployments) == 0 {
-			return errDeploymentNotFound
-		}
-
-		fmt.Printf(houstonDeploymentHeader, cloudDomain)
-		fmt.Println(houstonSelectDeploymentPrompt)
-
-		deployMap := map[string]houston.Deployment{}
-		for i := range deployments {
-			deployment := deployments[i]
-			index := i + 1
-			tab.AddRow([]string{strconv.Itoa(index), deployment.Label, deployment.ReleaseName, currentWorkspace.Label, deployment.ID}, false)
-
-			deployMap[strconv.Itoa(index)] = deployment
-		}
-
-		tab.Print(os.Stdout)
-		choice := input.Text("\n> ")
-		selected, ok := deployMap[choice]
-		if !ok {
-			return errInvalidDeploymentSelected
-		}
-		deploymentID = selected.ID
-	}
-
 	nextTag := ""
 	releaseName := ""
 	for i := range deployments {
@@ -139,7 +90,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
-		return fmt.Errorf("failed to get deployment info: %w", err)
+		return deploymentID, fmt.Errorf("failed to get deployment info: %w", err)
 	}
 
 	fmt.Printf(houstonDeploymentPrompt, releaseName)
@@ -147,13 +98,13 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	// Build the image to deploy
 	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled)
 	if err != nil {
-		return err
+		return deploymentID, err
 	}
 
 	deploymentLink := getAirflowUILink(deploymentID, deploymentInfo.Urls)
 	fmt.Printf("Successfully pushed Docker image to Astronomer registry, it can take a few minutes to update the deployment with the new image. Navigate to the Astronomer UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
-	return nil
+	return deploymentID, nil
 }
 
 // Find deployment ID in deployments slice
@@ -223,7 +174,7 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		TargetPlatforms: deployImagePlatformSupport,
 		Output:          true,
 	}
-	err = imageHandler.Build("", buildConfig)
+	err = imageHandler.Build("", "", buildConfig)
 	if err != nil {
 		return err
 	}
@@ -238,7 +189,7 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		token = c.Token
 	}
 
-	err = imageHandler.Push(registry, "", token, remoteImage)
+	err = imageHandler.Push(remoteImage, "", token)
 	if err != nil {
 		return err
 	}
@@ -288,4 +239,181 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 		}
 	}
 	return ""
+}
+
+func getDeploymentIDForCurrentCommand(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+	if wsID == "" {
+		return deploymentID, []houston.Deployment{}, ErrNoWorkspaceID
+	}
+
+	// Validate workspace
+	currentWorkspace, err := houston.Call(houstonClient.GetWorkspace)(wsID)
+	if err != nil {
+		return deploymentID, []houston.Deployment{}, err
+	}
+
+	// Get Deployments from workspace ID
+	request := houston.ListDeploymentsRequest{
+		WorkspaceID: currentWorkspace.ID,
+	}
+	deployments, err := houston.Call(houstonClient.ListDeployments)(request)
+	if err != nil {
+		return deploymentID, deployments, err
+	}
+
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return deploymentID, deployments, err
+	}
+
+	cloudDomain := c.Domain
+	if cloudDomain == "" {
+		return deploymentID, deployments, errNoDomainSet
+	}
+
+	// Use config deployment if provided
+	if deploymentID == "" {
+		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
+	}
+
+	if deploymentID != "" && !deploymentExists(deploymentID, deployments) {
+		return deploymentID, deployments, errInvalidDeploymentID
+	}
+
+	// Prompt user for deployment if no deployment passed in
+	if deploymentID == "" || prompt {
+		if len(deployments) == 0 {
+			return deploymentID, deployments, errDeploymentNotFound
+		}
+
+		fmt.Printf(houstonDeploymentHeader, cloudDomain)
+		fmt.Println(houstonSelectDeploymentPrompt)
+
+		deployMap := map[string]houston.Deployment{}
+		for i := range deployments {
+			deployment := deployments[i]
+			index := i + 1
+			tab.AddRow([]string{strconv.Itoa(index), deployment.Label, deployment.ReleaseName, currentWorkspace.Label, deployment.ID}, false)
+
+			deployMap[strconv.Itoa(index)] = deployment
+		}
+
+		tab.Print(os.Stdout)
+		choice := input.Text("\n> ")
+		selected, ok := deployMap[choice]
+		if !ok {
+			return deploymentID, deployments, errInvalidDeploymentSelected
+		}
+		deploymentID = selected.ID
+	}
+	return deploymentID, deployments, nil
+}
+
+func isDagOnlyDeploymentEnabled(appConfig *houston.AppConfig) bool {
+	return appConfig != nil && appConfig.Flags.DagOnlyDeployment
+}
+
+func isDagOnlyDeploymentEnabledForDeployment(deploymentInfo *houston.Deployment) bool {
+	return deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType
+}
+
+func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) error {
+	_, err := config.GetCurrentContext()
+	if err != nil {
+		return fmt.Errorf("could not get current context! Error: %w", err)
+	}
+	if deploymentInfo == nil || deploymentInfo.ReleaseName == "" {
+		return errInvalidDeploymentID
+	}
+	return nil
+}
+
+func getDagDeployURL(deploymentInfo *houston.Deployment) string {
+	c, _ := config.GetCurrentContext()
+	return fmt.Sprintf("https://deployments.%s/%s/dags/upload", c.Domain, deploymentInfo.ReleaseName)
+}
+
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+	// Throw error if the feature is disabled at Houston level
+	if !isDagOnlyDeploymentEnabled(appConfig) {
+		return ErrDagOnlyDeployDisabledInConfig
+	}
+
+	deploymentIDForCurrentCmd, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
+	if err != nil {
+		return err
+	}
+	deploymentID = deploymentIDForCurrentCmd
+
+	if deploymentID == "" {
+		return errInvalidDeploymentID
+	}
+
+	// Throw error if the feature is disabled at Deployment level
+	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment info: %w", err)
+	}
+	if !isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
+		return ErrDagOnlyDeployNotEnabledForDeployment
+	}
+
+	uploadURL := ""
+	if dagDeployURL == nil {
+		// Throw error if the upload URL can't be constructed
+		err = validateIfDagDeployURLCanBeConstructed(deploymentInfo)
+		if err != nil {
+			return err
+		}
+		uploadURL = getDagDeployURL(deploymentInfo)
+	} else {
+		uploadURL = *dagDeployURL
+	}
+
+	dagsPath := filepath.Join(dagsParentPath, "dags")
+	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
+
+	// Alert the user if dags folder is empty
+	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
+		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+		if !i {
+			return ErrEmptyDagFolderUserCancelledOperation
+		}
+	}
+
+	// Generate the dags tar
+	err = fileutil.Tar(dagsPath, dagsParentPath)
+	if err != nil {
+		return err
+	}
+	if cleanUpFiles {
+		defer os.Remove(dagsParentPath + "/dags.tar")
+	}
+
+	// Gzip the tar
+	err = gzipFile(dagsParentPath+"/dags.tar", dagsParentPath+"/dags.tar.gz")
+	if err != nil {
+		return err
+	}
+	if cleanUpFiles {
+		defer os.Remove(dagsParentPath + "/dags.tar.gz")
+	}
+
+	c, _ := config.GetCurrentContext()
+
+	headers := map[string]string{
+		"authorization": c.Token,
+	}
+
+	uploadFileArgs := fileutil.UploadFileArguments{
+		FilePath:            dagsParentPath + "/dags.tar.gz",
+		TargetURL:           uploadURL,
+		FormFileFieldName:   "file",
+		Headers:             headers,
+		MaxTries:            8,
+		InitialDelayInMS:    1 * 1000,
+		BackoffFactor:       2,
+		RetryDisplayMessage: "please wait, attempting to upload the dags",
+	}
+	return fileutil.UploadFile(&uploadFileArgs)
 }

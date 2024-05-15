@@ -2,6 +2,9 @@ package deploy
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -11,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
 	"github.com/spf13/afero"
@@ -100,7 +104,7 @@ func TestBuildPushDockerImageSuccessWithTagWarning(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -131,7 +135,7 @@ func TestBuildPushDockerImageSuccessWithImageRepoWarning(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -162,7 +166,7 @@ func TestBuildPushDockerImageSuccessWithBYORegistry(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("", nil).Once()
 		mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("1.10.12", nil).Once()
@@ -209,7 +213,7 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(errSomeContainerIssue)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
 		return mockImageHandler
 	}
 
@@ -220,7 +224,7 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 
 	mockImageHandler = new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
 		return mockImageHandler
 	}
@@ -263,14 +267,14 @@ func TestGetAirflowUILinkFailure(t *testing.T) {
 
 func TestAirflowFailure(t *testing.T) {
 	// No workspace ID test case
-	err := Airflow(nil, "", "", "", "", false, false, false)
-	assert.ErrorIs(t, err, errNoWorkspaceID)
+	_, err := Airflow(nil, "", "", "", "", false, false, false)
+	assert.ErrorIs(t, err, ErrNoWorkspaceID)
 
 	// houston GetWorkspace failure case
 	houstonMock := new(houston_mocks.ClientInterface)
 	houstonMock.On("GetWorkspace", mock.Anything).Return(nil, errMockHouston).Once()
 
-	err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
+	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
 	assert.ErrorIs(t, err, errMockHouston)
 	houstonMock.AssertExpectations(t)
 
@@ -278,7 +282,7 @@ func TestAirflowFailure(t *testing.T) {
 	houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil)
 	houstonMock.On("ListDeployments", mock.Anything).Return(nil, errMockHouston).Once()
 
-	err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
+	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
 	assert.ErrorIs(t, err, errMockHouston)
 	houstonMock.AssertExpectations(t)
 
@@ -292,29 +296,35 @@ func TestAirflowFailure(t *testing.T) {
 	// config GetCurrentContext failure case
 	config.ResetCurrentContext()
 
-	err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
+	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
 	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 
 	context.Switch("localhost")
 
 	// Invalid deployment name case
-	err = Airflow(houstonMock, "", "test-deployment-id", "test-workspace-id", "", false, false, false)
+	_, err = Airflow(houstonMock, "", "test-deployment-id", "test-workspace-id", "", false, false, false)
 	assert.ErrorIs(t, err, errInvalidDeploymentID)
 
 	// No deployment in the current workspace case
-	err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
+	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
 	assert.ErrorIs(t, err, errDeploymentNotFound)
 	houstonMock.AssertExpectations(t)
 
 	// Invalid deployment selection case
 	houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil)
-	err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
+	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
 	assert.ErrorIs(t, err, errInvalidDeploymentSelected)
+
+	// return error When houston get deployment throws an error
+	houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil)
+	houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
+	_, err = Airflow(houstonMock, "", "test-deployment-id", "test-workspace-id", "", false, false, false)
+	assert.Equal(t, err.Error(), "failed to get deployment info: "+errMockHouston.Error())
 
 	// buildPushDockerImage failure case
 	houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{}, nil)
 	dockerfile = "Dockerfile.invalid"
-	err = Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false)
+	_, err = Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false)
 	dockerfile = "Dockerfile"
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
@@ -328,7 +338,7 @@ func TestAirflowSuccess(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -347,7 +357,475 @@ func TestAirflowSuccess(t *testing.T) {
 	houstonMock.On("GetDeployment", mock.Anything).Return(&houston.Deployment{}, nil).Once()
 	houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
 
-	err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false)
+	_, err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false)
 	assert.Nil(t, err)
 	houstonMock.AssertExpectations(t)
+}
+
+func TestDeployDagsOnlyFailure(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	deploymentID := "test-deployment-id"
+	wsID := "test-workspace-id"
+
+	t.Run("When config flag is set to false", func(t *testing.T) {
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: false,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		assert.ErrorIs(t, err, ErrDagOnlyDeployDisabledInConfig)
+		houstonMock.AssertExpectations(t)
+	})
+
+	t.Run("When getDeploymentIDForCurrentCommandVar gives an error", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, errDeploymentNotFound
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		assert.ErrorIs(t, err, errDeploymentNotFound)
+		houstonMock.AssertExpectations(t)
+	})
+
+	t.Run("When config flag is set to true but an error occurs in the GetDeployment api call", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
+
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		assert.ErrorContains(t, err, "failed to get deployment info: some houston error")
+		houstonMock.AssertExpectations(t)
+	})
+
+	t.Run("When config flag is set to true but it is disabled at the deployment level", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.VolumeDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		assert.ErrorIs(t, err, ErrDagOnlyDeployNotEnabledForDeployment)
+		houstonMock.AssertExpectations(t)
+	})
+
+	t.Run("Valid Houston config, but unable to get context from astro-cli config", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		config.ResetCurrentContext()
+
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		assert.EqualError(t, err, "could not get current context! Error: no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+		houstonMock.AssertExpectations(t)
+		context.Switch("localhost")
+	})
+
+	t.Run("Valid Houston config, able to get context from config but no release name present", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			ReleaseName:   "",
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		houstonMock.AssertExpectations(t)
+		assert.ErrorIs(t, err, errInvalidDeploymentID)
+	})
+
+	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is empty. User doesn't give operation confirmation", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			ReleaseName:   "testReleaseName",
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "n")()
+
+		// create the empty dags folder
+		err = os.Mkdir("dags", os.ModePerm)
+		assert.NoError(t, err)
+		defer os.RemoveAll("dags")
+
+		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", nil, false)
+		assert.EqualError(t, err, ErrEmptyDagFolderUserCancelledOperation.Error())
+
+		// assert that no tar or gz file exists
+		_, err = os.Stat("./dags.tar")
+		assert.True(t, os.IsNotExist(err))
+		houstonMock.AssertExpectations(t)
+	})
+
+	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is empty. User gives the operation confirmation", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			ReleaseName:   "testReleaseName",
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "y")()
+
+		// create the empty dags folder
+		err = os.Mkdir("dags", os.ModePerm)
+		assert.NoError(t, err)
+		defer os.RemoveAll("dags")
+
+		// Prepare a test server to capture the request
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Assert the request method is POST
+			assert.Equal(t, http.MethodPost, r.Method)
+
+			// Assert the correct form field name
+			err := r.ParseMultipartForm(10 << 20) // 10 MB
+			assert.NoError(t, err, "Error parsing multipart form")
+			assert.NotNil(t, r.MultipartForm.File["file"], "Form file not found in request")
+
+			// Respond with a success status code
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, false)
+		assert.NoError(t, err)
+		houstonMock.AssertExpectations(t)
+
+		// Validate that dags.tar file was created
+		destFilePath := "./dags.tar"
+		_, err = os.ReadFile(destFilePath)
+		assert.NoError(t, err, "Error reading tar file")
+		defer os.Remove(destFilePath)
+
+		// Validate that dags.tar.gz file was created
+		destFilePath = "./dags.tar.gz"
+		_, err = os.ReadFile(destFilePath)
+		assert.NoError(t, err, "Error reading gZipped file")
+		defer os.Remove(destFilePath)
+	})
+
+	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. Tar creation throws an error", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			ReleaseName:   "testReleaseName",
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "y")()
+
+		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, "./dags", nil, false)
+		assert.EqualError(t, err, "open dags/dags.tar: no such file or directory")
+		houstonMock.AssertExpectations(t)
+
+		// assert that no tar or gz file exists
+		_, err = os.Stat("./dags.tar")
+		assert.True(t, os.IsNotExist(err))
+		_, err = os.Stat("./dags.tar.gz")
+		assert.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. Tar is successfully created. But gzip creation throws an error", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			ReleaseName:   "testReleaseName",
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+
+		// create the non-empty dags folder
+		err := os.Mkdir("dags", os.ModePerm)
+		assert.NoError(t, err)
+		defer os.RemoveAll("dags")
+		fileContent := []byte("print('Hello, World!')")
+		err = os.WriteFile("./dags/test.py", fileContent, os.ModePerm)
+		assert.NoError(t, err)
+
+		gzipMockError := errors.New("some gzip error") //nolint
+
+		// mock the gzip creation to throw an error
+		gzipFile = func(srcFilePath, destFilePath string) error {
+			return gzipMockError
+		}
+
+		err = DagsOnlyDeploy(houstonMock, appConfig, deploymentID, wsID, ".", nil, false)
+		assert.ErrorIs(t, err, gzipMockError)
+		houstonMock.AssertExpectations(t)
+
+		// Validate that dags.tar file was created
+		destFilePath := "./dags.tar"
+		_, err = os.ReadFile(destFilePath)
+		assert.NoError(t, err, "Error reading tar file")
+		defer os.Remove(destFilePath)
+
+		// Validate that dags.tar.gz file was not created
+		destFilePath = "./dags.tar.gz"
+		_, err = os.Stat(destFilePath)
+		assert.True(t, os.IsNotExist(err))
+
+		gzipFile = fileutil.GzipFile
+	})
+
+	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. No need of User confirmation", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			ReleaseName:   "testReleaseName",
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+
+		// create the non-empty dags folder
+		err := os.Mkdir("dags", os.ModePerm)
+		assert.NoError(t, err)
+		defer os.RemoveAll("dags")
+		fileContent := []byte("print('Hello, World!')")
+		err = os.WriteFile("./dags/test.py", fileContent, os.ModePerm)
+		assert.NoError(t, err)
+
+		// Prepare a test server to capture the request
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Assert the request method is POST
+			assert.Equal(t, http.MethodPost, r.Method)
+
+			// Assert the correct form field name
+			err := r.ParseMultipartForm(10 << 20) // 10 MB
+			assert.NoError(t, err, "Error parsing multipart form")
+			assert.NotNil(t, r.MultipartForm.File["file"], "Form file not found in request")
+
+			// Respond with a success status code
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, false)
+		assert.NoError(t, err)
+		houstonMock.AssertExpectations(t)
+
+		// Validate that dags.tar file was created
+		destFilePath := "./dags.tar"
+		_, err = os.ReadFile(destFilePath)
+		assert.NoError(t, err, "Error reading tar file")
+		defer os.Remove(destFilePath)
+
+		// Validate that dags.tar.gz file was created
+		destFilePath = "./dags.tar.gz"
+		_, err = os.ReadFile(destFilePath)
+		assert.NoError(t, err, "Error reading gZipped file")
+		defer os.Remove(destFilePath)
+	})
+
+	t.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. No need of User confirmation. Files should be auto-cleaned", func(t *testing.T) {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		}
+		appConfig := &houston.AppConfig{
+			Flags: *featureFlags,
+		}
+		houstonMock := new(houston_mocks.ClientInterface)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			ReleaseName:   "testReleaseName",
+			DagDeployment: *dagDeployment,
+		}
+		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+
+		// create the non-empty dags folder
+		err := os.Mkdir("dags", os.ModePerm)
+		assert.NoError(t, err)
+		defer os.RemoveAll("dags")
+		fileContent := []byte("print('Hello, World!')")
+		err = os.WriteFile("./dags/test.py", fileContent, os.ModePerm)
+		assert.NoError(t, err)
+
+		// Prepare a test server to capture the request
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Assert the request method is POST
+			assert.Equal(t, http.MethodPost, r.Method)
+
+			// Assert the correct form field name
+			err := r.ParseMultipartForm(10 << 20) // 10 MB
+			assert.NoError(t, err, "Error parsing multipart form")
+			assert.NotNil(t, r.MultipartForm.File["file"], "Form file not found in request")
+
+			// Respond with a success status code
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, true)
+		assert.NoError(t, err)
+		houstonMock.AssertExpectations(t)
+
+		// assert that no tar or gz file exists
+		_, err = os.Stat("./dags.tar")
+		assert.True(t, os.IsNotExist(err))
+		_, err = os.Stat("./dags.tar.gz")
+		assert.True(t, os.IsNotExist(err))
+	})
 }

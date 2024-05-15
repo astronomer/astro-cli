@@ -2,6 +2,7 @@ package software
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -189,7 +190,7 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	}{
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -225,7 +226,39 @@ func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:bote795/private-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
+	}
+	for _, tt := range myTests {
+		houstonClient = api
+		output, err := execDeploymentCmd(tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentCreateCommandDagOnlyDeployEnabled(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	appConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(5)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--force"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy", "--force"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -269,35 +302,378 @@ func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
 	}
 }
 
-func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfig = &houston.AppConfig{
-		TriggererEnabled: true,
-		Flags:            houston.FeatureFlags{TriggererEnabled: true},
-	}
-
-	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(appConfig, nil)
-	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Twice()
-
-	myTests := []struct {
-		cmdArgs        []string
-		expectedOutput string
-		expectedError  string
-	}{
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--triggerer-replicas=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-	}
-	for _, tt := range myTests {
-		houstonClient = api
-		output, err := execDeploymentCmd(tt.cmdArgs...)
-		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
-		} else {
-			assert.NoError(t, err)
+func TestDeploymentCreateWithTypeDagDeploy(t *testing.T) {
+	t.Run("user should not be prompted if deployment type is not dag_deploy", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			TriggererEnabled: true,
+			Flags: houston.FeatureFlags{
+				TriggererEnabled: true,
+			},
 		}
-		assert.Contains(t, output, tt.expectedOutput)
-	}
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+
+		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}
+		expectedOutput := "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs"
+		houstonClient = api
+		output, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, output, expectedOutput)
+		api.AssertExpectations(t)
+	})
+
+	t.Run("user should not be prompted if deployment type is dag_deploy but -f flag is sent", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			TriggererEnabled: true,
+			Flags: houston.FeatureFlags{
+				TriggererEnabled:  true,
+				DagOnlyDeployment: true,
+			},
+		}
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+
+		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1", "--force"}
+		expectedOutput := "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs"
+		houstonClient = api
+		output, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, output, expectedOutput)
+		api.AssertExpectations(t)
+	})
+
+	t.Run("user should be prompted if deployment type is dag_deploy and -f flag is not sent. No deployment is created without confirmation.", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			TriggererEnabled: true,
+			Flags: houston.FeatureFlags{
+				TriggererEnabled:  true,
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1"}
+		houstonClient = api
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "n")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		// Houston CreateDeployment API should not be called if user does not confirm the prompt
+		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
+	})
+
+	t.Run("user should be prompted if deployment type is dag_deploy and -f flag is not sent. Deployment is created with confirmation.", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			TriggererEnabled: true,
+			Flags: houston.FeatureFlags{
+				TriggererEnabled:  true,
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1"}
+		houstonClient = api
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "y")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		// Houston CreateDeployment API should be called if user confirms the prompt
+		api.AssertCalled(t, "CreateDeployment", mock.Anything)
+	})
+}
+
+func TestDeploymentUpdateWithTypeDagDeploy(t *testing.T) {
+	t.Run("user should not be prompted if new deployment type is not dag_deploy", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			Flags: houston.FeatureFlags{
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.ImageDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		api.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=image"}
+		houstonClient = api
+		output, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, output, "Successfully updated deployment")
+	})
+
+	t.Run("GetDeployment throws an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			Flags: houston.FeatureFlags{
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		getDeploymentError := errors.New("Test error")
+		api.On("GetDeployment", mock.Anything).Return(nil, getDeploymentError).Once()
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}
+		houstonClient = api
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to get deployment info: "+getDeploymentError.Error())
+	})
+
+	t.Run("user should not be prompted if new deployment type is dag_deploy and current deployment type is also dag_deploy", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			Flags: houston.FeatureFlags{
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		api.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}
+		houstonClient = api
+		output, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, output, "Successfully updated deployment")
+	})
+
+	t.Run("user should be prompted if new deployment type is dag_deploy and current deployment type is not dag_deploy. User rejects.", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			Flags: houston.FeatureFlags{
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.ImageDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		api.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}
+		houstonClient = api
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "n")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		api.AssertCalled(t, "GetDeployment", mock.Anything)
+		// Houston UpdateDeployment API should not be called if user does not confirm the prompt
+		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
+	})
+
+	t.Run("user should be prompted if new deployment type is dag_deploy and current deployment type is not dag_deploy. User confirms.", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			Flags: houston.FeatureFlags{
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.ImageDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		api.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}
+		houstonClient = api
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "y")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		api.AssertCalled(t, "GetDeployment", mock.Anything)
+		// Houston UpdateDeployment API should be called if user confirms the prompt
+		api.AssertCalled(t, "UpdateDeployment", mock.Anything)
+	})
+}
+
+func TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy(t *testing.T) {
+	t.Run("user should be prompted if new deployment type is not dag_deploy but current type is dag_deploy. User rejects.", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			Flags: houston.FeatureFlags{
+				DagOnlyDeployment: true,
+			},
+		}
+		api := new(mocks.ClientInterface)
+		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		api.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=image"}
+		houstonClient = api
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "n")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		api.AssertCalled(t, "GetDeployment", mock.Anything)
+		// Houston UpdateDeployment API should not be called if user does not confirm the prompt
+		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
+	})
+
+	t.Run("user should be prompted if new deployment type is not dag_deploy but current type is dag_deploy. User confirms.", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		appConfig = &houston.AppConfig{
+			Flags: houston.FeatureFlags{
+				DagOnlyDeployment: true,
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.DagOnlyDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		api.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=image"}
+		houstonClient = api
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		defer testUtil.MockUserInput(t, "y")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		api.AssertCalled(t, "GetDeployment", mock.Anything)
+		// Houston UpdateDeployment API should be called if user does not confirm the prompt
+		api.AssertCalled(t, "UpdateDeployment", mock.Anything)
+	})
 }
 
 func TestDeploymentUpdateCommand(t *testing.T) {
@@ -313,6 +689,13 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Times(8)
+	dagDeployment := &houston.DagDeploymentConfig{
+		Type: houston.ImageDeploymentType,
+	}
+	deployment := &houston.Deployment{
+		DagDeployment: *dagDeployment,
+	}
+	api.On("GetDeployment", mock.Anything).Return(deployment, nil).Times(9)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -325,9 +708,46 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:bote795/private-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=wrong", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=wrong", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--executor=local"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--cloud-role=arn:aws:iam::1234567890:role/test_role4c2301381e"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		houstonClient = api
+		output, err := execDeploymentCmd(tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	appConfig = &houston.AppConfig{
+		TriggererEnabled: true,
+		Flags:            houston.FeatureFlags{TriggererEnabled: true},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Twice()
+	dagDeployment := &houston.DagDeploymentConfig{
+		Type: houston.ImageDeploymentType,
+	}
+	deployment := &houston.Deployment{
+		DagDeployment: *dagDeployment,
+	}
+	api.On("GetDeployment", mock.Anything).Return(deployment, nil).Times(2)
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--triggerer-replicas=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -354,7 +774,13 @@ func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
-
+	dagDeployment := &houston.DagDeploymentConfig{
+		Type: houston.ImageDeploymentType,
+	}
+	deployment := &houston.Deployment{
+		DagDeployment: *dagDeployment,
+	}
+	api.On("GetDeployment", mock.Anything).Return(deployment, nil).Times(2)
 	myTests := []struct {
 		cmdArgs        []string
 		expectedOutput string
@@ -362,6 +788,38 @@ func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 	}{
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "", expectedError: "unknown flag: --git-repository-url"},
+	}
+	for _, tt := range myTests {
+		houstonClient = api
+		output, err := execDeploymentCmd(tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentUpdateCommandDagOnlyDeployEnabled(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	appConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			DagOnlyDeployment: true,
+		},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy", "--force"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=invalid", "--force"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
 		houstonClient = api

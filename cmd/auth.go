@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"io"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
-	"github.com/astronomer/astro-cli/pkg/input"
 	softwareAuth "github.com/astronomer/astro-cli/software/auth"
 
 	"github.com/spf13/cobra"
@@ -26,14 +26,14 @@ var (
 	softwareLogout = softwareAuth.Logout
 )
 
-func newLoginCommand(astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) *cobra.Command {
+func newLoginCommand(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login [BASEDOMAIN]",
 		Short: "Log in to Astronomer",
 		Long:  "Authenticate to Astro or Astronomer Software",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return login(cmd, args, astroClient, coreClient, out)
+			return login(cmd, args, coreClient, platformCoreClient, out)
 		},
 	}
 
@@ -56,7 +56,7 @@ func newLogoutCommand(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func login(cmd *cobra.Command, args []string, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func login(cmd *cobra.Command, args []string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -66,26 +66,19 @@ func login(cmd *cobra.Command, args []string, astroClient astro.Client, coreClie
 			// get the domain from context as an extra check
 			ctx, _ := context.GetCurrentContext()
 			if context.IsCloudDomain(ctx.Domain) {
-				// print an error if context domain is a valid cloud domain
-				fmt.Fprintf(out, "Error: %s is an invalid domain to login into Astro.\n", args[0])
-				// give the user an option to login to software
-				y, _ := input.Confirm("Are you trying to authenticate to Astronomer Software or Nebula?")
-				if !y {
-					fmt.Println("Canceling login...")
-					return nil
-				}
+				fmt.Fprintf(out, "To login to Astronomer Software follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 			}
 			return softwareLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
 		}
-		return cloudLogin(args[0], token, astroClient, coreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(args[0], token, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
 	}
 	// Log back into the current context in case no domain is passed
 	ctx, err := context.GetCurrentContext()
 	if err != nil || ctx.Domain == "" {
 		// Default case when no domain is passed, and error getting current context
-		return cloudLogin(domainutil.DefaultDomain, token, astroClient, coreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(domainutil.DefaultDomain, token, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
 	} else if context.IsCloudDomain(ctx.Domain) {
-		return cloudLogin(ctx.Domain, token, astroClient, coreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(ctx.Domain, token, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
 	}
 	return softwareLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
 }

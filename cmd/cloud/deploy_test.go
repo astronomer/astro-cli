@@ -3,8 +3,8 @@ package cloud
 import (
 	"testing"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
@@ -20,13 +20,13 @@ func execDeployCmd(args ...string) error {
 }
 
 func TestDeployImage(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	DeployImage = func(deployInput cloud.InputDeploy, client astro.Client, coreClient astrocore.CoreClient) error {
+	DeployImage = func(deployInput cloud.InputDeploy, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 		return nil
 	}
 

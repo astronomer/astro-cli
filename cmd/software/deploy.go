@@ -1,10 +1,13 @@
 package software
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/software/deploy"
 
@@ -20,16 +23,18 @@ var (
 
 	EnsureProjectDir   = utils.EnsureProjectDir
 	DeployAirflowImage = deploy.Airflow
+	DagsOnlyDeploy     = deploy.DagsOnlyDeploy
+	isDagOnlyDeploy    bool
 )
 
 var deployExample = `
 Deployment you would like to deploy to Airflow cluster:
 
-  $ astro deploy <deployment-id>
+$ astro deploy <deployment-id>
 
 Menu will be presented if you do not specify a deployment name:
 
-  $ astro deploy
+$ astro deploy
 `
 
 const (
@@ -51,6 +56,9 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
 	cmd.Flags().BoolVarP(&ignoreCacheDeploy, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
+	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
+		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only DAGs to your Deployment")
+	}
 	return cmd
 }
 
@@ -88,7 +96,23 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	if appConfig != nil && appConfig.Flags.BYORegistryEnabled {
 		byoRegistryEnabled = true
 		byoRegistryDomain = appConfig.BYORegistryDomain
+		if byoRegistryDomain == "" {
+			return deploy.ErrBYORegistryDomainNotSet
+		}
+	}
+	if isDagOnlyDeploy {
+		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true)
+	}
+	// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
+	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
+	if err != nil {
+		return err
 	}
 
-	return DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
+	err = DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true)
+	// Don't throw the error if dag-deploy itself is disabled
+	if errors.Is(err, deploy.ErrDagOnlyDeployDisabledInConfig) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
+		return nil
+	}
+	return err
 }

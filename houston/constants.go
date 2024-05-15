@@ -25,4 +25,8 @@ const (
 	GitSyncDeploymentType = "git_sync"
 	VolumeDeploymentType  = "volume"
 	ImageDeploymentType   = "image"
+	DagOnlyDeploymentType = "dag_deploy"
+
+	DagDeployDocsLink    = "https://docs.astronomer.io/software/deploy-dags/"
+	DeployViaCLIDocsLink = "https://docs.astronomer.io/software/deploy-cli/"
 )

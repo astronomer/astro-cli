@@ -36,6 +36,10 @@ const (
 
 var errGetImageLabel = errors.New("error getting image label")
 
+var getDockerClient = func() (client.APIClient, error) {
+	return client.NewClientWithOpts(client.FromEnv)
+}
+
 type DockerImage struct {
 	imageName string
 }
@@ -44,7 +48,7 @@ func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(dockerfile string, buildConfig airflowTypes.ImageBuildConfig) error {
+func (d *DockerImage) Build(dockerfile, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
 	dockerCommand := config.CFG.DockerCommand.GetString()
 	if dockerfile == "" {
 		dockerfile = "Dockerfile"
@@ -68,6 +72,13 @@ func (d *DockerImage) Build(dockerfile string, buildConfig airflowTypes.ImageBui
 	if len(buildConfig.TargetPlatforms) > 0 {
 		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(buildConfig.TargetPlatforms, ",")))
 	}
+	if buildSecretString != "" {
+		buildSecretArgs := []string{
+			"--secret",
+			buildSecretString,
+		}
+		args = append(args, buildSecretArgs...)
+	}
 	// Build image
 	var stdout, stderr io.Writer
 	if buildConfig.Output {
@@ -77,6 +88,7 @@ func (d *DockerImage) Build(dockerfile string, buildConfig airflowTypes.ImageBui
 		stdout = nil
 		stderr = nil
 	}
+	fmt.Println(args)
 	err = cmdExec(dockerCommand, stdout, stderr, args...)
 	if err != nil {
 		return fmt.Errorf("command '%s build -t %s failed: %w", dockerCommand, d.imageName, err)
@@ -120,21 +132,24 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		stdout = nil
 		stderr = nil
 	}
+
 	// create pytest container
-	docErr := cmdExec(dockerCommand, stdout, stderr, args...)
-	if docErr != nil {
-		return "", docErr
+	err = cmdExec(dockerCommand, stdout, stderr, args...)
+	if err != nil {
+		return "", err
 	}
+
 	// cp DAGs folder
 	args = []string{
 		"cp",
 		airflowHome + "/dags",
 		"astro-pytest:/usr/local/airflow/",
 	}
-	docErr = cmdExec(dockerCommand, stdout, stderr, args...)
+	docErr := cmdExec(dockerCommand, stdout, stderr, args...)
 	if docErr != nil {
 		return "", docErr
 	}
+
 	// cp .astro folder
 	// on some machine .astro is being docker ignored, but not
 	// on every machine, hence to keep behavior consistent
@@ -148,11 +163,13 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	if docErr != nil {
 		return "", docErr
 	}
+
 	// start pytest container
-	docErr = cmdExec(dockerCommand, stdout, stderr, []string{"start", "astro-pytest", "-a"}...)
+	err = cmdExec(dockerCommand, stdout, stderr, []string{"start", "astro-pytest", "-a"}...)
 	if docErr != nil {
 		log.Debugf("Error starting pytest container: %s", docErr.Error())
 	}
+
 	// get exit code
 	args = []string{
 		"inspect",
@@ -160,29 +177,32 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		"--format='{{.State.ExitCode}}'",
 	}
 	var outb bytes.Buffer
-	err = cmdExec(dockerCommand, &outb, stderr, args...)
-	if err != nil {
-		log.Debug(err)
-	}
-	if htmlReport {
-		// Copy the dag-test-report.html file from the container to the destination folder
-		err = cmdExec(dockerCommand, nil, stderr, "cp", "astro-pytest:/usr/local/airflow/dag-test-report.html", "./"+testHomeDirectory)
-		if err != nil {
-			// Remove the temporary container
-			err2 := cmdExec(dockerCommand, nil, stderr, "rm", "astro-pytest")
-			if err2 != nil {
-				return outb.String(), err2
-			}
-			return outb.String(), err
-		}
-	}
-	// delete container
-	err = cmdExec(dockerCommand, nil, stderr, "rm", "astro-pytest")
-	if err != nil {
-		log.Debug(err)
+	docErr = cmdExec(dockerCommand, &outb, stderr, args...)
+	if docErr != nil {
+		log.Debug(docErr)
 	}
 
-	return outb.String(), docErr
+	if htmlReport {
+		// Copy the dag-test-report.html file from the container to the destination folder
+		docErr = cmdExec(dockerCommand, nil, stderr, "cp", "astro-pytest:/usr/local/airflow/dag-test-report.html", "./"+testHomeDirectory)
+		if docErr != nil {
+			log.Debugf("Error copying dag-test-report.html file from the pytest container: %s", docErr.Error())
+		}
+	}
+
+	// Persist the include folder from the Docker container to local include folder
+	docErr = cmdExec(dockerCommand, nil, stderr, "cp", "astro-pytest:/usr/local/airflow/include/", ".")
+	if docErr != nil {
+		log.Debugf("Error copying include folder from the pytest container: %s", docErr.Error())
+	}
+
+	// delete container
+	docErr = cmdExec(dockerCommand, nil, stderr, "rm", "astro-pytest")
+	if docErr != nil {
+		log.Debugf("Error removing the astro-pytest container: %s", docErr.Error())
+	}
+
+	return outb.String(), err
 }
 
 func (d *DockerImage) ConflictTest(workingDirectory, testHomeDirectory string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
@@ -283,11 +303,16 @@ func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error 
 	return nil
 }
 
-func (d *DockerImage) Push(registry, username, token, remoteImage string) error {
+func (d *DockerImage) Push(remoteImage, username, token string) error {
 	dockerCommand := config.CFG.DockerCommand.GetString()
 	err := cmdExec(dockerCommand, nil, nil, "tag", d.imageName, remoteImage)
 	if err != nil {
 		return fmt.Errorf("command '%s tag %s %s' failed: %w", dockerCommand, d.imageName, remoteImage, err)
+	}
+
+	registry, err := d.getRegistryToAuth(remoteImage)
+	if err != nil {
+		return err
 	}
 
 	// Push image to registry
@@ -318,13 +343,31 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 
 	log.Debugf("Exec Push %s creds %v \n", dockerCommand, authConfig)
 
+	err = d.pushWithClient(&authConfig, remoteImage)
+
+	if err != nil {
+		// if it does not work with the go library use bash to run docker commands. Support for (old?) versions of Colima
+		err = pushWithBash(&authConfig, remoteImage)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Delete the image tags we just generated
+	err = cmdExec(dockerCommand, nil, nil, "rmi", remoteImage)
+	if err != nil {
+		return fmt.Errorf("command '%s rmi %s' failed: %w", dockerCommand, remoteImage, err)
+	}
+	return nil
+}
+
+func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImage string) error {
 	ctx := context.Background()
 
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := getDockerClient()
 	if err != nil {
 		log.Debugf("Error setting up new Client ops %v", err)
-		// if NewClientWithOpt does not work use bash to run docker commands
-		return useBash(&authConfig, remoteImage)
+		return err
 	}
 	cli.NegotiateAPIVersion(ctx)
 	buf, err := json.Marshal(authConfig)
@@ -337,27 +380,40 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 	if err != nil {
 		log.Debugf("Error pushing image to docker: %v", err)
 		// if NewClientWithOpt does not work use bash to run docker commands
-		return useBash(&authConfig, remoteImage)
+		return err
 	}
 	defer responseBody.Close()
-	err = displayJSONMessagesToStream(responseBody, nil)
-	if err != nil {
-		return useBash(&authConfig, remoteImage)
-	}
-	// Delete the image tags we just generated
-	err = cmdExec(dockerCommand, nil, nil, "rmi", remoteImage)
-	if err != nil {
-		return fmt.Errorf("command '%s rmi %s' failed: %w", dockerCommand, remoteImage, err)
-	}
-	return nil
+	return displayJSONMessagesToStream(responseBody, nil)
 }
 
-func (d *DockerImage) Pull(registry, username, token, remoteImage string) error {
+// Get the registry name to authenticate against
+func (d *DockerImage) getRegistryToAuth(imageName string) (string, error) {
+	domain, err := config.GetCurrentDomain()
+	if err != nil {
+		return "", err
+	}
+
+	if domain == "localhost" {
+		return config.CFG.LocalRegistry.GetString(), nil
+	}
+	parts := strings.SplitN(imageName, "/", 2)
+	if len(parts) != 2 || !strings.Contains(parts[1], "/") {
+		// This _should_ be impossible for users to hit
+		return "", fmt.Errorf("internal logic error: unsure how to get registry from image name %q", imageName) //nolint:goerr113
+	}
+	return parts[0], nil
+}
+
+func (d *DockerImage) Pull(remoteImage, username, token string) error {
 	// Pulling image to registry
 	fmt.Println(pullingImagePrompt)
 	dockerCommand := config.CFG.DockerCommand.GetString()
 	var err error
 	if username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
+		var registry string
+		if registry, err = d.getRegistryToAuth(remoteImage); err != nil {
+			return err
+		}
 		pass := token
 		pass = strings.TrimPrefix(pass, prefix)
 		cmd := "echo \"" + pass + "\"" + " | " + dockerCommand + " login " + registry + " -u " + username + " --password-stdin"
@@ -405,6 +461,18 @@ func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 	label = stdout.String()
 	label = strings.Trim(label, "\n")
 	return label, nil
+}
+
+func (d *DockerImage) DoesImageExist(image string) error {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err := cmdExec(dockerCommand, stdout, stderr, "manifest", "inspect", image)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (d *DockerImage) ListLabels() (map[string]string, error) {
@@ -555,7 +623,7 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 }
 
 // When login and push do not work use bash to run docker commands, this function is for users using colima
-func useBash(authConfig *cliTypes.AuthConfig, image string) error {
+func pushWithBash(authConfig *cliTypes.AuthConfig, image string) error {
 	dockerCommand := config.CFG.DockerCommand.GetString()
 
 	var err error
@@ -564,19 +632,10 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 		pass = strings.TrimPrefix(pass, prefix)
 		cmd := "echo \"" + pass + "\"" + " | " + dockerCommand + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
 		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
-	}
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 	// docker push <image>
-	err = cmdExec(dockerCommand, os.Stdout, os.Stderr, "push", image)
-	if err != nil {
-		return err
-	}
-	// Delete the image tags we just generated
-	err = cmdExec(dockerCommand, nil, nil, "rmi", image)
-	if err != nil {
-		return fmt.Errorf("command '%s rmi %s' failed: %w", dockerCommand, image, err)
-	}
-	return nil
+	return cmdExec(dockerCommand, os.Stdout, os.Stderr, "push", image)
 }

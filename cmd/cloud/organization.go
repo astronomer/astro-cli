@@ -1,25 +1,20 @@
 package cloud
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
-	"log"
 	"os"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/astronomer/astro-cli/pkg/printutil"
-
-	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cloud/organization"
+	roleClient "github.com/astronomer/astro-cli/cloud/role"
 	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -41,7 +36,18 @@ var (
 	organizationID                     string
 	updateOrganizationRole             string
 	teamOrgRole                        string
+	validOrganizationRoles             []string
+	shouldIncludeDefaultRoles          bool
 )
+
+const (
+	allowedOrganizationRoleNames      = "ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER"
+	allowedOrganizationRoleNamesProse = "ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, and ORGANIZATION_OWNER"
+)
+
+func init() {
+	validOrganizationRoles = []string{"ORGANIZATION_MEMBER", "ORGANIZATION_BILLING_ADMIN", "ORGANIZATION_OWNER"}
+}
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -57,6 +63,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 		newOrganizationTeamRootCmd(out),
 		newOrganizationAuditLogs(out),
 		newOrganizationTokenRootCmd(out),
+		newOrganizationRoleRootCmd(out),
 	)
 	return cmd
 }
@@ -113,11 +120,7 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 			return organizationExportAuditLogs(cmd)
 		},
 	}
-	cmd.PersistentFlags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for.")
-	err := cmd.MarkPersistentFlagRequired("organization-name")
-	if err != nil {
-		log.Fatalf("Error marking organization-name flag as required in astro Organization audit-logs command: %s", err.Error())
-	}
+	cmd.Flags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for.")
 	cmd.Flags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
 	cmd.Flags().IntVarP(&auditLogsEarliestParam, "include", "i", auditLogsEarliestParamDefaultValue,
 		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90.")
@@ -145,14 +148,13 @@ func newOrganizationUserInviteCmd(out io.Writer) *cobra.Command {
 		Use:     "invite [email]",
 		Aliases: []string{"inv"},
 		Short:   "Invite a user to your Astro Organization",
-		Long: "Invite a user to your Astro Organization\n$astro user invite [email] --role [ORGANIZATION_MEMBER, " +
-			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
+		Long:    "Invite a user to your Astro Organization\n$astro user invite [email] --role [" + allowedOrganizationRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return userInvite(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&role, "role", "r", "ORGANIZATION_MEMBER", "The role for the "+
-		"user. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+		"user. Possible values are"+allowedOrganizationRoleNamesProse)
 	return cmd
 }
 
@@ -174,21 +176,20 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [email]",
 		Aliases: []string{"up"},
 		Short:   "Update a the role of a user your in Astro Organization",
-		Long: "Update the role of a user in your Astro Organization\n$astro user update [email] --role [ORGANIZATION_MEMBER, " +
-			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
+		Long:    "Update the role of a user in your Astro Organization\n$astro user update [email] --role [" + allowedOrganizationRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return userUpdate(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&updateRole, "role", "r", "", "The new role for the "+
-		"user. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+		"user. Possible values are "+allowedOrganizationRoleNamesProse)
 	return cmd
 }
 
 func organizationList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return orgList(out, astroCoreClient)
+	return orgList(out, platformCoreClient)
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -201,29 +202,16 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationNameOrID = args[0]
 	}
 
-	return orgSwitch(organizationNameOrID, astroClient, astroCoreClient, out, shouldDisplayLoginLink)
+	return orgSwitch(organizationNameOrID, astroCoreClient, platformCoreClient, out, shouldDisplayLoginLink)
 }
 
 func organizationExportAuditLogs(cmd *cobra.Command) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	var outputFileName string
-	if auditLogsOutputFilePath != "" {
-		outputFileName = auditLogsOutputFilePath
-	} else {
-		outputFileName = fmt.Sprintf("audit-logs-%s.ndjson.gz", time.Now().Format("2006-01-02-150405"))
-	}
-
-	var filePerms fs.FileMode = 0o755
-	// In CLI mode we should not need to close f
-	f, err := os.OpenFile(outputFileName, os.O_RDWR|os.O_CREATE, filePerms)
-	if err != nil {
-		return err
-	}
-	out := bufio.NewWriter(f)
 	fmt.Println("This may take some time depending on how many days are being exported.")
-	return orgExportAuditLogs(astroClient, out, orgName, auditLogsEarliestParam)
+	return orgExportAuditLogs(astroCoreClient, platformCoreClient,
+		orgName, auditLogsOutputFilePath, auditLogsEarliestParam)
 }
 
 func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -258,7 +246,7 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	if updateRole == "" {
 		// no role was provided so ask the user for it
-		updateRole = input.Text("enter a user Organization role(ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER) to update user: ")
+		updateRole = input.Text("enter a user Organization role(" + allowedOrganizationRoleNames + ") to update user: ")
 	}
 
 	cmd.SilenceUsage = true
@@ -313,9 +301,10 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
+	cmd.Flags().
+		StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
 	cmd.Flags().StringVarP(&updateOrganizationRole, "role", "r", "", "The new role for the "+
-		"team. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER ")
+		"team. Possible values are "+allowedOrganizationRoleNamesProse)
 	return cmd
 }
 
@@ -343,8 +332,7 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire team within quotes \"\" ")
 	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team in quotes \"\"")
-	cmd.Flags().StringVarP(&teamOrgRole, "role", "r", "", "The role for the "+
-		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER")
+	cmd.Flags().StringVarP(&teamOrgRole, "role", "r", "", "The role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
 
 	return cmd
 }
@@ -517,8 +505,7 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create an API token in an Astro Organization",
-		Long: "Create an API token in an Astro Organization\n$astro organization token create --name [token name] --role [ORGANIZATION_MEMBER, " +
-			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_MEMBER].",
+		Long:    "Create an API token in an Astro Organization\n$astro organization token create --name [token name] --role [" + allowedOrganizationRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createOrganizationToken(cmd, out)
 		},
@@ -526,8 +513,7 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the "+
-		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
 	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Expiration of the token in days. If the flag isn't used the token won't have an expiration. Must be between 1 and 3650 days. ")
 	return cmd
 }
@@ -538,8 +524,7 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
 		Short:   "Update a Organization or Organaization API token",
-		Long: "Update a Organization or Organaization API token that has a role in an Astro Organization\n$astro organization token update [TOKEN_ID] --name [new token name] --role [ORGANIZATION_MEMBER, " +
-			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
+		Long:    "Update a Organization or Organaization API token that has a role in an Astro Organization\n$astro organization token update [TOKEN_ID] --name [new token name] --role [" + allowedOrganizationRoleNames + "].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateOrganizationToken(cmd, args, out)
 		},
@@ -547,8 +532,7 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the "+
-		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
 	return cmd
 }
 
@@ -600,7 +584,7 @@ func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer
 		tokenID = strings.ToLower(args[0])
 	}
 	cmd.SilenceUsage = true
-	return organization.ListTokenRoles(tokenID, astroCoreClient, out)
+	return organization.ListTokenRoles(tokenID, astroCoreClient, astroCoreIamClient, out)
 }
 
 //nolint:dupl
@@ -632,7 +616,7 @@ func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, out, astroCoreClient)
+	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, out, astroCoreClient, astroCoreIamClient)
 }
 
 //nolint:dupl
@@ -644,7 +628,7 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.RotateToken(tokenID, name, cleanTokenOutput, forceRotate, out, astroCoreClient)
+	return organization.RotateToken(tokenID, name, cleanTokenOutput, forceRotate, out, astroCoreClient, astroCoreIamClient)
 }
 
 //nolint:dupl
@@ -656,7 +640,7 @@ func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.DeleteToken(tokenID, name, forceDelete, out, astroCoreClient)
+	return organization.DeleteToken(tokenID, name, forceDelete, out, astroCoreClient, astroCoreIamClient)
 }
 
 //nolint:dupl
@@ -666,14 +650,13 @@ func selectOrganizationRole() (string, error) {
 		DynamicPadding: true,
 		Header:         []string{"#", "ROLE"},
 	}
-	roles := []string{"ORGANIZATION_MEMBER", "ORGANIZATION_BILLING_ADMIN", "ORGANIZATION_OWNER"}
-	for i := range roles {
+	for i := range validOrganizationRoles {
 		index := i + 1
 		tab.AddRow([]string{
 			strconv.Itoa(index),
-			roles[i],
+			validOrganizationRoles[i],
 		}, false)
-		tokenRolesMap[strconv.Itoa(index)] = roles[i]
+		tokenRolesMap[strconv.Itoa(index)] = validOrganizationRoles[i]
 	}
 
 	tab.Print(os.Stdout)
@@ -683,4 +666,38 @@ func selectOrganizationRole() (string, error) {
 		return "", errInvalidOrganizationRoleKey
 	}
 	return selected, nil
+}
+
+func newOrganizationRoleRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "role",
+		Aliases: []string{"ro", "roles"},
+		Short:   "Manage roles in your Astro Organization",
+		Long:    "Manage roles in your Astro Organization.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newOrganizationRoleListCmd(out),
+	)
+	return cmd
+}
+
+func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the roles in your Astro Organization",
+		Long:    "List all the roles in your Astro Organization",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listRoles(cmd, out)
+		},
+	}
+	cmd.Flags().BoolVarP(&shouldIncludeDefaultRoles, "include-default-roles", "i", false, "Should include default roles in response")
+
+	return cmd
+}
+
+func listRoles(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return roleClient.ListOrgRoles(out, astroCoreClient, shouldIncludeDefaultRoles)
 }

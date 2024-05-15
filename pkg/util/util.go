@@ -2,6 +2,7 @@ package util
 
 import (
 	b64 "encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -104,9 +105,51 @@ func ParseAPIToken(astroAPIToken string) (*CustomClaims, error) {
 	// Parse the token to peek at the custom claims
 	jwtParser := jwt.NewParser()
 	parsedToken, _, err := jwtParser.ParseUnverified(astroAPIToken, &CustomClaims{})
+	if err != nil {
+		return nil, errors.Wrap(err, "token is invalid or malformed")
+	}
 	claims, ok := parsedToken.Claims.(*CustomClaims)
 	if !ok {
 		return nil, errors.Wrap(err, "failed to parse auth token")
 	}
 	return claims, nil
+}
+
+func GetbuildSecretString(buildSecret []string) (buildSecretString string) {
+	for i, secret := range buildSecret {
+		if i == 0 {
+			buildSecretString = secret
+		} else {
+			buildSecretString = buildSecretString + "," + secret
+		}
+	}
+	if os.Getenv("BUILD_SECRET_INPUT") != "" && buildSecretString == "" {
+		buildSecretString = os.Getenv("BUILD_SECRET_INPUT")
+	}
+
+	return buildSecretString
+}
+
+func StripOutKeysFromJSONByteArray(jsonData []byte, keys []string) ([]byte, error) {
+	var jsonDataStruct map[string]interface{}
+	err := json.Unmarshal(jsonData, &jsonDataStruct)
+	if err != nil {
+		// If not a valid json, return the original data itself
+		return jsonData, nil
+	}
+	for _, key := range keys {
+		delete(jsonDataStruct, key)
+	}
+	resultJSON, _ := json.Marshal(jsonDataStruct)
+	return resultJSON, nil
+}
+
+// Filter returns a new slice holding only the elements of ss that satisfy test.
+func Filter[T any](ss []T, test func(T) bool) (ret []T) {
+	for _, s := range ss {
+		if test(s) {
+			ret = append(ret, s)
+		}
+	}
+	return
 }

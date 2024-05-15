@@ -5,19 +5,20 @@ import (
 	"os"
 	"testing"
 
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestConfigSettings(t *testing.T) {
 	// config settings success
-	err := ConfigSettings("container-id", "", 2, false, false, false)
+	err := ConfigSettings("container-id", "", nil, 2, false, false, false)
 	assert.NoError(t, err)
 	// config setttings no id error
-	err = ConfigSettings("", "", 2, false, false, false)
+	err = ConfigSettings("", "", nil, 2, false, false, false)
 	assert.ErrorIs(t, err, errNoID)
 	// config settings settings file error
-	err = ConfigSettings("container-id", "testfiles/airflow_settings_invalid.yaml", 2, false, false, false)
+	err = ConfigSettings("container-id", "testfiles/airflow_settings_invalid.yaml", nil, 2, false, false, false)
 	assert.Contains(t, err.Error(), "unable to decode file")
 }
 
@@ -43,7 +44,7 @@ func TestAddConnectionsAirflowOne(t *testing.T) {
 		assert.Contains(t, []string{expectedAddCmd, expectedListCmd}, airflowCommand)
 		return ""
 	}
-	AddConnections("test-conn-id", 1)
+	AddConnections("test-conn-id", 1, nil)
 }
 
 func TestAddConnectionsAirflowTwo(t *testing.T) {
@@ -72,7 +73,57 @@ func TestAddConnectionsAirflowTwo(t *testing.T) {
 		}
 		return ""
 	}
-	AddConnections("test-conn-id", 2)
+	AddConnections("test-conn-id", 2, nil)
+}
+
+func ptr[T any](t T) *T {
+	return &t
+}
+
+func TestAddConnectionsAirflowTwoWithEnvConns(t *testing.T) {
+	var testExtra map[string]string
+
+	testConn := Connection{
+		ConnID:       "test-id",
+		ConnType:     "test-type",
+		ConnHost:     "test-host",
+		ConnSchema:   "test-schema",
+		ConnLogin:    "test-login",
+		ConnPassword: "test-password",
+		ConnPort:     1,
+		ConnURI:      "test-uri",
+		ConnExtra:    testExtra,
+	}
+	settings.Airflow.Connections = []Connection{testConn}
+
+	envConns := map[string]astrocore.EnvironmentObjectConnection{
+		"test-env-id": {
+			Type:     "test-env-type",
+			Host:     ptr("test-env-host"),
+			Port:     ptr(2),
+			Login:    ptr("test-env-login"),
+			Password: ptr("test-env-password"),
+			Schema:   ptr("test-env-schema"),
+			Extra: &map[string]any{
+				"test-extra-key": "test-extra-value",
+			},
+		},
+	}
+
+	expectedAddCmd := "airflow connections add   'test-id' --conn-type 'test-type' --conn-host 'test-host' --conn-login 'test-login' --conn-password 'test-password' --conn-schema 'test-schema' --conn-port 1"
+	expectedDelCmd := "airflow connections delete   \"test-id\""
+	expectedListCmd := "airflow connections list -o plain"
+
+	expectedEnvAddCmd := "airflow connections add   'test-env-id' --conn-type 'test-env-type' --conn-extra '{\"test-extra-key\":\"test-extra-value\"}' --conn-host 'test-env-host' --conn-login 'test-env-login' --conn-password 'test-env-password' --conn-schema 'test-env-schema' --conn-port 2"
+
+	execAirflowCommand = func(id, airflowCommand string) string {
+		assert.Contains(t, []string{expectedAddCmd, expectedEnvAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
+		if airflowCommand == expectedListCmd {
+			return "'test-id' 'test-type' 'test-host' 'test-uri'"
+		}
+		return ""
+	}
+	AddConnections("test-conn-id", 2, envConns)
 }
 
 func TestAddConnectionsAirflowTwoURI(t *testing.T) {
@@ -91,7 +142,7 @@ func TestAddConnectionsAirflowTwoURI(t *testing.T) {
 		}
 		return ""
 	}
-	AddConnections("test-conn-id", 2)
+	AddConnections("test-conn-id", 2, nil)
 }
 
 func TestAddVariableAirflowOne(t *testing.T) {
@@ -323,8 +374,30 @@ func TestJsonString(t *testing.T) {
 		assert.Equal(t, result["key2"], "value2")
 	})
 
+	t.Run("string-keyed map", func(t *testing.T) {
+		conn := Connection{ConnExtra: map[string]interface{}{"key1": "value1", "key2": "value2"}}
+		res := jsonString(&conn)
+		var result map[string]interface{}
+		json.Unmarshal([]byte(res), &result)
+
+		assert.Equal(t, result["key1"], "value1")
+		assert.Equal(t, result["key2"], "value2")
+	})
+
+	t.Run("unexpected type", func(t *testing.T) {
+		conn := Connection{ConnExtra: []string{"key1", "value1", "key2", "value2"}}
+		res := jsonString(&conn)
+		assert.Equal(t, res, "")
+	})
+
 	t.Run("empty extra", func(t *testing.T) {
 		conn := Connection{ConnExtra: ""}
+		res := jsonString(&conn)
+		assert.Equal(t, "", res)
+	})
+
+	t.Run("nil extra", func(t *testing.T) {
+		conn := Connection{ConnExtra: nil}
 		res := jsonString(&conn)
 		assert.Equal(t, "", res)
 	})

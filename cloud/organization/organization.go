@@ -5,15 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
+	"strings"
+	"time"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+)
+
+const (
+	AstronomerConnectionErrMsg = "cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions. If you are using an API Key or Token make sure your context is correct.\n\nDetails"
 )
 
 var (
@@ -34,29 +41,30 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-func ListOrganizations(coreClient astrocore.CoreClient) ([]astrocore.Organization, error) {
-	organizationListParams := &astrocore.ListOrganizationsParams{}
-	resp, err := coreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
+func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Organization, error) {
+	organizationListParams := &astroplatformcore.ListOrganizationsParams{}
+	resp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 	if err != nil {
 		return nil, err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astroplatformcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	orgs := *resp.JSON200
+	orgsPaginated := *resp.JSON200
+	orgs := orgsPaginated.Organizations
 	return orgs, nil
 }
 
 // List all Organizations
-func List(out io.Writer, coreClient astrocore.CoreClient) error {
+func List(out io.Writer, platformCoreClient astroplatformcore.CoreClient) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	or, err := ListOrganizations(coreClient)
+	or, err := ListOrganizations(platformCoreClient)
 	if err != nil {
-		return fmt.Errorf(astro.AstronomerConnectionErrMsg+"%w", err)
+		return fmt.Errorf(AstronomerConnectionErrMsg+"%w", err)
 	}
 	tab := newTableOut()
 	for i := range or {
@@ -76,7 +84,7 @@ func List(out io.Writer, coreClient astrocore.CoreClient) error {
 	return nil
 }
 
-func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (*astrocore.Organization, error) {
+func getOrganizationSelection(out io.Writer, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {
 	tab := printutil.Table{
 		Padding:        []int{5, 44, 50},
 		DynamicPadding: true,
@@ -90,12 +98,12 @@ func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (*
 		return nil, err
 	}
 
-	or, err := ListOrganizations(coreClient)
+	or, err := ListOrganizations(platformCoreClient)
 	if err != nil {
 		return nil, err
 	}
 
-	deployMap := map[string]astrocore.Organization{}
+	deployMap := map[string]astroplatformcore.Organization{}
 	for i := range or {
 		index := i + 1
 
@@ -114,7 +122,7 @@ func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (*
 	return &selected, nil
 }
 
-func SwitchWithContext(domain string, targetOrg *astrocore.Organization, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func SwitchWithContext(domain string, targetOrg *astroplatformcore.Organization, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	c, _ := context.GetCurrentContext()
 
 	// reset org context
@@ -122,14 +130,14 @@ func SwitchWithContext(domain string, targetOrg *astrocore.Organization, astroCl
 	if targetOrg.Product != nil {
 		orgProduct = fmt.Sprintf("%s", *targetOrg.Product) //nolint
 	}
-	_ = c.SetOrganizationContext(targetOrg.Id, targetOrg.ShortName, orgProduct)
+	_ = c.SetOrganizationContext(targetOrg.Id, orgProduct)
 	// need to reset all relevant keys because of https://github.com/spf13/viper/issues/1106 :shrug
 	_ = c.SetContextKey("token", c.Token)
 	_ = c.SetContextKey("refreshtoken", c.RefreshToken)
 	_ = c.SetContextKey("user_email", c.UserEmail)
 	c, _ = context.GetCurrentContext()
 	// call check user session which will trigger workspace switcher flow
-	err := CheckUserSession(&c, astroClient, coreClient, out)
+	err := CheckUserSession(&c, coreClient, platformCoreClient, out)
 	if err != nil {
 		return err
 	}
@@ -138,7 +146,7 @@ func SwitchWithContext(domain string, targetOrg *astrocore.Organization, astroCl
 }
 
 // Switch switches organizations
-func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+func Switch(orgNameOrID string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	// get current context
 	c, err := context.GetCurrentContext()
 	if err != nil {
@@ -146,14 +154,14 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 	}
 
 	// get target org
-	var targetOrg *astrocore.Organization
+	var targetOrg *astroplatformcore.Organization
 	if orgNameOrID == "" {
-		targetOrg, err = getOrganizationSelection(out, coreClient)
+		targetOrg, err = getOrganizationSelection(out, platformCoreClient)
 		if err != nil {
 			return err
 		}
 	} else {
-		or, err := ListOrganizations(coreClient)
+		or, err := ListOrganizations(platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -174,23 +182,75 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 		fmt.Fprintln(out, "You selected the same organization as the current one. No switch was made")
 		return nil
 	}
-	return SwitchWithContext(c.Domain, targetOrg, astroClient, coreClient, out)
+	return SwitchWithContext(c.Domain, targetOrg, coreClient, platformCoreClient, out)
 }
 
 // Write the audit logs to the provided io.Writer.
-func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earliest int) error {
-	logStreamBuffer, err := client.GetOrganizationAuditLogs(orgName, earliest)
+func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, orgName, filePath string, earliest int) error {
+	var orgID string
+	or, err := ListOrganizations(platformCoreClient)
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(out, logStreamBuffer)
+	if orgName == "" {
+		// get current context
+		c, err := context.GetCurrentContext()
+		if err != nil {
+			return err
+		}
+		orgID = c.Organization
+		for i := range or {
+			if orgID == or[i].Id {
+				orgName = or[i].Name
+				break
+			}
+		}
+	} else {
+		for i := range or {
+			if orgName == or[i].Name {
+				orgID = or[i].Id
+				break
+			}
+		}
+		if orgID == "" {
+			return errInvalidOrganizationName
+		}
+	}
+	earliestString := fmt.Sprint(earliest)
+	if filePath == "" {
+		orgName = strings.ReplaceAll(strings.ToLower(orgName), " ", "")
+
+		currentTime := time.Now()
+		date := "-" + currentTime.Format("20060102")
+		filePath = fmt.Sprintf("%s-logs-%d-day%s%s.ndjson.gz", orgName, earliest, pluralize(earliest), date)
+	}
+
+	organizationAuditLogsParams := &astrocore.GetOrganizationAuditLogsParams{
+		Earliest: &earliestString,
+	}
+	resp, err := coreClient.GetOrganizationAuditLogsWithResponse(http_context.Background(), orgID, organizationAuditLogsParams)
 	if err != nil {
-		logStreamBuffer.Close()
 		return err
 	}
-	logStreamBuffer.Close()
+	err = astroplatformcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(filePath, resp.Body, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
 	fmt.Println("Finished exporting logs to local GZIP file")
 	return nil
+}
+
+func pluralize(count int) string {
+	if count > 1 {
+		return "s"
+	}
+	return ""
 }
 
 func IsOrgHosted() bool {
@@ -198,14 +258,12 @@ func IsOrgHosted() bool {
 	return c.OrganizationProduct == "HOSTED"
 }
 
-func ListClusters(organizationShortName string, coreClient astrocore.CoreClient) ([]astrocore.Cluster, error) {
-	clusterTypes := []astrocore.ListClustersParamsTypes{astrocore.ListClustersParamsTypesBRINGYOUROWNCLOUD, astrocore.ListClustersParamsTypesHOSTED}
+func ListClusters(organizationID string, platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Cluster, error) {
 	limit := 1000
-	clusterListParams := &astrocore.ListClustersParams{
-		Types: &clusterTypes,
+	clusterListParams := &astroplatformcore.ListClustersParams{
 		Limit: &limit,
 	}
-	resp, err := coreClient.ListClustersWithResponse(http_context.Background(), organizationShortName, clusterListParams)
+	resp, err := platformCoreClient.ListClustersWithResponse(http_context.Background(), organizationID, clusterListParams)
 	if err != nil {
 		return nil, err
 	}

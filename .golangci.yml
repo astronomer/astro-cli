@@ -4,15 +4,17 @@ run:
   timeout: 3m
   skip-files:
 linters-settings:
-  depguard:
-    list-type: blacklist
-    # to be added once migrated out of logrus logger
-    # packages:
-    #   # logging is allowed only by logutils.Log, logrus
-    #   # is allowed to use only in logutils package
-    #   - github.com/sirupsen/logrus
-    # packages-with-error-message:
-    #   - github.com/sirupsen/logrus: "logging is allowed only by logutils.Log"
+  # to be added once migrated out of logrus logger
+  # depguard:
+  #   rules:
+  #     logger:
+  #       # Allow everything that we don't explicitly deny
+  #       listMode: lax
+  #       deny: []
+  #       #   # logging is allowed only by logutils.Log,
+  #       #   # logrus is allowed to use only in logutils package.
+  #       #   - pkg: "github.com/sirupsen/logrus"
+  #       #     desc: logging is allowed only by logutils.Log
   dupl:
     threshold: 100
   funlen:
@@ -21,8 +23,9 @@ linters-settings:
   gci:
     local-prefixes: github.com/golangci/golangci-lint
   goconst:
-    min-len: 2
-    min-occurrences: 2
+    min-len: 3
+    min-occurrences: 3
+    # ignore-strings: Help for[ ]|Bearer[ ]|The (new )?role for the[ ]|https:\/\/|/dags.tar.gz
   gocritic:
     enabled-tags:
       - diagnostic
@@ -46,7 +49,7 @@ linters-settings:
       mnd:
         # don't include the "operation" and "assign"
         checks: [argument, case, condition, return]
-        ignored-numbers: 10,64  # numbers used by strconv
+        ignored-numbers: 2,10,64  # numbers used by strconv
   govet:
     check-shadowing: true
     settings:
@@ -74,7 +77,8 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - depguard
+    # to be added once migrated out of logrus logger
+    # - depguard
     - dogsled
     - dupl
     - errcheck
@@ -85,7 +89,6 @@ linters:
     - gocyclo
     - gofumpt
     - goimports
-    - revive
     - gomnd
     - goprintffuncname
     - gosec
@@ -105,7 +108,6 @@ linters:
     - whitespace
     - goerr113
     - prealloc
-    - revive
     - gocognit
 
   # don't enable:
@@ -132,5 +134,12 @@ issues:
         - errcheck
         - gosec
         - typecheck
+        - revive
+        - unused
+        - goerr113
   exclude:
     - "shadow: declaration of .err. shadows declaration"
+    - "sloppyTestFuncName: function cleanUpInitFiles should be of form"
+    # Once golangci updates to include goconst 1.7 these can be dropped
+    - >-
+      string `(/dags\.tar\.gz|Bearer |https://|Help for |The (new )?role for the )` has \d+ occurrences

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -217,6 +218,23 @@ func TestCheckEnvBool(t *testing.T) {
 	}
 }
 
+func TestParseAPIToken(t *testing.T) {
+	t.Run("throw error is token is invalid", func(t *testing.T) {
+		token := "invalid-token"
+		_, err := ParseAPIToken(token)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "token is invalid or malformed")
+	})
+
+	t.Run("returns token claims if token is valid", func(t *testing.T) {
+		// dummy token
+		token := "eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0K.eyJ1c2VybmFtZSI6ImFkbWluaW5pc3RyYXRvciIsImlzX2FkbWluIjp0cnVlLCJpYXQiOjE1MTYyMzkwMjIsImV4cCI6MTUxNjI0MjYyMn0."
+		claims, err := ParseAPIToken(token)
+		assert.NotNil(t, claims)
+		assert.Nil(t, err)
+	})
+}
+
 func TestIsM1(t *testing.T) {
 	t.Run("returns true if running on arm architecture", func(t *testing.T) {
 		assert.True(t, IsM1("darwin", "arm64"))
@@ -226,5 +244,79 @@ func TestIsM1(t *testing.T) {
 	})
 	t.Run("returns false if running on windows", func(t *testing.T) {
 		assert.False(t, IsM1("windows", "amd64"))
+	})
+}
+
+func TestGetbuildSecretString(t *testing.T) {
+	t.Run("returns empty string if buildSecret is empty", func(t *testing.T) {
+		assert.Equal(t, "", GetbuildSecretString([]string{}))
+	})
+
+	t.Run("returns the only secret if buildSecret has only one element", func(t *testing.T) {
+		assert.Equal(t, "secret1", GetbuildSecretString([]string{"secret1"}))
+	})
+
+	t.Run("returns comma-separated string for multiple secrets in buildSecret", func(t *testing.T) {
+		assert.Equal(t, "secret1,secret2,secret3", GetbuildSecretString([]string{"secret1", "secret2", "secret3"}))
+	})
+
+	t.Run("overrides buildSecretString with BUILD_SECRET_INPUT if set", func(t *testing.T) {
+		// Save the original value of BUILD_SECRET_INPUT
+		originalBuildSecretInput := os.Getenv("BUILD_SECRET_INPUT")
+		defer func() {
+			// Reset BUILD_SECRET_INPUT to its original value after the test
+			os.Setenv("BUILD_SECRET_INPUT", originalBuildSecretInput)
+		}()
+
+		// Set BUILD_SECRET_INPUT to a different value
+		os.Setenv("BUILD_SECRET_INPUT", "override_secret")
+
+		// Test with a non-empty buildSecret
+		assert.Equal(t, "secret1,secret2", GetbuildSecretString([]string{"secret1", "secret2"}))
+
+		// Test with an empty buildSecret
+		assert.Equal(t, "override_secret", GetbuildSecretString([]string{}))
+	})
+}
+
+func TestStripOutKeysFromJSONByteArray(t *testing.T) {
+	t.Run("valid JSON, strip out keys", func(t *testing.T) {
+		jsonData := []byte(`{"a": 1, "b": 2, "c": 3}`)
+		keys := []string{"a", "c"}
+		expectedResult := []byte(`{"b":2}`)
+		result, err := StripOutKeysFromJSONByteArray(jsonData, keys)
+		assert.Nil(t, err)
+		assert.Equal(t, result, expectedResult)
+	})
+
+	t.Run("invalid JSON, return as is - case 1", func(t *testing.T) {
+		jsonData := []byte(`{invalid: json}`)
+		keys := []string{"a", "c"}
+		expectedResult := jsonData
+		result, err := StripOutKeysFromJSONByteArray(jsonData, keys)
+		assert.Nil(t, err)
+		assert.Equal(t, result, expectedResult)
+	})
+
+	t.Run("invalid JSON, return as is - case 2", func(t *testing.T) {
+		jsonData := []byte(``)
+		keys := []string{"a", "c"}
+		expectedResult := jsonData
+		result, err := StripOutKeysFromJSONByteArray(jsonData, keys)
+		assert.Nil(t, err)
+		assert.Equal(t, result, expectedResult)
+	})
+}
+
+func TestFilter(t *testing.T) {
+	t.Run("strings", func(t *testing.T) {
+		expectedResult := []string{"a"}
+		result := Filter([]string{"a", "b", "c"}, func(s string) bool { return s == "a" })
+		assert.Equal(t, result, expectedResult)
+	})
+	t.Run("ints", func(t *testing.T) {
+		expectedResult := []int{2}
+		result := Filter([]int{1, 2, 3}, func(s int) bool { return s%2 == 0 })
+		assert.Equal(t, result, expectedResult)
 	})
 }
