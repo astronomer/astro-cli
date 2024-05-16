@@ -3,46 +3,38 @@ package airflow
 import (
 	"os"
 	"path/filepath"
-	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestInitDirs(t *testing.T) {
+func (s *Suite) TestInitDirs() {
 	tmpDir, err := os.MkdirTemp("", "temp")
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
 
 	dirs := []string{"dags"}
 
 	err = initDirs(tmpDir, dirs)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	exist, err := fileutil.Exists(filepath.Join(tmpDir, "dags"), nil)
 
-	assert.NoError(t, err)
-	assert.True(t, exist)
+	s.NoError(err)
+	s.True(exist)
 }
 
-func TestInitDirsEmpty(t *testing.T) {
+func (s *Suite) TestInitDirsEmpty() {
 	tmpDir, err := os.MkdirTemp("", "temp")
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
 
 	err = initDirs(tmpDir, nil)
-	assert.NoError(t, err)
+	s.NoError(err)
 }
 
-func TestInitFiles(t *testing.T) {
+func (s *Suite) TestInitFiles() {
 	tmpDir, err := os.MkdirTemp("", "temp")
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
 
 	files := map[string]string{
@@ -50,23 +42,21 @@ func TestInitFiles(t *testing.T) {
 	}
 
 	err = initFiles(tmpDir, files)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	exist, err := fileutil.Exists(filepath.Join(tmpDir, "requirements.txt"), nil)
 
-	assert.NoError(t, err)
-	assert.True(t, exist)
+	s.NoError(err)
+	s.True(exist)
 }
 
-func TestInit(t *testing.T) {
+func (s *Suite) TestInit() {
 	tmpDir, err := os.MkdirTemp("", "temp")
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
 
 	err = Init(tmpDir, "astro-runtime", "test")
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	expectedFiles := []string{
 		".dockerignore",
@@ -82,27 +72,25 @@ func TestInit(t *testing.T) {
 	}
 	for _, file := range expectedFiles {
 		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
-		assert.NoError(t, err)
-		assert.True(t, exist)
+		s.NoError(err)
+		s.True(exist)
 	}
 }
 
-func TestInitConflictTest(t *testing.T) {
+func (s *Suite) TestInitConflictTest() {
 	tmpDir, err := os.MkdirTemp("", "temp")
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
 
 	err = initConflictTest(tmpDir, "astro-runtime", "test")
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	expectedFiles := []string{
 		"conflict-check.Dockerfile",
 	}
 	for _, file := range expectedFiles {
 		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
-		assert.NoError(t, err)
-		assert.True(t, exist)
+		s.NoError(err)
+		s.True(exist)
 	}
 }

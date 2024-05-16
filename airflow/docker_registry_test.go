@@ -2,22 +2,20 @@ package airflow
 
 import (
 	"context"
-	"testing"
 
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/docker/docker/api/types/registry"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestDockerRegistryInit(t *testing.T) {
+func (s *Suite) TestDockerRegistryInit() {
 	resp, err := DockerRegistryInit("test")
-	assert.NoError(t, err)
-	assert.Equal(t, resp.registry, "test")
+	s.NoError(err)
+	s.Equal(resp.registry, "test")
 }
 
-func TestRegistryLogin(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestRegistryLogin() {
+	s.Run("success", func() {
 		mockClient := new(mocks.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
 		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("types.AuthConfig")).Return(registry.AuthenticateOKBody{}, nil).Once()
@@ -28,11 +26,11 @@ func TestRegistryLogin(t *testing.T) {
 		}
 
 		err := handler.Login("", "")
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("registry error", func(t *testing.T) {
+	s.Run("registry error", func() {
 		mockClient := new(mocks.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
 		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("types.AuthConfig")).Return(registry.AuthenticateOKBody{}, errMockDocker).Once()
@@ -43,7 +41,7 @@ func TestRegistryLogin(t *testing.T) {
 		}
 
 		err := handler.Login("", "")
-		assert.ErrorIs(t, err, errMockDocker)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMockDocker)
+		mockClient.AssertExpectations(s.T())
 	})
 }
