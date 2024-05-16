@@ -460,4 +460,44 @@ func TestCheckAPIToken(t *testing.T) {
 		_, err = checkAPIToken(true, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errExpiredAPIToken)
 	})
+
+	t.Run("non-expiry token", func(t *testing.T) {
+		permissions = []string{
+			"workspaceId:workspace-id",
+			"organizationId:org-ID",
+		}
+		mockClaims = util.CustomClaims{
+			Permissions: permissions,
+			RegisteredClaims: jwt.RegisteredClaims{
+				Issuer:    "test-issuer",
+				Subject:   "test-subject",
+				Audience:  jwt.ClaimStrings{"audience1", "audience2"},
+				NotBefore: jwt.NewNumericDate(time.Now()),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+				ID:        "test-id",
+			},
+		}
+
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+
+		t.Setenv("ASTRO_API_TOKEN", "token")
+
+		// Switch context
+		domain := "astronomer-dev.io"
+		err := context.Switch(domain)
+		assert.NoError(t, err)
+
+		// run CheckAPIKeys
+		_, err = checkAPIToken(true, mockPlatformCoreClient)
+		assert.NoError(t, err)
+	})
+
 }
