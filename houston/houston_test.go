@@ -5,20 +5,17 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestNewHoustonClient(t *testing.T) {
+func (s *Suite) TestNewHoustonClient() {
 	client := newInternalClient(httputil.NewHTTPClient())
-	assert.NotNil(t, client, "Can't create new houston Client")
+	s.NotNil(client, "Can't create new houston Client")
 }
 
-func TestErrAuthTokenRefreshFailed(t *testing.T) {
+func (s *Suite) TestErrAuthTokenRefreshFailed() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockResponse := &Response{
 		Data: ResponseData{},
@@ -31,7 +28,7 @@ func TestErrAuthTokenRefreshFailed(t *testing.T) {
 	}
 	jsonResponse, _ := json.Marshal(mockResponse)
 
-	t.Run("Test ErrAuthTokenRefreshFailed error", func(t *testing.T) {
+	s.Run("Test ErrAuthTokenRefreshFailed error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -47,13 +44,13 @@ func TestErrAuthTokenRefreshFailed(t *testing.T) {
 		houstonClient := &Client{HTTPClient: client}
 		resp, err := houstonClient.Do(doOpts)
 
-		assert.Contains(t, err.Error(), ErrVerboseInaptPermissions.Error())
-		assert.Nil(t, resp)
+		s.Contains(err.Error(), ErrVerboseInaptPermissions.Error())
+		s.Nil(resp)
 	})
 }
 
-func TestNewHTTPClient(t *testing.T) {
+func (s *Suite) TestNewHTTPClient() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	client := NewHTTPClient()
-	assert.NotNil(t, client)
+	s.NotNil(client)
 }

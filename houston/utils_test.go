@@ -1,8 +1,6 @@
 package houston
 
-import "testing"
-
-func TestQueryListGreatestLowerBound(t *testing.T) {
+func (s *Suite) TestQueryListGreatestLowerBound() {
 	type args struct {
 		v string
 	}
@@ -44,9 +42,9 @@ func TestQueryListGreatestLowerBound(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			if got := tt.s.GreatestLowerBound(tt.args.v); got != tt.want {
-				t.Errorf("%v: queryList.GreatestLowerBound() = %v, want %v", tt.name, got, tt.want)
+				s.Fail("%v: queryList.GreatestLowerBound() = %v, want %v", tt.name, got, tt.want)
 			}
 		})
 	}

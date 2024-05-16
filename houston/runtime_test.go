@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestGetRuntimeReleases(t *testing.T) {
+func (s *Suite) TestGetRuntimeReleases() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockResp := &Response{
@@ -22,9 +20,9 @@ func TestGetRuntimeReleases(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResp)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success without airflow version", func(t *testing.T) {
+	s.Run("success without airflow version", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -35,11 +33,11 @@ func TestGetRuntimeReleases(t *testing.T) {
 		api := NewClient(client)
 
 		resp, err := api.GetRuntimeReleases("")
-		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResp.Data.RuntimeReleases)
+		s.NoError(err)
+		s.Equal(resp, mockResp.Data.RuntimeReleases)
 	})
 
-	t.Run("success with airflow version", func(t *testing.T) {
+	s.Run("success with airflow version", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -50,11 +48,11 @@ func TestGetRuntimeReleases(t *testing.T) {
 		api := NewClient(client)
 
 		resp, err := api.GetRuntimeReleases("2.2.4")
-		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResp.Data.RuntimeReleases)
+		s.NoError(err)
+		s.Equal(resp, mockResp.Data.RuntimeReleases)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -65,6 +63,6 @@ func TestGetRuntimeReleases(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.GetRuntimeReleases("")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

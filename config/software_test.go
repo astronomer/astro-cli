@@ -2,12 +2,9 @@ package config
 
 import (
 	"bytes"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestContextGetSoftwareAPIURL(t *testing.T) {
+func (s *Suite) TestContextGetSoftwareAPIURL() {
 	initTestConfig()
 	CFG.LocalHouston.SetHomeString("http://localhost/v1")
 	CFG.CloudAPIProtocol.SetHomeString("https")
@@ -32,18 +29,18 @@ func TestContextGetSoftwareAPIURL(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			c := &Context{
 				Domain: tt.fields.Domain,
 			}
 			if got := c.GetSoftwareAPIURL(); got != tt.want {
-				t.Errorf("Context.GetSoftwareAPIURL() = %v, want %v", got, tt.want)
+				s.Fail("Context.GetSoftwareAPIURL() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestContextGetSoftwareAppURL(t *testing.T) {
+func (s *Suite) TestContextGetSoftwareAppURL() {
 	initTestConfig()
 	CFG.LocalHouston.SetHomeString("http://localhost/v1")
 	CFG.CloudAPIProtocol.SetHomeString("https")
@@ -67,18 +64,18 @@ func TestContextGetSoftwareAppURL(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			c := &Context{
 				Domain: tt.fields.Domain,
 			}
 			if got := c.GetSoftwareAppURL(); got != tt.want {
-				t.Errorf("Context.GetSoftwareAppURL() = %v, want %v", got, tt.want)
+				s.Fail("Context.GetSoftwareAppURL() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestContextGetSoftwareWebsocketURL(t *testing.T) {
+func (s *Suite) TestContextGetSoftwareWebsocketURL() {
 	initTestConfig()
 	CFG.LocalHouston.SetHomeString("http://localhost/v1")
 	CFG.CloudAPIPort.SetHomeString("8080")
@@ -102,24 +99,24 @@ func TestContextGetSoftwareWebsocketURL(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			c := &Context{
 				Domain: tt.fields.Domain,
 			}
 			if got := c.GetSoftwareWebsocketURL(); got != tt.want {
-				t.Errorf("Context.GetSoftwareWebsocketURL() = %v, want %v", got, tt.want)
+				s.Fail("Context.GetSoftwareWebsocketURL() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestPrintCurrentSoftwareContext(t *testing.T) {
+func (s *Suite) TestPrintCurrentSoftwareContext() {
 	initTestConfig()
 	ctx := Context{Domain: "localhost"}
 	ctx.SetContext()
 	ctx.SwitchContext()
 	buf := new(bytes.Buffer)
 	err := PrintCurrentSoftwareContext(buf)
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "localhost")
+	s.NoError(err)
+	s.Contains(buf.String(), "localhost")
 }

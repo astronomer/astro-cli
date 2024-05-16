@@ -5,18 +5,16 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestAuthenticateWithBasicAuth(t *testing.T) {
+func (s *Suite) TestAuthenticateWithBasicAuth() {
 	testUtil.InitTestConfig("software")
 
 	ctx, err := config.GetCurrentContext()
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	mockToken := &Response{
 		Data: ResponseData{
@@ -28,9 +26,9 @@ func TestAuthenticateWithBasicAuth(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockToken)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -41,11 +39,11 @@ func TestAuthenticateWithBasicAuth(t *testing.T) {
 		api := NewClient(client)
 
 		token, err := api.AuthenticateWithBasicAuth(BasicAuthRequest{"username", "password", &ctx})
-		assert.NoError(t, err)
-		assert.Equal(t, token, mockToken.Data.CreateToken.Token.Value)
+		s.NoError(err)
+		s.Equal(token, mockToken.Data.CreateToken.Token.Value)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -56,15 +54,15 @@ func TestAuthenticateWithBasicAuth(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.AuthenticateWithBasicAuth(BasicAuthRequest{"username", "password", &ctx})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestGetAuthConfig(t *testing.T) {
+func (s *Suite) TestGetAuthConfig() {
 	testUtil.InitTestConfig("software")
 
 	ctx, err := config.GetCurrentContext()
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	mockAuthConfig := &Response{
 		Data: ResponseData{
@@ -75,9 +73,9 @@ func TestGetAuthConfig(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockAuthConfig)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -88,11 +86,11 @@ func TestGetAuthConfig(t *testing.T) {
 		api := NewClient(client)
 
 		authConfig, err := api.GetAuthConfig(&ctx)
-		assert.NoError(t, err)
-		assert.Equal(t, authConfig, mockAuthConfig.Data.GetAuthConfig)
+		s.NoError(err)
+		s.Equal(authConfig, mockAuthConfig.Data.GetAuthConfig)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -103,6 +101,6 @@ func TestGetAuthConfig(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.GetAuthConfig(&ctx)
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

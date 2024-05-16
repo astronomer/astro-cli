@@ -8,46 +8,54 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestNewTableOut(t *testing.T) {
-	tab := newTableOut()
-	assert.NotNil(t, tab)
-	assert.Equal(t, []int{36, 36}, tab.Padding)
+type Suite struct {
+	suite.Suite
 }
 
-func TestExists(t *testing.T) {
+func TestContext(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestNewTableOut() {
+	tab := newTableOut()
+	s.NotNil(tab)
+	s.Equal([]int{36, 36}, tab.Padding)
+}
+
+func (s *Suite) TestExists() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	// Check that we don't have localhost123 in test config from testUtils.NewTestConfig()
-	assert.False(t, Exists("localhost123"))
+	s.False(Exists("localhost123"))
 }
 
-func TestGetCurrentContext(t *testing.T) {
+func (s *Suite) TestGetCurrentContext() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	cluster, err := GetCurrentContext()
-	assert.NoError(t, err)
-	assert.Equal(t, cluster.Domain, testUtil.GetEnv("HOST", "localhost"))
-	assert.Equal(t, cluster.Workspace, "ck05r3bor07h40d02y2hw4n4v")
-	assert.Equal(t, cluster.LastUsedWorkspace, "ck05r3bor07h40d02y2hw4n4v")
-	assert.Equal(t, cluster.Token, "token")
+	s.NoError(err)
+	s.Equal(cluster.Domain, testUtil.GetEnv("HOST", "localhost"))
+	s.Equal(cluster.Workspace, "ck05r3bor07h40d02y2hw4n4v")
+	s.Equal(cluster.LastUsedWorkspace, "ck05r3bor07h40d02y2hw4n4v")
+	s.Equal(cluster.Token, "token")
 }
 
-func TestGetContextKeyValidContextConfig(t *testing.T) {
+func (s *Suite) TestGetContextKeyValidContextConfig() {
 	c := config.Context{Domain: "test.com"}
 	key, err := c.GetContextKey()
-	assert.NoError(t, err)
-	assert.Equal(t, key, "test_com")
+	s.NoError(err)
+	s.Equal(key, "test_com")
 }
 
-func TestGetContextKeyInvalidContextConfig(t *testing.T) {
+func (s *Suite) TestGetContextKeyInvalidContextConfig() {
 	c := config.Context{}
 	_, err := c.GetContextKey()
-	assert.EqualError(t, err, "context config invalid, no domain specified")
+	s.EqualError(err, "context config invalid, no domain specified")
 }
 
-func TestIsCloudContext(t *testing.T) {
-	t.Run("validates cloud context based on domains", func(t *testing.T) {
+func (s *Suite) TestIsCloudContext() {
+	s.Run("validates cloud context based on domains", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		tests := []struct {
 			name           string
@@ -79,55 +87,55 @@ func TestIsCloudContext(t *testing.T) {
 			Switch(tt.contextDomain)
 			config.CFG.LocalPlatform.SetHomeString(tt.localPlatform)
 			output := IsCloudContext()
-			assert.Equal(t, tt.expectedOutput, output, fmt.Sprintf("input: %+v", tt))
+			s.Equal(tt.expectedOutput, output, fmt.Sprintf("input: %+v", tt))
 		}
 	})
-	t.Run("returns true when no current context is set", func(t *testing.T) {
+	s.Run("returns true when no current context is set", func() {
 		// Case when no current context is set
 		config.ResetCurrentContext()
 		output := IsCloudContext()
-		assert.Equal(t, true, output)
+		s.Equal(true, output)
 	})
 }
 
-func TestDelete(t *testing.T) {
+func (s *Suite) TestDelete() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	err := Delete("astronomer.io", true)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = Delete("", false)
-	assert.ErrorIs(t, err, config.ErrCtxConfigErr)
+	s.ErrorIs(err, config.ErrCtxConfigErr)
 }
 
-func TestDeleteContext(t *testing.T) {
+func (s *Suite) TestDeleteContext() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	err := DeleteContext(&cobra.Command{}, []string{"astronomer.io"}, false)
-	assert.NoError(t, err)
+	s.NoError(err)
 }
 
-func TestGetContext(t *testing.T) {
+func (s *Suite) TestGetContext() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	ctx, err := GetContext("localhost")
-	assert.NoError(t, err)
-	assert.Equal(t, ctx.Domain, "localhost")
+	s.NoError(err)
+	s.Equal(ctx.Domain, "localhost")
 }
 
-func TestSwitchContext(t *testing.T) {
+func (s *Suite) TestSwitchContext() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	err := SwitchContext(&cobra.Command{}, []string{"localhost"})
-	assert.NoError(t, err)
+	s.NoError(err)
 }
 
-func TestListContext(t *testing.T) {
+func (s *Suite) TestListContext() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	SetContext("astronomer.io")
 	buf := new(bytes.Buffer)
 	err := ListContext(&cobra.Command{}, []string{}, buf)
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "localhost")
+	s.NoError(err)
+	s.Contains(buf.String(), "localhost")
 }
 
-func TestIsCloudDomain(t *testing.T) {
+func (s *Suite) TestIsCloudDomain() {
 	domainList := []string{
 		"astronomer.io",
 		"astronomer-dev.io",
@@ -151,14 +159,14 @@ func TestIsCloudDomain(t *testing.T) {
 		"localhost",
 		"localhost123",
 	}
-	t.Run("returns true for valid domains", func(t *testing.T) {
+	s.Run("returns true for valid domains", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		for _, domain := range domainList {
 			actual := IsCloudDomain(domain)
-			assert.True(t, actual, domain)
+			s.True(actual, domain)
 		}
 	})
-	t.Run("returns false for invalid domains", func(t *testing.T) {
+	s.Run("returns false for invalid domains", func() {
 		NotCloudList := []string{
 			"cloud.prastronomer-dev.io",
 			"pr1234567.astronomer-dev.io",
@@ -168,7 +176,7 @@ func TestIsCloudDomain(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		for _, domain := range NotCloudList {
 			actual := IsCloudDomain(domain)
-			assert.False(t, actual, domain)
+			s.False(actual, domain)
 		}
 	})
 }

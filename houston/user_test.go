@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateUser(t *testing.T) {
+func (s *Suite) TestCreateUser() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -32,9 +30,9 @@ func TestCreateUser(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -45,11 +43,11 @@ func TestCreateUser(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.CreateUser(CreateUserRequest{"email", "password"})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.CreateUser)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.CreateUser)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -60,6 +58,6 @@ func TestCreateUser(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.CreateUser(CreateUserRequest{"email", "password"})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

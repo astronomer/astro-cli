@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestAddDeploymentTeam(t *testing.T) {
+func (s *Suite) TestAddDeploymentTeam() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockResponse := &Response{
@@ -29,9 +27,9 @@ func TestAddDeploymentTeam(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -42,11 +40,11 @@ func TestAddDeploymentTeam(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.AddDeploymentTeam(AddDeploymentTeamRequest{"deployment-id", "team-id", "role"})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.AddDeploymentTeam)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.AddDeploymentTeam)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -57,11 +55,11 @@ func TestAddDeploymentTeam(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.AddDeploymentTeam(AddDeploymentTeamRequest{"deployment-id", "team-id", "role"})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestDeleteDeploymentTeam(t *testing.T) {
+func (s *Suite) TestDeleteDeploymentTeam() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockResponse := &Response{
@@ -79,9 +77,9 @@ func TestDeleteDeploymentTeam(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -92,11 +90,11 @@ func TestDeleteDeploymentTeam(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.RemoveDeploymentTeam(RemoveDeploymentTeamRequest{"deployment-id", "team-id"})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.RemoveDeploymentTeam)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.RemoveDeploymentTeam)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -107,11 +105,11 @@ func TestDeleteDeploymentTeam(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.RemoveDeploymentTeam(RemoveDeploymentTeamRequest{"deployment-id", "team-id"})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestListDeploymentTeamsAndRoles(t *testing.T) {
+func (s *Suite) TestListDeploymentTeamsAndRoles() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockResponse := []Team{
@@ -126,9 +124,9 @@ func TestListDeploymentTeamsAndRoles(t *testing.T) {
 			},
 		},
 	}})
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -139,11 +137,11 @@ func TestListDeploymentTeamsAndRoles(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.ListDeploymentTeamsAndRoles("deployment-id")
-		assert.NoError(t, err)
-		assert.Equal(t, mockResponse, response)
+		s.NoError(err)
+		s.Equal(mockResponse, response)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -154,11 +152,11 @@ func TestListDeploymentTeamsAndRoles(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.ListDeploymentTeamsAndRoles("deploymeny-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestUpdateDeploymentTeamAndRole(t *testing.T) {
+func (s *Suite) TestUpdateDeploymentTeamAndRole() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockResponse := &Response{
@@ -176,9 +174,9 @@ func TestUpdateDeploymentTeamAndRole(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -189,11 +187,11 @@ func TestUpdateDeploymentTeamAndRole(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.UpdateDeploymentTeamRole(UpdateDeploymentTeamRequest{"deployment-id", "team-id", DeploymentAdminRole})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.UpdateDeploymentTeam)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.UpdateDeploymentTeam)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -204,6 +202,6 @@ func TestUpdateDeploymentTeamAndRole(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.UpdateDeploymentTeamRole(UpdateDeploymentTeamRequest{"deployment-id", "team-id", "role"})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

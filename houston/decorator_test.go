@@ -2,20 +2,17 @@ package houston
 
 import (
 	"errors"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var errMockHouston = errors.New("mock houston error")
 
-func Test_isCalledFromUnitTestFile(t *testing.T) {
+func (s *Suite) Test_isCalledFromUnitTestFile() {
 	if got := isCalledFromUnitTestFile(); got != true {
-		t.Errorf("isCalledFromUnitTestFile() = %v, want %v", got, true)
+		s.Fail("isCalledFromUnitTestFile() = %v, want %v", got, true)
 	}
 }
 
-func TestSanitiseVersionString(t *testing.T) {
+func (s *Suite) TestSanitiseVersionString() {
 	type args struct {
 		v string
 	}
@@ -41,9 +38,9 @@ func TestSanitiseVersionString(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			if got := sanitiseVersionString(tt.args.v); got != tt.want {
-				t.Errorf("sanitiseVersionString() = %v, want %v", got, tt.want)
+				s.Fail("sanitiseVersionString() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -51,13 +48,13 @@ func TestSanitiseVersionString(t *testing.T) {
 
 func funcToTest(_ interface{}) (interface{}, error) { return nil, nil }
 
-func TestGetFunctionName(t *testing.T) {
+func (s *Suite) TestGetFunctionName() {
 	if got := getFunctionName(funcToTest); got != "funcToTest" {
-		t.Errorf("GetFunctionName() = %v, want %v", got, "funcToTest")
+		s.Fail("GetFunctionName() = %v, want %v", got, "funcToTest")
 	}
 }
 
-func TestVerifyVersionMatch(t *testing.T) {
+func (s *Suite) TestVerifyVersionMatch() {
 	type args struct {
 		version         string
 		funcRestriction VersionRestrictions
@@ -124,72 +121,72 @@ func TestVerifyVersionMatch(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			if got := VerifyVersionMatch(tt.args.version, tt.args.funcRestriction); got != tt.want {
-				t.Errorf("VerifyVersionMatch() = %v, want %v", got, tt.want)
+				s.Fail("VerifyVersionMatch() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestCall(t *testing.T) {
-	t.Run("basic case", func(t *testing.T) {
+func (s *Suite) TestCall() {
+	s.Run("basic case", func() {
 		resp, err := Call(funcToTest)(nil)
-		assert.NoError(t, err)
-		assert.Nil(t, resp)
+		s.NoError(err)
+		s.Nil(resp)
 	})
 
-	t.Run("basic case bypassing test file check", func(t *testing.T) {
+	s.Run("basic case bypassing test file check", func() {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		resp, err := Call(funcToTest)(nil)
-		assert.NoError(t, err)
-		assert.Nil(t, resp)
+		s.NoError(err)
+		s.Nil(resp)
 	})
 
-	t.Run("basic case with method restriction", func(t *testing.T) {
+	s.Run("basic case with method restriction", func() {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.30.0"
 		houstonAPIAvailabilityByVersion["funcToTest"] = VersionRestrictions{GTE: "0.30.0"}
 		resp, err := Call(funcToTest)(nil)
-		assert.NoError(t, err)
-		assert.Nil(t, resp)
+		s.NoError(err)
+		s.Nil(resp)
 	})
 
-	t.Run("case when version is empty string", func(t *testing.T) {
+	s.Run("case when version is empty string", func() {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "invalid"
 		versionErr = errMockHouston
 		houstonAPIAvailabilityByVersion["funcToTest"] = VersionRestrictions{GTE: "0.30.0"}
 		resp, err := Call(funcToTest)(nil)
-		assert.NoError(t, err)
-		assert.Nil(t, resp)
+		s.NoError(err)
+		s.Nil(resp)
 	})
 
-	t.Run("negative case with method restriction", func(t *testing.T) {
+	s.Run("negative case with method restriction", func() {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.29.0"
 		houstonAPIAvailabilityByVersion["funcToTest"] = VersionRestrictions{GTE: "0.30.0"}
 		resp, err := Call(funcToTest)(nil)
-		assert.ErrorIs(t, err, ErrAPINotImplemented{APIName: "funcToTest"})
-		assert.Nil(t, resp)
+		s.ErrorIs(err, ErrAPINotImplemented{APIName: "funcToTest"})
+		s.Nil(resp)
 	})
 }
 
-func TestGetVersion(t *testing.T) {
-	t.Run("when version is already present", func(t *testing.T) {
+func (s *Suite) TestGetVersion() {
+	s.Run("when version is already present", func() {
 		version = "0.30.0"
 		resp := getVersion()
-		assert.Equal(t, version, resp)
+		s.Equal(version, resp)
 	})
 
-	t.Run("when version error is already present", func(t *testing.T) {
+	s.Run("when version error is already present", func() {
 		versionErr = errMockHouston
 		version = ""
 		resp := getVersion()
-		assert.Equal(t, version, resp)
+		s.Equal(version, resp)
 	})
 }

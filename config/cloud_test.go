@@ -2,10 +2,8 @@ package config
 
 import (
 	"bytes"
-	"testing"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 )
 
 func initTestConfig() {
@@ -32,7 +30,7 @@ contexts:
 	InitConfig(fs)
 }
 
-func TestContextGetPublicGraphQLAPIURL(t *testing.T) {
+func (s *Suite) TestContextGetPublicGraphQLAPIURL() {
 	initTestConfig()
 	CFG.CloudAPIProtocol.SetHomeString("https")
 	type fields struct {
@@ -55,18 +53,18 @@ func TestContextGetPublicGraphQLAPIURL(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			c := &Context{
 				Domain: tt.fields.Domain,
 			}
 			if got := c.GetPublicGraphQLAPIURL(); got != tt.want {
-				t.Errorf("Context.GetPublicGraphQLAPIURL() = %v, want %v", got, tt.want)
+				s.Fail("Context.GetPublicGraphQLAPIURL() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestContextGetPublicRESTAPIURL(t *testing.T) {
+func (s *Suite) TestContextGetPublicRESTAPIURL() {
 	initTestConfig()
 	CFG.CloudAPIProtocol.SetHomeString("https")
 	type fields struct {
@@ -89,24 +87,24 @@ func TestContextGetPublicRESTAPIURL(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			c := &Context{
 				Domain: tt.fields.Domain,
 			}
 			if got := c.GetPublicRESTAPIURL("v1alpha1"); got != tt.want {
-				t.Errorf("Context.GetPublicRESTAPIURL() = %v, want %v", got, tt.want)
+				s.Fail("Context.GetPublicRESTAPIURL() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestPrintCurrentCloudContext(t *testing.T) {
+func (s *Suite) TestPrintCurrentCloudContext() {
 	initTestConfig()
 	ctx := Context{Domain: "localhost"}
 	ctx.SetContext()
 	ctx.SwitchContext()
 	buf := new(bytes.Buffer)
 	err := PrintCurrentCloudContext(buf)
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "localhost")
+	s.NoError(err)
+	s.Contains(buf.String(), "localhost")
 }

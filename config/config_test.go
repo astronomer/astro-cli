@@ -8,10 +8,18 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestIsProjectDir(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestConfig(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestIsProjectDir() {
 	homeDir, _ := fileutil.GetHomeDir()
 	tests := []struct {
 		name string
@@ -22,60 +30,60 @@ func TestIsProjectDir(t *testing.T) {
 		{"HomePath False", homeDir, false},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s, err := IsProjectDir(tt.in)
-			assert.NoError(t, err)
-			assert.Equal(t, s, tt.out)
+		s.Run(tt.name, func() {
+			got, err := IsProjectDir(tt.in)
+			s.NoError(err)
+			s.Equal(got, tt.out)
 		})
 	}
 }
 
-func TestInitHomeDefaultCase(t *testing.T) {
+func (s *Suite) TestInitHomeDefaultCase() {
 	fs := afero.NewMemMapFs()
 	initHome(fs)
 	homeDir, err := fileutil.GetHomeDir()
-	assert.NoError(t, err)
-	assert.Equal(t, filepath.Join(homeDir, ".astro", "config.yaml"), viperHome.ConfigFileUsed())
+	s.NoError(err)
+	s.Equal(filepath.Join(homeDir, ".astro", "config.yaml"), viperHome.ConfigFileUsed())
 }
 
-func TestInitHomeConfigOverride(t *testing.T) {
+func (s *Suite) TestInitHomeConfigOverride() {
 	fs := afero.NewMemMapFs()
 	os.Setenv("ASTRO_HOME", "test")
 	initHome(fs)
-	assert.Equal(t, filepath.Join("test", ".astro", "config.yaml"), viperHome.ConfigFileUsed())
+	s.Equal(filepath.Join("test", ".astro", "config.yaml"), viperHome.ConfigFileUsed())
 	os.Unsetenv("ASTRO_HOME")
 }
 
-func TestInitProject(t *testing.T) {
+func (s *Suite) TestInitProject() {
 	fs := afero.NewMemMapFs()
 	workingConfigPath := filepath.Join(WorkingPath, ConfigDir)
 	workingConfigFile := filepath.Join(workingConfigPath, ConfigFileNameWithExt)
 	fs.Create(workingConfigFile)
 	initProject(fs)
-	assert.Contains(t, viperProject.ConfigFileUsed(), "config.yaml")
+	s.Contains(viperProject.ConfigFileUsed(), "config.yaml")
 }
 
-func TestProjectConfigExists(t *testing.T) {
+func (s *Suite) TestProjectConfigExists() {
 	initTestConfig()
 	val := ProjectConfigExists()
-	assert.Equal(t, false, val)
+	s.Equal(false, val)
 
 	viperProject.SetConfigFile("test.yaml")
 	defer os.Remove("test.yaml")
 	val = ProjectConfigExists()
-	assert.Equal(t, true, val)
+	s.Equal(true, val)
 }
 
-func TestCreateConfig(t *testing.T) {
+func (s *Suite) TestCreateConfig() {
 	viperTest := viper.New()
 	defer os.RemoveAll("./test")
 	err := CreateConfig(viperTest, "./test", "test.yaml")
-	assert.NoError(t, err)
+	s.NoError(err)
 }
 
-func TestCreateProjectConfig(t *testing.T) {
+func (s *Suite) TestCreateProjectConfig() {
 	viperProject = viper.New()
 	defer os.RemoveAll("./test")
 	CreateProjectConfig("./test")
-	assert.Equal(t, "test/.astro/config.yaml", viperProject.ConfigFileUsed())
+	s.Equal("test/.astro/config.yaml", viperProject.ConfigFileUsed())
 }

@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestListDeploymentUsers(t *testing.T) {
+func (s *Suite) TestListDeploymentUsers() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -32,9 +30,9 @@ func TestListDeploymentUsers(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -45,11 +43,11 @@ func TestListDeploymentUsers(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.ListDeploymentUsers(ListDeploymentUsersRequest{})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.DeploymentUserList)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.DeploymentUserList)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -60,11 +58,11 @@ func TestListDeploymentUsers(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.ListDeploymentUsers(ListDeploymentUsersRequest{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestAddDeploymentUser(t *testing.T) {
+func (s *Suite) TestAddDeploymentUser() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -86,9 +84,9 @@ func TestAddDeploymentUser(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -99,11 +97,11 @@ func TestAddDeploymentUser(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.AddDeploymentUser(UpdateDeploymentUserRequest{})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.AddDeploymentUser)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.AddDeploymentUser)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -114,11 +112,11 @@ func TestAddDeploymentUser(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.AddDeploymentUser(UpdateDeploymentUserRequest{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestUpdateDeploymentUser(t *testing.T) {
+func (s *Suite) TestUpdateDeploymentUser() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -140,9 +138,9 @@ func TestUpdateDeploymentUser(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -153,11 +151,11 @@ func TestUpdateDeploymentUser(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.UpdateDeploymentUser(UpdateDeploymentUserRequest{})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.UpdateDeploymentUser)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.UpdateDeploymentUser)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -168,11 +166,11 @@ func TestUpdateDeploymentUser(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.UpdateDeploymentUser(UpdateDeploymentUserRequest{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestDeleteDeploymentUser(t *testing.T) {
+func (s *Suite) TestDeleteDeploymentUser() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -194,9 +192,9 @@ func TestDeleteDeploymentUser(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -207,11 +205,11 @@ func TestDeleteDeploymentUser(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.DeleteDeploymentUser(DeleteDeploymentUserRequest{"deployment-id", "email"})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.DeleteDeploymentUser)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.DeleteDeploymentUser)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -222,6 +220,6 @@ func TestDeleteDeploymentUser(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.DeleteDeploymentUser(DeleteDeploymentUserRequest{"deployment-id", "email"})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

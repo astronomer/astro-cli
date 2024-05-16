@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestGetTeam(t *testing.T) {
+func (s *Suite) TestGetTeam() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -22,9 +20,9 @@ func TestGetTeam(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -35,11 +33,11 @@ func TestGetTeam(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.GetTeam("team-id")
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.GetTeam)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.GetTeam)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -50,11 +48,11 @@ func TestGetTeam(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.GetTeam("team-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestGetTeamUsers(t *testing.T) {
+func (s *Suite) TestGetTeamUsers() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -67,9 +65,9 @@ func TestGetTeamUsers(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -80,11 +78,11 @@ func TestGetTeamUsers(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.GetTeamUsers("team-id")
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.GetTeamUsers)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.GetTeamUsers)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -95,11 +93,11 @@ func TestGetTeamUsers(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.GetTeamUsers("team-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestListTeams(t *testing.T) {
+func (s *Suite) TestListTeams() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -115,9 +113,9 @@ func TestListTeams(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -128,11 +126,11 @@ func TestListTeams(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.ListTeams(ListTeamsRequest{"", 1})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.ListTeams)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.ListTeams)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -143,11 +141,11 @@ func TestListTeams(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.ListTeams(ListTeamsRequest{"", 1})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestCreateTeamSystemRoleBinding(t *testing.T) {
+func (s *Suite) TestCreateTeamSystemRoleBinding() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -157,9 +155,9 @@ func TestCreateTeamSystemRoleBinding(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -170,11 +168,11 @@ func TestCreateTeamSystemRoleBinding(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.CreateTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.CreateTeamSystemRoleBinding.Role)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.CreateTeamSystemRoleBinding.Role)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -185,11 +183,11 @@ func TestCreateTeamSystemRoleBinding(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.CreateTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestDeleteTeamSystemRoleBinding(t *testing.T) {
+func (s *Suite) TestDeleteTeamSystemRoleBinding() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -199,9 +197,9 @@ func TestDeleteTeamSystemRoleBinding(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -212,11 +210,11 @@ func TestDeleteTeamSystemRoleBinding(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.DeleteTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.DeleteTeamSystemRoleBinding.Role)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.DeleteTeamSystemRoleBinding.Role)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -227,6 +225,6 @@ func TestDeleteTeamSystemRoleBinding(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.DeleteTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
