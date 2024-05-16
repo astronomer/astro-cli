@@ -499,5 +499,4 @@ func TestCheckAPIToken(t *testing.T) {
 		_, err = checkAPIToken(true, mockPlatformCoreClient)
 		assert.NoError(t, err)
 	})
-
 }
