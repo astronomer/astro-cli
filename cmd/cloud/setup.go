@@ -406,7 +406,7 @@ func checkAPIToken(isDeploymentFile bool, platformCoreClient astroplatformcore.C
 	if len(claims.Permissions) == 0 {
 		return false, errNotAPIToken
 	}
-	if claims.ExpiresAt.Before(time.Now()) {
+	if claims.ExpiresAt != nil && claims.ExpiresAt.Before(time.Now()) {
 		fmt.Printf("The given API Token %s has expired \n", claims.APITokenID)
 		return false, errExpiredAPIToken
 	}
