@@ -141,7 +141,7 @@ func Switch(workspaceNameOrID string, client astrocore.CoreClient, out io.Writer
 		}
 
 		if wsID == "" {
-			return errors.Wrap(err, "workspace id/name is not valid")
+			return errors.Wrap(err, "workspace id/name could not be found")
 		}
 	}
 
