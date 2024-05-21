@@ -11,7 +11,7 @@ import (
 )
 
 func TestNewDeploymentInspectCmd(t *testing.T) {
-	expectedHelp := "Inspect an Astro Deployment."
+	expectedHelp := "Inspect an Astro Deployment configuration, which can be useful if you manage deployments as code or use Deployment configuration templates. This command returns the Deployment's configuration as a YAML or JSON output, which includes information about resources, such as cluster ID, region, and Airflow API URL, as well as scheduler and worker queue configurations."
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
