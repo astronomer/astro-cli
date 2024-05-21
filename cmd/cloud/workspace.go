@@ -598,13 +598,13 @@ func workspaceList(cmd *cobra.Command, out io.Writer) error {
 func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 
-	workspaceNameOrId := ""
+	workspaceNameOrID := ""
 
 	if len(args) == 1 {
-		workspaceNameOrId = args[0]
+		workspaceNameOrID = args[0]
 	}
 	cmd.SilenceUsage = true
-	return workspace.Switch(workspaceNameOrId, astroCoreClient, out)
+	return workspace.Switch(workspaceNameOrID, astroCoreClient, out)
 }
 
 func workspaceCreate(cmd *cobra.Command, out io.Writer) error {

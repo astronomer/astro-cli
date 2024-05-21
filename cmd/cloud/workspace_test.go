@@ -86,7 +86,7 @@ func TestWorkspaceSwitch(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Twice()
+	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 	astroCoreClient = mockClient
 
 	// mock os.Stdin
