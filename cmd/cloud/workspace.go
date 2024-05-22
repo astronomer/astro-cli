@@ -85,7 +85,7 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 
 func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "switch [workspace_id]",
+		Use:     "switch [workspace name/id]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different Astro Workspace",
 		Long:    "Switch to a different Astro Workspace",
@@ -598,13 +598,13 @@ func workspaceList(cmd *cobra.Command, out io.Writer) error {
 func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 
-	id := ""
+	workspaceNameOrID := ""
 
 	if len(args) == 1 {
-		id = args[0]
+		workspaceNameOrID = args[0]
 	}
 	cmd.SilenceUsage = true
-	return workspace.Switch(id, astroCoreClient, out)
+	return workspace.Switch(workspaceNameOrID, astroCoreClient, out)
 }
 
 func workspaceCreate(cmd *cobra.Command, out io.Writer) error {

@@ -120,14 +120,29 @@ var GetWorkspaceSelection = func(client astrocore.CoreClient, out io.Writer) (st
 	return selected.Id, nil
 }
 
-func Switch(id string, client astrocore.CoreClient, out io.Writer) error {
-	if id == "" {
-		_id, err := GetWorkspaceSelection(client, out)
+func Switch(workspaceNameOrID string, client astrocore.CoreClient, out io.Writer) error {
+	var wsID string
+	if workspaceNameOrID == "" {
+		id, err := GetWorkspaceSelection(client, out)
 		if err != nil {
 			return err
 		}
 
-		id = _id
+		wsID = id
+	} else {
+		ws, err := GetWorkspaces(client)
+		if err != nil {
+			return err
+		}
+		for i := range ws {
+			if ws[i].Name == workspaceNameOrID || ws[i].Id == workspaceNameOrID {
+				wsID = ws[i].Id
+			}
+		}
+
+		if wsID == "" {
+			return errors.Wrap(err, "workspace id/name could not be found")
+		}
 	}
 
 	c, err := config.GetCurrentContext()
@@ -135,18 +150,12 @@ func Switch(id string, client astrocore.CoreClient, out io.Writer) error {
 		return err
 	}
 
-	// validate workspace
-	_, err = GetWorkspaces(client)
-	if err != nil {
-		return errors.Wrap(err, "workspace id is not valid")
-	}
-
-	err = c.SetContextKey("workspace", id)
+	err = c.SetContextKey("workspace", wsID)
 	if err != nil {
 		return err
 	}
 
-	err = c.SetContextKey("last_used_workspace", id)
+	err = c.SetContextKey("last_used_workspace", wsID)
 	if err != nil {
 		return err
 	}

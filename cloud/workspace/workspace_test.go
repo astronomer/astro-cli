@@ -146,13 +146,37 @@ func TestSwitch(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
+	workspace2 := astrocore.Workspace{
+		Name:                         "test-workspace-2",
+		Description:                  &description,
+		ApiKeyOnlyDeploymentsDefault: false,
+		Id:                           "workspace-id-2",
+	}
+
+	workspaces = []astrocore.Workspace{
+		workspace1,
+		workspace2,
+	}
+
+	ListWorkspacesResponseOK = astrocore.ListWorkspacesResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.WorkspacesPaginated{
+			Limit:      10,
+			Offset:     0,
+			TotalCount: 2,
+			Workspaces: workspaces,
+		},
+	}
+
 	t.Run("success", func(t *testing.T) {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := Switch("test-id-1", mockCoreClient, buf)
+		err := Switch("workspace-id-2", mockCoreClient, buf)
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "test-id-1")
+		assert.Contains(t, buf.String(), "workspace-id-2")
 		mockCoreClient.AssertExpectations(t)
 	})
 
@@ -160,13 +184,13 @@ func TestSwitch(t *testing.T) {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
 		buf := new(bytes.Buffer)
-		err := Switch("test-id-1", mockCoreClient, buf)
+		err := Switch("workspace-id-2", mockCoreClient, buf)
 		assert.ErrorIs(t, err, errMock)
 		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("success with selection", func(t *testing.T) {
-		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Twice()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
