@@ -118,7 +118,6 @@ func UpdateWorkspaceTeamRole(id, role, workspaceID string, out io.Writer, client
 		}
 	} else {
 		team, err = GetTeam(client, id)
-
 		if err != nil {
 			return err
 		}
@@ -162,7 +161,6 @@ func UpdateTeam(id, name, description, role string, out io.Writer, client astroc
 		}
 	} else {
 		team, err = GetTeam(client, id)
-
 		if err != nil {
 			return err
 		}
@@ -244,7 +242,6 @@ func RemoveWorkspaceTeam(id, workspaceID string, out io.Writer, client astrocore
 		}
 	} else {
 		team, err = GetTeam(client, id)
-
 		if err != nil {
 			return err
 		}
@@ -402,7 +399,6 @@ func AddWorkspaceTeam(id, role, workspaceID string, out io.Writer, client astroc
 		}
 	} else {
 		team, err = GetTeam(client, id)
-
 		if err != nil {
 			return err
 		}
@@ -512,7 +508,6 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 		}
 	} else {
 		team, err = GetTeam(client, id)
-
 		if err != nil {
 			return err
 		}
@@ -560,7 +555,6 @@ func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.Cor
 		}
 	} else {
 		team, err = GetTeam(client, teamID)
-
 		if err != nil {
 			return err
 		}
@@ -632,7 +626,6 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 		}
 	} else {
 		team, err = GetTeam(client, teamID)
-
 		if err != nil {
 			return err
 		}
@@ -738,7 +731,6 @@ func ListTeamUsers(teamID string, out io.Writer, client astrocore.CoreClient) (e
 		}
 	} else {
 		team, err = GetTeam(client, teamID)
-
 		if err != nil {
 			return err
 		}
@@ -865,7 +857,6 @@ func AddDeploymentTeam(id, role, deploymentID string, out io.Writer, client astr
 		}
 	} else {
 		team, err = GetTeam(client, id)
-
 		if err != nil {
 			return err
 		}
@@ -912,7 +903,6 @@ func UpdateDeploymentTeamRole(id, role, deploymentID string, out io.Writer, clie
 		}
 	} else {
 		team, err = GetTeam(client, id)
-
 		if err != nil {
 			return err
 		}
@@ -956,7 +946,6 @@ func RemoveDeploymentTeam(id, deploymentID string, out io.Writer, client astroco
 		}
 	} else {
 		team, err = GetTeam(client, id)
-
 		if err != nil {
 			return err
 		}

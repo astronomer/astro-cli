@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"testing"
 	"time"
 
 	semver "github.com/Masterminds/semver/v3"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -25,7 +23,7 @@ var (
 	errRegMock              = errors.New("error")
 )
 
-func TestGetDeployments(t *testing.T) {
+func (s *Suite) TestGetDeployments() {
 	// Create a mock Houston client
 	mockClient := &mocks.ClientInterface{}
 
@@ -43,33 +41,33 @@ func TestGetDeployments(t *testing.T) {
 
 	// Assert that the returned deployments match the expected deployments
 	if !reflect.DeepEqual(deployments, expectedDeployments) {
-		t.Errorf("Expected deployments to be %v, but got %v", expectedDeployments, deployments)
+		s.Fail("Expected deployments to be %v, but got %v", expectedDeployments, deployments)
 	}
 
 	// Assert that there was no error returned
 	if err != nil {
-		t.Errorf("Expected no error, but got %v", err)
+		s.Fail("Expected no error, but got %v", err)
 	}
 
 	// Assert that the ListDeployments function was called with the correct parameters
 	expectedRequest := houston.ListDeploymentsRequest{WorkspaceID: "workspace"}
-	mockClient.AssertCalled(t, "ListDeployments", expectedRequest)
+	mockClient.AssertCalled(s.T(), "ListDeployments", expectedRequest)
 
 	mockClientErr := &mocks.ClientInterface{}
 	mockClientErr.On("ListDeployments", mock.Anything).Return(nil, errMock)
 	_, err = GetDeployments("workspace", mockClientErr)
-	assert.EqualError(t, err, GetDeploymentsErr(errMock).Error())
+	s.EqualError(err, GetDeploymentsErr(errMock).Error())
 }
 
-func TestSelectDeployment(t *testing.T) {
-	t.Run("no deployments", func(t *testing.T) {
+func (s *Suite) TestSelectDeployment() {
+	s.Run("no deployments", func() {
 		deployments := []houston.Deployment{}
 		message := "Choose a deployment:"
 		dep, err := SelectDeployment(deployments, message)
-		assert.Equal(t, houston.Deployment{}, dep)
-		assert.Nil(t, err)
+		s.Equal(houston.Deployment{}, dep)
+		s.NoError(err)
 	})
-	t.Run("One deployment", func(t *testing.T) {
+	s.Run("One deployment", func() {
 		createdAt := time.Now().Add(-1 * time.Hour)
 		deployments := []houston.Deployment{
 			{
@@ -81,11 +79,11 @@ func TestSelectDeployment(t *testing.T) {
 		}
 		message := "Choose a deployment:"
 		dep, err := SelectDeployment(deployments, message)
-		assert.Equal(t, deployments[0], dep)
-		assert.Nil(t, err)
+		s.Equal(deployments[0], dep)
+		s.NoError(err)
 	})
 	//
-	t.Run("Multiple deployments", func(t *testing.T) {
+	s.Run("Multiple deployments", func() {
 		createdAt := time.Now().Add(-1 * time.Hour)
 		deployments := []houston.Deployment{
 			{
@@ -108,13 +106,13 @@ func TestSelectDeployment(t *testing.T) {
 			},
 		}
 		message := "Choose a deployment:"
-		testUtil.MockUserInput(t, "2\n")
+		testUtil.MockUserInput(s.T(), "2\n")
 		dep, err := SelectDeployment(deployments, message)
-		assert.Equal(t, deployments[1], dep)
-		assert.Nil(t, err)
+		s.Equal(deployments[1], dep)
+		s.NoError(err)
 	})
 	//
-	t.Run("Invalid choice", func(t *testing.T) {
+	s.Run("Invalid choice", func() {
 		createdAt := time.Now().Add(-1 * time.Hour)
 		deployments := []houston.Deployment{
 			{
@@ -137,18 +135,18 @@ func TestSelectDeployment(t *testing.T) {
 			},
 		}
 		message := "Choose a deployment:"
-		testUtil.MockUserInput(t, "4\n")
+		testUtil.MockUserInput(s.T(), "4\n")
 
 		dep, err := SelectDeployment(deployments, message)
-		assert.Equal(t, houston.Deployment{}, dep)
-		assert.Equal(t, ErrInvalidDeploymentKey, err)
+		s.Equal(houston.Deployment{}, dep)
+		s.Equal(ErrInvalidDeploymentKey, err)
 	})
 }
 
-func TestCheckManualReleaseNames(t *testing.T) {
+func (s *Suite) TestCheckManualReleaseNames() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-	t.Run("manual release names true", func(t *testing.T) {
+	s.Run("manual release names true", func() {
 		appConfig := &houston.AppConfig{
 			ManualReleaseNames: true,
 		}
@@ -156,11 +154,11 @@ func TestCheckManualReleaseNames(t *testing.T) {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
 
-		assert.True(t, checkManualReleaseNames(api))
-		api.AssertExpectations(t)
+		s.True(checkManualReleaseNames(api))
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("manual release names false", func(t *testing.T) {
+	s.Run("manual release names false", func() {
 		appConfig := &houston.AppConfig{
 			ManualReleaseNames: false,
 		}
@@ -168,20 +166,20 @@ func TestCheckManualReleaseNames(t *testing.T) {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
 
-		assert.False(t, checkManualReleaseNames(api))
-		api.AssertExpectations(t)
+		s.False(checkManualReleaseNames(api))
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("manual release names error", func(t *testing.T) {
+	s.Run("manual release names error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(nil, errMock)
 
-		assert.False(t, checkManualReleaseNames(api))
-		api.AssertExpectations(t)
+		s.False(checkManualReleaseNames(api))
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestCreate(t *testing.T) {
+func (s *Suite) TestCreate() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockAppConfig := &houston.AppConfig{
@@ -227,7 +225,7 @@ func TestCreate(t *testing.T) {
 	triggerReplicas := 0
 	req := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas}
 
-	t.Run("create success", func(t *testing.T) {
+	s.Run("create success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		// Have to use mock anything for now as vars is too big
@@ -235,12 +233,12 @@ func TestCreate(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := Create(req, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("create trigger enabled", func(t *testing.T) {
+	s.Run("create trigger enabled", func() {
 		mockAppConfig.TriggererEnabled = true
 
 		api := new(mocks.ClientInterface)
@@ -250,12 +248,12 @@ func TestCreate(t *testing.T) {
 		triggerReplicas = 1
 		buf := new(bytes.Buffer)
 		err := Create(req, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("create trigger enabled with trigger replicas count -1", func(t *testing.T) {
+	s.Run("create trigger enabled with trigger replicas count -1", func() {
 		mockAppConfig.TriggererEnabled = true
 
 		api := new(mocks.ClientInterface)
@@ -266,12 +264,12 @@ func TestCreate(t *testing.T) {
 		buf := new(bytes.Buffer)
 		req = &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas}
 		err := Create(req, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("create nfslocation enabled", func(t *testing.T) {
+	s.Run("create nfslocation enabled", func() {
 		mockAppConfig.TriggererEnabled = false
 
 		api := new(mocks.ClientInterface)
@@ -283,12 +281,12 @@ func TestCreate(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := Create(req, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("create git sync enabled", func(t *testing.T) {
+	s.Run("create git sync enabled", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
@@ -296,7 +294,7 @@ func TestCreate(t *testing.T) {
 		nfsLocation = ""
 		dagDeploymentType = houston.GitSyncDeploymentType
 
-		myTests := []struct {
+		myTests := []*struct {
 			repoURL              string
 			revision             string
 			dagDirectoryLocation string
@@ -320,15 +318,15 @@ func TestCreate(t *testing.T) {
 			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, "", runtimeVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas}
 			err := Create(createReq, api, buf)
 			if tt.expectedError != "" {
-				assert.EqualError(t, err, tt.expectedError)
+				s.EqualError(err, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				s.NoError(err)
 			}
-			assert.Contains(t, buf.String(), tt.expectedOutput)
+			s.Contains(buf.String(), tt.expectedOutput)
 		}
 	})
 
-	t.Run("create with pre-create namespace deployment success", func(t *testing.T) {
+	s.Run("create with pre-create namespace deployment success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
@@ -342,13 +340,9 @@ func TestCreate(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -356,12 +350,12 @@ func TestCreate(t *testing.T) {
 		os.Stdin = r
 
 		err = Create(req, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("create pre-create namespace deployment error", func(t *testing.T) {
+	s.Run("create pre-create namespace deployment error", func() {
 		appConfig := *mockAppConfig
 		appConfig.Flags = houston.FeatureFlags{
 			ManualNamespaceNames: true,
@@ -380,13 +374,9 @@ func TestCreate(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("5")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -394,11 +384,11 @@ func TestCreate(t *testing.T) {
 		os.Stdin = r
 
 		err = Create(req, api, buf)
-		assert.EqualError(t, err, "number is out of available range")
-		api.AssertExpectations(t)
+		s.EqualError(err, "number is out of available range")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("create get namespaces error", func(t *testing.T) {
+	s.Run("create get namespaces error", func() {
 		appConfig := *mockAppConfig
 		appConfig.Flags = houston.FeatureFlags{
 			ManualNamespaceNames: true,
@@ -410,22 +400,22 @@ func TestCreate(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := Create(req, api, buf)
-		assert.EqualError(t, err, errMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("create api error", func(t *testing.T) {
+	s.Run("create api error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := Create(req, api, buf)
-		assert.EqualError(t, err, errMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("create free form namespace success", func(t *testing.T) {
+	s.Run("create free form namespace success", func() {
 		mockAppConfig.Flags.NamespaceFreeFormEntry = true
 
 		api := new(mocks.ClientInterface)
@@ -436,13 +426,9 @@ func TestCreate(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("Test1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -450,11 +436,11 @@ func TestCreate(t *testing.T) {
 		os.Stdin = r
 
 		err = Create(req, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		api.AssertExpectations(s.T())
 	})
-	t.Run("create free form namespace error", func(t *testing.T) {
+	s.Run("create free form namespace error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(nil, errMock)
@@ -463,13 +449,9 @@ func TestCreate(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("    ")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -477,11 +459,11 @@ func TestCreate(t *testing.T) {
 		os.Stdin = r
 
 		err = Create(req, api, buf)
-		assert.EqualError(t, err, "no kubernetes namespaces specified")
+		s.EqualError(err, "no kubernetes namespaces specified")
 	})
 }
 
-func TestDelete(t *testing.T) {
+func (s *Suite) TestDelete() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockDeployment := &houston.Deployment{
 		ID:             "ckbv818oa00r107606ywhoqtw",
@@ -492,39 +474,39 @@ func TestDelete(t *testing.T) {
 		AirflowVersion: "1.1.0",
 	}
 
-	t.Run("delete success", func(t *testing.T) {
+	s.Run("delete success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: false}).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
 		err := Delete(mockDeployment.ID, false, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Successfully deleted deployment")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully deleted deployment")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("delete api error", func(t *testing.T) {
+	s.Run("delete api error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: false}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := Delete(mockDeployment.ID, false, api, buf)
-		assert.EqualError(t, err, errMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("delete hard success", func(t *testing.T) {
+	s.Run("delete hard success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: true}).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
 		err := Delete(mockDeployment.ID, true, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Successfully deleted deployment")
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully deleted deployment")
 	})
 }
 
-func TestList(t *testing.T) {
+func (s *Suite) TestList() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockDeployments := []houston.Deployment{
 		{
@@ -546,31 +528,31 @@ func TestList(t *testing.T) {
 		WorkspaceID: mockDeployments[0].Workspace.ID,
 	}
 
-	t.Run("list deployments for workspace success", func(t *testing.T) {
+	s.Run("list deployments for workspace success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListDeployments", expectedRequest).Return(mockDeployments, nil)
 
 		buf := new(bytes.Buffer)
 		err := List(mockDeployments[0].Workspace.ID, false, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := ` NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 TAG     IMAGE VERSION                  
  test     burning-terrestrial-5940     v1.1.0     ckbv801t300qh0760pck7ea0c     ?       Astronomer-Certified-1.1.0     
 `
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("list namespace api error", func(t *testing.T) {
+	s.Run("list namespace api error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListDeployments", expectedRequest).Return([]houston.Deployment{}, errMock)
 
 		buf := new(bytes.Buffer)
 		err := List(mockDeployments[0].Workspace.ID, false, api, buf)
-		assert.EqualError(t, err, errMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("list namespace all enabled", func(t *testing.T) {
+	s.Run("list namespace all enabled", func() {
 		expectedRequest.WorkspaceID = ""
 
 		api := new(mocks.ClientInterface)
@@ -578,16 +560,16 @@ func TestList(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := List(mockDeployments[0].Workspace.ID, true, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := ` NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 TAG     IMAGE VERSION                  
  test     burning-terrestrial-5940     v1.1.0     ckbv801t300qh0760pck7ea0c     ?       Astronomer-Certified-1.1.0     
 `
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestUpdate(t *testing.T) {
+func (s *Suite) TestUpdate() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockAppConfig := &houston.AppConfig{
@@ -628,7 +610,7 @@ func TestUpdate(t *testing.T) {
 
 	role := "test-role"
 
-	t.Run("update success", func(t *testing.T) {
+	s.Run("update success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
@@ -638,7 +620,7 @@ func TestUpdate(t *testing.T) {
 
  Successfully updated deployment
 `
-		myTests := []struct {
+		myTests := []*struct {
 			deploymentConfig  map[string]string
 			dagDeploymentType string
 			expectedOutput    string
@@ -649,13 +631,13 @@ func TestUpdate(t *testing.T) {
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
 			err := Update(mockDeployment.ID, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", "", 1, 0, api, buf)
-			assert.NoError(t, err)
-			assert.Equal(t, expected, buf.String())
-			api.AssertExpectations(t)
+			s.NoError(err)
+			s.Equal(expected, buf.String())
+			api.AssertExpectations(s.T())
 		}
 	})
 
-	t.Run("update triggerer enabled", func(t *testing.T) {
+	s.Run("update triggerer enabled", func() {
 		mockAppConfig.TriggererEnabled = true
 
 		api := new(mocks.ClientInterface)
@@ -678,13 +660,13 @@ func TestUpdate(t *testing.T) {
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
 			err := Update(mockDeployment.ID, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", "", 1, 1, api, buf)
-			assert.NoError(t, err)
-			assert.Equal(t, expected, buf.String())
-			api.AssertExpectations(t)
+			s.NoError(err)
+			s.Equal(expected, buf.String())
+			api.AssertExpectations(s.T())
 		}
 	})
 
-	t.Run("update error", func(t *testing.T) {
+	s.Run("update error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("UpdateDeployment", mock.Anything).Return(nil, errMock)
@@ -695,12 +677,12 @@ func TestUpdate(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := Update(mockDeployment.ID, role, deploymentConfig, "", "", "", "", "", "", "", "", "", 1, 0, api, buf)
 
-		assert.EqualError(t, err, errMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestAirflowUpgrade(t *testing.T) {
+func (s *Suite) TestAirflowUpgrade() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockDeployment := &houston.Deployment{
@@ -713,7 +695,7 @@ func TestAirflowUpgrade(t *testing.T) {
 		DesiredAirflowVersion: "1.10.10",
 	}
 
-	t.Run("upgrade airflow success", func(t *testing.T) {
+	s.Run("upgrade airflow success", func() {
 		expectedVars := map[string]interface{}{"deploymentId": mockDeployment.ID, "desiredAirflowVersion": mockDeployment.DesiredAirflowVersion}
 
 		api := new(mocks.ClientInterface)
@@ -721,7 +703,7 @@ func TestAirflowUpgrade(t *testing.T) {
 		api.On("UpdateDeploymentAirflow", expectedVars).Return(mockDeployment, nil)
 		buf := new(bytes.Buffer)
 		err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION                    
  test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Astronomer-Certified-1.10.10     
 
@@ -731,21 +713,21 @@ To cancel, run:
 
 `
 
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("upgrade airflow get deployment error", func(t *testing.T) {
+	s.Run("upgrade airflow get deployment error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, errGetDeploymentMock)
 
 		buf := new(bytes.Buffer)
 		err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
-		assert.Error(t, err, errGetDeploymentMock.Error())
-		api.AssertExpectations(t)
+		s.Error(err, errGetDeploymentMock.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("upgrade airflow update deployment error", func(t *testing.T) {
+	s.Run("upgrade airflow update deployment error", func() {
 		expectedVars := map[string]interface{}{"deploymentId": mockDeployment.ID, "desiredAirflowVersion": mockDeployment.DesiredAirflowVersion}
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
@@ -753,12 +735,12 @@ To cancel, run:
 
 		buf := new(bytes.Buffer)
 		err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
-		assert.Error(t, err, errUpdateDeploymentMock.Error())
-		api.AssertExpectations(t)
+		s.Error(err, errUpdateDeploymentMock.Error())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestAirflowUpgradeCancel(t *testing.T) {
+func (s *Suite) TestAirflowUpgradeCancel() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 
@@ -774,22 +756,22 @@ func TestAirflowUpgradeCancel(t *testing.T) {
 
 	expectedVars := map[string]interface{}{"deploymentId": mockDeployment.ID, "desiredAirflowVersion": mockDeployment.AirflowVersion}
 
-	t.Run("upgrade cancel success", func(t *testing.T) {
+	s.Run("upgrade cancel success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("UpdateDeploymentAirflow", expectedVars).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
 		err := AirflowUpgradeCancel(deploymentID, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := `
 Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.
 `
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("nothing to upgrade cancel", func(t *testing.T) {
+	s.Run("nothing to upgrade cancel", func() {
 		api := new(mocks.ClientInterface)
 		mockResp := *mockDeployment
 		mockResp.AirflowVersion = mockResp.DesiredAirflowVersion
@@ -797,24 +779,24 @@ Airflow upgrade process has been successfully canceled. Your Deployment was not 
 
 		buf := new(bytes.Buffer)
 		err := AirflowUpgradeCancel(deploymentID, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := `
 Nothing to cancel. You are currently running Airflow 1.10.10 and you have not indicated that you want to upgrade.`
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("upgrade cancel get deployment error", func(t *testing.T) {
+	s.Run("upgrade cancel get deployment error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, errGetDeploymentMock)
 
 		buf := new(bytes.Buffer)
 		err := AirflowUpgradeCancel(deploymentID, api, buf)
-		assert.EqualError(t, err, errGetDeploymentMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errGetDeploymentMock.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("upgrade cancel error", func(t *testing.T) {
+	s.Run("upgrade cancel error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		expectedVars["desiredAirflowVersion"] = mockDeployment.AirflowVersion
@@ -822,11 +804,11 @@ Nothing to cancel. You are currently running Airflow 1.10.10 and you have not in
 
 		buf := new(bytes.Buffer)
 		err := AirflowUpgradeCancel(deploymentID, api, buf)
-		assert.EqualError(t, err, errUpdateDeploymentMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errUpdateDeploymentMock.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("upgrade empty desired version", func(t *testing.T) {
+	s.Run("upgrade empty desired version", func() {
 		mockDeploymentConfig := &houston.DeploymentConfig{
 			AirflowVersions: []string{
 				"1.10.7",
@@ -843,13 +825,9 @@ Nothing to cancel. You are currently running Airflow 1.10.10 and you have not in
 		// mock os.Stdin for when prompted by getAirflowVersionSelection()
 		input := []byte("2")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -858,9 +836,9 @@ Nothing to cancel. You are currently running Airflow 1.10.10 and you have not in
 
 		buf := new(bytes.Buffer)
 		err = AirflowUpgrade(deploymentID, "", api, buf)
-		t.Log(buf.String()) // Log the buffer so that this test is recognized by go test
+		s.T().Log(buf.String()) // Log the buffer so that this test is recognized by go test
 
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := `#     AIRFLOW VERSION                  
 1     Astronomer-Certified-1.10.7      
 2     Astronomer-Certified-1.10.10     
@@ -873,12 +851,12 @@ To cancel, run:
  $ astro deployment airflow upgrade --cancel
 
 `
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func Test_getAirflowVersionSelection(t *testing.T) {
+func (s *Suite) Test_getAirflowVersionSelection() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockDeploymentConfig := &houston.DeploymentConfig{
@@ -889,7 +867,7 @@ func Test_getAirflowVersionSelection(t *testing.T) {
 		},
 	}
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeploymentConfig", nil).Return(mockDeploymentConfig, nil)
 
@@ -898,13 +876,9 @@ func Test_getAirflowVersionSelection(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("2")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -912,70 +886,70 @@ func Test_getAirflowVersionSelection(t *testing.T) {
 		os.Stdin = r
 
 		airflowVersion, err := getAirflowVersionSelection("1.10.7", api, buf)
-		t.Log(buf.String()) // Log the buffer so that this test is recognized by go test
-		assert.NoError(t, err)
-		assert.Equal(t, "1.10.12", airflowVersion)
-		api.AssertExpectations(t)
+		s.T().Log(buf.String()) // Log the buffer so that this test is recognized by go test
+		s.NoError(err)
+		s.Equal("1.10.12", airflowVersion)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeploymentConfig", nil).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		airflowVersion, err := getAirflowVersionSelection("1.10.7", api, buf)
-		assert.EqualError(t, err, errMock.Error())
-		assert.Equal(t, "", airflowVersion)
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		s.Equal("", airflowVersion)
+		api.AssertExpectations(s.T())
 	})
 }
 
-func Test_meetsAirflowUpgradeReqs(t *testing.T) {
+func (s *Suite) Test_meetsAirflowUpgradeReqs() {
 	airflowVersion := "1.10.12"
 	desiredAirflowVersion := "2.0.0"
 	err := meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
-	assert.Error(t, err)
-	assert.EqualError(t, err, "Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to 1.10.14 "+
+	s.Error(err)
+	s.EqualError(err, "Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to 1.10.14 "+
 		"first and make sure your DAGs and configs are 2.0 compatible")
 
 	airflowVersion = "2.0.0"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
-	assert.Error(t, err)
-	assert.EqualError(t, err, "Error: You tried to set --desired-airflow-version to 2.0.0, but this Airflow Deployment "+
+	s.Error(err)
+	s.EqualError(err, "Error: You tried to set --desired-airflow-version to 2.0.0, but this Airflow Deployment "+
 		"is already running 2.0.0. Please indicate a higher version of Airflow and try again.")
 
 	airflowVersion = "1.10.14"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	airflowVersion = "1.10.7"
 	desiredAirflowVersion = "1.10.10"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	airflowVersion = "-1.10.12"
 	desiredAirflowVersion = "2.0.0"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
-	assert.Error(t, err)
-	assert.EqualError(t, err, "Invalid Semantic Version")
+	s.Error(err)
+	s.EqualError(err, "Invalid Semantic Version")
 
 	airflowVersion = "1.10.12"
 	desiredAirflowVersion = "-2.0.0"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
-	assert.Error(t, err)
-	assert.EqualError(t, err, "Invalid Semantic Version")
+	s.Error(err)
+	s.EqualError(err, "Invalid Semantic Version")
 }
 
-func TestCheckNFSMountDagDeploymentError(t *testing.T) {
+func (s *Suite) TestCheckNFSMountDagDeploymentError() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(nil, errMock)
-	assert.Equal(t, false, CheckNFSMountDagDeployment(api))
-	api.AssertExpectations(t)
+	s.Equal(false, CheckNFSMountDagDeployment(api))
+	api.AssertExpectations(s.T())
 }
 
-func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
+func (s *Suite) TestCheckNFSMountDagDeploymentSuccess() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockAppConfig := &houston.AppConfig{
 		Version:                "0.15.1",
@@ -992,11 +966,11 @@ func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
 	}
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
-	assert.Equal(t, true, CheckNFSMountDagDeployment(api))
-	api.AssertExpectations(t)
+	s.Equal(true, CheckNFSMountDagDeployment(api))
+	api.AssertExpectations(s.T())
 }
 
-func TestCheckHardDeleteDeployment(t *testing.T) {
+func (s *Suite) TestCheckHardDeleteDeployment() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockAppConfig := &houston.AppConfig{
 		Version:              "0.15.1",
@@ -1007,26 +981,26 @@ func TestCheckHardDeleteDeployment(t *testing.T) {
 		},
 	}
 
-	t.Run("check hard delete success", func(t *testing.T) {
+	s.Run("check hard delete success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 
 		hardDelete := CheckHardDeleteDeployment(api)
-		assert.Equal(t, true, hardDelete)
-		api.AssertExpectations(t)
+		s.Equal(true, hardDelete)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("check hard delete error", func(t *testing.T) {
+	s.Run("check hard delete error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(nil, errRegMock)
 
 		hardDelete := CheckHardDeleteDeployment(api)
-		assert.False(t, hardDelete)
-		api.AssertExpectations(t)
+		s.False(hardDelete)
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestCheckTriggererEnabled(t *testing.T) {
+func (s *Suite) TestCheckTriggererEnabled() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockAppConfig := &houston.AppConfig{
@@ -1036,24 +1010,24 @@ func TestCheckTriggererEnabled(t *testing.T) {
 		},
 	}
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 
 		triggererEnabled := CheckTriggererEnabled(api)
-		assert.True(t, triggererEnabled)
+		s.True(triggererEnabled)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(nil, errRegMock)
 
 		triggererEnabled := CheckTriggererEnabled(api)
-		assert.False(t, triggererEnabled)
+		s.False(triggererEnabled)
 	})
 }
 
-func TestGetDeploymentSelectionNamespaces(t *testing.T) {
+func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockAvailableNamespaces := []houston.Namespace{
@@ -1061,7 +1035,7 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 		{Name: "test2"},
 	}
 
-	t.Run("get available namespaces", func(t *testing.T) {
+	s.Run("get available namespaces", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAvailableNamespaces", nil).Return(mockAvailableNamespaces, nil)
 
@@ -1070,13 +1044,9 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -1084,29 +1054,29 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 		os.Stdin = r
 
 		name, err := getDeploymentSelectionNamespaces(api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := `#     AVAILABLE KUBERNETES NAMESPACES     
 1     test1                               
 2     test2                               
 `
-		assert.Equal(t, expected, buf.String())
-		assert.Equal(t, "test1", name)
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		s.Equal("test1", name)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("no namespace", func(t *testing.T) {
+	s.Run("no namespace", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAvailableNamespaces", nil).Return([]houston.Namespace{}, nil)
 
 		buf := new(bytes.Buffer)
 		name, err := getDeploymentSelectionNamespaces(api, buf)
 		expected := ``
-		assert.Equal(t, expected, name)
-		assert.EqualError(t, err, "no kubernetes namespaces are available")
-		api.AssertExpectations(t)
+		s.Equal(expected, name)
+		s.EqualError(err, "no kubernetes namespaces are available")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("parse error", func(t *testing.T) {
+	s.Run("parse error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAvailableNamespaces", nil).Return(mockAvailableNamespaces, nil)
 
@@ -1115,13 +1085,9 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("test")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -1129,23 +1095,23 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 		os.Stdin = r
 
 		name, err := getDeploymentSelectionNamespaces(api, buf)
-		assert.Equal(t, "", name)
-		assert.EqualError(t, err, "cannot parse test to int")
-		api.AssertExpectations(t)
+		s.Equal("", name)
+		s.EqualError(err, "cannot parse test to int")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("api error", func(t *testing.T) {
+	s.Run("api error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAvailableNamespaces", nil).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		name, err := getDeploymentSelectionNamespaces(api, buf)
-		assert.Equal(t, "", name)
-		assert.EqualError(t, err, errMock.Error())
+		s.Equal("", name)
+		s.EqualError(err, errMock.Error())
 	})
 }
 
-func TestCheckPreCreateNamespacesDeployment(t *testing.T) {
+func (s *Suite) TestCheckPreCreateNamespacesDeployment() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockAppConfig := &houston.AppConfig{
@@ -1158,21 +1124,17 @@ func TestCheckPreCreateNamespacesDeployment(t *testing.T) {
 	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 
 	usesPreCreateNamespace := CheckPreCreateNamespaceDeployment(api)
-	assert.Equal(t, true, usesPreCreateNamespace)
-	api.AssertExpectations(t)
+	s.Equal(true, usesPreCreateNamespace)
+	api.AssertExpectations(s.T())
 }
 
-func TestGetDeploymentNamespaceName(t *testing.T) {
+func (s *Suite) TestGetDeploymentNamespaceName() {
 	// mock os.Stdin
 	input := []byte("Test1")
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	_, err = w.Write(input)
-	if err != nil {
-		t.Error(err)
-	}
+	s.NoError(err)
 	w.Close()
 	stdin := os.Stdin
 	// Restore stdin right after the test.
@@ -1180,20 +1142,16 @@ func TestGetDeploymentNamespaceName(t *testing.T) {
 	os.Stdin = r
 
 	name, _ := getDeploymentNamespaceName()
-	assert.Equal(t, "Test1", name)
+	s.Equal("Test1", name)
 }
 
-func TestGetDeploymentNamespaceNameError(t *testing.T) {
+func (s *Suite) TestGetDeploymentNamespaceNameError() {
 	// mock os.Stdin
 	input := []byte("   ")
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	_, err = w.Write(input)
-	if err != nil {
-		t.Error(err)
-	}
+	s.NoError(err)
 	w.Close()
 	stdin := os.Stdin
 	// Restore stdin right after the test.
@@ -1201,12 +1159,12 @@ func TestGetDeploymentNamespaceNameError(t *testing.T) {
 	os.Stdin = r
 
 	name, err := getDeploymentNamespaceName()
-	assert.Equal(t, "", name)
-	assert.EqualError(t, err, "no kubernetes namespaces specified")
+	s.Equal("", name)
+	s.EqualError(err, "no kubernetes namespaces specified")
 }
 
-func TestAddDagDeploymentArgs(t *testing.T) {
-	tests := []struct {
+func (s *Suite) TestAddDagDeploymentArgs() {
+	tests := []*struct {
 		dagDeploymentType string
 		nfsLocation       string
 		sshKey            string
@@ -1248,15 +1206,15 @@ func TestAddDagDeploymentArgs(t *testing.T) {
 		output := map[string]interface{}{}
 		err := addDagDeploymentArgs(output, tt.dagDeploymentType, tt.nfsLocation, tt.sshKey, tt.knownHosts, tt.gitRepoURL, tt.gitRevision, tt.gitBranchName, tt.gitDAGDir, tt.gitSyncInterval)
 		if tt.expectedError != "" {
-			assert.Equal(t, tt.expectedError, err.Error())
+			s.Equal(tt.expectedError, err.Error())
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Equal(t, output, tt.expectedOutput)
+		s.Equal(output, tt.expectedOutput)
 	}
 }
 
-func TestRuntimeUpgrade(t *testing.T) {
+func (s *Suite) TestRuntimeUpgrade() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockDeployment := &houston.Deployment{
@@ -1272,7 +1230,7 @@ func TestRuntimeUpgrade(t *testing.T) {
 		DesiredRuntimeVersion: "4.2.5",
 	}
 
-	t.Run("upgrade runtime success when deployment is coming from AC migration", func(t *testing.T) {
+	s.Run("upgrade runtime success when deployment is coming from AC migration", func() {
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": mockDeployment.DesiredRuntimeVersion}
 
 		api := new(mocks.ClientInterface)
@@ -1280,7 +1238,7 @@ func TestRuntimeUpgrade(t *testing.T) {
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
 		buf := new(bytes.Buffer)
 		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
  test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.5     
 
@@ -1290,11 +1248,11 @@ To cancel, run:
 
 `
 
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("upgrade runtime success if deployment was always using runtime", func(t *testing.T) {
+	s.Run("upgrade runtime success if deployment was always using runtime", func() {
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": mockDeployment.DesiredRuntimeVersion}
 
 		api := new(mocks.ClientInterface)
@@ -1304,7 +1262,7 @@ To cancel, run:
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
 		buf := new(bytes.Buffer)
 		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
  test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.5     
 
@@ -1314,11 +1272,11 @@ To cancel, run:
 
 `
 
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("not on runtime", func(t *testing.T) {
+	s.Run("not on runtime", func() {
 		mockResp := *mockDeployment
 		mockResp.AirflowVersion = "2.2.5"
 		mockResp.RuntimeVersion = ""
@@ -1328,21 +1286,21 @@ To cancel, run:
 
 		buf := new(bytes.Buffer)
 		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
-		assert.ErrorIs(t, err, errDeploymentNotOnRuntime)
+		s.ErrorIs(err, errDeploymentNotOnRuntime)
 	})
 
-	t.Run("upgrade runtime get deployment error", func(t *testing.T) {
+	s.Run("upgrade runtime get deployment error", func() {
 		mockError := errors.New("get deployment error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
 		buf := new(bytes.Buffer)
 		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
-		assert.Error(t, err, mockError.Error())
-		api.AssertExpectations(t)
+		s.Error(err, mockError.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("upgrade runtime update deployment error", func(t *testing.T) {
+	s.Run("upgrade runtime update deployment error", func() {
 		mockError := errors.New("update deployment error") //nolint:goerr113
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": mockDeployment.DesiredRuntimeVersion}
 		api := new(mocks.ClientInterface)
@@ -1351,11 +1309,11 @@ To cancel, run:
 
 		buf := new(bytes.Buffer)
 		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
-		assert.Error(t, err, mockError.Error())
-		api.AssertExpectations(t)
+		s.Error(err, mockError.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("upgrade runtime with empty desired version", func(t *testing.T) {
+	s.Run("upgrade runtime with empty desired version", func() {
 		mockRuntimeReleases := houston.RuntimeReleases{
 			houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.5"},
 			houston.RuntimeRelease{Version: "4.2.5", AirflowVersion: "2.2.5"},
@@ -1369,13 +1327,9 @@ To cancel, run:
 		// mock os.Stdin for when prompted by getAirflowVersionSelection()
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -1384,9 +1338,9 @@ To cancel, run:
 
 		buf := new(bytes.Buffer)
 		err = RuntimeUpgrade(mockDeployment.ID, "", api, buf)
-		t.Log(buf.String()) // Log the buffer so that this test is recognized by go test
+		s.T().Log(buf.String()) // Log the buffer so that this test is recognized by go test
 
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := `#     RUNTIME VERSION     
 1     Runtime-4.2.5       
  NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
@@ -1397,12 +1351,12 @@ To cancel, run:
  $ astro deployment runtime upgrade --cancel
 
 `
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestRuntimeUpgradeCancel(t *testing.T) {
+func (s *Suite) TestRuntimeUpgradeCancel() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 
@@ -1418,33 +1372,33 @@ func TestRuntimeUpgradeCancel(t *testing.T) {
 
 	expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID}
 
-	t.Run("upgrade cancel success", func(t *testing.T) {
+	s.Run("upgrade cancel success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("CancelUpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
 		err := RuntimeUpgradeCancel(deploymentID, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := `
 Runtime upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Runtime 4.2.4.
 `
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("upgrade cancel get deployment error", func(t *testing.T) {
+	s.Run("upgrade cancel get deployment error", func() {
 		mockError := errors.New("get deployment error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
 		buf := new(bytes.Buffer)
 		err := RuntimeUpgradeCancel(deploymentID, api, buf)
-		assert.EqualError(t, err, mockError.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, mockError.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("upgrade cancel error", func(t *testing.T) {
+	s.Run("upgrade cancel error", func() {
 		mockError := errors.New("update deployment error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
@@ -1452,12 +1406,12 @@ Runtime upgrade process has been successfully canceled. Your Deployment was not 
 
 		buf := new(bytes.Buffer)
 		err := RuntimeUpgradeCancel(deploymentID, api, buf)
-		assert.EqualError(t, err, mockError.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, mockError.Error())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestRuntimeMigrate(t *testing.T) {
+func (s *Suite) TestRuntimeMigrate() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockDeployment := &houston.Deployment{
@@ -1470,7 +1424,7 @@ func TestRuntimeMigrate(t *testing.T) {
 		AirflowVersion: "2.2.4",
 	}
 
-	t.Run("migrate runtime success", func(t *testing.T) {
+	s.Run("migrate runtime success", func() {
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": "4.2.4"}
 
 		api := new(mocks.ClientInterface)
@@ -1481,7 +1435,7 @@ func TestRuntimeMigrate(t *testing.T) {
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(&mockMigrateRuntimeResp, nil)
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
  test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.4     
 
@@ -1491,22 +1445,22 @@ To cancel, run:
 
 `
 
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("migrate runtime get deployment error", func(t *testing.T) {
+	s.Run("migrate runtime get deployment error", func() {
 		mockError := errors.New("get deployment error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
-		assert.Error(t, err, mockError.Error())
-		api.AssertExpectations(t)
+		s.Error(err, mockError.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("already on runtime error", func(t *testing.T) {
+	s.Run("already on runtime error", func() {
 		api := new(mocks.ClientInterface)
 		mockDeploymentResp := *mockDeployment
 		mockDeploymentResp.RuntimeVersion = "4.2.4"
@@ -1515,11 +1469,11 @@ To cancel, run:
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
-		assert.Error(t, err, errDeploymentAlreadyOnRuntime)
-		api.AssertExpectations(t)
+		s.Error(err, errDeploymentAlreadyOnRuntime)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("migrate runtime get runtime releases error", func(t *testing.T) {
+	s.Run("migrate runtime get runtime releases error", func() {
 		mockError := errors.New("get runtime releases error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
@@ -1527,22 +1481,22 @@ To cancel, run:
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
-		assert.Error(t, err, mockError.Error())
-		api.AssertExpectations(t)
+		s.Error(err, mockError.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("invalid airflow version to migrate to runtime", func(t *testing.T) {
+	s.Run("invalid airflow version to migrate to runtime", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{}, nil)
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
-		assert.Error(t, err, errInvalidAirflowVersion)
-		api.AssertExpectations(t)
+		s.Error(err, errInvalidAirflowVersion)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("migrate runtime update deployment error", func(t *testing.T) {
+	s.Run("migrate runtime update deployment error", func() {
 		mockError := errors.New("update deployment error") //nolint:goerr113
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": "4.2.4"}
 		api := new(mocks.ClientInterface)
@@ -1552,12 +1506,12 @@ To cancel, run:
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
-		assert.Error(t, err, mockError.Error())
-		api.AssertExpectations(t)
+		s.Error(err, mockError.Error())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestRuntimeMigrateCancel(t *testing.T) {
+func (s *Suite) TestRuntimeMigrateCancel() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 
@@ -1574,33 +1528,33 @@ func TestRuntimeMigrateCancel(t *testing.T) {
 
 	expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID}
 
-	t.Run("migrate cancel success", func(t *testing.T) {
+	s.Run("migrate cancel success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("CancelUpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrateCancel(deploymentID, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := `
 Runtime migrate process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 2.2.4.
 `
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("migrate cancel get deployment error", func(t *testing.T) {
+	s.Run("migrate cancel get deployment error", func() {
 		mockError := errors.New("get deployment error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrateCancel(deploymentID, api, buf)
-		assert.EqualError(t, err, mockError.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, mockError.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("migrate cancel error", func(t *testing.T) {
+	s.Run("migrate cancel error", func() {
 		mockError := errors.New("update deployment error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
@@ -1608,11 +1562,11 @@ Runtime migrate process has been successfully canceled. Your Deployment was not 
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrateCancel(deploymentID, api, buf)
-		assert.EqualError(t, err, mockError.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, mockError.Error())
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("already migrated error", func(t *testing.T) {
+	s.Run("already migrated error", func() {
 		api := new(mocks.ClientInterface)
 		mockDeploymentResp := *mockDeployment
 		mockDeploymentResp.AirflowVersion = ""
@@ -1621,20 +1575,20 @@ Runtime migrate process has been successfully canceled. Your Deployment was not 
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrateCancel(deploymentID, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := `
 Nothing to cancel. You are already running Runtime 4.2.4 and you have either not indicated that you want to migrate or migration has been completed.`
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestMeetsRuntimeUpgradeReqs(t *testing.T) {
+func (s *Suite) TestMeetsRuntimeUpgradeReqs() {
 	type args struct {
 		runtimeVersion        string
 		desiredRuntimeVersion string
 	}
-	tests := []struct {
+	tests := []*struct {
 		name        string
 		args        args
 		expectedErr error
@@ -1661,12 +1615,12 @@ func TestMeetsRuntimeUpgradeReqs(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			err := meetsRuntimeUpgradeReqs(tt.args.runtimeVersion, tt.args.desiredRuntimeVersion)
 			if tt.expectedErr == nil {
-				assert.NoError(t, err)
+				s.NoError(err)
 			} else {
-				assert.EqualError(t, err, tt.expectedErr.Error())
+				s.EqualError(err, tt.expectedErr.Error())
 			}
 		})
 	}

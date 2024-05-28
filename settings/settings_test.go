@@ -20,8 +20,8 @@ func TestSettings(t *testing.T) {
 
 var _ suite.TearDownTestSuite = (*Suite)(nil)
 
-func (s* Suite) TearDownTest() {
-  settings = Config{}
+func (s *Suite) TearDownTest() {
+	settings = Config{}
 }
 
 func (s *Suite) TestConfigSettings() {

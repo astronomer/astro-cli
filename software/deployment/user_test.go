@@ -2,17 +2,14 @@ package deployment
 
 import (
 	"bytes"
-	"testing"
 
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestUserList(t *testing.T) {
+func (s *Suite) TestUserList() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	// Test that UserList returns a single deployment user correctly
 	mockUser := houston.DeploymentUser{
@@ -31,7 +28,7 @@ func TestUserList(t *testing.T) {
 		},
 	}
 
-	t.Run("single deployment user", func(t *testing.T) {
+	s.Run("single deployment user", func() {
 		deploymentID := "ckgqw2k2600081qc90nbage4h"
 
 		expectedRequest := houston.ListDeploymentUsersRequest{
@@ -45,12 +42,12 @@ func TestUserList(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := UserList(deploymentID, mockUser.Emails[0].Address, mockUser.ID, mockUser.FullName, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgno     Some Person     somebody     DEPLOYMENT_ADMIN`)
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), `ckgqw2k2600081qc90nbamgno     Some Person     somebody     DEPLOYMENT_ADMIN`)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("multiple users", func(t *testing.T) {
+	s.Run("multiple users", func() {
 		deploymentID := "ckgqw2k2600081qc90nbage4h"
 		mockUsers := []houston.DeploymentUser{
 			mockUser,
@@ -76,14 +73,14 @@ func TestUserList(t *testing.T) {
 		api.On("ListDeploymentUsers", expectedRequest).Return(mockUsers, nil)
 		buf := new(bytes.Buffer)
 		err := UserList(deploymentID, "", "", "", api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgno     Some Person        somebody          DEPLOYMENT_ADMIN`)
-		assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgni     Another Person     anotherperson     DEPLOYMENT_EDITOR`)
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), `ckgqw2k2600081qc90nbamgno     Some Person        somebody          DEPLOYMENT_ADMIN`)
+		s.Contains(buf.String(), `ckgqw2k2600081qc90nbamgni     Another Person     anotherperson     DEPLOYMENT_EDITOR`)
+		api.AssertExpectations(s.T())
 	})
 
 	// Test that UserList returns an empty list when deployment does not exist
-	t.Run("empty list when deployment does not exist", func(t *testing.T) {
+	s.Run("empty list when deployment does not exist", func() {
 		deploymentID := "ckgqw2k2600081qc90nbamgno"
 		expectedRequest := houston.ListDeploymentUsersRequest{
 			DeploymentID: deploymentID,
@@ -93,12 +90,12 @@ func TestUserList(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := UserList(deploymentID, "", "", "", api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), houstonInvalidDeploymentUsersMsg)
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), houstonInvalidDeploymentUsersMsg)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("api error", func(t *testing.T) {
+	s.Run("api error", func() {
 		deploymentID := "ckgqw2k2600081qc90nbamgno"
 		expectedRequest := houston.ListDeploymentUsersRequest{
 			DeploymentID: deploymentID,
@@ -108,15 +105,15 @@ func TestUserList(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := UserList(deploymentID, "", "", "", api, buf)
-		assert.EqualError(t, err, errMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestAdd(t *testing.T) {
+func (s *Suite) TestAdd() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-	t.Run("add user success", func(t *testing.T) {
+	s.Run("add user success", func() {
 		mockUserRole := &houston.RoleBinding{
 			Role: houston.DeploymentAdminRole,
 			User: houston.RoleBindingUser{
@@ -139,11 +136,11 @@ func TestAdd(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := Add(mockUserRole.Deployment.ID, mockUserRole.User.Username, mockUserRole.Role, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Successfully added somebody@astronomer.io as a DEPLOYMENT_ADMIN")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully added somebody@astronomer.io as a DEPLOYMENT_ADMIN")
+		api.AssertExpectations(s.T())
 	})
-	t.Run("add user api error", func(t *testing.T) {
+	s.Run("add user api error", func() {
 		deploymentID := "ckggzqj5f4157qtc9lescmehm"
 		email := "somebody@astronomer.com"
 		role := houston.DeploymentAdminRole
@@ -159,16 +156,16 @@ func TestAdd(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := Add(deploymentID, email, role, api, buf)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), errMock.Error())
-		api.AssertExpectations(t)
+		s.Error(err)
+		s.Contains(err.Error(), errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestDeleteUser(t *testing.T) {
+func (s *Suite) TestDeleteUser() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-	t.Run("delete user success", func(t *testing.T) {
+	s.Run("delete user success", func() {
 		mockUserRole := &houston.RoleBinding{
 			User: houston.RoleBindingUser{Username: "somebody@astronomer.com"},
 			Role: houston.DeploymentAdminRole,
@@ -183,11 +180,11 @@ func TestDeleteUser(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := RemoveUser(mockUserRole.Deployment.ID, mockUserRole.User.Username, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Successfully removed the DEPLOYMENT_ADMIN role for somebody@astronomer.com from deployment deploymentid")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully removed the DEPLOYMENT_ADMIN role for somebody@astronomer.com from deployment deploymentid")
+		api.AssertExpectations(s.T())
 	})
-	t.Run("delete user api error", func(t *testing.T) {
+	s.Run("delete user api error", func() {
 		deploymentID := "deploymentid"
 		email := "somebody@astronomer.com"
 
@@ -196,16 +193,16 @@ func TestDeleteUser(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := RemoveUser(deploymentID, email, api, buf)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), errMock.Error())
-		api.AssertExpectations(t)
+		s.Error(err)
+		s.Contains(err.Error(), errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestUpdateUser(t *testing.T) {
+func (s *Suite) TestUpdateUser() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-	t.Run("update user success", func(t *testing.T) {
+	s.Run("update user success", func() {
 		mockUserRole := &houston.RoleBinding{
 			Role: houston.DeploymentEditorRole,
 			User: houston.RoleBindingUser{
@@ -228,12 +225,12 @@ func TestUpdateUser(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := UpdateUser(mockUserRole.Deployment.ID, mockUserRole.User.Username, houston.DeploymentEditorRole, api, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Successfully updated somebody@astronomer.com to a DEPLOYMENT_EDITOR")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully updated somebody@astronomer.com to a DEPLOYMENT_EDITOR")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("update user api error", func(t *testing.T) {
+	s.Run("update user api error", func() {
 		deploymentID := "ckggzqj5f4157qtc9lescmehm"
 		email := "somebody@astronomer.com"
 		role := "DEPLOYMENT_FAKE_ROLE"
@@ -248,8 +245,8 @@ func TestUpdateUser(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := UpdateUser(deploymentID, email, role, api, buf)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), errMock.Error())
-		api.AssertExpectations(t)
+		s.Error(err)
+		s.Contains(err.Error(), errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 }

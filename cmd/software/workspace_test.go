@@ -2,15 +2,12 @@ package software
 
 import (
 	"bytes"
-	"testing"
 
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var mockWorkspace = &houston.Workspace{
@@ -33,7 +30,7 @@ func execWorkspaceCmd(args ...string) (string, error) {
 	return buf.String(), err
 }
 
-func TestWorkspaceList(t *testing.T) {
+func (s *Suite) TestWorkspaceList() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := " NAME           ID                            \n" +
 		"\x1b[1;32m airflow        ck05r3bor07h40d02y2hw4n4v     \x1b[0m\n " +
@@ -55,16 +52,16 @@ func TestWorkspaceList(t *testing.T) {
 	houstonClient = api
 
 	output, err := execWorkspaceCmd("list")
-	assert.NoError(t, err)
-	assert.Equal(t, expectedOut, output, err)
+	s.NoError(err)
+	s.Equal(expectedOut, output, err)
 }
 
-func TestWorkspaceCreate(t *testing.T) {
+func (s *Suite) TestWorkspaceCreate() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	buf := new(bytes.Buffer)
 
 	err := workspaceCreate(&cobra.Command{}, buf)
-	assert.ErrorIs(t, err, errCreateWorkspaceMissingLabel)
+	s.ErrorIs(err, errCreateWorkspaceMissingLabel)
 
 	houstonMock := new(mocks.ClientInterface)
 	currentClient := houstonClient
@@ -74,13 +71,13 @@ func TestWorkspaceCreate(t *testing.T) {
 
 	houstonMock.On("CreateWorkspace", houston.CreateWorkspaceRequest{Label: workspaceCreateLabel, Description: "N/A"}).Return(&houston.Workspace{ID: "test", Label: workspaceCreateLabel}, nil).Once()
 	err = workspaceCreate(&cobra.Command{}, buf)
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), workspaceCreateLabel)
+	s.NoError(err)
+	s.Contains(buf.String(), workspaceCreateLabel)
 
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }
 
-func TestWorkspaceDelete(t *testing.T) {
+func (s *Suite) TestWorkspaceDelete() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	buf := new(bytes.Buffer)
 	wsID := "test-id"
@@ -92,19 +89,19 @@ func TestWorkspaceDelete(t *testing.T) {
 
 	houstonMock.On("DeleteWorkspace", wsID).Return(nil, nil).Once()
 	err := workspaceDelete(&cobra.Command{}, buf, []string{wsID})
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "Successfully deleted workspace")
+	s.NoError(err)
+	s.Contains(buf.String(), "Successfully deleted workspace")
 
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }
 
-func TestWorkspaceUpdate(t *testing.T) {
+func (s *Suite) TestWorkspaceUpdate() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	wsID := "test-id"
 	buf := new(bytes.Buffer)
 
 	err := workspaceUpdate(&cobra.Command{}, buf, []string{wsID})
-	assert.ErrorIs(t, err, errUpdateWorkspaceInvalidArgs)
+	s.ErrorIs(err, errUpdateWorkspaceInvalidArgs)
 
 	houstonMock := new(mocks.ClientInterface)
 	currentClient := houstonClient
@@ -115,15 +112,15 @@ func TestWorkspaceUpdate(t *testing.T) {
 
 	houstonMock.On("UpdateWorkspace", houston.UpdateWorkspaceRequest{WorkspaceID: wsID, Args: map[string]string{"label": workspaceUpdateLabel, "description": workspaceUpdateDescription}}).Return(&houston.Workspace{ID: wsID, Label: workspaceUpdateLabel}, nil).Once()
 	err = workspaceUpdate(&cobra.Command{}, buf, []string{wsID})
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), wsID)
-	assert.Contains(t, buf.String(), workspaceUpdateLabel)
+	s.NoError(err)
+	s.Contains(buf.String(), wsID)
+	s.Contains(buf.String(), workspaceUpdateLabel)
 
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }
 
-func TestWorkspaceSwitch(t *testing.T) {
-	t.Run("Without pagination", func(t *testing.T) {
+func (s *Suite) TestWorkspaceSwitch() {
+	s.Run("Without pagination", func() {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		wsID := "test-id"
 		buf := new(bytes.Buffer)
@@ -136,12 +133,12 @@ func TestWorkspaceSwitch(t *testing.T) {
 		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
 		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), wsID)
-		houstonMock.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), wsID)
+		houstonMock.AssertExpectations(s.T())
 	})
 
-	t.Run("With pagination default pageSize", func(t *testing.T) {
+	s.Run("With pagination default pageSize", func() {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		wsID := "test-id"
 		buf := new(bytes.Buffer)
@@ -155,12 +152,12 @@ func TestWorkspaceSwitch(t *testing.T) {
 		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
 		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), wsID)
-		houstonMock.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), wsID)
+		houstonMock.AssertExpectations(s.T())
 	})
 
-	t.Run("With pagination, invalid/negative pageSize", func(t *testing.T) {
+	s.Run("With pagination, invalid/negative pageSize", func() {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		wsID := "test-id"
 		workspacePaginated = true
@@ -175,8 +172,8 @@ func TestWorkspaceSwitch(t *testing.T) {
 		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
 		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), wsID)
-		houstonMock.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), wsID)
+		houstonMock.AssertExpectations(s.T())
 	})
 }

@@ -2,6 +2,8 @@ package git
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsGitRepository(t *testing.T) {
@@ -16,9 +18,7 @@ func TestIsGitRepository(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsGitRepository(); got != tt.want {
-				t.Errorf("IsGitRepository() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, IsGitRepository())
 		})
 	}
 }

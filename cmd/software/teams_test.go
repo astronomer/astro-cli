@@ -2,14 +2,11 @@ package software
 
 import (
 	"bytes"
-	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/software/teams"
-
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -23,7 +20,7 @@ func execTeamCmd(args ...string) (string, error) {
 	return buf.String(), err
 }
 
-func TestNewGetTeamCmd(t *testing.T) {
+func (s *Suite) TestNewGetTeamCmd() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	team := &houston.Team{
@@ -36,12 +33,12 @@ func TestNewGetTeamCmd(t *testing.T) {
 	houstonClient = api
 
 	output, err := execTeamCmd("get", "test-id")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "")
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, "")
+	api.AssertExpectations(s.T())
 }
 
-func TestNewGetTeamUsersCmd(t *testing.T) {
+func (s *Suite) TestNewGetTeamUsersCmd() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	team := &houston.Team{
@@ -61,12 +58,12 @@ func TestNewGetTeamUsersCmd(t *testing.T) {
 	houstonClient = api
 
 	output, err := execTeamCmd("get", "-u", "test-id")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "USERNAME            ID          \n email@email.com     test-id")
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, "USERNAME            ID          \n email@email.com     test-id")
+	api.AssertExpectations(s.T())
 }
 
-func TestNewTeamListCmd(t *testing.T) {
+func (s *Suite) TestNewTeamListCmd() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	team := houston.Team{
@@ -79,13 +76,13 @@ func TestNewTeamListCmd(t *testing.T) {
 	houstonClient = api
 
 	output, err := execTeamCmd("list")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "Everyone")
-	assert.Contains(t, output, "blah-id")
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, "Everyone")
+	s.Contains(output, "blah-id")
+	api.AssertExpectations(s.T())
 }
 
-func TestNewTeamUpdateCmd(t *testing.T) {
+func (s *Suite) TestNewTeamUpdateCmd() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
@@ -93,47 +90,47 @@ func TestNewTeamUpdateCmd(t *testing.T) {
 	houstonClient = api
 
 	output, err := execTeamCmd("update", "team-id", "--role", houston.SystemAdminRole)
-	assert.NoError(t, err)
-	assert.Contains(t, output, "team-id")
-	assert.Contains(t, output, houston.SystemAdminRole)
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, "team-id")
+	s.Contains(output, houston.SystemAdminRole)
+	api.AssertExpectations(s.T())
 }
 
-func TestListTeam(t *testing.T) {
+func (s *Suite) TestListTeam() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-	t.Run("success with page size more than the threshold", func(t *testing.T) {
+	s.Run("success with page size more than the threshold", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: teams.ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
 		houstonClient = api
-		defer testUtil.MockUserInput(t, "q")()
+		defer testUtil.MockUserInput(s.T(), "q")()
 
 		output, err := execTeamCmd("list", "-p", "-s=30")
-		assert.NoError(t, err)
-		assert.Contains(t, output, "test-id")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(output, "test-id")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("success with negative page size", func(t *testing.T) {
+	s.Run("success with negative page size", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: teams.ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
 		houstonClient = api
-		defer testUtil.MockUserInput(t, "q")()
+		defer testUtil.MockUserInput(s.T(), "q")()
 
 		output, err := execTeamCmd("list", "-p", "-s=-2")
-		assert.NoError(t, err)
-		assert.Contains(t, output, "test-id")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(output, "test-id")
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("success without pagination", func(t *testing.T) {
+	s.Run("success without pagination", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: teams.ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
 		houstonClient = api
 
 		output, err := execTeamCmd("list")
-		assert.NoError(t, err)
-		assert.Contains(t, output, "test-id")
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(output, "test-id")
+		api.AssertExpectations(s.T())
 	})
 }

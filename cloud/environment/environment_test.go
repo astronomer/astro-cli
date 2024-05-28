@@ -11,9 +11,18 @@ import (
 	"github.com/lucsky/cuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestListConnections(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestEnvironment(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestListConnections() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	context, _ := config.GetCurrentContext()
@@ -24,7 +33,7 @@ func TestListConnections(t *testing.T) {
 	resolvedLinked := true
 	limit := 1000
 
-	t.Run("List connections with deployment ID", func(t *testing.T) {
+	s.Run("List connections with deployment ID", func() {
 		listParams := &astrocore.ListEnvironmentObjectsParams{
 			DeploymentId:  &deploymentID,
 			ObjectType:    &objectType,
@@ -42,14 +51,14 @@ func TestListConnections(t *testing.T) {
 		}, nil).Once()
 
 		conns, err := ListConnections("", deploymentID, mockClient)
-		assert.NoError(t, err)
-		assert.Len(t, conns, 1)
-		assert.Equal(t, "postgres", conns["conn1"].Type)
+		s.NoError(err)
+		s.Len(conns, 1)
+		s.Equal("postgres", conns["conn1"].Type)
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("List connections with specified workspace ID", func(t *testing.T) {
+	s.Run("List connections with specified workspace ID", func() {
 		workspaceID := cuid.New()
 		listParams := &astrocore.ListEnvironmentObjectsParams{
 			WorkspaceId:   &workspaceID,
@@ -68,14 +77,14 @@ func TestListConnections(t *testing.T) {
 		}, nil).Once()
 
 		conns, err := ListConnections(workspaceID, "", mockClient)
-		assert.NoError(t, err)
-		assert.Len(t, conns, 1)
-		assert.Equal(t, "postgres", conns["conn1"].Type)
+		s.NoError(err)
+		s.Len(conns, 1)
+		s.Equal("postgres", conns["conn1"].Type)
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("List no connections when no deployment or workspace IDs", func(t *testing.T) {
+	s.Run("List no connections when no deployment or workspace IDs", func() {
 		originalWorkspace := context.Workspace
 		context.Workspace = ""
 		context.SetContext()
@@ -84,12 +93,12 @@ func TestListConnections(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 		_, err := ListConnections("", "", mockClient)
-		assert.Error(t, err)
+		s.Error(err)
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("List no connections when core listing fails", func(t *testing.T) {
+	s.Run("List no connections when core listing fails", func() {
 		listParams := &astrocore.ListEnvironmentObjectsParams{
 			WorkspaceId:   &context.Workspace,
 			ObjectType:    &objectType,
@@ -102,8 +111,8 @@ func TestListConnections(t *testing.T) {
 		mockClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, organization, listParams).Return(nil, assert.AnError).Once()
 
 		_, err := ListConnections(context.Workspace, "", mockClient)
-		assert.Error(t, err)
+		s.Error(err)
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 }

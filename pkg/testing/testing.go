@@ -10,6 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -122,9 +123,7 @@ func StringContains(tt []string, t string) bool {
 func MockUserInput(t *testing.T, i string) func() {
 	input := []byte(i)
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	_, err = w.Write(input)
 	if err != nil {
 		t.Error(err)

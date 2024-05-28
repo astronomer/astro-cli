@@ -2,56 +2,54 @@ package deployment
 
 import (
 	"bytes"
-	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestLog(t *testing.T) {
+func (s *Suite) TestLog() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListDeploymentLogs", mock.AnythingOfType("houston.ListDeploymentLogsRequest")).Return([]houston.DeploymentLog{{ID: "test-id", Log: "test log"}}, nil)
 		out := new(bytes.Buffer)
 
 		err := Log("test-id", "test-component", "test", 0, api, out)
-		assert.NoError(t, err)
-		assert.Contains(t, out.String(), "test log")
+		s.NoError(err)
+		s.Contains(out.String(), "test log")
 	})
 
-	t.Run("houston error", func(t *testing.T) {
+	s.Run("houston error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListDeploymentLogs", mock.AnythingOfType("houston.ListDeploymentLogsRequest")).Return([]houston.DeploymentLog{}, errMock)
 		out := new(bytes.Buffer)
 
 		err := Log("test-id", "test-component", "test", 0, api, out)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestSubscribeDeploymentLog(t *testing.T) {
+func (s *Suite) TestSubscribeDeploymentLog() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		subscribe = func(jwtToken, url, queryMessage string) error {
 			return nil
 		}
 
 		err := SubscribeDeploymentLog("test-id", "test-component", "test", 0)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("houston failure", func(t *testing.T) {
+	s.Run("houston failure", func() {
 		subscribe = func(jwtToken, url, queryMessage string) error {
 			return errMock
 		}
 
 		err := SubscribeDeploymentLog("test-id", "test-component", "test", 0)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }

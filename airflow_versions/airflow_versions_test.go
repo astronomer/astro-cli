@@ -7,14 +7,20 @@ import (
 	"net/http"
 	"testing"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-
-	"github.com/stretchr/testify/assert"
-
 	semver "github.com/Masterminds/semver/v3"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestGetAstronomerCertifiedTag(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestAirflowVersions(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestGetAstronomerCertifiedTag() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	availableReleases := []AirflowVersionRaw{
@@ -82,15 +88,15 @@ func TestGetAstronomerCertifiedTag(t *testing.T) {
 	for _, tt := range tests {
 		defaultImageTag, err := getAstronomerCertifiedTag(availableReleases, tt.airflowVersion)
 		if tt.err == nil {
-			assert.NoError(t, err)
+			s.NoError(err)
 		} else {
-			assert.EqualError(t, err, tt.err.Error())
+			s.EqualError(err, tt.err.Error())
 		}
-		assert.Equal(t, tt.output, defaultImageTag)
+		s.Equal(tt.output, defaultImageTag)
 	}
 }
 
-func TestGetAstroRuntimeTag(t *testing.T) {
+func (s *Suite) TestGetAstroRuntimeTag() {
 	tagToRuntimeVersion := map[string]RuntimeVersion{
 		"2.1.1": {
 			Metadata: RuntimeVersionMetadata{
@@ -157,18 +163,18 @@ func TestGetAstroRuntimeTag(t *testing.T) {
 	for _, tt := range tests {
 		defaultImageTag, err := getAstroRuntimeTag(tagToRuntimeVersion, tt.airflowVersion)
 		if tt.err == nil {
-			assert.NoError(t, err)
+			s.NoError(err)
 		} else {
-			assert.EqualError(t, err, tt.err.Error())
+			s.EqualError(err, tt.err.Error())
 		}
-		assert.Equal(t, tt.output, defaultImageTag)
+		s.Equal(tt.output, defaultImageTag)
 	}
 }
 
-func TestGetDefaultImageTag(t *testing.T) {
+func (s *Suite) TestGetDefaultImageTag() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("certified", func(t *testing.T) {
+	s.Run("certified", func() {
 		mockResp := &Response{
 			AvailableReleases: []AirflowVersionRaw{
 				{
@@ -230,11 +236,11 @@ func TestGetDefaultImageTag(t *testing.T) {
 		httpClient := NewClient(client, true)
 
 		defaultImageTag, err := GetDefaultImageTag(httpClient, "")
-		assert.NoError(t, err)
-		assert.Equal(t, "2.2.0-onbuild", defaultImageTag)
+		s.NoError(err)
+		s.Equal("2.2.0-onbuild", defaultImageTag)
 	})
 
-	t.Run("runtime", func(t *testing.T) {
+	s.Run("runtime", func() {
 		mockResp := &Response{
 			RuntimeVersions: map[string]RuntimeVersion{
 				"2.1.1": {
@@ -300,12 +306,12 @@ func TestGetDefaultImageTag(t *testing.T) {
 		httpClient := NewClient(client, false)
 
 		defaultImageTag, err := GetDefaultImageTag(httpClient, "")
-		assert.NoError(t, err)
-		assert.Equal(t, "4.0.0", defaultImageTag)
+		s.NoError(err)
+		s.Equal("4.0.0", defaultImageTag)
 	})
 }
 
-func TestGetDefaultImageTagError(t *testing.T) {
+func (s *Suite) TestGetDefaultImageTagError() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	okResponse := `Page not found`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
@@ -318,6 +324,6 @@ func TestGetDefaultImageTagError(t *testing.T) {
 	httpClient := NewClient(client, true)
 
 	defaultImageTag, err := GetDefaultImageTag(httpClient, "")
-	assert.Error(t, err)
-	assert.Equal(t, "", defaultImageTag)
+	s.Error(err)
+	s.Equal("", defaultImageTag)
 }

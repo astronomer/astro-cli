@@ -6,16 +6,24 @@ import (
 	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestRegistryCommand(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestRegistry(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestRegistryCommand() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	buf := new(bytes.Buffer)
 	deplyCmd := newRegistryCmd(os.Stdout)
 	deplyCmd.SetOut(buf)
 	testUtil.SetupOSArgsForGinkgo()
 	_, err := deplyCmd.ExecuteC()
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "Astronomer Registry")
+	s.NoError(err)
+	s.Contains(buf.String(), "Astronomer Registry")
 }

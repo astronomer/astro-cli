@@ -56,6 +56,7 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 
 var switchToLastUsedWorkspace = func(client houston.ClientInterface, c *config.Context) bool {
 	if c.LastUsedWorkspace == "" {
+		log.Debug("last used workspace was empty")
 		return false
 	}
 

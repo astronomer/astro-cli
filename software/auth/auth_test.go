@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
 
 const (
@@ -26,7 +27,30 @@ var (
 	errInvalidWorkspace = errors.New("last used workspace id is not valid")
 )
 
-func TestBasicAuth(t *testing.T) {
+type Suite struct {
+	suite.Suite
+
+	origSwitchToLastUsedWorkspace func(client houston.ClientInterface, c *config.Context) bool
+}
+
+func TestAuth(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+var (
+	_ suite.SetupAllSuite     = (*Suite)(nil)
+	_ suite.TearDownTestSuite = (*Suite)(nil)
+)
+
+func (s *Suite) SetupSuite() {
+	s.origSwitchToLastUsedWorkspace = switchToLastUsedWorkspace
+}
+
+func (s *Suite) TearDownTest() {
+	switchToLastUsedWorkspace = s.origSwitchToLastUsedWorkspace
+}
+
+func (s *Suite) TestBasicAuth() {
 	houstonMock := new(houstonMocks.ClientInterface)
 	houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
 
@@ -54,20 +78,18 @@ func TestBasicAuth(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			got, err := basicAuth(tt.args.username, tt.args.password, &config.Context{}, houstonMock)
-			if !tt.errAssertion(t, err) {
+			if !tt.errAssertion(s.T(), err) {
 				return
 			}
-			if got != tt.want {
-				t.Errorf("basicAuth() = %v, want %v", got, tt.want)
-			}
+			s.Equal(tt.want, got)
 		})
 	}
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }
 
-func TestSwitchToLastUsedWorkspace(t *testing.T) {
+func (s *Suite) TestSwitchToLastUsedWorkspace() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("localhost")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -110,20 +132,20 @@ func TestSwitchToLastUsedWorkspace(t *testing.T) {
 		},
 	}
 
-	houstonMock := new(houstonMocks.ClientInterface)
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
+			houstonMock := new(houstonMocks.ClientInterface)
+
 			if tt.args.c.LastUsedWorkspace != "" {
 				houstonMock.On("ValidateWorkspaceID", tt.args.c.LastUsedWorkspace).Return(tt.args.workspace, tt.args.err).Once()
 			}
-			if got := switchToLastUsedWorkspace(houstonMock, tt.args.c); got != tt.want {
-				t.Errorf("switchToLastUsedWorkspace() = %v, want %v", got, tt.want)
-			}
+			got := switchToLastUsedWorkspace(houstonMock, tt.args.c)
+			s.Equal(tt.want, got)
 		})
 	}
 }
 
-func TestRegistryAuthSuccess(t *testing.T) {
+func (s *Suite) TestRegistryAuthSuccess() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("localhost")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -166,27 +188,27 @@ func TestRegistryAuthSuccess(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			ctx := config.Context{Domain: tt.domain}
 			err := ctx.SetContext()
-			assert.NoError(t, err)
+			s.NoError(err)
 
 			err = ctx.SwitchContext()
-			assert.NoError(t, err)
+			s.NoError(err)
 
-			tt.errAssertion(t, registryAuth(houstonMock, out))
+			tt.errAssertion(s.T(), registryAuth(houstonMock, out))
 		})
 	}
-	mockRegistryHandler.AssertExpectations(t)
+	mockRegistryHandler.AssertExpectations(s.T())
 }
 
-func TestRegistryAuthFailure(t *testing.T) {
+func (s *Suite) TestRegistryAuthFailure() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig(testUtil.SoftwarePlatform)
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
-	t.Run("registry failures", func(t *testing.T) {
+	s.Run("registry failures", func() {
 		registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
 			return nil, errMockRegistry
 		}
@@ -196,7 +218,7 @@ func TestRegistryAuthFailure(t *testing.T) {
 		houstonMock.On("GetAppConfig", nil).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: true}}, nil).Twice()
 
 		err := registryAuth(houstonMock, out)
-		assert.ErrorIs(t, err, errMockRegistry)
+		s.ErrorIs(err, errMockRegistry)
 
 		mockRegistryHandler := new(mocks.RegistryHandler)
 		registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
@@ -205,30 +227,30 @@ func TestRegistryAuthFailure(t *testing.T) {
 		}
 
 		err = registryAuth(houstonMock, out)
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		houstonMock.On("GetAppConfig", nil).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil).Once()
 
 		err = registryAuth(houstonMock, out)
-		assert.ErrorIs(t, err, errMockRegistry)
+		s.ErrorIs(err, errMockRegistry)
 
-		mockRegistryHandler.AssertExpectations(t)
-		houstonMock.AssertExpectations(t)
+		mockRegistryHandler.AssertExpectations(s.T())
+		houstonMock.AssertExpectations(s.T())
 	})
 
-	t.Run("houston get app config failure", func(t *testing.T) {
+	s.Run("houston get app config failure", func() {
 		out := new(bytes.Buffer)
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAppConfig", nil).Return(nil, errMockHouston).Once()
 
 		err := registryAuth(houstonMock, out)
-		assert.ErrorIs(t, err, errMockHouston)
-		houstonMock.AssertExpectations(t)
+		s.ErrorIs(err, errMockHouston)
+		houstonMock.AssertExpectations(s.T())
 	})
 }
 
-func TestLoginSuccess(t *testing.T) {
-	t.Run("default without workspace pagination switch", func(t *testing.T) {
+func (s *Suite) TestLoginSuccess() {
+	s.Run("default without workspace pagination switch", func() {
 		fs := afero.NewMemMapFs()
 		configYaml := testUtil.NewTestConfig("localhost")
 		afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -241,26 +263,26 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock.On("ValidateWorkspaceID", "test-workspace-id").Return(&houston.Workspace{ID: "test-workspace-id"}, nil).Once()
 
 		out := &bytes.Buffer{}
-		if !assert.NoError(t, Login("localhost", false, "test", "test", "0.29.0", houstonMock, out)) {
+		if !s.NoError(Login("localhost", false, "test", "test", "0.29.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
-			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost"})
+			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost"})
 		}
 
 		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
 		out = &bytes.Buffer{}
-		if assert.NoError(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
+		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-id"}, gotOut) {
-			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost", "test-workspace-id"})
+			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost", "test-workspace-id"})
 		}
 
-		houstonMock.AssertExpectations(t)
+		houstonMock.AssertExpectations(s.T())
 	})
 
-	t.Run("default with more than one workspace", func(t *testing.T) {
+	s.Run("default with more than one workspace", func() {
 		fs := afero.NewMemMapFs()
 		configYaml := testUtil.NewTestConfig("localhost")
 		afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -268,7 +290,7 @@ func TestLoginSuccess(t *testing.T) {
 		config.CFG.Interactive.SetHomeString("false")
 		config.CFG.PageSize.SetHomeString("100")
 
-		defer testUtil.MockUserInput(t, "1")()
+		defer testUtil.MockUserInput(s.T(), "1")()
 
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
@@ -280,17 +302,17 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock.On("ValidateWorkspaceID", "ck05r3bor07h40d02y2hw4n4v").Return(&houston.Workspace{}, nil).Once()
 
 		out := &bytes.Buffer{}
-		if assert.NoError(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
+		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-id"}, gotOut) {
-			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost", "test-workspace-id"})
+			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost", "test-workspace-id"})
 		}
 
-		houstonMock.AssertExpectations(t)
+		houstonMock.AssertExpectations(s.T())
 	})
 
-	t.Run("when interactive set to true, auto selected first workspace if returned one workspace", func(t *testing.T) {
+	s.Run("when interactive set to true, auto selected first workspace if returned one workspace", func() {
 		fs := afero.NewMemMapFs()
 		configYaml := testUtil.NewTestConfig("localhost")
 		afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -298,7 +320,7 @@ func TestLoginSuccess(t *testing.T) {
 		config.CFG.Interactive.SetHomeString("true")
 		config.CFG.PageSize.SetHomeString("100")
 
-		defer testUtil.MockUserInput(t, "1")()
+		defer testUtil.MockUserInput(s.T(), "1")()
 
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
@@ -309,17 +331,17 @@ func TestLoginSuccess(t *testing.T) {
 		}
 
 		out := &bytes.Buffer{}
-		if assert.NoError(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
+		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "ck05r3bor07h40d02y2hw4n4v"}, gotOut) {
-			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost", "ck05r3bor07h40d02y2hw4n4v"})
+			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost", "ck05r3bor07h40d02y2hw4n4v"})
 		}
 
-		houstonMock.AssertExpectations(t)
+		houstonMock.AssertExpectations(s.T())
 	})
 
-	t.Run("when interactive set to true, prompt user to select workspace with pagination", func(t *testing.T) {
+	s.Run("when interactive set to true, prompt user to select workspace with pagination", func() {
 		fs := afero.NewMemMapFs()
 		configYaml := testUtil.NewTestConfig("localhost")
 		afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -327,7 +349,7 @@ func TestLoginSuccess(t *testing.T) {
 		config.CFG.Interactive.SetHomeString("true")
 		config.CFG.PageSize.SetHomeString("100")
 
-		defer testUtil.MockUserInput(t, "1")()
+		defer testUtil.MockUserInput(s.T(), "1")()
 
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
@@ -341,69 +363,69 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock.On("ValidateWorkspaceID", "test-workspace-1").Return(&houston.Workspace{}, nil).Once()
 
 		out := &bytes.Buffer{}
-		if assert.NoError(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
+		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-1"}, gotOut) {
-			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost", "ck05r3bor07h40d02y2hw4n4v"})
+			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost", "ck05r3bor07h40d02y2hw4n4v"})
 		}
 
-		houstonMock.AssertExpectations(t)
+		houstonMock.AssertExpectations(s.T())
 	})
 }
 
-func TestLoginFailure(t *testing.T) {
+func (s *Suite) TestLoginFailure() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("software")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
-	t.Run("getAuthConfig failure", func(t *testing.T) {
+	s.Run("getAuthConfig failure", func() {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(nil, errMockRegistry)
 
 		out := &bytes.Buffer{}
-		if !assert.ErrorIs(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
+		if !s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
-			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost"})
+			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost"})
 		}
-		houstonMock.AssertExpectations(t)
+		houstonMock.AssertExpectations(s.T())
 	})
 
-	t.Run("AuthenticateWithBasicAuth failure", func(t *testing.T) {
+	s.Run("AuthenticateWithBasicAuth failure", func() {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything).Return("", errMockRegistry)
 
 		out := &bytes.Buffer{}
-		if assert.ErrorIs(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
+		if s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
-			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost"})
+			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost"})
 		}
-		houstonMock.AssertExpectations(t)
+		houstonMock.AssertExpectations(s.T())
 	})
 
-	t.Run("ListWorkspaces failure", func(t *testing.T) {
+	s.Run("ListWorkspaces failure", func() {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
 		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{}, errMockRegistry).Once()
 
 		out := &bytes.Buffer{}
-		if assert.ErrorIs(t, Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
+		if s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
-			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost"})
+			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost"})
 		}
-		houstonMock.AssertExpectations(t)
+		houstonMock.AssertExpectations(s.T())
 	})
 
-	t.Run("no workspace failure", func(t *testing.T) {
+	s.Run("no workspace failure", func() {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything).Return(mockToken, nil)
@@ -411,16 +433,16 @@ func TestLoginFailure(t *testing.T) {
 		houstonMock.On("GetAppConfig", nil).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil)
 
 		out := &bytes.Buffer{}
-		if assert.NoError(t, Login("dev.astro.io", false, "test", "test", "0.30.0", houstonMock, out)) {
+		if s.NoError(Login("dev.astro.io", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"dev.astro.io", "No default workspace detected"}, gotOut) {
-			t.Errorf("Login() = %v, want %v", gotOut, []string{"dev.astro.io", "No default workspace detected"})
+			s.Fail("Login() = %v, want %v", gotOut, []string{"dev.astro.io", "No default workspace detected"})
 		}
-		houstonMock.AssertExpectations(t)
+		houstonMock.AssertExpectations(s.T())
 	})
 
-	t.Run("registry login failure", func(t *testing.T) {
+	s.Run("registry login failure", func() {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
@@ -434,17 +456,17 @@ func TestLoginFailure(t *testing.T) {
 		}
 
 		out := &bytes.Buffer{}
-		if assert.NoError(t, Login("test.astro.io", false, "test", "test", "0.30.0", houstonMock, out)) {
+		if s.NoError(Login("test.astro.io", false, "test", "test", "0.30.0", houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"test.astro.io", "Failed to authenticate to the registry"}, gotOut) {
-			t.Errorf("Login() = %v, want %v", gotOut, []string{"test.astro.io", "Failed to authenticate to the registry"})
+			s.Fail("Login() = %v, want %v", gotOut, []string{"test.astro.io", "Failed to authenticate to the registry"})
 		}
-		houstonMock.AssertExpectations(t)
+		houstonMock.AssertExpectations(s.T())
 	})
 }
 
-func TestLogout(t *testing.T) {
+func (s *Suite) TestLogout() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("localhost")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -467,13 +489,13 @@ func TestLogout(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			Logout(tt.args.domain)
 		})
 	}
 }
 
-func TestCheckClusterDomain(t *testing.T) {
+func (s *Suite) TestCheckClusterDomain() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("localhost")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -499,13 +521,13 @@ func TestCheckClusterDomain(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.errAssertion(t, checkClusterDomain(tt.args.domain))
+		s.Run(tt.name, func() {
+			tt.errAssertion(s.T(), checkClusterDomain(tt.args.domain))
 		})
 	}
 }
 
-func TestGetAuthTokenSuccess(t *testing.T) {
+func (s *Suite) TestGetAuthTokenSuccess() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("software")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -540,38 +562,38 @@ func TestGetAuthTokenSuccess(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			got, err := getAuthToken(tt.args.username, tt.args.password, tt.args.authConfig, tt.args.ctx, houstonMock)
-			if !tt.errAssertion(t, err) {
+			if !tt.errAssertion(s.T(), err) {
 				return
 			}
 			if got != tt.want {
-				t.Errorf("getAuthToken() = %v, want %v", got, tt.want)
+				s.Fail("getAuthToken() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }
 
-func TestGetAuthTokenFailure(t *testing.T) {
+func (s *Suite) TestGetAuthTokenFailure() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("software")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
 	got, err := getAuthToken("", "", &houston.AuthConfig{LocalEnabled: true}, &config.Context{Domain: "localhost"}, nil)
-	if !assert.ErrorIs(t, err, errOAuthDisabled) {
+	if !s.ErrorIs(err, errOAuthDisabled) {
 		return
 	}
-	assert.Equal(t, got, "")
+	s.Equal(got, "")
 
 	houstonMock := new(houstonMocks.ClientInterface)
 	houstonMock.On("AuthenticateWithBasicAuth", mock.Anything).Return("", errMockRegistry)
 
 	_, err = getAuthToken("test", "test", &houston.AuthConfig{LocalEnabled: true}, &config.Context{Domain: "localhost"}, houstonMock)
-	if !assert.ErrorIs(t, err, errMockRegistry) {
+	if !s.ErrorIs(err, errMockRegistry) {
 		return
 	}
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }

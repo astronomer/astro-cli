@@ -5,9 +5,18 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestCoerce(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestUtils(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestCoerce() {
 	type args struct {
 		version string
 	}
@@ -28,18 +37,18 @@ func TestCoerce(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			got := Coerce(tt.args.version)
 			if tt.want != "" && tt.want != got.String() {
-				t.Errorf("Coerce() = %v, want %v", got, tt.want)
+				s.Fail("Coerce() = %v, want %v", got, tt.want)
 			} else if tt.want == "" && got != nil {
-				t.Errorf("Coerce() = %v, want nil", got)
+				s.Fail("Coerce() = %v, want nil", got)
 			}
 		})
 	}
 }
 
-func TestContains(t *testing.T) {
+func (s *Suite) TestContains() {
 	type args struct {
 		elems []string
 		v     string
@@ -61,15 +70,15 @@ func TestContains(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			if got := Contains(tt.args.elems, tt.args.v); got != tt.want {
-				t.Errorf("Contains() = %v, want %v", got, tt.want)
+				s.Fail("Contains() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestGetStringInBetweenTwoString(t *testing.T) {
+func (s *Suite) TestGetStringInBetweenTwoString() {
 	type args struct {
 		str    string
 		startS string
@@ -101,19 +110,19 @@ func TestGetStringInBetweenTwoString(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			gotResult, gotFound := GetStringInBetweenTwoString(tt.args.str, tt.args.startS, tt.args.endS)
 			if gotResult != tt.wantResult {
-				t.Errorf("GetStringInBetweenTwoString() gotResult = %v, want %v", gotResult, tt.wantResult)
+				s.Fail("GetStringInBetweenTwoString() gotResult = %v, want %v", gotResult, tt.wantResult)
 			}
 			if gotFound != tt.wantFound {
-				t.Errorf("GetStringInBetweenTwoString() gotFound = %v, want %v", gotFound, tt.wantFound)
+				s.Fail("GetStringInBetweenTwoString() gotFound = %v, want %v", gotFound, tt.wantFound)
 			}
 		})
 	}
 }
 
-func TestExists(t *testing.T) {
+func (s *Suite) TestExists() {
 	type args struct {
 		path string
 	}
@@ -137,20 +146,18 @@ func TestExists(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			got, err := Exists(tt.args.path)
-			if !tt.errAssertion(t, err) {
+			if !tt.errAssertion(s.T(), err) {
 				return
 			}
 
-			if got != tt.want {
-				t.Errorf("Exists() = %v, want %v", got, tt.want)
-			}
+			s.Equal(tt.want, got)
 		})
 	}
 }
 
-func TestBase64URLEncode(t *testing.T) {
+func (s *Suite) TestBase64URLEncode() {
 	type args struct {
 		arg []byte
 	}
@@ -166,15 +173,13 @@ func TestBase64URLEncode(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := Base64URLEncode(tt.args.arg); got != tt.want {
-				t.Errorf("Base64URLEncode() = %v, want %v", got, tt.want)
-			}
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, Base64URLEncode(tt.args.arg))
 		})
 	}
 }
 
-func TestCheckEnvBool(t *testing.T) {
+func (s *Suite) TestCheckEnvBool() {
 	type args struct {
 		arg string
 	}
@@ -210,57 +215,55 @@ func TestCheckEnvBool(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := CheckEnvBool(tt.args.arg); got != tt.want {
-				t.Errorf("CheckEnvBool() = %v, want %v", got, tt.want)
-			}
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, CheckEnvBool(tt.args.arg))
 		})
 	}
 }
 
-func TestParseAPIToken(t *testing.T) {
-	t.Run("throw error is token is invalid", func(t *testing.T) {
+func (s *Suite) TestParseAPIToken() {
+	s.Run("throw error is token is invalid", func() {
 		token := "invalid-token"
 		_, err := ParseAPIToken(token)
-		assert.NotNil(t, err)
-		assert.Contains(t, err.Error(), "token is invalid or malformed")
+		s.NotNil(err)
+		s.Contains(err.Error(), "token is invalid or malformed")
 	})
 
-	t.Run("returns token claims if token is valid", func(t *testing.T) {
+	s.Run("returns token claims if token is valid", func() {
 		// dummy token
 		token := "eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0K.eyJ1c2VybmFtZSI6ImFkbWluaW5pc3RyYXRvciIsImlzX2FkbWluIjp0cnVlLCJpYXQiOjE1MTYyMzkwMjIsImV4cCI6MTUxNjI0MjYyMn0."
 		claims, err := ParseAPIToken(token)
-		assert.NotNil(t, claims)
-		assert.Nil(t, err)
+		s.NotNil(claims)
+		s.NoError(err)
 	})
 }
 
-func TestIsM1(t *testing.T) {
-	t.Run("returns true if running on arm architecture", func(t *testing.T) {
-		assert.True(t, IsM1("darwin", "arm64"))
+func (s *Suite) TestIsM1() {
+	s.Run("returns true if running on arm architecture", func() {
+		s.True(IsM1("darwin", "arm64"))
 	})
-	t.Run("returns false if not running on arm architecture", func(t *testing.T) {
-		assert.False(t, IsM1("darwin", "x86_64"))
+	s.Run("returns false if not running on arm architecture", func() {
+		s.False(IsM1("darwin", "x86_64"))
 	})
-	t.Run("returns false if running on windows", func(t *testing.T) {
-		assert.False(t, IsM1("windows", "amd64"))
+	s.Run("returns false if running on windows", func() {
+		s.False(IsM1("windows", "amd64"))
 	})
 }
 
-func TestGetbuildSecretString(t *testing.T) {
-	t.Run("returns empty string if buildSecret is empty", func(t *testing.T) {
-		assert.Equal(t, "", GetbuildSecretString([]string{}))
+func (s *Suite) TestGetbuildSecretString() {
+	s.Run("returns empty string if buildSecret is empty", func() {
+		s.Equal("", GetbuildSecretString([]string{}))
 	})
 
-	t.Run("returns the only secret if buildSecret has only one element", func(t *testing.T) {
-		assert.Equal(t, "secret1", GetbuildSecretString([]string{"secret1"}))
+	s.Run("returns the only secret if buildSecret has only one element", func() {
+		s.Equal("secret1", GetbuildSecretString([]string{"secret1"}))
 	})
 
-	t.Run("returns comma-separated string for multiple secrets in buildSecret", func(t *testing.T) {
-		assert.Equal(t, "secret1,secret2,secret3", GetbuildSecretString([]string{"secret1", "secret2", "secret3"}))
+	s.Run("returns comma-separated string for multiple secrets in buildSecret", func() {
+		s.Equal("secret1,secret2,secret3", GetbuildSecretString([]string{"secret1", "secret2", "secret3"}))
 	})
 
-	t.Run("overrides buildSecretString with BUILD_SECRET_INPUT if set", func(t *testing.T) {
+	s.Run("overrides buildSecretString with BUILD_SECRET_INPUT if set", func() {
 		// Save the original value of BUILD_SECRET_INPUT
 		originalBuildSecretInput := os.Getenv("BUILD_SECRET_INPUT")
 		defer func() {
@@ -272,51 +275,51 @@ func TestGetbuildSecretString(t *testing.T) {
 		os.Setenv("BUILD_SECRET_INPUT", "override_secret")
 
 		// Test with a non-empty buildSecret
-		assert.Equal(t, "secret1,secret2", GetbuildSecretString([]string{"secret1", "secret2"}))
+		s.Equal("secret1,secret2", GetbuildSecretString([]string{"secret1", "secret2"}))
 
 		// Test with an empty buildSecret
-		assert.Equal(t, "override_secret", GetbuildSecretString([]string{}))
+		s.Equal("override_secret", GetbuildSecretString([]string{}))
 	})
 }
 
-func TestStripOutKeysFromJSONByteArray(t *testing.T) {
-	t.Run("valid JSON, strip out keys", func(t *testing.T) {
+func (s *Suite) TestStripOutKeysFromJSONByteArray() {
+	s.Run("valid JSON, strip out keys", func() {
 		jsonData := []byte(`{"a": 1, "b": 2, "c": 3}`)
 		keys := []string{"a", "c"}
 		expectedResult := []byte(`{"b":2}`)
 		result, err := StripOutKeysFromJSONByteArray(jsonData, keys)
-		assert.Nil(t, err)
-		assert.Equal(t, result, expectedResult)
+		s.NoError(err)
+		s.Equal(result, expectedResult)
 	})
 
-	t.Run("invalid JSON, return as is - case 1", func(t *testing.T) {
+	s.Run("invalid JSON, return as is - case 1", func() {
 		jsonData := []byte(`{invalid: json}`)
 		keys := []string{"a", "c"}
 		expectedResult := jsonData
 		result, err := StripOutKeysFromJSONByteArray(jsonData, keys)
-		assert.Nil(t, err)
-		assert.Equal(t, result, expectedResult)
+		s.NoError(err)
+		s.Equal(result, expectedResult)
 	})
 
-	t.Run("invalid JSON, return as is - case 2", func(t *testing.T) {
+	s.Run("invalid JSON, return as is - case 2", func() {
 		jsonData := []byte(``)
 		keys := []string{"a", "c"}
 		expectedResult := jsonData
 		result, err := StripOutKeysFromJSONByteArray(jsonData, keys)
-		assert.Nil(t, err)
-		assert.Equal(t, result, expectedResult)
+		s.NoError(err)
+		s.Equal(result, expectedResult)
 	})
 }
 
-func TestFilter(t *testing.T) {
-	t.Run("strings", func(t *testing.T) {
+func (s *Suite) TestFilter() {
+	s.Run("strings", func() {
 		expectedResult := []string{"a"}
 		result := Filter([]string{"a", "b", "c"}, func(s string) bool { return s == "a" })
-		assert.Equal(t, result, expectedResult)
+		s.Equal(result, expectedResult)
 	})
-	t.Run("ints", func(t *testing.T) {
+	s.Run("ints", func() {
 		expectedResult := []int{2}
 		result := Filter([]int{1, 2, 3}, func(s int) bool { return s%2 == 0 })
-		assert.Equal(t, result, expectedResult)
+		s.Equal(result, expectedResult)
 	})
 }

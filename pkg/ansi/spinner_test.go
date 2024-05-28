@@ -2,14 +2,13 @@ package ansi
 
 import (
 	"errors"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 var errMock = errors.New("mock error")
 
-func TestSpinner(t *testing.T) {
+func (s *Suite) TestSpinner() {
 	type args struct {
 		text string
 		fn   func() error
@@ -33,8 +32,8 @@ func TestSpinner(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.errAssertion(t, Spinner(tt.args.text, tt.args.fn))
+		s.Run(tt.name, func() {
+			tt.errAssertion(s.T(), Spinner(tt.args.text, tt.args.fn))
 		})
 	}
 }

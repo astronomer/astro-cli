@@ -6,15 +6,23 @@ import (
 	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
-	"github.com/stretchr/testify/assert"
 )
 
 var errMock = errors.New("api error")
 
-func TestCreateUsingDeploymentUUID(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestServiceAccount(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestCreateUsingDeploymentUUID() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockSA := &houston.DeploymentServiceAccount{
 		ID:             "ckbvcbqs1014t0760u4bszmcs",
@@ -35,34 +43,34 @@ func TestCreateUsingDeploymentUUID(t *testing.T) {
 		Role:         "test",
 	}
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("CreateDeploymentServiceAccount", expectedRequest).Return(mockSA, nil)
 
 		buf := new(bytes.Buffer)
 		err := CreateUsingDeploymentUUID(mockSA.DeploymentUUID, mockSA.Label, mockSA.Category, "test", api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expectedOut := ` NAME     CATEGORY     ID                            APIKEY                               
  test     test         ckbvcbqs1014t0760u4bszmcs     60f2f4f3fa006e3e135dbe99b1391d84     
 
  Service account successfully created.
 `
-		assert.Equal(t, buf.String(), expectedOut)
-		api.AssertExpectations(t)
+		s.Equal(buf.String(), expectedOut)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("CreateDeploymentServiceAccount", expectedRequest).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := CreateUsingDeploymentUUID(mockSA.DeploymentUUID, mockSA.Label, mockSA.Category, "test", api, buf)
-		assert.EqualError(t, err, errMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestCreateUsingWorkspaceUUID(t *testing.T) {
+func (s *Suite) TestCreateUsingWorkspaceUUID() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockSA := &houston.WorkspaceServiceAccount{
@@ -86,33 +94,33 @@ func TestCreateUsingWorkspaceUUID(t *testing.T) {
 
 	label, category, role := "test", "test", "test"
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("CreateWorkspaceServiceAccount", expectedRequest).Return(mockSA, nil)
 
 		buf := new(bytes.Buffer)
 		err := CreateUsingWorkspaceUUID(mockSA.WorkspaceUUID, label, category, role, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expectedOut := ` NAME     CATEGORY     ID                            APIKEY                               
  test     test         ckbvcbqs1014t0760u4bszmcs     60f2f4f3fa006e3e135dbe99b1391d84     
 
  Service account successfully created.
 `
-		assert.Equal(t, buf.String(), expectedOut)
-		api.AssertExpectations(t)
+		s.Equal(buf.String(), expectedOut)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("api error", func(t *testing.T) {
+	s.Run("api error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("CreateWorkspaceServiceAccount", expectedRequest).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := CreateUsingWorkspaceUUID(mockSA.WorkspaceUUID, label, category, role, api, buf)
-		assert.EqualError(t, err, errMock.Error())
+		s.EqualError(err, errMock.Error())
 	})
 }
 
-func TestDeleteUsingWorkspaceUUID(t *testing.T) {
+func (s *Suite) TestDeleteUsingWorkspaceUUID() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockSA := &houston.ServiceAccount{
@@ -121,31 +129,31 @@ func TestDeleteUsingWorkspaceUUID(t *testing.T) {
 
 	workspaceUUID := "ck1qg6whg001r08691y117hub"
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteWorkspaceServiceAccount", houston.DeleteServiceAccountRequest{WorkspaceID: workspaceUUID, ServiceAccountID: mockSA.ID}).Return(mockSA, nil)
 
 		buf := new(bytes.Buffer)
 		err := DeleteUsingWorkspaceUUID(mockSA.ID, workspaceUUID, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expectedOut := `Service Account  (ckbvcbqs1014t0760u4bszmcs) successfully deleted
 `
-		assert.Equal(t, buf.String(), expectedOut)
-		api.AssertExpectations(t)
+		s.Equal(buf.String(), expectedOut)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteWorkspaceServiceAccount", houston.DeleteServiceAccountRequest{WorkspaceID: workspaceUUID, ServiceAccountID: mockSA.ID}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := DeleteUsingWorkspaceUUID(mockSA.ID, workspaceUUID, api, buf)
-		assert.EqualError(t, err, errMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestDeleteUsingDeploymentUUID(t *testing.T) {
+func (s *Suite) TestDeleteUsingDeploymentUUID() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockSA := &houston.ServiceAccount{
@@ -153,30 +161,30 @@ func TestDeleteUsingDeploymentUUID(t *testing.T) {
 	}
 	deploymentUUID := "ck1qg6whg001r08691y117hub"
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: deploymentUUID, ServiceAccountID: mockSA.ID}).Return(mockSA, nil)
 
 		buf := new(bytes.Buffer)
 		err := DeleteUsingDeploymentUUID(mockSA.ID, deploymentUUID, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expectedOut := `Service Account  (ckbvcbqs1014t0760u4bszmcs) successfully deleted
 `
-		assert.Equal(t, buf.String(), expectedOut)
+		s.Equal(buf.String(), expectedOut)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: deploymentUUID, ServiceAccountID: mockSA.ID}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := DeleteUsingDeploymentUUID(mockSA.ID, deploymentUUID, api, buf)
-		assert.EqualError(t, err, errMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestGetDeploymentServiceAccount(t *testing.T) {
+func (s *Suite) TestGetDeploymentServiceAccount() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockSAs := []houston.ServiceAccount{
 		{
@@ -190,30 +198,30 @@ func TestGetDeploymentServiceAccount(t *testing.T) {
 	}
 	deploymentUUID := "ckqvf9spa1189rn9hbh5h439u"
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListDeploymentServiceAccounts", deploymentUUID).Return(mockSAs, nil)
 
 		buf := new(bytes.Buffer)
 		err := GetDeploymentServiceAccounts(deploymentUUID, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expectedOut := ` yooo can u see me test                  ckqvfa2cu1468rn9hnr0bqqfk     658b304f36eaaf19860a6d9eb73f7d8a`
-		assert.Contains(t, buf.String(), expectedOut)
-		api.AssertExpectations(t)
+		s.Contains(buf.String(), expectedOut)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListDeploymentServiceAccounts", deploymentUUID).Return([]houston.ServiceAccount{}, errMock)
 
 		buf := new(bytes.Buffer)
 		err := GetDeploymentServiceAccounts(deploymentUUID, api, buf)
-		assert.EqualError(t, err, errMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestGetWorkspaceServiceAccount(t *testing.T) {
+func (s *Suite) TestGetWorkspaceServiceAccount() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockSAs := []houston.ServiceAccount{
@@ -228,25 +236,25 @@ func TestGetWorkspaceServiceAccount(t *testing.T) {
 	}
 	workspaceUUID := "ckqvf9spa1189rn9hbh5h439u"
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListWorkspaceServiceAccounts", workspaceUUID).Return(mockSAs, nil)
 
 		buf := new(bytes.Buffer)
 		err := GetWorkspaceServiceAccounts(workspaceUUID, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expectedOut := ` yooo can u see me test                  ckqvfa2cu1468rn9hnr0bqqfk     658b304f36eaaf19860a6d9eb73f7d8a`
-		assert.Contains(t, buf.String(), expectedOut)
-		api.AssertExpectations(t)
+		s.Contains(buf.String(), expectedOut)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListWorkspaceServiceAccounts", workspaceUUID).Return([]houston.ServiceAccount{}, errMock)
 
 		buf := new(bytes.Buffer)
 		err := GetWorkspaceServiceAccounts(workspaceUUID, api, buf)
-		assert.EqualError(t, err, errMock.Error())
-		api.AssertExpectations(t)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
 	})
 }

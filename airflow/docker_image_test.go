@@ -26,8 +26,6 @@ import (
 var errMock = errors.New("build error")
 
 func (s *Suite) TestDockerImageBuild() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -86,7 +84,6 @@ func (s *Suite) TestDockerImageBuild() {
 }
 
 func (s *Suite) TestDockerImagePytest() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -183,7 +180,6 @@ func (s *Suite) TestDockerImagePytest() {
 }
 
 func (s *Suite) TestDockerImageConflictTest() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -285,7 +281,6 @@ func (s *Suite) TestParseExitCode() {
 }
 
 func (s *Suite) TestDockerCreatePipFreeze() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -317,7 +312,6 @@ func (s *Suite) TestDockerCreatePipFreeze() {
 }
 
 func (s *Suite) TestDockerPull() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -389,12 +383,9 @@ func (s *Suite) TestDockerPull() {
 			s.Equal(loginSeen, tc.expectedLogin != "", "docker login expected to be seen %v", tc.expectedLogin != "")
 		})
 	}
-
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
 }
 
 func (s *Suite) TestDockerImagePush() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -489,8 +480,6 @@ func (s *Suite) TestDockerImagePush() {
 		err := handler.Push("repo/test/image", "username", "")
 		s.NoError(err)
 	})
-
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
 }
 
 func (s *Suite) TestDockerImageGetLabel() {
@@ -675,7 +664,6 @@ func (s *Suite) TestUseBash() {
 }
 
 func (s *Suite) TestDockerImageRun() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	handler := DockerImage{
 		imageName: "testing",
 	}

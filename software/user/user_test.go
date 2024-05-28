@@ -9,11 +9,20 @@ import (
 	houstonMocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
 
 var errMockHouston = errors.New("some houston error")
 
-func TestCreateSuccess(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestUser(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestCreateSuccess() {
 	houstonMock := new(houstonMocks.ClientInterface)
 	houstonMock.On("CreateUser", mock.Anything).Return(&houston.AuthUser{}, nil)
 
@@ -41,39 +50,39 @@ func TestCreateSuccess(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			out := &bytes.Buffer{}
-			if tt.errAssertion(t, Create(tt.args.email, tt.args.password, houstonMock, out)) {
+			if tt.errAssertion(s.T(), Create(tt.args.email, tt.args.password, houstonMock, out)) {
 				return
 			}
-			assert.Contains(t, out.String(), tt.wantOut)
+			s.Contains(out.String(), tt.wantOut)
 		})
 	}
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }
 
-func TestCreateFailure(t *testing.T) {
+func (s *Suite) TestCreateFailure() {
 	houstonMock := new(houstonMocks.ClientInterface)
 	houstonMock.On("CreateUser", mock.Anything).Return(nil, errMockHouston)
 
 	out := &bytes.Buffer{}
-	if !assert.ErrorIs(t, Create("test@test.com", "test", houstonMock, out), errUserCreationDisabled) {
+	if !s.ErrorIs(Create("test@test.com", "test", houstonMock, out), errUserCreationDisabled) {
 		return
 	}
 
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }
 
-func TestCreatePending(t *testing.T) {
+func (s *Suite) TestCreatePending() {
 	houstonMock := new(houstonMocks.ClientInterface)
 	houstonMock.On("CreateUser", mock.Anything).Return(&houston.AuthUser{User: houston.User{Status: "pending"}}, nil)
 
 	out := &bytes.Buffer{}
-	if !assert.NoError(t, Create("test@test.com", "test", houstonMock, out)) {
+	if !s.NoError(Create("test@test.com", "test", houstonMock, out)) {
 		return
 	}
-	assert.Contains(t, out.String(), "Check your email for a verification.")
-	assert.Contains(t, out.String(), "Successfully created user")
+	s.Contains(out.String(), "Check your email for a verification.")
+	s.Contains(out.String(), "Successfully created user")
 
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }
