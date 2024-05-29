@@ -27,6 +27,6 @@ const (
 	ImageDeploymentType   = "image"
 	DagOnlyDeploymentType = "dag_deploy"
 
-	DagDeployDocsLink    = "https://docs.astronomer.io/software/deploy-dags/"
-	DeployViaCLIDocsLink = "https://docs.astronomer.io/software/deploy-cli/"
+	DagDeployDocsLink    = "https://www.astronomer.io/docs/software/deploy-dags/"
+	DeployViaCLIDocsLink = "https://www.astronomer.io/docs/software/deploy-cli/"
 )
