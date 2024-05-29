@@ -338,6 +338,11 @@ func UploadFile(args *UploadFileArguments) error {
 		if i < args.MaxTries {
 			retryDelayInMS = backOff(retryDelayInMS, args.BackoffFactor)
 		}
+		// Reset the file pointer to the beginning of the file
+		_, err = file.Seek(0, io.SeekStart)
+		if err != nil {
+			return fmt.Errorf("error seeking file: %w", err)
+		}
 	}
 	return currentUploadError
 }
