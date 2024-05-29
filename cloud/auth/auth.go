@@ -354,7 +354,7 @@ func Login(domain, token string, coreClient astrocore.CoreClient, platformCoreCl
 	}
 	// Welcome User
 	fmt.Print("\nWelcome to the Astro CLI 🚀\n\n")
-	fmt.Print("To learn more about Astro, go to https://docs.astronomer.io\n\n")
+	fmt.Print("To learn more about Astro, go to https://astronomer.io/docs\n\n")
 
 	c, _ := context.GetCurrentContext()
 

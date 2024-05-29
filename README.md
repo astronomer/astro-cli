@@ -21,7 +21,7 @@ The Astro CLI is a command-line interface for data orchestration. It allows you 
   - `version`       Show the running version of the Astro CLI
   - `workspace`     Manage Astronomer Workspaces
 
-For a list of available Astro CLI commands, see the [Astro CLI command reference](https://docs.astronomer.io/astro/cli/reference).
+For a list of available Astro CLI commands, see the [Astro CLI command reference](https://www.astronomer.io/docs/astro/cli/reference).
 
 ## Install the Astro CLI
 
@@ -208,7 +208,7 @@ Adding this entry to your `~/.astro/config.yaml` file turns on debugging for all
 
 ## Support
 
-To resolve an issue, Astronomer recommends reviewing the [Astronomer documentation](https://docs.astronomer.io/astro/cli/overview) first.
+To resolve an issue, Astronomer recommends reviewing the [Astronomer documentation](https://www.astronomer.io/docs/astro/cli/overview) first.
 
 If you're unable to resolve your issue after reviewing the documentation, you can post a question on the [Astronomer web forum](https://forum.astronomer.io) or you can contact [Astronomer support](https://support.astronomer.io).
 
