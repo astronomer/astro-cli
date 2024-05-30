@@ -1,22 +1,19 @@
 package software
 
 import (
-	"testing"
-
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestDeploymentSaRootCommand(t *testing.T) {
+func (s *Suite) TestDeploymentSaRootCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	output, err := execDeploymentCmd("service-account")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "deployment service-account")
+	s.NoError(err)
+	s.Contains(output, "deployment service-account")
 }
 
-func TestDeploymentSAListCommand(t *testing.T) {
+func (s *Suite) TestDeploymentSAListCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockSA := houston.ServiceAccount{
@@ -35,27 +32,27 @@ func TestDeploymentSAListCommand(t *testing.T) {
 
 	houstonClient = api
 	output, err := execDeploymentCmd("sa", "list", "--deployment-id="+mockDeployment.ID)
-	assert.NoError(t, err)
-	assert.Contains(t, output, mockSA.Label)
-	assert.Contains(t, output, mockSA.ID)
-	assert.Contains(t, output, mockSA.APIKey)
+	s.NoError(err)
+	s.Contains(output, mockSA.Label)
+	s.Contains(output, mockSA.ID)
+	s.Contains(output, mockSA.APIKey)
 }
 
-func TestDeploymentSaDeleteWoKeyIdCommand(t *testing.T) {
+func (s *Suite) TestDeploymentSaDeleteWoKeyIdCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	_, err := execDeploymentCmd("service-account", "delete", "--deployment-id=1234")
-	assert.Error(t, err)
-	assert.EqualError(t, err, "accepts 1 arg(s), received 0")
+	s.Error(err)
+	s.EqualError(err, "accepts 1 arg(s), received 0")
 }
 
-func TestDeploymentSaDeleteWoDeploymentIdCommand(t *testing.T) {
+func (s *Suite) TestDeploymentSaDeleteWoDeploymentIdCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	_, err := execDeploymentCmd("service-account", "delete", "key-test-id")
-	assert.Error(t, err)
-	assert.EqualError(t, err, `required flag(s) "deployment-id" not set`)
+	s.Error(err)
+	s.EqualError(err, `required flag(s) "deployment-id" not set`)
 }
 
-func TestDeploymentSaDeleteRootCommand(t *testing.T) {
+func (s *Suite) TestDeploymentSaDeleteRootCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
@@ -63,11 +60,11 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 	api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: "1234", ServiceAccountID: mockDeploymentSA.ID}).Return(mockDeploymentSA, nil)
 	houstonClient = api
 	output, err := execDeploymentCmd("service-account", "delete", mockDeploymentSA.ID, "--deployment-id=1234")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "Service Account my_label (q1w2e3r4t5y6u7i8o9p0) successfully deleted")
+	s.NoError(err)
+	s.Contains(output, "Service Account my_label (q1w2e3r4t5y6u7i8o9p0) successfully deleted")
 }
 
-func TestDeploymentSaCreateCommand(t *testing.T) {
+func (s *Suite) TestDeploymentSaCreateCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := ` NAME         CATEGORY     ID                       APIKEY                       
  my_label     default      q1w2e3r4t5y6u7i8o9p0     000000000000000000000000     
@@ -106,6 +103,6 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 		"--label="+expectedSARequest.Label,
 		"--role=DEPLOYMENT_VIEWER",
 	)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedOut, output)
+	s.NoError(err)
+	s.Equal(expectedOut, output)
 }

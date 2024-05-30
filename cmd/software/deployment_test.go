@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"os"
-	"testing"
 	"time"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -72,15 +70,13 @@ func execDeploymentCmd(args ...string) (string, error) {
 	return buf.String(), err
 }
 
-func TestDeploymentRootCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentRootCommand() {
 	output, err := execDeploymentCmd()
-	assert.NoError(t, err)
-	assert.Contains(t, output, "deployment [command]")
+	s.NoError(err)
+	s.Contains(output, "deployment [command]")
 }
 
-func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentCreateCommandNfsMountDisabled() {
 	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: false,
 	}
@@ -103,16 +99,15 @@ func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentCreateCommandTriggererDisabled() {
 	appConfig = &houston.AppConfig{TriggererEnabled: false}
 
 	api := new(mocks.ClientInterface)
@@ -131,16 +126,15 @@ func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentCreateCommandTriggererEnabled() {
 	appConfig = &houston.AppConfig{
 		TriggererEnabled: true,
 		Flags: houston.FeatureFlags{
@@ -162,16 +156,15 @@ func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentCreateCommandNfsMountEnabled() {
 	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: true,
 		Flags: houston.FeatureFlags{
@@ -196,16 +189,15 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentCreateCommandGitSyncEnabled() {
 	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{
 			GitSyncEnabled: true,
@@ -232,16 +224,15 @@ func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateCommandDagOnlyDeployEnabled(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentCreateCommandDagOnlyDeployEnabled() {
 	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{
 			DagOnlyDeployment: true,
@@ -264,16 +255,15 @@ func TestDeploymentCreateCommandDagOnlyDeployEnabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentCreateCommandGitSyncDisabled() {
 	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{GitSyncEnabled: false},
 	}
@@ -294,17 +284,16 @@ func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateWithTypeDagDeploy(t *testing.T) {
-	t.Run("user should not be prompted if deployment type is not dag_deploy", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
+	s.Run("user should not be prompted if deployment type is not dag_deploy", func() {
 		appConfig = &houston.AppConfig{
 			TriggererEnabled: true,
 			Flags: houston.FeatureFlags{
@@ -319,13 +308,12 @@ func TestDeploymentCreateWithTypeDagDeploy(t *testing.T) {
 		expectedOutput := "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs"
 		houstonClient = api
 		output, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, output, expectedOutput)
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(output, expectedOutput)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("user should not be prompted if deployment type is dag_deploy but -f flag is sent", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.Run("user should not be prompted if deployment type is dag_deploy but -f flag is sent", func() {
 		appConfig = &houston.AppConfig{
 			TriggererEnabled: true,
 			Flags: houston.FeatureFlags{
@@ -341,13 +329,12 @@ func TestDeploymentCreateWithTypeDagDeploy(t *testing.T) {
 		expectedOutput := "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs"
 		houstonClient = api
 		output, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, output, expectedOutput)
-		api.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(output, expectedOutput)
+		api.AssertExpectations(s.T())
 	})
 
-	t.Run("user should be prompted if deployment type is dag_deploy and -f flag is not sent. No deployment is created without confirmation.", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.Run("user should be prompted if deployment type is dag_deploy and -f flag is not sent. No deployment is created without confirmation.", func() {
 		appConfig = &houston.AppConfig{
 			TriggererEnabled: true,
 			Flags: houston.FeatureFlags{
@@ -365,28 +352,23 @@ func TestDeploymentCreateWithTypeDagDeploy(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		defer testUtil.MockUserInput(t, "n")()
+		defer testUtil.MockUserInput(s.T(), "n")()
 
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
+		s.NoError(err)
 		// Houston CreateDeployment API should not be called if user does not confirm the prompt
-		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
+		api.AssertNotCalled(s.T(), "CreateDeployment", mock.Anything)
 	})
 
-	t.Run("user should be prompted if deployment type is dag_deploy and -f flag is not sent. Deployment is created with confirmation.", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.Run("user should be prompted if deployment type is dag_deploy and -f flag is not sent. Deployment is created with confirmation.", func() {
 		appConfig = &houston.AppConfig{
 			TriggererEnabled: true,
 			Flags: houston.FeatureFlags{
@@ -404,30 +386,25 @@ func TestDeploymentCreateWithTypeDagDeploy(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		defer testUtil.MockUserInput(t, "y")()
+		defer testUtil.MockUserInput(s.T(), "y")()
 
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
+		s.NoError(err)
 		// Houston CreateDeployment API should be called if user confirms the prompt
-		api.AssertCalled(t, "CreateDeployment", mock.Anything)
+		api.AssertCalled(s.T(), "CreateDeployment", mock.Anything)
 	})
 }
 
-func TestDeploymentUpdateWithTypeDagDeploy(t *testing.T) {
-	t.Run("user should not be prompted if new deployment type is not dag_deploy", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
+	s.Run("user should not be prompted if new deployment type is not dag_deploy", func() {
 		appConfig = &houston.AppConfig{
 			Flags: houston.FeatureFlags{
 				DagOnlyDeployment: true,
@@ -447,12 +424,11 @@ func TestDeploymentUpdateWithTypeDagDeploy(t *testing.T) {
 		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=image"}
 		houstonClient = api
 		output, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, output, "Successfully updated deployment")
+		s.NoError(err)
+		s.Contains(output, "Successfully updated deployment")
 	})
 
-	t.Run("GetDeployment throws an error", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.Run("GetDeployment throws an error", func() {
 		appConfig = &houston.AppConfig{
 			Flags: houston.FeatureFlags{
 				DagOnlyDeployment: true,
@@ -467,11 +443,10 @@ func TestDeploymentUpdateWithTypeDagDeploy(t *testing.T) {
 		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}
 		houstonClient = api
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "failed to get deployment info: "+getDeploymentError.Error())
+		s.EqualError(err, "failed to get deployment info: "+getDeploymentError.Error())
 	})
 
-	t.Run("user should not be prompted if new deployment type is dag_deploy and current deployment type is also dag_deploy", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.Run("user should not be prompted if new deployment type is dag_deploy and current deployment type is also dag_deploy", func() {
 		appConfig = &houston.AppConfig{
 			Flags: houston.FeatureFlags{
 				DagOnlyDeployment: true,
@@ -491,12 +466,11 @@ func TestDeploymentUpdateWithTypeDagDeploy(t *testing.T) {
 		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}
 		houstonClient = api
 		output, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, output, "Successfully updated deployment")
+		s.NoError(err)
+		s.Contains(output, "Successfully updated deployment")
 	})
 
-	t.Run("user should be prompted if new deployment type is dag_deploy and current deployment type is not dag_deploy. User rejects.", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.Run("user should be prompted if new deployment type is dag_deploy and current deployment type is not dag_deploy. User rejects.", func() {
 		appConfig = &houston.AppConfig{
 			Flags: houston.FeatureFlags{
 				DagOnlyDeployment: true,
@@ -519,29 +493,24 @@ func TestDeploymentUpdateWithTypeDagDeploy(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		defer testUtil.MockUserInput(t, "n")()
+		defer testUtil.MockUserInput(s.T(), "n")()
 
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		api.AssertCalled(t, "GetDeployment", mock.Anything)
+		s.NoError(err)
+		api.AssertCalled(s.T(), "GetDeployment", mock.Anything)
 		// Houston UpdateDeployment API should not be called if user does not confirm the prompt
-		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
+		api.AssertNotCalled(s.T(), "UpdateDeployment", mock.Anything)
 	})
 
-	t.Run("user should be prompted if new deployment type is dag_deploy and current deployment type is not dag_deploy. User confirms.", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.Run("user should be prompted if new deployment type is dag_deploy and current deployment type is not dag_deploy. User confirms.", func() {
 		appConfig = &houston.AppConfig{
 			Flags: houston.FeatureFlags{
 				DagOnlyDeployment: true,
@@ -564,31 +533,26 @@ func TestDeploymentUpdateWithTypeDagDeploy(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		defer testUtil.MockUserInput(t, "y")()
+		defer testUtil.MockUserInput(s.T(), "y")()
 
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		api.AssertCalled(t, "GetDeployment", mock.Anything)
+		s.NoError(err)
+		api.AssertCalled(s.T(), "GetDeployment", mock.Anything)
 		// Houston UpdateDeployment API should be called if user confirms the prompt
-		api.AssertCalled(t, "UpdateDeployment", mock.Anything)
+		api.AssertCalled(s.T(), "UpdateDeployment", mock.Anything)
 	})
 }
 
-func TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy(t *testing.T) {
-	t.Run("user should be prompted if new deployment type is not dag_deploy but current type is dag_deploy. User rejects.", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy() {
+	s.Run("user should be prompted if new deployment type is not dag_deploy but current type is dag_deploy. User rejects.", func() {
 		appConfig = &houston.AppConfig{
 			Flags: houston.FeatureFlags{
 				DagOnlyDeployment: true,
@@ -609,29 +573,24 @@ func TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		defer testUtil.MockUserInput(t, "n")()
+		defer testUtil.MockUserInput(s.T(), "n")()
 
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		api.AssertCalled(t, "GetDeployment", mock.Anything)
+		s.NoError(err)
+		api.AssertCalled(s.T(), "GetDeployment", mock.Anything)
 		// Houston UpdateDeployment API should not be called if user does not confirm the prompt
-		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
+		api.AssertNotCalled(s.T(), "UpdateDeployment", mock.Anything)
 	})
 
-	t.Run("user should be prompted if new deployment type is not dag_deploy but current type is dag_deploy. User confirms.", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.Run("user should be prompted if new deployment type is not dag_deploy but current type is dag_deploy. User confirms.", func() {
 		appConfig = &houston.AppConfig{
 			Flags: houston.FeatureFlags{
 				DagOnlyDeployment: true,
@@ -654,30 +613,25 @@ func TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		defer testUtil.MockUserInput(t, "y")()
+		defer testUtil.MockUserInput(s.T(), "y")()
 
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		api.AssertCalled(t, "GetDeployment", mock.Anything)
+		s.NoError(err)
+		api.AssertCalled(s.T(), "GetDeployment", mock.Anything)
 		// Houston UpdateDeployment API should be called if user does not confirm the prompt
-		api.AssertCalled(t, "UpdateDeployment", mock.Anything)
+		api.AssertCalled(s.T(), "UpdateDeployment", mock.Anything)
 	})
 }
 
-func TestDeploymentUpdateCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentUpdateCommand() {
 	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: true,
 		Flags: houston.FeatureFlags{
@@ -716,16 +670,15 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentUpdateTriggererEnabledCommand() {
 	appConfig = &houston.AppConfig{
 		TriggererEnabled: true,
 		Flags:            houston.FeatureFlags{TriggererEnabled: true},
@@ -753,16 +706,15 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentUpdateCommandGitSyncDisabled() {
 	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: true,
 		Flags: houston.FeatureFlags{
@@ -793,16 +745,15 @@ func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentUpdateCommandDagOnlyDeployEnabled(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentUpdateCommandDagOnlyDeployEnabled() {
 	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{
 			DagOnlyDeployment: true,
@@ -825,16 +776,15 @@ func TestDeploymentUpdateCommandDagOnlyDeployEnabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentAirflowUpgradeCommand() {
 	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.`
 
 	mockDeploymentResponse := *mockDeployment
@@ -858,12 +808,11 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 		"--deployment-id="+mockDeploymentResponse.ID,
 		"--desired-airflow-version="+mockDeploymentResponse.DesiredAirflowVersion,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
 }
 
-func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentAirflowUpgradeCancelCommand() {
 	expectedOut := `Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.`
 
 	mockDeploymentResponse := *mockDeployment
@@ -890,12 +839,11 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 		"--cancel",
 		"--deployment-id="+mockDeploymentResponse.ID,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
 }
 
-func TestDeploymentDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentDelete() {
 	expectedOut := `Successfully deleted deployment`
 
 	api := new(mocks.ClientInterface)
@@ -904,25 +852,23 @@ func TestDeploymentDelete(t *testing.T) {
 
 	houstonClient = api
 	output, err := execDeploymentCmd("delete", mockDeployment.ID)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
 }
 
-func TestDeploymentList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentList() {
 	api := new(mocks.ClientInterface)
 	api.On("ListDeployments", houston.ListDeploymentsRequest{}).Return([]houston.Deployment{*mockDeployment}, nil)
 	allDeployments = true
 
 	houstonClient = api
 	output, err := execDeploymentCmd("list", "--all")
-	assert.NoError(t, err)
-	assert.Contains(t, output, mockDeployment.ID)
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, mockDeployment.ID)
+	api.AssertExpectations(s.T())
 }
 
-func TestDeploymentDeleteHardResponseNo(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentDeleteHardResponseNo() {
 	appConfig = &houston.AppConfig{
 		HardDeleteDeployment: true,
 		Flags: houston.FeatureFlags{
@@ -936,13 +882,9 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	// mock os.Stdin
 	input := []byte("n")
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	_, err = w.Write(input)
-	if err != nil {
-		t.Error(err)
-	}
+	s.NoError(err)
 	w.Close()
 	stdin := os.Stdin
 	// Restore stdin right after the test.
@@ -951,11 +893,10 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 
 	houstonClient = api
 	_, err = execDeploymentCmd("delete", "--hard", mockDeployment.ID)
-	assert.Nil(t, err)
+	s.NoError(err)
 }
 
-func TestDeploymentDeleteHardResponseYes(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploymentDeleteHardResponseYes() {
 	expectedOut := `Successfully deleted deployment`
 	appConfig = &houston.AppConfig{
 		HardDeleteDeployment: true,
@@ -971,13 +912,9 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	// mock os.Stdin
 	input := []byte("y")
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	_, err = w.Write(input)
-	if err != nil {
-		t.Error(err)
-	}
+	s.NoError(err)
 	w.Close()
 	stdin := os.Stdin
 	// Restore stdin right after the test.
@@ -986,13 +923,11 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 
 	houstonClient = api
 	output, err := execDeploymentCmd("delete", "--hard", mockDeployment.ID)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
 }
 
-func TestDeploymentRuntimeUpgradeCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
+func (s *Suite) TestDeploymentRuntimeUpgradeCommand() {
 	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{
 			AstroRuntimeEnabled: true,
@@ -1024,13 +959,11 @@ func TestDeploymentRuntimeUpgradeCommand(t *testing.T) {
 		"--deployment-id="+mockDeploymentResponse.ID,
 		"--desired-runtime-version="+mockDeploymentResponse.DesiredRuntimeVersion,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
 }
 
-func TestDeploymentRuntimeUpgradeCancelCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
+func (s *Suite) TestDeploymentRuntimeUpgradeCancelCommand() {
 	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{
 			AstroRuntimeEnabled: true,
@@ -1064,14 +997,12 @@ func TestDeploymentRuntimeUpgradeCancelCommand(t *testing.T) {
 		"--cancel",
 		"--deployment-id="+mockDeploymentResponse.ID,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
+	api.AssertExpectations(s.T())
 }
 
-func TestDeploymentRuntimeMigrateCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
+func (s *Suite) TestDeploymentRuntimeMigrateCommand() {
 	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{
 			AstroRuntimeEnabled: true,
@@ -1102,14 +1033,12 @@ func TestDeploymentRuntimeMigrateCommand(t *testing.T) {
 		"migrate",
 		"--deployment-id="+mockDeploymentResponse.ID,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
+	api.AssertExpectations(s.T())
 }
 
-func TestDeploymentRuntimeMigrateCancelCommand(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
+func (s *Suite) TestDeploymentRuntimeMigrateCancelCommand() {
 	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{
 			AstroRuntimeEnabled: true,
@@ -1139,7 +1068,7 @@ func TestDeploymentRuntimeMigrateCancelCommand(t *testing.T) {
 		"--cancel",
 		"--deployment-id="+mockDeploymentResponse.ID,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
+	api.AssertExpectations(s.T())
 }

@@ -3,9 +3,19 @@ package ansi
 import (
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/suite"
 )
 
-func TestShouldUseColors(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestAnsi(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestShouldUseColors() {
 	tests := []struct {
 		name          string
 		cliColorForce string
@@ -23,11 +33,9 @@ func TestShouldUseColors(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			os.Setenv(cliColorForce, tt.cliColorForce)
-			if got := shouldUseColors(); got != tt.want {
-				t.Errorf("shouldUseColors() = %v, want %v", got, tt.want)
-			}
+			s.Equal(tt.want, shouldUseColors())
 		})
 	}
 }

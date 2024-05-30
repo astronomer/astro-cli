@@ -344,7 +344,6 @@ func (d *DockerImage) Push(remoteImage, username, token string) error {
 	log.Debugf("Exec Push %s creds %v \n", dockerCommand, authConfig)
 
 	err = d.pushWithClient(&authConfig, remoteImage)
-
 	if err != nil {
 		// if it does not work with the go library use bash to run docker commands. Support for (old?) versions of Colima
 		err = pushWithBash(&authConfig, remoteImage)

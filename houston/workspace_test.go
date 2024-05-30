@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateWorkspace(t *testing.T) {
+func (s *Suite) TestCreateWorkspace() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -36,9 +34,9 @@ func TestCreateWorkspace(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -49,11 +47,11 @@ func TestCreateWorkspace(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.CreateWorkspace(CreateWorkspaceRequest{"label", "description"})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.CreateWorkspace)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.CreateWorkspace)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -64,11 +62,11 @@ func TestCreateWorkspace(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.CreateWorkspace(CreateWorkspaceRequest{"label", "description"})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestListWorkspaces(t *testing.T) {
+func (s *Suite) TestListWorkspaces() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -112,9 +110,9 @@ func TestListWorkspaces(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -125,11 +123,11 @@ func TestListWorkspaces(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.ListWorkspaces(nil)
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.GetWorkspaces)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.GetWorkspaces)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -140,11 +138,11 @@ func TestListWorkspaces(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.ListWorkspaces(nil)
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestPaginatedListWorkspaces(t *testing.T) {
+func (s *Suite) TestPaginatedListWorkspaces() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -188,9 +186,9 @@ func TestPaginatedListWorkspaces(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -201,11 +199,11 @@ func TestPaginatedListWorkspaces(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.PaginatedListWorkspaces(PaginatedListWorkspaceRequest{10, 0})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.GetPaginatedWorkspaces)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.GetPaginatedWorkspaces)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -216,11 +214,11 @@ func TestPaginatedListWorkspaces(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.PaginatedListWorkspaces(PaginatedListWorkspaceRequest{10, 0})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestDeleteWorkspace(t *testing.T) {
+func (s *Suite) TestDeleteWorkspace() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -245,9 +243,9 @@ func TestDeleteWorkspace(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -258,11 +256,11 @@ func TestDeleteWorkspace(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.DeleteWorkspace("workspace-id")
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.DeleteWorkspace)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.DeleteWorkspace)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -273,11 +271,11 @@ func TestDeleteWorkspace(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.DeleteWorkspace("workspace-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestGetWorkspace(t *testing.T) {
+func (s *Suite) TestGetWorkspace() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -302,9 +300,9 @@ func TestGetWorkspace(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -315,11 +313,11 @@ func TestGetWorkspace(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.GetWorkspace("workspace-id")
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.GetWorkspace)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.GetWorkspace)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -330,11 +328,11 @@ func TestGetWorkspace(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.GetWorkspace("workspace-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestValidateWorkspaceID(t *testing.T) {
+func (s *Suite) TestValidateWorkspaceID() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -349,9 +347,9 @@ func TestValidateWorkspaceID(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -362,11 +360,11 @@ func TestValidateWorkspaceID(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.ValidateWorkspaceID("workspace-id")
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.GetWorkspace)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.GetWorkspace)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -377,11 +375,11 @@ func TestValidateWorkspaceID(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.ValidateWorkspaceID("workspace-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestUpdateWorkspace(t *testing.T) {
+func (s *Suite) TestUpdateWorkspace() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -406,9 +404,9 @@ func TestUpdateWorkspace(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -419,11 +417,11 @@ func TestUpdateWorkspace(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.UpdateWorkspace(UpdateWorkspaceRequest{"workspace-id", map[string]string{}})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.UpdateWorkspace)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.UpdateWorkspace)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -434,6 +432,6 @@ func TestUpdateWorkspace(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.UpdateWorkspace(UpdateWorkspaceRequest{"workspace-id", map[string]string{}})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

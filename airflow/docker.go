@@ -716,8 +716,9 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerF
 		return 1, err
 	}
 
+	reqFile := d.airflowHome + "/requirements.txt"
 	// add pytest-html to the requirements
-	err = fileutil.AddLineToFile("./requirements.txt", "pytest-html", "# This package is needed for the upgrade dag test. It will be removed once the test is over")
+	err = fileutil.AddLineToFile(reqFile, "pytest-html", "# This package is needed for the upgrade dag test. It will be removed once the test is over")
 	if err != nil {
 		fmt.Printf("Adding 'pytest-html' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 	}
@@ -725,7 +726,7 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerF
 	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 
 	// remove pytest-html to the requirements
-	err = fileutil.RemoveLineFromFile("./requirements.txt", "pytest-html", " # This package is needed for the upgrade dag test. It will be removed once the test is over")
+	err = fileutil.RemoveLineFromFile(reqFile, "pytest-html", " # This package is needed for the upgrade dag test. It will be removed once the test is over")
 	if err != nil {
 		fmt.Printf("Removing package 'pytest-html' from requirements.txt unsuccessful: %s\n", err.Error())
 	}

@@ -10,9 +10,17 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
+
+type Suite struct {
+	suite.Suite
+}
+
+func TestRole(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
 
 var (
 	errorNetwork = errors.New("network error")
@@ -67,50 +75,50 @@ var (
 	}
 )
 
-func TestListOrgRole(t *testing.T) {
-	t.Run("happy path TestListOrgRole", func(t *testing.T) {
+func (s *Suite) TestListOrgRole() {
+	s.Run("happy path TestListOrgRole", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListRolesResponseOK, nil).Twice()
 		err := ListOrgRoles(out, mockClient, true)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("happy path TestListOrgRole - should include default roles false", func(t *testing.T) {
+	s.Run("happy path TestListOrgRole - should include default roles false", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListRolesResponseOK, nil).Twice()
 		err := ListOrgRoles(out, mockClient, false)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("error path when ListRolesWithResponse return network error", func(t *testing.T) {
+	s.Run("error path when ListRolesWithResponse return network error", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 		err := ListOrgRoles(out, mockClient, true)
-		assert.EqualError(t, err, "network error")
+		s.EqualError(err, "network error")
 	})
 
-	t.Run("error path when ListRolesWithResponse returns an error", func(t *testing.T) {
+	s.Run("error path when ListRolesWithResponse returns an error", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListRolesResponseError, nil).Twice()
 		err := ListOrgRoles(out, mockClient, true)
-		assert.EqualError(t, err, "failed to list roles")
+		s.EqualError(err, "failed to list roles")
 	})
 
-	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		err := ListOrgRoles(out, mockClient, true)
-		assert.Error(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
+		s.Error(err)
+		s.Equal(expectedOutMessage, out.String())
 	})
 }

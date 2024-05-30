@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 var (
@@ -43,148 +43,156 @@ var (
 	}
 )
 
-func TestFormatDomain(t *testing.T) {
-	t.Run("removes cloud from cloud.astronomer.io", func(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestDomainUtil(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestFormatDomain() {
+	s.Run("removes cloud from cloud.astronomer.io", func() {
 		actual := FormatDomain("cloud.astronomer.io")
-		assert.Equal(t, "astronomer.io", actual)
+		s.Equal("astronomer.io", actual)
 	})
-	t.Run("removes cloud from cloud.astronomer-dev.io", func(t *testing.T) {
+	s.Run("removes cloud from cloud.astronomer-dev.io", func() {
 		actual := FormatDomain("cloud.astronomer-dev.io")
-		assert.Equal(t, "astronomer-dev.io", actual)
+		s.Equal("astronomer-dev.io", actual)
 	})
-	t.Run("removes https://cloud from cloud.astronomer-dev.io", func(t *testing.T) {
+	s.Run("removes https://cloud from cloud.astronomer-dev.io", func() {
 		actual := FormatDomain("https://cloud.astronomer-dev.io")
-		assert.Equal(t, "astronomer-dev.io", actual)
+		s.Equal("astronomer-dev.io", actual)
 	})
-	t.Run("removes trailing / from cloud.astronomer-dev.io", func(t *testing.T) {
+	s.Run("removes trailing / from cloud.astronomer-dev.io", func() {
 		actual := FormatDomain("https://cloud.astronomer-dev.io/")
-		assert.Equal(t, "astronomer-dev.io", actual)
+		s.Equal("astronomer-dev.io", actual)
 	})
-	t.Run("removes cloud from cloud.astronomer-stage.io", func(t *testing.T) {
+	s.Run("removes cloud from cloud.astronomer-stage.io", func() {
 		actual := FormatDomain("cloud.astronomer-stage.io")
-		assert.Equal(t, "astronomer-stage.io", actual)
+		s.Equal("astronomer-stage.io", actual)
 	})
-	t.Run("removes https://cloud from cloud.astronomer-stage.io", func(t *testing.T) {
+	s.Run("removes https://cloud from cloud.astronomer-stage.io", func() {
 		actual := FormatDomain("https://cloud.astronomer-stage.io")
-		assert.Equal(t, "astronomer-stage.io", actual)
+		s.Equal("astronomer-stage.io", actual)
 	})
-	t.Run("removes cloud from cloud.astronomer-perf.io", func(t *testing.T) {
+	s.Run("removes cloud from cloud.astronomer-perf.io", func() {
 		actual := FormatDomain("cloud.astronomer-perf.io")
-		assert.Equal(t, "astronomer-perf.io", actual)
+		s.Equal("astronomer-perf.io", actual)
 	})
-	t.Run("removes https://cloud from cloud.astronomer-perf.io", func(t *testing.T) {
+	s.Run("removes https://cloud from cloud.astronomer-perf.io", func() {
 		actual := FormatDomain("https://cloud.astronomer-perf.io")
-		assert.Equal(t, "astronomer-perf.io", actual)
+		s.Equal("astronomer-perf.io", actual)
 	})
-	t.Run("removes cloud from pr1234.cloud.astronomer-dev.io", func(t *testing.T) {
+	s.Run("removes cloud from pr1234.cloud.astronomer-dev.io", func() {
 		actual := FormatDomain("pr1234.cloud.astronomer-dev.io")
-		assert.Equal(t, "pr1234.astronomer-dev.io", actual)
+		s.Equal("pr1234.astronomer-dev.io", actual)
 	})
-	t.Run("removes https://cloud from pr1234.cloud.astronomer-dev.io", func(t *testing.T) {
+	s.Run("removes https://cloud from pr1234.cloud.astronomer-dev.io", func() {
 		actual := FormatDomain("https://pr1234.cloud.astronomer-dev.io")
-		assert.Equal(t, "pr1234.astronomer-dev.io", actual)
+		s.Equal("pr1234.astronomer-dev.io", actual)
 	})
-	t.Run("sets default domain if one was not provided", func(t *testing.T) {
+	s.Run("sets default domain if one was not provided", func() {
 		actual := FormatDomain("")
-		assert.Equal(t, "astronomer.io", actual)
+		s.Equal("astronomer.io", actual)
 	})
-	t.Run("does not mutate domain if cloud is not found in input", func(t *testing.T) {
+	s.Run("does not mutate domain if cloud is not found in input", func() {
 		actual := FormatDomain("fail.astronomer-dev.io")
-		assert.Equal(t, "fail.astronomer-dev.io", actual)
+		s.Equal("fail.astronomer-dev.io", actual)
 	})
 }
 
-func TestIsPrPreviewDomain(t *testing.T) {
-	t.Run("returns true if its pr preview domain", func(t *testing.T) {
+func (s *Suite) TestIsPrPreviewDomain() {
+	s.Run("returns true if its pr preview domain", func() {
 		for _, urlToCheck := range listOfPRURLs {
 			actual := isPrPreviewDomain(urlToCheck)
-			assert.True(t, actual, urlToCheck+" should be true")
+			s.True(actual, urlToCheck+" should be true")
 		}
 	})
-	t.Run("returns false if its not pr preview domain", func(t *testing.T) {
+	s.Run("returns false if its not pr preview domain", func() {
 		for _, urlToCheck := range listOfURLs {
 			actual := isPrPreviewDomain(urlToCheck)
-			assert.False(t, actual, urlToCheck+" should be false")
+			s.False(actual, urlToCheck+" should be false")
 		}
 	})
 }
 
-func TestGetPRSubDomain(t *testing.T) {
-	t.Run("returns pr subdomain for a valid PR preview domain", func(t *testing.T) {
+func (s *Suite) TestGetPRSubDomain() {
+	s.Run("returns pr subdomain for a valid PR preview domain", func() {
 		for i, domainToCheck := range listOfPRURLs {
 			actualPR, actualDomain := GetPRSubDomain(domainToCheck)
-			assert.Equal(t, "astronomer-dev.io", actualDomain)
-			assert.Equal(t, listOfPRs[i], actualPR)
+			s.Equal("astronomer-dev.io", actualDomain)
+			s.Equal(listOfPRs[i], actualPR)
 		}
 	})
-	t.Run("returns empty pr subdomain for domains that are not a PR Preview domain", func(t *testing.T) {
+	s.Run("returns empty pr subdomain for domains that are not a PR Preview domain", func() {
 		for _, domainToCheck := range listOfURLs {
 			actualPRDomain, actualDomain := GetPRSubDomain(domainToCheck)
-			assert.Equal(t, domainToCheck, actualDomain)
-			assert.Equal(t, "", actualPRDomain)
+			s.Equal(domainToCheck, actualDomain)
+			s.Equal("", actualPRDomain)
 		}
 	})
 }
 
-func TestGetURLToEndpoint(t *testing.T) {
+func (s *Suite) TestGetURLToEndpoint() {
 	var prSubDomain, domain, expectedURL, endpoint string
 	endpoint = "myendpoint"
-	t.Run("returns localhost endpoint", func(t *testing.T) {
+	s.Run("returns localhost endpoint", func() {
 		domain = "localhost"
 		expectedURL = fmt.Sprintf("http://%s:8871/%s", domain, endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
-		assert.Equal(t, expectedURL, actualURL)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns pr preview endpoint", func(t *testing.T) {
+	s.Run("returns pr preview endpoint", func() {
 		prSubDomain = "pr1234"
 		domain = "pr1234.astronomer-dev.io"
 		expectedURL = fmt.Sprintf("https://%s.api.%s/hub/%s", prSubDomain, "astronomer-dev.io", endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
-		assert.Equal(t, expectedURL, actualURL)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns cloud endpoint for prod", func(t *testing.T) {
+	s.Run("returns cloud endpoint for prod", func() {
 		domain = "astronomer.io"
 		expectedURL = fmt.Sprintf("https://api.%s/hub/%s", domain, endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
-		assert.Equal(t, expectedURL, actualURL)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns cloud endpoint for dev", func(t *testing.T) {
+	s.Run("returns cloud endpoint for dev", func() {
 		domain = "astronomer-dev.io"
 		expectedURL = fmt.Sprintf("https://api.%s/hub/%s", domain, endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
-		assert.Equal(t, expectedURL, actualURL)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns cloud endpoint for stage", func(t *testing.T) {
+	s.Run("returns cloud endpoint for stage", func() {
 		domain = "astronomer-stage.io"
 		expectedURL = fmt.Sprintf("https://api.%s/hub/%s", domain, endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
-		assert.Equal(t, expectedURL, actualURL)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns cloud endpoint for perf", func(t *testing.T) {
+	s.Run("returns cloud endpoint for perf", func() {
 		domain = "astronomer-perf.io"
 		expectedURL = fmt.Sprintf("https://api.%s/hub/%s", domain, endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
-		assert.Equal(t, expectedURL, actualURL)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns cloud endpoint for everything else", func(t *testing.T) {
+	s.Run("returns cloud endpoint for everything else", func() {
 		domain = "someotherdomain.io"
 		expectedURL = fmt.Sprintf("https://api.%s/hub/%s", domain, endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
-		assert.Equal(t, expectedURL, actualURL)
+		s.Equal(expectedURL, actualURL)
 	})
 }
 
-func TestTransformToCoreApiEndpoint(t *testing.T) {
-	t.Run("transforms non-local url to core api endpoint", func(t *testing.T) {
+func (s *Suite) TestTransformToCoreApiEndpoint() {
+	s.Run("transforms non-local url to core api endpoint", func() {
 		actual := TransformToCoreAPIEndpoint("https://somedomain.io/hub/v1alpha1/great-endpoint")
-		assert.Equal(t, "https://somedomain.io/v1alpha1/great-endpoint", actual)
+		s.Equal("https://somedomain.io/v1alpha1/great-endpoint", actual)
 	})
-	t.Run("transforms local url to core api endpoint", func(t *testing.T) {
+	s.Run("transforms local url to core api endpoint", func() {
 		actual := TransformToCoreAPIEndpoint("http://localhost:8871/v1alpha1/great-endpoint")
-		assert.Equal(t, "http://localhost:8888/v1alpha1/great-endpoint", actual)
+		s.Equal("http://localhost:8888/v1alpha1/great-endpoint", actual)
 	})
-	t.Run("returns without changes if url is not meant for core api", func(t *testing.T) {
+	s.Run("returns without changes if url is not meant for core api", func() {
 		actual := TransformToCoreAPIEndpoint("https://somedomain.io/hub/valpha1/great-enedpoint")
-		assert.Equal(t, "https://somedomain.io/hub/valpha1/great-enedpoint", actual)
+		s.Equal("https://somedomain.io/hub/valpha1/great-enedpoint", actual)
 	})
 }

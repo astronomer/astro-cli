@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -31,7 +29,7 @@ var (
 	}
 )
 
-func TestWorkspaceTeamAddCommand(t *testing.T) {
+func (s *Suite) TestWorkspaceTeamAddCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := ` NAME        WORKSPACE ID                  TEAM ID                       ROLE                 
  airflow     ck05r3bor07h40d02y2hw4n4v     cl0evnxfl0120dxxu1s4nbnk7     WORKSPACE_VIEWER     
@@ -50,11 +48,11 @@ Successfully added cl0evnxfl0120dxxu1s4nbnk7 to airflow
 		"--team-id="+mockWorkspaceTeamRole.Team.ID,
 		"--role="+mockWorkspaceTeamRole.Role,
 	)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedOut, output)
+	s.NoError(err)
+	s.Equal(expectedOut, output)
 }
 
-func TestWorkspaceTeamRm(t *testing.T) {
+func (s *Suite) TestWorkspaceTeamRm() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockTeamID := "ckc0eir8e01gj07608ajmvia1"
@@ -72,11 +70,11 @@ Successfully removed team from workspace
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceTeamRemoveCmd(buf)
 	err := cmd.RunE(cmd, []string{mockTeamID})
-	assert.NoError(t, err)
-	assert.Equal(t, expected, buf.String())
+	s.NoError(err)
+	s.Equal(expected, buf.String())
 }
 
-func TestWorkspaceTeamUpdateCommand(t *testing.T) {
+func (s *Suite) TestWorkspaceTeamUpdateCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
@@ -92,10 +90,10 @@ func TestWorkspaceTeamUpdateCommand(t *testing.T) {
 		"--workspace-id="+mockWorkspace.ID,
 		"--role="+mockWorkspaceTeamRole.Role,
 	)
-	assert.NoError(t, err)
+	s.NoError(err)
 }
 
-func TestWorkspaceTeamsListCmd(t *testing.T) {
+func (s *Suite) TestWorkspaceTeamsListCmd() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -107,6 +105,6 @@ func TestWorkspaceTeamsListCmd(t *testing.T) {
 	houstonClient = houston.NewClient(client)
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceTeamsListCmd(buf)
-	assert.NotNil(t, cmd)
-	assert.Nil(t, cmd.Args)
+	s.NotNil(cmd)
+	s.Nil(cmd.Args)
 }

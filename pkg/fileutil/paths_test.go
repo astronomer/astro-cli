@@ -1,12 +1,10 @@
 package fileutil
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetWorkingDir(t *testing.T) {
+func (s *Suite) TestGetWorkingDir() {
 	tests := []struct {
 		name         string
 		want         string
@@ -19,18 +17,18 @@ func TestGetWorkingDir(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			got, err := GetWorkingDir()
-			if !tt.errAssertion(t, err) {
+			if !tt.errAssertion(s.T(), err) {
 				return
 			}
 
-			assert.Contains(t, got, tt.want)
+			s.Contains(got, tt.want)
 		})
 	}
 }
 
-func TestGetHomeDir(t *testing.T) {
+func (s *Suite) TestGetHomeDir() {
 	tests := []struct {
 		name         string
 		want         string
@@ -43,18 +41,18 @@ func TestGetHomeDir(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			got, err := GetHomeDir()
-			if !tt.errAssertion(t, err) {
+			if !tt.errAssertion(s.T(), err) {
 				return
 			}
 
-			assert.Contains(t, got, tt.want)
+			s.Contains(got, tt.want)
 		})
 	}
 }
 
-func TestIsEmptyDir(t *testing.T) {
+func (s *Suite) TestIsEmptyDir() {
 	type args struct {
 		path string
 	}
@@ -70,9 +68,9 @@ func TestIsEmptyDir(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			if got := IsEmptyDir(tt.args.path); got != tt.want {
-				t.Errorf("IsEmptyDir() = %v, want %v", got, tt.want)
+				s.Fail("IsEmptyDir() = %v, want %v", got, tt.want)
 			}
 		})
 	}

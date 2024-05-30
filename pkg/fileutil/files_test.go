@@ -16,7 +16,16 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
+
+type Suite struct {
+	suite.Suite
+}
+
+func TestFileUtil(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
 
 var errMock = errors.New("mock error")
 
@@ -30,7 +39,7 @@ func readFileError(name string) ([]byte, error) {
 	return nil, errMock
 }
 
-func TestExists(t *testing.T) {
+func (s *Suite) TestExists() {
 	filePath := "test.yaml"
 	fs := afero.NewMemMapFs()
 	_ = afero.WriteFile(fs, filePath, []byte(`test`), 0o777)
@@ -106,15 +115,15 @@ func TestExists(t *testing.T) {
 	for _, tt := range tests {
 		actualResp, actualErr := Exists(tt.args.path, tt.args.fs)
 		if tt.errResp != "" && actualErr != nil {
-			assert.Contains(t, actualErr.Error(), tt.errResp)
+			s.Contains(actualErr.Error(), tt.errResp)
 		} else {
-			assert.NoError(t, actualErr)
+			s.NoError(actualErr)
 		}
-		assert.Equal(t, tt.expectedResp, actualResp)
+		s.Equal(tt.expectedResp, actualResp)
 	}
 }
 
-func TestWriteStringToFile(t *testing.T) {
+func (s *Suite) TestWriteStringToFile() {
 	type args struct {
 		path string
 		s    string
@@ -132,18 +141,17 @@ func TestWriteStringToFile(t *testing.T) {
 	}
 	defer afero.NewOsFs().Remove("./test.out")
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.errAssertion(t, WriteStringToFile(tt.args.path, tt.args.s)) {
+		s.Run(tt.name, func() {
+			if tt.errAssertion(s.T(), WriteStringToFile(tt.args.path, tt.args.s)) {
 				return
 			}
-			if _, err := os.Open(tt.args.path); err != nil {
-				t.Errorf("Error opening file %s", tt.args.path)
-			}
+			_, err := os.Open(tt.args.path)
+			s.NoError(err, "Error opening file %s", tt.args.path)
 		})
 	}
 }
 
-func TestTar(t *testing.T) {
+func (s *Suite) TestTar() {
 	os.Mkdir("./test", os.ModePerm)
 
 	path := "./test/test.txt"
@@ -169,25 +177,25 @@ func TestTar(t *testing.T) {
 	defer afero.NewOsFs().Remove("./test")
 	defer afero.NewOsFs().Remove("/tmp/test.tar")
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.errAssertion(t, Tar(tt.args.source, tt.args.target)) {
+		s.Run(tt.name, func() {
+			if tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target)) {
 				return
 			}
 			filePath := "/tmp/test.tar"
 			if _, err := os.Create(filePath); err != nil {
-				t.Errorf("Error creating file %s", filePath)
+				s.Fail("Error creating file %s", filePath)
 			}
 			if _, err := os.Stat(tt.args.source); err != nil {
-				t.Errorf("Error getting file stats %s", tt.args.source)
+				s.Fail("Error getting file stats %s", tt.args.source)
 			}
 			if _, err := os.Open(tt.args.source); err != nil {
-				t.Errorf("Error opening file %s", tt.args.source)
+				s.Fail("Error opening file %s", tt.args.source)
 			}
 		})
 	}
 }
 
-func TestContains(t *testing.T) {
+func (s *Suite) TestContains() {
 	type args struct {
 		elems []string
 		param string
@@ -213,15 +221,15 @@ func TestContains(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			exist, index := Contains(tt.args.elems, tt.args.param)
-			assert.Equal(t, exist, tt.expectedResp)
-			assert.Equal(t, index, tt.expectedPos)
+			s.Equal(exist, tt.expectedResp)
+			s.Equal(index, tt.expectedPos)
 		})
 	}
 }
 
-func TestRead(t *testing.T) {
+func (s *Suite) TestRead() {
 	filePath := "./test.out"
 	content := "testing"
 	WriteStringToFile(filePath, content)
@@ -249,19 +257,19 @@ func TestRead(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			actualResp, actualErr := Read(tt.args.path)
 			if tt.errResp != "" && actualErr != nil {
-				assert.Contains(t, actualErr.Error(), tt.errResp)
+				s.Contains(actualErr.Error(), tt.errResp)
 			} else {
-				assert.NoError(t, actualErr)
+				s.NoError(actualErr)
 			}
-			assert.Equal(t, tt.expectedResp, actualResp)
+			s.Equal(tt.expectedResp, actualResp)
 		})
 	}
 }
 
-func TestReadFileToString(t *testing.T) {
+func (s *Suite) TestReadFileToString() {
 	filePath := "./test.out"
 	content := "testing"
 	WriteStringToFile(filePath, content)
@@ -289,19 +297,19 @@ func TestReadFileToString(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			actualResp, actualErr := ReadFileToString(tt.args.path)
 			if tt.errResp != "" && actualErr != nil {
-				assert.Contains(t, actualErr.Error(), tt.errResp)
+				s.Contains(actualErr.Error(), tt.errResp)
 			} else {
-				assert.NoError(t, actualErr)
+				s.NoError(actualErr)
 			}
-			assert.Equal(t, tt.expectedResp, actualResp)
+			s.Equal(tt.expectedResp, actualResp)
 		})
 	}
 }
 
-func TestGetFilesWithSpecificExtension(t *testing.T) {
+func (s *Suite) TestGetFilesWithSpecificExtension() {
 	filePath := "./test.py"
 	content := "testing"
 	WriteStringToFile(filePath, content)
@@ -322,14 +330,14 @@ func TestGetFilesWithSpecificExtension(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			files := GetFilesWithSpecificExtension(tt.args.folderPath, tt.args.ext)
-			assert.Equal(t, expectedFiles, files)
+			s.Equal(expectedFiles, files)
 		})
 	}
 }
 
-func TestAddLineToFile(t *testing.T) {
+func (s *Suite) TestAddLineToFile() {
 	filePath := "./test.py"
 	content := "testing"
 
@@ -359,29 +367,29 @@ func TestAddLineToFile(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = os.OpenFile
 			readFile = os.ReadFile
 			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.NoError(t, err)
+			s.NoError(err)
 		})
 
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = openFileError
 			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.Contains(t, err.Error(), errMock.Error())
+			s.Contains(err.Error(), errMock.Error())
 		})
 
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = os.OpenFile
 			readFile = readFileError
 			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.Contains(t, err.Error(), errMock.Error())
+			s.Contains(err.Error(), errMock.Error())
 		})
 	}
 }
 
-func TestRemoveLineFromFile(t *testing.T) {
+func (s *Suite) TestRemoveLineFromFile() {
 	filePath := "./test.py"
 	content := "testing\nremove this"
 
@@ -411,83 +419,83 @@ func TestRemoveLineFromFile(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = os.OpenFile
 			readFile = os.ReadFile
 			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.NoError(t, err)
+			s.NoError(err)
 		})
 
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = openFileError
 			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.ErrorIs(t, err, errMock)
+			s.ErrorIs(err, errMock)
 		})
 
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = os.OpenFile
 			readFile = readFileError
 			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.ErrorIs(t, err, errMock)
+			s.ErrorIs(err, errMock)
 		})
 	}
 }
 
-func TestGzipFile(t *testing.T) {
-	t.Run("source file not found", func(t *testing.T) {
+func (s *Suite) TestGzipFile() {
+	s.Run("source file not found", func() {
 		err := GzipFile("non-existent-file.txt", "./zipped.txt.gz")
-		assert.EqualError(t, err, "open non-existent-file.txt: no such file or directory")
+		s.EqualError(err, "open non-existent-file.txt: no such file or directory")
 	})
 
-	t.Run("destination file error", func(t *testing.T) {
+	s.Run("destination file error", func() {
 		// Create a temporary source file
 		srcContent := []byte("This is a test file.")
 		srcFilePath := "./testFileForTestGzipFile.txt"
 		err := os.WriteFile(srcFilePath, srcContent, os.ModePerm)
-		assert.NoError(t, err)
+		s.NoError(err)
 		defer os.Remove(srcFilePath)
 
 		err = GzipFile(srcFilePath, "/invalidPath/zipped.txt.gz")
-		assert.EqualError(t, err, "open /invalidPath/zipped.txt.gz: no such file or directory")
+		s.EqualError(err, "open /invalidPath/zipped.txt.gz: no such file or directory")
 	})
 
-	t.Run("successful gzip", func(t *testing.T) {
+	s.Run("successful gzip", func() {
 		// Create a temporary source file
 		srcContent := []byte("This is a test file.")
 		srcFilePath := "./testFileForTestGzipFile.txt"
 		err := os.WriteFile(srcFilePath, srcContent, os.ModePerm)
-		assert.NoError(t, err)
+		s.NoError(err)
 		defer os.Remove(srcFilePath)
 
 		destFilePath := "./zipped.txt.gz"
 		err = GzipFile(srcFilePath, destFilePath)
-		assert.NoError(t, err)
+		s.NoError(err)
 		defer os.Remove(destFilePath)
 
 		// Create the expected content
 		expectedContent := new(bytes.Buffer)
 		gzipWriter := gzip.NewWriter(expectedContent)
 		_, err = gzipWriter.Write(srcContent)
-		assert.NoError(t, err, "Error writing to gzip buffer")
+		s.NoError(err, "Error writing to gzip buffer")
 		gzipWriter.Close()
 
 		// Check if the destination file has the expected content
 		actualContent, err := os.ReadFile(destFilePath)
-		assert.NoError(t, err, "Error reading gZipped file")
-		assert.True(t, bytes.Equal(expectedContent.Bytes(), actualContent), "GZipped file content does not match expected")
+		s.NoError(err, "Error reading gZipped file")
+		s.True(bytes.Equal(expectedContent.Bytes(), actualContent), "GZipped file content does not match expected")
 
 		// Check if the gZipped file is a valid gzip file
 		destFile, err := os.Open(destFilePath)
-		assert.NoError(t, err, "Error opening gZipped file")
+		s.NoError(err, "Error opening gZipped file")
 		defer destFile.Close()
 		gzipReader, err := gzip.NewReader(destFile)
-		assert.NoError(t, err, "Error creating gzip reader")
+		s.NoError(err, "Error creating gzip reader")
 		defer gzipReader.Close()
 
 		// Read the content from the gzip reader
 		actualGZippedContent, err := io.ReadAll(gzipReader)
-		assert.NoError(t, err, "Error reading gZipped file with gzip reader")
-		assert.True(t, bytes.Equal(srcContent, actualGZippedContent), "Unzipped content does not match original")
+		s.NoError(err, "Error reading gZipped file with gzip reader")
+		s.True(bytes.Equal(srcContent, actualGZippedContent), "Unzipped content does not match original")
 	})
 }
 
@@ -552,8 +560,8 @@ func createMockServerWithHitCountReturning400() *MockServerWithHitCountReturning
 	return &MockServerWithHitCountReturning400{}
 }
 
-func TestUploadFile(t *testing.T) {
-	t.Run("attempt to upload a non-existent file", func(t *testing.T) {
+func (s *Suite) TestUploadFile() {
+	s.Run("attempt to upload a non-existent file", func() {
 		uploadFileArgs := UploadFileArguments{
 			FilePath:            "non-existent-file.txt",
 			TargetURL:           "http://localhost:8080/upload",
@@ -565,10 +573,10 @@ func TestUploadFile(t *testing.T) {
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
 		err := UploadFile(&uploadFileArgs)
-		assert.EqualError(t, err, "error opening file: open non-existent-file.txt: no such file or directory")
+		s.EqualError(err, "error opening file: open non-existent-file.txt: no such file or directory")
 	})
 
-	t.Run("io copy throws an error", func(t *testing.T) {
+	s.Run("io copy throws an error", func() {
 		ioCopyError := errors.New("mock error")
 
 		ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
@@ -579,7 +587,7 @@ func TestUploadFile(t *testing.T) {
 		filePath := "./testFile.txt"
 		fileContent := []byte("This is a test file.")
 		err := os.WriteFile(filePath, fileContent, os.ModePerm)
-		assert.NoError(t, err, "Error creating test file")
+		s.NoError(err, "Error creating test file")
 		defer os.Remove(filePath)
 
 		uploadFileArgs := UploadFileArguments{
@@ -594,11 +602,11 @@ func TestUploadFile(t *testing.T) {
 		}
 		err = UploadFile(&uploadFileArgs)
 
-		assert.ErrorIs(t, err, ioCopyError)
+		s.ErrorIs(err, ioCopyError)
 		ioCopy = io.Copy
 	})
 
-	t.Run("newRequestWithContext throws an error", func(t *testing.T) {
+	s.Run("newRequestWithContext throws an error", func() {
 		requestError := errors.New("mock error")
 		newRequestWithContext = func(ctx http_context.Context, method, url string, body io.Reader) (*http.Request, error) {
 			return nil, requestError
@@ -607,7 +615,7 @@ func TestUploadFile(t *testing.T) {
 		filePath := "./testFile.txt"
 		fileContent := []byte("This is a test file.")
 		err := os.WriteFile(filePath, fileContent, os.ModePerm)
-		assert.NoError(t, err, "Error creating test file")
+		s.NoError(err, "Error creating test file")
 		defer os.Remove(filePath)
 
 		uploadFileArgs := UploadFileArguments{
@@ -622,11 +630,11 @@ func TestUploadFile(t *testing.T) {
 		}
 		err = UploadFile(&uploadFileArgs)
 
-		assert.ErrorIs(t, err, requestError)
+		s.ErrorIs(err, requestError)
 		newRequestWithContext = http.NewRequestWithContext
 	})
 
-	t.Run("uploaded the file but got 500 response code. Uploading should be retried", func(t *testing.T) {
+	s.Run("uploaded the file but got 500 response code. Uploading should be retried", func() {
 		mockServer := createMockServerWithHitCountReturning500()
 		testServer := httptest.NewServer(mockServer)
 		defer testServer.Close()
@@ -635,7 +643,7 @@ func TestUploadFile(t *testing.T) {
 		filePath := "./testFile.txt"
 		fileContent := []byte("This is a test file.")
 		err := os.WriteFile(filePath, fileContent, os.ModePerm)
-		assert.NoError(t, err, "Error creating test file")
+		s.NoError(err, "Error creating test file")
 		defer os.Remove(filePath)
 
 		headers := map[string]string{
@@ -656,12 +664,12 @@ func TestUploadFile(t *testing.T) {
 		err = UploadFile(&uploadFileArgs)
 
 		// Assert the error is as expected
-		assert.EqualError(t, err, "file upload failed. Status code: 500 and Message: Internal Server Error")
+		s.EqualError(err, "file upload failed. Status code: 500 and Message: Internal Server Error")
 		// Assert that the server is hit required number of times
-		assert.Equal(t, 2, mockServer.hitCount)
+		s.Equal(2, mockServer.hitCount)
 	})
 
-	t.Run("uploaded the file but got 400 response code. Uploading should not be retried", func(t *testing.T) {
+	s.Run("uploaded the file but got 400 response code. Uploading should not be retried", func() {
 		mockServer := createMockServerWithHitCountReturning400()
 		testServer := httptest.NewServer(mockServer)
 		defer testServer.Close()
@@ -670,7 +678,7 @@ func TestUploadFile(t *testing.T) {
 		filePath := "./testFile.txt"
 		fileContent := []byte("This is a test file.")
 		err := os.WriteFile(filePath, fileContent, os.ModePerm)
-		assert.NoError(t, err, "Error creating test file")
+		s.NoError(err, "Error creating test file")
 		defer os.Remove(filePath)
 
 		headers := map[string]string{
@@ -691,17 +699,17 @@ func TestUploadFile(t *testing.T) {
 		err = UploadFile(&uploadFileArgs)
 
 		// Assert the error is as expected
-		assert.EqualError(t, err, "file upload failed. Status code: 400 and Message: Bad Request")
+		s.EqualError(err, "file upload failed. Status code: 400 and Message: Bad Request")
 		// Assert that the server is hit required number of times
-		assert.Equal(t, 1, mockServer.hitCount)
+		s.Equal(1, mockServer.hitCount)
 	})
 
-	t.Run("error making POST request due to invalid URL.", func(t *testing.T) {
+	s.Run("error making POST request due to invalid URL.", func() {
 		// Create a temporary file with some content for testing
 		filePath := "./testFile.txt"
 		fileContent := []byte("This is a test file.")
 		err := os.WriteFile(filePath, fileContent, os.ModePerm)
-		assert.NoError(t, err, "Error creating test file")
+		s.NoError(err, "Error creating test file")
 		defer os.Remove(filePath)
 
 		uploadFileArgs := UploadFileArguments{
@@ -716,10 +724,10 @@ func TestUploadFile(t *testing.T) {
 		}
 		err = UploadFile(&uploadFileArgs)
 
-		assert.ErrorContains(t, err, "astro.unit.test")
+		s.ErrorContains(err, "astro.unit.test")
 	})
 
-	t.Run("successfully uploaded the file", func(t *testing.T) {
+	s.Run("successfully uploaded the file", func() {
 		// Prepare a test server to capture the request
 		server := createMockServer(http.StatusOK, "OK", make(map[string][]string))
 		defer server.Close()
@@ -728,7 +736,7 @@ func TestUploadFile(t *testing.T) {
 		filePath := "./testFile.txt"
 		fileContent := []byte("This is a test file.")
 		err := os.WriteFile(filePath, fileContent, os.ModePerm)
-		assert.NoError(t, err, "Error creating test file")
+		s.NoError(err, "Error creating test file")
 		defer os.Remove(filePath)
 
 		headers := map[string]string{
@@ -748,10 +756,10 @@ func TestUploadFile(t *testing.T) {
 		}
 		err = UploadFile(&uploadFileArgs)
 
-		assert.NoError(t, err, "Expected no error")
+		s.NoError(err, "Expected no error")
 		// assert the received headers
 		request := getCapturedRequest(server)
-		assert.Equal(t, "Bearer token", request.Header.Get("Authorization"))
-		assert.Contains(t, request.Header.Get("Content-Type"), "multipart/form-data")
+		s.Equal("Bearer token", request.Header.Get("Authorization"))
+		s.Contains(request.Header.Get("Content-Type"), "multipart/form-data")
 	})
 }

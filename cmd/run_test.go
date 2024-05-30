@@ -1,24 +1,21 @@
 package cmd
 
 import (
-	"testing"
-
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestRunCommand(t *testing.T) {
+func (s *CmdSuite) TestRunCommand() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	output, err := executeCommand("run", "--help")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "astro run", output)
+	s.NoError(err)
+	s.Contains(output, "astro run", output)
 }
 
-func TestRun(t *testing.T) {
+func (s *CmdSuite) TestRun() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		cmd := newRunCommand()
 		args := []string{"test-dag"}
 
@@ -29,11 +26,11 @@ func TestRun(t *testing.T) {
 		}
 
 		err := run(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newRunCommand()
 		args := []string{"test-dag"}
 
@@ -44,11 +41,11 @@ func TestRun(t *testing.T) {
 		}
 
 		err := run(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newRunCommand()
 		args := []string{}
 
@@ -57,6 +54,6 @@ func TestRun(t *testing.T) {
 		}
 
 		err := run(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }

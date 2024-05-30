@@ -1,25 +1,21 @@
 package software
 
 import (
-	"testing"
-
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/software/deploy"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
 )
 
 func execDeployCmd(args ...string) error {
 	cmd := NewDeployCmd()
 	cmd.SetArgs(args)
-	testUtil.SetupOSArgsForGinkgo()
+	defer testUtil.SetupOSArgsForGinkgo()()
 	_, err := cmd.ExecuteC()
 	return err
 }
 
-func TestDeploy(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+func (s *Suite) TestDeploy() {
 	appConfig = &houston.AppConfig{
 		BYORegistryDomain: "test.registry.io",
 		Flags: houston.FeatureFlags{
@@ -38,49 +34,49 @@ func TestDeploy(t *testing.T) {
 	}
 
 	err := execDeployCmd([]string{"-f"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"-f", "test-deployment-id"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"test-deployment-id", "--save"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	DagsOnlyDeploy = deploy.DagsOnlyDeploy
 
-	t.Run("error should be returned for astro deploy, if DeployAirflowImage throws error", func(t *testing.T) {
+	s.Run("error should be returned for astro deploy, if DeployAirflowImage throws error", func() {
 		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
 			return deploymentID, deploy.ErrNoWorkspaceID
 		}
 
 		err := execDeployCmd([]string{"-f"}...)
-		assert.ErrorIs(t, err, deploy.ErrNoWorkspaceID)
+		s.ErrorIs(err, deploy.ErrNoWorkspaceID)
 
 		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
 			return deploymentID, nil
 		}
 	})
 
-	t.Run("error should be returned for astro deploy, if dags deploy throws error and the feature is enabled", func(t *testing.T) {
+	s.Run("error should be returned for astro deploy, if dags deploy throws error and the feature is enabled", func() {
 		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
 			return deploy.ErrNoWorkspaceID
 		}
 		err := execDeployCmd([]string{"-f"}...)
-		assert.ErrorIs(t, err, deploy.ErrNoWorkspaceID)
+		s.ErrorIs(err, deploy.ErrNoWorkspaceID)
 		DagsOnlyDeploy = deploy.DagsOnlyDeploy
 	})
 
-	t.Run("No error should be returned for astro deploy, if dags deploy throws error but the feature itself is disabled", func(t *testing.T) {
+	s.Run("No error should be returned for astro deploy, if dags deploy throws error but the feature itself is disabled", func() {
 		err := execDeployCmd([]string{"-f"}...)
-		assert.ErrorIs(t, err, nil)
+		s.ErrorIs(err, nil)
 	})
 
-	t.Run("Test for the flag --dags", func(t *testing.T) {
+	s.Run("Test for the flag --dags", func() {
 		err := execDeployCmd([]string{"test-deployment-id", "--dags", "--force"}...)
-		assert.ErrorIs(t, err, deploy.ErrDagOnlyDeployDisabledInConfig)
+		s.ErrorIs(err, deploy.ErrDagOnlyDeployDisabledInConfig)
 	})
 
-	t.Run("error should be returned if BYORegistryEnabled is true but BYORegistryDomain is empty", func(t *testing.T) {
+	s.Run("error should be returned if BYORegistryEnabled is true but BYORegistryDomain is empty", func() {
 		appConfig = &houston.AppConfig{
 			BYORegistryDomain: "",
 			Flags: houston.FeatureFlags{
@@ -91,7 +87,7 @@ func TestDeploy(t *testing.T) {
 			return deploy.ErrNoWorkspaceID
 		}
 		err := execDeployCmd([]string{"-f"}...)
-		assert.ErrorIs(t, err, deploy.ErrBYORegistryDomainNotSet)
+		s.ErrorIs(err, deploy.ErrBYORegistryDomainNotSet)
 		DagsOnlyDeploy = deploy.DagsOnlyDeploy
 	})
 }

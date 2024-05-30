@@ -2,13 +2,21 @@ package printutil
 
 import (
 	"bytes"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestTableAddRow(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestPrintUtil(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestTableAddRow() {
 	type args struct {
 		values []string
 		color  bool
@@ -23,15 +31,15 @@ func TestTableAddRow(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			tr := &Table{}
 			tr.AddRow(tt.args.values, tt.args.color)
-			assert.Contains(t, tr.Rows[0].Raw[0], tt.args.values[0])
+			s.Contains(tr.Rows[0].Raw[0], tt.args.values[0])
 		})
 	}
 }
 
-func TestTablePrint(t *testing.T) {
+func (s *Suite) TestTablePrint() {
 	type fields struct {
 		Padding         []int
 		RenderedPadding string
@@ -46,7 +54,7 @@ func TestTablePrint(t *testing.T) {
 		altPadding      []int
 		DynamicPadding  bool
 	}
-	tests := []struct {
+	tests := []*struct {
 		name         string
 		fields       fields
 		wantOut      string
@@ -66,7 +74,7 @@ func TestTablePrint(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			tr := &Table{
 				Padding:         tt.fields.Padding,
 				RenderedPadding: tt.fields.RenderedPadding,
@@ -82,15 +90,15 @@ func TestTablePrint(t *testing.T) {
 				DynamicPadding:  tt.fields.DynamicPadding,
 			}
 			out := &bytes.Buffer{}
-			if tt.errAssertion(t, tr.Print(out)) {
+			if tt.errAssertion(s.T(), tr.Print(out)) {
 				return
 			}
-			assert.Contains(t, out.String(), tt.wantOut)
+			s.Contains(out.String(), tt.wantOut)
 		})
 	}
 }
 
-func TestTablePrintWithIndex(t *testing.T) {
+func (s *Suite) TestTablePrintWithIndex() {
 	type fields struct {
 		Padding         []int
 		RenderedPadding string
@@ -105,7 +113,7 @@ func TestTablePrintWithIndex(t *testing.T) {
 		altPadding      []int
 		DynamicPadding  bool
 	}
-	tests := []struct {
+	tests := []*struct {
 		name         string
 		fields       fields
 		wantOut      string
@@ -125,7 +133,7 @@ func TestTablePrintWithIndex(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			tr := &Table{
 				Padding:         tt.fields.Padding,
 				RenderedPadding: tt.fields.RenderedPadding,
@@ -141,15 +149,15 @@ func TestTablePrintWithIndex(t *testing.T) {
 				DynamicPadding:  tt.fields.DynamicPadding,
 			}
 			out := &bytes.Buffer{}
-			if tt.errAssertion(t, tr.PrintWithPageNumber(10, out)) {
+			if tt.errAssertion(s.T(), tr.PrintWithPageNumber(10, out)) {
 				return
 			}
-			assert.Contains(t, out.String(), tt.wantOut)
+			s.Contains(out.String(), tt.wantOut)
 		})
 	}
 }
 
-func TestTablePrintHeader(t *testing.T) {
+func (s *Suite) TestTablePrintHeader() {
 	type fields struct {
 		Padding         []int
 		RenderedPadding string
@@ -164,7 +172,7 @@ func TestTablePrintHeader(t *testing.T) {
 		altPadding      []int
 		DynamicPadding  bool
 	}
-	tests := []struct {
+	tests := []*struct {
 		name    string
 		fields  fields
 		wantOut string
@@ -176,7 +184,7 @@ func TestTablePrintHeader(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			tr := &Table{
 				Padding:         tt.fields.Padding,
 				RenderedPadding: tt.fields.RenderedPadding,
@@ -193,12 +201,12 @@ func TestTablePrintHeader(t *testing.T) {
 			}
 			out := &bytes.Buffer{}
 			tr.PrintHeader(out)
-			assert.Contains(t, out.String(), tt.wantOut)
+			s.Contains(out.String(), tt.wantOut)
 		})
 	}
 }
 
-func TestTablePrintRows(t *testing.T) {
+func (s *Suite) TestTablePrintRows() {
 	type fields struct {
 		Padding         []int
 		RenderedPadding string
@@ -213,7 +221,7 @@ func TestTablePrintRows(t *testing.T) {
 		altPadding      []int
 		DynamicPadding  bool
 	}
-	tests := []struct {
+	tests := []*struct {
 		name    string
 		fields  fields
 		wantOut string
@@ -225,7 +233,7 @@ func TestTablePrintRows(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			tr := &Table{
 				Padding:         tt.fields.Padding,
 				RenderedPadding: tt.fields.RenderedPadding,
@@ -242,12 +250,12 @@ func TestTablePrintRows(t *testing.T) {
 			}
 			out := &bytes.Buffer{}
 			tr.PrintRows(out, 0)
-			assert.Contains(t, out.String(), tt.wantOut)
+			s.Contains(out.String(), tt.wantOut)
 		})
 	}
 }
 
-func TestGetPadding(t *testing.T) {
+func (s *Suite) TestGetPadding() {
 	type args struct {
 		padding []int
 	}
@@ -263,15 +271,13 @@ func TestGetPadding(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := getPadding(tt.args.padding); got != tt.want {
-				t.Errorf("getPadding() = %v, want %v", got, tt.want)
-			}
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, getPadding(tt.args.padding))
 		})
 	}
 }
 
-func TestStrSliceToInterSlice(t *testing.T) {
+func (s *Suite) TestStrSliceToInterSlice() {
 	type args struct {
 		ss []string
 	}
@@ -287,15 +293,13 @@ func TestStrSliceToInterSlice(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := strSliceToInterSlice(tt.args.ss); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("strSliceToInterSlice() = %v, want %v", got, tt.want)
-			}
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, strSliceToInterSlice(tt.args.ss))
 		})
 	}
 }
 
-func TestTableDynamicPadding(t *testing.T) {
+func (s *Suite) TestTableDynamicPadding() {
 	type fields struct {
 		altPadding []int
 	}
@@ -316,12 +320,12 @@ func TestTableDynamicPadding(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			tr := &Table{
 				altPadding: tt.fields.altPadding,
 			}
 			tr.dynamicPadding(tt.args.row)
-			assert.ElementsMatch(t, tr.altPadding, tt.wantAltPadding)
+			s.ElementsMatch(tr.altPadding, tt.wantAltPadding)
 		})
 	}
 }

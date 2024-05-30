@@ -2,67 +2,65 @@ package deployment
 
 import (
 	"bytes"
-	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
 	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestAddTeam(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAddTeam() {
+	s.Run("success", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("AddDeploymentTeam", houston.AddDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id", Role: "role"}).Return(&houston.RoleBinding{Deployment: houston.Deployment{ID: "deployment-id"}, Team: houston.Team{ID: "team-id"}, Role: "role"}, nil)
 
 		buf := new(bytes.Buffer)
 		err := AddTeam("deployment-id", "team-id", "role", mock, buf)
 
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "deployment-id")
-		assert.Contains(t, buf.String(), "team-id")
-		mock.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "deployment-id")
+		s.Contains(buf.String(), "team-id")
+		mock.AssertExpectations(s.T())
 	})
 
-	t.Run("houston failure", func(t *testing.T) {
+	s.Run("houston failure", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("AddDeploymentTeam", houston.AddDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id", Role: "role"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := AddTeam("deployment-id", "team-id", "role", mock, buf)
 
-		assert.ErrorIs(t, err, errMock)
-		mock.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mock.AssertExpectations(s.T())
 	})
 }
 
-func TestRemoveTeam(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestRemoveTeam() {
+	s.Run("success", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("RemoveDeploymentTeam", houston.RemoveDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id"}).Return(&houston.RoleBinding{Deployment: houston.Deployment{ID: "deployment-id"}, Team: houston.Team{ID: "team-id"}, Role: "role"}, nil)
 
 		buf := new(bytes.Buffer)
 		err := RemoveTeam("deployment-id", "team-id", mock, buf)
 
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "deployment-id")
-		assert.Contains(t, buf.String(), "team-id")
-		mock.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "deployment-id")
+		s.Contains(buf.String(), "team-id")
+		mock.AssertExpectations(s.T())
 	})
 
-	t.Run("houston failure", func(t *testing.T) {
+	s.Run("houston failure", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("RemoveDeploymentTeam", houston.RemoveDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := RemoveTeam("deployment-id", "team-id", mock, buf)
 
-		assert.ErrorIs(t, err, errMock)
-		mock.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mock.AssertExpectations(s.T())
 	})
 }
 
-func TestListTeamRoles(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestListTeamRoles() {
+	s.Run("success", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("ListDeploymentTeamsAndRoles", "deployment-id").Return(
 			[]houston.Team{
@@ -73,52 +71,52 @@ func TestListTeamRoles(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := ListTeamRoles("deployment-id", mock, buf)
 
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "deployment-id")
-		assert.Contains(t, buf.String(), "test-id-1")
-		assert.Contains(t, buf.String(), "test-id-2")
-		mock.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "deployment-id")
+		s.Contains(buf.String(), "test-id-1")
+		s.Contains(buf.String(), "test-id-2")
+		mock.AssertExpectations(s.T())
 	})
 
-	t.Run("houston failure", func(t *testing.T) {
+	s.Run("houston failure", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("ListDeploymentTeamsAndRoles", "deployment-id").Return([]houston.Team{}, errMock)
 
 		buf := new(bytes.Buffer)
 		err := ListTeamRoles("deployment-id", mock, buf)
 
-		assert.ErrorIs(t, err, errMock)
-		mock.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mock.AssertExpectations(s.T())
 	})
 }
 
-func TestUpdateTeamRole(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestUpdateTeamRole() {
+	s.Run("success", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("UpdateDeploymentTeamRole", houston.UpdateDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id", Role: "role-id"}).Return(&houston.RoleBinding{}, nil)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("deployment-id", "team-id", "role-id", mock, buf)
 
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "team-id")
-		assert.Contains(t, buf.String(), "role-id")
-		mock.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "team-id")
+		s.Contains(buf.String(), "role-id")
+		mock.AssertExpectations(s.T())
 	})
 
-	t.Run("UpdateWorkspaceTeamRole failure", func(t *testing.T) {
+	s.Run("UpdateWorkspaceTeamRole failure", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("UpdateDeploymentTeamRole", houston.UpdateDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id", Role: "role-id"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("deployment-id", "team-id", "role-id", mock, buf)
 
-		assert.ErrorIs(t, err, errMock)
-		mock.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mock.AssertExpectations(s.T())
 	})
 }
 
-func TestGetDeploymentLevelRole(t *testing.T) {
+func (s *Suite) TestGetDeploymentLevelRole() {
 	tests := []struct {
 		roleBinding  []houston.RoleBinding
 		deploymentID string
@@ -145,6 +143,6 @@ func TestGetDeploymentLevelRole(t *testing.T) {
 
 	for _, tt := range tests {
 		resp := getDeploymentLevelRole(tt.roleBinding, tt.deploymentID)
-		assert.Equal(t, tt.result, resp, "expected: %v, actual: %v", tt.result, resp)
+		s.Equal(tt.result, resp, "expected: %v, actual: %v", tt.result, resp)
 	}
 }

@@ -6,19 +6,17 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 var errMockHouston = errors.New("some houston error")
 
-func TestWorkspaceUserRemove(t *testing.T) {
+func (s *Suite) TestWorkspaceUserRemove() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	mockUser := houston.WorkspaceUserRoleBindings{
@@ -47,11 +45,11 @@ Successfully removed user from workspace
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceUserRemoveCmd(buf)
 	err := cmd.RunE(cmd, []string{mockUser.Username})
-	assert.NoError(t, err)
-	assert.Equal(t, expected, buf.String())
+	s.NoError(err)
+	s.Equal(expected, buf.String())
 }
 
-func TestNewWorkspaceUserListCmd(t *testing.T) {
+func (s *Suite) TestNewWorkspaceUserListCmd() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -63,11 +61,11 @@ func TestNewWorkspaceUserListCmd(t *testing.T) {
 	houstonClient = houston.NewClient(client)
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceUserListCmd(buf)
-	assert.NotNil(t, cmd)
-	assert.Nil(t, cmd.Args)
+	s.NotNil(cmd)
+	s.Nil(cmd.Args)
 }
 
-func TestWorkspaceUserAdd(t *testing.T) {
+func (s *Suite) TestWorkspaceUserAdd() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	houstonMock := new(mocks.ClientInterface)
 	houstonMock.On("AddWorkspaceUser", mock.Anything).Return(&houston.Workspace{}, nil).Once()
@@ -79,23 +77,23 @@ func TestWorkspaceUserAdd(t *testing.T) {
 	buf := new(bytes.Buffer)
 	workspaceUserWsRole = houston.WorkspaceAdminRole
 	err := workspaceUserAdd(&cobra.Command{}, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	// houston error case
 	houstonMock.On("AddWorkspaceUser", mock.Anything).Return(nil, errMockHouston).Once()
 	err = workspaceUserAdd(&cobra.Command{}, buf)
-	assert.ErrorIs(t, err, errMockHouston)
+	s.ErrorIs(err, errMockHouston)
 
 	// invalid role case
 	workspaceUserWsRole = "invalid-role"
 	err = workspaceUserAdd(&cobra.Command{}, buf)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to find a valid role")
+	s.Error(err)
+	s.Contains(err.Error(), "failed to find a valid role")
 
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }
 
-func TestWorkspaceUserUpdate(t *testing.T) {
+func (s *Suite) TestWorkspaceUserUpdate() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockEmail := "test-email"
 	mockRoles := houston.WorkspaceUserRoleBindings{
@@ -117,26 +115,26 @@ func TestWorkspaceUserUpdate(t *testing.T) {
 	buf := new(bytes.Buffer)
 	workspaceUserWsRole = houston.WorkspaceAdminRole
 	err := workspaceUserUpdate(&cobra.Command{}, buf, []string{mockEmail})
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	// houston error case
 	houstonMock.On("UpdateWorkspaceUserRole", mock.Anything).Return("", errMockHouston).Once()
 	err = workspaceUserUpdate(&cobra.Command{}, buf, []string{mockEmail})
-	assert.ErrorIs(t, err, errMockHouston)
+	s.ErrorIs(err, errMockHouston)
 
 	// invalid role case
 	workspaceUserWsRole = "invalid-role"
 	err = workspaceUserUpdate(&cobra.Command{}, buf, []string{mockEmail})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to find a valid role")
+	s.Error(err)
+	s.Contains(err.Error(), "failed to find a valid role")
 
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }
 
-func TestWorkspaceUserList(t *testing.T) {
+func (s *Suite) TestWorkspaceUserList() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	ws, err := coalesceWorkspace()
-	assert.NoError(t, err)
+	s.NoError(err)
 	mockResponse := []houston.WorkspaceUserRoleBindings{
 		{
 			ID:       "test-id-username",
@@ -161,19 +159,19 @@ func TestWorkspaceUserList(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err = workspaceUserList(&cobra.Command{}, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	content := buf.String()
-	assert.Contains(t, content, mockResponse[0].Username)
-	assert.Contains(t, content, mockResponse[0].ID)
-	assert.Contains(t, content, houston.WorkspaceViewerRole)
-	houstonMock.AssertExpectations(t)
+	s.Contains(content, mockResponse[0].Username)
+	s.Contains(content, mockResponse[0].ID)
+	s.Contains(content, houston.WorkspaceViewerRole)
+	houstonMock.AssertExpectations(s.T())
 }
 
-func TestWorkspaceUserListPaginated(t *testing.T) {
-	t.Run("with default page size", func(t *testing.T) {
+func (s *Suite) TestWorkspaceUserListPaginated() {
+	s.Run("with default page size", func() {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		ws, err := coalesceWorkspace()
-		assert.NoError(t, err)
+		s.NoError(err)
 		mockResponse := []houston.WorkspaceUserRoleBindings{
 			{
 				ID:       "test-id-username",
@@ -200,13 +198,9 @@ func TestWorkspaceUserListPaginated(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("q")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -215,18 +209,18 @@ func TestWorkspaceUserListPaginated(t *testing.T) {
 
 		paginated = true
 		err = workspaceUserList(&cobra.Command{}, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		content := buf.String()
-		assert.Contains(t, content, mockResponse[0].Username)
-		assert.Contains(t, content, mockResponse[0].ID)
-		assert.Contains(t, content, houston.WorkspaceViewerRole)
-		houstonMock.AssertExpectations(t)
+		s.Contains(content, mockResponse[0].Username)
+		s.Contains(content, mockResponse[0].ID)
+		s.Contains(content, houston.WorkspaceViewerRole)
+		houstonMock.AssertExpectations(s.T())
 	})
 
-	t.Run("with invalid/negative page size", func(t *testing.T) {
+	s.Run("with invalid/negative page size", func() {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		ws, err := coalesceWorkspace()
-		assert.NoError(t, err)
+		s.NoError(err)
 		mockResponse := []houston.WorkspaceUserRoleBindings{
 			{
 				ID:       "test-id-username",
@@ -253,13 +247,9 @@ func TestWorkspaceUserListPaginated(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("q")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -269,11 +259,11 @@ func TestWorkspaceUserListPaginated(t *testing.T) {
 		paginated = true
 		pageSize = -10
 		err = workspaceUserList(&cobra.Command{}, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		content := buf.String()
-		assert.Contains(t, content, mockResponse[0].Username)
-		assert.Contains(t, content, mockResponse[0].ID)
-		assert.Contains(t, content, houston.WorkspaceViewerRole)
-		houstonMock.AssertExpectations(t)
+		s.Contains(content, mockResponse[0].Username)
+		s.Contains(content, mockResponse[0].ID)
+		s.Contains(content, houston.WorkspaceViewerRole)
+		houstonMock.AssertExpectations(s.T())
 	})
 }

@@ -8,23 +8,29 @@ import (
 	"testing"
 
 	"github.com/docker/docker/api/types"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestExecPipe(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestDocker(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestExecPipe() {
 	var buf bytes.Buffer
 	data := ""
 	resp := &types.HijackedResponse{Reader: bufio.NewReader(strings.NewReader(data))}
 	err := ExecPipe(*resp, &buf, &buf, &buf)
 	fmt.Println(buf.String())
-	if err != nil {
-		t.Error(err)
-	}
+	s.NoError(err)
 }
 
-func TestAirflowCommand(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowCommand() {
+	s.Run("success", func() {
 		out := AirflowCommand("test-id", "-f docker_image_test.go")
-		assert.Empty(t, out)
+		s.Empty(out)
 	})
 }

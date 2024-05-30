@@ -4,11 +4,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -41,24 +39,24 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func TestBuildDeploymentLogsSubscribeRequest(t *testing.T) {
+func (s *Suite) TestBuildDeploymentLogsSubscribeRequest() {
 	resp, err := BuildDeploymentLogsSubscribeRequest("test-id", "test-component", "test", time.Time{})
-	assert.NoError(t, err)
-	assert.Contains(t, resp, "test-id")
-	assert.Contains(t, resp, "test-component")
-	assert.Contains(t, resp, "test")
+	s.NoError(err)
+	s.Contains(resp, "test-id")
+	s.Contains(resp, "test-component")
+	s.Contains(resp, "test")
 }
 
-func TestSubscribe(t *testing.T) {
+func (s *Suite) TestSubscribe() {
 	// Create test server with the echo handler.
-	s := httptest.NewServer(http.HandlerFunc(websocketHandler))
-	defer s.Close()
+	srv := httptest.NewServer(http.HandlerFunc(websocketHandler))
+	defer srv.Close()
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		// Convert http://127.0.0.1 to ws://127.0.0.
-		url := "ws" + strings.TrimPrefix(s.URL, "http")
+		url := "ws" + strings.TrimPrefix(srv.URL, "http")
 
 		err := Subscribe("test-token", url, `{"type": "test", "payload": {"data": {"log": {"log": "test"}}}}`)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 }

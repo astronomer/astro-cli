@@ -9,28 +9,36 @@ import (
 	"time"
 
 	"github.com/google/go-github/v48/github"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestGithubAPITimeout(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestVersionSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestGithubAPITimeout() {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(5 * time.Second) // sleeping and doing nothing
 	}))
 	defer ts.Close()
 	githubURL, err := url.Parse(fmt.Sprintf("%s/", ts.URL))
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	githubClient := github.NewClient(&http.Client{Timeout: 1 * time.Second}) // client side timeout should be less than server side sleep defined above
+	githubClient := github.NewClient(&http.Client{Timeout: 100 * time.Microsecond}) // client side timeout should be less than server side sleep defined above
 	githubClient.BaseURL = githubURL
 
 	start := time.Now()
 	release, err := getLatestRelease(githubClient, "test", "test")
 	elapsed := time.Since(start)
 	// assert time to get a response from the function is only slightly greater than client timeout
-	assert.GreaterOrEqual(t, elapsed, 1*time.Second)
-	assert.Less(t, elapsed, 2*time.Second)
+	s.GreaterOrEqual(elapsed, 100*time.Microsecond)
+	s.Less(elapsed, 300*time.Microsecond)
 	// assert error returned is related to client timeout
-	assert.Nil(t, release)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "context deadline exceeded")
+	s.Nil(release)
+	s.Error(err)
+	s.Contains(err.Error(), "context deadline exceeded")
 }

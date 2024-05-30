@@ -6,27 +6,35 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 var errMock = errors.New("test error")
 
-func TestUpload(t *testing.T) {
-	t.Run("happy path", func(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestAzure(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestUpload() {
+	s.Run("happy path", func() {
 		azureUploader = func(sasLink string, file io.Reader) (string, error) {
 			return "version-id", nil
 		}
 
 		resp, err := azureUpload("test-url", io.Reader(strings.NewReader("abcde")))
-		assert.NoError(t, err)
-		assert.Equal(t, "version-id", resp)
+		s.NoError(err)
+		s.Equal("version-id", resp)
 	})
-	t.Run("error path", func(t *testing.T) {
+	s.Run("error path", func() {
 		azureUploader = func(sasLink string, file io.Reader) (string, error) {
 			return "", errMock
 		}
 
 		_, err := azureUpload("test-url", io.Reader(strings.NewReader("abcde")))
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }

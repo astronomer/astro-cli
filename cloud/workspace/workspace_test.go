@@ -12,8 +12,8 @@ import (
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
 
 var (
@@ -43,48 +43,54 @@ var (
 	}
 )
 
-func TestList(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func (*Suite) SetupTest() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+}
+
+var _ suite.SetupTestSuite = (*Suite)(nil)
+
+func TestWorkspace(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestList() {
 	mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 	buf := new(bytes.Buffer)
 	err := List(mockClient, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := ` NAME               ID               
  test-workspace     workspace-id     
 `
-	assert.Equal(t, buf.String(), expected)
+	s.Equal(buf.String(), expected)
 }
 
-func TestListError(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
+func (s *Suite) TestListError() {
 	mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
 	buf := new(bytes.Buffer)
 	err := List(mockClient, buf)
-	assert.ErrorIs(t, err, errMock)
+	s.ErrorIs(err, errMock)
 }
 
-func TestGetWorkspaceSelection(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
+func (s *Suite) TestGetWorkspaceSelection() {
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -93,32 +99,28 @@ func TestGetWorkspaceSelection(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		resp, err := GetWorkspaceSelection(mockCoreClient, buf)
-		assert.NoError(t, err)
-		assert.Equal(t, "workspace-id", resp)
-		mockCoreClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal("workspace-id", resp)
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("list workspace failure", func(t *testing.T) {
+	s.Run("list workspace failure", func() {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 		buf := new(bytes.Buffer)
 		_, err := GetWorkspaceSelection(mockCoreClient, buf)
-		assert.ErrorIs(t, err, errMock)
-		mockCoreClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("invalid selection", func(t *testing.T) {
+	s.Run("invalid selection", func() {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("0")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -127,23 +129,22 @@ func TestGetWorkspaceSelection(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		_, err = GetWorkspaceSelection(mockCoreClient, buf)
-		assert.ErrorIs(t, err, errInvalidWorkspaceKey)
-		mockCoreClient.AssertExpectations(t)
+		s.ErrorIs(err, errInvalidWorkspaceKey)
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("get current context failure", func(t *testing.T) {
+	s.Run("get current context failure", func() {
 		err := config.ResetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		buf := new(bytes.Buffer)
 		_, err = GetWorkspaceSelection(mockCoreClient, buf)
-		assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
-		mockCoreClient.AssertExpectations(t)
+		s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+		mockCoreClient.AssertExpectations(s.T())
 	})
 }
 
-func TestSwitch(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
+func (s *Suite) TestSwitch() {
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	workspace2 := astrocore.Workspace{
@@ -170,38 +171,34 @@ func TestSwitch(t *testing.T) {
 		},
 	}
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err := Switch("workspace-id-2", mockCoreClient, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "workspace-id-2")
-		mockCoreClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "workspace-id-2")
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("list workspace failure", func(t *testing.T) {
+	s.Run("list workspace failure", func() {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
 		buf := new(bytes.Buffer)
 		err := Switch("workspace-id-2", mockCoreClient, buf)
-		assert.ErrorIs(t, err, errMock)
-		mockCoreClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("success with selection", func(t *testing.T) {
+	s.Run("success with selection", func() {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -210,24 +207,20 @@ func TestSwitch(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err = Switch("", mockCoreClient, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "workspace-id")
-		mockCoreClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "workspace-id")
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("failure with invalid selection", func(t *testing.T) {
+	s.Run("failure with invalid selection", func() {
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("0")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -236,40 +229,38 @@ func TestSwitch(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err = Switch("", mockCoreClient, buf)
-		assert.ErrorIs(t, err, errInvalidWorkspaceKey)
-		mockCoreClient.AssertExpectations(t)
+		s.ErrorIs(err, errInvalidWorkspaceKey)
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("failure to get current context", func(t *testing.T) {
+	s.Run("failure to get current context", func() {
 		err := config.ResetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		buf := new(bytes.Buffer)
 		err = Switch("test-id-1", mockCoreClient, buf)
-		assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
-		mockCoreClient.AssertExpectations(t)
+		s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+		mockCoreClient.AssertExpectations(s.T())
 	})
 }
 
-func TestGetCurrentWorkspace(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
+func (s *Suite) TestGetCurrentWorkspace() {
 	resp, err := GetCurrentWorkspace()
-	assert.NoError(t, err)
-	assert.Equal(t, resp, "ck05r3bor07h40d02y2hw4n4v")
+	s.NoError(err)
+	s.Equal(resp, "ck05r3bor07h40d02y2hw4n4v")
 
 	ctx, err := config.GetCurrentContext()
-	assert.NoError(t, err)
+	s.NoError(err)
 	ctx.Workspace = ""
 	err = ctx.SetContext()
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	_, err = GetCurrentWorkspace()
-	assert.EqualError(t, err, "current workspace context not set, you can switch to a workspace with \n\astro workspace switch WORKSPACEID")
+	s.EqualError(err, "current workspace context not set, you can switch to a workspace with \n\astro workspace switch WORKSPACEID")
 
 	config.ResetCurrentContext()
 	_, err = GetCurrentWorkspace()
-	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 }
 
 var (
@@ -296,50 +287,49 @@ var (
 	}
 )
 
-func TestCreate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	t.Run("happy path Create", func(t *testing.T) {
+func (s *Suite) TestCreate() {
+	s.Run("happy path Create", func() {
 		expectedOutMessage := "Astro Workspace workspace-test was successfully created\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceResponseOK, nil).Once()
 		err := Create("workspace-test", "a test workspace", "ON", out, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
+		s.NoError(err)
+		s.Equal(expectedOutMessage, out.String())
 	})
 
-	t.Run("error path when CreateWorkspaceWithResponse return network error", func(t *testing.T) {
+	s.Run("error path when CreateWorkspaceWithResponse return network error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 		err := Create("workspace-test", "a test workspace", "ON", out, mockClient)
-		assert.EqualError(t, err, "network error")
+		s.EqualError(err, "network error")
 	})
 
-	t.Run("error path when CreateWorkspaceWithResponse returns an error", func(t *testing.T) {
+	s.Run("error path when CreateWorkspaceWithResponse returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceResponseError, nil).Once()
 		err := Create("workspace-test", "a test workspace", "ON", out, mockClient)
-		assert.EqualError(t, err, "failed to create workspace")
+		s.EqualError(err, "failed to create workspace")
 	})
-	t.Run("error path when validateEnforceCD returns an error", func(t *testing.T) {
+	s.Run("error path when validateEnforceCD returns an error", func() {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		err := Create("workspace-test", "a test workspace", "on", out, mockClient)
-		assert.ErrorIs(t, err, ErrWrongEnforceInput)
-		assert.Equal(t, expectedOutMessage, out.String())
+		s.ErrorIs(err, ErrWrongEnforceInput)
+		s.Equal(expectedOutMessage, out.String())
 	})
 
-	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		err := Create("workspace-test", "a test workspace", "on", out, mockClient)
-		assert.Error(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
+		s.Error(err)
+		s.Equal(expectedOutMessage, out.String())
 	})
 }
 
@@ -362,20 +352,19 @@ var (
 	}
 )
 
-func TestDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	t.Run("happy path Delete", func(t *testing.T) {
+func (s *Suite) TestDelete() {
+	s.Run("happy path Delete", func() {
 		expectedOutMessage := "Astro Workspace test-workspace was successfully deleted\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceResponseOK, nil).Once()
 		err := Delete("workspace-id", out, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
+		s.NoError(err)
+		s.Equal(expectedOutMessage, out.String())
 	})
 
-	t.Run("print message if no workpaces found", func(t *testing.T) {
+	s.Run("print message if no workpaces found", func() {
 		ws := []astrocore.Workspace{}
 
 		listWorkspacesResponseOK := astrocore.ListWorkspacesResponse{
@@ -393,38 +382,38 @@ func TestDelete(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listWorkspacesResponseOK, nil).Once()
 		err := Delete("", out, mockClient)
-		assert.ErrorIs(t, err, ErrNoWorkspaceExists)
+		s.ErrorIs(err, ErrNoWorkspaceExists)
 	})
 
-	t.Run("error path when DeleteWorkspaceWithResponse return network error", func(t *testing.T) {
+	s.Run("error path when DeleteWorkspaceWithResponse return network error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 		err := Delete("workspace-id", out, mockClient)
-		assert.EqualError(t, err, "network error")
+		s.EqualError(err, "network error")
 	})
 
-	t.Run("error path when DeleteWorkspaceWithResponse returns an error", func(t *testing.T) {
+	s.Run("error path when DeleteWorkspaceWithResponse returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceResponseError, nil).Once()
 		err := Delete("workspace-id", out, mockClient)
-		assert.EqualError(t, err, "failed to delete workspace")
+		s.EqualError(err, "failed to delete workspace")
 	})
 
-	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		err := Delete("workspace-id", out, mockClient)
-		assert.Error(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
+		s.Error(err)
+		s.Equal(expectedOutMessage, out.String())
 	})
 
-	t.Run("DeleteWorkspace no workspace id passed", func(t *testing.T) {
+	s.Run("DeleteWorkspace no workspace id passed", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
@@ -433,9 +422,9 @@ func TestDelete(t *testing.T) {
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
-		assert.NoError(t, err)
+		s.NoError(err)
 		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -446,8 +435,8 @@ func TestDelete(t *testing.T) {
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceResponseOK, nil).Once()
 
 		err = Delete("", out, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedOut, out.String())
+		s.NoError(err)
+		s.Equal(expectedOut, out.String())
 	})
 }
 
@@ -474,20 +463,19 @@ var (
 	}
 )
 
-func TestUpdate(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	t.Run("happy path Update", func(t *testing.T) {
+func (s *Suite) TestUpdate() {
+	s.Run("happy path Update", func() {
 		expectedOutMessage := "Astro Workspace test-workspace was successfully updated\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseOK, nil).Once()
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		err := Update("workspace-id", "update-workspace-test", "updated workspace", "ON", out, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
+		s.NoError(err)
+		s.Equal(expectedOutMessage, out.String())
 	})
 
-	t.Run("print message if no workpaces found", func(t *testing.T) {
+	s.Run("print message if no workpaces found", func() {
 		ws := []astrocore.Workspace{}
 
 		listWorkspacesResponseOK := astrocore.ListWorkspacesResponse{
@@ -506,10 +494,10 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseOK, nil).Once()
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listWorkspacesResponseOK, nil).Once()
 		err := Update("", "update-workspace-test", "updated workspace", "ON", out, mockClient)
-		assert.ErrorIs(t, err, ErrNoWorkspaceExists)
+		s.ErrorIs(err, ErrNoWorkspaceExists)
 	})
 
-	t.Run("ask to select the workspace if more than 1 exists", func(t *testing.T) {
+	s.Run("ask to select the workspace if more than 1 exists", func() {
 		workspace2 := astrocore.Workspace{
 			Name:                         "test-workspace-2",
 			Description:                  &description,
@@ -539,39 +527,39 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseOK, nil).Once()
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		err := Update("workspace-id", "update-workspace-test", "updated workspace", "ON", out, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
+		s.NoError(err)
+		s.Equal(expectedOutMessage, out.String())
 	})
 
-	t.Run("error path when UpdateWorkspaceWithResponse return network error", func(t *testing.T) {
+	s.Run("error path when UpdateWorkspaceWithResponse return network error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		err := Update("workspace-id", "", "", "", out, mockClient)
-		assert.EqualError(t, err, "network error")
+		s.EqualError(err, "network error")
 	})
 
-	t.Run("error path when UpdateWorkspaceWithResponse returns an error", func(t *testing.T) {
+	s.Run("error path when UpdateWorkspaceWithResponse returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseError, nil).Once()
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		err := Update("workspace-id", "", "", "", out, mockClient)
-		assert.EqualError(t, err, "failed to update workspace")
+		s.EqualError(err, "failed to update workspace")
 	})
 
-	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		err := Update("workspace-id", "", "", "", out, mockClient)
-		assert.Error(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
+		s.Error(err)
+		s.Equal(expectedOutMessage, out.String())
 	})
 
-	t.Run("UpdateWorkspace no workspace id passed", func(t *testing.T) {
+	s.Run("UpdateWorkspace no workspace id passed", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)
 
@@ -580,9 +568,9 @@ func TestUpdate(t *testing.T) {
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
-		assert.NoError(t, err)
+		s.NoError(err)
 		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -593,7 +581,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseOK, nil).Once()
 
 		err = Update("", "", "", "", out, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedOut, out.String())
+		s.NoError(err)
+		s.Equal(expectedOut, out.String())
 	})
 }

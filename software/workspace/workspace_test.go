@@ -5,16 +5,30 @@ import (
 	"testing"
 
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
+	mockWorkspace     *houston.Workspace
+	mockWorkspaceList []houston.Workspace
+)
+
+type Suite struct {
+	suite.Suite
+}
+
+var (
+	_ suite.SetupAllSuite     = (*Suite)(nil)
+	_ suite.TearDownTestSuite = (*Suite)(nil)
+)
+
+func (s *Suite) SetupSuite() {
 	mockWorkspace = &houston.Workspace{
 		ID:           "ckc0j8y1101xo0760or02jdi7",
 		Label:        "test",
@@ -53,9 +67,16 @@ var (
 			RoleBindings: nil,
 		},
 	}
-)
+}
 
-func TestCreate(t *testing.T) {
+func (s *Suite) TearDownTest() {
+}
+
+func TestWorkspace(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestCreate() {
 	testUtil.InitTestConfig("software")
 
 	label := "test"
@@ -66,17 +87,17 @@ func TestCreate(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := Create(label, description, api, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := ` NAME     ID                            
  test     ckc0j8y1101xo0760or02jdi7     
 
  Successfully created workspace
 `
-	assert.Equal(t, buf.String(), expected)
-	api.AssertExpectations(t)
+	s.Equal(buf.String(), expected)
+	api.AssertExpectations(s.T())
 }
 
-func TestCreateError(t *testing.T) {
+func (s *Suite) TestCreateError() {
 	testUtil.InitTestConfig("software")
 
 	label := "test"
@@ -87,11 +108,11 @@ func TestCreateError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := Create(label, description, api, buf)
-	assert.EqualError(t, err, errMock.Error())
-	api.AssertExpectations(t)
+	s.EqualError(err, errMock.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestList(t *testing.T) {
+func (s *Suite) TestList() {
 	testUtil.InitTestConfig("software")
 
 	api := new(mocks.ClientInterface)
@@ -99,17 +120,17 @@ func TestList(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := List(api, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := ` NAME     ID                            
  w1       ckbv7zvb100pe0760xp98qnh9     
  wwww     ckbv8pwbq00wk0760us7ktcgd     
  test     ckc0j8y1101xo0760or02jdi7     
 `
-	assert.Equal(t, buf.String(), expected)
-	api.AssertExpectations(t)
+	s.Equal(buf.String(), expected)
+	api.AssertExpectations(s.T())
 }
 
-func TestListActiveWorkspace(t *testing.T) {
+func (s *Suite) TestListActiveWorkspace() {
 	testUtil.InitTestConfig("software")
 
 	// Add active workspace to mocks
@@ -120,13 +141,13 @@ func TestListActiveWorkspace(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := List(api, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := " NAME     ID                            \n\x1b[1;32m w1       ck05r3bor07h40d02y2hw4n4v     \x1b[0m\n wwww     ckbv8pwbq00wk0760us7ktcgd     \n test     ckc0j8y1101xo0760or02jdi7     \n"
-	assert.Equal(t, expected, buf.String())
-	api.AssertExpectations(t)
+	s.Equal(expected, buf.String())
+	api.AssertExpectations(s.T())
 }
 
-func TestListError(t *testing.T) {
+func (s *Suite) TestListError() {
 	testUtil.InitTestConfig("software")
 
 	api := new(mocks.ClientInterface)
@@ -134,11 +155,11 @@ func TestListError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := List(api, buf)
-	assert.EqualError(t, err, errMock.Error())
-	api.AssertExpectations(t)
+	s.EqualError(err, errMock.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestDelete(t *testing.T) {
+func (s *Suite) TestDelete() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &houston.Workspace{
@@ -150,13 +171,13 @@ func TestDelete(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := Delete(mockResponse.ID, api, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := "\n Successfully deleted workspace\n"
-	assert.Equal(t, expected, buf.String())
-	api.AssertExpectations(t)
+	s.Equal(expected, buf.String())
+	api.AssertExpectations(s.T())
 }
 
-func TestDeleteError(t *testing.T) {
+func (s *Suite) TestDeleteError() {
 	testUtil.InitTestConfig("software")
 
 	wsID := "ckc0j8y1101xo0760or02jdi7"
@@ -166,11 +187,11 @@ func TestDeleteError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := Delete(wsID, api, buf)
-	assert.EqualError(t, err, errMock.Error())
-	api.AssertExpectations(t)
+	s.EqualError(err, errMock.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestGetWorkspaceSelectionId(t *testing.T) {
+func (s *Suite) TestGetWorkspaceSelectionId() {
 	// Create a mock client
 	testUtil.InitTestConfig("software")
 	api := new(mocks.ClientInterface)
@@ -183,11 +204,11 @@ func TestGetWorkspaceSelectionId(t *testing.T) {
 	buf := new(bytes.Buffer)
 
 	// Set up mock input
-	testUtil.MockUserInput(t, "1\n")
+	testUtil.MockUserInput(s.T(), "1\n")
 	// Call the function
 	workspaceID, err := GetWorkspaceSelectionID(api, buf)
 	if err != nil {
-		t.Errorf("Unexpected error: %s", err)
+		s.Fail("Unexpected error: %s", err)
 	}
 
 	// Check the output buffer
@@ -195,35 +216,35 @@ func TestGetWorkspaceSelectionId(t *testing.T) {
  1     Workspace 1     123     
  2     Workspace 2     456     
 `
-	assert.Equal(t, expectedOutput, buf.String())
+	s.Equal(expectedOutput, buf.String())
 
 	// Check the selected workspace ID
-	assert.Equal(t, "123", workspaceID)
+	s.Equal("123", workspaceID)
 
-	testUtil.MockUserInput(t, "7\n")
+	testUtil.MockUserInput(s.T(), "7\n")
 	// Call the function
 	_, err = GetWorkspaceSelectionID(api, buf)
-	assert.Error(t, err)
+	s.Error(err)
 }
 
-func TestGetCurrentWorkspace(t *testing.T) {
+func (s *Suite) TestGetCurrentWorkspace() {
 	// we init default workspace to: ck05r3bor07h40d02y2hw4n4v
 	testUtil.InitTestConfig("software")
 
 	ws, err := GetCurrentWorkspace()
-	assert.NoError(t, err)
-	assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", ws)
+	s.NoError(err)
+	s.Equal("ck05r3bor07h40d02y2hw4n4v", ws)
 }
 
-func TestGetCurrentWorkspaceError(t *testing.T) {
+func (s *Suite) TestGetCurrentWorkspaceError() {
 	fs := afero.NewMemMapFs()
 	_ = afero.WriteFile(fs, config.HomeConfigFile, []byte(""), 0o777)
 	config.InitConfig(fs)
 	_, err := GetCurrentWorkspace()
-	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 }
 
-func TestGetCurrentWorkspaceErrorNoCurrentContext(t *testing.T) {
+func (s *Suite) TestGetCurrentWorkspaceErrorNoCurrentContext() {
 	configRaw := []byte(`cloud:
   api:
     port: "443"
@@ -241,10 +262,10 @@ contexts:
 	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777)
 	config.InitConfig(fs)
 	_, err := GetCurrentWorkspace()
-	assert.EqualError(t, err, "current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+	s.EqualError(err, "current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
 }
 
-func TestGetWorkspaceSelectionError(t *testing.T) {
+func (s *Suite) TestGetWorkspaceSelectionError() {
 	testUtil.InitTestConfig("software")
 
 	api := new(mocks.ClientInterface)
@@ -252,11 +273,11 @@ func TestGetWorkspaceSelectionError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	workspaceSelection := getWorkspaceSelection(0, 0, api, buf)
-	assert.EqualError(t, workspaceSelection.err, errMock.Error())
-	api.AssertExpectations(t)
+	s.EqualError(workspaceSelection.err, errMock.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestSwitch(t *testing.T) {
+func (s *Suite) TestSwitch() {
 	// prepare test config and init it
 	configRaw := []byte(`cloud:
   api:
@@ -279,16 +300,16 @@ contexts:
 	api.On("ValidateWorkspaceID", mockWorkspace.ID).Return(mockWorkspace, nil)
 	api.On("ListWorkspaces", nil).Return(mockWorkspaceList, nil)
 
-	defer testUtil.MockUserInput(t, "3")()
+	defer testUtil.MockUserInput(s.T(), "3")()
 
 	buf := new(bytes.Buffer)
 	err := Switch("", 0, api, buf)
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), mockWorkspace.ID)
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(buf.String(), mockWorkspace.ID)
+	api.AssertExpectations(s.T())
 }
 
-func TestSwitchWithQuitSelection(t *testing.T) {
+func (s *Suite) TestSwitchWithQuitSelection() {
 	// prepare test config and init it
 	configRaw := []byte(`cloud:
   api:
@@ -310,15 +331,15 @@ contexts:
 	api := new(mocks.ClientInterface)
 	api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 10, PageNumber: 0}).Return(mockWorkspaceList, nil)
 
-	defer testUtil.MockUserInput(t, "q")()
+	defer testUtil.MockUserInput(s.T(), "q")()
 
 	buf := new(bytes.Buffer)
 	err := Switch("", 10, api, buf)
-	assert.NoError(t, err)
-	api.AssertExpectations(t)
+	s.NoError(err)
+	api.AssertExpectations(s.T())
 }
 
-func TestSwitchWithError(t *testing.T) {
+func (s *Suite) TestSwitchWithError() {
 	// prepare test config and init it
 	configRaw := []byte(`cloud:
   api:
@@ -340,16 +361,16 @@ contexts:
 	api := new(mocks.ClientInterface)
 	api.On("ListWorkspaces", nil).Return(mockWorkspaceList, nil)
 
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(s.T(), "y")()
 
 	buf := new(bytes.Buffer)
 	err := Switch("", 0, api, buf)
-	assert.Contains(t, err.Error(), "cannot parse y to int")
-	assert.Contains(t, buf.String(), mockWorkspace.ID)
-	api.AssertExpectations(t)
+	s.Contains(err.Error(), "cannot parse y to int")
+	s.Contains(buf.String(), mockWorkspace.ID)
+	api.AssertExpectations(s.T())
 }
 
-func TestSwitchHoustonError(t *testing.T) {
+func (s *Suite) TestSwitchHoustonError() {
 	// prepare test config and init it
 	configRaw := []byte(`cloud:
   api:
@@ -375,11 +396,11 @@ contexts:
 
 	buf := new(bytes.Buffer)
 	err := Switch(wsID, 0, api, buf)
-	assert.EqualError(t, err, "workspace id is not valid: api error")
-	api.AssertExpectations(t)
+	s.EqualError(err, "workspace id is not valid: api error")
+	api.AssertExpectations(s.T())
 }
 
-func TestUpdate(t *testing.T) {
+func (s *Suite) TestUpdate() {
 	testUtil.InitTestConfig("software")
 
 	id := "test"
@@ -390,13 +411,13 @@ func TestUpdate(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := Update(id, api, buf, args)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := " NAME     ID                            \n test     ckc0j8y1101xo0760or02jdi7     \n\n Successfully updated workspace\n"
-	assert.Equal(t, expected, buf.String())
-	api.AssertExpectations(t)
+	s.Equal(expected, buf.String())
+	api.AssertExpectations(s.T())
 }
 
-func TestUpdateError(t *testing.T) {
+func (s *Suite) TestUpdateError() {
 	testUtil.InitTestConfig("software")
 
 	// prepare houston-api fake response
@@ -408,70 +429,70 @@ func TestUpdateError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := Update(id, api, buf, args)
-	assert.EqualError(t, err, errMock.Error())
-	api.AssertExpectations(t)
+	s.EqualError(err, errMock.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestGetWorkspaceSelection(t *testing.T) {
+func (s *Suite) TestGetWorkspaceSelection() {
 	api := new(mocks.ClientInterface)
 	api.On("ListWorkspaces", nil).Return(mockWorkspaceList, nil)
 	api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 10, PageNumber: 0}).Return(mockWorkspaceList, nil)
 
-	t.Run("no context set", func(t *testing.T) {
+	s.Run("no context set", func() {
 		err := config.ResetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		out := new(bytes.Buffer)
 		workspaceSelection := getWorkspaceSelection(0, 0, api, out)
 
-		assert.Contains(t, workspaceSelection.err.Error(), "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
-		assert.Equal(t, "", workspaceSelection.id)
+		s.Contains(workspaceSelection.err.Error(), "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+		s.Equal("", workspaceSelection.id)
 	})
 
 	testUtil.InitTestConfig("software")
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		out := new(bytes.Buffer)
-		defer testUtil.MockUserInput(t, "1")()
+		defer testUtil.MockUserInput(s.T(), "1")()
 		workspaceSelection := getWorkspaceSelection(0, 0, api, out)
 
-		assert.NoError(t, workspaceSelection.err)
-		assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", workspaceSelection.id)
+		s.NoError(workspaceSelection.err)
+		s.Equal("ckbv7zvb100pe0760xp98qnh9", workspaceSelection.id)
 	})
 
-	t.Run("success with pagination", func(t *testing.T) {
+	s.Run("success with pagination", func() {
 		out := new(bytes.Buffer)
-		defer testUtil.MockUserInput(t, "1")()
+		defer testUtil.MockUserInput(s.T(), "1")()
 		workspaceSelection := getWorkspaceSelection(10, 0, api, out)
 
-		assert.NoError(t, workspaceSelection.err)
-		assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", workspaceSelection.id)
+		s.NoError(workspaceSelection.err)
+		s.Equal("ckbv7zvb100pe0760xp98qnh9", workspaceSelection.id)
 	})
 
-	t.Run("invalid selection", func(t *testing.T) {
+	s.Run("invalid selection", func() {
 		out := new(bytes.Buffer)
-		defer testUtil.MockUserInput(t, "y")()
+		defer testUtil.MockUserInput(s.T(), "y")()
 		workspaceSelection := getWorkspaceSelection(0, 0, api, out)
 
-		assert.Contains(t, workspaceSelection.err.Error(), "cannot parse y to int")
-		assert.Equal(t, "", workspaceSelection.id)
+		s.Contains(workspaceSelection.err.Error(), "cannot parse y to int")
+		s.Equal("", workspaceSelection.id)
 	})
 
-	t.Run("quit selection when paginated", func(t *testing.T) {
+	s.Run("quit selection when paginated", func() {
 		out := new(bytes.Buffer)
-		defer testUtil.MockUserInput(t, "q")()
+		defer testUtil.MockUserInput(s.T(), "q")()
 		workspaceSelection := getWorkspaceSelection(10, 0, api, out)
-		assert.Nil(t, workspaceSelection.err)
-		assert.Equal(t, "", workspaceSelection.id)
-		assert.Equal(t, true, workspaceSelection.quit)
+		s.Nil(workspaceSelection.err)
+		s.Equal("", workspaceSelection.id)
+		s.Equal(true, workspaceSelection.quit)
 	})
 }
 
-func TestWorkspacesPromptPaginatedOption(t *testing.T) {
-	t.Run("quit selection when total record less then page size and page first", func(t *testing.T) {
-		defer testUtil.MockUserInput(t, "q")()
+func (s *Suite) TestWorkspacesPromptPaginatedOption() {
+	s.Run("quit selection when total record less then page size and page first", func() {
+		defer testUtil.MockUserInput(s.T(), "q")()
 		resp := workspacesPromptPaginatedOption(3, 0, 3)
 		expected := workspacePaginationOptions{pageSize: 3, pageNumber: 0, quit: true, userSelection: 0}
 
-		assert.Equal(t, expected, resp)
+		s.Equal(expected, resp)
 	})
 }
