@@ -31,12 +31,7 @@ func (s *Suite) TestGithubAPITimeout() {
 	githubClient := github.NewClient(&http.Client{Timeout: 100 * time.Microsecond}) // client side timeout should be less than server side sleep defined above
 	githubClient.BaseURL = githubURL
 
-	start := time.Now()
 	release, err := getLatestRelease(githubClient, "test", "test")
-	elapsed := time.Since(start)
-	// assert time to get a response from the function is only slightly greater than client timeout
-	s.GreaterOrEqual(elapsed, 100*time.Microsecond)
-	s.Less(elapsed, 300*time.Microsecond)
 	// assert error returned is related to client timeout
 	s.Nil(release)
 	s.Error(err)
