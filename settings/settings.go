@@ -524,7 +524,7 @@ func ExportVariables(id string) error {
 		// get variables created by the airflow command
 		out = execAirflowCommand(id, catVarFile)
 
-		m := map[string]string{}
+		var m map[string]interface{}
 		err := json.Unmarshal([]byte(out), &m)
 		if err != nil {
 			fmt.Println("variable json decode unsuccessful")
@@ -540,7 +540,16 @@ func ExportVariables(id string) error {
 				}
 			}
 
-			newVariables := Variables{{k, v}}
+			var vs string
+			switch vt := v.(type) {
+			case string:
+				vs = vt
+			default:
+				// Re-encode complex types as JSON.
+				b, _ := json.Marshal(v)
+				vs = string(b)
+			}
+			newVariables := Variables{{k, vs}}
 			fmt.Println("Exporting Variable: " + k)
 			settings.Airflow.Variables = append(settings.Airflow.Variables, newVariables...)
 		}
