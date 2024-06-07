@@ -1,6 +1,7 @@
 package fileutil
 
 import (
+	"archive/tar"
 	"bytes"
 	"compress/gzip"
 	http_context "context"
@@ -16,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -152,45 +154,97 @@ func (s *Suite) TestWriteStringToFile() {
 }
 
 func (s *Suite) TestTar() {
-	os.Mkdir("./test", os.ModePerm)
+	// create a test directory with a sub-directory "source" for the tar contents
+	testDirPath, _ := os.MkdirTemp("", "")
+	testSourceDirName := "source"
+	testSourceDirPath := filepath.Join(testDirPath, testSourceDirName)
+	defer afero.NewOsFs().Remove(testSourceDirPath)
 
-	path := "./test/test.txt"
-	WriteStringToFile(path, "testing")
-	os.Symlink(path, filepath.Join("test", "symlink"))
+	// create a test file, and a symlink to it, and a hidden test file
+	testFileName := "test.txt"
+	testFilePath := filepath.Join(testSourceDirPath, testFileName)
+	WriteStringToFile(testFilePath, "testing")
+	symlinkFileName := "symlink"
+	symlinkFilePath := filepath.Join(testSourceDirPath, symlinkFileName)
+	os.Symlink(testFilePath, symlinkFilePath)
+	hiddenTestFileName := ".hidden_test.txt"
+	hiddenTestFilePath := filepath.Join(testSourceDirPath, hiddenTestFileName)
+	WriteStringToFile(hiddenTestFilePath, "testing")
+
+	// create test file in a sub-directory
+	testSubDirFileName := "test_subdir.txt"
+	testSubDirName := "subdir"
+	testSubDirPath := filepath.Join(testSourceDirPath, testSubDirName)
+	testSubDirFilePath := filepath.Join(testSubDirPath, testSubDirFileName)
+	_ = os.Mkdir(testSubDirPath, os.ModePerm)
+	WriteStringToFile(testSubDirFilePath, "testing")
+
 	type args struct {
-		source string
-		target string
+		source         string
+		target         string
+		prependBaseDir bool
 	}
 	tests := []struct {
 		name         string
 		args         args
 		errAssertion assert.ErrorAssertionFunc
+		expectPaths  []string
 	}{
 		{
-			name:         "basic case",
-			args:         args{source: "./test", target: "/tmp"},
+			name: "no prepend base dir",
+			args: args{
+				source:         testSourceDirPath,
+				target:         filepath.Join(testDirPath, "test_no_prepend.tar"),
+				prependBaseDir: false,
+			},
 			errAssertion: assert.NoError,
+			expectPaths: []string{
+				testFileName,
+				symlinkFileName,
+				filepath.Join(testSubDirName, testSubDirFileName),
+				// no hidden file
+			},
+		},
+		{
+			name: "prepend base dir",
+			args: args{
+				source:         testSourceDirPath,
+				target:         filepath.Join(testDirPath, "test_prepend.tar"),
+				prependBaseDir: true,
+			},
+			errAssertion: assert.NoError,
+			expectPaths: []string{
+				filepath.Join(testSourceDirName, testFileName),
+				filepath.Join(testSourceDirName, symlinkFileName),
+				filepath.Join(testSourceDirName, testSubDirName, testSubDirFileName),
+				// no hidden file
+			},
 		},
 	}
-	defer afero.NewOsFs().Remove(path)
-	defer afero.NewOsFs().Remove("./test/symlink")
-	defer afero.NewOsFs().Remove("./test")
-	defer afero.NewOsFs().Remove("/tmp/test.tar")
+
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			if tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target)) {
-				return
+			// check that the tar operation was successful
+			assert.True(s.T(), tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target, tt.args.prependBaseDir)))
+
+			// check that all the files are in the tar at the correct paths
+			file, err := os.Open(tt.args.target)
+			if err != nil {
+				s.Fail("Error opening file %s", tt.args.target)
 			}
-			filePath := "/tmp/test.tar"
-			if _, err := os.Create(filePath); err != nil {
-				s.Fail("Error creating file %s", filePath)
+			defer file.Close()
+			tarReader := tar.NewReader(file)
+			numIteratedFiles := 0
+			for {
+				header, err := tarReader.Next()
+				if err == io.EOF {
+					break
+				}
+				require.NoError(s.T(), err)
+				require.True(s.T(), s.Contains(tt.expectPaths, header.Name))
+				numIteratedFiles++
 			}
-			if _, err := os.Stat(tt.args.source); err != nil {
-				s.Fail("Error getting file stats %s", tt.args.source)
-			}
-			if _, err := os.Open(tt.args.source); err != nil {
-				s.Fail("Error opening file %s", tt.args.source)
-			}
+			require.Equal(s.T(), len(tt.expectPaths), numIteratedFiles)
 		})
 	}
 }

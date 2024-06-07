@@ -214,7 +214,7 @@ func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) 
 		if errMsg == errInaptPermissionsMsg || errMsg == errAuthTokenRefreshFailedMsg {
 			return nil, ErrVerboseInaptPermissions
 		}
-		return nil, fmt.Errorf("%s", decode.Errors[0].Message) //nolint:goerr113
+		return nil, fmt.Errorf("%s", decode.Errors[0].Message)
 	}
 
 	return &decode, nil

@@ -171,7 +171,7 @@ func PaginatedList(client houston.ClientInterface, out io.Writer, pageSize, page
 // Update will update the system role associated with the team
 func Update(teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	if !isValidSystemLevelRole(role) {
-		return fmt.Errorf("invalid role: %s, should be one of: %s, %s, %s or %s", role, houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneRole) //nolint:goerr113
+		return fmt.Errorf("invalid role: %s, should be one of: %s, %s, %s or %s", role, houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneRole)
 	}
 
 	if role == houston.NoneRole {

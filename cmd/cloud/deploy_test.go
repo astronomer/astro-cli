@@ -30,39 +30,39 @@ func TestDeployImage(t *testing.T) {
 		return nil
 	}
 
-	err := execDeployCmd([]string{"-f"}...)
+	err := execDeployCmd("-f")
 	assert.NoError(t, err)
 
-	err = execDeployCmd([]string{"test-deployment-id", "-f", "--wait"}...)
+	err = execDeployCmd("test-deployment-id", "-f", "--wait")
 	assert.NoError(t, err)
 
-	err = execDeployCmd([]string{"test-deployment-id", "--save"}...)
+	err = execDeployCmd("test-deployment-id", "--save")
 	assert.NoError(t, err)
 
-	err = execDeployCmd([]string{"-f", "test-deployment-id", "--pytest"}...)
+	err = execDeployCmd("-f", "test-deployment-id", "--pytest")
 	assert.NoError(t, err)
 
-	err = execDeployCmd([]string{"-f", "test-deployment-id", "--parse"}...)
+	err = execDeployCmd("-f", "test-deployment-id", "--parse")
 	assert.NoError(t, err)
 
-	err = execDeployCmd([]string{"-f", "test-deployment-id", "--parse", "--pytest"}...)
+	err = execDeployCmd("-f", "test-deployment-id", "--parse", "--pytest")
 	assert.NoError(t, err)
 
-	err = execDeployCmd([]string{"test-deployment-id", "--parse", "--pytest"}...)
+	err = execDeployCmd("test-deployment-id", "--parse", "--pytest")
 	assert.NoError(t, err)
 
-	err = execDeployCmd([]string{"test-deployment-id", "--dags"}...)
+	err = execDeployCmd("test-deployment-id", "--dags")
 	assert.NoError(t, err)
 
-	err = execDeployCmd([]string{"test-deployment-id", "--dags", "--wait"}...)
+	err = execDeployCmd("test-deployment-id", "--dags", "--wait")
 	assert.NoError(t, err)
 
-	err = execDeployCmd([]string{"-f", "test-deployment-id", "--dags", "--pytest"}...)
+	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--pytest")
 	assert.NoError(t, err)
 
-	err = execDeployCmd([]string{"-f", "test-deployment-id", "--dags", "--parse"}...)
+	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--parse")
 	assert.NoError(t, err)
 
-	err = execDeployCmd([]string{"-f", "test-deployment-id", "--dags", "--parse", "--pytest"}...)
+	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--parse", "--pytest")
 	assert.NoError(t, err)
 }

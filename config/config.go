@@ -57,7 +57,7 @@ var (
 		Contexts:              newCfg("contexts", ""),
 		DockerCommand:         newCfg("container.binary", "docker"),
 		LocalAstro:            newCfg("local.astrohub", "http://localhost:8871/v1"),
-		LocalCore:             newCfg("local.core", "http://localhost:8888/v1alpha1"),
+		LocalCore:             newCfg("local.core", "http://localhost:8888"),
 		LocalPublicAstro:      newCfg("local.public_astrohub", "http://localhost:8871/graphql"),
 		LocalRegistry:         newCfg("local.registry", "localhost:5555"),
 		LocalHouston:          newCfg("local.houston", ""),
@@ -85,6 +85,7 @@ var (
 		DisableAstroRun:       newCfg("disable_astro_run", "false"),
 		DisableEnvObjects:     newCfg("disable_env_objects", "false"),
 		AutoSelect:            newCfg("auto_select", "false"),
+		DbtDeploysEnabled:     newCfg("dbt_deploys_enabled", "false"),
 	}
 
 	// viperHome is the viper object in the users home directory

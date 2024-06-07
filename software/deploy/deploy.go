@@ -371,6 +371,8 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 	}
 
 	dagsPath := filepath.Join(dagsParentPath, "dags")
+	dagsTarPath := filepath.Join(dagsParentPath, "dags.tar")
+	dagsTarGzPath := dagsTarPath + ".gz"
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
 	// Alert the user if dags folder is empty
@@ -382,21 +384,21 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 	}
 
 	// Generate the dags tar
-	err = fileutil.Tar(dagsPath, dagsParentPath)
+	err = fileutil.Tar(dagsPath, dagsTarPath, true)
 	if err != nil {
 		return err
 	}
 	if cleanUpFiles {
-		defer os.Remove(dagsParentPath + "/dags.tar")
+		defer os.Remove(dagsTarPath)
 	}
 
 	// Gzip the tar
-	err = gzipFile(dagsParentPath+"/dags.tar", dagsParentPath+"/dags.tar.gz")
+	err = gzipFile(dagsTarPath, dagsTarGzPath)
 	if err != nil {
 		return err
 	}
 	if cleanUpFiles {
-		defer os.Remove(dagsParentPath + "/dags.tar.gz")
+		defer os.Remove(dagsTarGzPath)
 	}
 
 	c, _ := config.GetCurrentContext()
@@ -406,7 +408,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 	}
 
 	uploadFileArgs := fileutil.UploadFileArguments{
-		FilePath:            dagsParentPath + "/dags.tar.gz",
+		FilePath:            dagsTarGzPath,
 		TargetURL:           uploadURL,
 		FormFileFieldName:   "file",
 		Headers:             headers,

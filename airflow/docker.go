@@ -1382,7 +1382,7 @@ var checkWebserverHealth = func(settingsFile string, envConns map[string]astroco
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				fmt.Printf("\n")
-				return fmt.Errorf("there might be a problem with your project starting up. The webserver health check timed out after %s but your project will continue trying to start. Run 'astro dev logs --webserver | --scheduler' for details.\n\nTry again or use the --wait flag to increase the time out", timeout) //nolint:goerr113
+				return fmt.Errorf("there might be a problem with your project starting up. The webserver health check timed out after %s but your project will continue trying to start. Run 'astro dev logs --webserver | --scheduler' for details.\n\nTry again or use the --wait flag to increase the time out", timeout)
 			}
 			if !errors.Is(err, errComposeProjectRunning) {
 				return err

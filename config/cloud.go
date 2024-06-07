@@ -65,7 +65,7 @@ func (c *Context) GetPublicGraphQLAPIURL() string {
 // GetPublicRESTAPIURL returns full core API Url for the provided Context
 func (c *Context) GetPublicRESTAPIURL(version string) string {
 	if c.Domain == localhostDomain || c.Domain == astrohubDomain {
-		return CFG.LocalCore.GetString()
+		return CFG.LocalCore.GetString() + "/" + version
 	}
 
 	domain := domainutil.FormatDomain(c.Domain)

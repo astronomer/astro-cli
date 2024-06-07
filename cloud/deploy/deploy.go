@@ -160,47 +160,23 @@ func shouldIncludeMonitoringDag(deploymentType astroplatformcore.DeploymentType)
 }
 
 func deployDags(path, dagsPath, dagsUploadURL string, deploymentType astroplatformcore.DeploymentType) (string, error) {
-	// Check the dags directory
-	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
-
 	if shouldIncludeMonitoringDag(deploymentType) {
+		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
+
 		// Create monitoring dag file
 		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
 		if err != nil {
 			return "", err
 		}
+
+		// Remove the monitoring dag file after the upload
+		defer os.Remove(monitoringDagPath)
 	}
 
-	// Generate the dags tar
-	err := fileutil.Tar(dagsPath, path)
+	versionID, err := uploadBundle(path, dagsPath, dagsUploadURL, true)
 	if err != nil {
 		return "", err
 	}
-
-	dagsFilePath := filepath.Join(path, "dags.tar")
-	dagFile, err := os.Open(dagsFilePath)
-	if err != nil {
-		return "", err
-	}
-	defer dagFile.Close()
-
-	versionID, err := azureUploader(dagsUploadURL, dagFile)
-	if err != nil {
-		return "", err
-	}
-
-	// Delete the tar file
-	defer func() {
-		dagFile.Close()
-		if shouldIncludeMonitoringDag(deploymentType) {
-			os.Remove(monitoringDagPath)
-		}
-		err = os.Remove(dagFile.Name())
-		if err != nil {
-			fmt.Println("\nFailed to delete dags tar file: ", err.Error())
-			fmt.Println("\nPlease delete the dags tar file manually from path: " + dagFile.Name())
-		}
-	}()
 
 	return versionID, nil
 }

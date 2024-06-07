@@ -1290,7 +1290,7 @@ To cancel, run:
 	})
 
 	s.Run("upgrade runtime get deployment error", func() {
-		mockError := errors.New("get deployment error") //nolint:goerr113
+		mockError := errors.New("get deployment error")
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
@@ -1301,7 +1301,7 @@ To cancel, run:
 	})
 
 	s.Run("upgrade runtime update deployment error", func() {
-		mockError := errors.New("update deployment error") //nolint:goerr113
+		mockError := errors.New("update deployment error")
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": mockDeployment.DesiredRuntimeVersion}
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
@@ -1388,7 +1388,7 @@ Runtime upgrade process has been successfully canceled. Your Deployment was not 
 	})
 
 	s.Run("upgrade cancel get deployment error", func() {
-		mockError := errors.New("get deployment error") //nolint:goerr113
+		mockError := errors.New("get deployment error")
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
@@ -1399,7 +1399,7 @@ Runtime upgrade process has been successfully canceled. Your Deployment was not 
 	})
 
 	s.Run("upgrade cancel error", func() {
-		mockError := errors.New("update deployment error") //nolint:goerr113
+		mockError := errors.New("update deployment error")
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("CancelUpdateDeploymentRuntime", expectedVars).Return(nil, mockError)
@@ -1450,7 +1450,7 @@ To cancel, run:
 	})
 
 	s.Run("migrate runtime get deployment error", func() {
-		mockError := errors.New("get deployment error") //nolint:goerr113
+		mockError := errors.New("get deployment error")
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
@@ -1474,7 +1474,7 @@ To cancel, run:
 	})
 
 	s.Run("migrate runtime get runtime releases error", func() {
-		mockError := errors.New("get runtime releases error") //nolint:goerr113
+		mockError := errors.New("get runtime releases error")
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{}, mockError)
@@ -1497,7 +1497,7 @@ To cancel, run:
 	})
 
 	s.Run("migrate runtime update deployment error", func() {
-		mockError := errors.New("update deployment error") //nolint:goerr113
+		mockError := errors.New("update deployment error")
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": "4.2.4"}
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
@@ -1544,7 +1544,7 @@ Runtime migrate process has been successfully canceled. Your Deployment was not 
 	})
 
 	s.Run("migrate cancel get deployment error", func() {
-		mockError := errors.New("get deployment error") //nolint:goerr113
+		mockError := errors.New("get deployment error")
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
@@ -1555,7 +1555,7 @@ Runtime migrate process has been successfully canceled. Your Deployment was not 
 	})
 
 	s.Run("migrate cancel error", func() {
-		mockError := errors.New("update deployment error") //nolint:goerr113
+		mockError := errors.New("update deployment error")
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("CancelUpdateDeploymentRuntime", expectedVars).Return(nil, mockError)

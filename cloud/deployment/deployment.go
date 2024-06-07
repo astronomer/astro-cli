@@ -257,7 +257,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	}
 
 	if organizationID == "" {
-		return fmt.Errorf(noWorkspaceMsg, workspaceID) //nolint:goerr113
+		return fmt.Errorf(noWorkspaceMsg, workspaceID)
 	}
 	fmt.Printf("Current Workspace: %s\n\n", currentWorkspace.Name)
 
@@ -725,7 +725,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 				return err
 			}
 
-			if currentDeployment.Status == "HEALTHY" {
+			if currentDeployment.Status == astroplatformcore.DeploymentStatusHEALTHY {
 				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Name)
 				return nil
 			}
@@ -1684,7 +1684,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 		deployments = util.Filter(deployments, deploymentFilter)
 	}
 	if len(deployments) == 0 && disableCreateFlow {
-		return astroplatformcore.Deployment{}, fmt.Errorf("%s %s", NoDeploymentInWSMsg, ws) //nolint:goerr113
+		return astroplatformcore.Deployment{}, fmt.Errorf("%s %s", NoDeploymentInWSMsg, ws)
 	}
 	currentDeployment, err := SelectDeployment(deployments, "Select a Deployment")
 	if err != nil {

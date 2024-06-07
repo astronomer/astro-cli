@@ -95,9 +95,7 @@ func WriteToFile(path string, r io.Reader) error {
 	return err
 }
 
-func Tar(source, target string) error {
-	filename := filepath.Base(source)
-	target = filepath.Join(target, fmt.Sprintf("%s.tar", filename))
+func Tar(source, target string, prependBaseDir bool) error {
 	tarfile, err := os.Create(target)
 	if err != nil {
 		return err
@@ -107,39 +105,56 @@ func Tar(source, target string) error {
 	tarball := tar.NewWriter(tarfile)
 	defer tarball.Close()
 
-	info, err := os.Stat(source)
+	sourceInfo, err := os.Stat(source)
 	if err != nil {
 		return nil
 	}
 
-	var baseDir string
-	if info.IsDir() {
-		baseDir = filepath.Base(source)
+	if !sourceInfo.IsDir() {
+		return errors.New("source is not a directory")
 	}
 
 	return filepath.Walk(source,
 		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
 			if info.IsDir() {
 				return nil
 			}
 
-			if err != nil {
-				return err
+			// ignore hidden files, and files in hidden directories
+			if IsHidden(path) {
+				return nil
 			}
+
+			if path == target {
+				return nil
+			}
+
 			var link string
 			if info.Mode()&os.ModeSymlink == os.ModeSymlink {
 				if link, err = os.Readlink(path); err != nil {
 					return err
 				}
 			}
+
 			header, err := tar.FileInfoHeader(info, link)
 			if err != nil {
 				return err
 			}
 
-			if baseDir != "" {
-				header.Name = filepath.ToSlash(filepath.Join(baseDir, strings.TrimPrefix(path, source)))
+			// set the tar file path to be relative to the source directory
+			headerName := strings.TrimPrefix(path, filepath.Clean(source))
+			headerName = strings.TrimPrefix(headerName, string(filepath.Separator))
+			if prependBaseDir {
+				// prepend the base of the source directory to the tar file path, e.g. prepend "dags/" to "my_dag.py"
+				baseDir := filepath.Base(source)
+				headerName = filepath.Join(baseDir, headerName)
 			}
+			// force use forward slashes in tar files
+			header.Name = filepath.ToSlash(headerName)
 
 			if err := tarball.WriteHeader(header); err != nil {
 				return err
@@ -367,4 +382,14 @@ func GzipFile(srcFilePath, destFilePath string) error {
 	// Copy contents of the file to the gzip writer
 	_, err = io.Copy(gzipWriter, srcFile)
 	return err
+}
+
+func IsHidden(path string) bool {
+	components := strings.Split(path, string(filepath.Separator))
+	for _, component := range components {
+		if strings.HasPrefix(component, ".") {
+			return true
+		}
+	}
+	return false
 }

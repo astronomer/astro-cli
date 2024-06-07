@@ -15,7 +15,6 @@ type cfgs struct {
 	Context               cfg
 	Contexts              cfg
 	DockerCommand         cfg
-	LocalEnabled          cfg
 	LocalAstro            cfg
 	LocalCore             cfg
 	LocalPublicAstro      cfg
@@ -46,6 +45,7 @@ type cfgs struct {
 	DisableAstroRun       cfg
 	DisableEnvObjects     cfg
 	AutoSelect            cfg
+	DbtDeploysEnabled     cfg
 }
 
 // Creates a new cfg struct
