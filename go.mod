@@ -7,7 +7,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/briandowns/spinner v1.18.0
 	github.com/compose-spec/compose-go v1.0.8
-	github.com/docker/cli v20.10.7+incompatible
+	github.com/docker/cli v20.10.9+incompatible
 	github.com/docker/compose/v2 v2.1.1
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/gorilla/websocket v1.5.0

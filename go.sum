@@ -432,8 +432,8 @@ github.com/docker/buildx v0.5.2-0.20210422185057-908a856079fc h1:oqPGOy23wxFCyOM
 github.com/docker/buildx v0.5.2-0.20210422185057-908a856079fc/go.mod h1:T5sa7xGu8G7dLXwaLLj6dRbJ5mxugPFDfELGnO2B5lQ=
 github.com/docker/cli v0.0.0-20191017083524-a8ff7f821017/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/cli v20.10.5+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
-github.com/docker/cli v20.10.7+incompatible h1:pv/3NqibQKphWZiAskMzdz8w0PRbtTaEB+f6NwdU7Is=
-github.com/docker/cli v20.10.7+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
+github.com/docker/cli v20.10.9+incompatible h1:OJ7YkwQA+k2Oi51lmCojpjiygKpi76P7bg91b2eJxYU=
+github.com/docker/cli v20.10.9+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/compose-on-kubernetes v0.4.19-0.20190128150448-356b2919c496/go.mod h1:iT2pYfi580XlpaV4KmK0T6+4/9+XoKmk/fhoDod1emE=
 github.com/docker/compose/v2 v2.1.1 h1:Cv2Hlu1EyAp/oo8uaReoGUSf8yX9PBLsa32gQGPd4co=
 github.com/docker/compose/v2 v2.1.1/go.mod h1:95eVFqu5FS0X7KeBqFF71gtwKJPW+28UW0c2JlGaTbQ=
