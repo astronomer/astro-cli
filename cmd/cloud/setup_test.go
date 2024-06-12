@@ -3,21 +3,19 @@ package cloud
 import (
 	"bytes"
 	"encoding/json"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/util"
+	"github.com/golang-jwt/jwt/v4"
 	"io"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
-
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	"github.com/astronomer/astro-cli/config"
-
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -379,7 +377,49 @@ func TestCheckAPIToken(t *testing.T) {
 		err := context.Switch(domain)
 		assert.NoError(t, err)
 
-		// run CheckAPIKeys
+		// run checkAPIToken
+		_, err = checkAPIToken(true, mockPlatformCoreClient)
+		assert.NoError(t, err)
+	})
+
+	t.Run("failed to parse api token", func(t *testing.T) {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return nil, errors.New("Failed to parse token")
+		}
+
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+
+		t.Setenv("ASTRO_API_TOKEN", "token")
+
+		// Switch context
+		domain := "astronomer-dev.io"
+		err := context.Switch(domain)
+		assert.NoError(t, err)
+
+		// run checkAPIToken
+		_, err = checkAPIToken(true, mockPlatformCoreClient)
+		assert.Error(t, err)
+	})
+	t.Run("unable to fetch current context", func(t *testing.T) {
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+
+		t.Setenv("ASTRO_API_TOKEN", "token")
+		err := config.ResetCurrentContext()
+		assert.NoError(t, err)
+
+		// run checkAPIToken
 		_, err = checkAPIToken(true, mockPlatformCoreClient)
 		assert.NoError(t, err)
 	})
@@ -416,8 +456,8 @@ func TestCheckAPIToken(t *testing.T) {
 		err := context.Switch(domain)
 		assert.NoError(t, err)
 
-		// run CheckAPIKeys
-		_, err = checkAPIToken(true, mockPlatformCoreClient)
+		// run checkAPIToken
+		_, err = checkAPIToken(false, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 
@@ -456,7 +496,7 @@ func TestCheckAPIToken(t *testing.T) {
 		err := context.Switch(domain)
 		assert.NoError(t, err)
 
-		// run CheckAPIKeys
+		// run checkAPIToken
 		_, err = checkAPIToken(true, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errExpiredAPIToken)
 	})
@@ -495,7 +535,7 @@ func TestCheckAPIToken(t *testing.T) {
 		err := context.Switch(domain)
 		assert.NoError(t, err)
 
-		// run CheckAPIKeys
+		// run checkAPIToken
 		_, err = checkAPIToken(true, mockPlatformCoreClient)
 		assert.NoError(t, err)
 	})
