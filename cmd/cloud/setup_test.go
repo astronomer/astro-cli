@@ -3,14 +3,15 @@ package cloud
 import (
 	"bytes"
 	"encoding/json"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/util"
-	"github.com/golang-jwt/jwt/v4"
 	"io"
 	"net/http"
 	"testing"
 	"time"
+
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/util"
+	"github.com/golang-jwt/jwt/v4"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
