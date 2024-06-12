@@ -205,6 +205,102 @@ func TestSetup(t *testing.T) {
 			},
 		}
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockClaims := util.CustomClaims{
+			Permissions: []string{
+				"workspaceId:workspace-id",
+				"organizationId:org-ID",
+			},
+			RegisteredClaims: jwt.RegisteredClaims{
+				Issuer:    "test-issuer",
+				Subject:   "test-subject",
+				Audience:  jwt.ClaimStrings{"audience1", "audience2"},         // Audience can be a single string or an array of strings
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Set expiration date 24 hours from now
+				NotBefore: jwt.NewNumericDate(time.Now()),                     // Set not before to current time
+				IssuedAt:  jwt.NewNumericDate(time.Now()),                     // Set issued at to current time
+				ID:        "test-id",
+			},
+		}
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("domain", "astronomer.io")
+		assert.NoError(t, err)
+
+		cmd := &cobra.Command{Use: "deploy"}
+		cmd, err = cmd.ExecuteC()
+		assert.NoError(t, err)
+
+		rootCmd := &cobra.Command{Use: "astro"}
+		rootCmd.AddCommand(cmd)
+
+		t.Setenv("ASTRO_API_TOKEN", "token")
+
+		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("using a bad API token will throw error", func(t *testing.T) {
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return nil, errors.New("bad token")
+		}
+
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("domain", "astronomer.io")
+		assert.NoError(t, err)
+
+		cmd := &cobra.Command{Use: "deploy"}
+		cmd, err = cmd.ExecuteC()
+		assert.NoError(t, err)
+
+		rootCmd := &cobra.Command{Use: "astro"}
+		rootCmd.AddCommand(cmd)
+
+		t.Setenv("ASTRO_API_TOKEN", "bad token")
+
+		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
+		assert.Error(t, err)
+	})
+
+	t.Run("using a empty API token will skip api token check and go to auth login", func(t *testing.T) {
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("domain", "astronomer.io")
+		assert.NoError(t, err)
+
+		cmd := &cobra.Command{Use: "deploy"}
+		cmd, err = cmd.ExecuteC()
+		assert.NoError(t, err)
+
+		rootCmd := &cobra.Command{Use: "astro"}
+		rootCmd.AddCommand(cmd)
+
+		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		t.Setenv("ASTRO_API_TOKEN", "")
+
+		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
+		assert.NoError(t, err)
+	})
+
+	t.Run("use API key", func(t *testing.T) {
+		mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astroplatformcore.OrganizationsPaginated{
+				Organizations: []astroplatformcore.Organization{
+					{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
+				},
+			},
+		}
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		c, err := config.GetCurrentContext()
