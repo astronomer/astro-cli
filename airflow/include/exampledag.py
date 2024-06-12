@@ -15,7 +15,7 @@ depending on how many Astronauts are in space, and the DAG will adjust
 accordingly each time it runs.
 
 For more explanation and getting started instructions, see our Write your
-first DAG tutorial: https://www.astronomer.io/docs/learn/get-started-with-airflow
+first DAG tutorial: https://docs.astronomer.io/learn/get-started-with-airflow
 
 ![Picture of the ISS](https://www.esa.int/var/esa/storage/images/esa_multimedia/images/2010/02/space_station_over_earth/10293696-3-eng-GB/Space_Station_over_Earth_card_full.jpg)
 """
@@ -48,9 +48,27 @@ def example_astronauts():
         so they can be used in a downstream pipeline. The task returns a list
         of Astronauts to be used in the next task.
         """
-        r = requests.get("http://api.open-notify.org/astros.json")
-        number_of_people_in_space = r.json()["number"]
-        list_of_people_in_space = r.json()["people"]
+        try:
+            r = requests.get("http://api.open-notify.org/astros.json")
+            number_of_people_in_space = r.json()["number"]
+            list_of_people_in_space = r.json()["people"]
+        except:
+            print("API currently not available, using hardcoded data instead.")
+            number_of_people_in_space = 12
+            list_of_people_in_space = [
+                {"craft": "ISS", "name": "Oleg Kononenko"},
+                {"craft": "ISS", "name": "Nikolai Chub"},
+                {"craft": "ISS", "name": "Tracy Caldwell Dyson"},
+                {"craft": "ISS", "name": "Matthew Dominick"},
+                {"craft": "ISS", "name": "Michael Barratt"},
+                {"craft": "ISS", "name": "Jeanette Epps"},
+                {"craft": "ISS", "name": "Alexander Grebenkin"},
+                {"craft": "ISS", "name": "Butch Wilmore"},
+                {"craft": "ISS", "name": "Sunita Williams"},
+                {"craft": "Tiangong", "name": "Li Guangsu"},
+                {"craft": "Tiangong", "name": "Li Cong"},
+                {"craft": "Tiangong", "name": "Ye Guangfu"},
+            ]
 
         context["ti"].xcom_push(
             key="number_of_people_in_space", value=number_of_people_in_space
