@@ -48,9 +48,28 @@ def example_astronauts():
         so they can be used in a downstream pipeline. The task returns a list
         of Astronauts to be used in the next task.
         """
-        r = requests.get("http://api.open-notify.org/astros.json")
-        number_of_people_in_space = r.json()["number"]
-        list_of_people_in_space = r.json()["people"]
+        try:
+            r = requests.get("http://api.open-notify.org/astros.json")
+            r.raise_for_status()
+            number_of_people_in_space = r.json()["number"]
+            list_of_people_in_space = r.json()["people"]
+        except:
+            print("API currently not available, using hardcoded data instead.")
+            number_of_people_in_space = 12
+            list_of_people_in_space = [
+                {"craft": "ISS", "name": "Oleg Kononenko"},
+                {"craft": "ISS", "name": "Nikolai Chub"},
+                {"craft": "ISS", "name": "Tracy Caldwell Dyson"},
+                {"craft": "ISS", "name": "Matthew Dominick"},
+                {"craft": "ISS", "name": "Michael Barratt"},
+                {"craft": "ISS", "name": "Jeanette Epps"},
+                {"craft": "ISS", "name": "Alexander Grebenkin"},
+                {"craft": "ISS", "name": "Butch Wilmore"},
+                {"craft": "ISS", "name": "Sunita Williams"},
+                {"craft": "Tiangong", "name": "Li Guangsu"},
+                {"craft": "Tiangong", "name": "Li Cong"},
+                {"craft": "Tiangong", "name": "Ye Guangfu"},
+            ]
 
         context["ti"].xcom_push(
             key="number_of_people_in_space", value=number_of_people_in_space
