@@ -2,9 +2,11 @@ package deploy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -12,7 +14,6 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/git"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -32,19 +33,19 @@ func DeployBundle(input *DeployBundleInput, platformCoreClient astroplatformcore
 	}
 
 	// get the current deployment so we can check the deploy is valid
-	currentDeployment, err := getDeployment(c.Organization, input.DeploymentID, platformCoreClient)
+	currentDeployment, err := deployment.CoreGetDeployment(c.Organization, input.DeploymentID, platformCoreClient)
 	if err != nil {
 		return err
 	}
 
 	// if CI/CD is enforced, check the subject can deploy
 	if currentDeployment.IsCicdEnforced && !canCiCdDeploy(c.Token) {
-		return fmt.Errorf(errCiCdEnforcementUpdate, currentDeployment.Name) //nolint
+		return fmt.Errorf(errCiCdEnforcementUpdate, currentDeployment.Name)
 	}
 
 	// check the deployment is enabled for DAG deploys
 	if !currentDeployment.IsDagDeployEnabled {
-		return fmt.Errorf(enableDagDeployMsg, input.DeploymentID) //nolint
+		return fmt.Errorf(enableDagDeployMsg, input.DeploymentID)
 	}
 
 	// retrieve metadata about the local Git checkout. returns nil if not available
@@ -58,7 +59,7 @@ func DeployBundle(input *DeployBundleInput, platformCoreClient astroplatformcore
 
 	// check we received an upload URL
 	if deploy.BundleUploadUrl == nil {
-		return errors.New("No bundle upload URL received from Astro")
+		return errors.New("no bundle upload URL received from Astro")
 	}
 
 	// upload the bundle
@@ -115,19 +116,6 @@ func uploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool)
 	return versionID, nil
 }
 
-func getDeployment(organizationID, deploymentID string, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Deployment, error) {
-	resp, err := platformCoreClient.GetDeploymentWithResponse(context.Background(), organizationID, deploymentID)
-	if err != nil {
-		return nil, err
-	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp.JSON200, nil
-}
-
 func createBundleDeploy(organizationID string, input *DeployBundleInput, deployGit *astrocore.DeployGit, coreClient astrocore.CoreClient) (*astrocore.Deploy, error) {
 	request := astrocore.CreateDeployRequest{
 		Description:     &input.Description,
@@ -174,7 +162,7 @@ func finalizeBundleDeploy(organizationID, deployID, tarballVersion string, input
 }
 
 func retrieveLocalGitMetadata(bundlePath string) *astrocore.DeployGit {
-	if git.HasUncommittedChanges() {
+	if git.HasUncommittedChanges(bundlePath) {
 		logrus.Warn("Local repository has uncommitted changes, skipping Git metadata retrieval")
 		return nil
 	}
@@ -182,23 +170,29 @@ func retrieveLocalGitMetadata(bundlePath string) *astrocore.DeployGit {
 	gitMetadata := &astrocore.DeployGit{}
 
 	// get the remote repository details, assume the remote is named "origin"
-	host, account, repo, err := git.GetRemoteRepository("origin")
+	repoURL, err := git.GetRemoteRepository(bundlePath, "origin")
 	if err != nil {
 		logrus.Debugf("Failed to retrieve remote repository details, skipping Git metadata retrieval: %s", err)
 		return nil
 	}
-	switch host {
+	switch repoURL.Host {
 	case "github.com":
 		gitMetadata.Provider = astrocore.DeployGitProviderGITHUB
 	default:
-		logrus.Debugf("Unsupported Git provider, skipping Git metadata retrieval: %s", host)
+		logrus.Debugf("Unsupported Git provider, skipping Git metadata retrieval: %s", repoURL.Host)
 		return nil
 	}
-	gitMetadata.Account = account
-	gitMetadata.Repo = repo
+	urlPath := strings.TrimPrefix(repoURL.Path, "/")
+	firstSlashIndex := strings.Index(urlPath, "/")
+	if firstSlashIndex == -1 {
+		logrus.Debugf("Failed to parse remote repository path, skipping Git metadata retrieval: %s", repoURL.Path)
+		return nil
+	}
+	gitMetadata.Account = urlPath[:firstSlashIndex]
+	gitMetadata.Repo = urlPath[firstSlashIndex+1:]
 
 	// get the path of the bundle within the repository
-	path, err := git.GetLocalRepositoryPathPrefix(bundlePath)
+	path, err := git.GetLocalRepositoryPathPrefix(bundlePath, bundlePath)
 	if err != nil {
 		logrus.Debugf("Failed to retrieve local repository path prefix, skipping Git metadata retrieval: %s", err)
 		return nil
@@ -208,7 +202,7 @@ func retrieveLocalGitMetadata(bundlePath string) *astrocore.DeployGit {
 	}
 
 	// get the branch of the local commit
-	branch, err := git.GetBranch()
+	branch, err := git.GetBranch(bundlePath)
 	if err != nil {
 		logrus.Debugf("Failed to retrieve branch name, skipping Git metadata retrieval: %s", err)
 		return nil
@@ -216,7 +210,7 @@ func retrieveLocalGitMetadata(bundlePath string) *astrocore.DeployGit {
 	gitMetadata.Branch = branch
 
 	// get the SHA of the local commit
-	sha, err := git.GetHeadCommitSHA()
+	sha, err := git.GetHeadCommitSHA(bundlePath)
 	if err != nil {
 		logrus.Debugf("Failed to retrieve commit SHA, skipping Git metadata retrieval: %s", err)
 		return nil
@@ -224,15 +218,16 @@ func retrieveLocalGitMetadata(bundlePath string) *astrocore.DeployGit {
 	gitMetadata.CommitSha = sha
 
 	// derive the remote URL of the local commit
-	commitURL, err := git.GetCommitURL(host, account, repo, sha)
-	if err != nil {
-		logrus.Debugf("Failed to derive commit URL, skipping Git metadata retrieval: %s", err)
+	switch repoURL.Host {
+	case "github.com":
+		gitMetadata.CommitUrl = fmt.Sprintf("https://%s/%s/%s/commit/%s", repoURL.Host, gitMetadata.Account, gitMetadata.Repo, sha)
+	default:
+		logrus.Debugf("Unsupported Git provider, skipping Git metadata retrieval: %s", repoURL.Host)
 		return nil
 	}
-	gitMetadata.CommitUrl = commitURL
 
 	// get the author name of the local commit
-	authorName, _, err := git.GetHeadCommitAuthor()
+	authorName, _, err := git.GetHeadCommitAuthor(bundlePath)
 	if err != nil {
 		logrus.Debugf("Failed to retrieve commit author, skipping Git metadata retrieval: %s", err)
 		return nil

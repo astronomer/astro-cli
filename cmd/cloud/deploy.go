@@ -94,7 +94,7 @@ func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 }
 
 func deploy(cmd *cobra.Command, args []string) error {
-	deploymentID := ""
+	deploymentID = ""
 
 	// Get deploymentId from args, if passed
 	if len(args) > 0 {
@@ -121,7 +121,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if git.HasUncommittedChanges() && !forceDeploy {
+	if git.HasUncommittedChanges("") && !forceDeploy {
 		fmt.Println(registryUncommitedChangesMsg)
 		return nil
 	}

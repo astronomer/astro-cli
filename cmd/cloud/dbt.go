@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,7 +9,6 @@ import (
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )
@@ -24,7 +24,7 @@ const (
 	dbtDeployExample = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this dbt project to:
 
-  $ astro dbt deploy <deployment ID>
+  $ astro dbt deploy -d <deployment ID>
 
 Menu will be presented if you do not specify a deployment ID:
 
@@ -49,17 +49,18 @@ func newDbtCmd() *cobra.Command {
 
 func newDbtDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "deploy DEPLOYMENT-ID",
+		Use:     "deploy",
 		Short:   "Deploy your dbt project to a Deployment on Astro",
 		Long:    "Deploy your dbt project to a Deployment on Astro. This command bundles your dbt project files and uploads it to your Deployment.",
-		Args:    cobra.MaximumNArgs(1),
+		Args:    cobra.NoArgs,
 		RunE:    deployDbt,
 		Example: dbtDeployExample,
 	}
 
 	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", "Path to mount dbt project in Airflow, for reference by DAGs. Default /usr/local/dbt/{dbt project name}")
-	cmd.Flags().StringVarP(&dbtProjectPath, "project-path", "b", "", "Path to the dbt project to deploy. Default current directory")
+	cmd.Flags().StringVarP(&dbtProjectPath, "project-path", "p", "", "Path to the dbt project to deploy. Default current directory")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to deploy to")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to deploy to")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Description to store on the deploy")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
@@ -78,11 +79,11 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 	// check that there is a valid dbt project at the dbt project path
 	dbtProjectYamlPath := filepath.Join(dbtProjectPath, dbtProjectYmlFilename)
 	if _, err := os.Stat(dbtProjectYamlPath); os.IsNotExist(err) {
-		return fmt.Errorf("dbt project not found in %s. Please run this command in the root of your dbt project, or use --project-path to specify the dbt project path.", dbtProjectYamlPath) //nolint
+		return fmt.Errorf("dbt project not found in %s. Please run this command in the root of your dbt project, or use --project-path to specify the dbt project path", dbtProjectYamlPath)
 	}
 	dbtProjectName, err := extractDbtProjectName(dbtProjectYamlPath)
 	if err != nil {
-		return fmt.Errorf("dbt project name not found in %s", dbtProjectYamlPath) //nolint
+		return fmt.Errorf("dbt project name not found in %s", dbtProjectYamlPath)
 	}
 
 	// if the workspace ID is not provided, try to find a valid workspace
@@ -90,17 +91,12 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 		var err error
 		workspaceID, err = coalesceWorkspace()
 		if err != nil {
-			return errors.Wrap(err, "failed to find a valid workspace")
+			return fmt.Errorf("failed to find a valid workspace: %w", err)
 		}
 	}
 
-	// get the deployment to deploy the dbt project to
-	var deploymentID string
-	if len(args) > 0 {
-		// if provided, use the deployment ID from the command argument
-		deploymentID = args[0]
-	} else {
-		// otherwise, prompt the user to select a deployment
+	// if the deployment ID is not provided, get it from the deployment name or prompt the user
+	if deploymentID == "" {
 		selectedDeployment, err := deployment.GetDeployment(workspaceID, "", deploymentName, false, nil, platformCoreClient, astroCoreClient)
 		if err != nil {
 			return err

@@ -84,7 +84,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if git.HasUncommittedChanges() && !forceDeploy {
+	if git.HasUncommittedChanges("") && !forceDeploy {
 		fmt.Println(registryUncommittedChanges)
 		return nil
 	}

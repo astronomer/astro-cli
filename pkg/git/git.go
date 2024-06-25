@@ -8,63 +8,48 @@ import (
 	"strings"
 )
 
-var Path = ""
-
 // HasUncommittedChanges checks repository for uncommitted changes
-func HasUncommittedChanges() bool {
-	if !IsGitRepository() {
+func HasUncommittedChanges(path string) bool {
+	if !IsGitRepository(path) {
 		return false
 	}
 
-	_, err := runGitCommand("diff", "--quiet", "HEAD")
+	_, err := runGitCommand(path, []string{"diff", "--quiet", "HEAD"})
 	return err != nil
 }
 
 // IsGitRepository checks if current directory is a git repository
-func IsGitRepository() bool {
-	_, err := runGitCommand("rev-parse", "--is-inside-working-tree")
+func IsGitRepository(path string) bool {
+	_, err := runGitCommand(path, []string{"rev-parse", "--is-inside-working-tree"})
 	return err == nil
 }
 
-func GetRemoteRepository(remote string) (host, account, repo string, err error) {
-	remoteURLStr, err := runGitCommand("remote", "get-url", remote)
+func GetRemoteRepository(path, remote string) (*url.URL, error) {
+	urlStr, err := runGitCommand(path, []string{"remote", "get-url", remote})
 	if err != nil {
-		return "", "", "", err
+		return nil, err
 	}
-	remoteURL, err := url.Parse(remoteURLStr)
-	if err != nil {
-		return "", "", "", err
-	}
-
-	host = remoteURL.Hostname()
-	accountRepo := strings.Split(remoteURL.Path, "/")
-	if len(accountRepo) != 3 || accountRepo[0] != "" {
-		return "", "", "", fmt.Errorf("failed to parse remote URL: %s", remoteURLStr)
-	}
-	account = accountRepo[1]
-	repo = strings.TrimSuffix(accountRepo[2], ".git")
-
-	return host, account, repo, nil
+	return parseGitURL(urlStr)
 }
 
-func GetLocalRepositoryPathPrefix(dir string) (string, error) {
-	path, err := runGitCommand("-C", dir, "rev-parse", "--show-prefix")
+func GetLocalRepositoryPathPrefix(path, dir string) (string, error) {
+	path, err := runGitCommand(path, []string{"-C", dir, "rev-parse", "--show-prefix"})
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSuffix(path, "/"), nil
 }
 
-func GetBranch() (string, error) {
-	return runGitCommand("rev-parse", "--abbrev-ref", "HEAD")
+func GetBranch(path string) (string, error) {
+	return runGitCommand(path, []string{"rev-parse", "--abbrev-ref", "HEAD"})
 }
 
-func GetHeadCommitSHA() (string, error) {
-	return runGitCommand("rev-parse", "HEAD")
+func GetHeadCommitSHA(path string) (string, error) {
+	return runGitCommand(path, []string{"rev-parse", "HEAD"})
 }
 
-func GetHeadCommitAuthor() (name, email string, err error) {
-	authorJSON, err := runGitCommand("log", "-1", `--pretty=format:{"name":"%an","email":"%ae"}`, "HEAD")
+func GetHeadCommitAuthor(path string) (name, email string, err error) {
+	authorJSON, err := runGitCommand(path, []string{"log", "-1", `--pretty=format:{"name":"%an","email":"%ae"}`, "HEAD"})
 	if err != nil {
 		return "", "", err
 	}
@@ -83,22 +68,45 @@ func GetHeadCommitAuthor() (name, email string, err error) {
 	return author.Name, author.Email, nil
 }
 
-func GetCommitURL(host, account, repo, sha string) (string, error) {
-	switch host {
-	case "github.com":
-		return fmt.Sprintf("https://%s/%s/%s/commit/%s", host, account, repo, sha), nil
-	default:
-		return "", fmt.Errorf("unsupported Git provider: %s", host)
-	}
-}
-
-func runGitCommand(args ...string) (string, error) {
-	if Path != "" {
-		args = append([]string{"-C", Path}, args...)
+func runGitCommand(path string, args []string) (string, error) {
+	if path != "" {
+		args = append([]string{"-C", path}, args...)
 	}
 	out, err := exec.Command("git", args...).CombinedOutput()
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+func parseGitURL(urlStr string) (*url.URL, error) {
+	var parsedURL *url.URL
+	var err error
+
+	if strings.Contains(urlStr, "://") {
+		parsedURL, err = url.Parse(urlStr)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// if the URL is not a full URL, assume it is an "SCP-like" SSH URL
+		// e.g. git@github.com:astronomer/astro-cli
+		parts := strings.Split(urlStr, ":")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid Git URL: %s", urlStr)
+		}
+		userHost := strings.Split(parts[0], "@")
+		if len(userHost) > 2 {
+			return nil, fmt.Errorf("invalid user@host format")
+		}
+		parsedURL = &url.URL{
+			Scheme: "ssh",
+			Host:   userHost[len(userHost)-1],
+			Path:   parts[1],
+		}
+	}
+
+	parsedURL.Path = strings.TrimSuffix(parsedURL.Path, ".git")
+
+	return parsedURL, nil
 }

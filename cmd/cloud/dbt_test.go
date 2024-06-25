@@ -7,61 +7,84 @@ import (
 	"testing"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestDbtDeploy_PickDeployment(t *testing.T) {
+type Suite struct {
+	suite.Suite
+	mockPlatformCoreClient *astroplatformcore_mocks.ClientWithResponsesInterface
+	mockCoreClient         *astrocore_mocks.ClientWithResponsesInterface
+	origPlatformCoreClient astroplatformcore.CoreClient
+	origCoreClient         astrocore.CoreClient
+}
+
+func (s *Suite) SetupTest() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	defer createDbtProjectFile(t, "dbt_project.yml")()
+	// the package depends on global variables so we need to manage overriding those
+	s.origPlatformCoreClient = platformCoreClient
+	s.origCoreClient = astroCoreClient
+	s.mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
+	s.mockCoreClient = new(astrocore_mocks.ClientWithResponsesInterface)
+	platformCoreClient = s.mockPlatformCoreClient
+	astroCoreClient = s.mockCoreClient
+}
+
+func (s *Suite) TearDownTest() {
+	platformCoreClient = s.origPlatformCoreClient
+	astroCoreClient = s.origCoreClient
+}
+
+func TestDbtDeploy(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestDbtDeploy_PickDeployment() {
+	s.createDbtProjectFile("dbt_project.yml")
+	defer os.Remove("dbt_project.yml")
 
 	DeployBundle = func(deployInput *cloud.DeployBundleInput, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 		return nil
 	}
 
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	mockListTestDeployments(mockPlatformCoreClient)
-	mockGetTestDeployment(mockPlatformCoreClient)
-	defer setPlatformCoreClient(mockPlatformCoreClient)()
+	s.mockListTestDeployments()
+	s.mockGetTestDeployment()
 
-	defer testUtil.MockUserInput(t, "1")()
+	defer testUtil.MockUserInput(s.T(), "1")()
 	err := execDbtDeployCmd()
-	assert.NoError(t, err)
+	assert.NoError(s.T(), err)
 
-	mockPlatformCoreClient.AssertExpectations(t)
+	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
-func TestDbtDeploy_ProvidedDeploymentId(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	defer createDbtProjectFile(t, "dbt_project.yml")()
+func (s *Suite) TestDbtDeploy_ProvidedDeploymentId() {
+	s.createDbtProjectFile("dbt_project.yml")
+	defer os.Remove("dbt_project.yml")
 
 	DeployBundle = func(deployInput *cloud.DeployBundleInput, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 		return nil
 	}
 
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	defer setPlatformCoreClient(mockPlatformCoreClient)()
+	err := execDbtDeployCmd("--deployment-id", "test-deployment-id")
+	assert.NoError(s.T(), err)
 
-	err := execDbtDeployCmd("test-deployment-id")
-	assert.NoError(t, err)
-
-	mockPlatformCoreClient.AssertExpectations(t)
+	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
-func TestDbtDeploy_CustomProjectPath(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	projectPath := "/tmp/test_dbt_project"
-	err := os.MkdirAll(projectPath, os.ModePerm)
-	assert.NoError(t, err)
+func (s *Suite) TestDbtDeploy_CustomProjectPath() {
+	projectPath, err := os.MkdirTemp("", "")
+	assert.NoError(s.T(), err)
 	defer os.RemoveAll(projectPath)
-	createDbtProjectFile(t, filepath.Join(projectPath, "dbt_project.yml"))
+
+	s.createDbtProjectFile(filepath.Join(projectPath, "dbt_project.yml"))
+	defer os.Remove("dbt_project.yml")
 
 	DeployBundle = func(deployInput *cloud.DeployBundleInput, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 		if deployInput.BundlePath != projectPath {
@@ -70,20 +93,16 @@ func TestDbtDeploy_CustomProjectPath(t *testing.T) {
 		return nil
 	}
 
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	defer setPlatformCoreClient(mockPlatformCoreClient)()
+	defer testUtil.MockUserInput(s.T(), "1")()
+	err = execDbtDeployCmd("--deployment-id", "test-deployment-id", "--project-path", projectPath)
+	assert.NoError(s.T(), err)
 
-	defer testUtil.MockUserInput(t, "1")()
-	err = execDbtDeployCmd("test-deployment-id", "--project-path", "/tmp/test_dbt_project")
-	assert.NoError(t, err)
-
-	mockPlatformCoreClient.AssertExpectations(t)
+	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
-func TestDbtDeploy_CustomMountPath(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	defer createDbtProjectFile(t, "dbt_project.yml")()
+func (s *Suite) TestDbtDeploy_CustomMountPath() {
+	s.createDbtProjectFile("dbt_project.yml")
+	defer os.Remove("dbt_project.yml")
 
 	DeployBundle = func(deployInput *cloud.DeployBundleInput, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 		if deployInput.MountPath != dbtDefaultMountPathPrefix+"test_dbt_project" {
@@ -92,14 +111,11 @@ func TestDbtDeploy_CustomMountPath(t *testing.T) {
 		return nil
 	}
 
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	defer setPlatformCoreClient(mockPlatformCoreClient)()
+	defer testUtil.MockUserInput(s.T(), "1")()
+	err := execDbtDeployCmd("--deployment-id", "test-deployment-id", "--mount-path", dbtDefaultMountPathPrefix+"test_dbt_project")
+	assert.NoError(s.T(), err)
 
-	defer testUtil.MockUserInput(t, "1")()
-	err := execDbtDeployCmd("test-deployment-id", "--mount-path", dbtDefaultMountPathPrefix+"test_dbt_project")
-	assert.NoError(t, err)
-
-	mockPlatformCoreClient.AssertExpectations(t)
+	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
 func execDbtDeployCmd(args ...string) error {
@@ -113,17 +129,16 @@ func execDbtDeployCmd(args ...string) error {
 	return err
 }
 
-func createDbtProjectFile(t *testing.T, path string) func() {
+func (s *Suite) createDbtProjectFile(path string) {
 	file, err := os.Create(path)
-	assert.NoError(t, err)
+	assert.NoError(s.T(), err)
 	defer file.Close()
 	_, err = file.WriteString("name: test_dbt_project")
-	assert.NoError(t, err)
-	return func() { os.Remove(path) }
+	assert.NoError(s.T(), err)
 }
 
-func mockListTestDeployments(client *astroplatformcore_mocks.ClientWithResponsesInterface) {
-	client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListDeploymentsResponse{
+func (s *Suite) mockListTestDeployments() {
+	s.mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: astrocore.HTTPStatus200,
 		},
@@ -137,8 +152,8 @@ func mockListTestDeployments(client *astroplatformcore_mocks.ClientWithResponses
 	}, nil)
 }
 
-func mockGetTestDeployment(client *astroplatformcore_mocks.ClientWithResponsesInterface) {
-	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.GetDeploymentResponse{
+func (s *Suite) mockGetTestDeployment() {
+	s.mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: astrocore.HTTPStatus200,
 		},
@@ -146,9 +161,4 @@ func mockGetTestDeployment(client *astroplatformcore_mocks.ClientWithResponsesIn
 			Id: "test-deployment-id",
 		},
 	}, nil)
-}
-
-func setPlatformCoreClient(client astroplatformcore.CoreClient) func() {
-	platformCoreClient = client
-	return func() { platformCoreClient = nil }
 }
