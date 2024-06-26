@@ -72,7 +72,7 @@ func (s *Suite) TestDbtDeploy_ProvidedDeploymentId() {
 		return nil
 	}
 
-	err := execDbtDeployCmd("--deployment-id", "test-deployment-id")
+	err := execDbtDeployCmd("test-deployment-id")
 	assert.NoError(s.T(), err)
 
 	s.mockPlatformCoreClient.AssertExpectations(s.T())
@@ -94,7 +94,7 @@ func (s *Suite) TestDbtDeploy_CustomProjectPath() {
 	}
 
 	defer testUtil.MockUserInput(s.T(), "1")()
-	err = execDbtDeployCmd("--deployment-id", "test-deployment-id", "--project-path", projectPath)
+	err = execDbtDeployCmd("test-deployment-id", "--project-path", projectPath)
 	assert.NoError(s.T(), err)
 
 	s.mockPlatformCoreClient.AssertExpectations(s.T())
@@ -112,7 +112,7 @@ func (s *Suite) TestDbtDeploy_CustomMountPath() {
 	}
 
 	defer testUtil.MockUserInput(s.T(), "1")()
-	err := execDbtDeployCmd("--deployment-id", "test-deployment-id", "--mount-path", dbtDefaultMountPathPrefix+"test_dbt_project")
+	err := execDbtDeployCmd("test-deployment-id", "--mount-path", dbtDefaultMountPathPrefix+"test_dbt_project")
 	assert.NoError(s.T(), err)
 
 	s.mockPlatformCoreClient.AssertExpectations(s.T())

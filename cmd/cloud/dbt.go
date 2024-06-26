@@ -24,7 +24,7 @@ const (
 	dbtDeployExample = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this dbt project to:
 
-  $ astro dbt deploy -d <deployment ID>
+  $ astro dbt deploy <deployment ID>
 
 Menu will be presented if you do not specify a deployment ID:
 
@@ -49,10 +49,10 @@ func newDbtCmd() *cobra.Command {
 
 func newDbtDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "deploy",
+		Use:     "deploy DEPLOYMENT-ID",
 		Short:   "Deploy your dbt project to a Deployment on Astro",
 		Long:    "Deploy your dbt project to a Deployment on Astro. This command bundles your dbt project files and uploads it to your Deployment.",
-		Args:    cobra.NoArgs,
+		Args:    cobra.MaximumNArgs(1),
 		RunE:    deployDbt,
 		Example: dbtDeployExample,
 	}
@@ -60,7 +60,6 @@ func newDbtDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", "Path to mount dbt project in Airflow, for reference by DAGs. Default /usr/local/dbt/{dbt project name}")
 	cmd.Flags().StringVarP(&dbtProjectPath, "project-path", "p", "", "Path to the dbt project to deploy. Default current directory")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to deploy to")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to deploy to")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Description to store on the deploy")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
@@ -95,8 +94,13 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// if the deployment ID is not provided, get it from the deployment name or prompt the user
-	if deploymentID == "" {
+	// get the deployment to deploy the dbt project to
+	var deploymentID string
+	if len(args) > 0 {
+		// if provided, use the deployment ID from the command argument
+		deploymentID = args[0]
+	} else {
+		// otherwise, prompt the user to select a deployment
 		selectedDeployment, err := deployment.GetDeployment(workspaceID, "", deploymentName, false, nil, platformCoreClient, astroCoreClient)
 		if err != nil {
 			return err
