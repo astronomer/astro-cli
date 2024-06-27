@@ -7,7 +7,6 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	"github.com/astronomer/astro-cli/config"
 	"github.com/spf13/cobra"
 )
 
@@ -24,14 +23,11 @@ func AddCmds(astroPlatformCoreClient astroplatformcore.CoreClient, coreClient as
 	platformCoreClient = astroPlatformCoreClient
 	astroCoreIamClient = iamCoreClient
 	airflowAPIClient = airflowClient
-	cmds := []*cobra.Command{
+	return []*cobra.Command{
 		NewDeployCmd(),
 		newDeploymentRootCmd(out),
 		newWorkspaceCmd(out),
 		newOrganizationCmd(out),
+		newDbtCmd(),
 	}
-	if config.CFG.DbtDeploysEnabled.GetBool() {
-		cmds = append(cmds, newDbtCmd())
-	}
-	return cmds
 }

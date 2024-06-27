@@ -45,7 +45,6 @@ type cfgs struct {
 	DisableAstroRun       cfg
 	DisableEnvObjects     cfg
 	AutoSelect            cfg
-	DbtDeploysEnabled     cfg
 }
 
 // Creates a new cfg struct
