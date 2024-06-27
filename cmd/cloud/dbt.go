@@ -76,13 +76,15 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 	}
 
 	// check that there is a valid dbt project at the dbt project path
-	dbtProjectYamlPath := filepath.Join(dbtProjectPath, dbtProjectYmlFilename)
-	if _, err := os.Stat(dbtProjectYamlPath); os.IsNotExist(err) {
-		return fmt.Errorf("dbt project not found in %s. Please run this command in the root of your dbt project, or use --project-path to specify the dbt project path", dbtProjectYamlPath)
-	}
-	dbtProjectName, err := extractDbtProjectName(dbtProjectYamlPath)
+	err := validateDbtProjectExists(dbtProjectPath)
 	if err != nil {
-		return fmt.Errorf("dbt project name not found in %s", dbtProjectYamlPath)
+		return err
+	}
+
+	// extract the dbt project's name
+	dbtProjectName, err := extractDbtProjectName(dbtProjectPath)
+	if err != nil {
+		return fmt.Errorf("dbt project name not found in %s: %w", dbtProjectPath, err)
 	}
 
 	// if the workspace ID is not provided, try to find a valid workspace
@@ -132,7 +134,19 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func extractDbtProjectName(dbtProjectYamlPath string) (string, error) {
+func validateDbtProjectExists(dbtProjectPath string) error {
+	dbtProjectYamlPath := filepath.Join(dbtProjectPath, dbtProjectYmlFilename)
+
+	_, err := os.Stat(dbtProjectYamlPath)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("dbt project file not found at %s. Please run this command in the root of your dbt project, or use --project-path to specify the dbt project path", dbtProjectYamlPath)
+	}
+	return err
+}
+
+func extractDbtProjectName(dbtProjectPath string) (string, error) {
+	dbtProjectYamlPath := filepath.Join(dbtProjectPath, dbtProjectYmlFilename)
+
 	var dbtProject map[string]interface{}
 	file, err := os.Open(dbtProjectYamlPath)
 	if err != nil {
