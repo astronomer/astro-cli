@@ -36,17 +36,25 @@ const (
 
 // Defines values for ClusterStatus.
 const (
-	ClusterStatusCREATED      ClusterStatus = "CREATED"
-	ClusterStatusCREATEFAILED ClusterStatus = "CREATE_FAILED"
-	ClusterStatusCREATING     ClusterStatus = "CREATING"
-	ClusterStatusUPDATEFAILED ClusterStatus = "UPDATE_FAILED"
-	ClusterStatusUPDATING     ClusterStatus = "UPDATING"
+	ClusterStatusACCESSDENIED   ClusterStatus = "ACCESS_DENIED"
+	ClusterStatusCREATED        ClusterStatus = "CREATED"
+	ClusterStatusCREATEFAILED   ClusterStatus = "CREATE_FAILED"
+	ClusterStatusCREATING       ClusterStatus = "CREATING"
+	ClusterStatusUPDATEFAILED   ClusterStatus = "UPDATE_FAILED"
+	ClusterStatusUPDATING       ClusterStatus = "UPDATING"
+	ClusterStatusUPGRADEPENDING ClusterStatus = "UPGRADE_PENDING"
 )
 
 // Defines values for ClusterType.
 const (
 	ClusterTypeDEDICATED ClusterType = "DEDICATED"
 	ClusterTypeHYBRID    ClusterType = "HYBRID"
+)
+
+// Defines values for ClusterHealthStatusValue.
+const (
+	HEALTHY   ClusterHealthStatusValue = "HEALTHY"
+	UNHEALTHY ClusterHealthStatusValue = "UNHEALTHY"
 )
 
 // Defines values for ClusterOptionsProvider.
@@ -483,7 +491,8 @@ type Cluster struct {
 	CreatedAt time.Time `json:"createdAt"`
 
 	// DbInstanceType The type of database instance that is used for the cluster.
-	DbInstanceType string `json:"dbInstanceType"`
+	DbInstanceType string               `json:"dbInstanceType"`
+	HealthStatus   *ClusterHealthStatus `json:"healthStatus,omitempty"`
 
 	// Id The cluster's ID.
 	Id string `json:"id"`
@@ -546,6 +555,30 @@ type ClusterStatus string
 
 // ClusterType The type of the cluster.
 type ClusterType string
+
+// ClusterHealthStatus defines model for ClusterHealthStatus.
+type ClusterHealthStatus struct {
+	// Details List of details supporting health assessment.
+	Details *[]ClusterHealthStatusDetail `json:"details,omitempty"`
+
+	// Value Overall health state (HEALTHY or UNHEALTHY).
+	Value ClusterHealthStatusValue `json:"value"`
+}
+
+// ClusterHealthStatusValue Overall health state (HEALTHY or UNHEALTHY).
+type ClusterHealthStatusValue string
+
+// ClusterHealthStatusDetail defines model for ClusterHealthStatusDetail.
+type ClusterHealthStatusDetail struct {
+	// Code The health status for a specific component.
+	Code string `json:"code"`
+
+	// Description A description of the component that was assessed.
+	Description string `json:"description"`
+
+	// Severity The weight this component is given in overall cluster health assessment.
+	Severity string `json:"severity"`
+}
 
 // ClusterK8sTag defines model for ClusterK8sTag.
 type ClusterK8sTag struct {
@@ -783,14 +816,14 @@ type CreateDedicatedDeploymentRequestType string
 
 // CreateDeployRequest defines model for CreateDeployRequest.
 type CreateDeployRequest struct {
-	// Description The Deploy's description.
+	// Description The deploy's description.
 	Description *string `json:"description,omitempty"`
 
-	// Type The type of the Deploy.
+	// Type The type of the deploy.
 	Type CreateDeployRequestType `json:"type"`
 }
 
-// CreateDeployRequestType The type of the Deploy.
+// CreateDeployRequestType The type of the deploy.
 type CreateDeployRequestType string
 
 // CreateDeploymentRequest defines model for CreateDeploymentRequest.
@@ -1009,58 +1042,58 @@ type CreateWorkspaceRequest struct {
 
 // Deploy defines model for Deploy.
 type Deploy struct {
-	// AirflowVersion The Deploy's Airflow version.
+	// AirflowVersion The deploy's Airflow version.
 	AirflowVersion *string `json:"airflowVersion,omitempty"`
 
-	// AstroRuntimeVersion The Deploy's Astro Runtime version.
+	// AstroRuntimeVersion The deploy's Astro Runtime version.
 	AstroRuntimeVersion *string `json:"astroRuntimeVersion,omitempty"`
 
-	// CreatedAt The time when the Deploy was created in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
+	// CreatedAt The time when the deploy was created in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
 	CreatedAt        time.Time            `json:"createdAt"`
 	CreatedBySubject *BasicSubjectProfile `json:"createdBySubject,omitempty"`
 
-	// DagTarballVersion The Deploy's DAG tarball version, also known as the Bundle Version in the Astro UI.
+	// DagTarballVersion The deploy's DAG tarball version, also known as the Bundle Version in the Astro UI.
 	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
 
-	// DagsUploadUrl The Deploy's upload URL to upload DAG bundles. Appears only if dag deploy is enabled on the Deployment.
+	// DagsUploadUrl The deploy's upload URL to upload DAG bundles. Appears only if dag deploys are enabled on the Deployment.
 	DagsUploadUrl *string `json:"dagsUploadUrl,omitempty"`
 
 	// DeploymentId The Deployment's ID.
 	DeploymentId string `json:"deploymentId"`
 
-	// Description The Deploy's description.
+	// Description The deploy's description.
 	Description *string `json:"description,omitempty"`
 
-	// Id The Deploy's ID.
+	// Id The deploy's ID.
 	Id string `json:"id"`
 
-	// ImageRepository The URL of the Deploy's image repository.
+	// ImageRepository The URL of the deploy's image repository.
 	ImageRepository string `json:"imageRepository"`
 
-	// ImageTag The Deploy's image tag. Appears only if specified in the most recent deploy.
+	// ImageTag The deploy's image tag. Appears only if specified in the most recent deploy.
 	ImageTag string `json:"imageTag"`
 
-	// IsDagDeployEnabled Whether the Deploy has DAG deploys enabled.
+	// IsDagDeployEnabled Whether the deploy was triggered on a Deployment with DAG deploys enabled.
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
 
-	// RollbackFromId The Deploy's ID which was Rollback from. Appears only if a rollback as been performed.
+	// RollbackFromId The ID of the deploy that you completed a rollback on. Appears only if a rollback has been performed.
 	RollbackFromId *string `json:"rollbackFromId,omitempty"`
 
-	// Status The status of the Deploy.
+	// Status The status of the deploy.
 	Status DeployStatus `json:"status"`
 
-	// Type The type of Deploy.
+	// Type The type of deploy.
 	Type DeployType `json:"type"`
 
-	// UpdatedAt The time when the Deploy was last updated in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
+	// UpdatedAt The time when the deploy was last updated in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
 	UpdatedAt        *time.Time           `json:"updatedAt,omitempty"`
 	UpdatedBySubject *BasicSubjectProfile `json:"updatedBySubject,omitempty"`
 }
 
-// DeployStatus The status of the Deploy.
+// DeployStatus The status of the deploy.
 type DeployStatus string
 
-// DeployType The type of Deploy.
+// DeployType The type of deploy.
 type DeployType string
 
 // DeployRollbackRequest defines model for DeployRollbackRequest.
@@ -1401,16 +1434,16 @@ type DeploymentsPaginated struct {
 
 // DeploysPaginated defines model for DeploysPaginated.
 type DeploysPaginated struct {
-	// Deploys A list of Deploys in the current page.
+	// Deploys A list of deploys in the current page.
 	Deploys []Deploy `json:"deploys"`
 
-	// Limit The maximum number of Deploys in one page.
+	// Limit The maximum number of deploys in one page.
 	Limit int `json:"limit"`
 
-	// Offset The offset of the current page of Deploys.
+	// Offset The offset of the current page of deploys.
 	Offset int `json:"offset"`
 
-	// TotalCount The total number of Deploys.
+	// TotalCount The total number of deploys.
 	TotalCount int `json:"totalCount"`
 }
 
@@ -1423,7 +1456,7 @@ type Error struct {
 
 // FinalizeDeployRequest defines model for FinalizeDeployRequest.
 type FinalizeDeployRequest struct {
-	// DagTarballVersion The Deploy's DAG tarball version, also known as the Bundle Version in the Astro UI. Required if DAG deploy is enabled on the deployment and deploy type is IMAGE_AND_DAG or DAG_ONLY
+	// DagTarballVersion The deploy's DAG tarball version, also known as the Bundle Version in the Astro UI. Required if DAG deploys are enabled on the Deployment, and deploy type is either IMAGE_AND_DAG or DAG_ONLY.
 	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
 }
 
@@ -1795,7 +1828,7 @@ type UpdateDedicatedDeploymentRequestType string
 
 // UpdateDeployRequest defines model for UpdateDeployRequest.
 type UpdateDeployRequest struct {
-	// Description The Deploy's description.
+	// Description The deploy's description.
 	Description *string `json:"description,omitempty"`
 }
 

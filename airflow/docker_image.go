@@ -398,7 +398,7 @@ func (d *DockerImage) getRegistryToAuth(imageName string) (string, error) {
 	parts := strings.SplitN(imageName, "/", 2)
 	if len(parts) != 2 || !strings.Contains(parts[1], "/") {
 		// This _should_ be impossible for users to hit
-		return "", fmt.Errorf("internal logic error: unsure how to get registry from image name %q", imageName) //nolint:goerr113
+		return "", fmt.Errorf("internal logic error: unsure how to get registry from image name %q", imageName)
 	}
 	return parts[0], nil
 }

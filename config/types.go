@@ -15,7 +15,6 @@ type cfgs struct {
 	Context               cfg
 	Contexts              cfg
 	DockerCommand         cfg
-	LocalEnabled          cfg
 	LocalAstro            cfg
 	LocalCore             cfg
 	LocalPublicAstro      cfg

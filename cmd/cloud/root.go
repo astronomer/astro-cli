@@ -28,5 +28,6 @@ func AddCmds(astroPlatformCoreClient astroplatformcore.CoreClient, coreClient as
 		newDeploymentRootCmd(out),
 		newWorkspaceCmd(out),
 		newOrganizationCmd(out),
+		newDbtCmd(),
 	}
 }

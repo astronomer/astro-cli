@@ -9,6 +9,7 @@ import (
 	"time"
 
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/golang-jwt/jwt/v4"
@@ -30,6 +31,8 @@ var (
 
 func TestSetup(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	t.Run("login cmd", func(t *testing.T) {
 		cmd := &cobra.Command{Use: "login"}
@@ -345,6 +348,8 @@ func TestSetup(t *testing.T) {
 
 func TestCheckAPIKeys(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	t.Run("test context switch", func(t *testing.T) {
 		mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
 			HTTPResponse: &http.Response{
@@ -401,6 +406,7 @@ func TestCheckAPIKeys(t *testing.T) {
 
 func TestCheckToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	t.Run("test check token", func(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
@@ -455,6 +461,7 @@ func TestCheckAPIToken(t *testing.T) {
 			ID:        "test-id",
 		},
 	}
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
 	t.Run("test context switch", func(t *testing.T) {
 		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {

@@ -48,17 +48,27 @@ const (
 	ClusterCloudProviderGcp   ClusterCloudProvider = "gcp"
 )
 
+// Defines values for ClusterCohort.
+const (
+	ClusterCohortCRITICAL ClusterCohort = "CRITICAL"
+	ClusterCohortDEFAULT  ClusterCohort = "DEFAULT"
+	ClusterCohortINTERNAL ClusterCohort = "INTERNAL"
+	ClusterCohortSTABLE   ClusterCohort = "STABLE"
+)
+
 // Defines values for ClusterStatus.
 const (
-	ClusterStatusCREATED      ClusterStatus = "CREATED"
-	ClusterStatusCREATEFAILED ClusterStatus = "CREATE_FAILED"
-	ClusterStatusCREATING     ClusterStatus = "CREATING"
-	ClusterStatusDELETED      ClusterStatus = "DELETED"
-	ClusterStatusDELETEFAILED ClusterStatus = "DELETE_FAILED"
-	ClusterStatusDELETING     ClusterStatus = "DELETING"
-	ClusterStatusFORCEDELETED ClusterStatus = "FORCE_DELETED"
-	ClusterStatusUPDATEFAILED ClusterStatus = "UPDATE_FAILED"
-	ClusterStatusUPDATING     ClusterStatus = "UPDATING"
+	ClusterStatusACCESSDENIED   ClusterStatus = "ACCESS_DENIED"
+	ClusterStatusCREATED        ClusterStatus = "CREATED"
+	ClusterStatusCREATEFAILED   ClusterStatus = "CREATE_FAILED"
+	ClusterStatusCREATING       ClusterStatus = "CREATING"
+	ClusterStatusDELETED        ClusterStatus = "DELETED"
+	ClusterStatusDELETEFAILED   ClusterStatus = "DELETE_FAILED"
+	ClusterStatusDELETING       ClusterStatus = "DELETING"
+	ClusterStatusFORCEDELETED   ClusterStatus = "FORCE_DELETED"
+	ClusterStatusUPDATEFAILED   ClusterStatus = "UPDATE_FAILED"
+	ClusterStatusUPDATING       ClusterStatus = "UPDATING"
+	ClusterStatusUPGRADEPENDING ClusterStatus = "UPGRADE_PENDING"
 )
 
 // Defines values for ClusterType.
@@ -75,17 +85,27 @@ const (
 	ClusterDetailedCloudProviderGcp   ClusterDetailedCloudProvider = "gcp"
 )
 
+// Defines values for ClusterDetailedCohort.
+const (
+	ClusterDetailedCohortCRITICAL ClusterDetailedCohort = "CRITICAL"
+	ClusterDetailedCohortDEFAULT  ClusterDetailedCohort = "DEFAULT"
+	ClusterDetailedCohortINTERNAL ClusterDetailedCohort = "INTERNAL"
+	ClusterDetailedCohortSTABLE   ClusterDetailedCohort = "STABLE"
+)
+
 // Defines values for ClusterDetailedStatus.
 const (
-	ClusterDetailedStatusCREATED      ClusterDetailedStatus = "CREATED"
-	ClusterDetailedStatusCREATEFAILED ClusterDetailedStatus = "CREATE_FAILED"
-	ClusterDetailedStatusCREATING     ClusterDetailedStatus = "CREATING"
-	ClusterDetailedStatusDELETED      ClusterDetailedStatus = "DELETED"
-	ClusterDetailedStatusDELETEFAILED ClusterDetailedStatus = "DELETE_FAILED"
-	ClusterDetailedStatusDELETING     ClusterDetailedStatus = "DELETING"
-	ClusterDetailedStatusFORCEDELETED ClusterDetailedStatus = "FORCE_DELETED"
-	ClusterDetailedStatusUPDATEFAILED ClusterDetailedStatus = "UPDATE_FAILED"
-	ClusterDetailedStatusUPDATING     ClusterDetailedStatus = "UPDATING"
+	ClusterDetailedStatusACCESSDENIED   ClusterDetailedStatus = "ACCESS_DENIED"
+	ClusterDetailedStatusCREATED        ClusterDetailedStatus = "CREATED"
+	ClusterDetailedStatusCREATEFAILED   ClusterDetailedStatus = "CREATE_FAILED"
+	ClusterDetailedStatusCREATING       ClusterDetailedStatus = "CREATING"
+	ClusterDetailedStatusDELETED        ClusterDetailedStatus = "DELETED"
+	ClusterDetailedStatusDELETEFAILED   ClusterDetailedStatus = "DELETE_FAILED"
+	ClusterDetailedStatusDELETING       ClusterDetailedStatus = "DELETING"
+	ClusterDetailedStatusFORCEDELETED   ClusterDetailedStatus = "FORCE_DELETED"
+	ClusterDetailedStatusUPDATEFAILED   ClusterDetailedStatus = "UPDATE_FAILED"
+	ClusterDetailedStatusUPDATING       ClusterDetailedStatus = "UPDATING"
+	ClusterDetailedStatusUPGRADEPENDING ClusterDetailedStatus = "UPGRADE_PENDING"
 )
 
 // Defines values for ClusterDetailedType.
@@ -93,6 +113,12 @@ const (
 	ClusterDetailedTypeBRINGYOUROWNCLOUD ClusterDetailedType = "BRING_YOUR_OWN_CLOUD"
 	ClusterDetailedTypeHOSTED            ClusterDetailedType = "HOSTED"
 	ClusterDetailedTypeSHARED            ClusterDetailedType = "SHARED"
+)
+
+// Defines values for ClusterHealthStatusValue.
+const (
+	ClusterHealthStatusValueHEALTHY   ClusterHealthStatusValue = "HEALTHY"
+	ClusterHealthStatusValueUNHEALTHY ClusterHealthStatusValue = "UNHEALTHY"
 )
 
 // Defines values for ClusterRouteSource.
@@ -154,10 +180,16 @@ const (
 	CreateDedicatedDeploymentRequestTypeSTANDARD  CreateDedicatedDeploymentRequestType = "STANDARD"
 )
 
+// Defines values for CreateDeployGitRequestProvider.
+const (
+	CreateDeployGitRequestProviderGITHUB CreateDeployGitRequestProvider = "GITHUB"
+)
+
 // Defines values for CreateDeployRequestType.
 const (
-	CreateDeployRequestTypeDAG   CreateDeployRequestType = "DAG"
-	CreateDeployRequestTypeIMAGE CreateDeployRequestType = "IMAGE"
+	CreateDeployRequestTypeBUNDLE CreateDeployRequestType = "BUNDLE"
+	CreateDeployRequestTypeDAG    CreateDeployRequestType = "DAG"
+	CreateDeployRequestTypeIMAGE  CreateDeployRequestType = "IMAGE"
 )
 
 // Defines values for CreateEnvironmentObjectLinkRequestScope.
@@ -254,8 +286,9 @@ const (
 
 // Defines values for DeployType.
 const (
-	DeployTypeDAG   DeployType = "DAG"
-	DeployTypeIMAGE DeployType = "IMAGE"
+	DeployTypeBUNDLE DeployType = "BUNDLE"
+	DeployTypeDAG    DeployType = "DAG"
+	DeployTypeIMAGE  DeployType = "IMAGE"
 )
 
 // Defines values for DeployGitProvider.
@@ -338,6 +371,7 @@ const (
 const (
 	EntitlementRequiredPlanAZUREMANAGEDPREVIEW EntitlementRequiredPlan = "AZURE_MANAGED_PREVIEW"
 	EntitlementRequiredPlanBASIC               EntitlementRequiredPlan = "BASIC"
+	EntitlementRequiredPlanBASICPAYGO          EntitlementRequiredPlan = "BASIC_PAYGO"
 	EntitlementRequiredPlanBUSINESS            EntitlementRequiredPlan = "BUSINESS"
 	EntitlementRequiredPlanBUSINESSCRITICAL    EntitlementRequiredPlan = "BUSINESS_CRITICAL"
 	EntitlementRequiredPlanENTERPRISE          EntitlementRequiredPlan = "ENTERPRISE"
@@ -493,17 +527,33 @@ const (
 	SharedClusterCloudProviderGcp   SharedClusterCloudProvider = "gcp"
 )
 
+// Defines values for SharedClusterCohort.
+const (
+	SharedClusterCohortCRITICAL SharedClusterCohort = "CRITICAL"
+	SharedClusterCohortDEFAULT  SharedClusterCohort = "DEFAULT"
+	SharedClusterCohortINTERNAL SharedClusterCohort = "INTERNAL"
+	SharedClusterCohortSTABLE   SharedClusterCohort = "STABLE"
+)
+
 // Defines values for SharedClusterStatus.
 const (
-	SharedClusterStatusCREATED      SharedClusterStatus = "CREATED"
-	SharedClusterStatusCREATEFAILED SharedClusterStatus = "CREATE_FAILED"
-	SharedClusterStatusCREATING     SharedClusterStatus = "CREATING"
-	SharedClusterStatusDELETED      SharedClusterStatus = "DELETED"
-	SharedClusterStatusDELETEFAILED SharedClusterStatus = "DELETE_FAILED"
-	SharedClusterStatusDELETING     SharedClusterStatus = "DELETING"
-	SharedClusterStatusFORCEDELETED SharedClusterStatus = "FORCE_DELETED"
-	SharedClusterStatusUPDATEFAILED SharedClusterStatus = "UPDATE_FAILED"
-	SharedClusterStatusUPDATING     SharedClusterStatus = "UPDATING"
+	SharedClusterStatusACCESSDENIED   SharedClusterStatus = "ACCESS_DENIED"
+	SharedClusterStatusCREATED        SharedClusterStatus = "CREATED"
+	SharedClusterStatusCREATEFAILED   SharedClusterStatus = "CREATE_FAILED"
+	SharedClusterStatusCREATING       SharedClusterStatus = "CREATING"
+	SharedClusterStatusDELETED        SharedClusterStatus = "DELETED"
+	SharedClusterStatusDELETEFAILED   SharedClusterStatus = "DELETE_FAILED"
+	SharedClusterStatusDELETING       SharedClusterStatus = "DELETING"
+	SharedClusterStatusFORCEDELETED   SharedClusterStatus = "FORCE_DELETED"
+	SharedClusterStatusUPDATEFAILED   SharedClusterStatus = "UPDATE_FAILED"
+	SharedClusterStatusUPDATING       SharedClusterStatus = "UPDATING"
+	SharedClusterStatusUPGRADEPENDING SharedClusterStatus = "UPGRADE_PENDING"
+)
+
+// Defines values for TriggerGitDeployRequestDeployType.
+const (
+	DAG   TriggerGitDeployRequestDeployType = "DAG"
+	IMAGE TriggerGitDeployRequestDeployType = "IMAGE"
 )
 
 // Defines values for UpdateEnvironmentObjectLinkRequestScope.
@@ -680,6 +730,27 @@ const (
 	ListOrganizationApiTokensParamsSortsUpdatedByIdDesc  ListOrganizationApiTokensParamsSorts = "updatedById:desc"
 )
 
+// Defines values for ListAssignableRolesParamsScopeType.
+const (
+	ListAssignableRolesParamsScopeTypeDEPLOYMENT   ListAssignableRolesParamsScopeType = "DEPLOYMENT"
+	ListAssignableRolesParamsScopeTypeORGANIZATION ListAssignableRolesParamsScopeType = "ORGANIZATION"
+	ListAssignableRolesParamsScopeTypeWORKSPACE    ListAssignableRolesParamsScopeType = "WORKSPACE"
+)
+
+// Defines values for ListAssignableRolesParamsSorts.
+const (
+	ListAssignableRolesParamsSortsCreatedAtAsc    ListAssignableRolesParamsSorts = "createdAt:asc"
+	ListAssignableRolesParamsSortsCreatedAtDesc   ListAssignableRolesParamsSorts = "createdAt:desc"
+	ListAssignableRolesParamsSortsDescriptionAsc  ListAssignableRolesParamsSorts = "description:asc"
+	ListAssignableRolesParamsSortsDescriptionDesc ListAssignableRolesParamsSorts = "description:desc"
+	ListAssignableRolesParamsSortsNameAsc         ListAssignableRolesParamsSorts = "name:asc"
+	ListAssignableRolesParamsSortsNameDesc        ListAssignableRolesParamsSorts = "name:desc"
+	ListAssignableRolesParamsSortsScopeTypeAsc    ListAssignableRolesParamsSorts = "scopeType:asc"
+	ListAssignableRolesParamsSortsScopeTypeDesc   ListAssignableRolesParamsSorts = "scopeType:desc"
+	ListAssignableRolesParamsSortsUpdatedAtAsc    ListAssignableRolesParamsSorts = "updatedAt:asc"
+	ListAssignableRolesParamsSortsUpdatedAtDesc   ListAssignableRolesParamsSorts = "updatedAt:desc"
+)
+
 // Defines values for ListClustersParamsProvider.
 const (
 	ListClustersParamsProviderAws   ListClustersParamsProvider = "aws"
@@ -696,15 +767,17 @@ const (
 
 // Defines values for ListClustersParamsStatuses.
 const (
-	CREATED      ListClustersParamsStatuses = "CREATED"
-	CREATEFAILED ListClustersParamsStatuses = "CREATE_FAILED"
-	CREATING     ListClustersParamsStatuses = "CREATING"
-	DELETED      ListClustersParamsStatuses = "DELETED"
-	DELETEFAILED ListClustersParamsStatuses = "DELETE_FAILED"
-	DELETING     ListClustersParamsStatuses = "DELETING"
-	FORCEDELETED ListClustersParamsStatuses = "FORCE_DELETED"
-	UPDATEFAILED ListClustersParamsStatuses = "UPDATE_FAILED"
-	UPDATING     ListClustersParamsStatuses = "UPDATING"
+	ListClustersParamsStatusesACCESSDENIED   ListClustersParamsStatuses = "ACCESS_DENIED"
+	ListClustersParamsStatusesCREATED        ListClustersParamsStatuses = "CREATED"
+	ListClustersParamsStatusesCREATEFAILED   ListClustersParamsStatuses = "CREATE_FAILED"
+	ListClustersParamsStatusesCREATING       ListClustersParamsStatuses = "CREATING"
+	ListClustersParamsStatusesDELETED        ListClustersParamsStatuses = "DELETED"
+	ListClustersParamsStatusesDELETEFAILED   ListClustersParamsStatuses = "DELETE_FAILED"
+	ListClustersParamsStatusesDELETING       ListClustersParamsStatuses = "DELETING"
+	ListClustersParamsStatusesFORCEDELETED   ListClustersParamsStatuses = "FORCE_DELETED"
+	ListClustersParamsStatusesUPDATEFAILED   ListClustersParamsStatuses = "UPDATE_FAILED"
+	ListClustersParamsStatusesUPDATING       ListClustersParamsStatuses = "UPDATING"
+	ListClustersParamsStatusesUPGRADEPENDING ListClustersParamsStatuses = "UPGRADE_PENDING"
 )
 
 // Defines values for ListClustersParamsSorts.
@@ -753,9 +826,9 @@ const (
 
 // Defines values for GetDeploymentOptionsParamsDeploymentType.
 const (
-	GetDeploymentOptionsParamsDeploymentTypeDEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
-	GetDeploymentOptionsParamsDeploymentTypeHYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
-	GetDeploymentOptionsParamsDeploymentTypeSTANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
+	DEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
+	HYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
+	STANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
 )
 
 // Defines values for GetDeploymentOptionsParamsExecutor.
@@ -992,8 +1065,8 @@ const (
 
 // Defines values for ListWorkspaceApiTokensParamsTokenTypes.
 const (
-	ORGANIZATION ListWorkspaceApiTokensParamsTokenTypes = "ORGANIZATION"
-	WORKSPACE    ListWorkspaceApiTokensParamsTokenTypes = "WORKSPACE"
+	ListWorkspaceApiTokensParamsTokenTypesORGANIZATION ListWorkspaceApiTokensParamsTokenTypes = "ORGANIZATION"
+	ListWorkspaceApiTokensParamsTokenTypesWORKSPACE    ListWorkspaceApiTokensParamsTokenTypes = "WORKSPACE"
 )
 
 // Defines values for ListWorkspaceApiTokensParamsSorts.
@@ -1034,18 +1107,18 @@ const (
 
 // Defines values for ListWorkspaceUsersParamsSorts.
 const (
-	ListWorkspaceUsersParamsSortsCreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
-	ListWorkspaceUsersParamsSortsCreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
-	ListWorkspaceUsersParamsSortsFullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
-	ListWorkspaceUsersParamsSortsFullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
-	ListWorkspaceUsersParamsSortsStatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
-	ListWorkspaceUsersParamsSortsStatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
-	ListWorkspaceUsersParamsSortsUpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
-	ListWorkspaceUsersParamsSortsUpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
-	ListWorkspaceUsersParamsSortsUsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
-	ListWorkspaceUsersParamsSortsUsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
-	ListWorkspaceUsersParamsSortsWorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
-	ListWorkspaceUsersParamsSortsWorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
+	CreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
+	CreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
+	FullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
+	FullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
+	StatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
+	StatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
+	UpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
+	UpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
+	UsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
+	UsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
+	WorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
+	WorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
 )
 
 // Defines values for ListSelfUserGitAccountsParamsGitProvider.
@@ -1070,7 +1143,7 @@ const (
 
 // Defines values for GetSelfUserGitAppInstallationParamsGitProvider.
 const (
-	GITHUB GetSelfUserGitAppInstallationParamsGitProvider = "GITHUB"
+	GetSelfUserGitAppInstallationParamsGitProviderGITHUB GetSelfUserGitAppInstallationParamsGitProvider = "GITHUB"
 )
 
 // AddTeamMembersRequest defines model for AddTeamMembersRequest.
@@ -1140,17 +1213,27 @@ type BasicSubjectProfile struct {
 // BasicSubjectProfileSubjectType defines model for BasicSubjectProfile.SubjectType.
 type BasicSubjectProfileSubjectType string
 
+// Bundle defines model for Bundle.
+type Bundle struct {
+	BundleType     *string `json:"bundleType,omitempty"`
+	CurrentVersion *string `json:"currentVersion,omitempty"`
+	DeployId       *string `json:"deployId,omitempty"`
+	DesiredVersion *string `json:"desiredVersion,omitempty"`
+	MountPath      *string `json:"mountPath,omitempty"`
+}
+
 // Cluster defines model for Cluster.
 type Cluster struct {
 	AppliedHarmonyVersion  *string              `json:"appliedHarmonyVersion,omitempty"`
 	AppliedTemplateVersion string               `json:"appliedTemplateVersion"`
 	CloudProvider          ClusterCloudProvider `json:"cloudProvider"`
-	Cohort                 *string              `json:"cohort,omitempty"`
+	Cohort                 *ClusterCohort       `json:"cohort,omitempty"`
 	CreatedAt              time.Time            `json:"createdAt"`
 	DbInstanceType         string               `json:"dbInstanceType"`
 	DbInstanceVersion      string               `json:"dbInstanceVersion"`
 	DeletedAt              *string              `json:"deletedAt,omitempty"`
-	HarmonyVersion         *string              `json:"harmonyVersion,omitempty"`
+	HarmonyVersion         string               `json:"harmonyVersion"`
+	HealthStatus           *ClusterHealthStatus `json:"healthStatus,omitempty"`
 	Id                     string               `json:"id"`
 	IsCordoned             *bool                `json:"isCordoned,omitempty"`
 	IsDryRun               bool                 `json:"isDryRun"`
@@ -1180,6 +1263,9 @@ type Cluster struct {
 // ClusterCloudProvider defines model for Cluster.CloudProvider.
 type ClusterCloudProvider string
 
+// ClusterCohort defines model for Cluster.Cohort.
+type ClusterCohort string
+
 // ClusterStatus defines model for Cluster.Status.
 type ClusterStatus string
 
@@ -1188,24 +1274,26 @@ type ClusterType string
 
 // ClusterDetailed defines model for ClusterDetailed.
 type ClusterDetailed struct {
-	AppliedHarmonyVersion  *string                      `json:"appliedHarmonyVersion,omitempty"`
-	AppliedTemplateVersion string                       `json:"appliedTemplateVersion"`
-	CloudProvider          ClusterDetailedCloudProvider `json:"cloudProvider"`
-	Cohort                 *string                      `json:"cohort,omitempty"`
-	CreatedAt              time.Time                    `json:"createdAt"`
-	CreatedBy              BasicSubjectProfile          `json:"createdBy"`
-	DbInstanceType         string                       `json:"dbInstanceType"`
-	DbInstanceVersion      string                       `json:"dbInstanceVersion"`
-	DeletedAt              *string                      `json:"deletedAt,omitempty"`
-	HarmonyVersion         *string                      `json:"harmonyVersion,omitempty"`
-	Id                     string                       `json:"id"`
-	IsCordoned             *bool                        `json:"isCordoned,omitempty"`
-	IsDryRun               bool                         `json:"isDryRun"`
-	IsLimited              bool                         `json:"isLimited"`
-	K8sTags                []ClusterTag                 `json:"k8sTags"`
-	Metadata               ClusterMetadata              `json:"metadata"`
-	Name                   string                       `json:"name"`
-	NodePools              []NodePool                   `json:"nodePools"`
+	AppliedHarmonyVersion         *string                      `json:"appliedHarmonyVersion,omitempty"`
+	AppliedTemplateVersion        string                       `json:"appliedTemplateVersion"`
+	CloudProvider                 ClusterDetailedCloudProvider `json:"cloudProvider"`
+	Cohort                        *ClusterDetailedCohort       `json:"cohort,omitempty"`
+	CreatedAt                     time.Time                    `json:"createdAt"`
+	CreatedBy                     BasicSubjectProfile          `json:"createdBy"`
+	DbInstanceType                string                       `json:"dbInstanceType"`
+	DbInstanceVersion             string                       `json:"dbInstanceVersion"`
+	DeletedAt                     *string                      `json:"deletedAt,omitempty"`
+	DisableHarmonyVersionUpgrades *bool                        `json:"disableHarmonyVersionUpgrades,omitempty"`
+	HarmonyVersion                string                       `json:"harmonyVersion"`
+	HealthStatus                  *ClusterHealthStatus         `json:"healthStatus,omitempty"`
+	Id                            string                       `json:"id"`
+	IsCordoned                    *bool                        `json:"isCordoned,omitempty"`
+	IsDryRun                      bool                         `json:"isDryRun"`
+	IsLimited                     bool                         `json:"isLimited"`
+	K8sTags                       []ClusterTag                 `json:"k8sTags"`
+	Metadata                      ClusterMetadata              `json:"metadata"`
+	Name                          string                       `json:"name"`
+	NodePools                     []NodePool                   `json:"nodePools"`
 
 	// OrgShortName Deprecated: orgShortName has been replaced with organizationShortName
 	OrgShortName               *string               `json:"orgShortName,omitempty"`
@@ -1235,11 +1323,30 @@ type ClusterDetailed struct {
 // ClusterDetailedCloudProvider defines model for ClusterDetailed.CloudProvider.
 type ClusterDetailedCloudProvider string
 
+// ClusterDetailedCohort defines model for ClusterDetailed.Cohort.
+type ClusterDetailedCohort string
+
 // ClusterDetailedStatus defines model for ClusterDetailed.Status.
 type ClusterDetailedStatus string
 
 // ClusterDetailedType defines model for ClusterDetailed.Type.
 type ClusterDetailedType string
+
+// ClusterHealthStatus defines model for ClusterHealthStatus.
+type ClusterHealthStatus struct {
+	Details *[]ClusterHealthStatusDetail `json:"details,omitempty"`
+	Value   ClusterHealthStatusValue     `json:"value"`
+}
+
+// ClusterHealthStatusValue defines model for ClusterHealthStatus.Value.
+type ClusterHealthStatusValue string
+
+// ClusterHealthStatusDetail defines model for ClusterHealthStatusDetail.
+type ClusterHealthStatusDetail struct {
+	Code        string `json:"code"`
+	Description string `json:"description"`
+	Severity    string `json:"severity"`
+}
 
 // ClusterMetadata defines model for ClusterMetadata.
 type ClusterMetadata struct {
@@ -1479,11 +1586,32 @@ type CreateDedicatedDeploymentRequestSchedulerSize string
 // CreateDedicatedDeploymentRequestType Types of the deployment, one of: DEDICATED, HYBRID, STANDARD
 type CreateDedicatedDeploymentRequestType string
 
+// CreateDeployGitRequest defines model for CreateDeployGitRequest.
+type CreateDeployGitRequest struct {
+	Account         string                         `json:"account"`
+	AuthorName      *string                        `json:"authorName,omitempty"`
+	AuthorUrl       *string                        `json:"authorUrl,omitempty"`
+	AuthorUsername  *string                        `json:"authorUsername,omitempty"`
+	BeforeCommitSha *string                        `json:"beforeCommitSha,omitempty"`
+	Branch          string                         `json:"branch"`
+	CommitSha       string                         `json:"commitSha"`
+	CommitUrl       string                         `json:"commitUrl"`
+	Path            *string                        `json:"path,omitempty"`
+	Provider        CreateDeployGitRequestProvider `json:"provider"`
+	Repo            string                         `json:"repo"`
+}
+
+// CreateDeployGitRequestProvider defines model for CreateDeployGitRequest.Provider.
+type CreateDeployGitRequestProvider string
+
 // CreateDeployRequest defines model for CreateDeployRequest.
 type CreateDeployRequest struct {
-	Description *string                 `json:"description,omitempty"`
-	ImageTag    *string                 `json:"imageTag,omitempty"`
-	Type        CreateDeployRequestType `json:"type"`
+	BundleMountPath *string                 `json:"bundleMountPath,omitempty"`
+	BundleType      *string                 `json:"bundleType,omitempty"`
+	Description     *string                 `json:"description,omitempty"`
+	Git             *CreateDeployGitRequest `json:"git,omitempty"`
+	ImageTag        *string                 `json:"imageTag,omitempty"`
+	Type            CreateDeployRequestType `json:"type"`
 }
 
 // CreateDeployRequestType defines model for CreateDeployRequest.Type.
@@ -1563,7 +1691,7 @@ type CreateEnvironmentObjectMetricsExportOverridesRequestExporterType string
 
 // CreateEnvironmentObjectMetricsExportRequest defines model for CreateEnvironmentObjectMetricsExportRequest.
 type CreateEnvironmentObjectMetricsExportRequest struct {
-	BasicToken   string                                                  `json:"basicToken"`
+	BasicToken   *string                                                 `json:"basicToken,omitempty"`
 	Endpoint     string                                                  `json:"endpoint"`
 	ExporterType CreateEnvironmentObjectMetricsExportRequestExporterType `json:"exporterType"`
 }
@@ -1848,6 +1976,9 @@ type DefaultValueOptions struct {
 // Deploy defines model for Deploy.
 type Deploy struct {
 	AirflowVersion     *string              `json:"airflowVersion,omitempty"`
+	BundleMountPath    *string              `json:"bundleMountPath,omitempty"`
+	BundleUploadUrl    *string              `json:"bundleUploadUrl,omitempty"`
+	Bundles            *[]Bundle            `json:"bundles,omitempty"`
 	CreatedAt          time.Time            `json:"createdAt"`
 	CreatedBySubject   *BasicSubjectProfile `json:"createdBySubject,omitempty"`
 	DagTarballVersion  *string              `json:"dagTarballVersion,omitempty"`
@@ -1876,16 +2007,17 @@ type DeployType string
 
 // DeployGit defines model for DeployGit.
 type DeployGit struct {
-	Account        string            `json:"account"`
-	AuthorName     string            `json:"authorName"`
-	AuthorUrl      string            `json:"authorUrl"`
-	AuthorUsername string            `json:"authorUsername"`
-	Branch         string            `json:"branch"`
-	CommitSha      string            `json:"commitSha"`
-	CommitUrl      string            `json:"commitUrl"`
-	Path           *string           `json:"path,omitempty"`
-	Provider       DeployGitProvider `json:"provider"`
-	Repo           string            `json:"repo"`
+	Account         string            `json:"account"`
+	AuthorName      *string           `json:"authorName,omitempty"`
+	AuthorUrl       *string           `json:"authorUrl,omitempty"`
+	AuthorUsername  *string           `json:"authorUsername,omitempty"`
+	BeforeCommitSha *string           `json:"beforeCommitSha,omitempty"`
+	Branch          string            `json:"branch"`
+	CommitSha       string            `json:"commitSha"`
+	CommitUrl       string            `json:"commitUrl"`
+	Path            *string           `json:"path,omitempty"`
+	Provider        DeployGitProvider `json:"provider"`
+	Repo            string            `json:"repo"`
 }
 
 // DeployGitProvider defines model for DeployGit.Provider.
@@ -2311,9 +2443,9 @@ type EnvironmentObjectMetricsExportExporterType string
 
 // EnvironmentObjectMetricsExportOverrides defines model for EnvironmentObjectMetricsExportOverrides.
 type EnvironmentObjectMetricsExportOverrides struct {
-	BasicToken   *string                                             `json:"basicToken,omitempty"`
-	Endpoint     string                                              `json:"endpoint"`
-	ExporterType EnvironmentObjectMetricsExportOverridesExporterType `json:"exporterType"`
+	BasicToken   *string                                              `json:"basicToken,omitempty"`
+	Endpoint     *string                                              `json:"endpoint,omitempty"`
+	ExporterType *EnvironmentObjectMetricsExportOverridesExporterType `json:"exporterType,omitempty"`
 }
 
 // EnvironmentObjectMetricsExportOverridesExporterType defines model for EnvironmentObjectMetricsExportOverrides.ExporterType.
@@ -2632,7 +2764,10 @@ type RepositoriesPaginated struct {
 
 // RepositoryBranch defines model for RepositoryBranch.
 type RepositoryBranch struct {
-	Name string `json:"name"`
+	CommitMessage string `json:"commitMessage"`
+	CommitSha     string `json:"commitSha"`
+	CommitUrl     string `json:"commitUrl"`
+	Name          string `json:"name"`
 }
 
 // ResourceOption defines model for ResourceOption.
@@ -2787,10 +2922,11 @@ type SelfSignupType string
 // SharedCluster defines model for SharedCluster.
 type SharedCluster struct {
 	CloudProvider       SharedClusterCloudProvider `json:"cloudProvider"`
-	Cohort              *string                    `json:"cohort,omitempty"`
+	Cohort              *SharedClusterCohort       `json:"cohort,omitempty"`
 	CreatedAt           time.Time                  `json:"createdAt"`
 	DbInstanceType      string                     `json:"dbInstanceType"`
 	DbInstanceVersion   string                     `json:"dbInstanceVersion"`
+	HealthStatus        *ClusterHealthStatus       `json:"healthStatus,omitempty"`
 	Id                  string                     `json:"id"`
 	IsCordoned          *bool                      `json:"isCordoned,omitempty"`
 	IsDryRun            bool                       `json:"isDryRun"`
@@ -2808,6 +2944,9 @@ type SharedCluster struct {
 
 // SharedClusterCloudProvider defines model for SharedCluster.CloudProvider.
 type SharedClusterCloudProvider string
+
+// SharedClusterCohort defines model for SharedCluster.Cohort.
+type SharedClusterCohort string
 
 // SharedClusterStatus defines model for SharedCluster.Status.
 type SharedClusterStatus string
@@ -2892,6 +3031,21 @@ type TransferDeploymentRequest struct {
 	TargetWorkspaceId string `json:"targetWorkspaceId"`
 }
 
+// TriggerGitDeployRequest defines model for TriggerGitDeployRequest.
+type TriggerGitDeployRequest struct {
+	// BeforeSha The commit before the deploy commit for inferring the deploy type. Can be multiple commits prior to the deploy commit. If not provided uses the parent commit where there is exactly one, otherwise infers an image deploy.
+	BeforeSha *string `json:"beforeSha,omitempty"`
+
+	// DeployType The type of deploy to trigger. If omitted then the deploy type will be inferred
+	DeployType *TriggerGitDeployRequestDeployType `json:"deployType,omitempty"`
+
+	// Sha The commit of the deployment's repository to deploy. If not provided uses the most recent commit on the deployment's branch
+	Sha *string `json:"sha,omitempty"`
+}
+
+// TriggerGitDeployRequestDeployType The type of deploy to trigger. If omitted then the deploy type will be inferred
+type TriggerGitDeployRequestDeployType string
+
 // UpdateAwsClusterRequest defines model for UpdateAwsClusterRequest.
 type UpdateAwsClusterRequest struct {
 	DbInstanceType                string                  `json:"dbInstanceType"`
@@ -2926,7 +3080,10 @@ type UpdateCustomRoleRequest struct {
 
 // UpdateDeployRequest defines model for UpdateDeployRequest.
 type UpdateDeployRequest struct {
-	// DagTarballVersion Required if DAG deploy is enabled on the deployment
+	// BundleTarballVersion Required if DAG deploy is enabled on the deployment and deploy type is BUNDLE.
+	BundleTarballVersion *string `json:"bundleTarballVersion,omitempty"`
+
+	// DagTarballVersion Required if DAG deploy is enabled on the deployment and deploy type is either IMAGE or DAG.
 	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
 }
 
@@ -3458,6 +3615,30 @@ type ListOrganizationApiTokensParams struct {
 
 // ListOrganizationApiTokensParamsSorts defines parameters for ListOrganizationApiTokens.
 type ListOrganizationApiTokensParamsSorts string
+
+// ListAssignableRolesParams defines parameters for ListAssignableRoles.
+type ListAssignableRolesParams struct {
+	// ScopeId scope ID
+	ScopeId *string `form:"scopeId,omitempty" json:"scopeId,omitempty"`
+
+	// ScopeType scope Type
+	ScopeType *ListAssignableRolesParamsScopeType `form:"scopeType,omitempty" json:"scopeType,omitempty"`
+
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListAssignableRolesParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+}
+
+// ListAssignableRolesParamsScopeType defines parameters for ListAssignableRoles.
+type ListAssignableRolesParamsScopeType string
+
+// ListAssignableRolesParamsSorts defines parameters for ListAssignableRoles.
+type ListAssignableRolesParamsSorts string
 
 // GetOrganizationAuditLogsParams defines parameters for GetOrganizationAuditLogs.
 type GetOrganizationAuditLogsParams struct {
@@ -4062,6 +4243,9 @@ type CreateDeploymentApiTokenJSONRequestBody = CreateDeploymentApiTokenRequest
 // UpdateDeploymentApiTokenJSONRequestBody defines body for UpdateDeploymentApiToken for application/json ContentType.
 type UpdateDeploymentApiTokenJSONRequestBody = UpdateDeploymentApiTokenRequest
 
+// TriggerGitDeployJSONRequestBody defines body for TriggerGitDeploy for application/json ContentType.
+type TriggerGitDeployJSONRequestBody = TriggerGitDeployRequest
+
 // DeployRollbackJSONRequestBody defines body for DeployRollback for application/json ContentType.
 type DeployRollbackJSONRequestBody = DeployRollbackRequest
 
@@ -4463,6 +4647,9 @@ type ClientInterface interface {
 	// RotateOrganizationApiToken request
 	RotateOrganizationApiToken(ctx context.Context, organizationId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAssignableRoles request
+	ListAssignableRoles(ctx context.Context, organizationId string, params *ListAssignableRolesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetOrganizationAuditLogs request
 	GetOrganizationAuditLogs(ctx context.Context, organizationId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -4559,6 +4746,11 @@ type ClientInterface interface {
 
 	// RotateDeploymentApiToken request
 	RotateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TriggerGitDeploy request with any body
+	TriggerGitDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	TriggerGitDeploy(ctx context.Context, organizationId string, deploymentId string, body TriggerGitDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeployRollback request with any body
 	DeployRollbackWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5015,6 +5207,18 @@ func (c *Client) RotateOrganizationApiToken(ctx context.Context, organizationId 
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListAssignableRoles(ctx context.Context, organizationId string, params *ListAssignableRolesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAssignableRolesRequest(c.Server, organizationId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetOrganizationAuditLogs(ctx context.Context, organizationId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetOrganizationAuditLogsRequest(c.Server, organizationId, params)
 	if err != nil {
@@ -5437,6 +5641,30 @@ func (c *Client) UpdateDeploymentApiToken(ctx context.Context, organizationId st
 
 func (c *Client) RotateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRotateDeploymentApiTokenRequest(c.Server, organizationId, deploymentId, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) TriggerGitDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTriggerGitDeployRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) TriggerGitDeploy(ctx context.Context, organizationId string, deploymentId string, body TriggerGitDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTriggerGitDeployRequest(c.Server, organizationId, deploymentId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7249,6 +7477,124 @@ func NewRotateOrganizationApiTokenRequest(server string, organizationId string, 
 	return req, nil
 }
 
+// NewListAssignableRolesRequest generates requests for ListAssignableRoles
+func NewListAssignableRolesRequest(server string, organizationId string, params *ListAssignableRolesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/assignable-roles", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.ScopeId != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "scopeId", runtime.ParamLocationQuery, *params.ScopeId); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.ScopeType != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "scopeType", runtime.ParamLocationQuery, *params.ScopeType); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetOrganizationAuditLogsRequest generates requests for GetOrganizationAuditLogs
 func NewGetOrganizationAuditLogsRequest(server string, organizationId string, params *GetOrganizationAuditLogsParams) (*http.Request, error) {
 	var err error
@@ -8832,6 +9178,60 @@ func NewRotateDeploymentApiTokenRequest(server string, organizationId string, de
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewTriggerGitDeployRequest calls the generic TriggerGitDeploy builder with application/json body
+func NewTriggerGitDeployRequest(server string, organizationId string, deploymentId string, body TriggerGitDeployJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewTriggerGitDeployRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
+}
+
+// NewTriggerGitDeployRequestWithBody generates requests for TriggerGitDeploy with any type of body
+func NewTriggerGitDeployRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploy-git", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -13697,6 +14097,9 @@ type ClientWithResponsesInterface interface {
 	// RotateOrganizationApiToken request
 	RotateOrganizationApiTokenWithResponse(ctx context.Context, organizationId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateOrganizationApiTokenResponse, error)
 
+	// ListAssignableRoles request
+	ListAssignableRolesWithResponse(ctx context.Context, organizationId string, params *ListAssignableRolesParams, reqEditors ...RequestEditorFn) (*ListAssignableRolesResponse, error)
+
 	// GetOrganizationAuditLogs request
 	GetOrganizationAuditLogsWithResponse(ctx context.Context, organizationId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*GetOrganizationAuditLogsResponse, error)
 
@@ -13793,6 +14196,11 @@ type ClientWithResponsesInterface interface {
 
 	// RotateDeploymentApiToken request
 	RotateDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateDeploymentApiTokenResponse, error)
+
+	// TriggerGitDeploy request with any body
+	TriggerGitDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TriggerGitDeployResponse, error)
+
+	TriggerGitDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body TriggerGitDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*TriggerGitDeployResponse, error)
 
 	// DeployRollback request with any body
 	DeployRollbackWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error)
@@ -14388,6 +14796,33 @@ func (r RotateOrganizationApiTokenResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r RotateOrganizationApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListAssignableRolesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *RolesPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAssignableRolesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAssignableRolesResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -15057,6 +15492,32 @@ func (r RotateDeploymentApiTokenResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r RotateDeploymentApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type TriggerGitDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r TriggerGitDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TriggerGitDeployResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -17027,6 +17488,15 @@ func (c *ClientWithResponses) RotateOrganizationApiTokenWithResponse(ctx context
 	return ParseRotateOrganizationApiTokenResponse(rsp)
 }
 
+// ListAssignableRolesWithResponse request returning *ListAssignableRolesResponse
+func (c *ClientWithResponses) ListAssignableRolesWithResponse(ctx context.Context, organizationId string, params *ListAssignableRolesParams, reqEditors ...RequestEditorFn) (*ListAssignableRolesResponse, error) {
+	rsp, err := c.ListAssignableRoles(ctx, organizationId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAssignableRolesResponse(rsp)
+}
+
 // GetOrganizationAuditLogsWithResponse request returning *GetOrganizationAuditLogsResponse
 func (c *ClientWithResponses) GetOrganizationAuditLogsWithResponse(ctx context.Context, organizationId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*GetOrganizationAuditLogsResponse, error) {
 	rsp, err := c.GetOrganizationAuditLogs(ctx, organizationId, params, reqEditors...)
@@ -17338,6 +17808,23 @@ func (c *ClientWithResponses) RotateDeploymentApiTokenWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseRotateDeploymentApiTokenResponse(rsp)
+}
+
+// TriggerGitDeployWithBodyWithResponse request with arbitrary body returning *TriggerGitDeployResponse
+func (c *ClientWithResponses) TriggerGitDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TriggerGitDeployResponse, error) {
+	rsp, err := c.TriggerGitDeployWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTriggerGitDeployResponse(rsp)
+}
+
+func (c *ClientWithResponses) TriggerGitDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body TriggerGitDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*TriggerGitDeployResponse, error) {
+	rsp, err := c.TriggerGitDeploy(ctx, organizationId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTriggerGitDeployResponse(rsp)
 }
 
 // DeployRollbackWithBodyWithResponse request with arbitrary body returning *DeployRollbackResponse
@@ -18915,6 +19402,67 @@ func ParseRotateOrganizationApiTokenResponse(rsp *http.Response) (*RotateOrganiz
 	return response, nil
 }
 
+// ParseListAssignableRolesResponse parses an HTTP response from a ListAssignableRolesWithResponse call
+func ParseListAssignableRolesResponse(rsp *http.Response) (*ListAssignableRolesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAssignableRolesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RolesPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetOrganizationAuditLogsResponse parses an HTTP response from a GetOrganizationAuditLogsWithResponse call
 func ParseGetOrganizationAuditLogsResponse(rsp *http.Response) (*GetOrganizationAuditLogsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -20358,6 +20906,60 @@ func ParseRotateDeploymentApiTokenResponse(rsp *http.Response) (*RotateDeploymen
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTriggerGitDeployResponse parses an HTTP response from a TriggerGitDeployWithResponse call
+func ParseTriggerGitDeployResponse(rsp *http.Response) (*TriggerGitDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TriggerGitDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

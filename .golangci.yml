@@ -106,22 +106,8 @@ linters:
     - unparam
     - unused
     - whitespace
-    - goerr113
     - prealloc
     - gocognit
-
-  # don't enable:
-  # - asciicheck
-  # - scopelint
-  # - gochecknoglobals
-  # - godot
-  # - godox
-  # - goerr113
-  # - interfacer
-  # - maligned
-  # - testpackage
-  # - revive
-  # - wsl
 
 issues:
   # Excluding configuration per-path, per-linter, per-text and per-source
@@ -136,7 +122,6 @@ issues:
         - typecheck
         - revive
         - unused
-        - goerr113
   exclude:
     - "shadow: declaration of .err. shadows declaration"
     - "sloppyTestFuncName: function cleanUpInitFiles should be of form"

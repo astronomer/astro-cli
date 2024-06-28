@@ -69,7 +69,7 @@ func validateWorkspaceRole(role string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("please use one of: %s", strings.Join(validRoles, ", ")) //nolint:goerr113
+	return fmt.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
 }
 
 func validateDeploymentRole(role string) error {
@@ -80,7 +80,7 @@ func validateDeploymentRole(role string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("please use one of: %s", strings.Join(validRoles, ", ")) //nolint:goerr113
+	return fmt.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
 }
 
 func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string, acceptEmptyArgs bool) error {

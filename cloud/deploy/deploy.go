@@ -48,7 +48,7 @@ const (
 	action                   = "UPLOAD"
 	allTests                 = "all-tests"
 	parseAndPytest           = "parse-and-all-tests"
-	enableDagDeployMsg       = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys."
+	enableDagDeployMsg       = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys"
 	dagDeployDisabled        = "dag deploy is not enabled for deployment"
 	invalidWorkspaceID       = "Invalid workspace id %s was provided through the --workspace-id flag\n"
 	errCiCdEnforcementUpdate = "cannot deploy since ci/cd enforcement is enabled for the deployment %s. Please use API Tokens instead"
@@ -160,47 +160,23 @@ func shouldIncludeMonitoringDag(deploymentType astroplatformcore.DeploymentType)
 }
 
 func deployDags(path, dagsPath, dagsUploadURL string, deploymentType astroplatformcore.DeploymentType) (string, error) {
-	// Check the dags directory
-	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
-
 	if shouldIncludeMonitoringDag(deploymentType) {
+		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
+
 		// Create monitoring dag file
 		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
 		if err != nil {
 			return "", err
 		}
+
+		// Remove the monitoring dag file after the upload
+		defer os.Remove(monitoringDagPath)
 	}
 
-	// Generate the dags tar
-	err := fileutil.Tar(dagsPath, path)
+	versionID, err := uploadBundle(path, dagsPath, dagsUploadURL, true)
 	if err != nil {
 		return "", err
 	}
-
-	dagsFilePath := filepath.Join(path, "dags.tar")
-	dagFile, err := os.Open(dagsFilePath)
-	if err != nil {
-		return "", err
-	}
-	defer dagFile.Close()
-
-	versionID, err := azureUploader(dagsUploadURL, dagFile)
-	if err != nil {
-		return "", err
-	}
-
-	// Delete the tar file
-	defer func() {
-		dagFile.Close()
-		if shouldIncludeMonitoringDag(deploymentType) {
-			os.Remove(monitoringDagPath)
-		}
-		err = os.Remove(dagFile.Name())
-		if err != nil {
-			fmt.Println("\nFailed to delete dags tar file: ", err.Error())
-			fmt.Println("\nPlease delete the dags tar file manually from path: " + dagFile.Name())
-		}
-	}()
 
 	return versionID, nil
 }
@@ -252,18 +228,29 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	if err != nil {
 		return err
 	}
-	resp, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, deployInput.Description, deployInput.Dags, deployInput.Image, platformCoreClient)
+	createDeployRequest := astroplatformcore.CreateDeployRequest{
+		Description: &deployInput.Description,
+	}
+	switch {
+	case deployInput.Dags:
+		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeDAGONLY
+	case deployInput.Image:
+		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEONLY
+	default:
+		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEANDDAG
+	}
+	deploy, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, createDeployRequest, platformCoreClient)
 	if err != nil {
 		return err
 	}
-	deployID := resp.JSON200.Id
-	if resp.JSON200.DagsUploadUrl != nil {
-		dagsUploadURL = *resp.JSON200.DagsUploadUrl
+	deployID := deploy.Id
+	if deploy.DagsUploadUrl != nil {
+		dagsUploadURL = *deploy.DagsUploadUrl
 	} else {
 		dagsUploadURL = ""
 	}
-	if resp.JSON200.ImageTag != "" {
-		nextTag = resp.JSON200.ImageTag
+	if deploy.ImageTag != "" {
+		nextTag = deploy.ImageTag
 	} else {
 		nextTag = ""
 	}
@@ -372,7 +359,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			fmt.Println("No DAGs found. Skipping testing...")
 		}
 
-		repository := resp.JSON200.ImageRepository
+		repository := deploy.ImageRepository
 		// TODO: Resolve the edge case where two people push the same nextTag at the same time
 		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
 
@@ -760,29 +747,16 @@ func finalizeDeploy(deployID, deploymentID, organizationID, dagTarballVersion st
 	return nil
 }
 
-// create deploy
-func createDeploy(organizationID, deploymentID, description string, dagDeploy, imageOnlyDeploy bool, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.CreateDeployResponse, error) {
-	createDeployRequest := astroplatformcore.CreateDeployRequest{
-		Description: &description,
-	}
-	switch {
-	case dagDeploy:
-		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeDAGONLY
-	case imageOnlyDeploy:
-		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEONLY
-	default:
-		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEANDDAG
-	}
-
-	resp, err := platformCoreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, createDeployRequest)
+func createDeploy(organizationID, deploymentID string, request astroplatformcore.CreateDeployRequest, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Deploy, error) {
+	resp, err := platformCoreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, request)
 	if err != nil {
-		return astroplatformcore.CreateDeployResponse{}, err
+		return nil, err
 	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return astroplatformcore.CreateDeployResponse{}, err
+		return nil, err
 	}
-	return *resp, err
+	return resp.JSON200, err
 }
 
 func IsValidUpgrade(currentVersion, tag string) bool {

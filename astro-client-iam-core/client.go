@@ -38,7 +38,7 @@ func NormalizeAPIError(httpResp *http.Response, body []byte) error {
 		if err != nil {
 			return fmt.Errorf("%w, status %d", ErrorRequest, httpResp.StatusCode)
 		}
-		return errors.New(decode.Message) //nolint:goerr113
+		return errors.New(decode.Message)
 	}
 	return nil
 }
