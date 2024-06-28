@@ -18,19 +18,10 @@ var (
 	dbtProjectPath string
 
 	DeployBundle = cloud.DeployBundle
+	DeleteBundle = cloud.DeleteBundle
 )
 
 const (
-	dbtDeployExample = `
-Specify the ID of the Deployment on Astronomer you would like to deploy this dbt project to:
-
-  $ astro dbt deploy <deployment ID>
-
-Menu will be presented if you do not specify a deployment ID:
-
-  $ astro dbt deploy
-`
-
 	dbtDefaultMountPathPrefix = "/usr/local/airflow/dbt/"
 	dbtProjectYmlFilename     = "dbt_project.yml"
 	dbtBundleType             = "dbt"
@@ -43,21 +34,30 @@ func newDbtCmd() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newDbtDeployCmd(),
+		newDbtDeleteCmd(),
 	)
 	return cmd
 }
 
 func newDbtDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "deploy DEPLOYMENT-ID",
-		Short:   "Deploy your dbt project to a Deployment on Astro",
-		Long:    "Deploy your dbt project to a Deployment on Astro. This command bundles your dbt project files and uploads it to your Deployment.",
-		Args:    cobra.MaximumNArgs(1),
-		RunE:    deployDbt,
-		Example: dbtDeployExample,
+		Use:   "deploy DEPLOYMENT-ID",
+		Short: "Deploy your dbt project to a Deployment on Astro",
+		Long:  "Deploy your dbt project to a Deployment on Astro. This command bundles your dbt project files and uploads it to your Deployment.",
+		Args:  cobra.MaximumNArgs(1),
+		RunE:  deployDbt,
+		Example: `
+Specify the ID of the Deployment on Astronomer you would like to deploy this dbt project to:
+
+  $ astro dbt deploy <deployment ID>
+
+Menu will be presented if you do not specify a deployment ID:
+
+  $ astro dbt deploy
+`,
 	}
 
-	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", "Path to mount dbt project in Airflow, for reference by DAGs. Default /usr/local/dbt/{dbt project name}")
+	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", fmt.Sprintf("Path to mount dbt project in Airflow, for reference by DAGs. Default %s{dbt project name}", dbtDefaultMountPathPrefix))
 	cmd.Flags().StringVarP(&dbtProjectPath, "project-path", "p", "", "Path to the dbt project to deploy. Default current directory")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to deploy to")
@@ -96,18 +96,10 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// get the deployment to deploy the dbt project to
-	var deploymentID string
-	if len(args) > 0 {
-		// if provided, use the deployment ID from the command argument
-		deploymentID = args[0]
-	} else {
-		// otherwise, prompt the user to select a deployment
-		selectedDeployment, err := deployment.GetDeployment(workspaceID, "", deploymentName, false, nil, platformCoreClient, astroCoreClient)
-		if err != nil {
-			return err
-		}
-		deploymentID = selectedDeployment.Id
+	// get the deployment id to deploy the dbt project to
+	deploymentID, err := resolveDeploymentIDFromDbtArgsFlags(args, workspaceID, deploymentName)
+	if err != nil {
+		return err
 	}
 	fmt.Println("Initiating dbt deploy for deployment ID: " + deploymentID)
 
@@ -119,19 +111,91 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 
 	// deploy the dbt project as a bundle
 	deployBundleInput := &cloud.DeployBundleInput{
-		BundlePath:   dbtProjectPath,
-		MountPath:    mountPath,
-		DeploymentID: deploymentID,
-		BundleType:   dbtBundleType,
-		Description:  deployDescription,
-		Wait:         waitForDeploy,
+		BundlePath:         dbtProjectPath,
+		MountPath:          mountPath,
+		DeploymentID:       deploymentID,
+		BundleType:         dbtBundleType,
+		Description:        deployDescription,
+		Wait:               waitForDeploy,
+		PlatformCoreClient: platformCoreClient,
+		CoreClient:         astroCoreClient,
 	}
-	err = DeployBundle(deployBundleInput, platformCoreClient, astroCoreClient)
+	return DeployBundle(deployBundleInput)
+}
+
+func newDbtDeleteCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete DEPLOYMENT-ID",
+		Short: "Delete a dbt project from a Deployment on Astro",
+		Args:  cobra.MaximumNArgs(1),
+		RunE:  deleteDbt,
+		Example: `
+Specify the ID of the Deployment on Astronomer you would like to delete this dbt project from:
+
+  $ astro dbt delete <deployment ID>
+
+Menu will be presented if you do not specify a deployment ID:
+
+  $ astro dbt delete
+`,
+	}
+
+	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", fmt.Sprintf("Path to mount dbt project in Airflow, for reference by DAGs. Default %s{dbt project name}", dbtDefaultMountPathPrefix))
+	cmd.Flags().StringVarP(&dbtProjectPath, "project-path", "p", "", "Path to the dbt project to delete from the Deployment. Default current directory")
+	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to deploy to")
+	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Description to store on the deploy")
+	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
+
+	return cmd
+}
+
+func deleteDbt(cmd *cobra.Command, args []string) error {
+	cmd.SilenceUsage = true
+
+	// if the workspace ID is not provided, try to find a valid workspace
+	if workspaceID == "" {
+		var err error
+		workspaceID, err = coalesceWorkspace()
+		if err != nil {
+			return fmt.Errorf("failed to find a valid workspace: %w", err)
+		}
+	}
+
+	// get the deployment id to deploy the dbt project to
+	deploymentID, err := resolveDeploymentIDFromDbtArgsFlags(args, workspaceID, deploymentName)
 	if err != nil {
 		return err
 	}
+	fmt.Println("Initiating dbt delete deploy for deployment ID: " + deploymentID)
 
-	return nil
+	// if the mount path is not provided, derive it from the dbt project name
+	if mountPath == "" {
+		// extract the dbt project's name
+		dbtProjectName, err := extractDbtProjectName(dbtProjectPath)
+		if err != nil {
+			return fmt.Errorf("dbt project name not found in %s: %w", dbtProjectPath, err)
+		}
+
+		// if the dbt project path is not provided, use the current directory
+		if dbtProjectPath == "" {
+			dbtProjectPath = config.WorkingPath
+		}
+
+		mountPath = dbtDefaultMountPathPrefix + dbtProjectName
+	}
+
+	deleteBundleInput := &cloud.DeleteBundleInput{
+		MountPath:          mountPath,
+		DeploymentID:       deploymentID,
+		WorkspaceID:        workspaceID,
+		BundleType:         dbtBundleType,
+		Description:        deployDescription,
+		Wait:               waitForDeploy,
+		PlatformCoreClient: platformCoreClient,
+		CoreClient:         astroCoreClient,
+	}
+	return DeleteBundle(deleteBundleInput)
 }
 
 func validateDbtProjectExists(dbtProjectPath string) error {
@@ -165,4 +229,18 @@ func extractDbtProjectName(dbtProjectPath string) (string, error) {
 	}
 
 	return dbtProjectName, nil
+}
+
+func resolveDeploymentIDFromDbtArgsFlags(args []string, workspaceID, deploymentName string) (string, error) {
+	// if provided, use the deployment ID from the command argument
+	if len(args) > 0 {
+		return args[0], nil
+	}
+
+	// otherwise, prompt the user to select a deployment
+	selectedDeployment, err := deployment.GetDeployment(workspaceID, "", deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	if err != nil {
+		return "", err
+	}
+	return selectedDeployment.Id, nil
 }
