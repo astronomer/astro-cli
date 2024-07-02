@@ -140,7 +140,7 @@ Menu will be presented if you do not specify a deployment ID:
 `,
 	}
 
-	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", fmt.Sprintf("Path to mount dbt project in Airflow, for reference by DAGs. Default %s{dbt project name}", dbtDefaultMountPathPrefix))
+	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", fmt.Sprintf("Mount path of the dbt project to be deleted from the Deployment. Default %s{dbt project name}", dbtDefaultMountPathPrefix))
 	cmd.Flags().StringVarP(&dbtProjectPath, "project-path", "p", "", "Path to the dbt project to delete from the Deployment. Default current directory")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to deploy to")
@@ -162,7 +162,7 @@ func deleteDbt(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// get the deployment id to deploy the dbt project to
+	// get the deployment id to delete the dbt project
 	deploymentID, err := resolveDeploymentIDFromDbtArgsFlags(args, workspaceID, deploymentName)
 	if err != nil {
 		return err
