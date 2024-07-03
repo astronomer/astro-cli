@@ -18,22 +18,24 @@ import (
 )
 
 type DeployBundleInput struct {
-	BundlePath   string
-	MountPath    string
-	DeploymentID string
-	BundleType   string
-	Description  string
-	Wait         bool
+	BundlePath         string
+	MountPath          string
+	DeploymentID       string
+	BundleType         string
+	Description        string
+	Wait               bool
+	PlatformCoreClient astroplatformcore.CoreClient
+	CoreClient         astrocore.CoreClient
 }
 
-func DeployBundle(input *DeployBundleInput, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
+func DeployBundle(input *DeployBundleInput) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
 	// get the current deployment so we can check the deploy is valid
-	currentDeployment, err := deployment.CoreGetDeployment(c.Organization, input.DeploymentID, platformCoreClient)
+	currentDeployment, err := deployment.CoreGetDeployment(c.Organization, input.DeploymentID, input.PlatformCoreClient)
 	if err != nil {
 		return err
 	}
@@ -52,7 +54,7 @@ func DeployBundle(input *DeployBundleInput, platformCoreClient astroplatformcore
 	gitMetadata := retrieveLocalGitMetadata(input.BundlePath)
 
 	// initialize the deploy
-	deploy, err := createBundleDeploy(c.Organization, input, gitMetadata, coreClient)
+	deploy, err := createBundleDeploy(c.Organization, input, gitMetadata, input.CoreClient)
 	if err != nil {
 		return err
 	}
@@ -69,7 +71,7 @@ func DeployBundle(input *DeployBundleInput, platformCoreClient astroplatformcore
 	}
 
 	// finalize the deploy
-	_, err = finalizeBundleDeploy(c.Organization, deploy.Id, tarballVersion, input, coreClient)
+	err = finalizeBundleDeploy(c.Organization, input.DeploymentID, deploy.Id, tarballVersion, input.CoreClient)
 	if err != nil {
 		return err
 	}
@@ -77,7 +79,54 @@ func DeployBundle(input *DeployBundleInput, platformCoreClient astroplatformcore
 
 	// if requested, wait for the deploy to finish by polling the deployment until it is healthy
 	if input.Wait {
-		err = deployment.HealthPoll(currentDeployment.Id, currentDeployment.WorkspaceId, dagOnlyDeploySleepTime, tickNum, timeoutNum, platformCoreClient)
+		err = deployment.HealthPoll(currentDeployment.Id, currentDeployment.WorkspaceId, dagOnlyDeploySleepTime, tickNum, timeoutNum, input.PlatformCoreClient)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type DeleteBundleInput struct {
+	MountPath          string
+	DeploymentID       string
+	WorkspaceID        string
+	BundleType         string
+	Description        string
+	Wait               bool
+	CoreClient         astrocore.CoreClient
+	PlatformCoreClient astroplatformcore.CoreClient
+}
+
+func DeleteBundle(input *DeleteBundleInput) error {
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	// initialize the deploy
+	createInput := &DeployBundleInput{
+		MountPath:    input.MountPath,
+		DeploymentID: input.DeploymentID,
+		BundleType:   input.BundleType,
+		Description:  input.Description,
+	}
+	deploy, err := createBundleDeploy(c.Organization, createInput, nil, input.CoreClient)
+	if err != nil {
+		return err
+	}
+
+	// immediately finalize with no version, which will delete the bundle from the deployment
+	err = finalizeBundleDeploy(c.Organization, input.DeploymentID, deploy.Id, "", input.CoreClient)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Successfully requested bundle delete for mount path " + input.MountPath + " from Astro.")
+
+	// if requested, wait for the deploy to finish by polling the deployment until it is healthy
+	if input.Wait {
+		err = deployment.HealthPoll(input.DeploymentID, input.WorkspaceID, dagOnlyDeploySleepTime, tickNum, timeoutNum, input.PlatformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -146,19 +195,19 @@ func createBundleDeploy(organizationID string, input *DeployBundleInput, deployG
 	return resp.JSON200, nil
 }
 
-func finalizeBundleDeploy(organizationID, deployID, tarballVersion string, input *DeployBundleInput, coreClient astrocore.CoreClient) (*astrocore.UpdateDeployResponse, error) {
+func finalizeBundleDeploy(organizationID, deploymentID, deployID, tarballVersion string, coreClient astrocore.CoreClient) error {
 	request := astrocore.UpdateDeployRequest{
 		BundleTarballVersion: &tarballVersion,
 	}
-	resp, err := coreClient.UpdateDeployWithResponse(context.Background(), organizationID, input.DeploymentID, deployID, request)
+	resp, err := coreClient.UpdateDeployWithResponse(context.Background(), organizationID, deploymentID, deployID, request)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return resp, nil
+	return nil
 }
 
 func retrieveLocalGitMetadata(bundlePath string) *astrocore.DeployGit {
