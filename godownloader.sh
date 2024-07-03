@@ -317,7 +317,7 @@ github_release() {
   if [ "$code" == "200" ]; then
     log_debug "HTTP Status Code 200"
   else
-    log_info "HTTP Status Code $code: $body"
+    log_err "HTTP Status Code $code: $body"
   fi
   test -z "$version" && return 1
   echo "$version"
