@@ -143,7 +143,7 @@ Menu will be presented if you do not specify a deployment ID:
 	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", fmt.Sprintf("Mount path of the dbt project to be deleted from the Deployment. Default %s{dbt project name}", dbtDefaultMountPathPrefix))
 	cmd.Flags().StringVarP(&dbtProjectPath, "project-path", "p", "", "Path to the dbt project to delete from the Deployment. Default current directory")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to deploy to")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to delete the dbt project from")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Description to store on the deploy")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 
