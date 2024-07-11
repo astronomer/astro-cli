@@ -33,10 +33,10 @@ builds:
       - 7
     ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
 brews:
-  - tap:
+  - repository:
       owner: astronomer
       name: homebrew-tap
-    folder: Formula
+    directory: Formula
     # Setting this will prevent goreleaser to actually try to commit the updated
     # formula - instead, the formula file will be stored on the dist folder only,
     # leaving the responsibility of publishing it to the user.
