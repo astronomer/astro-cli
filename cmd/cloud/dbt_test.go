@@ -11,6 +11,7 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -123,6 +124,16 @@ func (s *DbtSuite) TestDbtDeploy_CustomMountPath() {
 	assert.NoError(s.T(), err)
 
 	s.mockPlatformCoreClient.AssertExpectations(s.T())
+}
+
+func (s *DbtSuite) TestDbtDeploy_WithinAstroProject() {
+	projectDir, cleanup, err := config.CreateTempProject()
+	assert.NoError(s.T(), err)
+	defer cleanup()
+
+	err = testExecCmd(newDbtDeployCmd(), "test-deployment-id", "--project-path", projectDir)
+	assert.Error(s.T(), err)
+	assert.Contains(s.T(), err.Error(), "dbt project is within an Astro project")
 }
 
 func (s *DbtSuite) TestDbtDelete_PickDeployment() {
