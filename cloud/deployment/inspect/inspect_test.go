@@ -1186,6 +1186,12 @@ func TestGetSpecificField(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, *sourceDeployment.ClusterName, actual)
 	})
+	t.Run("returns correct boolean value", func(t *testing.T) {
+		requestedField := "configuration.is_development_mode"
+		actual, err := getSpecificField(printableDeployment, requestedField)
+		assert.NoError(t, err)
+		assert.Equal(t, *sourceDeployment.IsDevelopmentMode, actual)
+	})
 	t.Run("returns error if no value is found", func(t *testing.T) {
 		requestedField := "does-not-exist"
 		actual, err := getSpecificField(printableDeployment, requestedField)
