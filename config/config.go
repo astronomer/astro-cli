@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/spf13/afero"
@@ -228,6 +229,26 @@ func IsProjectDir(path string) (bool, error) {
 	}
 
 	return fileutil.Exists(configFile, nil)
+}
+
+// IsWithinProjectDir returns true if the path is at or within an Astro project directory
+func IsWithinProjectDir(path string) (bool, error) {
+	pathAbs, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return false, err
+	}
+	pathComponents := strings.Split(pathAbs, string(os.PathSeparator))
+	for i := range pathComponents {
+		componentAbs := strings.Join(pathComponents[:i+1], string(os.PathSeparator))
+		isProjectDir, err := IsProjectDir(componentAbs)
+		if err != nil {
+			return false, err
+		}
+		if isProjectDir {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // saveConfig will save the config to a file

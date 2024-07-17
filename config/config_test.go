@@ -38,6 +38,34 @@ func (s *Suite) TestIsProjectDir() {
 	}
 }
 
+func (s *Suite) TestIsWithinProjectDir() {
+	projectDir, cleanupProjectDir, err := CreateTempProject()
+	s.NoError(err)
+	defer cleanupProjectDir()
+
+	anotherDir, err := os.MkdirTemp("", "")
+	s.NoError(err)
+
+	tests := []struct {
+		name string
+		in   string
+		out  bool
+	}{
+		{"not in", anotherDir, false},
+		{"at", projectDir, true},
+		{"just in", filepath.Join(projectDir, "test"), true},
+		{"deep in", filepath.Join(projectDir, "test", "test", "test"), true},
+		{"root", string(os.PathSeparator), false},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			got, err := IsWithinProjectDir(tt.in)
+			s.NoError(err)
+			s.Equal(got, tt.out)
+		})
+	}
+}
+
 func (s *Suite) TestInitHomeDefaultCase() {
 	fs := afero.NewMemMapFs()
 	initHome(fs)

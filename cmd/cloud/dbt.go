@@ -75,8 +75,17 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 		dbtProjectPath = config.WorkingPath
 	}
 
+	// check that the dbt project path is not within an Astro project
+	withinAstroProject, err := config.IsWithinProjectDir(dbtProjectPath)
+	if err != nil {
+		return fmt.Errorf("failed to verify dbt project path is not within an Astro project: %w", err)
+	}
+	if withinAstroProject {
+		return fmt.Errorf("dbt project is within an Astro project. Use 'astro deploy' to deploy your Astro project")
+	}
+
 	// check that there is a valid dbt project at the dbt project path
-	err := validateDbtProjectExists(dbtProjectPath)
+	err = validateDbtProjectExists(dbtProjectPath)
 	if err != nil {
 		return err
 	}
