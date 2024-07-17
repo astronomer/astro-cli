@@ -261,7 +261,7 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 		deploymentMap["is_high_availability"] = *coreDeployment.IsHighAvailability
 	}
 	if coreDeployment.IsDevelopmentMode != nil {
-		deploymentMap["is_development_mode"] = coreDeployment.IsDevelopmentMode
+		deploymentMap["is_development_mode"] = *coreDeployment.IsDevelopmentMode
 	}
 	if coreDeployment.SchedulerAu != nil {
 		deploymentMap["scheduler_au"] = *coreDeployment.SchedulerAu
