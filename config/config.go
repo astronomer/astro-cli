@@ -233,13 +233,13 @@ func IsProjectDir(path string) (bool, error) {
 
 // IsWithinProjectDir returns true if the path is at or within an Astro project directory
 func IsWithinProjectDir(path string) (bool, error) {
-	dbtProjectPathAbs, err := filepath.Abs(filepath.Clean(path))
+	pathAbs, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
 		return false, err
 	}
-	dbtProjectPathComponents := strings.Split(dbtProjectPathAbs, string(os.PathSeparator))
-	for i := range dbtProjectPathComponents {
-		componentAbs := strings.Join(dbtProjectPathComponents[:i+1], string(os.PathSeparator))
+	pathComponents := strings.Split(pathAbs, string(os.PathSeparator))
+	for i := range pathComponents {
+		componentAbs := strings.Join(pathComponents[:i+1], string(os.PathSeparator))
 		isProjectDir, err := IsProjectDir(componentAbs)
 		if err != nil {
 			return false, err
