@@ -44,6 +44,9 @@ func (s *DbtSuite) SetupTest() {
 }
 
 func (s *DbtSuite) TearDownTest() {
+	s.mockPlatformCoreClient.AssertExpectations(s.T())
+	s.mockCoreClient.AssertExpectations(s.T())
+
 	platformCoreClient = s.origPlatformCoreClient
 	astroCoreClient = s.origCoreClient
 	DeployBundle = s.origDeployBundle
@@ -68,8 +71,6 @@ func (s *DbtSuite) TestDbtDeploy_PickDeployment() {
 	defer testUtil.MockUserInput(s.T(), "1")()
 	err := testExecCmd(newDbtDeployCmd())
 	assert.NoError(s.T(), err)
-
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
 func (s *DbtSuite) TestDbtDeploy_ProvidedDeploymentId() {
@@ -82,8 +83,6 @@ func (s *DbtSuite) TestDbtDeploy_ProvidedDeploymentId() {
 
 	err := testExecCmd(newDbtDeployCmd(), "test-deployment-id")
 	assert.NoError(s.T(), err)
-
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
 func (s *DbtSuite) TestDbtDeploy_CustomProjectPath() {
@@ -104,8 +103,6 @@ func (s *DbtSuite) TestDbtDeploy_CustomProjectPath() {
 	defer testUtil.MockUserInput(s.T(), "1")()
 	err = testExecCmd(newDbtDeployCmd(), "test-deployment-id", "--project-path", projectPath)
 	assert.NoError(s.T(), err)
-
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
 func (s *DbtSuite) TestDbtDeploy_CustomMountPath() {
@@ -122,8 +119,6 @@ func (s *DbtSuite) TestDbtDeploy_CustomMountPath() {
 	defer testUtil.MockUserInput(s.T(), "1")()
 	err := testExecCmd(newDbtDeployCmd(), "test-deployment-id", "--mount-path", dbtDefaultMountPathPrefix+"test_dbt_project")
 	assert.NoError(s.T(), err)
-
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
 func (s *DbtSuite) TestDbtDeploy_WithinAstroProject() {
@@ -150,8 +145,6 @@ func (s *DbtSuite) TestDbtDelete_PickDeployment() {
 	defer testUtil.MockUserInput(s.T(), "1")()
 	err := testExecCmd(newDbtDeleteCmd())
 	assert.NoError(s.T(), err)
-
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
 func (s *DbtSuite) TestDbtDelete_ProvidedDeploymentId() {
@@ -164,8 +157,6 @@ func (s *DbtSuite) TestDbtDelete_ProvidedDeploymentId() {
 
 	err := testExecCmd(newDbtDeleteCmd(), "test-deployment-id")
 	assert.NoError(s.T(), err)
-
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
 func (s *DbtSuite) TestDbtDelete_CustomProjectPath() {
@@ -186,8 +177,29 @@ func (s *DbtSuite) TestDbtDelete_CustomProjectPath() {
 	defer testUtil.MockUserInput(s.T(), "1")()
 	err = testExecCmd(newDbtDeleteCmd(), "test-deployment-id", "--project-path", projectPath)
 	assert.NoError(s.T(), err)
+}
 
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
+func (s *DbtSuite) TestDbtDelete_NoMountPathOrProjectPath() {
+	s.createDbtProjectFile("dbt_project.yml")
+	defer os.Remove("dbt_project.yml")
+
+	DeleteBundle = func(deleteInput *cloud.DeleteBundleInput) error {
+		if deleteInput.MountPath != dbtDefaultMountPathPrefix+"test_dbt_project" {
+			return assert.AnError
+		}
+		return nil
+	}
+
+	defer testUtil.MockUserInput(s.T(), "1")()
+	err := testExecCmd(newDbtDeleteCmd(), "test-deployment-id")
+	assert.NoError(s.T(), err)
+}
+
+func (s *DbtSuite) TestDbtDelete_NoMountPathOrProjectPath_MissingProject() {
+	defer testUtil.MockUserInput(s.T(), "1")()
+	err := testExecCmd(newDbtDeleteCmd(), "test-deployment-id")
+	assert.Error(s.T(), err)
+	assert.Contains(s.T(), err.Error(), "dbt project file not found")
 }
 
 func (s *DbtSuite) TestDbtDelete_CustomMountPath() {
@@ -204,8 +216,6 @@ func (s *DbtSuite) TestDbtDelete_CustomMountPath() {
 	defer testUtil.MockUserInput(s.T(), "1")()
 	err := testExecCmd(newDbtDeleteCmd(), "test-deployment-id", "--mount-path", dbtDefaultMountPathPrefix+"test_dbt_project")
 	assert.NoError(s.T(), err)
-
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
 func testExecCmd(cmd *cobra.Command, args ...string) error {
