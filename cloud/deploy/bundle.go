@@ -51,10 +51,15 @@ func DeployBundle(input *DeployBundleInput) error {
 	}
 
 	// retrieve metadata about the local Git checkout. returns nil if not available
-	gitMetadata := retrieveLocalGitMetadata(input.BundlePath)
+	deployGit, commitMessage := retrieveLocalGitMetadata(input.BundlePath)
+
+	// if no description was provided, use the commit message from the local Git checkout
+	if input.Description == "" {
+		input.Description = commitMessage
+	}
 
 	// initialize the deploy
-	deploy, err := createBundleDeploy(c.Organization, input, gitMetadata, input.CoreClient)
+	deploy, err := createBundleDeploy(c.Organization, input, deployGit, input.CoreClient)
 	if err != nil {
 		return err
 	}
@@ -210,82 +215,75 @@ func finalizeBundleDeploy(organizationID, deploymentID, deployID, tarballVersion
 	return nil
 }
 
-func retrieveLocalGitMetadata(bundlePath string) *astrocore.DeployGit {
+func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrocore.DeployGit, commitMessage string) {
 	if git.HasUncommittedChanges(bundlePath) {
-		logrus.Warn("Local repository has uncommitted changes, skipping Git metadata retrieval")
-		return nil
+		fmt.Println("Local repository has uncommitted changes, skipping Git metadata retrieval")
+		return nil, ""
 	}
 
-	gitMetadata := &astrocore.DeployGit{}
+	deployGit = &astrocore.DeployGit{}
 
 	// get the remote repository details, assume the remote is named "origin"
 	repoURL, err := git.GetRemoteRepository(bundlePath, "origin")
 	if err != nil {
 		logrus.Debugf("Failed to retrieve remote repository details, skipping Git metadata retrieval: %s", err)
-		return nil
+		return nil, ""
 	}
 	switch repoURL.Host {
 	case "github.com":
-		gitMetadata.Provider = astrocore.DeployGitProviderGITHUB
+		deployGit.Provider = astrocore.DeployGitProviderGITHUB
 	default:
 		logrus.Debugf("Unsupported Git provider, skipping Git metadata retrieval: %s", repoURL.Host)
-		return nil
+		return nil, ""
 	}
 	urlPath := strings.TrimPrefix(repoURL.Path, "/")
 	firstSlashIndex := strings.Index(urlPath, "/")
 	if firstSlashIndex == -1 {
 		logrus.Debugf("Failed to parse remote repository path, skipping Git metadata retrieval: %s", repoURL.Path)
-		return nil
+		return nil, ""
 	}
-	gitMetadata.Account = urlPath[:firstSlashIndex]
-	gitMetadata.Repo = urlPath[firstSlashIndex+1:]
+	deployGit.Account = urlPath[:firstSlashIndex]
+	deployGit.Repo = urlPath[firstSlashIndex+1:]
 
 	// get the path of the bundle within the repository
 	path, err := git.GetLocalRepositoryPathPrefix(bundlePath, bundlePath)
 	if err != nil {
 		logrus.Debugf("Failed to retrieve local repository path prefix, skipping Git metadata retrieval: %s", err)
-		return nil
+		return nil, ""
 	}
 	if path != "" {
-		gitMetadata.Path = &path
+		deployGit.Path = &path
 	}
 
 	// get the branch of the local commit
 	branch, err := git.GetBranch(bundlePath)
 	if err != nil {
 		logrus.Debugf("Failed to retrieve branch name, skipping Git metadata retrieval: %s", err)
-		return nil
+		return nil, ""
 	}
-	gitMetadata.Branch = branch
+	deployGit.Branch = branch
 
-	// get the SHA of the local commit
-	sha, err := git.GetHeadCommitSHA(bundlePath)
+	// get the local commit
+	sha, message, authorName, _, err := git.GetHeadCommit(bundlePath)
 	if err != nil {
-		logrus.Debugf("Failed to retrieve commit SHA, skipping Git metadata retrieval: %s", err)
-		return nil
+		logrus.Debugf("Failed to retrieve commit, skipping Git metadata retrieval: %s", err)
+		return nil, ""
 	}
-	gitMetadata.CommitSha = sha
+	deployGit.CommitSha = sha
+	if authorName != "" {
+		deployGit.AuthorName = &authorName
+	}
 
 	// derive the remote URL of the local commit
 	switch repoURL.Host {
 	case "github.com":
-		gitMetadata.CommitUrl = fmt.Sprintf("https://%s/%s/%s/commit/%s", repoURL.Host, gitMetadata.Account, gitMetadata.Repo, sha)
+		deployGit.CommitUrl = fmt.Sprintf("https://%s/%s/%s/commit/%s", repoURL.Host, deployGit.Account, deployGit.Repo, sha)
 	default:
 		logrus.Debugf("Unsupported Git provider, skipping Git metadata retrieval: %s", repoURL.Host)
-		return nil
+		return nil, ""
 	}
 
-	// get the author name of the local commit
-	authorName, _, err := git.GetHeadCommitAuthor(bundlePath)
-	if err != nil {
-		logrus.Debugf("Failed to retrieve commit author, skipping Git metadata retrieval: %s", err)
-		return nil
-	}
-	if authorName != "" {
-		gitMetadata.AuthorName = &authorName
-	}
+	logrus.Debugf("Retrieved Git metadata: %+v", deployGit)
 
-	logrus.Debugf("Retrieved Git metadata: %+v", gitMetadata)
-
-	return gitMetadata
+	return deployGit, message
 }
