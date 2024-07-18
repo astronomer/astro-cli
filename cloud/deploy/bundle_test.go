@@ -13,6 +13,7 @@ import (
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/pkg/git"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -121,11 +122,12 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataRetrieved() {
 	mockGetDeployment(s.mockPlatformCoreClient, true, false)
 
 	expectedAuthorName := "Test"
+	expectedDescription := strings.Repeat("a", git.MaxCommitMessageLineLength)
 	expectedDeploy := &astrocore.CreateDeployRequest{
 		Type:            astrocore.CreateDeployRequestTypeBUNDLE,
 		BundleType:      &input.BundleType,
 		BundleMountPath: &input.MountPath,
-		Description:     &input.Description,
+		Description:     &expectedDescription,
 		Git: &astrocore.CreateDeployGitRequest{
 			Provider:   astrocore.CreateDeployGitRequestProviderGITHUB,
 			Account:    "account",
@@ -280,7 +282,8 @@ func (s *BundleSuite) createTestGitRepository(withUncommittedFile bool) (sha, pa
 	err = exec.Command("git", "-C", dir, "config", "user.name", "Test").Run()
 	require.NoError(s.T(), err)
 
-	err = exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", "Initial commit").Run()
+	commitMessage := strings.Repeat("a", git.MaxCommitMessageLineLength+1) + "\n" + strings.Repeat("b", git.MaxCommitMessageLineLength+1)
+	err = exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", commitMessage).Run()
 	require.NoError(s.T(), err)
 
 	err = exec.Command("git", "-C", dir, "remote", "add", "origin", "https://github.com/account/repo.git").Run()
