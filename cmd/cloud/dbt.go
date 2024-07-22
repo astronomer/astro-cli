@@ -180,15 +180,21 @@ func deleteDbt(cmd *cobra.Command, args []string) error {
 
 	// if the mount path is not provided, derive it from the dbt project name
 	if mountPath == "" {
+		// if the dbt project path is not provided, use the current directory
+		if dbtProjectPath == "" {
+			dbtProjectPath = config.WorkingPath
+		}
+
+		// check that there is a valid dbt project at the dbt project path
+		err := validateDbtProjectExists(dbtProjectPath)
+		if err != nil {
+			return err
+		}
+
 		// extract the dbt project's name
 		dbtProjectName, err := extractDbtProjectName(dbtProjectPath)
 		if err != nil {
 			return fmt.Errorf("dbt project name not found in %s: %w", dbtProjectPath, err)
-		}
-
-		// if the dbt project path is not provided, use the current directory
-		if dbtProjectPath == "" {
-			dbtProjectPath = config.WorkingPath
 		}
 
 		mountPath = dbtDefaultMountPathPrefix + dbtProjectName

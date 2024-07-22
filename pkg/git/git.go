@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const MaxCommitMessageLineLength = 72
+
 // HasUncommittedChanges checks repository for uncommitted changes
 func HasUncommittedChanges(path string) bool {
 	if !IsGitRepository(path) {
@@ -44,28 +46,35 @@ func GetBranch(path string) (string, error) {
 	return runGitCommand(path, []string{"rev-parse", "--abbrev-ref", "HEAD"})
 }
 
-func GetHeadCommitSHA(path string) (string, error) {
-	return runGitCommand(path, []string{"rev-parse", "HEAD"})
-}
-
-func GetHeadCommitAuthor(path string) (name, email string, err error) {
-	authorJSON, err := runGitCommand(path, []string{"log", "-1", `--pretty=format:{"name":"%an","email":"%ae"}`, "HEAD"})
+func GetHeadCommit(path string) (sha, message, name, email string, err error) {
+	commitJSON, err := runGitCommand(path, []string{"log", "-1", `--pretty=format:{"sha":"%H","name":"%an","email":"%ae"}`, "HEAD"})
 	if err != nil {
-		return "", "", err
+		return "", "", "", "", err
 	}
 
-	// parse the author JSON
-	// e.g. {"name":"Jane Doe","email":"jane@doe.com"}
-	author := struct {
+	// parse the commit JSON
+	// e.g. {"sha":"c1b4c1b...","name":"author name","email":"author email"}
+	commit := struct {
+		Sha   string `json:"sha"`
 		Name  string `json:"name"`
 		Email string `json:"email"`
 	}{}
-	err = json.Unmarshal([]byte(authorJSON), &author)
+	err = json.Unmarshal([]byte(commitJSON), &commit)
 	if err != nil {
-		return "", "", err
+		return "", "", "", "", err
 	}
 
-	return author.Name, author.Email, nil
+	// get the commit message, truncated to the first line with a max line length
+	message, err = runGitCommand(path, []string{"log", "-1", "--pretty=%B", "HEAD"})
+	if err != nil {
+		return "", "", "", "", err
+	}
+	message = strings.Split(message, "\n")[0]
+	if len(message) > MaxCommitMessageLineLength {
+		message = message[:MaxCommitMessageLineLength]
+	}
+
+	return commit.Sha, message, commit.Name, commit.Email, nil
 }
 
 func runGitCommand(path string, args []string) (string, error) {
