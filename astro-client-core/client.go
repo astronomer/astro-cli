@@ -64,7 +64,7 @@ func CoreRequestEditor(ctx httpContext.Context, req *http.Request) error {
 		req.Header.Add("x-astro-client-identifier", "deploy-action")
 		req.Header.Add("x-astro-client-version", os.Getenv("DEPLOY_ACTION_VERSION"))
 	case os.Getenv("GITHUB_ACTIONS") == "true":
-		req.Header.Add("x-astro-client-identifier", "deploy-action")
+		req.Header.Add("x-astro-client-identifier", "github-action")
 		req.Header.Add("x-astro-client-version", version.CurrVersion)
 	default:
 		req.Header.Add("x-astro-client-identifier", "cli")
