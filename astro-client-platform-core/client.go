@@ -47,13 +47,17 @@ func requestEditor(ctx httpContext.Context, req *http.Request) error {
 	}
 	req.URL = requestURL
 	req.Header.Add("authorization", currentCtx.Token)
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		req.Header.Add("x-astro-client-identifier", "github-action")
-	} else {
+	switch {
+	case os.Getenv("DEPLOY_ACTION") == "true" && os.Getenv("GITHUB_ACTIONS") == "true":
+		req.Header.Add("x-astro-client-identifier", "deploy-action")
+		req.Header.Add("x-astro-client-version", os.Getenv("DEPLOY_ACTION_VERSION"))
+	case os.Getenv("GITHUB_ACTIONS") == "true":
+		req.Header.Add("x-astro-client-identifier", "deploy-action")
+		req.Header.Add("x-astro-client-version", version.CurrVersion)
+	default:
 		req.Header.Add("x-astro-client-identifier", "cli")
+		req.Header.Add("x-astro-client-version", version.CurrVersion)
 	}
-
-	req.Header.Add("x-astro-client-version", version.CurrVersion)
 	req.Header.Add("x-client-os-identifier", operatingSystem+"-"+arch)
 	req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.CurrVersion))
 	return nil
