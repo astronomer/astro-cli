@@ -23,6 +23,8 @@ var (
 	HTTPStatus204 = 204
 )
 
+const TrueString = "true"
+
 // a shorter alias
 type CoreClient = ClientWithResponsesInterface
 
@@ -59,10 +61,10 @@ func CoreRequestEditor(ctx httpContext.Context, req *http.Request) error {
 	req.URL = requestURL
 	req.Header.Add("authorization", currentCtx.Token)
 	switch {
-	case os.Getenv("DEPLOY_ACTION") == "true" && os.Getenv("GITHUB_ACTIONS") == "true":
+	case os.Getenv("DEPLOY_ACTION") == TrueString && os.Getenv("GITHUB_ACTIONS") == TrueString:
 		req.Header.Add("x-astro-client-identifier", "deploy-action")
 		req.Header.Add("x-astro-client-version", os.Getenv("DEPLOY_ACTION_VERSION"))
-	case os.Getenv("GITHUB_ACTIONS") == "true":
+	case os.Getenv("GITHUB_ACTIONS") == TrueString:
 		req.Header.Add("x-astro-client-identifier", "github-action")
 		req.Header.Add("x-astro-client-version", version.CurrVersion)
 	default:
