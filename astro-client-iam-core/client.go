@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"runtime"
 
 	"github.com/astronomer/astro-cli/context"
@@ -48,7 +49,7 @@ func CoreRequestEditor(ctx httpContext.Context, req *http.Request) error {
 	if err != nil {
 		return nil
 	}
-	os := runtime.GOOS
+	operatingSystem := runtime.GOOS
 	arch := runtime.GOARCH
 	baseURL := currentCtx.GetPublicRESTAPIURL("iam/v1beta1")
 	requestURL, err := url.Parse(baseURL + req.URL.String())
@@ -57,9 +58,18 @@ func CoreRequestEditor(ctx httpContext.Context, req *http.Request) error {
 	}
 	req.URL = requestURL
 	req.Header.Add("authorization", currentCtx.Token)
-	req.Header.Add("x-astro-client-identifier", "cli")
-	req.Header.Add("x-astro-client-version", version.CurrVersion)
-	req.Header.Add("x-client-os-identifier", os+"-"+arch)
+	switch {
+	case os.Getenv("DEPLOY_ACTION") == "true" && os.Getenv("GITHUB_ACTIONS") == "true":
+		req.Header.Add("x-astro-client-identifier", "deploy-action")
+		req.Header.Add("x-astro-client-version", os.Getenv("DEPLOY_ACTION_VERSION"))
+	case os.Getenv("GITHUB_ACTIONS") == "true":
+		req.Header.Add("x-astro-client-identifier", "github-action")
+		req.Header.Add("x-astro-client-version", version.CurrVersion)
+	default:
+		req.Header.Add("x-astro-client-identifier", "cli")
+		req.Header.Add("x-astro-client-version", version.CurrVersion)
+	}
+	req.Header.Add("x-client-os-identifier", operatingSystem+"-"+arch)
 	req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.CurrVersion))
 	return nil
 }
