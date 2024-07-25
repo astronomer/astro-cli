@@ -222,7 +222,7 @@ func (s *Suite) TestTar() {
 				source:         testSourceDirPath,
 				target:         filepath.Join(testDirPath, "test_exclude.tar"),
 				prependBaseDir: false,
-				excludePaths:   []string{testSubDirPath},
+				excludePaths:   []string{testSubDirName},
 			},
 			errAssertion: assert.NoError,
 			expectPaths: []string{
