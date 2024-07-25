@@ -151,7 +151,7 @@ func uploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool)
 	}()
 
 	// Generate the bundle tar
-	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir)
+	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"})
 	if err != nil {
 		return "", err
 	}
