@@ -160,16 +160,13 @@ func (s *Suite) TestTar() {
 	testSourceDirPath := filepath.Join(testDirPath, testSourceDirName)
 	defer afero.NewOsFs().Remove(testSourceDirPath)
 
-	// create a test file, and a symlink to it, and a hidden test file
+	// create a test file, and a symlink to it
 	testFileName := "test.txt"
 	testFilePath := filepath.Join(testSourceDirPath, testFileName)
 	WriteStringToFile(testFilePath, "testing")
 	symlinkFileName := "symlink"
 	symlinkFilePath := filepath.Join(testSourceDirPath, symlinkFileName)
 	os.Symlink(testFilePath, symlinkFilePath)
-	hiddenTestFileName := ".hidden_test.txt"
-	hiddenTestFilePath := filepath.Join(testSourceDirPath, hiddenTestFileName)
-	WriteStringToFile(hiddenTestFilePath, "testing")
 
 	// create test file in a sub-directory
 	testSubDirFileName := "test_subdir.txt"
@@ -183,6 +180,7 @@ func (s *Suite) TestTar() {
 		source         string
 		target         string
 		prependBaseDir bool
+		excludePaths   []string
 	}
 	tests := []struct {
 		name         string
@@ -202,7 +200,6 @@ func (s *Suite) TestTar() {
 				testFileName,
 				symlinkFileName,
 				filepath.Join(testSubDirName, testSubDirFileName),
-				// no hidden file
 			},
 		},
 		{
@@ -217,7 +214,21 @@ func (s *Suite) TestTar() {
 				filepath.Join(testSourceDirName, testFileName),
 				filepath.Join(testSourceDirName, symlinkFileName),
 				filepath.Join(testSourceDirName, testSubDirName, testSubDirFileName),
-				// no hidden file
+			},
+		},
+		{
+			name: "exclude paths",
+			args: args{
+				source:         testSourceDirPath,
+				target:         filepath.Join(testDirPath, "test_exclude.tar"),
+				prependBaseDir: false,
+				excludePaths:   []string{testSubDirName},
+			},
+			errAssertion: assert.NoError,
+			expectPaths: []string{
+				testFileName,
+				symlinkFileName,
+				// testSubDirFileName excluded
 			},
 		},
 	}
@@ -225,7 +236,7 @@ func (s *Suite) TestTar() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			// check that the tar operation was successful
-			assert.True(s.T(), tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target, tt.args.prependBaseDir)))
+			assert.True(s.T(), tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target, tt.args.prependBaseDir, tt.args.excludePaths)))
 
 			// check that all the files are in the tar at the correct paths
 			file, err := os.Open(tt.args.target)

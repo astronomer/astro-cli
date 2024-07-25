@@ -18,6 +18,7 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 )
 
@@ -95,7 +96,7 @@ func WriteToFile(path string, r io.Reader) error {
 	return err
 }
 
-func Tar(source, target string, prependBaseDir bool) error {
+func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []string) error {
 	tarfile, err := os.Create(target)
 	if err != nil {
 		return err
@@ -124,11 +125,6 @@ func Tar(source, target string, prependBaseDir bool) error {
 				return nil
 			}
 
-			// ignore hidden files, and files in hidden directories
-			if IsHidden(path) {
-				return nil
-			}
-
 			if path == target {
 				return nil
 			}
@@ -154,7 +150,18 @@ func Tar(source, target string, prependBaseDir bool) error {
 				headerName = filepath.Join(baseDir, headerName)
 			}
 			// force use forward slashes in tar files
-			header.Name = filepath.ToSlash(headerName)
+			headerName = filepath.ToSlash(headerName)
+
+			// ignore excluded paths
+			for _, excludePathPrefix := range excludePathPrefixes {
+				if strings.HasPrefix(headerName, excludePathPrefix) {
+					logrus.Debugf("Excluding tarball path: %s", headerName)
+					return nil
+				}
+			}
+
+			header.Name = headerName
+			logrus.Debugf("Adding to tarball: %s", header.Name)
 
 			if err := tarball.WriteHeader(header); err != nil {
 				return err
