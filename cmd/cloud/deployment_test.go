@@ -119,6 +119,7 @@ var (
 			DefaultTaskPodMemory:   &defaultTaskPodMemory,
 			WebServerAirflowApiUrl: "airflow-url",
 			WorkerQueues:           &[]astroplatformcore.WorkerQueue{},
+			WorkloadIdentity:       &mockWorkloadIdentity,
 		},
 	}
 	mockListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{

@@ -13,6 +13,7 @@ var (
 	outputFormat, requestedField string
 	template                     bool
 	cleanOutput                  bool
+	includeWorkloadIdentity      bool
 )
 
 func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
@@ -30,6 +31,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&template, "template", "t", false, "Create a template from the deployment being inspected.")
 	cmd.Flags().StringVarP(&requestedField, "key", "k", "", "A specific key for the deployment. Use --key configuration.cluster_id to get a deployment's cluster id.")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "clean output to only include inspect yaml or json file in any situation.")
+	cmd.Flags().BoolVarP(&includeWorkloadIdentity, "include-workload-identity", "", false, "Include Workload Identity configuration in the output.")
 	return cmd
 }
 
@@ -48,5 +50,5 @@ func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
 	// clean output
 	deployment.CleanOutput = cleanOutput
 
-	return inspect.Inspect(wsID, deploymentName, deploymentID, outputFormat, platformCoreClient, astroCoreClient, out, requestedField, template)
+	return inspect.Inspect(wsID, deploymentName, deploymentID, outputFormat, platformCoreClient, astroCoreClient, out, requestedField, template, includeWorkloadIdentity)
 }

@@ -66,6 +66,16 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
+	t.Run("includes workload identity", func(t *testing.T) {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
+		cmdArgs := []string{"inspect", "-n", "test", "--include-workload-identity"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, mockWorkloadIdentity)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOut := "Usage:\n"

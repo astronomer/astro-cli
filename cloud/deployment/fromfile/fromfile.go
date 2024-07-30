@@ -182,7 +182,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 	if jsonOutput {
 		outputFormat = jsonFormat
 	}
-	return inspect.Inspect(workspaceID, "", existingDeployment.Id, outputFormat, astroPlatformCore, coreClient, out, "", false)
+	return inspect.Inspect(workspaceID, "", existingDeployment.Id, outputFormat, astroPlatformCore, coreClient, out, "", false, true)
 }
 
 // createOrUpdateDeployment transforms an inspect.FormattedDeployment into astroplateformcore CreateDeploymentInput or
