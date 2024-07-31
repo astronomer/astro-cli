@@ -194,10 +194,15 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		return err
 	}
 
+	var skipRevision bool
+	if isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
+		skipRevision = true
+	}
+
 	if byoRegistryEnabled {
 		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel)
 		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel)
-		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
+		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion, SkipRevision: skipRevision}
 		_, err := houston.Call(houstonClient.UpdateDeploymentImage)(req)
 		return err
 	}
