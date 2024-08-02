@@ -327,13 +327,13 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 
 			var schedulerSize astroplatformcore.CreateStandardDeploymentRequestSchedulerSize
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
-			case deployment.SMALL:
+			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL):
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeSMALL
-			case deployment.MEDIUM:
+			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM):
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
-			case deployment.LARGE:
+			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE):
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
-			case deployment.EXTRA_LARGE:
+			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE):
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
@@ -381,13 +381,13 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 
 			var schedulerSize astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
-			case deployment.SMALL:
+			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL):
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
-			case deployment.MEDIUM:
+			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM):
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-			case deployment.LARGE:
+			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE):
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
-			case deployment.EXTRA_LARGE:
+			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE):
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
@@ -488,13 +488,13 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 
 			var schedulerSize astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
-			case deployment.SMALL:
+			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL):
 				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeSMALL
-			case deployment.MEDIUM:
+			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM):
 				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
-			case deployment.LARGE:
+			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE):
 				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
-			case deployment.EXTRA_LARGE:
+			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE):
 				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
@@ -553,13 +553,13 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 
 			var schedulerSize astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
-			case deployment.SMALL:
+			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL):
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeSMALL
-			case deployment.MEDIUM:
+			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM):
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-			case deployment.LARGE:
+			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE):
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
-			case deployment.EXTRA_LARGE:
+			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE):
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 			if deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU == "" {

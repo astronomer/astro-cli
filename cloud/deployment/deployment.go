@@ -62,10 +62,6 @@ const (
 	MediumScheduler     = "medium"
 	SmallScheduler      = "small"
 	ExtraLargeScheduler = "extra_large"
-	SMALL               = "SMALL"
-	MEDIUM              = "MEDIUM"
-	LARGE               = "LARGE"
-	EXTRA_LARGE         = "EXTRA_LARGE"
 	disable             = "disable"
 	enable              = "enable"
 )
