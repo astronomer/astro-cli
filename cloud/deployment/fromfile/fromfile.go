@@ -333,6 +333,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
 			case deployment.LARGE:
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
+			case deployment.EXTRA_LARGE:
+				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
 			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
@@ -385,6 +387,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
 			case deployment.LARGE:
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case deployment.EXTRA_LARGE:
+				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
@@ -490,6 +494,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
 			case deployment.LARGE:
 				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
+			case deployment.EXTRA_LARGE:
+				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
 			if deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory == "" {
@@ -553,6 +559,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
 			case deployment.LARGE:
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case deployment.EXTRA_LARGE:
+				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 			if deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU == "" {
 				deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU = *existingDeployment.DefaultTaskPodCpu

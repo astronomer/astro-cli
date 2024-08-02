@@ -717,6 +717,35 @@ deployment:
 		assert.ErrorContains(t, err, "Invalid --type value")
 		mockCoreClient.AssertExpectations(t)
 	})
+
+	t.Run("creates an extra large deployment", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		extraLarge := astroplatformcore.DeploymentSchedulerSizeEXTRALARGE
+		mockCreateDeploymentResponse.JSON200.SchedulerSize = &extraLarge
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		ctx.SetContextKey("organization_short_name", "test-org")
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+		astroCoreClient = mockCoreClient
+		platformCoreClient = mockPlatformCoreClient
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--scheduler-size", "extra-large",
+		}
+
+		// Mock user input for deployment name and wait for status
+		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(t, "1")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
 }
 
 func TestDeploymentUpdate(t *testing.T) {
@@ -954,6 +983,29 @@ deployment:
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
+	})
+
+	t.Run("updates a deployment with extra large scheduler size", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+
+		astroCoreClient = mockCoreClient
+		platformCoreClient = mockPlatformCoreClient
+
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+
+		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "extra_large", "--force"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 

@@ -61,9 +61,11 @@ const (
 	LargeScheduler      = "large"
 	MediumScheduler     = "medium"
 	SmallScheduler      = "small"
+	ExtraLargeScheduler = "extra_large"
 	SMALL               = "SMALL"
 	MEDIUM              = "MEDIUM"
 	LARGE               = "LARGE"
+	EXTRA_LARGE         = "EXTRA_LARGE"
 	disable             = "disable"
 	enable              = "enable"
 )
@@ -377,6 +379,8 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
 			case LargeScheduler:
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
+			case ExtraLargeScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
 			}
@@ -424,6 +428,8 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
 			case LargeScheduler:
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case ExtraLargeScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
 			}
@@ -945,6 +951,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
 			case LargeScheduler:
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
+			case ExtraLargeScheduler:
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
@@ -1006,6 +1014,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
 			case LargeScheduler:
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case ExtraLargeScheduler:
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
