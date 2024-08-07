@@ -22,7 +22,6 @@ type UpdateDeploymentImageRequest struct {
 	Image          string `json:"image"`
 	AirflowVersion string `json:"airflowVersion"`
 	RuntimeVersion string `json:"runtimeVersion"`
-	SkipRevision   bool	  `json:"skipRevision"`
 }
 
 // DeleteDeploymentRequest - properties to delete a deployment
@@ -54,7 +53,7 @@ var (
 					workspaceUuid: $workspaceId
 					releaseName: $releaseName
 					executor: $executor
-					airflowVersion: $airflowVersion
+						airflowVersion: $airflowVersion
 					namespace: $namespace
 					config: $config
 					cloudRole: $cloudRole
@@ -152,57 +151,6 @@ var (
 					dagDeployment: $dagDeployment
 					triggerer: {
 						replicas: $triggererReplicas
-					}
-				){
-					id
-					type
-					label
-					releaseName
-					version
-					airflowVersion
-					runtimeVersion
-					urls {
-						type
-						url
-					}
-					createdAt
-					updatedAt
-				}
-			}`,
-		},
-		{
-			version: "0.35.2",
-			query: `
-			mutation CreateDeployment(
-				$label: String!
-				$type: String = "airflow"
-				$releaseName: String
-				$workspaceId: Uuid!
-				$executor: ExecutorType!
-				$airflowVersion: String
-				$runtimeVersion: String
-				$namespace: String
-				$config: JSON
-				$cloudRole: String
-				$dagDeployment: DagDeployment
-				$triggererReplicas: Int
-				$skipRevision: Boolean
-			){
-				createDeployment(
-					label: $label
-					type: $type
-					workspaceUuid: $workspaceId
-					releaseName: $releaseName
-					executor: $executor
-					airflowVersion: $airflowVersion
-					runtimeVersion: $runtimeVersion
-					namespace: $namespace
-					config: $config
-					cloudRole: $cloudRole
-					dagDeployment: $dagDeployment
-					triggerer: {
-					replicas: $triggererReplicas
-					skipRevision: $skipRevision
 					}
 				){
 					id
@@ -480,14 +428,12 @@ var (
 		$image:String!,
 		$airflowVersion:String,
 		$runtimeVersion:String,
-		$skipRevision: Boolean
 	){
 		updateDeploymentImage(
 			releaseName:$releaseName,
 			image:$image,
 			airflowVersion:$airflowVersion,
-			runtimeVersion:$runtimeVersion,
-			skipRevision:$skipRevision
+			runtimeVersion:$runtimeVersion
 		){
 			releaseName
 			airflowVersion
