@@ -22,7 +22,7 @@ type UpdateDeploymentImageRequest struct {
 	Image          string `json:"image"`
 	AirflowVersion string `json:"airflowVersion"`
 	RuntimeVersion string `json:"runtimeVersion"`
-	SkipRevision   bool   `json:"skipRevision"`
+	SkipRevision   bool	  `json:"skipRevision"`
 }
 
 // DeleteDeploymentRequest - properties to delete a deployment
