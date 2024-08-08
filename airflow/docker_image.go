@@ -64,6 +64,8 @@ func (d *DockerImage) Build(dockerfile, buildSecretString string, buildConfig ai
 		"-f",
 		dockerfile,
 		".",
+		"--label",
+		"io.astronomer.skip.revision=true",
 	}
 	if buildConfig.NoCache {
 		args = append(args, "--no-cache")
