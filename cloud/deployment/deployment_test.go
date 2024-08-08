@@ -1292,8 +1292,8 @@ func (s *Suite) TestCreate() {
 
 		// Call the Create function
 		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, awsCloud, "us-west-2", "extra_large", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
-    s.NoError(err)
-  
+		s.NoError(err)
+
 		// Assert expectations
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
