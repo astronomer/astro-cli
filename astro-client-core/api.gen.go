@@ -119,6 +119,7 @@ const (
 const (
 	ClusterHealthStatusValueHEALTHY   ClusterHealthStatusValue = "HEALTHY"
 	ClusterHealthStatusValueUNHEALTHY ClusterHealthStatusValue = "UNHEALTHY"
+	ClusterHealthStatusValueUNKNOWN   ClusterHealthStatusValue = "UNKNOWN"
 )
 
 // Defines values for ClusterRouteSource.
@@ -168,9 +169,10 @@ const (
 
 // Defines values for CreateDedicatedDeploymentRequestSchedulerSize.
 const (
-	CreateDedicatedDeploymentRequestSchedulerSizeLARGE  CreateDedicatedDeploymentRequestSchedulerSize = "LARGE"
-	CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM CreateDedicatedDeploymentRequestSchedulerSize = "MEDIUM"
-	CreateDedicatedDeploymentRequestSchedulerSizeSMALL  CreateDedicatedDeploymentRequestSchedulerSize = "SMALL"
+	CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE CreateDedicatedDeploymentRequestSchedulerSize = "EXTRA_LARGE"
+	CreateDedicatedDeploymentRequestSchedulerSizeLARGE      CreateDedicatedDeploymentRequestSchedulerSize = "LARGE"
+	CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM     CreateDedicatedDeploymentRequestSchedulerSize = "MEDIUM"
+	CreateDedicatedDeploymentRequestSchedulerSizeSMALL      CreateDedicatedDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for CreateDedicatedDeploymentRequestType.
@@ -257,9 +259,10 @@ const (
 
 // Defines values for CreateStandardDeploymentRequestSchedulerSize.
 const (
-	CreateStandardDeploymentRequestSchedulerSizeLARGE  CreateStandardDeploymentRequestSchedulerSize = "LARGE"
-	CreateStandardDeploymentRequestSchedulerSizeMEDIUM CreateStandardDeploymentRequestSchedulerSize = "MEDIUM"
-	CreateStandardDeploymentRequestSchedulerSizeSMALL  CreateStandardDeploymentRequestSchedulerSize = "SMALL"
+	CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE CreateStandardDeploymentRequestSchedulerSize = "EXTRA_LARGE"
+	CreateStandardDeploymentRequestSchedulerSizeLARGE      CreateStandardDeploymentRequestSchedulerSize = "LARGE"
+	CreateStandardDeploymentRequestSchedulerSizeMEDIUM     CreateStandardDeploymentRequestSchedulerSize = "MEDIUM"
+	CreateStandardDeploymentRequestSchedulerSizeSMALL      CreateStandardDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for CreateStandardDeploymentRequestType.
@@ -267,6 +270,14 @@ const (
 	CreateStandardDeploymentRequestTypeDEDICATED CreateStandardDeploymentRequestType = "DEDICATED"
 	CreateStandardDeploymentRequestTypeHYBRID    CreateStandardDeploymentRequestType = "HYBRID"
 	CreateStandardDeploymentRequestTypeSTANDARD  CreateStandardDeploymentRequestType = "STANDARD"
+)
+
+// Defines values for DAGProcessorMachineName.
+const (
+	DAGProcessorMachineNameEXTRALARGE DAGProcessorMachineName = "EXTRA_LARGE"
+	DAGProcessorMachineNameLARGE      DAGProcessorMachineName = "LARGE"
+	DAGProcessorMachineNameMEDIUM     DAGProcessorMachineName = "MEDIUM"
+	DAGProcessorMachineNameSMALL      DAGProcessorMachineName = "SMALL"
 )
 
 // Defines values for DefaultRoleScopeType.
@@ -286,9 +297,10 @@ const (
 
 // Defines values for DeployType.
 const (
-	DeployTypeBUNDLE DeployType = "BUNDLE"
-	DeployTypeDAG    DeployType = "DAG"
-	DeployTypeIMAGE  DeployType = "IMAGE"
+	DeployTypeBASEIMAGE DeployType = "BASE_IMAGE"
+	DeployTypeBUNDLE    DeployType = "BUNDLE"
+	DeployTypeDAG       DeployType = "DAG"
+	DeployTypeIMAGE     DeployType = "IMAGE"
 )
 
 // Defines values for DeployGitProvider.
@@ -319,9 +331,10 @@ const (
 
 // Defines values for DeploymentSchedulerSize.
 const (
-	DeploymentSchedulerSizeLARGE  DeploymentSchedulerSize = "LARGE"
-	DeploymentSchedulerSizeMEDIUM DeploymentSchedulerSize = "MEDIUM"
-	DeploymentSchedulerSizeSMALL  DeploymentSchedulerSize = "SMALL"
+	DeploymentSchedulerSizeEXTRALARGE DeploymentSchedulerSize = "EXTRA_LARGE"
+	DeploymentSchedulerSizeLARGE      DeploymentSchedulerSize = "LARGE"
+	DeploymentSchedulerSizeMEDIUM     DeploymentSchedulerSize = "MEDIUM"
+	DeploymentSchedulerSizeSMALL      DeploymentSchedulerSize = "SMALL"
 )
 
 // Defines values for DeploymentStatus.
@@ -356,10 +369,11 @@ const (
 
 // Defines values for DeploymentLogEntrySource.
 const (
-	DeploymentLogEntrySourceScheduler DeploymentLogEntrySource = "scheduler"
-	DeploymentLogEntrySourceTriggerer DeploymentLogEntrySource = "triggerer"
-	DeploymentLogEntrySourceWebserver DeploymentLogEntrySource = "webserver"
-	DeploymentLogEntrySourceWorker    DeploymentLogEntrySource = "worker"
+	DeploymentLogEntrySourceDagProcessor DeploymentLogEntrySource = "dag-processor"
+	DeploymentLogEntrySourceScheduler    DeploymentLogEntrySource = "scheduler"
+	DeploymentLogEntrySourceTriggerer    DeploymentLogEntrySource = "triggerer"
+	DeploymentLogEntrySourceWebserver    DeploymentLogEntrySource = "webserver"
+	DeploymentLogEntrySourceWorker       DeploymentLogEntrySource = "worker"
 )
 
 // Defines values for DeploymentRepositoryPathGitProvider.
@@ -509,9 +523,10 @@ const (
 
 // Defines values for SchedulerMachineName.
 const (
-	SchedulerMachineNameLARGE  SchedulerMachineName = "LARGE"
-	SchedulerMachineNameMEDIUM SchedulerMachineName = "MEDIUM"
-	SchedulerMachineNameSMALL  SchedulerMachineName = "SMALL"
+	SchedulerMachineNameEXTRALARGE SchedulerMachineName = "EXTRA_LARGE"
+	SchedulerMachineNameLARGE      SchedulerMachineName = "LARGE"
+	SchedulerMachineNameMEDIUM     SchedulerMachineName = "MEDIUM"
+	SchedulerMachineNameSMALL      SchedulerMachineName = "SMALL"
 )
 
 // Defines values for SelfSignupType.
@@ -594,9 +609,10 @@ const (
 
 // Defines values for UpdateHostedDeploymentRequestSchedulerSize.
 const (
-	LARGE  UpdateHostedDeploymentRequestSchedulerSize = "LARGE"
-	MEDIUM UpdateHostedDeploymentRequestSchedulerSize = "MEDIUM"
-	SMALL  UpdateHostedDeploymentRequestSchedulerSize = "SMALL"
+	UpdateHostedDeploymentRequestSchedulerSizeEXTRALARGE UpdateHostedDeploymentRequestSchedulerSize = "EXTRA_LARGE"
+	UpdateHostedDeploymentRequestSchedulerSizeLARGE      UpdateHostedDeploymentRequestSchedulerSize = "LARGE"
+	UpdateHostedDeploymentRequestSchedulerSizeMEDIUM     UpdateHostedDeploymentRequestSchedulerSize = "MEDIUM"
+	UpdateHostedDeploymentRequestSchedulerSizeSMALL      UpdateHostedDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for UpdateHostedDeploymentRequestType.
@@ -913,10 +929,11 @@ const (
 
 // Defines values for GetDeploymentLogsParamsSources.
 const (
-	GetDeploymentLogsParamsSourcesScheduler GetDeploymentLogsParamsSources = "scheduler"
-	GetDeploymentLogsParamsSourcesTriggerer GetDeploymentLogsParamsSources = "triggerer"
-	GetDeploymentLogsParamsSourcesWebserver GetDeploymentLogsParamsSources = "webserver"
-	GetDeploymentLogsParamsSourcesWorker    GetDeploymentLogsParamsSources = "worker"
+	GetDeploymentLogsParamsSourcesDagProcessor GetDeploymentLogsParamsSources = "dag-processor"
+	GetDeploymentLogsParamsSourcesScheduler    GetDeploymentLogsParamsSources = "scheduler"
+	GetDeploymentLogsParamsSourcesTriggerer    GetDeploymentLogsParamsSources = "triggerer"
+	GetDeploymentLogsParamsSourcesWebserver    GetDeploymentLogsParamsSources = "webserver"
+	GetDeploymentLogsParamsSourcesWorker       GetDeploymentLogsParamsSources = "worker"
 )
 
 // Defines values for ListDeploymentTeamsParamsSorts.
@@ -1351,6 +1368,7 @@ type ClusterHealthStatusDetail struct {
 // ClusterMetadata defines model for ClusterMetadata.
 type ClusterMetadata struct {
 	ExternalIPs   *[]string `json:"externalIPs,omitempty"`
+	KubeDnsIp     *string   `json:"kubeDnsIp,omitempty"`
 	OidcIssuerUrl *string   `json:"oidcIssuerUrl,omitempty"`
 }
 
@@ -1561,7 +1579,7 @@ type CreateDedicatedDeploymentRequest struct {
 	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
 	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
-	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE, EXTRA_LARGE
 	SchedulerSize CreateDedicatedDeploymentRequestSchedulerSize `json:"schedulerSize"`
 
 	// Type Types of the deployment, one of: DEDICATED, HYBRID, STANDARD
@@ -1580,7 +1598,7 @@ type CreateDedicatedDeploymentRequest struct {
 // CreateDedicatedDeploymentRequestExecutor Airflow executors, supported: CELERY, KUBERNETES
 type CreateDedicatedDeploymentRequestExecutor string
 
-// CreateDedicatedDeploymentRequestSchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+// CreateDedicatedDeploymentRequestSchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE, EXTRA_LARGE
 type CreateDedicatedDeploymentRequestSchedulerSize string
 
 // CreateDedicatedDeploymentRequestType Types of the deployment, one of: DEDICATED, HYBRID, STANDARD
@@ -1684,6 +1702,10 @@ type CreateEnvironmentObjectMetricsExportOverridesRequest struct {
 	BasicToken   *string                                                           `json:"basicToken,omitempty"`
 	Endpoint     *string                                                           `json:"endpoint,omitempty"`
 	ExporterType *CreateEnvironmentObjectMetricsExportOverridesRequestExporterType `json:"exporterType,omitempty"`
+	Headers      *map[string]string                                                `json:"headers,omitempty"`
+	Labels       *map[string]string                                                `json:"labels,omitempty"`
+	Password     *string                                                           `json:"password,omitempty"`
+	Username     *string                                                           `json:"username,omitempty"`
 }
 
 // CreateEnvironmentObjectMetricsExportOverridesRequestExporterType defines model for CreateEnvironmentObjectMetricsExportOverridesRequest.ExporterType.
@@ -1694,6 +1716,10 @@ type CreateEnvironmentObjectMetricsExportRequest struct {
 	BasicToken   *string                                                 `json:"basicToken,omitempty"`
 	Endpoint     string                                                  `json:"endpoint"`
 	ExporterType CreateEnvironmentObjectMetricsExportRequestExporterType `json:"exporterType"`
+	Headers      *map[string]string                                      `json:"headers,omitempty"`
+	Labels       *map[string]string                                      `json:"labels,omitempty"`
+	Password     *string                                                 `json:"password,omitempty"`
+	Username     *string                                                 `json:"username,omitempty"`
 }
 
 // CreateEnvironmentObjectMetricsExportRequestExporterType defines model for CreateEnvironmentObjectMetricsExportRequest.ExporterType.
@@ -1872,7 +1898,7 @@ type CreateStandardDeploymentRequest struct {
 	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
 	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
-	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE, EXTRA_LARGE
 	SchedulerSize CreateStandardDeploymentRequestSchedulerSize `json:"schedulerSize"`
 
 	// Type Types of the deployment, one of: DEDICATED, HYBRID, STANDARD
@@ -1894,7 +1920,7 @@ type CreateStandardDeploymentRequestCloudProvider string
 // CreateStandardDeploymentRequestExecutor Airflow executors, supported: CELERY, KUBERNETES
 type CreateStandardDeploymentRequestExecutor string
 
-// CreateStandardDeploymentRequestSchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+// CreateStandardDeploymentRequestSchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE, EXTRA_LARGE
 type CreateStandardDeploymentRequestSchedulerSize string
 
 // CreateStandardDeploymentRequestType Types of the deployment, one of: DEDICATED, HYBRID, STANDARD
@@ -1933,6 +1959,16 @@ type CreateWorkspaceRequest struct {
 type CronExpressionSchema struct {
 	Value string `json:"value"`
 }
+
+// DAGProcessorMachine defines model for DAGProcessorMachine.
+type DAGProcessorMachine struct {
+	// Name The name of this machine.
+	Name DAGProcessorMachineName `json:"name"`
+	Spec MachineSpec             `json:"spec"`
+}
+
+// DAGProcessorMachineName The name of this machine.
+type DAGProcessorMachineName string
 
 // DagFilters defines model for DagFilters.
 type DagFilters struct {
@@ -1993,6 +2029,7 @@ type Deploy struct {
 	RollbackFromId     *string              `json:"rollbackFromId,omitempty"`
 	RuntimeVersion     *string              `json:"runtimeVersion,omitempty"`
 	Status             DeployStatus         `json:"status"`
+	StatusReason       *string              `json:"statusReason,omitempty"`
 	Steps              *[]DeployStep        `json:"steps,omitempty"`
 	Type               DeployType           `json:"type"`
 	UpdatedAt          *time.Time           `json:"updatedAt,omitempty"`
@@ -2070,6 +2107,7 @@ type DeployStepsPaginated struct {
 // Deployment defines model for Deployment.
 type Deployment struct {
 	AirflowVersion                 string                           `json:"airflowVersion"`
+	Bundles                        *[]Bundle                        `json:"bundles,omitempty"`
 	ClusterCloudProvider           *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
 	ClusterId                      string                           `json:"clusterId"`
 	ClusterName                    *string                          `json:"clusterName,omitempty"`
@@ -2299,6 +2337,7 @@ type DeploymentLogEntrySource string
 
 // DeploymentOptions defines model for DeploymentOptions.
 type DeploymentOptions struct {
+	DagProcessorMachines    *[]DAGProcessorMachine    `json:"dagProcessorMachines,omitempty"`
 	DefaultValues           DefaultValueOptions       `json:"defaultValues"`
 	Executors               []string                  `json:"executors"`
 	LegacyAstro             LegacyAstroOptions        `json:"legacyAstro"`
@@ -2436,6 +2475,10 @@ type EnvironmentObjectMetricsExport struct {
 	BasicToken   *string                                    `json:"basicToken,omitempty"`
 	Endpoint     string                                     `json:"endpoint"`
 	ExporterType EnvironmentObjectMetricsExportExporterType `json:"exporterType"`
+	Headers      *map[string]string                         `json:"headers,omitempty"`
+	Labels       *map[string]string                         `json:"labels,omitempty"`
+	Password     *string                                    `json:"password,omitempty"`
+	Username     *string                                    `json:"username,omitempty"`
 }
 
 // EnvironmentObjectMetricsExportExporterType defines model for EnvironmentObjectMetricsExport.ExporterType.
@@ -2446,6 +2489,10 @@ type EnvironmentObjectMetricsExportOverrides struct {
 	BasicToken   *string                                              `json:"basicToken,omitempty"`
 	Endpoint     *string                                              `json:"endpoint,omitempty"`
 	ExporterType *EnvironmentObjectMetricsExportOverridesExporterType `json:"exporterType,omitempty"`
+	Headers      *map[string]string                                   `json:"headers,omitempty"`
+	Labels       *map[string]string                                   `json:"labels,omitempty"`
+	Password     *string                                              `json:"password,omitempty"`
+	Username     *string                                              `json:"username,omitempty"`
 }
 
 // EnvironmentObjectMetricsExportOverridesExporterType defines model for EnvironmentObjectMetricsExportOverrides.ExporterType.
@@ -3147,6 +3194,10 @@ type UpdateEnvironmentObjectMetricsExportOverridesRequest struct {
 	BasicToken   *string                                                           `json:"basicToken,omitempty"`
 	Endpoint     *string                                                           `json:"endpoint,omitempty"`
 	ExporterType *UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType `json:"exporterType,omitempty"`
+	Headers      *map[string]string                                                `json:"headers,omitempty"`
+	Labels       *map[string]string                                                `json:"labels,omitempty"`
+	Password     *string                                                           `json:"password,omitempty"`
+	Username     *string                                                           `json:"username,omitempty"`
 }
 
 // UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType defines model for UpdateEnvironmentObjectMetricsExportOverridesRequest.ExporterType.
@@ -3157,6 +3208,10 @@ type UpdateEnvironmentObjectMetricsExportRequest struct {
 	BasicToken   *string                                                  `json:"basicToken,omitempty"`
 	Endpoint     *string                                                  `json:"endpoint,omitempty"`
 	ExporterType *UpdateEnvironmentObjectMetricsExportRequestExporterType `json:"exporterType,omitempty"`
+	Headers      *map[string]string                                       `json:"headers,omitempty"`
+	Labels       *map[string]string                                       `json:"labels,omitempty"`
+	Password     *string                                                  `json:"password,omitempty"`
+	Username     *string                                                  `json:"username,omitempty"`
 }
 
 // UpdateEnvironmentObjectMetricsExportRequestExporterType defines model for UpdateEnvironmentObjectMetricsExportRequest.ExporterType.
@@ -3242,7 +3297,7 @@ type UpdateHostedDeploymentRequest struct {
 	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
 	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
-	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+	// SchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE, EXTRA_LARGE
 	SchedulerSize UpdateHostedDeploymentRequestSchedulerSize `json:"schedulerSize"`
 	Type          UpdateHostedDeploymentRequestType          `json:"type"`
 
@@ -3255,7 +3310,7 @@ type UpdateHostedDeploymentRequest struct {
 // UpdateHostedDeploymentRequestExecutor Airflow executors, supported: CELERY, KUBERNETES
 type UpdateHostedDeploymentRequestExecutor string
 
-// UpdateHostedDeploymentRequestSchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE
+// UpdateHostedDeploymentRequestSchedulerSize Size of scheduler, one of: SMALL, MEDIUM, LARGE, EXTRA_LARGE
 type UpdateHostedDeploymentRequestSchedulerSize string
 
 // UpdateHostedDeploymentRequestType defines model for UpdateHostedDeploymentRequest.Type.

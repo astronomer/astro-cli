@@ -58,12 +58,6 @@ const (
 	awsCloud            = "aws"
 	azureCloud          = "azure"
 	standard            = "standard"
-	LargeScheduler      = "large"
-	MediumScheduler     = "medium"
-	SmallScheduler      = "small"
-	SMALL               = "SMALL"
-	MEDIUM              = "MEDIUM"
-	LARGE               = "LARGE"
 	disable             = "disable"
 	enable              = "enable"
 )
@@ -371,12 +365,14 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
 			switch schedulerSize {
-			case SmallScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeSMALL
-			case MediumScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
-			case LargeScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE)):
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
 			}
@@ -418,12 +414,14 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
 			switch schedulerSize {
-			case SmallScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
-			case MediumScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-			case LargeScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE)):
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
 			}
@@ -945,12 +943,14 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 			}
 			switch schedulerSize {
-			case SmallScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeSMALL
-			case MediumScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
-			case LargeScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE)):
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
@@ -1006,12 +1006,14 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				WorkerQueues:         &workerQueuesRequest,
 			}
 			switch schedulerSize {
-			case SmallScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeSMALL
-			case MediumScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-			case LargeScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE)):
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}

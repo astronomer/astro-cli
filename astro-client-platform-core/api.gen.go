@@ -55,6 +55,7 @@ const (
 const (
 	HEALTHY   ClusterHealthStatusValue = "HEALTHY"
 	UNHEALTHY ClusterHealthStatusValue = "UNHEALTHY"
+	UNKNOWN   ClusterHealthStatusValue = "UNKNOWN"
 )
 
 // Defines values for ClusterOptionsProvider.
@@ -98,9 +99,10 @@ const (
 
 // Defines values for CreateDedicatedDeploymentRequestSchedulerSize.
 const (
-	CreateDedicatedDeploymentRequestSchedulerSizeLARGE  CreateDedicatedDeploymentRequestSchedulerSize = "LARGE"
-	CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM CreateDedicatedDeploymentRequestSchedulerSize = "MEDIUM"
-	CreateDedicatedDeploymentRequestSchedulerSizeSMALL  CreateDedicatedDeploymentRequestSchedulerSize = "SMALL"
+	CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE CreateDedicatedDeploymentRequestSchedulerSize = "EXTRA_LARGE"
+	CreateDedicatedDeploymentRequestSchedulerSizeLARGE      CreateDedicatedDeploymentRequestSchedulerSize = "LARGE"
+	CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM     CreateDedicatedDeploymentRequestSchedulerSize = "MEDIUM"
+	CreateDedicatedDeploymentRequestSchedulerSizeSMALL      CreateDedicatedDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for CreateDedicatedDeploymentRequestType.
@@ -158,9 +160,10 @@ const (
 
 // Defines values for CreateStandardDeploymentRequestSchedulerSize.
 const (
-	CreateStandardDeploymentRequestSchedulerSizeLARGE  CreateStandardDeploymentRequestSchedulerSize = "LARGE"
-	CreateStandardDeploymentRequestSchedulerSizeMEDIUM CreateStandardDeploymentRequestSchedulerSize = "MEDIUM"
-	CreateStandardDeploymentRequestSchedulerSizeSMALL  CreateStandardDeploymentRequestSchedulerSize = "SMALL"
+	CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE CreateStandardDeploymentRequestSchedulerSize = "EXTRA_LARGE"
+	CreateStandardDeploymentRequestSchedulerSizeLARGE      CreateStandardDeploymentRequestSchedulerSize = "LARGE"
+	CreateStandardDeploymentRequestSchedulerSizeMEDIUM     CreateStandardDeploymentRequestSchedulerSize = "MEDIUM"
+	CreateStandardDeploymentRequestSchedulerSizeSMALL      CreateStandardDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for CreateStandardDeploymentRequestType.
@@ -199,9 +202,10 @@ const (
 
 // Defines values for DeploymentSchedulerSize.
 const (
-	DeploymentSchedulerSizeLARGE  DeploymentSchedulerSize = "LARGE"
-	DeploymentSchedulerSizeMEDIUM DeploymentSchedulerSize = "MEDIUM"
-	DeploymentSchedulerSizeSMALL  DeploymentSchedulerSize = "SMALL"
+	DeploymentSchedulerSizeEXTRALARGE DeploymentSchedulerSize = "EXTRA_LARGE"
+	DeploymentSchedulerSizeLARGE      DeploymentSchedulerSize = "LARGE"
+	DeploymentSchedulerSizeMEDIUM     DeploymentSchedulerSize = "MEDIUM"
+	DeploymentSchedulerSizeSMALL      DeploymentSchedulerSize = "SMALL"
 )
 
 // Defines values for DeploymentStatus.
@@ -273,9 +277,10 @@ const (
 
 // Defines values for SchedulerMachineName.
 const (
-	SchedulerMachineNameLARGE  SchedulerMachineName = "LARGE"
-	SchedulerMachineNameMEDIUM SchedulerMachineName = "MEDIUM"
-	SchedulerMachineNameSMALL  SchedulerMachineName = "SMALL"
+	SchedulerMachineNameEXTRALARGE SchedulerMachineName = "EXTRA_LARGE"
+	SchedulerMachineNameLARGE      SchedulerMachineName = "LARGE"
+	SchedulerMachineNameMEDIUM     SchedulerMachineName = "MEDIUM"
+	SchedulerMachineNameSMALL      SchedulerMachineName = "SMALL"
 )
 
 // Defines values for UpdateDedicatedClusterRequestClusterType.
@@ -291,9 +296,10 @@ const (
 
 // Defines values for UpdateDedicatedDeploymentRequestSchedulerSize.
 const (
-	UpdateDedicatedDeploymentRequestSchedulerSizeLARGE  UpdateDedicatedDeploymentRequestSchedulerSize = "LARGE"
-	UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM UpdateDedicatedDeploymentRequestSchedulerSize = "MEDIUM"
-	UpdateDedicatedDeploymentRequestSchedulerSizeSMALL  UpdateDedicatedDeploymentRequestSchedulerSize = "SMALL"
+	UpdateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE UpdateDedicatedDeploymentRequestSchedulerSize = "EXTRA_LARGE"
+	UpdateDedicatedDeploymentRequestSchedulerSizeLARGE      UpdateDedicatedDeploymentRequestSchedulerSize = "LARGE"
+	UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM     UpdateDedicatedDeploymentRequestSchedulerSize = "MEDIUM"
+	UpdateDedicatedDeploymentRequestSchedulerSizeSMALL      UpdateDedicatedDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for UpdateDedicatedDeploymentRequestType.
@@ -329,9 +335,10 @@ const (
 
 // Defines values for UpdateStandardDeploymentRequestSchedulerSize.
 const (
-	UpdateStandardDeploymentRequestSchedulerSizeLARGE  UpdateStandardDeploymentRequestSchedulerSize = "LARGE"
-	UpdateStandardDeploymentRequestSchedulerSizeMEDIUM UpdateStandardDeploymentRequestSchedulerSize = "MEDIUM"
-	UpdateStandardDeploymentRequestSchedulerSizeSMALL  UpdateStandardDeploymentRequestSchedulerSize = "SMALL"
+	UpdateStandardDeploymentRequestSchedulerSizeEXTRALARGE UpdateStandardDeploymentRequestSchedulerSize = "EXTRA_LARGE"
+	UpdateStandardDeploymentRequestSchedulerSizeLARGE      UpdateStandardDeploymentRequestSchedulerSize = "LARGE"
+	UpdateStandardDeploymentRequestSchedulerSizeMEDIUM     UpdateStandardDeploymentRequestSchedulerSize = "MEDIUM"
+	UpdateStandardDeploymentRequestSchedulerSizeSMALL      UpdateStandardDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for UpdateStandardDeploymentRequestType.
@@ -593,6 +600,9 @@ type ClusterK8sTag struct {
 type ClusterMetadata struct {
 	// ExternalIPs External IPs of the cluster.
 	ExternalIPs *[]string `json:"externalIPs,omitempty"`
+
+	// KubeDnsIp The IP address of the kube-dns service.
+	KubeDnsIp *string `json:"kubeDnsIp,omitempty"`
 
 	// OidcIssuerUrl OIDC issuer URL for the cluster
 	OidcIssuerUrl *string `json:"oidcIssuerUrl,omitempty"`
