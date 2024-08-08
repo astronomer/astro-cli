@@ -245,9 +245,14 @@ const (
 )
 
 var (
-	mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	mockCoreClient         = new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient *astroplatformcore_mocks.ClientWithResponsesInterface
+	mockCoreClient         *astrocore_mocks.ClientWithResponsesInterface
 )
+
+func (s *Suite) SetupTest() {
+	mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
+	mockCoreClient = new(astrocore_mocks.ClientWithResponsesInterface)
+}
 
 func (s *Suite) TestList() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -934,6 +939,7 @@ func (s *Suite) TestCreate() {
 			StatusCode: 200,
 		},
 	}
+
 	s.Run("success with Celery Executor", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
@@ -954,6 +960,7 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("success with Celery Executor and different schedulers", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(4)
@@ -985,6 +992,7 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("success with enabling ci-cd enforcement", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
@@ -1004,6 +1012,7 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("success with enabling development mode", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
@@ -1022,6 +1031,7 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("success with cloud provider and region", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
@@ -1107,6 +1117,7 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("success with region selection", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
@@ -1125,6 +1136,7 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("success with Kube Executor", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
@@ -1145,6 +1157,7 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("success and wait for status with Dedicated Deployment", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
@@ -1169,6 +1182,7 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("returns an error when creating a Hybrid deployment fails", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
@@ -1199,6 +1213,7 @@ func (s *Suite) TestCreate() {
 		s.ErrorIs(err, errMock)
 		mockCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("failed to get default options", func() {
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, errMock).Once()
 
@@ -1206,6 +1221,7 @@ func (s *Suite) TestCreate() {
 		s.ErrorIs(err, errMock)
 		mockCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("returns an error if cluster choice is not valid", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
@@ -1224,6 +1240,7 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("invalid hybrid resources", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
@@ -1240,6 +1257,7 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("invalid workspace failure", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
@@ -1249,6 +1267,7 @@ func (s *Suite) TestCreate() {
 		s.ErrorContains(err, "no Workspace with id")
 		mockCoreClient.AssertExpectations(s.T())
 	})
+
 	s.Run("success for standard deployment with Celery Executor and different scheduler sizes", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(4)
@@ -1273,6 +1292,26 @@ func (s *Suite) TestCreate() {
 
 		// Call the Create function
 		err = Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, awsCloud, "us-west-2", "extra_large", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeSTANDARD, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+    s.NoError(err)
+  
+		// Assert expectations
+		mockCoreClient.AssertExpectations(s.T())
+		mockPlatformCoreClient.AssertExpectations(s.T())
+	})
+
+	s.Run("no node pools on hybrid cluster", func() {
+		mockGetClusterResponseWithNoNodePools := mockGetClusterResponse
+		mockGetClusterResponseWithNoNodePools.JSON200.NodePools = nil
+
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponseWithNoNodePools, nil).Once()
+
+		defer testUtil.MockUserInput(s.T(), "test-name")()
+
+		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeHYBRID, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
 		s.NoError(err)
 
 		// Assert expectations
@@ -1769,6 +1808,31 @@ func (s *Suite) TestUpdate() { //nolint
 
 		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
+		mockCoreClient.AssertExpectations(s.T())
+		mockPlatformCoreClient.AssertExpectations(s.T())
+	})
+
+	s.Run("no node pools on hybrid cluster", func() {
+		mockGetClusterResponseWithNoNodePools := astroplatformcore.GetClusterResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astroplatformcore.Cluster{
+				Id:        "test-cluster-id",
+				Name:      "test-cluster",
+				NodePools: nil,
+			},
+		}
+
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponseWithNoNodePools, nil)
+
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		s.NoError(err)
+
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})

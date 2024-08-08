@@ -432,24 +432,23 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 	}
 	// build hybrid input
-	if !IsDeploymentStandard(deploymentType) && !IsDeploymentDedicated(deploymentType) {
+	if IsDeploymentHybrid(deploymentType) {
 		cluster, err := CoreGetCluster("", clusterID, platformCoreClient)
 		if err != nil {
 			return err
 		}
-		nodePools := *cluster.NodePools
+		nodePoolID := getDefaultNodePoolID(cluster.NodePools)
 		defautWorkerQueue := []astroplatformcore.HybridWorkerQueueRequest{{
 			IsDefault:         true,
 			MaxWorkerCount:    int(configOption.WorkerQueues.MaxWorkers.Default),
 			MinWorkerCount:    int(configOption.WorkerQueues.MinWorkers.Default),
 			Name:              "default",
 			WorkerConcurrency: int(configOption.WorkerQueues.WorkerConcurrency.Default),
-			NodePoolId:        nodePools[0].Id,
+			NodePoolId:        nodePoolID,
 		}}
 		if schedulerAU == 0 {
 			schedulerAU = int(configOption.LegacyAstro.SchedulerAstroUnitRange.Default)
 		}
-
 		if schedulerReplicas == 0 {
 			schedulerReplicas = int(configOption.LegacyAstro.SchedulerReplicaRange.Default)
 		}
@@ -486,7 +485,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 			hybridDeploymentRequest.WorkerQueues = &defautWorkerQueue
 		} else {
-			hybridDeploymentRequest.TaskPodNodePoolId = &nodePools[0].Id
+			hybridDeploymentRequest.TaskPodNodePoolId = &nodePoolID
 		}
 		err = createDeploymentRequest.FromCreateHybridDeploymentRequest(hybridDeploymentRequest)
 		if err != nil {
@@ -516,6 +515,13 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	}
 
 	return nil
+}
+
+func getDefaultNodePoolID(nodePools *[]astroplatformcore.NodePool) string {
+	if nodePools != nil && len(*nodePools) > 0 {
+		return (*nodePools)[0].Id
+	}
+	return ""
 }
 
 func createOutput(workspaceID string, d *astroplatformcore.Deployment) error {
@@ -1102,11 +1108,11 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if err != nil {
 			return err
 		}
-		nodePools := *cluster.NodePools
+		nodePoolID := getDefaultNodePoolID(cluster.NodePools)
 		if hybridDeploymentRequest.Executor == astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES {
 			if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
 				confirmWithUser = true
-				hybridDeploymentRequest.TaskPodNodePoolId = &nodePools[0].Id
+				hybridDeploymentRequest.TaskPodNodePoolId = &nodePoolID
 			} else {
 				hybridDeploymentRequest.TaskPodNodePoolId = currentDeployment.TaskPodNodePoolId
 			}
@@ -1118,7 +1124,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 					MinWorkerCount:    int(configOption.WorkerQueues.MinWorkers.Default),
 					Name:              "default",
 					WorkerConcurrency: int(configOption.WorkerQueues.WorkerConcurrency.Default),
-					NodePoolId:        nodePools[0].Id,
+					NodePoolId:        nodePoolID,
 				}}
 				hybridDeploymentRequest.WorkerQueues = &workerQueuesRequest
 			} else {
@@ -1311,6 +1317,10 @@ func IsDeploymentStandard(deploymentType astroplatformcore.DeploymentType) bool 
 
 func IsDeploymentDedicated(deploymentType astroplatformcore.DeploymentType) bool {
 	return deploymentType == astroplatformcore.DeploymentTypeDEDICATED
+}
+
+func IsDeploymentHybrid(deploymentType astroplatformcore.DeploymentType) bool {
+	return deploymentType == astroplatformcore.DeploymentTypeHYBRID
 }
 
 // CoreUpdateDeploymentHibernationOverride updates a deployment hibernation override with the core API
