@@ -6,5 +6,5 @@ type ImageBuildConfig struct {
 	TargetPlatforms []string
 	NoCache         bool
 	Output          bool
-	SkipRevision	bool
+	SkipRevision    bool
 }
