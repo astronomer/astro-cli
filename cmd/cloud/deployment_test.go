@@ -121,6 +121,38 @@ var (
 			WorkerQueues:           &[]astroplatformcore.WorkerQueue{},
 		},
 	}
+	hostedDeploymentResponse = astroplatformcore.GetDeploymentResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.Deployment{
+			Id:                     "test-id-1",
+			RuntimeVersion:         "4.2.5",
+			Namespace:              "test-name",
+			WorkspaceId:            "workspace-id",
+			WebServerUrl:           "test-url",
+			IsDagDeployEnabled:     false,
+			Description:            &description,
+			Name:                   "test-deployment-label",
+			Status:                 "HEALTHY",
+			Type:                   &standardType,
+			ClusterId:              &csID,
+			ClusterName:            &testCluster,
+			Executor:               &executorCelery,
+			IsHighAvailability:     &highAvailabilityTest,
+			IsDevelopmentMode:      &developmentModeTest,
+			ResourceQuotaCpu:       &resourceQuotaCPU,
+			ResourceQuotaMemory:    &ResourceQuotaMemory,
+			SchedulerSize:          &schedulerTestSize,
+			Region:                 &region,
+			WorkspaceName:          &workspaceName,
+			CloudProvider:          (*astroplatformcore.DeploymentCloudProvider)(&cloudProvider),
+			DefaultTaskPodCpu:      &defaultTaskPodCPU,
+			DefaultTaskPodMemory:   &defaultTaskPodMemory,
+			WebServerAirflowApiUrl: "airflow-url",
+			WorkerQueues:           &[]astroplatformcore.WorkerQueue{},
+		},
+	}
 	mockListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -717,6 +749,35 @@ deployment:
 		assert.ErrorContains(t, err, "Invalid --type value")
 		mockCoreClient.AssertExpectations(t)
 	})
+
+	t.Run("creates an extra large deployment", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		extraLarge := astroplatformcore.DeploymentSchedulerSizeEXTRALARGE
+		mockCreateDeploymentResponse.JSON200.SchedulerSize = &extraLarge
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		ctx.SetContextKey("organization_short_name", "test-org")
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+		astroCoreClient = mockCoreClient
+		platformCoreClient = mockPlatformCoreClient
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--scheduler-size", "extra-large",
+		}
+
+		// Mock user input for deployment name and wait for status
+		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(t, "1")()
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
 }
 
 func TestDeploymentUpdate(t *testing.T) {
@@ -904,8 +965,7 @@ deployment:
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Times(1)
 
 		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "small", "--force"}
 		_, err = execDeploymentCmd(cmdArgs...)
@@ -954,6 +1014,28 @@ deployment:
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
+	})
+
+	t.Run("updates a deployment with extra large scheduler size", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+
+		astroCoreClient = mockCoreClient
+		platformCoreClient = mockPlatformCoreClient
+
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Times(1)
+
+		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "extra_large", "--force"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 
@@ -1131,7 +1213,7 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			}
 
 			mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Once()
 			mockPlatformCoreClient.On("UpdateDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockResponse, nil).Once()
 
 			defer testUtil.MockUserInput(t, "1")()
@@ -1162,7 +1244,7 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			}
 
 			mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Once()
 			mockPlatformCoreClient.On("UpdateDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockResponse, nil).Once()
 
 			cmdArgs := []string{tt.command, "test-id-1", "--until", until, "--force"}
@@ -1200,7 +1282,7 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			}
 
 			mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Once()
 			mockPlatformCoreClient.On("UpdateDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockResponse, nil).Once()
 
 			cmdArgs := []string{tt.command, "test-id-1", "--for", forDuration, "--force"}
@@ -1228,7 +1310,7 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			}
 
 			mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+			mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Once()
 			mockPlatformCoreClient.On("DeleteDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockResponse, nil).Once()
 
 			cmdArgs := []string{tt.command, "test-id-1", "--remove-override", "--force"}
