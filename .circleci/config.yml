@@ -34,6 +34,9 @@ workflows:
       - lint
       - test
       - approve-release:
+          requires:
+            - lint
+            - test
           type: approval
           filters:
             branches:

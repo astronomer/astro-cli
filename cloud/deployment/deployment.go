@@ -58,12 +58,6 @@ const (
 	awsCloud            = "aws"
 	azureCloud          = "azure"
 	standard            = "standard"
-	LargeScheduler      = "large"
-	MediumScheduler     = "medium"
-	SmallScheduler      = "small"
-	SMALL               = "SMALL"
-	MEDIUM              = "MEDIUM"
-	LARGE               = "LARGE"
 	disable             = "disable"
 	enable              = "enable"
 )
@@ -371,12 +365,14 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
 			switch schedulerSize {
-			case SmallScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeSMALL
-			case MediumScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
-			case LargeScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE)):
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
 			}
@@ -418,12 +414,14 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
 			switch schedulerSize {
-			case SmallScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
-			case MediumScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-			case LargeScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE)):
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
 			}
@@ -434,24 +432,23 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 	}
 	// build hybrid input
-	if !IsDeploymentStandard(deploymentType) && !IsDeploymentDedicated(deploymentType) {
+	if IsDeploymentHybrid(deploymentType) {
 		cluster, err := CoreGetCluster("", clusterID, platformCoreClient)
 		if err != nil {
 			return err
 		}
-		nodePools := *cluster.NodePools
+		nodePoolID := getDefaultNodePoolID(cluster.NodePools)
 		defautWorkerQueue := []astroplatformcore.HybridWorkerQueueRequest{{
 			IsDefault:         true,
 			MaxWorkerCount:    int(configOption.WorkerQueues.MaxWorkers.Default),
 			MinWorkerCount:    int(configOption.WorkerQueues.MinWorkers.Default),
 			Name:              "default",
 			WorkerConcurrency: int(configOption.WorkerQueues.WorkerConcurrency.Default),
-			NodePoolId:        nodePools[0].Id,
+			NodePoolId:        nodePoolID,
 		}}
 		if schedulerAU == 0 {
 			schedulerAU = int(configOption.LegacyAstro.SchedulerAstroUnitRange.Default)
 		}
-
 		if schedulerReplicas == 0 {
 			schedulerReplicas = int(configOption.LegacyAstro.SchedulerReplicaRange.Default)
 		}
@@ -488,7 +485,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 			hybridDeploymentRequest.WorkerQueues = &defautWorkerQueue
 		} else {
-			hybridDeploymentRequest.TaskPodNodePoolId = &nodePools[0].Id
+			hybridDeploymentRequest.TaskPodNodePoolId = &nodePoolID
 		}
 		err = createDeploymentRequest.FromCreateHybridDeploymentRequest(hybridDeploymentRequest)
 		if err != nil {
@@ -518,6 +515,13 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	}
 
 	return nil
+}
+
+func getDefaultNodePoolID(nodePools *[]astroplatformcore.NodePool) string {
+	if nodePools != nil && len(*nodePools) > 0 {
+		return (*nodePools)[0].Id
+	}
+	return ""
 }
 
 func createOutput(workspaceID string, d *astroplatformcore.Deployment) error {
@@ -939,12 +943,14 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 			}
 			switch schedulerSize {
-			case SmallScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeSMALL
-			case MediumScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
-			case LargeScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE)):
+				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
@@ -1000,12 +1006,14 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				WorkerQueues:         &workerQueuesRequest,
 			}
 			switch schedulerSize {
-			case SmallScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeSMALL
-			case MediumScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-			case LargeScheduler:
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE)):
+				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
@@ -1100,11 +1108,11 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if err != nil {
 			return err
 		}
-		nodePools := *cluster.NodePools
+		nodePoolID := getDefaultNodePoolID(cluster.NodePools)
 		if hybridDeploymentRequest.Executor == astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES {
 			if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
 				confirmWithUser = true
-				hybridDeploymentRequest.TaskPodNodePoolId = &nodePools[0].Id
+				hybridDeploymentRequest.TaskPodNodePoolId = &nodePoolID
 			} else {
 				hybridDeploymentRequest.TaskPodNodePoolId = currentDeployment.TaskPodNodePoolId
 			}
@@ -1116,7 +1124,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 					MinWorkerCount:    int(configOption.WorkerQueues.MinWorkers.Default),
 					Name:              "default",
 					WorkerConcurrency: int(configOption.WorkerQueues.WorkerConcurrency.Default),
-					NodePoolId:        nodePools[0].Id,
+					NodePoolId:        nodePoolID,
 				}}
 				hybridDeploymentRequest.WorkerQueues = &workerQueuesRequest
 			} else {
@@ -1309,6 +1317,10 @@ func IsDeploymentStandard(deploymentType astroplatformcore.DeploymentType) bool 
 
 func IsDeploymentDedicated(deploymentType astroplatformcore.DeploymentType) bool {
 	return deploymentType == astroplatformcore.DeploymentTypeDEDICATED
+}
+
+func IsDeploymentHybrid(deploymentType astroplatformcore.DeploymentType) bool {
+	return deploymentType == astroplatformcore.DeploymentTypeHYBRID
 }
 
 // CoreUpdateDeploymentHibernationOverride updates a deployment hibernation override with the core API
