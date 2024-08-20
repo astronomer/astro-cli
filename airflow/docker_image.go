@@ -69,8 +69,8 @@ func (d *DockerImage) Build(dockerfile, buildSecretString string, buildConfig ai
 		args = append(args, "--no-cache")
 	}
 
-	if buildConfig.SkipRevision {
-		args = append(args, "--label", "io.astronomer.skip.revision=true")
+	if len(buildConfig.Labels) > 0 {
+		args = append(args, buildConfig.Labels...)
 	}
 
 	if len(buildConfig.TargetPlatforms) > 0 {
