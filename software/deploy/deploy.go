@@ -31,7 +31,7 @@ var (
 
 	getDeploymentIDForCurrentCommandVar = getDeploymentIDForCurrentCommand
 
-	deployLabels = []string{"--label", "io.astronomer.skip.revision=true"}
+	deployLabels = []string{"io.astronomer.skip.revision=true"}
 )
 
 var (

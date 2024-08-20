@@ -70,7 +70,9 @@ func (d *DockerImage) Build(dockerfile, buildSecretString string, buildConfig ai
 	}
 
 	if len(buildConfig.Labels) > 0 {
-		args = append(args, buildConfig.Labels...)
+		for _, label := range buildConfig.Labels {
+			args = append(args, "--label", label)
+		}
 	}
 
 	if len(buildConfig.TargetPlatforms) > 0 {
