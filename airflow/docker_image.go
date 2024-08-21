@@ -69,6 +69,10 @@ func (d *DockerImage) Build(dockerfile, buildSecretString string, buildConfig ai
 		args = append(args, "--no-cache")
 	}
 
+	for _, label := range buildConfig.Labels {
+		args = append(args, "--label", label)
+	}
+
 	if len(buildConfig.TargetPlatforms) > 0 {
 		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(buildConfig.TargetPlatforms, ",")))
 	}

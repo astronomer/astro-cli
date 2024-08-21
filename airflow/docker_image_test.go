@@ -63,6 +63,15 @@ func (s *Suite) TestDockerImageBuild() {
 		s.NoError(err)
 	})
 
+	s.Run("build --label", func() {
+		options.Labels = []string{"io.astronomer.skip.revision=true"}
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "--label", "io.astronomer.skip.revision=true")
+			return nil
+		}
+		err = handler.Build("", "", options)
+		s.NoError(err)
+	})
 	s.Run("build error", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock

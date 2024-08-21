@@ -6,4 +6,5 @@ type ImageBuildConfig struct {
 	TargetPlatforms []string
 	NoCache         bool
 	Output          bool
+	Labels          []string
 }
