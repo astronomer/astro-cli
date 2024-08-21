@@ -30,6 +30,8 @@ var (
 	gzipFile = fileutil.GzipFile
 
 	getDeploymentIDForCurrentCommandVar = getDeploymentIDForCurrentCommand
+
+	deployLabels = []string{"io.astronomer.skip.revision=true"}
 )
 
 var (
@@ -173,6 +175,7 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		NoCache:         ignoreCacheDeploy,
 		TargetPlatforms: deployImagePlatformSupport,
 		Output:          true,
+		Labels:          deployLabels,
 	}
 	err = imageHandler.Build("", "", buildConfig)
 	if err != nil {
