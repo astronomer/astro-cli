@@ -458,17 +458,10 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 func TestGetDeploymentConfig(t *testing.T) {
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
 		sourceDeployment.Type = &hybridType
+		sourceDeployment.WorkloadIdentity = &workloadIdentity
 		cloudProvider := astroplatformcore.DeploymentCloudProviderAWS
 		sourceDeployment.CloudProvider = &cloudProvider
 		var actualDeploymentConfig deploymentConfig
-		sourceDeployment.WorkloadIdentity = &workloadIdentity
-
-		// TODO: use test suite and have setup and teardown functions to make the tests stateless
-		defer func() {
-			// clear workload identity
-			sourceDeployment.WorkloadIdentity = nil
-		}()
-
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedDeploymentConfig := deploymentConfig{
 			Name:              sourceDeployment.Name,
@@ -484,13 +477,15 @@ func TestGetDeploymentConfig(t *testing.T) {
 			DeploymentType:    string(*sourceDeployment.Type),
 			CloudProvider:     string(*sourceDeployment.CloudProvider),
 			IsDevelopmentMode: *sourceDeployment.IsDevelopmentMode,
-			WorkloadIdentity:  workloadIdentity,
 		}
 		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
+
+		// clear workload identity
+		sourceDeployment.WorkloadIdentity = nil
 	})
 
 	t.Run("returns deployment config for the requested cloud standard deployment", func(t *testing.T) {
