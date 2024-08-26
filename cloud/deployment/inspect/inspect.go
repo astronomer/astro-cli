@@ -272,7 +272,9 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	if coreDeployment.Region != nil {
 		deploymentMap["region"] = *coreDeployment.Region
 	}
-
+	if coreDeployment.WorkloadIdentity != nil {
+		deploymentMap["workload_identity"] = *coreDeployment.WorkloadIdentity
+	}
 	return deploymentMap, nil
 }
 

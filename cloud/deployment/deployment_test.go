@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/pkg/util"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
@@ -30,12 +32,45 @@ func TestDeployment(t *testing.T) {
 }
 
 var (
-	hybridQueueList         = []astroplatformcore.HybridWorkerQueueRequest{}
-	workerQueueRequest      = []astroplatformcore.WorkerQueueRequest{}
-	newEnvironmentVariables = []astroplatformcore.DeploymentEnvironmentVariableRequest{}
-	errMock                 = errors.New("mock error")
-	errCreateFailed         = errors.New("failed to create deployment")
-	nodePools               = []astroplatformcore.NodePool{
+	hybridQueueList                = []astroplatformcore.HybridWorkerQueueRequest{}
+	workerQueueRequest             = []astroplatformcore.WorkerQueueRequest{}
+	newEnvironmentVariables        = []astroplatformcore.DeploymentEnvironmentVariableRequest{}
+	errMock                        = errors.New("mock error")
+	errCreateFailed                = errors.New("failed to create deployment")
+	nodePools                      = []astroplatformcore.NodePool{}
+	mockListClustersResponse       = astroplatformcore.ListClustersResponse{}
+	cluster                        = astroplatformcore.Cluster{}
+	mockGetClusterResponse         = astroplatformcore.GetClusterResponse{}
+	standardType                   = astroplatformcore.DeploymentTypeSTANDARD
+	dedicatedType                  = astroplatformcore.DeploymentTypeDEDICATED
+	hybridType                     = astroplatformcore.DeploymentTypeHYBRID
+	testRegion                     = "region"
+	testProvider                   = astroplatformcore.DeploymentCloudProviderGCP
+	testCluster                    = "cluster"
+	testWorkloadIdentity           = "test-workload-identity"
+	mockCoreDeploymentResponse     = []astroplatformcore.Deployment{}
+	mockListDeploymentsResponse    = astroplatformcore.ListDeploymentsResponse{}
+	emptyListDeploymentsResponse   = astroplatformcore.ListDeploymentsResponse{}
+	schedulerAU                    = 0
+	clusterID                      = "cluster-id"
+	executorCelery                 = astroplatformcore.DeploymentExecutorCELERY
+	executorKubernetes             = astroplatformcore.DeploymentExecutorKUBERNETES
+	highAvailability               = true
+	isDevelopmentMode              = true
+	resourceQuotaCPU               = "1cpu"
+	ResourceQuotaMemory            = "1"
+	schedulerSize                  = astroplatformcore.DeploymentSchedulerSizeSMALL
+	deploymentResponse             = astroplatformcore.GetDeploymentResponse{}
+	deploymentResponse2            = astroplatformcore.GetDeploymentResponse{}
+	GetDeploymentOptionsResponseOK = astrocore.GetDeploymentOptionsResponse{}
+	workspaceTestDescription       = "test workspace"
+	workspace1                     = astrocore.Workspace{}
+	workspaces                     = []astrocore.Workspace{}
+	ListWorkspacesResponseOK       = astrocore.ListWorkspacesResponse{}
+)
+
+func MockResponseInit() {
+	nodePools = []astroplatformcore.NodePool{
 		{
 			Id:               "test-pool-id",
 			IsDefault:        false,
@@ -76,13 +111,6 @@ var (
 		},
 		JSON200: &cluster,
 	}
-	standardType               = astroplatformcore.DeploymentTypeSTANDARD
-	dedicatedType              = astroplatformcore.DeploymentTypeDEDICATED
-	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
-	testRegion                 = "region"
-	testProvider               = astroplatformcore.DeploymentCloudProviderGCP
-	testCluster                = "cluster"
-	testWorkloadIdentity       = "test-workload-identity"
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 		{
 			Id:                "test-id-1",
@@ -117,16 +145,7 @@ var (
 			Deployments: []astroplatformcore.Deployment{},
 		},
 	}
-	schedulerAU         = 0
-	clusterID           = "cluster-id"
-	executorCelery      = astroplatformcore.DeploymentExecutorCELERY
-	executorKubernetes  = astroplatformcore.DeploymentExecutorKUBERNETES
-	highAvailability    = true
-	isDevelopmentMode   = true
-	resourceQuotaCPU    = "1cpu"
-	ResourceQuotaMemory = "1"
-	schedulerSize       = astroplatformcore.DeploymentSchedulerSizeSMALL
-	deploymentResponse  = astroplatformcore.GetDeploymentResponse{
+	deploymentResponse = astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -213,7 +232,7 @@ var (
 		},
 	}
 	workspaceTestDescription = "test workspace"
-	workspace1               = astrocore.Workspace{
+	workspace1 = astrocore.Workspace{
 		Name:                         "test-workspace",
 		Description:                  &workspaceTestDescription,
 		ApiKeyOnlyDeploymentsDefault: false,
@@ -234,7 +253,7 @@ var (
 			Workspaces: workspaces,
 		},
 	}
-)
+}
 
 const (
 	org       = "test-org-id"
@@ -250,8 +269,25 @@ var (
 )
 
 func (s *Suite) SetupTest() {
+	// init mocks
 	mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockCoreClient = new(astrocore_mocks.ClientWithResponsesInterface)
+
+	// init responses object
+	MockResponseInit()
+}
+
+func (s *Suite) TearDownSubTest() {
+	// assert expectations
+	mockPlatformCoreClient.AssertExpectations(s.T())
+	mockCoreClient.AssertExpectations(s.T())
+
+	// reset mocks
+	mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
+	mockCoreClient = new(astrocore_mocks.ClientWithResponsesInterface)
+
+	// reset responses object
+	MockResponseInit()
 }
 
 func (s *Suite) TestList() {
@@ -1076,6 +1112,31 @@ func (s *Suite) TestCreate() {
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
+	s.Run("success with hosted deployment with workload identity", func() {
+		mockWorkloadIdentity := "arn:aws:iam::1234567890:role/unit-test-1"
+		// Set up mock responses and expectations
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.CreateDeploymentRequest) bool {
+				request, _ := input.AsCreateDedicatedDeploymentRequest()
+				return *request.WorkloadIdentity == mockWorkloadIdentity
+			},
+		)).Return(&mockCreateDeploymentResponse, nil).Once()
+
+		// Mock user input for deployment name
+		defer testUtil.MockUserInput(s.T(), "test-name")()
+
+		// Call the Create function with a non-empty workload ID
+		err := Create("test-name", ws, "test-desc", csID, "12.0.0", dagDeploy, CeleryExecutor, "aws", "us-west-2", strings.ToLower(string(astrocore.DeploymentSchedulerSizeSMALL)), "", "", "", "", "", "", "", mockWorkloadIdentity, astroplatformcore.DeploymentTypeDEDICATED, 0, 0, mockPlatformCoreClient, mockCoreClient, false)
+		s.NoError(err)
+
+		// Assert expectations
+		mockCoreClient.AssertExpectations(s.T())
+		mockPlatformCoreClient.AssertExpectations(s.T())
+	})
+
 	s.Run("success with standard/dedicated type different scheduler sizes", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(8)
@@ -1515,8 +1576,6 @@ func (s *Suite) TestUpdate() { //nolint
 		// success with dedicated updating to kubernetes executor
 		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 	s.Run("successfully update schedulerSize and highAvailability and CICDEnforement", func() {
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(6)
@@ -1569,10 +1628,6 @@ func (s *Suite) TestUpdate() { //nolint
 		deploymentResponse.JSON200.Executor = &executorKubernetes
 		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
-		deploymentResponse.JSON200.Executor = &executorKubernetes
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
-		deploymentResponse.JSON200.Executor = &executorCelery
 	})
 
 	s.Run("successfully update developmentMode", func() {
@@ -1602,9 +1657,6 @@ func (s *Suite) TestUpdate() { //nolint
 		// success with dedicated type
 		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "disable", "enable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
-
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("failed to validate resources", func() {
@@ -1619,8 +1671,6 @@ func (s *Suite) TestUpdate() { //nolint
 		deploymentResponse.JSON200.Type = &hybridType
 		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "10Gi", "2CPU", "10Gi", "", 100, 100, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.ErrorIs(err, ErrInvalidResourceRequest)
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("list deployments failure", func() {
@@ -1628,8 +1678,6 @@ func (s *Suite) TestUpdate() { //nolint
 
 		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.ErrorIs(err, errMock)
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("invalid deployment id", func() {
@@ -1654,8 +1702,6 @@ func (s *Suite) TestUpdate() { //nolint
 		// invalid selection
 		err = Update("", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.ErrorContains(err, "invalid Deployment selected")
-
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("cancel update", func() {
@@ -1671,8 +1717,6 @@ func (s *Suite) TestUpdate() { //nolint
 
 		err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("update deployment failure", func() {
@@ -1685,8 +1729,6 @@ func (s *Suite) TestUpdate() { //nolint
 		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.ErrorIs(err, errMock)
 		s.NotContains(err.Error(), organization.AstronomerConnectionErrMsg)
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("do not update deployment to enable dag deploy if already enabled", func() {
@@ -1696,8 +1738,6 @@ func (s *Suite) TestUpdate() { //nolint
 
 		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("throw warning to enable dag deploy if ci-cd enforcement is enabled", func() {
@@ -1711,25 +1751,28 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "n")()
 		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "enable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("do not update deployment to disable dag deploy if already disabled", func() {
+		deploymentResponse.JSON200.IsDagDeployEnabled = false
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
 		err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("update deployment to change executor to KubernetesExecutor", func() {
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(3)
-		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(3)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.UpdateDeploymentRequest) bool {
+				// converting to hybrid deployment request type works for all three tests because the executor and worker queues are only being checked and
+				// it's common in all three deployment types, if we have to test more than we should break this into multiple test scenarios
+				request, err := input.AsUpdateHybridDeploymentRequest()
+				s.NoError(err)
+				return request.Executor == KUBERNETES && request.WorkerQueues == nil
+			},
+		)).Return(&mockUpdateDeploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
@@ -1755,9 +1798,6 @@ func (s *Suite) TestUpdate() { //nolint
 		err = Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 
 		s.NoError(err)
-		s.Equal((*[]astroplatformcore.WorkerQueueRequest)(nil), dedicatedDeploymentRequest.WorkerQueues)
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("update deployment to change executor to CeleryExecutor", func() {
@@ -1791,25 +1831,22 @@ func (s *Suite) TestUpdate() { //nolint
 		deploymentResponse.JSON200.Type = &hybridType
 		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
-
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("do not update deployment if user says no to the executor change", func() {
+		// change type to hybrid
+		deploymentResponse.JSON200.Type = &hybridType
+		deploymentResponse.JSON200.Executor = &executorKubernetes
+
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
-		deploymentResponse.JSON200.Executor = &executorKubernetes
-
 		defer testUtil.MockUserInput(s.T(), "n")()
 
 		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("no node pools on hybrid cluster", func() {
@@ -1824,17 +1861,43 @@ func (s *Suite) TestUpdate() { //nolint
 			},
 		}
 
-		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil)
-		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponseWithNoNodePools, nil)
+		// change type to hybrid
+		deploymentResponse.JSON200.Type = &hybridType
+		deploymentResponse.JSON200.Executor = &executorKubernetes
+
+		defer testUtil.MockUserInput(s.T(), "y")()
+
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponseWithNoNodePools, nil).Once()
 
 		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
+	})
 
-		mockCoreClient.AssertExpectations(s.T())
-		mockPlatformCoreClient.AssertExpectations(s.T())
+	s.Run("update workload identity for a hosted deployment", func() {
+		mockWorkloadIdentity := "arn:aws:iam::1234567890:role/unit-test-1"
+
+		// change type to dedicated
+		deploymentResponse.JSON200.Type = &dedicatedType
+
+		// Set up mock responses and expectations
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.UpdateDeploymentRequest) bool {
+				request, err := input.AsUpdateStandardDeploymentRequest()
+				assert.NoError(s.T(), err)
+				return request.WorkloadIdentity != nil && *request.WorkloadIdentity == mockWorkloadIdentity
+			},
+		)).Return(&mockUpdateDeploymentResponse, nil).Once()
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+
+		// Call the Create function with a non-empty workload ID
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "small", "enable", "", "disable", "", "", "", "", mockWorkloadIdentity, 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, true, mockCoreClient, mockPlatformCoreClient)
+		s.NoError(err)
 	})
 }
 
