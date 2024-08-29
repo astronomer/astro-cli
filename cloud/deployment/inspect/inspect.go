@@ -272,7 +272,6 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	if coreDeployment.Region != nil {
 		deploymentMap["region"] = *coreDeployment.Region
 	}
-
 	return deploymentMap, nil
 }
 

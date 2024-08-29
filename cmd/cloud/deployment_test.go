@@ -778,6 +778,33 @@ deployment:
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
+
+	t.Run("creates a hosted deployment with workload identity", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		workloadIdentity := "arn:aws:iam::1234567890:role/unit-test-1"
+		mockCreateDeploymentResponse.JSON200.WorkloadIdentity = &workloadIdentity
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		ctx.SetContextKey("organization_short_name", "test-org")
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(i astroplatformcore.CreateDeploymentRequest) bool {
+			input, _ := i.AsCreateStandardDeploymentRequest()
+			return input.WorkloadIdentity != nil && *input.WorkloadIdentity == workloadIdentity
+		})).Return(&mockCreateDeploymentResponse, nil).Once()
+		astroCoreClient = mockCoreClient
+		platformCoreClient = mockPlatformCoreClient
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--type", "standard", "--workload-identity", workloadIdentity, "--cloud-provider", "aws", "--region", "us-west-2",
+		}
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
 }
 
 func TestDeploymentUpdate(t *testing.T) {
@@ -1032,6 +1059,36 @@ deployment:
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Times(1)
 
 		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "extra_large", "--force"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("updates a hosted deployment with workload identity", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+
+		workloadIdentity := "arn:aws:iam::1234567890:role/unit-test-1"
+		mockUpdateDeploymentResponse.JSON200.WorkloadIdentity = &workloadIdentity
+
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(i astroplatformcore.UpdateDeploymentRequest) bool {
+			input, _ := i.AsUpdateDedicatedDeploymentRequest()
+			return input.WorkloadIdentity != nil && *input.WorkloadIdentity == workloadIdentity
+		})).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Times(1)
+
+		astroCoreClient = mockCoreClient
+		platformCoreClient = mockPlatformCoreClient
+		cmdArgs := []string{
+			"update", "test-id-1", "--name", "test-name", "--workload-identity", workloadIdentity,
+		}
+
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
