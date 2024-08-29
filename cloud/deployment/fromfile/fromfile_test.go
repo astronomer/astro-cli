@@ -1258,7 +1258,8 @@ deployment:
 			"deployment_type": "STANDARD",
 			"region": "test-region",
 			"cloud_provider": "aws",
-			"is_development_mode": true
+			"is_development_mode": true,
+			"workload_identity": "test-workload-identity"
         },
         "worker_queues": [
             {
@@ -1307,7 +1308,14 @@ deployment:
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.CreateDeploymentRequest) bool {
+				request, err := input.AsCreateStandardDeploymentRequest()
+				s.NoError(err)
+				return request.WorkloadIdentity != nil && *request.WorkloadIdentity == "test-workload-identity" &&
+					request.Type == astroplatformcore.CreateStandardDeploymentRequestTypeSTANDARD
+			},
+		)).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
@@ -1767,6 +1775,7 @@ deployment:
     scheduler_size: medium
     workspace_name: test-workspace
     deployment_type: STANDARD
+    workload_identity: test-workload-identity
   worker_queues:
     - name: default
       is_default: true
@@ -1809,7 +1818,14 @@ deployment:
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
-		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.UpdateDeploymentRequest) bool {
+				request, err := input.AsUpdateStandardDeploymentRequest()
+				s.NoError(err)
+				return request.WorkloadIdentity != nil && *request.WorkloadIdentity == "test-workload-identity" &&
+					request.Type == astroplatformcore.UpdateStandardDeploymentRequestTypeSTANDARD
+			},
+		)).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 
 		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out)
@@ -1853,6 +1869,7 @@ deployment:
     scheduler_size: medium
     workspace_name: test-workspace
     deployment_type: DEDICATED
+    workload_identity: test-workload-identity
   worker_queues:
     - name: default
       is_default: true
@@ -1885,7 +1902,14 @@ deployment:
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
-		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.UpdateDeploymentRequest) bool {
+				request, err := input.AsUpdateDedicatedDeploymentRequest()
+				s.NoError(err)
+				return request.WorkloadIdentity != nil && *request.WorkloadIdentity == "test-workload-identity" &&
+					request.Type == astroplatformcore.UpdateDedicatedDeploymentRequestTypeDEDICATED
+			},
+		)).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()

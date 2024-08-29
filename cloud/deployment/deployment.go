@@ -63,12 +63,11 @@ const (
 )
 
 var (
-	sleepTime                  = 180
-	tickNum                    = 10
-	timeoutNum                 = 180
-	listLimit                  = 1000
-	dedicatedDeploymentRequest = astroplatformcore.UpdateDedicatedDeploymentRequest{}
-	dagDeployEnabled           bool
+	sleepTime        = 180
+	tickNum          = 10
+	timeoutNum       = 180
+	listLimit        = 1000
+	dagDeployEnabled bool
 )
 
 func newTableOut() *printutil.Table {
@@ -135,6 +134,7 @@ func List(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcor
 	return nil
 }
 
+// TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
 func Logs(deploymentID, ws, deploymentName, keyword string, logWebserver, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs bool, logCount int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 	var logLevel string
 	var i int
@@ -212,6 +212,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logWebserver, logSch
 	return nil
 }
 
+// TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
 func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
@@ -325,6 +326,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		if resourceQuotaMemory == "" {
 			resourceQuotaMemory = configOption.ResourceQuotas.ResourceQuota.Memory.Default
 		}
+		var deplWorkloadIdentity *string
+		if workloadIdentity != "" {
+			deplWorkloadIdentity = &workloadIdentity
+		}
 		// build standard input
 		if IsDeploymentStandard(deploymentType) {
 			var requestedCloudProvider astroplatformcore.CreateStandardDeploymentRequestCloudProvider
@@ -360,6 +365,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
+				WorkloadIdentity:     deplWorkloadIdentity,
 			}
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
@@ -409,6 +415,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
+				WorkloadIdentity:     deplWorkloadIdentity,
 			}
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
@@ -738,6 +745,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 	}
 }
 
+// TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
 func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astroplatformcore.WorkerQueueRequest, hybridQueueList []astroplatformcore.HybridWorkerQueueRequest, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, force bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error { //nolint
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
@@ -911,6 +919,10 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if resourceQuotaMemory == "" {
 			resourceQuotaMemory = *currentDeployment.ResourceQuotaMemory
 		}
+		var deplWorkloadIdentity *string
+		if workloadIdentity != "" {
+			deplWorkloadIdentity = &workloadIdentity
+		}
 		if IsDeploymentStandard(*currentDeployment.Type) {
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
 			switch strings.ToUpper(executor) {
@@ -941,6 +953,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				EnvironmentVariables: deploymentEnvironmentVariablesRequest,
 				DefaultTaskPodCpu:    defaultTaskPodCpu,
 				DefaultTaskPodMemory: defaultTaskPodMemory,
+				WorkloadIdentity:     deplWorkloadIdentity,
 			}
 			switch schedulerSize {
 			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):
@@ -988,7 +1001,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			case strings.ToUpper(KUBERNETES):
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
-			dedicatedDeploymentRequest = astroplatformcore.UpdateDedicatedDeploymentRequest{
+			dedicatedDeploymentRequest := astroplatformcore.UpdateDedicatedDeploymentRequest{
 				Description:          &description,
 				Name:                 name,
 				Executor:             requestedExecutor,
@@ -1004,6 +1017,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				ResourceQuotaMemory:  resourceQuotaMemory,
 				EnvironmentVariables: deploymentEnvironmentVariablesRequest,
 				WorkerQueues:         &workerQueuesRequest,
+				WorkloadIdentity:     deplWorkloadIdentity,
 			}
 			switch schedulerSize {
 			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):

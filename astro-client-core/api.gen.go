@@ -50,10 +50,11 @@ const (
 
 // Defines values for ClusterCohort.
 const (
-	ClusterCohortCRITICAL ClusterCohort = "CRITICAL"
-	ClusterCohortDEFAULT  ClusterCohort = "DEFAULT"
-	ClusterCohortINTERNAL ClusterCohort = "INTERNAL"
-	ClusterCohortSTABLE   ClusterCohort = "STABLE"
+	ClusterCohortCRITICAL   ClusterCohort = "CRITICAL"
+	ClusterCohortDEFAULT    ClusterCohort = "DEFAULT"
+	ClusterCohortINTERNAL   ClusterCohort = "INTERNAL"
+	ClusterCohortPREDEFAULT ClusterCohort = "PRE_DEFAULT"
+	ClusterCohortSTABLE     ClusterCohort = "STABLE"
 )
 
 // Defines values for ClusterStatus.
@@ -87,10 +88,11 @@ const (
 
 // Defines values for ClusterDetailedCohort.
 const (
-	ClusterDetailedCohortCRITICAL ClusterDetailedCohort = "CRITICAL"
-	ClusterDetailedCohortDEFAULT  ClusterDetailedCohort = "DEFAULT"
-	ClusterDetailedCohortINTERNAL ClusterDetailedCohort = "INTERNAL"
-	ClusterDetailedCohortSTABLE   ClusterDetailedCohort = "STABLE"
+	ClusterDetailedCohortCRITICAL   ClusterDetailedCohort = "CRITICAL"
+	ClusterDetailedCohortDEFAULT    ClusterDetailedCohort = "DEFAULT"
+	ClusterDetailedCohortINTERNAL   ClusterDetailedCohort = "INTERNAL"
+	ClusterDetailedCohortPREDEFAULT ClusterDetailedCohort = "PRE_DEFAULT"
+	ClusterDetailedCohortSTABLE     ClusterDetailedCohort = "STABLE"
 )
 
 // Defines values for ClusterDetailedStatus.
@@ -544,10 +546,11 @@ const (
 
 // Defines values for SharedClusterCohort.
 const (
-	SharedClusterCohortCRITICAL SharedClusterCohort = "CRITICAL"
-	SharedClusterCohortDEFAULT  SharedClusterCohort = "DEFAULT"
-	SharedClusterCohortINTERNAL SharedClusterCohort = "INTERNAL"
-	SharedClusterCohortSTABLE   SharedClusterCohort = "STABLE"
+	SharedClusterCohortCRITICAL   SharedClusterCohort = "CRITICAL"
+	SharedClusterCohortDEFAULT    SharedClusterCohort = "DEFAULT"
+	SharedClusterCohortINTERNAL   SharedClusterCohort = "INTERNAL"
+	SharedClusterCohortPREDEFAULT SharedClusterCohort = "PRE_DEFAULT"
+	SharedClusterCohortSTABLE     SharedClusterCohort = "STABLE"
 )
 
 // Defines values for SharedClusterStatus.
@@ -1243,6 +1246,7 @@ type Bundle struct {
 type Cluster struct {
 	AppliedHarmonyVersion  *string              `json:"appliedHarmonyVersion,omitempty"`
 	AppliedTemplateVersion string               `json:"appliedTemplateVersion"`
+	BlockInternetAccess    *bool                `json:"blockInternetAccess,omitempty"`
 	CloudProvider          ClusterCloudProvider `json:"cloudProvider"`
 	Cohort                 *ClusterCohort       `json:"cohort,omitempty"`
 	CreatedAt              time.Time            `json:"createdAt"`
@@ -1293,6 +1297,7 @@ type ClusterType string
 type ClusterDetailed struct {
 	AppliedHarmonyVersion         *string                      `json:"appliedHarmonyVersion,omitempty"`
 	AppliedTemplateVersion        string                       `json:"appliedTemplateVersion"`
+	BlockInternetAccess           *bool                        `json:"blockInternetAccess,omitempty"`
 	CloudProvider                 ClusterDetailedCloudProvider `json:"cloudProvider"`
 	Cohort                        *ClusterDetailedCohort       `json:"cohort,omitempty"`
 	CreatedAt                     time.Time                    `json:"createdAt"`
@@ -1461,6 +1466,7 @@ type ConnectionAuthTypeParameter struct {
 
 // CreateAwsClusterRequest defines model for CreateAwsClusterRequest.
 type CreateAwsClusterRequest struct {
+	BlockInternetAccess           *bool                       `json:"blockInternetAccess,omitempty"`
 	DbInstanceType                string                      `json:"dbInstanceType"`
 	DisableHarmonyVersionUpgrades *bool                       `json:"disableHarmonyVersionUpgrades,omitempty"`
 	HarmonyVersion                *string                     `json:"harmonyVersion,omitempty"`
@@ -1480,6 +1486,7 @@ type CreateAwsClusterRequestType string
 
 // CreateAzureClusterRequest defines model for CreateAzureClusterRequest.
 type CreateAzureClusterRequest struct {
+	BlockInternetAccess           *bool                         `json:"blockInternetAccess,omitempty"`
 	DbInstanceType                string                        `json:"dbInstanceType"`
 	DisableHarmonyVersionUpgrades *bool                         `json:"disableHarmonyVersionUpgrades,omitempty"`
 	HarmonyVersion                *string                       `json:"harmonyVersion,omitempty"`
@@ -1753,6 +1760,7 @@ type CreateEnvironmentObjectRequestScope string
 
 // CreateGcpClusterRequest defines model for CreateGcpClusterRequest.
 type CreateGcpClusterRequest struct {
+	BlockInternetAccess           *bool                       `json:"blockInternetAccess,omitempty"`
 	DbInstanceType                string                      `json:"dbInstanceType"`
 	DisableHarmonyVersionUpgrades *bool                       `json:"disableHarmonyVersionUpgrades,omitempty"`
 	HarmonyVersion                *string                     `json:"harmonyVersion,omitempty"`
@@ -2968,6 +2976,7 @@ type SelfSignupType string
 
 // SharedCluster defines model for SharedCluster.
 type SharedCluster struct {
+	BlockInternetAccess *bool                      `json:"blockInternetAccess,omitempty"`
 	CloudProvider       SharedClusterCloudProvider `json:"cloudProvider"`
 	Cohort              *SharedClusterCohort       `json:"cohort,omitempty"`
 	CreatedAt           time.Time                  `json:"createdAt"`
@@ -3095,6 +3104,7 @@ type TriggerGitDeployRequestDeployType string
 
 // UpdateAwsClusterRequest defines model for UpdateAwsClusterRequest.
 type UpdateAwsClusterRequest struct {
+	BlockInternetAccess           *bool                   `json:"blockInternetAccess,omitempty"`
 	DbInstanceType                string                  `json:"dbInstanceType"`
 	DbInstanceVersion             *string                 `json:"dbInstanceVersion,omitempty"`
 	DisableHarmonyVersionUpgrades *bool                   `json:"disableHarmonyVersionUpgrades,omitempty"`
@@ -3107,6 +3117,7 @@ type UpdateAwsClusterRequest struct {
 
 // UpdateAzureClusterRequest defines model for UpdateAzureClusterRequest.
 type UpdateAzureClusterRequest struct {
+	BlockInternetAccess           *bool                   `json:"blockInternetAccess,omitempty"`
 	DbInstanceType                string                  `json:"dbInstanceType"`
 	DbInstanceVersion             *string                 `json:"dbInstanceVersion,omitempty"`
 	DisableHarmonyVersionUpgrades *bool                   `json:"disableHarmonyVersionUpgrades,omitempty"`
@@ -3245,6 +3256,7 @@ type UpdateEnvironmentObjectRequestScope string
 
 // UpdateGcpClusterRequest defines model for UpdateGcpClusterRequest.
 type UpdateGcpClusterRequest struct {
+	BlockInternetAccess           *bool                   `json:"blockInternetAccess,omitempty"`
 	DbInstanceType                string                  `json:"dbInstanceType"`
 	DbInstanceVersion             *string                 `json:"dbInstanceVersion,omitempty"`
 	DisableHarmonyVersionUpgrades *bool                   `json:"disableHarmonyVersionUpgrades,omitempty"`

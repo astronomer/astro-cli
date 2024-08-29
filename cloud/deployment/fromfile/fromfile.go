@@ -337,6 +337,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
+			var deplWorkloadIdentity *string
+			if deploymentFromFile.Deployment.Configuration.WorkloadIdentity != "" {
+				deplWorkloadIdentity = &deploymentFromFile.Deployment.Configuration.WorkloadIdentity
+			}
+
 			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
 				AstroRuntimeVersion:  deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 				CloudProvider:        &requestedCloudProvider,
@@ -356,6 +361,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				ResourceQuotaMemory:  deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory,
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
+				WorkloadIdentity:     deplWorkloadIdentity,
 			}
 			if standardDeploymentRequest.IsDevelopmentMode != nil && *standardDeploymentRequest.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
@@ -391,6 +397,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
+			var deplWorkloadIdentity *string
+			if deploymentFromFile.Deployment.Configuration.WorkloadIdentity != "" {
+				deplWorkloadIdentity = &deploymentFromFile.Deployment.Configuration.WorkloadIdentity
+			}
+
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
 				AstroRuntimeVersion:  deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
@@ -409,6 +420,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				ResourceQuotaMemory:  deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory,
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
+				WorkloadIdentity:     deplWorkloadIdentity,
 			}
 			if dedicatedDeploymentRequest.IsDevelopmentMode != nil && *dedicatedDeploymentRequest.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
@@ -511,6 +523,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory = *existingDeployment.ResourceQuotaMemory
 			}
 
+			var deplWorkloadIdentity *string
+			if deploymentFromFile.Deployment.Configuration.WorkloadIdentity != "" {
+				deplWorkloadIdentity = &deploymentFromFile.Deployment.Configuration.WorkloadIdentity
+			}
+
 			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
@@ -528,6 +545,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
+				WorkloadIdentity:     deplWorkloadIdentity,
 			}
 			if existingDeployment.IsDevelopmentMode != nil && *existingDeployment.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
@@ -575,6 +593,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory = *existingDeployment.ResourceQuotaMemory
 			}
 
+			var deplWorkloadIdentity *string
+			if deploymentFromFile.Deployment.Configuration.WorkloadIdentity != "" {
+				deplWorkloadIdentity = &deploymentFromFile.Deployment.Configuration.WorkloadIdentity
+			}
+
 			dedicatedDeploymentRequest := astroplatformcore.UpdateDedicatedDeploymentRequest{
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
@@ -592,6 +615,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
+				WorkloadIdentity:     deplWorkloadIdentity,
 			}
 			if existingDeployment.IsDevelopmentMode != nil && *existingDeployment.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
