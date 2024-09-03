@@ -12,4 +12,4 @@ jobs:
           ignore-comments: false
           labels-synonyms: false
           labels-not-allowed: false
-          default-labels: '["app/astro-cli"]'
+          default-labels: '["app/astro-cli", "team/dev-ex"]'
