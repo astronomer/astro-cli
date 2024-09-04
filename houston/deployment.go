@@ -18,10 +18,10 @@ type ListDeploymentLogsRequest struct {
 
 // UpdateDeploymentImageRequest - properties to update a deployment image
 type UpdateDeploymentImageRequest struct {
-	ReleaseName    string 			 `json:"releaseName"`
-	Image          string 			 `json:"image"`
-	AirflowVersion string 			 `json:"airflowVersion"`
-	RuntimeVersion string 			 `json:"runtimeVersion"`
+	ReleaseName               string `json:"releaseName"`
+	Image                     string `json:"image"`
+	AirflowVersion            string `json:"airflowVersion"`
+	RuntimeVersion            string `json:"runtimeVersion"`
 	DeployRevisionDescription string `json:"deployRevisionDescription"`
 }
 
