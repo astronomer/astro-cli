@@ -25,7 +25,7 @@ func (s *Suite) TestDeploy() {
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
-	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, desc string) (string, error) {
 		return deploymentID, nil
 	}
 
@@ -45,14 +45,14 @@ func (s *Suite) TestDeploy() {
 	DagsOnlyDeploy = deploy.DagsOnlyDeploy
 
 	s.Run("error should be returned for astro deploy, if DeployAirflowImage throws error", func() {
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, desc string) (string, error) {
 			return deploymentID, deploy.ErrNoWorkspaceID
 		}
 
 		err := execDeployCmd([]string{"-f"}...)
 		s.ErrorIs(err, deploy.ErrNoWorkspaceID)
 
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, desc string) (string, error) {
 			return deploymentID, nil
 		}
 	})

@@ -68,7 +68,7 @@ var tab = printutil.Table{
 	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
 }
 
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
+func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
 		return deploymentID, err
@@ -98,7 +98,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	fmt.Printf(houstonDeploymentPrompt, releaseName)
 
 	// Build the image to deploy
-	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled)
+	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, description)
 	if err != nil {
 		return deploymentID, err
 	}
@@ -120,7 +120,7 @@ func deploymentExists(deploymentID string, deployments []houston.Deployment) boo
 	return false
 }
 
-func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool) error {
+func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool, description string) error {
 	// Build our image
 	fmt.Println(imageBuildingPrompt)
 
@@ -197,11 +197,16 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		return err
 	}
 
+	var deployRevisionDescription string
+	if description != "" {
+		deployRevisionDescription = description
+	}
+
 	if byoRegistryEnabled {
 		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel)
 		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel)
-		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
-		_, err := houston.Call(houstonClient.UpdateDeploymentImage)(req)
+		vars := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion, DeployRevisionDescription: deployRevisionDescription}
+		_, err := houston.Call(houstonClient.UpdateDeploymentImage)(vars)
 		return err
 	}
 

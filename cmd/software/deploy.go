@@ -25,6 +25,7 @@ var (
 	DeployAirflowImage = deploy.Airflow
 	DagsOnlyDeploy     = deploy.DagsOnlyDeploy
 	isDagOnlyDeploy    bool
+	description		   string
 )
 
 var deployExample = `
@@ -59,6 +60,7 @@ func NewDeployCmd() *cobra.Command {
 
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
 		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only DAGs to your Deployment")
+		cmd.Flags().StringVar(&description, "description", "", "Reason for the deploy update")
 	}
 	return cmd
 }
@@ -104,8 +106,20 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	if isDagOnlyDeploy {
 		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true)
 	}
+
+	// Fetch the description flag value from the command flags
+    desc, err := cmd.Flags().GetString("description")
+    if err != nil {
+        return err
+    }
+
+    // If the description is not set, use GetDefaultDeployDescription to get the default
+    if desc == "" {
+        desc = utils.GetDefaultDeployDescription(cmd, args)
+    }
+
 	// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
-	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
+	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt, desc)
 	if err != nil {
 		return err
 	}
