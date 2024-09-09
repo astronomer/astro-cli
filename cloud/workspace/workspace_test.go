@@ -256,7 +256,7 @@ func (s *Suite) TestGetCurrentWorkspace() {
 	s.NoError(err)
 
 	_, err = GetCurrentWorkspace()
-	s.EqualError(err, "current workspace context not set, you can switch to a workspace with \n\astro workspace switch WORKSPACEID")
+	s.EqualError(err, "current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
 
 	config.ResetCurrentContext()
 	_, err = GetCurrentWorkspace()
