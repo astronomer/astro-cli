@@ -1,6 +1,8 @@
 package software
 
 import (
+	"fmt"
+
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/software/deploy"
@@ -26,6 +28,9 @@ func (s *Suite) TestDeploy() {
 		return nil
 	}
 	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, desc string) (string, error) {
+		if desc == "" {
+			return deploymentID, fmt.Errorf("description should not be empty")
+		}
 		return deploymentID, nil
 	}
 
@@ -42,6 +47,23 @@ func (s *Suite) TestDeploy() {
 	err = execDeployCmd([]string{"test-deployment-id", "--save"}...)
 	s.NoError(err)
 
+	// Test when description is provided using the flag --description
+	err = execDeployCmd([]string{"test-deployment-id", "--description", "Initial deployment", "--force"}...)
+	s.NoError(err)
+
+	// Test when the default description is used
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, desc string) (string, error) {
+		expectedDesc := "Deploy via <astro deploy>"
+		if desc != expectedDesc {
+			return deploymentID, fmt.Errorf("expected description to be '%s', but got '%s'", expectedDesc, desc)
+		}
+		return deploymentID, nil
+	}
+
+	err = execDeployCmd([]string{"test-deployment-id", "--force"}...)
+	s.NoError(err)
+
+	// Restore DagsOnlyDeploy to default behavior
 	DagsOnlyDeploy = deploy.DagsOnlyDeploy
 
 	s.Run("error should be returned for astro deploy, if DeployAirflowImage throws error", func() {
