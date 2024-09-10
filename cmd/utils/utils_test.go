@@ -36,3 +36,17 @@ func TestEnsureProjectDir(t *testing.T) {
 	err = EnsureProjectDir(&cobra.Command{}, []string{})
 	assert.NoError(t, err)
 }
+
+func TestGetDefaultDeployDescription(t *testing.T) {
+	// Test case where --dags flag is not set
+	cmd := &cobra.Command{}
+	description := GetDefaultDeployDescription(cmd, []string{})
+	assert.Equal(t, "Deploy via <astro deploy>", description)
+
+	// Test case where --dags flag is set
+	cmdWithDagsFlag := &cobra.Command{}
+	cmdWithDagsFlag.Flags().Bool("dags", true, "")
+	cmdWithDagsFlag.Flags().Set("dags", "true")
+	descriptionWithDags := GetDefaultDeployDescription(cmdWithDagsFlag, []string{})
+	assert.Equal(t, "Deploy via <astro deploy --dags>", descriptionWithDags)
+}
