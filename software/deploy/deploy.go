@@ -335,12 +335,12 @@ func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) 
 	return nil
 }
 
-func getDagDeployURL(deploymentInfo *houston.Deployment) string {
+func getDagDeployURL(deploymentInfo *houston.Deployment, description string) string {
 	c, _ := config.GetCurrentContext()
-	return fmt.Sprintf("https://deployments.%s/%s/dags/upload", c.Domain, deploymentInfo.ReleaseName)
+	return fmt.Sprintf("https://deployments.%s/%s/dags/upload?description=%s", c.Domain, deploymentInfo.ReleaseName, description)
 }
 
-func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
 		return ErrDagOnlyDeployDisabledInConfig
@@ -372,7 +372,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		if err != nil {
 			return err
 		}
-		uploadURL = getDagDeployURL(deploymentInfo)
+		uploadURL = getDagDeployURL(deploymentInfo, description)
 	} else {
 		uploadURL = *dagDeployURL
 	}

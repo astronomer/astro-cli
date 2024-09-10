@@ -379,7 +379,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}
 		houstonMock := new(houston_mocks.ClientInterface)
 
-		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		s.ErrorIs(err, ErrDagOnlyDeployDisabledInConfig)
 		houstonMock.AssertExpectations(s.T())
 	})
@@ -396,7 +396,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}
 		houstonMock := new(houston_mocks.ClientInterface)
 
-		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		s.ErrorIs(err, errDeploymentNotFound)
 		houstonMock.AssertExpectations(s.T())
 	})
@@ -414,7 +414,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		houstonMock := new(houston_mocks.ClientInterface)
 		houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
 
-		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		s.ErrorContains(err, "failed to get deployment info: some houston error")
 		houstonMock.AssertExpectations(s.T())
 	})
@@ -437,7 +437,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 			DagDeployment: *dagDeployment,
 		}
 		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		s.ErrorIs(err, ErrDagOnlyDeployNotEnabledForDeployment)
 		houstonMock.AssertExpectations(s.T())
 	})
@@ -462,7 +462,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
 		config.ResetCurrentContext()
 
-		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		s.EqualError(err, "could not get current context! Error: no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 		houstonMock.AssertExpectations(s.T())
 		context.Switch("localhost")
@@ -487,7 +487,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 			DagDeployment: *dagDeployment,
 		}
 		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false)
+		err := DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		houstonMock.AssertExpectations(s.T())
 		s.ErrorIs(err, errInvalidDeploymentID)
 	})
@@ -530,7 +530,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		s.NoError(err)
 		defer os.RemoveAll("dags")
 
-		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", nil, false)
+		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", nil, false, description)
 		s.EqualError(err, ErrEmptyDagFolderUserCancelledOperation.Error())
 
 		// assert that no tar or gz file exists
@@ -592,7 +592,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}))
 		defer server.Close()
 
-		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, false)
+		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, false, description)
 		s.NoError(err)
 		houstonMock.AssertExpectations(s.T())
 
@@ -642,7 +642,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		os.Stdin = r
 		defer testUtil.MockUserInput(s.T(), "y")()
 
-		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, "./dags", nil, false)
+		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, "./dags", nil, false, description)
 		s.EqualError(err, "open dags/dags.tar: no such file or directory")
 		houstonMock.AssertExpectations(s.T())
 
@@ -688,7 +688,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 			return gzipMockError
 		}
 
-		err = DagsOnlyDeploy(houstonMock, appConfig, deploymentID, wsID, ".", nil, false)
+		err = DagsOnlyDeploy(houstonMock, appConfig, deploymentID, wsID, ".", nil, false, description)
 		s.ErrorIs(err, gzipMockError)
 		houstonMock.AssertExpectations(s.T())
 
@@ -749,7 +749,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}))
 		defer server.Close()
 
-		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, false)
+		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, false, description)
 		s.NoError(err)
 		houstonMock.AssertExpectations(s.T())
 
@@ -809,7 +809,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}))
 		defer server.Close()
 
-		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, true)
+		err = DagsOnlyDeploy(houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, true, description)
 		s.NoError(err)
 		houstonMock.AssertExpectations(s.T())
 
