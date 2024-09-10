@@ -18,11 +18,10 @@ type ListDeploymentLogsRequest struct {
 
 // UpdateDeploymentImageRequest - properties to update a deployment image
 type UpdateDeploymentImageRequest struct {
-	ReleaseName               string `json:"releaseName"`
-	Image                     string `json:"image"`
-	AirflowVersion            string `json:"airflowVersion"`
-	RuntimeVersion            string `json:"runtimeVersion"`
-	DeployRevisionDescription string `json:"deployRevisionDescription"`
+	ReleaseName    string `json:"releaseName"`
+	Image          string `json:"image"`
+	AirflowVersion string `json:"airflowVersion"`
+	RuntimeVersion string `json:"runtimeVersion"`
 }
 
 // DeleteDeploymentRequest - properties to delete a deployment
@@ -423,52 +422,24 @@ var (
 		}
 	}`
 
-	DeploymentImageUpdateRequest = queryList{
-		{
-			version: "0.25.0",
-			query: `
-				mutation updateDeploymentImage(
-				$releaseName:String!,
-				$image:String!,
-				$airflowVersion:String,
-				$runtimeVersion:String
-			){
-				updateDeploymentImage(
-					releaseName:$releaseName,
-					image:$image,
-					airflowVersion:$airflowVersion,
-					runtimeVersion:$runtimeVersion
-				){
-					releaseName
-					airflowVersion
-					runtimeVersion
-				}
-			}`,
-		},
-		{
-			version: "0.35.3",
-			query: `
-				mutation updateDeploymentImage(
-				$releaseName:String!,
-				$image:String!,
-				$airflowVersion:String,
-				$runtimeVersion:String,
-				$deployRevisionDescription:String
-			){
-				updateDeploymentImage(
-					releaseName:$releaseName,
-					image:$image,
-					airflowVersion:$airflowVersion,
-					runtimeVersion:$runtimeVersion
-					deployRevisionDescription:$deployRevisionDescription
-				){
-					releaseName
-					airflowVersion
-					runtimeVersion
-				}
-			}`,
-		},
-	}
+	DeploymentImageUpdateRequest = `
+	mutation updateDeploymentImage(
+		$releaseName:String!,
+		$image:String!,
+		$airflowVersion:String,
+		$runtimeVersion:String,
+	){
+		updateDeploymentImage(
+			releaseName:$releaseName,
+			image:$image,
+			airflowVersion:$airflowVersion,
+			runtimeVersion:$runtimeVersion
+		){
+			releaseName
+			airflowVersion
+			runtimeVersion
+		}
+	}`
 
 	UpdateDeploymentRuntimeRequest = `
 	mutation updateDeploymentRuntime($deploymentUuid: Uuid!, $desiredRuntimeVersion: String!) {
@@ -632,9 +603,8 @@ func (h ClientImplementation) ListDeploymentLogs(filters ListDeploymentLogsReque
 }
 
 func (h ClientImplementation) UpdateDeploymentImage(updateReq UpdateDeploymentImageRequest) (interface{}, error) {
-	reqQuery := DeploymentImageUpdateRequest.GreatestLowerBound(version)
 	req := Request{
-		Query:     reqQuery,
+		Query:     DeploymentImageUpdateRequest,
 		Variables: updateReq,
 	}
 
