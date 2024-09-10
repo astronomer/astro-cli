@@ -170,6 +170,12 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 
 	imageHandler := imageHandlerInit(imageName)
 
+	var deployRevisionDescription string
+	if description != "" {
+		deployRevisionDescription = description
+		deployLabels = append(deployLabels, "io.astronomer.deploy.revision.description="+description)
+	}
+
 	buildConfig := types.ImageBuildConfig{
 		Path:            config.WorkingPath,
 		NoCache:         ignoreCacheDeploy,
@@ -197,16 +203,11 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		return err
 	}
 
-	var deployRevisionDescription string
-	if description != "" {
-		deployRevisionDescription = description
-	}
-
 	if byoRegistryEnabled {
 		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel)
 		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel)
-		vars := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion, DeployRevisionDescription: deployRevisionDescription}
-		_, err := houston.Call(houstonClient.UpdateDeploymentImage)(vars)
+		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion, DeployRevisionDescription: deployRevisionDescription}
+		_, err := houston.Call(houstonClient.UpdateDeploymentImage)(req)
 		return err
 	}
 
