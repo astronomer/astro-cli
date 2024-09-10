@@ -101,7 +101,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	if desc == "" {
 		desc = utils.GetDefaultDeployDescription(cmd, args)
 	}
-	
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
