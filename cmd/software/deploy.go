@@ -108,16 +108,16 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch the description flag value from the command flags
-    desc, err := cmd.Flags().GetString("description")
-    if err != nil {
-        return err
-    }
+	desc, err := cmd.Flags().GetString("description")
+	if err != nil {
+		return err
+	}
 	fmt.Println("\n\nTesting description!" + desc)
 
-    // If the description is not set, use GetDefaultDeployDescription to get the default
-    if desc == "" {
-        desc = utils.GetDefaultDeployDescription(cmd, args)
-    }
+	// If the description is not set, use GetDefaultDeployDescription to get the default
+	if desc == "" {
+		desc = utils.GetDefaultDeployDescription(cmd, args)
+	}
 
 	fmt.Println("\n\nTesting description again!" + desc)
 
