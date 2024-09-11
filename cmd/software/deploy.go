@@ -107,19 +107,11 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true)
 	}
 
-	// Fetch the description flag value from the command flags
-	desc, err := cmd.Flags().GetString("description")
-	if err != nil {
-		return err
+	if description == "" {
+		description = utils.GetDefaultDeployDescription(cmd, args)
 	}
-
-	// If the description is not set, use GetDefaultDeployDescription to get the default
-	if desc == "" {
-		desc = utils.GetDefaultDeployDescription(cmd, args)
-	}
-
 	// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
-	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt, desc)
+	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt, description)
 	if err != nil {
 		return err
 	}
