@@ -53,7 +53,7 @@ func (s *Suite) TestDeploy() {
 
 	// Test when the default description is used
 	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
-		expectedDesc := "Deploy via <astro deploy>"
+		expectedDesc := "Deployed via <astro deploy>"
 		if description != expectedDesc {
 			return deploymentID, fmt.Errorf("expected description to be '%s', but got '%s'", expectedDesc, description)
 		}

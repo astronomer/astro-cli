@@ -25,7 +25,7 @@ import (
 var (
 	errSomeContainerIssue = errors.New("some container issue")
 	errMockHouston        = errors.New("some houston error")
-	description           = "Deploy via <astro deploy>"
+	description           = "Deployed via <astro deploy>"
 
 	mockDeployment = &houston.Deployment{
 		ID:                    "cknz133ra49758zr9w34b87ua",
