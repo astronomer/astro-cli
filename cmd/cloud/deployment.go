@@ -99,7 +99,7 @@ var (
 	httpClient              = httputil.NewHTTPClient()
 	errFlag                 = errors.New("--deployment-file can not be used with other arguments")
 	errInvalidExecutor      = errors.New("not a valid executor")
-	errInvalidCloudProvider = errors.New("not a valid cloud provider. It can only be gcp or aws")
+	errInvalidCloudProvider = errors.New("not a valid cloud provider. It can only be gcp, azure or aws")
 )
 
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
@@ -407,7 +407,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVarP(&defaultTaskPodMemory, "default-task-pod-memory", "", "", "The default task pod memory to use for the Deployment. Example value: 0.5Gi")
 		cmd.Flags().StringVarP(&resourceQuotaCPU, "resource-quota-cpu", "", "", "The Deployment's CPU resource quota. Example value: 10")
 		cmd.Flags().StringVarP(&resourceQuotaMemory, "resource-quota-memory", "", "", "The Deployment's memory resource quota. Example value: 20Gi")
-		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "gcp", "The Cloud Provider to use for the Deployment. Possible values can be gcp, aws.")
+		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "azure", "The Cloud Provider to use for the Deployment. Possible values can be gcp, aws, azure.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the Deployment.")
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of scheduler for the Deployment. Possible values can be small, medium, large, extra_large")
 		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "disable", "Enables High Availability for the Deployment")
@@ -869,7 +869,7 @@ func isValidExecutor(executor string) bool {
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.
 func isValidCloudProvider(cloudProvider astrocore.SharedClusterCloudProvider) bool {
-	return cloudProvider == astrocore.SharedClusterCloudProviderGcp || cloudProvider == astrocore.SharedClusterCloudProviderAws
+	return cloudProvider == astrocore.SharedClusterCloudProviderGcp || cloudProvider == astrocore.SharedClusterCloudProviderAws || cloudProvider == astrocore.SharedClusterCloudProviderAzure
 }
 
 func addDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
