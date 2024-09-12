@@ -18,9 +18,10 @@ type Connection struct {
 
 // Pools contains structure of airflow pools
 type Pools []struct {
-	PoolName        string `mapstructure:"pool_name" yaml:"pool_name"`
-	PoolSlot        int    `mapstructure:"pool_slot" yaml:"pool_slot"`
-	PoolDescription string `mapstructure:"pool_description" yaml:"pool_description"`
+	PoolName            string `mapstructure:"pool_name" yaml:"pool_name"`
+	PoolSlot            int    `mapstructure:"pool_slot" yaml:"pool_slot"`
+	PoolDescription     string `mapstructure:"pool_description" yaml:"pool_description"`
+	PoolIncludeDeferred bool   `mapstructure:"pool_include_deferred" yaml:"pool_include_deferred"`
 }
 
 // Variables contains structure of airflow variables
@@ -56,9 +57,10 @@ type AirflowConnection struct {
 }
 
 type AirflowPools []struct {
-	PoolName        string `yaml:"pool"`
-	PoolSlot        string `yaml:"slots"`
-	PoolDescription string `yaml:"description"`
+	PoolName            string `yaml:"pool"`
+	PoolSlot            string `yaml:"slots"`
+	PoolDescription     string `yaml:"description"`
+	PoolIncludeDeferred bool   `yaml:"include_deferred"`
 }
 
 // types for creating variables and connections yaml files
