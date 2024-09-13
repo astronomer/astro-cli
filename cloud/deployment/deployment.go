@@ -604,6 +604,9 @@ func ListClusterOptions(cloudProvider string, coreClient astrocore.CoreClient) (
 	if cloudProvider == awsCloud {
 		provider = astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderAws) //nolint
 	}
+	if cloudProvider == azureCloud {
+		provider = astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderAzure) //nolint
+	}
 	optionsParams := &astrocore.GetClusterOptionsParams{
 		Provider: &provider,
 		Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
