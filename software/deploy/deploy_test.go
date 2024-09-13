@@ -25,10 +25,10 @@ import (
 )
 
 var (
-	errSomeContainerIssue 			= errors.New("some container issue")
-	errMockHouston        			= errors.New("some houston error")
-	description           			= "Deployed via <astro deploy>"
-	deployRevisionDescriptionLabel	= "io.astronomer.deploy.revision.description"
+	errSomeContainerIssue          = errors.New("some container issue")
+	errMockHouston                 = errors.New("some houston error")
+	description                    = "Deployed via <astro deploy>"
+	deployRevisionDescriptionLabel = "io.astronomer.deploy.revision.description"
 
 	mockDeployment = &houston.Deployment{
 		ID:                    "cknz133ra49758zr9w34b87ua",
@@ -180,7 +180,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 			capturedBuildConfig = buildConfig
 			// Check if the deploy label contains the correct description
 			for _, label := range buildConfig.Labels {
-				if label == deployRevisionDescriptionLabel + "=" + description {
+				if label == deployRevisionDescriptionLabel+"="+description {
 					return true
 				}
 			}
