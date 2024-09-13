@@ -114,12 +114,17 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 			return deploy.ErrBYORegistryDomainNotSet
 		}
 	}
+
+	if description == "" {
+		description = utils.GetDefaultDeployDescription(isDagOnlyDeploy)
+	}
+
 	if isDagOnlyDeploy {
-		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true, desc)
+		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true, description)
 	}
 
 	// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
-	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt, desc)
+	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt, description)
 	if err != nil {
 		return err
 	}

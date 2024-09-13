@@ -20,11 +20,10 @@ func EnsureProjectDir(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func GetDefaultDeployDescription(cmd *cobra.Command, args []string) string {
-	// Check if the "--dags" flag was passed
-	if cmd.Flags().Changed("dags") {
-		return "Deploy via <astro deploy --dags>"
+func GetDefaultDeployDescription(isDagOnlyDeploy bool) string {
+	if isDagOnlyDeploy {
+		return "Deployed via <astro deploy --dags>"
 	}
 
-	return "Deploy via <astro deploy>"
+	return "Deployed via <astro deploy>"
 }

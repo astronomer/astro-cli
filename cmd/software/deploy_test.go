@@ -27,8 +27,8 @@ func (s *Suite) TestDeploy() {
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
-	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, desc string) (string, error) {
-		if desc == "" {
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
+		if description == "" {
 			return deploymentID, fmt.Errorf("description should not be empty")
 		}
 		return deploymentID, nil
@@ -52,10 +52,10 @@ func (s *Suite) TestDeploy() {
 	s.NoError(err)
 
 	// Test when the default description is used
-	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, desc string) (string, error) {
-		expectedDesc := "Deploy via <astro deploy>"
-		if desc != expectedDesc {
-			return deploymentID, fmt.Errorf("expected description to be '%s', but got '%s'", expectedDesc, desc)
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
+		expectedDesc := "Deployed via <astro deploy>"
+		if description != expectedDesc {
+			return deploymentID, fmt.Errorf("expected description to be '%s', but got '%s'", expectedDesc, description)
 		}
 		return deploymentID, nil
 	}
@@ -67,14 +67,14 @@ func (s *Suite) TestDeploy() {
 	DagsOnlyDeploy = deploy.DagsOnlyDeploy
 
 	s.Run("error should be returned for astro deploy, if DeployAirflowImage throws error", func() {
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, desc string) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
 			return deploymentID, deploy.ErrNoWorkspaceID
 		}
 
 		err := execDeployCmd([]string{"-f"}...)
 		s.ErrorIs(err, deploy.ErrNoWorkspaceID)
 
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, desc string) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
 			return deploymentID, nil
 		}
 	})
