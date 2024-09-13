@@ -25,9 +25,10 @@ import (
 )
 
 var (
-	errSomeContainerIssue = errors.New("some container issue")
-	errMockHouston        = errors.New("some houston error")
-	description           = "Deployed via <astro deploy>"
+	errSomeContainerIssue 			= errors.New("some container issue")
+	errMockHouston        			= errors.New("some houston error")
+	description           			= "Deployed via <astro deploy>"
+	deployRevisionDescriptionLabel	= "io.astronomer.deploy.revision.description"
 
 	mockDeployment = &houston.Deployment{
 		ID:                    "cknz133ra49758zr9w34b87ua",
@@ -170,8 +171,6 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 	defer func() { dockerfile = "Dockerfile" }()
 
 	mockImageHandler := new(mocks.ImageHandler)
-	description := "Test description for deployment"
-
 	var capturedBuildConfig types.ImageBuildConfig
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
@@ -181,7 +180,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 			capturedBuildConfig = buildConfig
 			// Check if the deploy label contains the correct description
 			for _, label := range buildConfig.Labels {
-				if label == "io.astronomer.deploy.revision.description="+description {
+				if label == deployRevisionDescriptionLabel + "=" + description {
 					return true
 				}
 			}
@@ -206,7 +205,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 	err := buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description)
 	s.NoError(err)
 
-	expectedLabel := "io.astronomer.deploy.revision.description=" + description
+	expectedLabel := deployRevisionDescriptionLabel + "=" + description
 	assert.Contains(s.T(), capturedBuildConfig.Labels, expectedLabel)
 	mockImageHandler.AssertExpectations(s.T())
 	houstonMock.AssertExpectations(s.T())
