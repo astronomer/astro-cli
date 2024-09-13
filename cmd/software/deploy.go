@@ -91,17 +91,6 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Fetch the description flag value from the command flags
-	desc, err := cmd.Flags().GetString("description")
-	if err != nil {
-		return err
-	}
-
-	// If the description is not set, use GetDefaultDeployDescription to get the default
-	if desc == "" {
-		desc = utils.GetDefaultDeployDescription(cmd, args)
-	}
-
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -129,7 +118,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true, desc)
+	err = DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true, description)
 	// Don't throw the error if dag-deploy itself is disabled
 	if errors.Is(err, deploy.ErrDagOnlyDeployDisabledInConfig) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
 		return nil
