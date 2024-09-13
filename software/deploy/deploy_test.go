@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
+	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -20,6 +21,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -168,11 +170,28 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 	defer func() { dockerfile = "Dockerfile" }()
 
 	mockImageHandler := new(mocks.ImageHandler)
+	description := "Test description for deployment"
+
+	var capturedBuildConfig types.ImageBuildConfig
+
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		// Mock the Build function, capturing the buildConfig
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.MatchedBy(func(buildConfig types.ImageBuildConfig) bool {
+			// Capture buildConfig for later assertions
+			capturedBuildConfig = buildConfig
+			// Check if the deploy label contains the correct description
+			for _, label := range buildConfig.Labels {
+				if label == "io.astronomer.deploy.revision.description="+description {
+					return true
+				}
+			}
+			return false
+		})).Return(nil).Once()
+
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("", nil).Once()
 		mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("1.10.12", nil).Once()
+
 		return mockImageHandler
 	}
 
@@ -186,6 +205,9 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 
 	err := buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description)
 	s.NoError(err)
+
+	expectedLabel := "io.astronomer.deploy.revision.description=" + description
+	assert.Contains(s.T(), capturedBuildConfig.Labels, expectedLabel)
 	mockImageHandler.AssertExpectations(s.T())
 	houstonMock.AssertExpectations(s.T())
 }
