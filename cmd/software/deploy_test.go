@@ -34,7 +34,7 @@ func (s *Suite) TestDeploy() {
 		return deploymentID, nil
 	}
 
-	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 		return nil
 	}
 
@@ -80,7 +80,7 @@ func (s *Suite) TestDeploy() {
 	})
 
 	s.Run("error should be returned for astro deploy, if dags deploy throws error and the feature is enabled", func() {
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 			return deploy.ErrNoWorkspaceID
 		}
 		err := execDeployCmd([]string{"-f"}...)
@@ -105,7 +105,7 @@ func (s *Suite) TestDeploy() {
 				BYORegistryEnabled: true,
 			},
 		}
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 			return deploy.ErrNoWorkspaceID
 		}
 		err := execDeployCmd([]string{"-f"}...)

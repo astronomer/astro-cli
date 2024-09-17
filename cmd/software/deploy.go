@@ -103,12 +103,13 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 			return deploy.ErrBYORegistryDomainNotSet
 		}
 	}
-	if isDagOnlyDeploy {
-		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true)
-	}
 
 	if description == "" {
 		description = utils.GetDefaultDeployDescription(isDagOnlyDeploy)
+	}
+
+	if isDagOnlyDeploy {
+		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true, description)
 	}
 
 	// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
@@ -117,7 +118,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true)
+	err = DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true, description)
 	// Don't throw the error if dag-deploy itself is disabled
 	if errors.Is(err, deploy.ErrDagOnlyDeployDisabledInConfig) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
 		return nil
