@@ -19,3 +19,11 @@ func EnsureProjectDir(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+
+func GetDefaultDeployDescription(isDagOnlyDeploy bool) string {
+	if isDagOnlyDeploy {
+		return "Deployed via <astro deploy --dags>"
+	}
+
+	return "Deployed via <astro deploy>"
+}

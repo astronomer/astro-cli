@@ -53,7 +53,7 @@ var (
 					workspaceUuid: $workspaceId
 					releaseName: $releaseName
 					executor: $executor
-						airflowVersion: $airflowVersion
+					airflowVersion: $airflowVersion
 					namespace: $namespace
 					config: $config
 					cloudRole: $cloudRole
@@ -96,7 +96,7 @@ var (
 					workspaceUuid: $workspaceId
 					releaseName: $releaseName
 					executor: $executor
-						airflowVersion: $airflowVersion
+					airflowVersion: $airflowVersion
 					namespace: $namespace
 					config: $config
 					cloudRole: $cloudRole

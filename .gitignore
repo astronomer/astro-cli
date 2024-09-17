@@ -15,6 +15,7 @@ cover.out
 coverage-2.txt
 coverage.txt
 dist/
+hello-astro/
 meta/
 packages.txt
 requirements.txt

@@ -68,7 +68,7 @@ var tab = printutil.Table{
 	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
 }
 
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) (string, error) {
+func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
 		return deploymentID, err
@@ -98,7 +98,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	fmt.Printf(houstonDeploymentPrompt, releaseName)
 
 	// Build the image to deploy
-	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled)
+	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, description)
 	if err != nil {
 		return deploymentID, err
 	}
@@ -120,7 +120,7 @@ func deploymentExists(deploymentID string, deployments []houston.Deployment) boo
 	return false
 }
 
-func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool) error {
+func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool, description string) error {
 	// Build our image
 	fmt.Println(imageBuildingPrompt)
 
@@ -169,6 +169,10 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 	imageName := airflow.ImageName(name, "latest")
 
 	imageHandler := imageHandlerInit(imageName)
+
+	if description != "" {
+		deployLabels = append(deployLabels, "io.astronomer.deploy.revision.description="+description)
+	}
 
 	buildConfig := types.ImageBuildConfig{
 		Path:            config.WorkingPath,
@@ -331,12 +335,12 @@ func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) 
 	return nil
 }
 
-func getDagDeployURL(deploymentInfo *houston.Deployment) string {
+func getDagDeployURL(deploymentInfo *houston.Deployment, description string) string {
 	c, _ := config.GetCurrentContext()
-	return fmt.Sprintf("https://deployments.%s/%s/dags/upload", c.Domain, deploymentInfo.ReleaseName)
+	return fmt.Sprintf("https://deployments.%s/%s/dags/upload?description=%s", c.Domain, deploymentInfo.ReleaseName, description)
 }
 
-func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool) error {
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
 		return ErrDagOnlyDeployDisabledInConfig
@@ -368,7 +372,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		if err != nil {
 			return err
 		}
-		uploadURL = getDagDeployURL(deploymentInfo)
+		uploadURL = getDagDeployURL(deploymentInfo, description)
 	} else {
 		uploadURL = *dagDeployURL
 	}
