@@ -48,6 +48,10 @@ brews:
     description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
     test: |
       system "#{bin}/astro version"
+    dependencies:
+      - name: podman
+        os: mac
+        type: recommended
 archives:
   - format: tar.gz
     format_overrides:
@@ -64,6 +68,6 @@ archives:
       - changelog*
       - CHANGELOG*
 snapshot:
-  name_template: SNAPSHOT-{{ .Commit }}
+  version_template: SNAPSHOT-{{ .Commit }}
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
