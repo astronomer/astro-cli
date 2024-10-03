@@ -37,7 +37,7 @@ type UploadFileArguments struct {
 	TargetURL           string
 	FormFileFieldName   string
 	Headers             map[string]string
-	Description		    string
+	Description         string
 	MaxTries            int
 	InitialDelayInMS    int
 	BackoffFactor       int
