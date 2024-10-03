@@ -334,9 +334,8 @@ func UploadFile(args *UploadFileArguments) error {
 		}
 
 		// set headers
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
+		setHeaders(req, headers)
+
 		client := &http.Client{}
 		response, err := client.Do(req)
 		if err != nil {
@@ -375,6 +374,12 @@ func UploadFile(args *UploadFileArguments) error {
 		}
 	}
 	return currentUploadError
+}
+
+func setHeaders(req *http.Request, headers map[string]string) {
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 }
 
 func GzipFile(srcFilePath, destFilePath string) error {
