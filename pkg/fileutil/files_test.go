@@ -836,39 +836,39 @@ func (s *Suite) TestUploadFile() {
 	})
 
 	s.Run("successfully uploaded with an empty description", func() {
-        server := createMockServer(http.StatusOK, "OK", make(map[string][]string))
-        defer server.Close()
+		server := createMockServer(http.StatusOK, "OK", make(map[string][]string))
+		defer server.Close()
 
-        filePath := "./testFile.txt"
-        fileContent := []byte("This is a test file.")
-        err := os.WriteFile(filePath, fileContent, os.ModePerm)
-        s.NoError(err, "Error creating test file")
-        defer os.Remove(filePath)
+		filePath := "./testFile.txt"
+		fileContent := []byte("This is a test file.")
+		err := os.WriteFile(filePath, fileContent, os.ModePerm)
+		s.NoError(err, "Error creating test file")
+		defer os.Remove(filePath)
 
-        headers := map[string]string{
-            "Authorization": "Bearer token",
-            "Content-Type":  "application/json",
-        }
+		headers := map[string]string{
+			"Authorization": "Bearer token",
+			"Content-Type":  "application/json",
+		}
 
-        uploadFileArgs := UploadFileArguments{
-            FilePath:            filePath,
-            TargetURL:           server.URL,
-            FormFileFieldName:   "file",
-            Headers:             headers,
-            Description:         "",
-            MaxTries:            2,
-            InitialDelayInMS:    1 * 1000,
-            BackoffFactor:       2,
-            RetryDisplayMessage: "please wait, attempting to upload the dags",
-        }
-        err = UploadFile(&uploadFileArgs)
+		uploadFileArgs := UploadFileArguments{
+			FilePath:            filePath,
+			TargetURL:           server.URL,
+			FormFileFieldName:   "file",
+			Headers:             headers,
+			Description:         "",
+			MaxTries:            2,
+			InitialDelayInMS:    1 * 1000,
+			BackoffFactor:       2,
+			RetryDisplayMessage: "please wait, attempting to upload the dags",
+		}
+		err = UploadFile(&uploadFileArgs)
 
-        s.NoError(err, "Expected no error")
-        request := getCapturedRequest(server)
-        s.Equal("Bearer token", request.Header.Get("Authorization"))
-        s.Contains(request.Header.Get("Content-Type"), "multipart/form-data")
+		s.NoError(err, "Expected no error")
+		request := getCapturedRequest(server)
+		s.Equal("Bearer token", request.Header.Get("Authorization"))
+		s.Contains(request.Header.Get("Content-Type"), "multipart/form-data")
 
-        body, _ := io.ReadAll(request.Body)
-        s.NotContains(string(body), "description")
-    })
+		body, _ := io.ReadAll(request.Body)
+		s.NotContains(string(body), "description")
+	})
 }
