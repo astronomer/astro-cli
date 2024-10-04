@@ -41,10 +41,6 @@ func readFileError(name string) ([]byte, error) {
 	return nil, errMock
 }
 
-var writeField = func(writer *multipart.Writer, fieldname, value string) error {
-	return writer.WriteField(fieldname, value)
-}
-
 func (s *Suite) TestExists() {
 	filePath := "test.yaml"
 	fs := afero.NewMemMapFs()
