@@ -41,6 +41,10 @@ func readFileError(name string) ([]byte, error) {
 	return nil, errMock
 }
 
+var writeField = func(writer *multipart.Writer, fieldname, value string) error {
+	return writer.WriteField(fieldname, value)
+}
+
 func (s *Suite) TestExists() {
 	filePath := "test.yaml"
 	fs := afero.NewMemMapFs()
@@ -632,7 +636,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           "http://localhost:8080/upload",
 			FormFileFieldName:   "file",
 			Headers:             map[string]string{},
-			Description:         "This is a test description",
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            3,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -661,7 +665,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           "testURL",
 			FormFileFieldName:   "file",
 			Headers:             map[string]string{},
-			Description:         "This is a test description",
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            3,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -690,7 +694,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           "testURL",
 			FormFileFieldName:   "file",
 			Headers:             map[string]string{},
-			Description:         "This is a test description",
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            3,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -724,7 +728,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           testServer.URL,
 			FormFileFieldName:   "file",
 			Headers:             headers,
-			Description:         "This is a test description",
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -760,7 +764,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           testServer.URL,
 			FormFileFieldName:   "file",
 			Headers:             headers,
-			Description:         "This is a test description",
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -787,7 +791,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           "https://astro.unit.test",
 			FormFileFieldName:   "file",
 			Headers:             map[string]string{},
-			Description:         "This is a test description",
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -820,7 +824,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           server.URL,
 			FormFileFieldName:   "file",
 			Headers:             headers,
-			Description:         "This is a test description",
+			Description:         "Deployed via <astro deploy --dags>n",
 			MaxTries:            2,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -834,4 +838,41 @@ func (s *Suite) TestUploadFile() {
 		s.Equal("Bearer token", request.Header.Get("Authorization"))
 		s.Contains(request.Header.Get("Content-Type"), "multipart/form-data")
 	})
+
+	s.Run("successfully uploaded with an empty description", func() {
+        server := createMockServer(http.StatusOK, "OK", make(map[string][]string))
+        defer server.Close()
+
+        filePath := "./testFile.txt"
+        fileContent := []byte("This is a test file.")
+        err := os.WriteFile(filePath, fileContent, os.ModePerm)
+        s.NoError(err, "Error creating test file")
+        defer os.Remove(filePath)
+
+        headers := map[string]string{
+            "Authorization": "Bearer token",
+            "Content-Type":  "application/json",
+        }
+
+        uploadFileArgs := UploadFileArguments{
+            FilePath:            filePath,
+            TargetURL:           server.URL,
+            FormFileFieldName:   "file",
+            Headers:             headers,
+            Description:         "",
+            MaxTries:            2,
+            InitialDelayInMS:    1 * 1000,
+            BackoffFactor:       2,
+            RetryDisplayMessage: "please wait, attempting to upload the dags",
+        }
+        err = UploadFile(&uploadFileArgs)
+
+        s.NoError(err, "Expected no error")
+        request := getCapturedRequest(server)
+        s.Equal("Bearer token", request.Header.Get("Authorization"))
+        s.Contains(request.Header.Get("Content-Type"), "multipart/form-data")
+
+        body, _ := io.ReadAll(request.Body)
+        s.NotContains(string(body), "description")
+    })
 }
