@@ -5,15 +5,16 @@ type Connections []Connection
 
 // Connection contains structure of airflow connection
 type Connection struct {
-	ConnID       string      `mapstructure:"conn_id" yaml:"conn_id"`
-	ConnType     string      `mapstructure:"conn_type" yaml:"conn_type"`
-	ConnHost     string      `mapstructure:"conn_host" yaml:"conn_host"`
-	ConnSchema   string      `mapstructure:"conn_schema" yaml:"conn_schema"`
-	ConnLogin    string      `mapstructure:"conn_login" yaml:"conn_login"`
-	ConnPassword string      `mapstructure:"conn_password" yaml:"conn_password"`
-	ConnPort     int         `mapstructure:"conn_port" yaml:"conn_port"`
-	ConnURI      string      `mapstructure:"conn_uri" yaml:"conn_uri"`
-	ConnExtra    interface{} `mapstructure:"conn_extra" yaml:"conn_extra"`
+	ConnID          string      `mapstructure:"conn_id" yaml:"conn_id"`
+	ConnDescription string      `mapstructure:"conn_description" yaml:"conn_description"`
+	ConnType        string      `mapstructure:"conn_type" yaml:"conn_type"`
+	ConnHost        string      `mapstructure:"conn_host" yaml:"conn_host"`
+	ConnSchema      string      `mapstructure:"conn_schema" yaml:"conn_schema"`
+	ConnLogin       string      `mapstructure:"conn_login" yaml:"conn_login"`
+	ConnPassword    string      `mapstructure:"conn_password" yaml:"conn_password"`
+	ConnPort        int         `mapstructure:"conn_port" yaml:"conn_port"`
+	ConnURI         string      `mapstructure:"conn_uri" yaml:"conn_uri"`
+	ConnExtra       interface{} `mapstructure:"conn_extra" yaml:"conn_extra"`
 }
 
 // Pools contains structure of airflow pools
