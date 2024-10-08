@@ -191,21 +191,16 @@ func (s *AirflowSuite) cleanUpInitFiles() {
 		"airflow_settings.yaml",
 		"packages.txt",
 		"requirements.txt",
-		"dags/exampledag.py",
-		"plugins/example-plugin.py",
 		"include",
 		"plugins",
 		"README.md",
-		".astro/config.yaml",
-		".astro/test_dag_integrity.py",
+		".astro",
 		"./astro",
-		"tests/dags/test_dag_example.py",
-		"tests/dags",
 		"tests",
 		"dags",
 	}
 	for _, f := range files {
-		e := os.Remove(f)
+		e := os.RemoveAll(f)
 		if e != nil && !errors.Is(e, os.ErrNotExist) {
 			s.T().Log(e)
 		}
@@ -224,6 +219,40 @@ func (s *AirflowSuite) mockUserInput(i string) (r, stdin *os.File) {
 }
 
 func (s *AirflowSuite) TestAirflowInit() {
+	s.Run("invalid template name", func() {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		cmd.Flag("template").Value.Set("test")
+		var args []string
+
+		r, stdin := s.mockUserInput("y")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err := airflowInit(cmd, args)
+		s.ErrorIs(err, errInvalidTemplate)
+	})
+
+	s.Run("successfully initialize template based project ", func() {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		cmd.Flag("template").Value.Set("etl")
+		var args []string
+
+		r, stdin := s.mockUserInput("y")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err := airflowInit(cmd, args)
+		s.NoError(err)
+
+		b, _ := os.ReadFile("Dockerfile")
+		dockerfileContents := string(b)
+		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+	})
+
 	s.Run("success", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")

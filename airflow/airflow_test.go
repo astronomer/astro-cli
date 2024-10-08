@@ -77,6 +77,33 @@ func (s *Suite) TestInit() {
 	}
 }
 
+func (s *Suite) TestTemplateInit() {
+	tmpDir, err := os.MkdirTemp("", "temp")
+	s.Require().NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = Init(tmpDir, "astro-runtime", "test", "etl")
+	s.NoError(err)
+
+	expectedFiles := []string{
+		".dockerignore",
+		"Dockerfile",
+		".gitignore",
+		"packages.txt",
+		"requirements.txt",
+		"dags/example_etl_galaxies.py",
+		"dags/.airflowignore",
+		"README.md",
+		"include",
+		"tests/dags",
+	}
+	for _, file := range expectedFiles {
+		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
+		s.NoError(err)
+		s.True(exist)
+	}
+}
+
 func (s *Suite) TestInitConflictTest() {
 	tmpDir, err := os.MkdirTemp("", "temp")
 	s.Require().NoError(err)
