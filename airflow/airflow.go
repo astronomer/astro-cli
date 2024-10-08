@@ -3,11 +3,11 @@ package airflow
 import (
 	_ "embed"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	runtimeTemplateClient "github.com/astronomer/astro-cli/runtime-template-client"
 	"github.com/pkg/errors"
 )
@@ -104,7 +104,7 @@ func initFiles(root string, files map[string]string) error {
 
 // Init will scaffold out a new airflow project
 func Init(path, airflowImageName, airflowImageTag, template string) error {
-	templateClient := runtimeTemplateClient.NewHTTPAstroTemplateClient(&http.Client{})
+	templateClient := runtimeTemplateClient.NewHTTPAstroTemplateClient(&httputil.HTTPClient{})
 
 	// List of directories to create
 	dirs := []string{"dags", "plugins", "include"}
@@ -132,7 +132,6 @@ func Init(path, airflowImageName, airflowImageTag, template string) error {
 			return errors.Wrap(err, "failed to setup template based astro project")
 		}
 	} else {
-
 		// Initailize directories
 		if err := initDirs(path, dirs); err != nil {
 			return errors.Wrap(err, "failed to create project directories")

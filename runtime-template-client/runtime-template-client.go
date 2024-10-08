@@ -9,6 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/astronomer/astro-cli/pkg/httputil"
+)
+
+const (
+	maxExtractSize = 100 << 20
 )
 
 type Client interface {
@@ -16,10 +22,10 @@ type Client interface {
 }
 
 type HTTPAstroTemplateClient struct {
-	*http.Client
+	*httputil.HTTPClient
 }
 
-func NewHTTPAstroTemplateClient(client *http.Client) *HTTPAstroTemplateClient {
+func NewHTTPAstroTemplateClient(client *httputil.HTTPClient) *HTTPAstroTemplateClient {
 	return &HTTPAstroTemplateClient{
 		client,
 	}
@@ -28,7 +34,12 @@ func NewHTTPAstroTemplateClient(client *http.Client) *HTTPAstroTemplateClient {
 func (c *HTTPAstroTemplateClient) DownloadAndExtractTemplate(repoURL, templateDir, destDir string) error {
 	tarballURL := fmt.Sprintf("%s/tarball/main", repoURL)
 
-	resp, err := http.Get(tarballURL)
+	doOpts := &httputil.DoOptions{
+		Path:   tarballURL,
+		Method: http.MethodGet,
+	}
+
+	resp, err := c.Do(doOpts)
 	if err != nil {
 		return fmt.Errorf("failed to download tarball: %w", err)
 	}
@@ -45,13 +56,14 @@ func (c *HTTPAstroTemplateClient) DownloadAndExtractTemplate(repoURL, templateDi
 	defer os.RemoveAll(tempDir)
 
 	// Extract the tarball to the temporary directory
-	var extractedBaseDir string
-	if extractedBaseDir, err := extractTarGz(resp.Body, tempDir, templateDir); err != nil {
-		return fmt.Errorf("failed to extract tarball: %w %s", err, extractedBaseDir)
+	err = extractTarGz(resp.Body, tempDir, templateDir)
+	if err != nil {
+		return fmt.Errorf("failed to extract tarball: %w", err)
 	}
 
 	// Copy the extracted template directory to the destination directory
-	srcDir := filepath.Join(tempDir, extractedBaseDir, templateDir)
+	srcDir := filepath.Join(tempDir, templateDir)
+
 	if _, err := os.Stat(srcDir); os.IsNotExist(err) {
 		return fmt.Errorf("template directory %s not found", templateDir)
 	}
@@ -62,15 +74,17 @@ func (c *HTTPAstroTemplateClient) DownloadAndExtractTemplate(repoURL, templateDi
 	return nil
 }
 
-func extractTarGz(r io.Reader, dest string, templateDir string) (string, error) {
+func extractTarGz(r io.Reader, dest, templateDir string) error {
 	gr, err := gzip.NewReader(r)
 	if err != nil {
-		return "", fmt.Errorf("failed to create gzip reader: %w", err)
+		return fmt.Errorf("failed to create gzip reader: %w", err)
 	}
 	defer gr.Close()
 
 	tarReader := tar.NewReader(gr)
 	var baseDir string
+
+	limitTarReader := io.LimitReader(tarReader, maxExtractSize)
 
 	for {
 		header, err := tarReader.Next()
@@ -78,7 +92,7 @@ func extractTarGz(r io.Reader, dest string, templateDir string) (string, error) 
 			break
 		}
 		if err != nil {
-			return "", fmt.Errorf("failed to read tarball: %w", err)
+			return fmt.Errorf("failed to read tarball: %w", err)
 		}
 
 		// Skip over irrelevant files like pax_global_header
@@ -105,24 +119,28 @@ func extractTarGz(r io.Reader, dest string, templateDir string) (string, error) 
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(targetPath, os.ModePerm); err != nil {
-				return "", fmt.Errorf("failed to create directory: %w", err)
+				return fmt.Errorf("failed to create directory: %w", err)
 			}
 		case tar.TypeReg:
 			outFile, err := os.Create(targetPath)
 			if err != nil {
-				return "", fmt.Errorf("failed to create file: %w", err)
+				return fmt.Errorf("failed to create file: %w", err)
 			}
-			defer outFile.Close()
 
-			if _, err := io.Copy(outFile, tarReader); err != nil {
-				return "", fmt.Errorf("failed to copy file contents: %w", err)
+			if _, err := io.Copy(outFile, limitTarReader); err != nil {
+				outFile.Close()
+				return fmt.Errorf("failed to copy file contents: %w", err)
+			}
+
+			if err := outFile.Close(); err != nil {
+				return fmt.Errorf("failed to close file: %w", err)
 			}
 		}
 	}
-	return baseDir, nil
+	return nil
 }
 
-func copyDir(src string, dst string) error {
+func copyDir(src, dst string) error {
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return err
