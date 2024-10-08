@@ -3,11 +3,17 @@ package airflow
 import (
 	_ "embed"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	runtimeTemplateClient "github.com/astronomer/astro-cli/runtime-template-client"
 	"github.com/pkg/errors"
+)
+
+const (
+	astroTemplateRepoURL = "https://github.com/astronomer/templates"
 )
 
 var perm os.FileMode = 0o777
@@ -97,7 +103,9 @@ func initFiles(root string, files map[string]string) error {
 }
 
 // Init will scaffold out a new airflow project
-func Init(path, airflowImageName, airflowImageTag string) error {
+func Init(path, airflowImageName, airflowImageTag, template string) error {
+	templateClient := runtimeTemplateClient.NewHTTPAstroTemplateClient(&http.Client{})
+
 	// List of directories to create
 	dirs := []string{"dags", "plugins", "include"}
 
@@ -118,14 +126,22 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 		".astro/dag_integrity_exceptions.txt":  "# Add dag files to exempt from parse test below. ex: dags/<test-file>",
 	}
 
-	// Initailize directories
-	if err := initDirs(path, dirs); err != nil {
-		return errors.Wrap(err, "failed to create project directories")
-	}
+	if template != "" {
+		err := templateClient.DownloadAndExtractTemplate(astroTemplateRepoURL, template, path)
+		if err != nil {
+			return errors.Wrap(err, "failed to setup template based astro project")
+		}
+	} else {
 
-	// Initialize files
-	if err := initFiles(path, files); err != nil {
-		return errors.Wrap(err, "failed to create project files")
+		// Initailize directories
+		if err := initDirs(path, dirs); err != nil {
+			return errors.Wrap(err, "failed to create project directories")
+		}
+
+		// Initialize files
+		if err := initFiles(path, files); err != nil {
+			return errors.Wrap(err, "failed to create project files")
+		}
 	}
 
 	return nil

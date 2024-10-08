@@ -31,6 +31,7 @@ var (
 	projectName            string
 	runtimeVersion         string
 	airflowVersion         string
+	template               string
 	envFile                string
 	customImageName        string
 	settingsFile           string
@@ -150,6 +151,7 @@ func newAirflowInitCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
+	cmd.Flags().StringVarP(&template, "template", "t", "", "Tempate name that you want to use to create the local astro project. Posisble values can be etl, dbt-on-astro, generative-ai and learning-airflow  ")
 	var err error
 	var avoidACFlag bool
 
@@ -509,6 +511,12 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 
+	if template != "" {
+		if !isValidTemplate(template) {
+			return fmt.Errorf("%s is %w", template, errInvalidTemplate)
+		}
+	}
+
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersions
@@ -560,7 +568,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag)
+	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag, template)
 	if err != nil {
 		return err
 	}
@@ -943,4 +951,8 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		}
 	}
 	return defaultImageTag
+}
+
+func isValidTemplate(template string) bool {
+	return template == "etl" || template == "dbt-on-astro" || template == "learning-airflow" || template == "generative-ai"
 }
