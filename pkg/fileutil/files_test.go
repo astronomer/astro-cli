@@ -820,7 +820,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           server.URL,
 			FormFileFieldName:   "file",
 			Headers:             headers,
-			Description:         "Deployed via <astro deploy --dags>n",
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
