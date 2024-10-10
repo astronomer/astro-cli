@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/util"
+	runtimetemplateclient "github.com/astronomer/astro-cli/runtime-template-client"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -31,6 +33,7 @@ var (
 	projectName            string
 	runtimeVersion         string
 	airflowVersion         string
+	template               string
 	envFile                string
 	customImageName        string
 	settingsFile           string
@@ -107,9 +110,10 @@ astro dev init --airflow-version 2.2.3
 	errPytestArgs          = errors.New("you can only pass one pytest file or directory")
 	buildSecrets           = []string{}
 	errNoCompose           = errors.New("cannot use '--compose-file' without '--compose' flag")
+	templateVariations     = []string{"etl", "dbt-on-astro", "learning-airflow", "generative-ai"}
 )
 
-func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
+func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient, runtimeTemplateClient runtimetemplateclient.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -117,7 +121,7 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 		Long:    "Run an Apache Airflow environment on your local machine to test your project, including DAGs, Python Packages, and plugins.",
 	}
 	cmd.AddCommand(
-		newAirflowInitCmd(),
+		newAirflowInitCmd(runtimeTemplateClient),
 		newAirflowStartCmd(astroCoreClient),
 		newAirflowRunCmd(),
 		newAirflowPSCmd(),
@@ -135,7 +139,7 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 	return cmd
 }
 
-func newAirflowInitCmd() *cobra.Command {
+func newAirflowInitCmd(runtimeTemplateClient runtimetemplateclient.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "init",
 		Short:   "Create a new Astro project in your working directory",
@@ -146,10 +150,13 @@ func newAirflowInitCmd() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		RunE: airflowInit,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return airflowInit(cmd, args, runtimeTemplateClient)
+		},
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
+	cmd.Flags().StringVarP(&template, "template", "t", "", "Tempate name that you want to use to create the local astro project. Possible values can be etl, dbt-on-astro, generative-ai and learning-airflow. Please note template based astro project use latest runtime version and airflow-version flag will not be respected when creating a project with template flag")
 	var err error
 	var avoidACFlag bool
 
@@ -490,7 +497,7 @@ func newObjectExportCmd() *cobra.Command {
 }
 
 // Use project name for image name
-func airflowInit(cmd *cobra.Command, args []string) error {
+func airflowInit(cmd *cobra.Command, args []string, runtimeTemplateClient runtimetemplateclient.Client) error {
 	// Validate project name
 	if projectName != "" {
 		// error if project name has spaces
@@ -507,6 +514,12 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	} else {
 		projectDirectory := filepath.Base(config.WorkingPath)
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
+	}
+
+	if template != "" {
+		if !isValidTemplate(template) {
+			return fmt.Errorf("%s is %w", template, errInvalidTemplate)
+		}
 	}
 
 	// Validate runtimeVersion and airflowVersion
@@ -560,7 +573,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag)
+	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag, template, runtimeTemplateClient)
 	if err != nil {
 		return err
 	}
@@ -943,4 +956,8 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		}
 	}
 	return defaultImageTag
+}
+
+func isValidTemplate(template string) bool {
+	return slices.Contains(templateVariations, template)
 }
