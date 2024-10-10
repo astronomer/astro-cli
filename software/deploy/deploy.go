@@ -335,9 +335,9 @@ func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) 
 	return nil
 }
 
-func getDagDeployURL(deploymentInfo *houston.Deployment, description string) string {
+func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 	c, _ := config.GetCurrentContext()
-	return fmt.Sprintf("https://deployments.%s/%s/dags/upload?description=%s", c.Domain, deploymentInfo.ReleaseName, description)
+	return fmt.Sprintf("https://deployments.%s/%s/dags/upload", c.Domain, deploymentInfo.ReleaseName)
 }
 
 func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
@@ -372,7 +372,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		if err != nil {
 			return err
 		}
-		uploadURL = getDagDeployURL(deploymentInfo, description)
+		uploadURL = getDagDeployURL(deploymentInfo)
 	} else {
 		uploadURL = *dagDeployURL
 	}
@@ -419,6 +419,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		TargetURL:           uploadURL,
 		FormFileFieldName:   "file",
 		Headers:             headers,
+		Description:         description,
 		MaxTries:            8,
 		InitialDelayInMS:    1 * 1000,
 		BackoffFactor:       2,
