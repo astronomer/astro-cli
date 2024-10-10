@@ -573,23 +573,26 @@ func createMockServer(statusCode int, responseBody string, headers map[string][]
 	return httptest.NewServer(handler)
 }
 
-func getCapturedRequest(server *httptest.Server) *http.Request {
+func getCapturedRequest(server *httptest.Server) ([]byte, http.Header) {
 	handler, ok := server.Config.Handler.(*testHandler)
 	if !ok {
 		panic("Unexpected server handler type")
 	}
-	return handler.Request
+	return handler.RequestBody, handler.RequestHeader
 }
 
 type testHandler struct {
-	StatusCode   int
-	ResponseBody string
-	Headers      map[string][]string
-	Request      *http.Request
+	StatusCode    int
+	ResponseBody  string
+	Headers       map[string][]string
+	RequestBody   []byte
+	RequestHeader http.Header
 }
 
 func (h *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.Request = r
+	req, _ := io.ReadAll(r.Body)
+	h.RequestBody = req
+	h.RequestHeader = r.Header
 	w.WriteHeader(h.StatusCode)
 	for key, values := range h.Headers {
 		w.Header()[key] = values
@@ -830,9 +833,11 @@ func (s *Suite) TestUploadFile() {
 
 		s.NoError(err, "Expected no error")
 		// assert the received headers
-		request := getCapturedRequest(server)
-		s.Equal("Bearer token", request.Header.Get("Authorization"))
-		s.Contains(request.Header.Get("Content-Type"), "multipart/form-data")
+		reqBody, header := getCapturedRequest(server)
+		s.Equal("Bearer token", header.Get("Authorization"))
+		s.Contains(header.Get("Content-Type"), "multipart/form-data")
+		s.Contains(string(reqBody), "description")
+		s.Contains(string(reqBody), "Deployed via <astro deploy --dags>")
 	})
 
 	s.Run("successfully uploaded with an empty description", func() {
@@ -864,11 +869,9 @@ func (s *Suite) TestUploadFile() {
 		err = UploadFile(&uploadFileArgs)
 
 		s.NoError(err, "Expected no error")
-		request := getCapturedRequest(server)
-		s.Equal("Bearer token", request.Header.Get("Authorization"))
-		s.Contains(request.Header.Get("Content-Type"), "multipart/form-data")
-
-		body, _ := io.ReadAll(request.Body)
-		s.NotContains(string(body), "description")
+		reqBody, header := getCapturedRequest(server)
+		s.Equal("Bearer token", header.Get("Authorization"))
+		s.Contains(header.Get("Content-Type"), "multipart/form-data")
+		s.NotContains(string(reqBody), "description")
 	})
 }
