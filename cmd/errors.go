@@ -14,5 +14,5 @@ var (
 
 	errInvalidSetArgs    = errors.New("must specify exactly two arguments (key value) when setting a config")
 	errInvalidConfigPath = errors.New("config does not exist, check your config key")
-	errInvalidTemplate   = errors.New("not a valid template name. It can only be etl, dbt-on-astro, generative-ai or learning-airflow")
+	errInvalidTemplate   = errors.New("not a valid template name. Template names can only be etl, dbt-on-astro, generative-ai or learning-airflow")
 )

@@ -17,29 +17,32 @@ const (
 	maxExtractSize = 100 << 20
 )
 
+var astroTemplateRepoURL = "https://github.com/astronomer/templates"
+
 type Client interface {
-	DownloadAndExtractTemplate(repoURL, branch, templateDir, destDir string) error
+	DownloadAndExtractTemplate(templateDir, destDir string) error
 }
 
 type HTTPAstroTemplateClient struct {
-	*httputil.HTTPClient
+	client *httputil.HTTPClient
 }
 
-func NewHTTPAstroTemplateClient(client *httputil.HTTPClient) *HTTPAstroTemplateClient {
+func NewruntimeTemplateClient() *HTTPAstroTemplateClient {
+	HTTPClient := &httputil.HTTPClient{}
 	return &HTTPAstroTemplateClient{
-		client,
+		client: HTTPClient,
 	}
 }
 
-func (c *HTTPAstroTemplateClient) DownloadAndExtractTemplate(repoURL, templateDir, destDir string) error {
-	tarballURL := fmt.Sprintf("%s/tarball/main", repoURL)
+func (c *HTTPAstroTemplateClient) DownloadAndExtractTemplate(templateDir, destDir string) error {
+	tarballURL := fmt.Sprintf("%s/tarball/main", astroTemplateRepoURL)
 
 	doOpts := &httputil.DoOptions{
 		Path:   tarballURL,
 		Method: http.MethodGet,
 	}
 
-	resp, err := c.Do(doOpts)
+	resp, err := c.client.Do(doOpts)
 	if err != nil {
 		return fmt.Errorf("failed to download tarball: %w", err)
 	}

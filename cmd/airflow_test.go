@@ -15,6 +15,10 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	coreMocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	runtimetemplateclient "github.com/astronomer/astro-cli/runtime-template-client"
+	runtimetemplateclient_mocks "github.com/astronomer/astro-cli/runtime-template-client/mocks"
+
+	//	runtimetemplateclient "github.com/astronomer/astro-cli/runtime-template-client"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
@@ -72,10 +76,11 @@ func (s *AirflowSuite) TestDevInitCommand() {
 
 func (s *AirflowSuite) TestDevInitCommandSoftware() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	mockClient := new(runtimetemplateclient_mocks.Client)
 
 	s.Run("unknown software version", func() {
 		houstonVersion = ""
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(mockClient)
 		buf := new(bytes.Buffer)
 		cmd.SetOut(buf)
 		cmd.SetArgs([]string{"dev", "init", "--help"})
@@ -90,7 +95,7 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 
 	s.Run("0.28.0 software version", func() {
 		houstonVersion = "0.28.0"
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(mockClient)
 		buf := new(bytes.Buffer)
 		cmd.SetOut(buf)
 		cmd.SetArgs([]string{"--help"})
@@ -105,7 +110,7 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 
 	s.Run("0.29.0 software version", func() {
 		houstonVersion = "0.29.0"
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(mockClient)
 		buf := new(bytes.Buffer)
 		cmd.SetOut(buf)
 		cmd.SetArgs([]string{"dev", "init", "--help"})
@@ -120,7 +125,8 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 }
 
 func (s *AirflowSuite) TestNewAirflowInitCmd() {
-	cmd := newAirflowInitCmd()
+	mockClient := new(runtimetemplateclient_mocks.Client)
+	cmd := newAirflowInitCmd(mockClient)
 	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
@@ -155,11 +161,12 @@ func (s *AirflowSuite) TestNewAirflowUpgradeCheckCmd() {
 }
 
 func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
-	cmd := newAirflowInitCmd()
+	mockClient := new(runtimetemplateclient_mocks.Client)
+	cmd := newAirflowInitCmd(mockClient)
 	var args []string
 
 	defer testUtil.MockUserInput(s.T(), "y")()
-	err := airflowInit(cmd, args)
+	err := airflowInit(cmd, args, mockClient)
 	s.NoError(err)
 
 	b, _ := os.ReadFile("Dockerfile")
@@ -168,12 +175,13 @@ func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
 }
 
 func (s *AirflowSuite) Test_airflowInitNoDefaultImageTag() {
-	cmd := newAirflowInitCmd()
+	mockClient := new(runtimetemplateclient_mocks.Client)
+	cmd := newAirflowInitCmd(mockClient)
 	var args []string
 
 	defer testUtil.MockUserInput(s.T(), "y")()
 
-	err := airflowInit(cmd, args)
+	err := airflowInit(cmd, args, mockClient)
 	s.NoError(err)
 	// assert contents of Dockerfile
 	b, _ := os.ReadFile("Dockerfile")
@@ -219,8 +227,10 @@ func (s *AirflowSuite) mockUserInput(i string) (r, stdin *os.File) {
 }
 
 func (s *AirflowSuite) TestAirflowInit() {
+	mockClient := new(runtimetemplateclient_mocks.Client)
+	client := runtimetemplateclient.NewruntimeTemplateClient()
 	s.Run("invalid template name", func() {
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(client)
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("template").Value.Set("test")
 		var args []string
@@ -230,12 +240,12 @@ func (s *AirflowSuite) TestAirflowInit() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err := airflowInit(cmd, args)
+		err := airflowInit(cmd, args, client)
 		s.ErrorIs(err, errInvalidTemplate)
 	})
 
 	s.Run("successfully initialize template based project ", func() {
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(client)
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("template").Value.Set("etl")
 		var args []string
@@ -245,7 +255,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err := airflowInit(cmd, args)
+		err := airflowInit(cmd, args, client)
 		s.NoError(err)
 
 		b, _ := os.ReadFile("Dockerfile")
@@ -254,7 +264,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("success", func() {
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(mockClient)
 		cmd.Flag("name").Value.Set("test-project-name")
 		var args []string
 
@@ -263,7 +273,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err := airflowInit(cmd, args)
+		err := airflowInit(cmd, args, mockClient)
 		s.NoError(err)
 
 		b, _ := os.ReadFile("Dockerfile")
@@ -272,7 +282,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("invalid args", func() {
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(mockClient)
 		cmd.Flag("name").Value.Set("test-project-name")
 		args := []string{"invalid-arg"}
 
@@ -281,12 +291,12 @@ func (s *AirflowSuite) TestAirflowInit() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err := airflowInit(cmd, args)
+		err := airflowInit(cmd, args, mockClient)
 		s.ErrorIs(err, errProjectNameSpaces)
 	})
 
 	s.Run("invalid project name", func() {
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(mockClient)
 		cmd.Flag("name").Value.Set("test@project-name")
 		args := []string{}
 
@@ -295,12 +305,12 @@ func (s *AirflowSuite) TestAirflowInit() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err := airflowInit(cmd, args)
+		err := airflowInit(cmd, args, mockClient)
 		s.ErrorIs(err, errConfigProjectName)
 	})
 
 	s.Run("both runtime & AC version passed", func() {
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(mockClient)
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("airflow-version").Value.Set("2.2.5")
 		cmd.Flag("runtime-version").Value.Set("4.2.4")
@@ -311,13 +321,13 @@ func (s *AirflowSuite) TestAirflowInit() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err := airflowInit(cmd, args)
+		err := airflowInit(cmd, args, mockClient)
 		s.ErrorIs(err, errInvalidBothAirflowAndRuntimeVersions)
 	})
 
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	s.Run("runtime version passed alongside AC flag", func() {
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(mockClient)
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("use-astronomer-certified").Value.Set("true")
 		cmd.Flag("runtime-version").Value.Set("4.2.4")
@@ -334,7 +344,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		err := airflowInit(cmd, args)
+		err := airflowInit(cmd, args, mockClient)
 
 		w.Close()
 		out, _ := io.ReadAll(r)
@@ -344,7 +354,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("use AC flag", func() {
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(mockClient)
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("use-astronomer-certified").Value.Set("true")
 		args := []string{}
@@ -360,7 +370,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		err := airflowInit(cmd, args)
+		err := airflowInit(cmd, args, mockClient)
 
 		w.Close()
 		out, _ := io.ReadAll(r)
@@ -370,7 +380,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("cancel non empty dir warning", func() {
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(mockClient)
 		cmd.Flag("name").Value.Set("test-project-name")
 		args := []string{}
 
@@ -385,7 +395,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		err := airflowInit(cmd, args)
+		err := airflowInit(cmd, args, mockClient)
 
 		w.Close()
 		out, _ := io.ReadAll(r)
@@ -395,7 +405,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("reinitialize the same project", func() {
-		cmd := newAirflowInitCmd()
+		cmd := newAirflowInitCmd(mockClient)
 		cmd.Flag("name").Value.Set("test-project-name")
 		args := []string{}
 
@@ -405,7 +415,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err := airflowInit(cmd, args)
+		err := airflowInit(cmd, args, mockClient)
 		s.NoError(err)
 
 		r, stdin = s.mockUserInput("y")
@@ -419,7 +429,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		err = airflowInit(cmd, args)
+		err = airflowInit(cmd, args, mockClient)
 
 		w.Close()
 		out, _ := io.ReadAll(r)

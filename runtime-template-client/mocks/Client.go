@@ -9,13 +9,13 @@ type Client struct {
 	mock.Mock
 }
 
-// DownloadAndExtractTemplate provides a mock function with given fields: repoURL, branch, templateDir, destDir
-func (_m *Client) DownloadAndExtractTemplate(repoURL string, branch string, templateDir string, destDir string) error {
-	ret := _m.Called(repoURL, branch, templateDir, destDir)
+// DownloadAndExtractTemplate provides a mock function with given fields: templateDir, destDir
+func (_m *Client) DownloadAndExtractTemplate(templateDir string, destDir string) error {
+	ret := _m.Called(templateDir, destDir)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string) error); ok {
-		r0 = rf(repoURL, branch, templateDir, destDir)
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(templateDir, destDir)
 	} else {
 		r0 = ret.Error(0)
 	}

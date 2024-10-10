@@ -5,6 +5,10 @@ import (
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	runtimetemplateclient "github.com/astronomer/astro-cli/runtime-template-client"
+	runtimetemplateclient_mocks "github.com/astronomer/astro-cli/runtime-template-client/mocks"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/mock"
 )
 
 func (s *Suite) TestInitDirs() {
@@ -54,8 +58,9 @@ func (s *Suite) TestInit() {
 	tmpDir, err := os.MkdirTemp("", "temp")
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
+	mockClient := new(runtimetemplateclient_mocks.Client)
 
-	err = Init(tmpDir, "astro-runtime", "test", "")
+	err = Init(tmpDir, "astro-runtime", "test", "", mockClient)
 	s.NoError(err)
 
 	expectedFiles := []string{
@@ -81,8 +86,9 @@ func (s *Suite) TestTemplateInit() {
 	tmpDir, err := os.MkdirTemp("", "temp")
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
+	client := runtimetemplateclient.NewruntimeTemplateClient()
 
-	err = Init(tmpDir, "astro-runtime", "test", "etl")
+	err = Init(tmpDir, "astro-runtime", "test", "etl", client)
 	s.NoError(err)
 
 	expectedFiles := []string{
@@ -102,6 +108,19 @@ func (s *Suite) TestTemplateInit() {
 		s.NoError(err)
 		s.True(exist)
 	}
+}
+
+func (s *Suite) TestTemplateInitFail() {
+	tmpDir, err := os.MkdirTemp("", "temp")
+	s.Require().NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	errTest := errors.New("error")
+	mockClient := new(runtimetemplateclient_mocks.Client)
+	mockClient.On("DownloadAndExtractTemplate", mock.Anything, mock.Anything).Return(errTest).Once()
+	err = Init(tmpDir, "astro-runtime", "test", "etl", mockClient)
+	s.Error(err, "Expected an error but got none")
+	s.EqualError(err, "failed to set up template-based astro project: error")
 }
 
 func (s *Suite) TestInitConflictTest() {

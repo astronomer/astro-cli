@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/cmd/registry"
+	runtimetemplateclient "github.com/astronomer/astro-cli/runtime-template-client"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -49,6 +50,7 @@ func NewRootCmd() *cobra.Command {
 	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
 	astroCoreIamClient := astroiamcore.NewIamCoreClient(httputil.NewHTTPClient())
 	platformCoreClient := astroplatformcore.NewPlatformCoreClient(httputil.NewHTTPClient())
+	runtimeTemplateClient := runtimetemplateclient.NewruntimeTemplateClient()
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
@@ -110,7 +112,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newLoginCommand(astroCoreClient, platformCoreClient, os.Stdout),
 		newLogoutCommand(os.Stdout),
 		newVersionCommand(),
-		newDevRootCmd(platformCoreClient, astroCoreClient),
+		newDevRootCmd(platformCoreClient, astroCoreClient, runtimeTemplateClient),
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),

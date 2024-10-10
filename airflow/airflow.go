@@ -7,13 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/astronomer/astro-cli/pkg/httputil"
-	runtimeTemplateClient "github.com/astronomer/astro-cli/runtime-template-client"
+	runtimetemplateclient "github.com/astronomer/astro-cli/runtime-template-client"
 	"github.com/pkg/errors"
-)
-
-const (
-	astroTemplateRepoURL = "https://github.com/astronomer/templates"
 )
 
 var perm os.FileMode = 0o777
@@ -103,9 +98,7 @@ func initFiles(root string, files map[string]string) error {
 }
 
 // Init will scaffold out a new airflow project
-func Init(path, airflowImageName, airflowImageTag, template string) error {
-	templateClient := runtimeTemplateClient.NewHTTPAstroTemplateClient(&httputil.HTTPClient{})
-
+func Init(path, airflowImageName, airflowImageTag, template string, runtimeTemplateClient runtimetemplateclient.Client) error {
 	// List of directories to create
 	dirs := []string{"dags", "plugins", "include"}
 
@@ -127,9 +120,9 @@ func Init(path, airflowImageName, airflowImageTag, template string) error {
 	}
 
 	if template != "" {
-		err := templateClient.DownloadAndExtractTemplate(astroTemplateRepoURL, template, path)
+		err := runtimeTemplateClient.DownloadAndExtractTemplate(template, path)
 		if err != nil {
-			return errors.Wrap(err, "failed to setup template based astro project")
+			return errors.Wrap(err, "failed to set up template-based astro project")
 		}
 	} else {
 		// Initailize directories
