@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"testing"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -77,8 +76,4 @@ func (s *TemplateClientTestSuite) TestDownloadAndExtractTemplate_Fail() {
 	s.Error(err)
 
 	s.Contains(err.Error(), "template directory test not found")
-}
-
-func TestTemplateClientTestSuite(t *testing.T) {
-	suite.Run(t, new(TemplateClientTestSuite))
 }
