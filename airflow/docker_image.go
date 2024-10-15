@@ -1,6 +1,7 @@
 package airflow
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -48,23 +49,51 @@ func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(dockerfile, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
-	if dockerfile == "" {
-		dockerfile = "Dockerfile"
+func shouldAddPullFlag(dockerfilePath string) (bool, error) {
+	file, err := os.Open(dockerfilePath)
+	if err != nil {
+		return false, fmt.Errorf("opening file: %w", err)
 	}
-	err := os.Chdir(buildConfig.Path)
+	defer file.Close()
+
+	// scan the Dockerfile to check if any FROM instructions reference an image other than astro runtime
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "FROM ") && !strings.HasPrefix(line, fmt.Sprintf("FROM %s:", FullAstroRuntimeImageName)) {
+			return false, nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return false, fmt.Errorf("scanning file: %w", err)
+	}
+	return true, nil
+}
+
+func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+	if dockerfilePath == "" {
+		dockerfilePath = "Dockerfile"
+	}
+	args := []string{"build"}
+	addPullFlag, err := shouldAddPullFlag(dockerfilePath)
+	if err != nil {
+		return fmt.Errorf("reading dockerfile: %w", err)
+	}
+	if addPullFlag {
+		args = append(args, "--pull")
+	}
+	err = os.Chdir(buildConfig.Path)
 	if err != nil {
 		return err
 	}
-	args := []string{
-		"build",
+	args = append(args, []string{
 		"-t",
 		d.imageName,
 		"-f",
-		dockerfile,
+		dockerfilePath,
 		".",
-	}
+	}...)
 	if buildConfig.NoCache {
 		args = append(args, "--no-cache")
 	}
