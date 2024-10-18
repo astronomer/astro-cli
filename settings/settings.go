@@ -293,6 +293,9 @@ func AddPools(id string, version uint64) {
 				} else {
 					airflowCommand += "''"
 				}
+				if pool.PoolIncludeDeferred {
+					airflowCommand += "--include-deferred"
+				}
 				fmt.Println(airflowCommand)
 				out := execAirflowCommand(id, airflowCommand)
 				logrus.Debugf("Adding pool logs:\n" + out)
@@ -593,7 +596,7 @@ func ExportPools(id string) error {
 			}
 		}
 		fmt.Println("Exporting Pool: " + pools[i].PoolName)
-		newPools := Pools{{pools[i].PoolName, slot, pools[i].PoolDescription}}
+		newPools := Pools{{pools[i].PoolName, slot, pools[i].PoolDescription, pools[i].PoolIncludeDeferred}}
 		settings.Airflow.Pools = append(settings.Airflow.Pools, newPools...)
 	}
 	// write pools to the airflow settings file
