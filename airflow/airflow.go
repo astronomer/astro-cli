@@ -48,6 +48,8 @@ var (
 
 	//go:embed include/requirements.txt
 	RequirementsTxt string
+
+	ExtractTemplate = InitFromTemplate
 )
 
 func initDirs(root string, dirs []string) error {
@@ -97,7 +99,14 @@ func initFiles(root string, files map[string]string) error {
 }
 
 // Init will scaffold out a new airflow project
-func Init(path, airflowImageName, airflowImageTag string) error {
+func Init(path, airflowImageName, airflowImageTag, template string) error {
+	if template != "" {
+		err := ExtractTemplate(template, path)
+		if err != nil {
+			return errors.Wrap(err, "failed to set up template-based astro project")
+		}
+		return nil
+	}
 	// List of directories to create
 	dirs := []string{"dags", "plugins", "include"}
 
@@ -122,7 +131,6 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 	if err := initDirs(path, dirs); err != nil {
 		return errors.Wrap(err, "failed to create project directories")
 	}
-
 	// Initialize files
 	if err := initFiles(path, files); err != nil {
 		return errors.Wrap(err, "failed to create project files")

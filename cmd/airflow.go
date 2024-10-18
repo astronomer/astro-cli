@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ var (
 	projectName            string
 	runtimeVersion         string
 	airflowVersion         string
+	fromTemplate           string
 	envFile                string
 	customImageName        string
 	settingsFile           string
@@ -59,6 +61,7 @@ var (
 	conflictTest           bool
 	versionTest            bool
 	dagTest                bool
+	selectTemplate         bool
 	waitTime               time.Duration
 	RunExample             = `
 # Create default admin user.
@@ -90,6 +93,9 @@ astro dev init --runtime-version 4.1.0
 
 # Initialize a new Astro project with the latest Astro Runtime version based on Airflow 2.2.3
 astro dev init --airflow-version 2.2.3
+
+# Initialize a new template based Astro project with the latest Astro Runtime version
+astro dev init --from-template etl
 `
 	dockerfile = "Dockerfile"
 
@@ -107,6 +113,7 @@ astro dev init --airflow-version 2.2.3
 	errPytestArgs          = errors.New("you can only pass one pytest file or directory")
 	buildSecrets           = []string{}
 	errNoCompose           = errors.New("cannot use '--compose-file' without '--compose' flag")
+	TemplateList           = airflow.FetchTemplateList
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
@@ -150,6 +157,8 @@ func newAirflowInitCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
+	cmd.Flags().StringVarP(&fromTemplate, "from-template", "t", "", "Template name that you want to use to create the local astro project. Possible values can be etl, dbt-on-astro, generative-ai and learning-airflow. Please note template based astro project use latest runtime version and airflow-version flag will be ignored when creating a project with template flag")
+	cmd.Flags().BoolVarP(&selectTemplate, "select-template", "s", false, "Provides a list of templates to select from and create the local astro project based on selected template")
 	var err error
 	var avoidACFlag bool
 
@@ -509,6 +518,24 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 
+	if selectTemplate {
+		selectedTemplate, err := selectedTemplate()
+		if err != nil {
+			return fmt.Errorf("unable to select template from list: %w", err)
+		}
+		fromTemplate = selectedTemplate
+	}
+
+	if fromTemplate != "" {
+		templateList, err := TemplateList()
+		if err != nil {
+			return fmt.Errorf("unable to fetch template list: %w", err)
+		}
+		if !isValidTemplate(templateList, fromTemplate) {
+			return fmt.Errorf("%s is not a valid template name. Available templates are: %s", fromTemplate, templateList)
+		}
+	}
+
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersions
@@ -560,7 +587,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag)
+	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag, fromTemplate)
 	if err != nil {
 		return err
 	}
@@ -943,4 +970,21 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		}
 	}
 	return defaultImageTag
+}
+
+func isValidTemplate(templateList []string, template string) bool {
+	return slices.Contains(templateList, template)
+}
+
+func selectedTemplate() (string, error) {
+	templateList, err := TemplateList()
+	if err != nil {
+		return "", fmt.Errorf("unable to fetch template list: %w", err)
+	}
+	selectedTemplate, err := airflow.SelectTemplate(templateList)
+	if err != nil {
+		return "", fmt.Errorf("unable to select template from list: %w", err)
+	}
+
+	return selectedTemplate, nil
 }
