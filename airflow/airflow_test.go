@@ -5,10 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	runtimetemplateclient "github.com/astronomer/astro-cli/runtime-template-client"
-	runtimetemplateclient_mocks "github.com/astronomer/astro-cli/runtime-template-client/mocks"
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/mock"
 )
 
 func (s *Suite) TestInitDirs() {
@@ -58,9 +55,8 @@ func (s *Suite) TestInit() {
 	tmpDir, err := os.MkdirTemp("", "temp")
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
-	mockClient := new(runtimetemplateclient_mocks.Client)
 
-	err = Init(tmpDir, "astro-runtime", "test", "", mockClient)
+	err = Init(tmpDir, "astro-runtime", "test", "")
 	s.NoError(err)
 
 	expectedFiles := []string{
@@ -83,25 +79,25 @@ func (s *Suite) TestInit() {
 }
 
 func (s *Suite) TestTemplateInit() {
+	ExtractTemplate = func(templateDir, destDir string) error {
+		err := os.MkdirAll(destDir, os.ModePerm)
+		s.NoError(err)
+		mockFile := filepath.Join(destDir, "requirements.txt")
+		file, err := os.Create(mockFile)
+		s.NoError(err)
+		defer file.Close()
+		return nil
+	}
+
 	tmpDir, err := os.MkdirTemp("", "temp")
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
-	client := runtimetemplateclient.NewruntimeTemplateClient()
 
-	err = Init(tmpDir, "astro-runtime", "test", "etl", client)
+	err = Init(tmpDir, "astro-runtime", "test", "etl")
 	s.NoError(err)
 
 	expectedFiles := []string{
-		".dockerignore",
-		"Dockerfile",
-		".gitignore",
-		"packages.txt",
 		"requirements.txt",
-		"dags/example_etl_galaxies.py",
-		"dags/.airflowignore",
-		"README.md",
-		"include",
-		"tests/dags",
 	}
 	for _, file := range expectedFiles {
 		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
@@ -111,16 +107,15 @@ func (s *Suite) TestTemplateInit() {
 }
 
 func (s *Suite) TestTemplateInitFail() {
+	ExtractTemplate = func(templateDir, destDir string) error {
+		err := errors.New("error extracting files")
+		return err
+	}
 	tmpDir, err := os.MkdirTemp("", "temp")
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
-
-	errTest := errors.New("error")
-	mockClient := new(runtimetemplateclient_mocks.Client)
-	mockClient.On("DownloadAndExtractTemplate", mock.Anything, mock.Anything).Return(errTest).Once()
-	err = Init(tmpDir, "astro-runtime", "test", "etl", mockClient)
-	s.Error(err, "Expected an error but got none")
-	s.EqualError(err, "failed to set up template-based astro project: error")
+	err = Init(tmpDir, "astro-runtime", "test", "etl")
+	s.EqualError(err, "failed to set up template-based astro project: error extracting files")
 }
 
 func (s *Suite) TestInitConflictTest() {

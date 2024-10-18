@@ -1,40 +1,113 @@
-package runtimetemplateclient
+package airflow
 
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 const (
 	maxExtractSize = 100 << 20
 )
 
-var astroTemplateRepoURL = "https://github.com/astronomer/templates"
+var (
+	astroTemplateRepoURL = "https://github.com/astronomer/templates"
+	runtimeTemplateURL   = "https://updates.astronomer.io/astronomer-templates"
+)
 
-type Client interface {
-	DownloadAndExtractTemplate(templateDir, destDir string) error
+type Template struct {
+	Name string
 }
 
-type HTTPAstroTemplateClient struct {
-	client *httputil.HTTPClient
+type TemplatesResponse struct {
+	Templates []Template
 }
 
-func NewruntimeTemplateClient() *HTTPAstroTemplateClient {
+func FetchTemplateList() ([]string, error) {
 	HTTPClient := &httputil.HTTPClient{}
-	return &HTTPAstroTemplateClient{
-		client: HTTPClient,
+	doOpts := &httputil.DoOptions{
+		Path:   runtimeTemplateURL,
+		Method: http.MethodGet,
 	}
+
+	resp, err := HTTPClient.Do(doOpts)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("received non-200 status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var templatesResponse TemplatesResponse
+	err = json.Unmarshal(body, &templatesResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	uniqueTemplates := make(map[string]struct{})
+	var templateNames []string
+
+	for _, template := range templatesResponse.Templates {
+		if _, exists := uniqueTemplates[template.Name]; !exists {
+			templateNames = append(templateNames, template.Name)
+			uniqueTemplates[template.Name] = struct{}{}
+		}
+	}
+
+	return templateNames, nil
 }
 
-func (c *HTTPAstroTemplateClient) DownloadAndExtractTemplate(templateDir, destDir string) error {
+func SelectTemplate(templateList []string) (string, error) {
+	TemplatesTab := printutil.Table{
+		Padding:        []int{5, 30},
+		DynamicPadding: true,
+		Header:         []string{"#", "TEMPLATE"},
+	}
+	if len(templateList) == 0 {
+		return "", fmt.Errorf("no available templates found")
+	}
+
+	templateMap := make(map[string]string)
+
+	// Add rows for each template and index them
+	for i, template := range templateList {
+		index := i + 1
+		TemplatesTab.AddRow([]string{strconv.Itoa(index), template}, false)
+		templateMap[strconv.Itoa(index)] = template
+	}
+
+	TemplatesTab.Print(os.Stdout)
+
+	// Prompt user for selection
+	choice := input.Text("\n> ")
+	selected, ok := templateMap[choice]
+	if !ok {
+		return "", fmt.Errorf("invalid template selection")
+	}
+
+	return selected, nil
+}
+
+func InitFromTemplate(templateDir, destDir string) error {
+	HTTPClient := &httputil.HTTPClient{}
 	tarballURL := fmt.Sprintf("%s/tarball/main", astroTemplateRepoURL)
 
 	doOpts := &httputil.DoOptions{
@@ -42,7 +115,7 @@ func (c *HTTPAstroTemplateClient) DownloadAndExtractTemplate(templateDir, destDi
 		Method: http.MethodGet,
 	}
 
-	resp, err := c.client.Do(doOpts)
+	resp, err := HTTPClient.Do(doOpts)
 	if err != nil {
 		return fmt.Errorf("failed to download tarball: %w", err)
 	}
