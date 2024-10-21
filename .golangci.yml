@@ -122,6 +122,7 @@ issues:
         - typecheck
         - revive
         - unused
+        - gocyclo
   exclude:
     - "shadow: declaration of .err. shadows declaration"
     - "sloppyTestFuncName: function cleanUpInitFiles should be of form"
