@@ -467,7 +467,6 @@ func parseOrPytestDAG(pytest, version, envFile, deployImage, namespace, buildSec
 		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip DAG parse...")
 	}
 
-	fmt.Println("testing", deployImage)
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, "Dockerfile", namespace)
 	if err != nil {
 		return err
