@@ -905,7 +905,7 @@ func (s *Suite) TestSetWorkerQueueValues() {
 			Default: 180,
 		},
 	}
-	mockWorkerQueue := &astroplatformcore.WorkerQueueRequest{
+	mockWorkerQueue := astroplatformcore.WorkerQueueRequest{
 		Name:              "test-worker-queue",
 		IsDefault:         false,
 		MaxWorkerCount:    0,
@@ -965,7 +965,7 @@ func (s *Suite) TestIsCeleryWorkerQueueInputValid() {
 			Default: 180,
 		},
 	}
-	requestedWorkerQueue := &astroplatformcore.HybridWorkerQueueRequest{
+	requestedWorkerQueue := astroplatformcore.HybridWorkerQueueRequest{
 		Name:              "test-worker-queue",
 		IsDefault:         false,
 		MaxWorkerCount:    0,
@@ -1031,7 +1031,7 @@ func (s *Suite) TestIsHostedCeleryWorkerQueueInputValid() {
 			Ceiling: 15,
 		},
 	}
-	requestedWorkerQueue := &astroplatformcore.WorkerQueueRequest{
+	requestedWorkerQueue := astroplatformcore.WorkerQueueRequest{
 		Name:              "test-worker-queue",
 		IsDefault:         false,
 		MaxWorkerCount:    0,
@@ -1071,7 +1071,7 @@ func (s *Suite) TestIsHostedCeleryWorkerQueueInputValid() {
 
 func (s *Suite) TestIsKubernetesWorkerQueueInputValid() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	requestedWorkerQueue := &astroplatformcore.HybridWorkerQueueRequest{
+	requestedWorkerQueue := astroplatformcore.HybridWorkerQueueRequest{
 		Name:              "default",
 		MinWorkerCount:    -1,
 		MaxWorkerCount:    0,
@@ -1086,7 +1086,7 @@ func (s *Suite) TestIsKubernetesWorkerQueueInputValid() {
 	s.Run("returns an error when queue name is not default", func() {
 		requestedWorkerQueue.Name = "test-queue"
 		defer func() {
-			requestedWorkerQueue = &astroplatformcore.HybridWorkerQueueRequest{
+			requestedWorkerQueue = astroplatformcore.HybridWorkerQueueRequest{
 				Name:              "default",
 				NodePoolId:        "test-pool-id",
 				MinWorkerCount:    -1,
@@ -1101,7 +1101,7 @@ func (s *Suite) TestIsKubernetesWorkerQueueInputValid() {
 	s.Run("returns an error when max_worker_count is in input", func() {
 		requestedWorkerQueue.MaxWorkerCount = 25
 		defer func() {
-			requestedWorkerQueue = &astroplatformcore.HybridWorkerQueueRequest{
+			requestedWorkerQueue = astroplatformcore.HybridWorkerQueueRequest{
 				Name:              "default",
 				NodePoolId:        "test-pool-id",
 				MinWorkerCount:    -1,
@@ -1116,7 +1116,7 @@ func (s *Suite) TestIsKubernetesWorkerQueueInputValid() {
 	s.Run("returns an error when worker_concurrency is in input", func() {
 		requestedWorkerQueue.WorkerConcurrency = 350
 		defer func() {
-			requestedWorkerQueue = &astroplatformcore.HybridWorkerQueueRequest{
+			requestedWorkerQueue = astroplatformcore.HybridWorkerQueueRequest{
 				Name:              "default",
 				NodePoolId:        "test-pool-id",
 				MinWorkerCount:    -1,
@@ -1157,20 +1157,20 @@ func (s *Suite) TestQueueExists() {
 		},
 	}
 	s.Run("returns true if queue with same name exists in list of queues", func() {
-		actual := QueueExists(existingQueues, &astroplatformcore.WorkerQueueRequest{Name: "test-default-queue"}, &astroplatformcore.HybridWorkerQueueRequest{Name: "test-default-queue"})
+		actual := QueueExists(existingQueues, astroplatformcore.WorkerQueueRequest{Name: "test-default-queue"}, astroplatformcore.HybridWorkerQueueRequest{Name: "test-default-queue"})
 		s.True(actual)
 	})
 	s.Run("returns true if queue with same id exists in list of queues", func() {
-		actual := QueueExists(existingQueues, &astroplatformcore.WorkerQueueRequest{Id: &testWQID}, &astroplatformcore.HybridWorkerQueueRequest{Id: &testWQID})
+		actual := QueueExists(existingQueues, astroplatformcore.WorkerQueueRequest{Id: &testWQID}, astroplatformcore.HybridWorkerQueueRequest{Id: &testWQID})
 		fmt.Println(actual)
 		s.True(actual)
 	})
 	s.Run("returns false if queue with same name does not exist in list of queues", func() {
-		actual := QueueExists(existingQueues, &astroplatformcore.WorkerQueueRequest{Name: "test-default-queues"}, &astroplatformcore.HybridWorkerQueueRequest{Name: "test-default-queues"})
+		actual := QueueExists(existingQueues, astroplatformcore.WorkerQueueRequest{Name: "test-default-queues"}, astroplatformcore.HybridWorkerQueueRequest{Name: "test-default-queues"})
 		s.False(actual)
 	})
 	s.Run("returns false if queue with same id exists in list of queues", func() {
-		actual := QueueExists(existingQueues, &astroplatformcore.WorkerQueueRequest{Id: &testWQID10}, &astroplatformcore.HybridWorkerQueueRequest{Id: &testWQID10})
+		actual := QueueExists(existingQueues, astroplatformcore.WorkerQueueRequest{Id: &testWQID10}, astroplatformcore.HybridWorkerQueueRequest{Id: &testWQID10})
 		s.False(actual)
 	})
 }
@@ -1342,7 +1342,7 @@ func (s *Suite) TestUpdateQueueList() {
 			MinWorkerCount:    3,
 			WorkerConcurrency: 20,
 		}
-		updatedQueueList := updateQueueList(existingQs, &updatedQ, &deploymentCelery, 3, 16, 20)
+		updatedQueueList := updateQueueList(existingQs, updatedQ, &deploymentCelery, 3, 16, 20)
 		s.Equal(updatedQ, updatedQueueList[1])
 	})
 	s.Run("does not update id or isDefault when queue exists", func() {
@@ -1362,7 +1362,7 @@ func (s *Suite) TestUpdateQueueList() {
 			MinWorkerCount:    3,
 			WorkerConcurrency: 20,
 		}
-		updatedQueueList := updateQueueList(existingQs, &updatedQRequest, &deploymentCelery, 3, 16, 20)
+		updatedQueueList := updateQueueList(existingQs, updatedQRequest, &deploymentCelery, 3, 16, 20)
 		s.Equal(updatedQ, updatedQueueList[1])
 	})
 	s.Run("does not change any queues if queue to update does not exist", func() {
@@ -1374,7 +1374,7 @@ func (s *Suite) TestUpdateQueueList() {
 			MinWorkerCount:    3,
 			WorkerConcurrency: 20,
 		}
-		updatedQueueList := updateQueueList(existingQs, &updatedQRequest, &deploymentCelery, 0, 0, 0)
+		updatedQueueList := updateQueueList(existingQs, updatedQRequest, &deploymentCelery, 0, 0, 0)
 		s.Equal(existingQs, updatedQueueList)
 	})
 	s.Run("does not change any queues if user did not request min, max, concurrency", func() {
@@ -1386,7 +1386,7 @@ func (s *Suite) TestUpdateQueueList() {
 			MinWorkerCount:    5,
 			WorkerConcurrency: 18,
 		}
-		updatedQueueList := updateQueueList(existingQs, &updatedQRequest, &deploymentCelery, -1, 0, 0)
+		updatedQueueList := updateQueueList(existingQs, updatedQRequest, &deploymentCelery, -1, 0, 0)
 		s.Equal(existingQs, updatedQueueList)
 	})
 }
