@@ -3,7 +3,6 @@ package fromfile
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -2199,11 +2198,6 @@ deployment:
 			func(input astroplatformcore.UpdateDeploymentRequest) bool {
 				request, err := input.AsUpdateStandardDeploymentRequest()
 				s.NoError(err)
-				fmt.Println("testing", *request.WorkerQueues, request.WorkloadIdentity != nil && *request.WorkloadIdentity == "test-workload-identity" &&
-					request.Type == astroplatformcore.UpdateStandardDeploymentRequestTypeSTANDARD &&
-					len(*request.WorkerQueues) == 2 &&
-					(*request.WorkerQueues)[0].AstroMachine == "A5" &&
-					(*request.WorkerQueues)[1].AstroMachine == "A10")
 				return request.WorkloadIdentity != nil && *request.WorkloadIdentity == "test-workload-identity" &&
 					request.Type == astroplatformcore.UpdateStandardDeploymentRequestTypeSTANDARD &&
 					len(*request.WorkerQueues) == 2 &&
