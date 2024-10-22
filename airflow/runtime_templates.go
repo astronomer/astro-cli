@@ -22,8 +22,8 @@ const (
 )
 
 var (
-	astroTemplateRepoURL = "https://github.com/astronomer/templates"
-	runtimeTemplateURL   = "https://updates.astronomer.io/astronomer-templates"
+	AstroTemplateRepoURL = "https://github.com/astronomer/templates"
+	RuntimeTemplateURL   = "https://updates.astronomer.io/astronomer-templates"
 )
 
 type Template struct {
@@ -37,23 +37,23 @@ type TemplatesResponse struct {
 func FetchTemplateList() ([]string, error) {
 	HTTPClient := &httputil.HTTPClient{}
 	doOpts := &httputil.DoOptions{
-		Path:   runtimeTemplateURL,
+		Path:   RuntimeTemplateURL,
 		Method: http.MethodGet,
 	}
 
 	resp, err := HTTPClient.Do(doOpts)
-	if err != nil {
-		return nil, err
+	if err != nil && resp == nil {
+		return nil, fmt.Errorf("failed to get response: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("received non-200 status code: %d", resp.StatusCode)
-	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("received non-200 status code: %d, response: %s", resp.StatusCode, string(body))
 	}
 
 	var templatesResponse TemplatesResponse
@@ -108,7 +108,7 @@ func SelectTemplate(templateList []string) (string, error) {
 
 func InitFromTemplate(templateDir, destDir string) error {
 	HTTPClient := &httputil.HTTPClient{}
-	tarballURL := fmt.Sprintf("%s/tarball/main", astroTemplateRepoURL)
+	tarballURL := fmt.Sprintf("%s/tarball/main", AstroTemplateRepoURL)
 
 	doOpts := &httputil.DoOptions{
 		Path:   tarballURL,
@@ -125,26 +125,10 @@ func InitFromTemplate(templateDir, destDir string) error {
 		return fmt.Errorf("failed to download tarball, status code: %d", resp.StatusCode)
 	}
 
-	tempDir, err := os.MkdirTemp("", "extracted-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
 	// Extract the tarball to the temporary directory
-	err = extractTarGz(resp.Body, tempDir, templateDir)
+	err = extractTarGz(resp.Body, destDir, templateDir)
 	if err != nil {
 		return fmt.Errorf("failed to extract tarball: %w", err)
-	}
-
-	// Copy the extracted template directory to the destination directory
-	srcDir := filepath.Join(tempDir, templateDir)
-
-	if _, err := os.Stat(srcDir); os.IsNotExist(err) {
-		return fmt.Errorf("template directory %s not found", templateDir)
-	}
-	if err := copyDir(srcDir, destDir); err != nil {
-		return fmt.Errorf("failed to copy template directory: %w", err)
 	}
 
 	return nil
@@ -185,11 +169,12 @@ func extractTarGz(r io.Reader, dest, templateDir string) error {
 		}
 
 		// Skip files that are not part of the desired template directory
-		if !strings.Contains(header.Name, fmt.Sprintf("/%s/", templateDir)) {
+		templatePath := strings.TrimPrefix(header.Name, baseDir+"/")
+		if !strings.Contains(templatePath, templateDir+"/") {
 			continue
 		}
 
-		relativePath := strings.TrimPrefix(header.Name, baseDir+"/")
+		relativePath := strings.TrimPrefix(templatePath, templateDir+"/")
 		targetPath := filepath.Join(dest, relativePath)
 
 		switch header.Typeflag {
@@ -214,60 +199,4 @@ func extractTarGz(r io.Reader, dest, templateDir string) error {
 		}
 	}
 	return nil
-}
-
-func copyDir(src, dst string) error {
-	srcInfo, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
-		return err
-	}
-
-	dir, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer dir.Close()
-
-	objects, err := dir.Readdir(-1)
-	if err != nil {
-		return err
-	}
-	for _, obj := range objects {
-		srcFilePath := filepath.Join(src, obj.Name())
-		dstFilePath := filepath.Join(dst, obj.Name())
-
-		if obj.IsDir() {
-			if err := copyDir(srcFilePath, dstFilePath); err != nil {
-				return err
-			}
-		} else {
-			if err := copyFile(srcFilePath, dstFilePath); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	if _, err = io.Copy(out, in); err != nil {
-		return err
-	}
-	return out.Close()
 }

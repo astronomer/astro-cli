@@ -1,11 +1,11 @@
 package airflow
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/pkg/errors"
 )
 
 func (s *Suite) TestInitDirs() {
