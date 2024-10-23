@@ -17,10 +17,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-const (
-	maxExtractSize = 100 << 20
-)
-
 var (
 	AstroTemplateRepoURL = "https://github.com/astronomer/templates"
 	RuntimeTemplateURL   = "https://updates.astronomer.io/astronomer-templates"
@@ -144,8 +140,6 @@ func extractTarGz(r io.Reader, dest, templateDir string) error {
 	tarReader := tar.NewReader(gr)
 	var baseDir string
 
-	limitTarReader := io.LimitReader(tarReader, maxExtractSize)
-
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -188,7 +182,7 @@ func extractTarGz(r io.Reader, dest, templateDir string) error {
 				return fmt.Errorf("failed to create file: %w", err)
 			}
 
-			if _, err := io.Copy(outFile, limitTarReader); err != nil {
+			if _, err := io.Copy(outFile, tarReader); err != nil { //nolint
 				outFile.Close()
 				return fmt.Errorf("failed to copy file contents: %w", err)
 			}

@@ -642,7 +642,7 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 	}
 
 	// add upgrade-test* to the gitignore
-	err = fileutil.AddLineToFile("./.gitignore", "upgrade-test*", "")
+	err = fileutil.AddLineToFile(filepath.Join(config.WorkingPath, ".gitignore"), "upgrade-test*", "")
 	if err != nil {
 		fmt.Printf("failed to add 'upgrade-test*' to .gitignore: %s", err.Error())
 	}
