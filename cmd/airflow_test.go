@@ -42,6 +42,7 @@ func (s *AirflowSuite) SetupSubTest() {
 		s.T().Fatalf("failed to create temp dir: %v", err)
 	}
 	s.tempDir = dir
+	config.WorkingPath = s.tempDir
 }
 
 func (s *AirflowSuite) TearDownTest() {
@@ -81,7 +82,6 @@ func (s *AirflowSuite) TestDevInitCommand() {
 func (s *AirflowSuite) TestDevInitCommandSoftware() {
 	s.Run("unknown software version", func() {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-		config.WorkingPath = s.tempDir
 		houstonVersion = ""
 		cmd := newAirflowInitCmd()
 		buf := new(bytes.Buffer)
@@ -98,7 +98,6 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 
 	s.Run("0.28.0 software version", func() {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-		config.WorkingPath = s.tempDir
 		houstonVersion = "0.28.0"
 		cmd := newAirflowInitCmd()
 		buf := new(bytes.Buffer)
@@ -115,7 +114,6 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 
 	s.Run("0.29.0 software version", func() {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-		config.WorkingPath = s.tempDir
 		houstonVersion = "0.29.0"
 		cmd := newAirflowInitCmd()
 		buf := new(bytes.Buffer)
@@ -132,7 +130,6 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 }
 
 func (s *AirflowSuite) TestNewAirflowInitCmd() {
-	config.WorkingPath = s.tempDir
 	cmd := newAirflowInitCmd()
 	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
@@ -169,7 +166,6 @@ func (s *AirflowSuite) TestNewAirflowUpgradeCheckCmd() {
 
 func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
 	s.Run("test airflow init with non empty dir", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowInitCmd()
 		var args []string
 
@@ -185,7 +181,6 @@ func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
 
 func (s *AirflowSuite) Test_airflowInitNoDefaultImageTag() {
 	s.Run("test airflow init with non empty dir", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowInitCmd()
 		var args []string
 
@@ -224,10 +219,9 @@ func (s *AirflowSuite) mockUserInput(i string) (r, stdin *os.File) {
 func (s *AirflowSuite) TestAirflowInit() {
 	TemplateList = func() ([]string, error) { return []string{"A", "B", "C", "D"}, nil }
 	s.Run("initialize template based project via select-template flag", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
-		cmd.Flag("select-template").Value.Set("true")
+		cmd.Flag("from-template").Value.Set("")
 		var args []string
 
 		input := []byte("1")
@@ -245,7 +239,6 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("invalid template name", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("from-template").Value.Set("E")
@@ -272,7 +265,6 @@ func (s *AirflowSuite) TestAirflowInit() {
 			s.NoError(err)
 			return nil
 		}
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("from-template").Value.Set("A")
@@ -292,7 +284,6 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("success", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		var args []string
@@ -311,7 +302,6 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("invalid args", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		args := []string{"invalid-arg"}
@@ -340,7 +330,6 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("both runtime & AC version passed", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("airflow-version").Value.Set("2.2.5")
@@ -357,7 +346,6 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("runtime version passed alongside AC flag", func() {
-		config.WorkingPath = s.tempDir
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
@@ -386,7 +374,6 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("use AC flag", func() {
-		config.WorkingPath = s.tempDir
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
@@ -414,6 +401,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("cancel non empty dir warning", func() {
+		config.WorkingPath = ""
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		args := []string{}
@@ -439,7 +427,6 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("reinitialize the same project", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		args := []string{}
@@ -614,7 +601,6 @@ func (s *AirflowSuite) TestAirflowStart() {
 
 func (s *AirflowSuite) TestAirflowUpgradeTest() {
 	s.Run("success", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowUpgradeTestCmd(nil)
 
 		mockContainerHandler := new(mocks.ContainerHandler)
@@ -629,7 +615,6 @@ func (s *AirflowSuite) TestAirflowUpgradeTest() {
 	})
 
 	s.Run("failure", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowUpgradeTestCmd(nil)
 
 		mockContainerHandler := new(mocks.ContainerHandler)
@@ -644,7 +629,6 @@ func (s *AirflowSuite) TestAirflowUpgradeTest() {
 	})
 
 	s.Run("containerHandlerInit failure", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowUpgradeTestCmd(nil)
 
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
@@ -656,7 +640,6 @@ func (s *AirflowSuite) TestAirflowUpgradeTest() {
 	})
 
 	s.Run("Both airflow and runtime version used", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowUpgradeTestCmd(nil)
 
 		airflowVersion = "something"
@@ -667,7 +650,6 @@ func (s *AirflowSuite) TestAirflowUpgradeTest() {
 	})
 
 	s.Run("Both runtime version and custom image used", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowUpgradeTestCmd(nil)
 
 		customImageName = "something"
@@ -678,7 +660,6 @@ func (s *AirflowSuite) TestAirflowUpgradeTest() {
 	})
 
 	s.Run("Both airflow version and custom image used", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowUpgradeTestCmd(nil)
 
 		customImageName = "something"
@@ -1068,7 +1049,6 @@ func (s *AirflowSuite) TestAirflowRestart() {
 
 func (s *AirflowSuite) TestAirflowPytest() {
 	s.Run("success", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowPytestCmd()
 		cmd.Flag("args").Value.Set("args-string")
 		cmd.Flag("build-secrets").Value.Set("id=mysecret,src=secrets.txt")
@@ -1088,7 +1068,6 @@ func (s *AirflowSuite) TestAirflowPytest() {
 	})
 
 	s.Run("exit code 1", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
@@ -1105,7 +1084,6 @@ func (s *AirflowSuite) TestAirflowPytest() {
 	})
 
 	s.Run("pytest file doesnot exists", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = "/testfile-not-exists"
@@ -1122,7 +1100,6 @@ func (s *AirflowSuite) TestAirflowPytest() {
 	})
 
 	s.Run("failure", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
@@ -1139,7 +1116,6 @@ func (s *AirflowSuite) TestAirflowPytest() {
 	})
 
 	s.Run("containerHandlerInit failure", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
@@ -1153,7 +1129,6 @@ func (s *AirflowSuite) TestAirflowPytest() {
 	})
 
 	s.Run("projectNameUnique failure", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowParseCmd()
 		args := []string{}
 		pytestDir = ""
@@ -1168,7 +1143,6 @@ func (s *AirflowSuite) TestAirflowPytest() {
 	})
 
 	s.Run("too many args failure failure", func() {
-		config.WorkingPath = s.tempDir
 		cmd := newAirflowParseCmd()
 		args := []string{"arg1", "arg2"}
 

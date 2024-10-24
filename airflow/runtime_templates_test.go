@@ -13,171 +13,183 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestFetchTemplateList_Success(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		response := TemplatesResponse{
-			Templates: []Template{
-				{Name: "etl"},
-				{Name: "dbt-on-astro"},
-			},
-		}
-		json.NewEncoder(w).Encode(response)
-	}))
-	defer mockServer.Close()
-
-	RuntimeTemplateURL = mockServer.URL
-
-	templates, err := FetchTemplateList()
-
-	assert.NoError(t, err)
-	assert.Contains(t, templates, "etl")
-	assert.Contains(t, templates, "dbt-on-astro")
+type RuntimeTemplateSuite struct {
+	suite.Suite
 }
 
-func TestFetchTemplateList_BadRequest(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "bad request", http.StatusBadRequest)
-	}))
-	defer mockServer.Close()
-	RuntimeTemplateURL = mockServer.URL
-
-	templates, err := FetchTemplateList()
-
-	assert.Error(t, err)
-	assert.Nil(t, templates)
-	assert.Contains(t, err.Error(), "failed to get response")
-	assert.Contains(t, err.Error(), "400")
+func TestRuntimeTemplate(t *testing.T) {
+	suite.Run(t, new(RuntimeTemplateSuite))
 }
 
-func TestFetchTemplateList_Non200Response(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusTemporaryRedirect)
-		w.Write([]byte("test response"))
-	}))
-	defer mockServer.Close()
+func (s *RuntimeTemplateSuite) TestFetchTemplateList() {
+	s.Run("fetch runtime templates list successful request", func() {
+		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			response := TemplatesResponse{
+				Templates: []Template{
+					{Name: "etl"},
+					{Name: "dbt-on-astro"},
+				},
+			}
+			json.NewEncoder(w).Encode(response)
+		}))
+		defer mockServer.Close()
 
-	RuntimeTemplateURL = mockServer.URL
+		RuntimeTemplateURL = mockServer.URL
 
-	templates, err := FetchTemplateList()
+		templates, err := FetchTemplateList()
 
-	assert.Error(t, err)
-	assert.Nil(t, templates)
-	assert.Contains(t, err.Error(), "received non-200 status code")
-	assert.Contains(t, err.Error(), "test response")
+		s.NoError(err)
+		s.Contains(templates, "etl")
+		s.Contains(templates, "dbt-on-astro")
+	})
+
+	s.Run("fetch runtime templates list with bad request", func() {
+		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "bad request", http.StatusBadRequest)
+		}))
+		defer mockServer.Close()
+		RuntimeTemplateURL = mockServer.URL
+
+		templates, err := FetchTemplateList()
+
+		s.Error(err)
+		s.Nil(templates)
+		s.Contains(err.Error(), "failed to get response")
+		s.Contains(err.Error(), "400")
+	})
+
+	s.Run("fetch runtime templates list with Non-200 response request", func() {
+		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusTemporaryRedirect)
+			w.Write([]byte("test response"))
+		}))
+		defer mockServer.Close()
+
+		RuntimeTemplateURL = mockServer.URL
+
+		templates, err := FetchTemplateList()
+
+		s.Error(err)
+		s.Nil(templates)
+		s.Contains(err.Error(), "received non-200 status code")
+		s.Contains(err.Error(), "test response")
+	})
+
+	s.Run("fetch runtime templates list with invalid JSON", func() {
+		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintln(w, "test-invalid-json")
+		}))
+		defer mockServer.Close()
+
+		RuntimeTemplateURL = mockServer.URL
+
+		templates, err := FetchTemplateList()
+
+		s.Error(err)
+		s.Nil(templates)
+		s.Contains(err.Error(), "failed to parse JSON response")
+	})
+
+	s.Run("fetch runtime templates list with empty list response", func() {
+		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			response := TemplatesResponse{Templates: []Template{}}
+			json.NewEncoder(w).Encode(response)
+		}))
+		defer mockServer.Close()
+
+		RuntimeTemplateURL = mockServer.URL
+
+		templates, err := FetchTemplateList()
+
+		s.NoError(err)
+		s.Nil(templates)
+		s.Equal(0, len(templates))
+	})
 }
 
-func TestFetchTemplateList_InvalidJSON(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "test-invalid-json")
-	}))
-	defer mockServer.Close()
+func (s *RuntimeTemplateSuite) TestInitFromTemplate() {
+	s.Run("test initilaization of template based project with Non200Response", func() {
+		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "not found", http.StatusNotFound)
+		}))
+		defer mockServer.Close()
 
-	RuntimeTemplateURL = mockServer.URL
+		AstroTemplateRepoURL = mockServer.URL
 
-	templates, err := FetchTemplateList()
+		err := InitFromTemplate("test-template", "destination")
 
-	assert.Error(t, err)
-	assert.Nil(t, templates)
-	assert.Contains(t, err.Error(), "failed to parse JSON response")
-}
+		s.Error(err)
+		s.Contains(err.Error(), "failed to download tarball")
+		s.Contains(err.Error(), "404")
+		s.Contains(err.Error(), "not found")
+	})
 
-func TestFetchTemplateList_EmptyList(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		response := TemplatesResponse{Templates: []Template{}}
-		json.NewEncoder(w).Encode(response)
-	}))
-	defer mockServer.Close()
-
-	RuntimeTemplateURL = mockServer.URL
-
-	templates, err := FetchTemplateList()
-
-	assert.NoError(t, err)
-	assert.Nil(t, templates)
-	assert.Equal(t, 0, len(templates))
-}
-
-func TestInitFromTemplate_Non200Response(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "not found", http.StatusNotFound)
-	}))
-	defer mockServer.Close()
-
-	AstroTemplateRepoURL = mockServer.URL
-
-	err := InitFromTemplate("test-template", "destination")
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to download tarball")
-	assert.Contains(t, err.Error(), "404")
-	assert.Contains(t, err.Error(), "not found")
-}
-
-func TestInitFromTemplate_Success(t *testing.T) {
-	mockTarballBuf, err := createMockTarballInMemory()
-	if err != nil {
-		t.Fatalf("failed to create mock tarball: %v", err)
-	}
-
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/gzip")
-		_, err := w.Write(mockTarballBuf.Bytes())
+	s.Run("test successfully initilaization of template based project", func() {
+		mockTarballBuf, err := createMockTarballInMemory()
 		if err != nil {
-			t.Fatalf("failed to serve mock tarball: %v", err)
+			s.Errorf(err, "failed to create mock tarball: %w", err)
 		}
-	}))
-	defer mockServer.Close()
 
-	AstroTemplateRepoURL = mockServer.URL
+		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/gzip")
+			_, err := w.Write(mockTarballBuf.Bytes())
+			if err != nil {
+				s.Errorf(err, "failed to serve mock tarball: %w", err)
+			}
+		}))
+		defer mockServer.Close()
 
-	tmpDir, err := os.MkdirTemp("", "temp")
-	assert.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+		AstroTemplateRepoURL = mockServer.URL
 
-	if err := os.MkdirAll(tmpDir, os.ModePerm); err != nil {
-		t.Fatalf("failed to create destination directory: %v", err)
-	}
+		tmpDir, err := os.MkdirTemp("", "temp")
+		s.NoError(err)
+		defer os.RemoveAll(tmpDir)
 
-	err = InitFromTemplate("A", tmpDir)
-	assert.NoError(t, err)
-
-	expectedFiles := []string{
-		"file1.txt",
-		"dags/dag.py",
-		"include",
-	}
-	for _, file := range expectedFiles {
-		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
-		assert.NoError(t, err)
-		assert.True(t, exist)
-	}
-}
-
-func TestInitFromTemplate_InvalidTarball(t *testing.T) {
-	corruptedTarball := bytes.NewBufferString("this is not a valid tarball")
-
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/gzip")
-		_, err := w.Write(corruptedTarball.Bytes())
-		if err != nil {
-			t.Fatalf("failed to serve mock tarball: %v", err)
+		if err := os.MkdirAll(tmpDir, os.ModePerm); err != nil {
+			s.Errorf(err, "failed to create destination directory: %w", err)
 		}
-	}))
-	defer mockServer.Close()
 
-	AstroTemplateRepoURL = mockServer.URL
+		err = InitFromTemplate("A", tmpDir)
+		s.NoError(err)
 
-	tmpDir, err := os.MkdirTemp("", "temp")
-	assert.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+		expectedFiles := []string{
+			"file1.txt",
+			"dags/dag.py",
+			"include",
+		}
+		for _, file := range expectedFiles {
+			exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
+			s.NoError(err)
+			s.True(exist)
+		}
+	})
 
-	err = InitFromTemplate("test", tmpDir)
+	s.Run("test initilaization of template based project with invalid tarball", func() {
+		corruptedTarball := bytes.NewBufferString("this is not a valid tarball")
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to extract tarball")
+		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/gzip")
+			_, err := w.Write(corruptedTarball.Bytes())
+			if err != nil {
+				s.Errorf(err, "failed to serve mock tarball: %w", err)
+			}
+		}))
+		defer mockServer.Close()
+
+		AstroTemplateRepoURL = mockServer.URL
+
+		tmpDir, err := os.MkdirTemp("", "temp")
+		s.NoError(err)
+		defer os.RemoveAll(tmpDir)
+
+		err = InitFromTemplate("test", tmpDir)
+
+		s.Error(err)
+		s.Contains(err.Error(), "failed to extract tarball")
+	})
 }
 
 func createMockTarballInMemory() (*bytes.Buffer, error) {
