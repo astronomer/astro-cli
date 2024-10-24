@@ -156,7 +156,7 @@ func newAirflowInitCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
-	cmd.Flags().StringVarP(&fromTemplate, "from-template", "t", "", "Provides a list of templates to select from and create the local astro project based on selected template. Please note template based astro project use latest runtime version and airflow-version flag will be ignored when creating a project with template flag")
+	cmd.Flags().StringVarP(&fromTemplate, "from-template", "t", "", "Provides a list of templates to select from and create the local astro project based on the selected template. Please note template based astro projects use the latest runtime version, so runtime-version and airflow-version flags will be ignored when creating a project with template flag")
 	cmd.Flag("from-template").NoOptDefVal = "select-template"
 	var err error
 	var avoidACFlag bool
@@ -523,9 +523,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("unable to select template from list: %w", err)
 		}
 		fromTemplate = selectedTemplate
-	}
-
-	if fromTemplate != "" {
+	} else if fromTemplate != "" {
 		templateList, err := TemplateList()
 		if err != nil {
 			return fmt.Errorf("unable to fetch template list: %w", err)

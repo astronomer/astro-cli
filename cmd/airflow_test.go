@@ -221,7 +221,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 	s.Run("initialize template based project via select-template flag", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
-		cmd.Flag("from-template").Value.Set("")
+		cmd.Flag("from-template").Value.Set("select-template")
 		var args []string
 
 		input := []byte("1")
