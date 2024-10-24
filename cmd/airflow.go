@@ -156,7 +156,7 @@ func newAirflowInitCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
-	cmd.Flags().StringVarP(&fromTemplate, "from-template", "t", "", "Template name that you want to use to create the local astro project. Please note template based astro project use latest runtime version and airflow-version flag will be ignored when creating a project with template flag")
+	cmd.Flags().StringVarP(&fromTemplate, "from-template", "t", "", "Provides a list of templates to select from and create the local astro project based on selected template. Please note template based astro project use latest runtime version and airflow-version flag will be ignored when creating a project with template flag")
 	cmd.Flag("from-template").NoOptDefVal = "select-template"
 	var err error
 	var avoidACFlag bool
