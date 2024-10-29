@@ -206,7 +206,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 //nolint:gocognit
 func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
 	// check if docker is up for macOS
-	if runtime.GOOS == "darwin" && config.CFG.DockerCommand.GetString() == dockerCmd {
+	if runtime.GOOS == "darwin" && GetContainerRuntimeBinary() == dockerCmd {
 		err := startDocker()
 		if err != nil {
 			return err
@@ -1108,7 +1108,7 @@ func (d *DockerCompose) Bash(container string) error {
 		}
 	}
 	// exec into container
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 	err = cmdExec(dockerCommand, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
 	if err != nil {
 		return err
@@ -1350,7 +1350,7 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 }
 
 var checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
-	if config.CFG.DockerCommand.GetString() == podman {
+	if GetContainerRuntimeBinary() == podman {
 		err := printStatus(settingsFile, envConns, project, composeService, airflowDockerVersion, noBrowser)
 		if err != nil {
 			if !errors.Is(err, errComposeProjectRunning) {
@@ -1416,7 +1416,7 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 			}
 		}
 	}
-	if config.CFG.DockerCommand.GetString() == podman {
+	if GetContainerRuntimeBinary() == podman {
 		fmt.Println("\nComponents will be available soon. If they are not running in the next few minutes, run 'astro dev logs --webserver | --scheduler' for details.")
 	} else {
 		fmt.Println("\nProject is running! All components are now available.")
@@ -1484,7 +1484,7 @@ func checkServiceState(serviceState, expectedState string) bool {
 }
 
 func startDocker() error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 
 	buf := new(bytes.Buffer)
 	err := cmdExec(dockerCommand, buf, buf, "ps")
@@ -1508,7 +1508,7 @@ func startDocker() error {
 }
 
 func waitForDocker() error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 
 	buf := new(bytes.Buffer)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
@@ -1529,4 +1529,40 @@ func waitForDocker() error {
 			}
 		}
 	}
+}
+
+func GetContainerRuntimeBinary() string {
+	// If the binary is hard configured, return it
+	configuredBinary := config.CFG.DockerCommand.GetString()
+	if configuredBinary != "" {
+		return configuredBinary
+	}
+
+	// Otherwise we're searching for these binaries to use
+	binaries := []string{dockerCmd, podman}
+
+	// Get the PATH environment variable
+	pathEnv := os.Getenv("PATH")
+	paths := strings.Split(pathEnv, string(os.PathListSeparator))
+	for _, binary := range binaries {
+		// Check for Windows and add .exe if necessary
+		if isWindows() {
+			binary += ".exe"
+		}
+
+		// Search for the binary in each directory in PATH
+		for _, dir := range paths {
+			binaryPath := filepath.Join(dir, binary)
+			if _, err := os.Stat(binaryPath); err == nil {
+				return binary
+			}
+		}
+	}
+
+	// If we don't find anything, return "docker"
+	return binaries[0]
+}
+
+func isWindows() bool {
+	return strings.Contains(strings.ToLower(os.Getenv("OS")), "windows")
 }

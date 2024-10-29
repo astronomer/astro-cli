@@ -71,7 +71,7 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 }
 
 func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 	if dockerfilePath == "" {
 		dockerfilePath = "Dockerfile"
 	}
@@ -131,7 +131,7 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 
 func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
 	// delete container
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 	err := cmdExec(dockerCommand, nil, nil, "rm", "astro-pytest")
 	if err != nil {
 		log.Debug(err)
@@ -239,7 +239,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 }
 
 func (d *DockerImage) ConflictTest(workingDirectory, testHomeDirectory string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 	// delete container
 	err := cmdExec(dockerCommand, nil, nil, "rm", "astro-temp-container")
 	if err != nil {
@@ -312,7 +312,7 @@ func parseExitCode(logs string) string {
 }
 
 func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 	// Define the Docker command and arguments
 	imageName := d.imageName
 	if altImageName != "" {
@@ -337,7 +337,7 @@ func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error 
 }
 
 func (d *DockerImage) Push(remoteImage, username, token string) error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 	err := cmdExec(dockerCommand, nil, nil, "tag", d.imageName, remoteImage)
 	if err != nil {
 		return fmt.Errorf("command '%s tag %s %s' failed: %w", dockerCommand, d.imageName, remoteImage, err)
@@ -439,7 +439,7 @@ func (d *DockerImage) getRegistryToAuth(imageName string) (string, error) {
 func (d *DockerImage) Pull(remoteImage, username, token string) error {
 	// Pulling image to registry
 	fmt.Println(pullingImagePrompt)
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 	var err error
 	if username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
 		var registry string
@@ -473,7 +473,7 @@ var displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback f
 }
 
 func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
@@ -496,7 +496,7 @@ func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 }
 
 func (d *DockerImage) DoesImageExist(image string) error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
@@ -508,7 +508,7 @@ func (d *DockerImage) DoesImageExist(image string) error {
 }
 
 func (d *DockerImage) ListLabels() (map[string]string, error) {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -529,7 +529,7 @@ func (d *DockerImage) ListLabels() (map[string]string, error) {
 }
 
 func (d *DockerImage) TagLocalImage(localImage string) error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 
 	err := cmdExec(dockerCommand, nil, nil, "tag", localImage, d.imageName)
 	if err != nil {
@@ -539,7 +539,7 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 }
 
 func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 
 	stdout := os.Stdout
 	stderr := os.Stderr
@@ -656,7 +656,7 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 
 // When login and push do not work use bash to run docker commands, this function is for users using colima
 func pushWithBash(authConfig *cliTypes.AuthConfig, image string) error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	dockerCommand := GetContainerRuntimeBinary()
 
 	var err error
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
