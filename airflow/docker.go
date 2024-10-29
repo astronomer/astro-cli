@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -46,7 +47,7 @@ const (
 	RuntimeImageLabel              = "io.astronomer.docker.runtime.version"
 	AirflowImageLabel              = "io.astronomer.docker.airflow.version"
 	componentName                  = "airflow"
-	podman                         = "podman"
+	podmanCmd                      = "podman"
 	dockerStateUp                  = "running"
 	dockerExitState                = "exited"
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
@@ -206,7 +207,11 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 //nolint:gocognit
 func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
 	// check if docker is up for macOS
-	if runtime.GOOS == "darwin" && GetContainerRuntimeBinary() == dockerCmd {
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+	if runtime.GOOS == "darwin" && containerRuntime == dockerCmd {
 		err := startDocker()
 		if err != nil {
 			return err
@@ -1108,8 +1113,11 @@ func (d *DockerCompose) Bash(container string) error {
 		}
 	}
 	// exec into container
-	dockerCommand := GetContainerRuntimeBinary()
-	err = cmdExec(dockerCommand, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+	err = cmdExec(containerRuntime, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
 	if err != nil {
 		return err
 	}
@@ -1350,7 +1358,11 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 }
 
 var checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
-	if GetContainerRuntimeBinary() == podman {
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+	if containerRuntime == podmanCmd {
 		err := printStatus(settingsFile, envConns, project, composeService, airflowDockerVersion, noBrowser)
 		if err != nil {
 			if !errors.Is(err, errComposeProjectRunning) {
@@ -1416,7 +1428,11 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 			}
 		}
 	}
-	if GetContainerRuntimeBinary() == podman {
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+	if containerRuntime == podmanCmd {
 		fmt.Println("\nComponents will be available soon. If they are not running in the next few minutes, run 'astro dev logs --webserver | --scheduler' for details.")
 	} else {
 		fmt.Println("\nProject is running! All components are now available.")
@@ -1484,10 +1500,13 @@ func checkServiceState(serviceState, expectedState string) bool {
 }
 
 func startDocker() error {
-	dockerCommand := GetContainerRuntimeBinary()
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
 
 	buf := new(bytes.Buffer)
-	err := cmdExec(dockerCommand, buf, buf, "ps")
+	err = cmdExec(containerRuntime, buf, buf, "ps")
 	if err != nil {
 		// open docker
 		fmt.Println("\nDocker is not running. Starting up the Docker engine…")
@@ -1508,7 +1527,10 @@ func startDocker() error {
 }
 
 func waitForDocker() error {
-	dockerCommand := GetContainerRuntimeBinary()
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
 
 	buf := new(bytes.Buffer)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
@@ -1521,7 +1543,7 @@ func waitForDocker() error {
 		// Got a tick, we should check if docker is up & running
 		case <-ticker.C:
 			buf.Reset()
-			err := cmdExec(dockerCommand, buf, buf, "ps")
+			err := cmdExec(containerRuntime, buf, buf, "ps")
 			if err != nil {
 				continue
 			} else {
@@ -1531,36 +1553,70 @@ func waitForDocker() error {
 	}
 }
 
-func GetContainerRuntimeBinary() string {
+// FileChecker interface defines a method to check if a file exists.
+type FileChecker interface {
+	Exists(path string) bool
+}
+
+// OSFileChecker is a concrete implementation of FileChecker.
+type OSFileChecker struct{}
+
+// Exists checks if the file exists in the file system.
+func (f OSFileChecker) Exists(path string) bool {
+	exists, _ := fileutil.Exists(path, nil)
+	return exists
+}
+
+// FindBinary searches for the specified binary in the provided PATH directories.
+func FindBinary(pathEnv string, binaryName string, checker FileChecker) bool {
+	paths := strings.Split(pathEnv, string(os.PathListSeparator))
+
+	if isWindows() {
+		binaryName += ".exe"
+	}
+
+	var wg sync.WaitGroup
+	found := make(chan string, 1)
+
+	for _, dir := range paths {
+		wg.Add(1)
+		go func(dir string) {
+			defer wg.Done()
+			binaryPath := filepath.Join(dir, binaryName)
+			if exists := checker.Exists(binaryPath); exists {
+				found <- binaryPath
+			}
+		}(dir)
+	}
+
+	wg.Wait()
+	close(found)
+
+	if _, ok := <-found; ok {
+		return true
+	}
+
+	return false
+}
+
+func GetContainerRuntimeBinary() (string, error) {
+	// Supported container runtime binaries
+	binaries := []string{dockerCmd, podmanCmd}
+
 	// If the binary is hard configured, return it
 	configuredBinary := config.CFG.DockerCommand.GetString()
 	if configuredBinary != "" {
-		return configuredBinary
+		return configuredBinary, nil
 	}
-
-	// Otherwise we're searching for these binaries to use
-	binaries := []string{dockerCmd, podman}
 
 	// Get the PATH environment variable
 	pathEnv := os.Getenv("PATH")
-	paths := strings.Split(pathEnv, string(os.PathListSeparator))
 	for _, binary := range binaries {
-		// Check for Windows and add .exe if necessary
-		if isWindows() {
-			binary += ".exe"
-		}
-
-		// Search for the binary in each directory in PATH
-		for _, dir := range paths {
-			binaryPath := filepath.Join(dir, binary)
-			if _, err := os.Stat(binaryPath); err == nil {
-				return binary
-			}
+		if found := FindBinary(pathEnv, binary, OSFileChecker{}); found {
+			return binary, nil
 		}
 	}
-
-	// If we don't find anything, return "docker"
-	return binaries[0]
+	return "", errors.New("Failed to find a container runtime. See the Astro CLI prerequisites for more information. https://www.astronomer.io/docs/astro/cli/install-cli")
 }
 
 func isWindows() bool {
