@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -1551,74 +1550,4 @@ func waitForDocker() error {
 			}
 		}
 	}
-}
-
-// FileChecker interface defines a method to check if a file exists.
-type FileChecker interface {
-	Exists(path string) bool
-}
-
-// OSFileChecker is a concrete implementation of FileChecker.
-type OSFileChecker struct{}
-
-// Exists checks if the file exists in the file system.
-func (f OSFileChecker) Exists(path string) bool {
-	exists, _ := fileutil.Exists(path, nil)
-	return exists
-}
-
-// FindBinary searches for the specified binary in the provided PATH directories.
-func FindBinary(pathEnv string, binaryName string, checker FileChecker) bool {
-	paths := strings.Split(pathEnv, string(os.PathListSeparator))
-
-	if isWindows() {
-		binaryName += ".exe"
-	}
-
-	var wg sync.WaitGroup
-	found := make(chan string, 1)
-
-	for _, dir := range paths {
-		wg.Add(1)
-		go func(dir string) {
-			defer wg.Done()
-			binaryPath := filepath.Join(dir, binaryName)
-			if exists := checker.Exists(binaryPath); exists {
-				found <- binaryPath
-			}
-		}(dir)
-	}
-
-	wg.Wait()
-	close(found)
-
-	if _, ok := <-found; ok {
-		return true
-	}
-
-	return false
-}
-
-func GetContainerRuntimeBinary() (string, error) {
-	// Supported container runtime binaries
-	binaries := []string{dockerCmd, podmanCmd}
-
-	// If the binary is hard configured, return it
-	configuredBinary := config.CFG.DockerCommand.GetString()
-	if configuredBinary != "" {
-		return configuredBinary, nil
-	}
-
-	// Get the PATH environment variable
-	pathEnv := os.Getenv("PATH")
-	for _, binary := range binaries {
-		if found := FindBinary(pathEnv, binary, OSFileChecker{}); found {
-			return binary, nil
-		}
-	}
-	return "", errors.New("Failed to find a container runtime. See the Astro CLI prerequisites for more information. https://www.astronomer.io/docs/astro/cli/install-cli")
-}
-
-func isWindows() bool {
-	return strings.Contains(strings.ToLower(os.Getenv("OS")), "windows")
 }
