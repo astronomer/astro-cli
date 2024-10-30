@@ -307,10 +307,7 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatfo
 		return nil, err
 	}
 
-	showWorkloadIdentity := false
-	if strings.Contains(requestedField, "workload_identity") { // if the caller has requested for workload_identity, we set the flag to true to fetch the deployment workload_identity
-		showWorkloadIdentity = true
-	}
+	showWorkloadIdentity := strings.Contains(requestedField, "workload_identity") // if the caller has requested for workload_identity, we set the flag to true to fetch the deployment workload_identity
 
 	// create a map for deployment.information
 	deploymentInfoMap, err = getDeploymentInfo(requestedDeployment)
