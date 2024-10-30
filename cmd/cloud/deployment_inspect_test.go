@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"fmt"
 	"testing"
 
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
@@ -64,6 +65,26 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		cmdArgs := []string{"inspect", "-n", "test", "-k", "metadata.cluster_id"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+	t.Run("returns empty workload identity when show-workload-identity flag is not passed", func(t *testing.T) {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
+		cmdArgs := []string{"inspect", "-n", "test"}
+		out, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, out, `workload_identity: ""`)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+	t.Run("returns workload identity when show-workload-identity flag is passed", func(t *testing.T) {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
+		cmdArgs := []string{"inspect", "-n", "test", "--show-workload-identity"}
+		out, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, out, fmt.Sprintf(`workload_identity: %s`, mockWorkloadIdentity))
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
