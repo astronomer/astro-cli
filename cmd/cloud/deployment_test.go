@@ -118,6 +118,7 @@ var (
 			DefaultTaskPodCpu:      &defaultTaskPodCPU,
 			DefaultTaskPodMemory:   &defaultTaskPodMemory,
 			WebServerAirflowApiUrl: "airflow-url",
+			WorkloadIdentity:       &mockWorkloadIdentity,
 			WorkerQueues:           &[]astroplatformcore.WorkerQueue{},
 		},
 	}
