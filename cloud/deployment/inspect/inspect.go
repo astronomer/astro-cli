@@ -112,7 +112,7 @@ const (
 	notApplicable = "N/A"
 )
 
-func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer, requestedField string, template bool) error {
+func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer, requestedField string, template, showWorkloadIdentity bool) error {
 	var (
 		requestedDeployment                                                        astroplatformcore.Deployment
 		err                                                                        error
@@ -135,7 +135,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCo
 		return err
 	}
 	// create a map for deployment.configuration
-	deploymentConfigMap, err = getDeploymentConfig(&requestedDeployment, platformCoreClient)
+	deploymentConfigMap, err = getDeploymentConfig(&requestedDeployment, platformCoreClient, showWorkloadIdentity)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func getDeploymentInfo(coreDeployment astroplatformcore.Deployment) (map[string]
 	return metadata, nil
 }
 
-func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, platformCoreClient astroplatformcore.CoreClient) (map[string]interface{}, error) {
+func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, platformCoreClient astroplatformcore.CoreClient, showWorkloadIdentity bool) (map[string]interface{}, error) {
 	var clusterName string
 	var defaultWorkerType string
 	var err error
@@ -272,6 +272,9 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	if coreDeployment.Region != nil {
 		deploymentMap["region"] = *coreDeployment.Region
 	}
+	if showWorkloadIdentity && coreDeployment.WorkloadIdentity != nil {
+		deploymentMap["workload_identity"] = *coreDeployment.WorkloadIdentity
+	}
 	return deploymentMap, nil
 }
 
@@ -304,13 +307,15 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatfo
 		return nil, err
 	}
 
+	showWorkloadIdentity := strings.Contains(requestedField, "workload_identity") // if the caller has requested for workload_identity, we set the flag to true to fetch the deployment workload_identity
+
 	// create a map for deployment.information
 	deploymentInfoMap, err = getDeploymentInfo(requestedDeployment)
 	if err != nil {
 		return nil, err
 	}
 	// create a map for deployment.configuration
-	deploymentConfigMap, err = getDeploymentConfig(&requestedDeployment, astroPlatformCore)
+	deploymentConfigMap, err = getDeploymentConfig(&requestedDeployment, astroPlatformCore, showWorkloadIdentity)
 	if err != nil {
 		return nil, err
 	}

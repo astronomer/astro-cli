@@ -118,6 +118,7 @@ var (
 			DefaultTaskPodCpu:      &defaultTaskPodCPU,
 			DefaultTaskPodMemory:   &defaultTaskPodMemory,
 			WebServerAirflowApiUrl: "airflow-url",
+			WorkloadIdentity:       &mockWorkloadIdentity,
 			WorkerQueues:           &[]astroplatformcore.WorkerQueue{},
 		},
 	}
@@ -703,10 +704,10 @@ deployment:
 		ctx.SetContextKey("workspace", ws)
 		cmdArgs := []string{
 			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
-			"--executor", "KubernetesExecutor", "--cloud-provider", "azure",
+			"--executor", "KubernetesExecutor", "--cloud-provider", "ibm",
 		}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "azure is not a valid cloud provider. It can only be gcp")
+		assert.ErrorContains(t, err, "ibm is not a valid cloud provider. It can only be gcp")
 	})
 	t.Run("creates a hosted dedicated deployment", func(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
@@ -1445,8 +1446,12 @@ func TestIsValidCloudProvider(t *testing.T) {
 		actual := isValidCloudProvider("aws")
 		assert.True(t, actual)
 	})
-	t.Run("returns false if cloudProvider is not gcp", func(t *testing.T) {
+	t.Run("returns true if cloudProvider is azure", func(t *testing.T) {
 		actual := isValidCloudProvider("azure")
+		assert.True(t, actual)
+	})
+	t.Run("returns false if cloudProvider is not gcp,aws or azure", func(t *testing.T) {
+		actual := isValidCloudProvider("ibm")
 		assert.False(t, actual)
 	})
 }

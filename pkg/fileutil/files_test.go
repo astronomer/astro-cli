@@ -573,23 +573,26 @@ func createMockServer(statusCode int, responseBody string, headers map[string][]
 	return httptest.NewServer(handler)
 }
 
-func getCapturedRequest(server *httptest.Server) *http.Request {
+func getCapturedRequest(server *httptest.Server) ([]byte, http.Header) {
 	handler, ok := server.Config.Handler.(*testHandler)
 	if !ok {
 		panic("Unexpected server handler type")
 	}
-	return handler.Request
+	return handler.RequestBody, handler.RequestHeader
 }
 
 type testHandler struct {
-	StatusCode   int
-	ResponseBody string
-	Headers      map[string][]string
-	Request      *http.Request
+	StatusCode    int
+	ResponseBody  string
+	Headers       map[string][]string
+	RequestBody   []byte
+	RequestHeader http.Header
 }
 
 func (h *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.Request = r
+	req, _ := io.ReadAll(r.Body)
+	h.RequestBody = req
+	h.RequestHeader = r.Header
 	w.WriteHeader(h.StatusCode)
 	for key, values := range h.Headers {
 		w.Header()[key] = values
@@ -632,6 +635,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           "http://localhost:8080/upload",
 			FormFileFieldName:   "file",
 			Headers:             map[string]string{},
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            3,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -660,6 +664,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           "testURL",
 			FormFileFieldName:   "file",
 			Headers:             map[string]string{},
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            3,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -688,6 +693,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           "testURL",
 			FormFileFieldName:   "file",
 			Headers:             map[string]string{},
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            3,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -721,6 +727,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           testServer.URL,
 			FormFileFieldName:   "file",
 			Headers:             headers,
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -756,6 +763,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           testServer.URL,
 			FormFileFieldName:   "file",
 			Headers:             headers,
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -782,6 +790,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           "https://astro.unit.test",
 			FormFileFieldName:   "file",
 			Headers:             map[string]string{},
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -814,6 +823,7 @@ func (s *Suite) TestUploadFile() {
 			TargetURL:           server.URL,
 			FormFileFieldName:   "file",
 			Headers:             headers,
+			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
 			InitialDelayInMS:    1 * 1000,
 			BackoffFactor:       2,
@@ -823,8 +833,45 @@ func (s *Suite) TestUploadFile() {
 
 		s.NoError(err, "Expected no error")
 		// assert the received headers
-		request := getCapturedRequest(server)
-		s.Equal("Bearer token", request.Header.Get("Authorization"))
-		s.Contains(request.Header.Get("Content-Type"), "multipart/form-data")
+		reqBody, header := getCapturedRequest(server)
+		s.Equal("Bearer token", header.Get("Authorization"))
+		s.Contains(header.Get("Content-Type"), "multipart/form-data")
+		s.Contains(string(reqBody), "description")
+		s.Contains(string(reqBody), "Deployed via <astro deploy --dags>")
+	})
+
+	s.Run("successfully uploaded with an empty description", func() {
+		server := createMockServer(http.StatusOK, "OK", make(map[string][]string))
+		defer server.Close()
+
+		filePath := "./testFile.txt"
+		fileContent := []byte("This is a test file.")
+		err := os.WriteFile(filePath, fileContent, os.ModePerm)
+		s.NoError(err, "Error creating test file")
+		defer os.Remove(filePath)
+
+		headers := map[string]string{
+			"Authorization": "Bearer token",
+			"Content-Type":  "application/json",
+		}
+
+		uploadFileArgs := UploadFileArguments{
+			FilePath:            filePath,
+			TargetURL:           server.URL,
+			FormFileFieldName:   "file",
+			Headers:             headers,
+			Description:         "",
+			MaxTries:            2,
+			InitialDelayInMS:    1 * 1000,
+			BackoffFactor:       2,
+			RetryDisplayMessage: "please wait, attempting to upload the dags",
+		}
+		err = UploadFile(&uploadFileArgs)
+
+		s.NoError(err, "Expected no error")
+		reqBody, header := getCapturedRequest(server)
+		s.Equal("Bearer token", header.Get("Authorization"))
+		s.Contains(header.Get("Content-Type"), "multipart/form-data")
+		s.NotContains(string(reqBody), "description")
 	})
 }
