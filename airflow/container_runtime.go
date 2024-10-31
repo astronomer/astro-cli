@@ -6,10 +6,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/astronomer/astro-cli/pkg/util"
-
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
 )
 
@@ -36,7 +35,7 @@ func (f OSFileChecker) Exists(path string) bool {
 // $PATH environment variable for the binary concurrently and returns a boolean result
 // indicating if the binary was found or not.
 func FindBinary(pathEnv, binaryName string, checker FileChecker) bool {
-	// Split the $PATH variable into it's individual path,
+	// Split the $PATH variable into it's individual paths,
 	// using the OS specific path separator character.
 	paths := strings.Split(pathEnv, string(os.PathListSeparator))
 
@@ -46,6 +45,8 @@ func FindBinary(pathEnv, binaryName string, checker FileChecker) bool {
 		binaryName += ".exe"
 	}
 
+	// Create a wait group to allow all binary search goroutines
+	// to finish before we return from this function.
 	var wg sync.WaitGroup
 	found := make(chan string, 1)
 
@@ -56,7 +57,15 @@ func FindBinary(pathEnv, binaryName string, checker FileChecker) bool {
 			defer wg.Done()
 			binaryPath := filepath.Join(dir, binaryName)
 			if exists := checker.Exists(binaryPath); exists {
-				found <- binaryPath
+				select {
+				// If the channel is open, send the path in, indicating a found binary.
+				case found <- binaryPath:
+				// If another goroutine has already sent a path into the channel
+				// we'd be blocked. The default clause will run instead and effectively
+				// skip sending the path into the channel, doing nothing, but allowing the
+				// goroutine to complete without blocking.
+				default:
+				}
 			}
 		}(dir)
 	}
