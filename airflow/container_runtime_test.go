@@ -63,6 +63,22 @@ func (s *Suite) TestGetContainerRuntimeBinary() {
 			},
 			expected: false,
 		},
+		{
+			name:    "Duplicated paths in $PATH, binary exists",
+			pathEnv: "/usr/local/bin:/usr/local/bin:/usr/local/bin",
+			binary:  "docker",
+			mockFiles: map[string]bool{
+				"/usr/local/bin/docker": true,
+			},
+			expected: true,
+		},
+		{
+			name:      "Duplicated paths in $PATH, binary does not exist",
+			pathEnv:   "/usr/local/bin:/usr/local/bin:/usr/local/bin",
+			binary:    "docker",
+			mockFiles: map[string]bool{},
+			expected:  false,
+		},
 	}
 
 	for _, tt := range tests {
