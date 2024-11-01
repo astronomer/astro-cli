@@ -8,8 +8,6 @@ import (
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/suite"
 )
@@ -19,7 +17,7 @@ type Suite struct {
 	origCmdExec              func(cmd string, stdout, stderr io.Writer, args ...string) error
 	origGetDockerClient      func() (client.APIClient, error)
 	origInitSettings         func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error
-	origCheckWebserverHealth func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error
+	origCheckWebserverHealth func(timeout time.Duration) error
 	origStdout               *os.File
 }
 

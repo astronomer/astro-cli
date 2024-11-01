@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -82,7 +81,6 @@ const (
 var (
 	errNoFile                  = errors.New("file specified does not exist")
 	errSettingsPath            = "error looking for settings.yaml"
-	errComposeProjectRunning   = errors.New("project is up and running")
 	errCustomImageDoesNotExist = errors.New("The custom image provided either does not exist or Docker is unable to connect to the repository")
 
 	initSettings      = settings.ConfigSettings
@@ -301,10 +299,19 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		startupTimeout = 5 * time.Minute
 	}
 
-	err = checkWebserverHealth(settingsFile, envConns, project, d.composeService, airflowDockerVersion, noBrowser, startupTimeout)
+	// Check the health of the webserver, up to the timeout.
+	// If we fail to get a 200 status code, we'll return an error message.
+	err = checkWebserverHealth(startupTimeout)
 	if err != nil {
 		return err
 	}
+
+	// If we've successfully gotten a healthcheck response, print the status.
+	err = printStatus(settingsFile, envConns, project, d.composeService, airflowDockerVersion, noBrowser)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1349,49 +1356,6 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 	return project, err
 }
 
-var checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
-	if config.CFG.DockerCommand.GetString() == podman {
-		err := printStatus(settingsFile, envConns, project, composeService, airflowDockerVersion, noBrowser)
-		if err != nil {
-			if !errors.Is(err, errComposeProjectRunning) {
-				return err
-			}
-		}
-	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		// check if webserver is healthy for user
-		err := composeService.Events(ctx, project.Name, api.EventsOptions{
-			Services: []string{WebserverDockerContainerName}, Consumer: func(event api.Event) error {
-				marshal, err := json.Marshal(map[string]interface{}{
-					"action": event.Status,
-				})
-				if err != nil {
-					return err
-				}
-				if string(marshal) == `{"action":"health_status: healthy"}` {
-					err := printStatus(settingsFile, envConns, project, composeService, airflowDockerVersion, noBrowser)
-					if err != nil {
-						return err
-					}
-				}
-
-				return nil
-			},
-		})
-		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				fmt.Printf("\n")
-				return fmt.Errorf("there might be a problem with your project starting up. The webserver health check timed out after %s but your project will continue trying to start. Run 'astro dev logs --webserver | --scheduler' for details.\n\nTry again or use the --wait flag to increase the time out", timeout)
-			}
-			if !errors.Is(err, errComposeProjectRunning) {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
 	psInfo, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
 		All: true,
@@ -1416,11 +1380,7 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 			}
 		}
 	}
-	if config.CFG.DockerCommand.GetString() == podman {
-		fmt.Println("\nComponents will be available soon. If they are not running in the next few minutes, run 'astro dev logs --webserver | --scheduler' for details.")
-	} else {
-		fmt.Println("\nProject is running! All components are now available.")
-	}
+	fmt.Println("\nProject is running! All components are now available.")
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
 	webserverURL := "http://localhost:" + parts[len(parts)-1]
 	fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
@@ -1433,7 +1393,7 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 			fmt.Println("\nUnable to open the webserver URL, please visit the following link: " + webserverURL)
 		}
 	}
-	return errComposeProjectRunning
+	return nil
 }
 
 // CheckTriggererEnabled checks if the airflow triggerer component should be enabled.
