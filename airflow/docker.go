@@ -51,7 +51,6 @@ const (
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
-	M1ImageRuntimeVersion          = "6.0.4"
 	pytestDirectory                = "tests"
 	OpenCmd                        = "open"
 	dockerCmd                      = "docker"
@@ -87,11 +86,9 @@ var (
 	exportSettings    = settings.Export
 	envExportSettings = settings.EnvExport
 
-	openURL        = browser.OpenURL
-	timeoutNum     = 60
-	tickNum        = 500
-	startupTimeout time.Duration
-	isM1           = util.IsM1
+	openURL    = browser.OpenURL
+	timeoutNum = 60
+	tickNum    = 500
 
 	majorUpdatesAirflowProviders    = []string{}
 	minorUpdatesAirflowProviders    = []string{}
@@ -273,30 +270,12 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	if err != nil {
 		return errors.Wrap(err, composeRecreateErrMsg)
 	}
-	var airflowMessage string
-	if CheckM1Image(imageLabels) {
-		airflowMessage = " This might take a few minutes…"
-	} else {
-		airflowMessage = ""
-	}
 
-	fmt.Println("\n\nAirflow is starting up!" + airflowMessage)
+	fmt.Println("\n\nAirflow is starting up!")
 
 	airflowDockerVersion, err := d.checkAiflowVersion()
 	if err != nil {
 		return err
-	}
-
-	startupTimeout = waitTime
-	// check if user provided a waitTime
-	// default is 1 minute
-	if waitTime != 1*time.Minute {
-		startupTimeout = waitTime
-	} else if CheckM1Image(imageLabels) {
-		// user did not provide a waitTime
-		// if running darwin/M1 architecture
-		// we wait for a longer startup time
-		startupTimeout = 5 * time.Minute
 	}
 
 	// Airflow webserver should be hosted at localhost
@@ -305,7 +284,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 
 	// Check the health of the webserver, up to the timeout.
 	// If we fail to get a 200 status code, we'll return an error message.
-	err = checkWebserverHealth(healthURL, startupTimeout)
+	err = checkWebserverHealth(healthURL, waitTime)
 	if err != nil {
 		return err
 	}
@@ -1423,23 +1402,6 @@ var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 	}
 
 	return versions.GreaterThanOrEqualTo(runtimeVersion, triggererAllowedRuntimeVersion), nil
-}
-
-// CheckM1Image checks if the CLI is currently running on M1 architecture
-// next it checks if the runtime version of the image building is above 6.0.4
-// if the image is M1 architecture and runtime version is less than or equal to 6.0.4 it will print true
-var CheckM1Image = func(imageLabels map[string]string) bool {
-	if !isM1(runtime.GOOS, runtime.GOARCH) {
-		// the architecture is not arm64 no need to print message
-		return false
-	}
-	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
-	if !ok {
-		// cannot determine runtime version print message by default
-		return true
-	}
-
-	return versions.LessThanOrEqualTo(runtimeVersion, M1ImageRuntimeVersion)
 }
 
 func checkServiceState(serviceState, expectedState string) bool {

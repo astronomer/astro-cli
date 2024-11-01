@@ -34,7 +34,6 @@ func TestCheckWebserverHealthFailure(t *testing.T) {
 	}
 }
 
-// Unit tests
 func TestHealthCheck(t *testing.T) {
 	// Create a mock server that returns a 200 status
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +81,8 @@ func TestHealthCheckTimeout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &http.Client{Timeout: 1 * time.Second} // Set a shorter timeout
+	// Set a shorter timeout
+	client := &http.Client{Timeout: 1 * time.Second}
 
 	ctx := context.Background()
 	code, err := healthCheck(ctx, client, server.URL)

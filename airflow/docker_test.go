@@ -190,10 +190,6 @@ services:
     
 
 `
-		mockM1Checker := func(myOS, myArch string) bool {
-			return false
-		}
-		isM1 = mockM1Checker
 		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{})
 		s.NoError(err)
 		s.Equal(expectedCfg, cfg)
@@ -325,10 +321,6 @@ services:
     
 
 `
-		mockM1Checker := func(myOS, myArch string) bool {
-			return false
-		}
-		isM1 = mockM1Checker
 		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{runtimeVersionLabelName: triggererAllowedRuntimeVersion})
 		s.NoError(err)
 		s.Equal(expectedCfg, cfg)
@@ -408,11 +400,6 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
 
-		mockIsM1 := func(myOS, myArch string) bool {
-			return false
-		}
-		isM1 = mockIsM1
-
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			s.Equal(defaultTimeOut, timeout)
 			return nil
@@ -429,8 +416,7 @@ func (s *Suite) TestDockerComposeStart() {
 	})
 
 	s.Run("success with longer default startup time", func() {
-		defaultTimeOut := 1 * time.Minute
-		expectedTimeout := 5 * time.Minute
+		expectedTimeout := 10 * time.Minute
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: noCache}).Return(nil).Once()
@@ -440,11 +426,6 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
 
-		mockIsM1 := func(myOS, myArch string) bool {
-			return true
-		}
-		isM1 = mockIsM1
-
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			s.Equal(expectedTimeout, timeout)
 			return nil
@@ -453,7 +434,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, false, defaultTimeOut, nil)
+		err := mockDockerCompose.Start("", "", "", "", noCache, false, expectedTimeout, nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
