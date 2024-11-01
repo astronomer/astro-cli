@@ -380,7 +380,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(4)
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Twice()
 
-		checkWebserverHealth = func(timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
 		}
 
@@ -413,7 +413,7 @@ func (s *Suite) TestDockerComposeStart() {
 		}
 		isM1 = mockIsM1
 
-		checkWebserverHealth = func(timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			s.Equal(defaultTimeOut, timeout)
 			return nil
 		}
@@ -445,7 +445,7 @@ func (s *Suite) TestDockerComposeStart() {
 		}
 		isM1 = mockIsM1
 
-		checkWebserverHealth = func(timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			s.Equal(expectedTimeout, timeout)
 			return nil
 		}
@@ -471,7 +471,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
 
-		checkWebserverHealth = func(timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			s.Equal(userProvidedTimeOut, timeout)
 			return nil
 		}
@@ -497,7 +497,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(4)
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Twice()
 
-		checkWebserverHealth = func(timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
 		}
 
@@ -546,7 +546,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 
-		checkWebserverHealth = func(timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
 		}
 
@@ -569,7 +569,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 
-		checkWebserverHealth = func(timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
 		}
 
@@ -593,7 +593,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(errMockDocker).Once()
 
-		checkWebserverHealth = func(timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
 		}
 
@@ -617,7 +617,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
 
-		checkWebserverHealth = func(timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return errMockDocker
 		}
 
@@ -1709,14 +1709,6 @@ func (s *Suite) TestDockerComposeRunDAG() {
 
 		composeMock.AssertExpectations(s.T())
 	})
-}
-
-func (s *Suite) TestCheckWebserverHealth() {
-	//s.Run("success", func() {
-	//	err := checkWebserverHealth(1 * time.Second)
-	//	s.NoError(err)
-	//	//s.Contains(string(out), "Project is running! All components are now available.")
-	//})
 }
 
 var errExecMock = errors.New("docker is not running")

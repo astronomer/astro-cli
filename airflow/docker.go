@@ -299,9 +299,13 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		startupTimeout = 5 * time.Minute
 	}
 
+	// Airflow webserver should be hosted at localhost
+	// from the perspective of the CLI running on the host machine.
+	healthURL := "http://localhost:8080/health"
+
 	// Check the health of the webserver, up to the timeout.
 	// If we fail to get a 200 status code, we'll return an error message.
-	err = checkWebserverHealth(startupTimeout)
+	err = checkWebserverHealth(healthURL, startupTimeout)
 	if err != nil {
 		return err
 	}
