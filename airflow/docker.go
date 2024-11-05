@@ -280,7 +280,8 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 
 	// Airflow webserver should be hosted at localhost
 	// from the perspective of the CLI running on the host machine.
-	healthURL := "http://localhost:8080/health"
+	webserverPort := config.CFG.WebserverPort.GetString()
+	healthURL := fmt.Sprintf("http://localhost:%s/health", webserverPort)
 
 	// Check the health of the webserver, up to the timeout.
 	// If we fail to get a 200 status code, we'll return an error message.

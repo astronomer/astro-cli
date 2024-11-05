@@ -107,7 +107,7 @@ astro dev init --airflow-version 2.2.3
 	errPytestArgs          = errors.New("you can only pass one pytest file or directory")
 	buildSecrets           = []string{}
 	errNoCompose           = errors.New("cannot use '--compose-file' without '--compose' flag")
-	defaultWaitTime        = 5 * time.Minute
+	defaultWaitTime        = 1 * time.Minute
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
