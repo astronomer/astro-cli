@@ -34,7 +34,7 @@ require (
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/fatih/camelcase v1.0.0
 	github.com/ghodss/yaml v1.0.0
-	github.com/golang-jwt/jwt/v4 v4.5.0
+	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/golangci/golangci-lint v1.55.2
 	github.com/google/go-github/v48 v48.2.0
 	github.com/mitchellh/mapstructure v1.5.0
