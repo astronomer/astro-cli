@@ -193,6 +193,7 @@ var (
 		SchedulerSize:          &schedulerTestSize,
 		CloudProvider:          &cloudProvider,
 		IsDevelopmentMode:      &isDevelopmentMode,
+		WorkloadIdentity:       &workloadIdentity,
 		ScalingSpec: &astroplatformcore.DeploymentScalingSpec{
 			HibernationSpec: &astroplatformcore.DeploymentHibernationSpec{
 				Override:  &hibernationOverride,
@@ -251,7 +252,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.Namespace)
 		assert.Contains(t, out.String(), deploymentName)
@@ -265,7 +266,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", true)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", true, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
 		assert.NotContains(t, out.String(), deploymentResponse.Namespace)
@@ -279,7 +280,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "json", mockPlatformCoreClient, mockCoreClient, out, "", false)
+		err := Inspect(workspaceID, "", deploymentID, "json", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.Namespace)
 		assert.Contains(t, out.String(), deploymentName)
@@ -293,7 +294,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "json", mockPlatformCoreClient, mockCoreClient, out, "", true)
+		err := Inspect(workspaceID, "", deploymentID, "json", mockPlatformCoreClient, mockCoreClient, out, "", true, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
 		assert.NotContains(t, out.String(), deploymentResponse.Namespace)
@@ -307,7 +308,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "configuration.cluster_name", false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "configuration.cluster_name", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), *deploymentResponse.ClusterName)
 		mockCoreClient.AssertExpectations(t)
@@ -320,7 +321,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", "", "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false)
+		err := Inspect(workspaceID, "", "", "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentName)
 		mockCoreClient.AssertExpectations(t)
@@ -331,7 +332,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, errGetDeployment).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
 		assert.ErrorIs(t, err, errGetDeployment)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -340,7 +341,7 @@ func TestInspect(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errGetDeployment).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
 		assert.ErrorIs(t, err, errGetDeployment)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -351,7 +352,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "no-exist-information", false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "no-exist-information", false, false)
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, "", out.String())
 		mockCoreClient.AssertExpectations(t)
@@ -366,7 +367,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
 		assert.ErrorIs(t, err, errMarshal)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -375,7 +376,7 @@ func TestInspect(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 		out := new(bytes.Buffer)
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
 		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -391,7 +392,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err = Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false)
+		err = Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), "N/A")
 		assert.Contains(t, out.String(), deploymentName)
@@ -404,8 +405,34 @@ func TestInspect(t *testing.T) {
 	t.Run("when no deployments in workspace", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
-		err := Inspect(workspaceID, "", "", "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false)
+		err := Inspect(workspaceID, "", "", "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
 		assert.NoError(t, err)
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("returns an error when trying to fetch the workload identity field with flag set to false", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "configuration.workload_identity", false, false)
+		assert.ErrorIs(t, err, errKeyNotFound)
+		assert.Equal(t, out.String(), "")
+		mockCoreClient.AssertExpectations(t)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("returns actual workload identity when the flag is set to true", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "configuration.workload_identity", false, true)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), workloadIdentity)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
@@ -478,7 +505,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			CloudProvider:     string(*sourceDeployment.CloudProvider),
 			IsDevelopmentMode: *sourceDeployment.IsDevelopmentMode,
 		}
-		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
+		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
@@ -515,7 +542,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			ResourceQuotaMemory:  *sourceDeployment.ResourceQuotaMemory,
 			IsDevelopmentMode:    *sourceDeployment.IsDevelopmentMode,
 		}
-		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
+		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
@@ -532,7 +559,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 	t.Run("returns a deployment map", func(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedDeployment := map[string]interface{}{
@@ -625,7 +652,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 
 	t.Run("returns a yaml formatted printable deployment", func(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 
@@ -720,7 +747,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
-		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment2, nodePools)
 
@@ -809,7 +836,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.ScalingSpec.HibernationSpec.Override.OverrideUntil = &overrideUntil
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
-		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment2, nodePools)
 
@@ -907,7 +934,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
-		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment2, nodePools)
 		printableDeployment := map[string]interface{}{
@@ -1015,7 +1042,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		printableDeployment := map[string]interface{}{
@@ -1085,7 +1112,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		decodeToStruct = errorReturningDecode
 		defer restoreDecode(originalDecode)
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
@@ -1098,7 +1125,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		yamlMarshal = errReturningYAMLMarshal
 		defer restoreYAMLMarshal(originalMarshal)
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
@@ -1111,7 +1138,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		jsonMarshal = errReturningJSONMarshal
 		defer restoreJSONMarshal(originalMarshal)
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
+		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
@@ -1125,7 +1152,7 @@ func TestGetSpecificField(t *testing.T) {
 	sourceDeployment.Status = "UNHEALTHY"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	info, _ := getDeploymentInfo(sourceDeployment)
-	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
+	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
 	assert.NoError(t, err)
 	additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 	printableDeployment := map[string]interface{}{
@@ -1241,7 +1268,7 @@ func TestGetTemplate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	info, _ := getDeploymentInfo(sourceDeployment)
-	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient)
+	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
 	assert.NoError(t, err)
 	additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 

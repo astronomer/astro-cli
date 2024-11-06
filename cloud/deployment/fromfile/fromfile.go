@@ -182,7 +182,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 	if jsonOutput {
 		outputFormat = jsonFormat
 	}
-	return inspect.Inspect(workspaceID, "", existingDeployment.Id, outputFormat, astroPlatformCore, coreClient, out, "", false)
+	return inspect.Inspect(workspaceID, "", existingDeployment.Id, outputFormat, astroPlatformCore, coreClient, out, "", false, true)
 }
 
 // createOrUpdateDeployment transforms an inspect.FormattedDeployment into astroplateformcore CreateDeploymentInput or
@@ -241,7 +241,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				workerQueue.WorkerConcurrency = listQueues[i].WorkerConcurrency
 				workerQueue.AstroMachine = astroplatformcore.WorkerQueueRequestAstroMachine(strings.ToUpper(*listQueues[i].AstroMachine))
 				// set default values if none were specified
-				requestedWorkerQueue := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions, &astroMachine)
+				requestedWorkerQueue := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, workerQueue, defaultOptions, &astroMachine)
 				// check if queue is valid
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 					return errNoUseWorkerQueues
@@ -251,7 +251,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 					return err
 				}
 				// add it to the list of queues to be created
-				listQueuesRequest = append(listQueuesRequest, *requestedWorkerQueue)
+				listQueuesRequest = append(listQueuesRequest, requestedWorkerQueue)
 			} else {
 				var workerQueue astroplatformcore.HybridWorkerQueueRequest
 				workerQueue.Id = &listQueues[i].Id
@@ -266,12 +266,12 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 					return errUseDefaultWorkerType
 				}
 				// set default values if none were specified
-				requestedHybridWorkerQueue := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &workerQueue, defaultOptions)
+				requestedHybridWorkerQueue := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, workerQueue, defaultOptions)
 				err = workerqueue.IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue, defaultOptions)
 				if err != nil {
 					return err
 				}
-				workerQueue = *requestedHybridWorkerQueue
+				workerQueue = requestedHybridWorkerQueue
 				// add it to the list of queues to be created
 				listHybridQueuesRequest = append(listHybridQueuesRequest, workerQueue)
 			}
