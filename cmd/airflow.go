@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -491,12 +492,18 @@ func newObjectExportCmd() *cobra.Command {
 
 // Use project name for image name
 func airflowInit(cmd *cobra.Command, args []string) error {
+	pwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	if len(args) > 0 {
+		projectName = args[0]
+		config.WorkingPath = filepath.Join(config.WorkingPath, projectName)
+	}
+
 	// Validate project name
 	if projectName != "" {
-		// error if project name has spaces
-		if len(args) > 0 {
-			return errProjectNameSpaces
-		}
 		projectNameValid := regexp.
 			MustCompile(`^(?i)[a-z0-9]([a-z0-9_-]*[a-z0-9])$`).
 			MatchString
@@ -519,7 +526,6 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided)
-	var err error
 	defaultImageTag := runtimeVersion
 	if defaultImageTag == "" {
 		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
@@ -529,16 +535,28 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	defaultImageName := airflow.AstroRuntimeImageName
 	if useAstronomerCertified {
 		defaultImageName = airflow.AstronomerCertifiedImageName
-		fmt.Printf("Initializing Astro project\nPulling Airflow development files from Astronomer Certified Airflow Version %s\n", defaultImageTag)
-	} else {
-		fmt.Printf("Initializing Astro project\nPulling Airflow development files from Astro Runtime %s\n", defaultImageTag)
+	}
+
+	projectDirExists, err := fileutil.Exists(config.WorkingPath, nil)
+	if err != nil {
+		return err
+	}
+	if !projectDirExists {
+		err := os.Mkdir(config.WorkingPath, 0755)
+		if err != nil {
+			return err
+		}
+	}
+	err = os.Chdir(config.WorkingPath)
+	if err != nil {
+		return err
 	}
 
 	emptyDir := fileutil.IsEmptyDir(config.WorkingPath)
 
 	if !emptyDir {
 		i, _ := input.Confirm(
-			fmt.Sprintf("%s \nYou are not in an empty directory. Are you sure you want to initialize a project?", config.WorkingPath))
+			fmt.Sprintf("%s is not an empty directory. Are you sure you want to initialize a project here?", config.WorkingPath))
 
 		if !i {
 			fmt.Println("Canceling project initialization...")
@@ -546,7 +564,10 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	exists := config.ProjectConfigExists()
+	exists, err := config.IsProjectDir(config.WorkingPath)
+	if err != nil {
+		return err
+	}
 	if !exists {
 		config.CreateProjectConfig(config.WorkingPath)
 	}
@@ -569,6 +590,10 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf(configReinitProjectConfigMsg+"\n", config.WorkingPath)
 	} else {
 		fmt.Printf(configInitProjectConfigMsg+"\n", config.WorkingPath)
+	}
+
+	if pwd != config.WorkingPath {
+		fmt.Println("To begin developing, change to your project directory with `cd " + config.WorkingPath + "`")
 	}
 
 	return nil
