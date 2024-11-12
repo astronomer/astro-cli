@@ -8,6 +8,9 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
+
+	"github.com/briandowns/spinner"
 )
 
 // Command represents a command to be executed.
@@ -27,6 +30,7 @@ type ConnectionInfo struct {
 type Machine struct {
 	Name           string
 	ConnectionInfo ConnectionInfo
+	State          string
 }
 
 // Execute runs the Podman command and returns the output.
@@ -39,12 +43,16 @@ type Machine struct {
 //}
 
 // Execute runs the Podman command and returns the output.
-func (p *Command) Execute() (string, error) {
+func (p *Command) Execute(suffix string) (string, error) {
 	cmd := exec.Command(p.Command, p.Args...)
 	var out bytes.Buffer
+	s := spinner.New(spinner.CharSets[14], 200*time.Millisecond) // Use a character set and speed
+	s.Suffix = suffix
+	s.Start()
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 	err := cmd.Run()
+	s.Stop()
 	return out.String(), err
 }
 
@@ -59,7 +67,7 @@ func formatMachineName(s string) string {
 	return s
 }
 
-func SetDockerHost(machine *Machine) error {
+func setDockerHost(machine *Machine) error {
 	if machine == nil {
 		return fmt.Errorf("Machine does not exist")
 	}
@@ -69,30 +77,15 @@ func SetDockerHost(machine *Machine) error {
 	return err
 }
 
-// StartPodmanMachine starts the Podman machine.
 func StartPodmanMachine(name string) error {
-	machineName := "astro-" + formatMachineName(name)
-
-	machine, err := InspectPodmanMachine(machineName)
-	if machine != nil {
-		SetDockerHost(machine)
-		return nil
-	}
-
 	podmanCmd := Command{
 		Command: "podman",
-		Args:    []string{"machine", "init", machineName, "--now"},
+		Args:    []string{"machine", "start", name},
 	}
-	output, err := podmanCmd.Execute()
+	output, err := podmanCmd.Execute(" starting podman machine...")
 	if err != nil {
-		return fmt.Errorf("error starting Podman machine: %s, output: %s", err, output)
+		return fmt.Errorf("error stopping Podman machine: %s, output: %s", err, output)
 	}
-
-	machine, err = InspectPodmanMachine(machineName)
-	if err != nil {
-		return err
-	}
-	SetDockerHost(machine)
 	return nil
 }
 
@@ -102,9 +95,21 @@ func StopPodmanMachine(name string) error {
 		Command: "podman",
 		Args:    []string{"machine", "stop", name},
 	}
-	output, err := podmanCmd.Execute()
+	output, err := podmanCmd.Execute(" stopping podman machine...")
 	if err != nil {
 		return fmt.Errorf("error stopping Podman machine: %s, output: %s", err, output)
+	}
+	return nil
+}
+
+func deletePodmanMachine(name string) error {
+	podmanCmd := Command{
+		Command: "podman",
+		Args:    []string{"machine", "rm", "-f", name},
+	}
+	output, err := podmanCmd.Execute(" removing podman machine...")
+	if err != nil {
+		return fmt.Errorf("error removing Podman machine: %s, output: %s", err, output)
 	}
 	return nil
 }
@@ -115,7 +120,7 @@ func InspectPodmanMachine(machineName string) (*Machine, error) {
 		Command: "podman",
 		Args:    []string{"machine", "inspect", machineName},
 	}
-	output, err := podmanCmd.Execute()
+	output, err := podmanCmd.Execute("")
 	if err != nil {
 		return nil, fmt.Errorf("error inspecting Podman machine: %s, output: %s", err, output)
 	}
@@ -138,7 +143,7 @@ func ListPodmanMachines() ([]Machine, error) {
 		Command: "podman",
 		Args:    []string{"machine", "ls", "--format", "json"},
 	}
-	output, err := podmanCmd.Execute()
+	output, err := podmanCmd.Execute("Listing podman machine...")
 	if err != nil {
 		return nil, fmt.Errorf("error listing Podman machines: %s, output: %s", err, output)
 	}
@@ -157,4 +162,75 @@ func FindMachineByName(items []Machine, name string) *Machine {
 		}
 	}
 	return nil // Return nil if no item was found
+}
+
+func InitPodmanMachineCMD() error {
+	projectName, err := ProjectNameUnique()
+	if err != nil {
+		return fmt.Errorf("error retrieving working directory: %w", err)
+	}
+	machineName := "astro-" + formatMachineName(projectName)
+
+	machine, err := InspectPodmanMachine(machineName)
+	if machine != nil {
+		if machine.State == "stopped" {
+			err = StartPodmanMachine(machineName)
+			if err != nil {
+				return fmt.Errorf("error starting Podman machine: %s", err)
+			}
+		}
+		setDockerHost(machine)
+		return nil
+	}
+
+	podmanCmd := Command{
+		Command: "podman",
+		Args:    []string{"machine", "init", machineName, "--now"},
+	}
+	output, err := podmanCmd.Execute(" initializing podman machine")
+	if err != nil {
+		return fmt.Errorf("error starting Podman machine: %s, output: %s", err, output)
+	}
+
+	machine, err = InspectPodmanMachine(machineName)
+	if err != nil {
+		return err
+	}
+	setDockerHost(machine)
+	return nil
+}
+
+func SetPodmanDockerHost() error {
+	projectName, err := ProjectNameUnique()
+	if err != nil {
+		return fmt.Errorf("error retrieving working directory: %w", err)
+	}
+	machineName := "astro-" + formatMachineName(projectName)
+	machine, err := InspectPodmanMachine(machineName)
+	if err != nil {
+		return err
+	}
+	setDockerHost(machine)
+	return nil
+
+}
+
+func StopAndKillPodmanMachine() error {
+	projectName, err := ProjectNameUnique()
+	if err != nil {
+		return fmt.Errorf("error retrieving working directory: %w", err)
+	}
+	machineName := "astro-" + formatMachineName(projectName)
+
+	err = StopPodmanMachine(machineName)
+	if err != nil {
+		return err
+	}
+
+	err = deletePodmanMachine(machineName)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

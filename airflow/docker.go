@@ -174,13 +174,6 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 		imageName = projectName
 	}
 
-	if config.CFG.DockerCommand.GetString() == podman {
-		err := StartPodmanMachine(projectName)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
 	composeFile := Composeyml
 
@@ -390,12 +383,6 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 				if strings.Contains(psInfo[i].Name, PostgresDockerContainerName) {
 					if psInfo[i].State == dockerExitState {
 						logrus.Debug("postgres container reached exited state")
-						if config.CFG.DockerCommand.GetString() == podman {
-							err := StopPodmanMachine(d.projectName)
-							if err != nil {
-								return err
-							}
-						}
 						return nil
 					}
 					logrus.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
