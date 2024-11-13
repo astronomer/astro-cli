@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/briandowns/spinner"
@@ -33,6 +31,11 @@ type Machine struct {
 	State          string
 }
 
+type Container struct {
+	Name   string
+	Labels map[string]string
+}
+
 // Execute runs the Podman command and returns the output.
 //func (p *Command) Execute() (string, error) {
 //	err := cmdExec(p.Command, os.Stdout, os.Stderr, p.Args...)
@@ -54,17 +57,6 @@ func (p *Command) Execute(suffix string) (string, error) {
 	err := cmd.Run()
 	s.Stop()
 	return out.String(), err
-}
-
-// formatMachineName converts a string to kebab case and removes special characters.
-func formatMachineName(s string) string {
-	// Convert to lower case
-	s = strings.ToLower(s)
-	// Replace special characters with hyphens
-	s = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(s, "-")
-	// Trim leading and trailing hyphens
-	s = strings.Trim(s, "-")
-	return s
 }
 
 func setDockerHost(machine *Machine) error {
@@ -109,6 +101,24 @@ func StopPodmanMachine(name string) error {
 		return fmt.Errorf("error stopping Podman machine: %s, output: %s", err, output)
 	}
 	return nil
+}
+
+// ListContainers lists all pods in the machine.
+func ListContainers() ([]Container, error) {
+	podmanCmd := Command{
+		Command: "podman",
+		Args:    []string{"ps", "--format", "json"},
+	}
+	output, err := podmanCmd.Execute("")
+	if err != nil {
+		return nil, fmt.Errorf("error listing Podman containers: %s, output: %s", err, output)
+	}
+	var containers []Container
+	err = json.Unmarshal([]byte(output), &containers)
+	if err != nil {
+		return nil, err
+	}
+	return containers, nil
 }
 
 func deletePodmanMachine(name string) error {
@@ -174,13 +184,12 @@ func FindMachineByName(items []Machine, name string) *Machine {
 }
 
 func InitPodmanMachineCMD() error {
-	projectName, err := ProjectNameUnique()
-	if err != nil {
-		return fmt.Errorf("error retrieving working directory: %w", err)
-	}
-	machineName := "astro-" + formatMachineName(projectName)
+	machineName := "astro"
 
 	machines, err := ListPodmanMachines()
+	if err != nil {
+		return err
+	}
 	machine := FindMachineByName(machines, machineName)
 
 	if machine != nil {
@@ -205,7 +214,7 @@ func InitPodmanMachineCMD() error {
 
 	podmanCmd := Command{
 		Command: "podman",
-		Args:    []string{"machine", "init", machineName, "--now"},
+		Args:    []string{"machine", "init", machineName, "--memory", "4096", "--now"},
 	}
 	output, err := podmanCmd.Execute(" initializing podman machine")
 	if err != nil {
@@ -221,11 +230,7 @@ func InitPodmanMachineCMD() error {
 }
 
 func SetPodmanDockerHost() error {
-	projectName, err := ProjectNameUnique()
-	if err != nil {
-		return fmt.Errorf("error retrieving working directory: %w", err)
-	}
-	machineName := "astro-" + formatMachineName(projectName)
+	machineName := "astro"
 	machine, err := InspectPodmanMachine(machineName)
 	if err != nil {
 		return err
@@ -236,20 +241,42 @@ func SetPodmanDockerHost() error {
 }
 
 func StopAndKillPodmanMachine() error {
-	projectName, err := ProjectNameUnique()
-	if err != nil {
-		return fmt.Errorf("error retrieving working directory: %w", err)
-	}
-	machineName := "astro-" + formatMachineName(projectName)
+	machineName := "astro"
 
-	err = StopPodmanMachine(machineName)
+	machines, err := ListPodmanMachines()
 	if err != nil {
 		return err
 	}
+	machine := FindMachineByName(machines, machineName)
 
-	err = deletePodmanMachine(machineName)
-	if err != nil {
-		return err
+	if machine != nil {
+		containers, err := ListContainers()
+		if err != nil {
+			return err
+		}
+		projectNames := make(map[string]struct{})
+		for _, item := range containers {
+			// Check if "project.name" exists in the Labels map
+			if projectName, exists := item.Labels["com.docker.compose.project"]; exists {
+				// Add the project name to the map (map keys are unique)
+				projectNames[projectName] = struct{}{}
+			}
+		}
+		// At this point our project has already been stopped, and
+		// we are checking to see if any additional proejcts are running
+		if len(projectNames) > 0 {
+			return nil
+		}
+
+		err = StopPodmanMachine(machineName)
+		if err != nil {
+			return err
+		}
+
+		err = deletePodmanMachine(machineName)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
