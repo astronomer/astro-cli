@@ -72,8 +72,17 @@ func setDockerHost(machine *Machine) error {
 		return fmt.Errorf("Machine does not exist")
 	}
 	dockerHost := "unix://" + machine.ConnectionInfo.PodmanSocket.Path
-	fmt.Println("Setting DOCKER_HOST to", dockerHost)
 	err := os.Setenv("DOCKER_HOST", dockerHost)
+
+	podmanCmd := Command{
+		Command: "podman",
+		Args:    []string{"system", "connection", "default", machine.Name},
+	}
+	output, err := podmanCmd.Execute("")
+	if err != nil {
+		return fmt.Errorf("error initalizing Podman machine: %s, output: %s", err, output)
+	}
+
 	return err
 }
 
@@ -171,16 +180,27 @@ func InitPodmanMachineCMD() error {
 	}
 	machineName := "astro-" + formatMachineName(projectName)
 
-	machine, err := InspectPodmanMachine(machineName)
+	machines, err := ListPodmanMachines()
+	machine := FindMachineByName(machines, machineName)
+
 	if machine != nil {
+		machine, err = InspectPodmanMachine(machineName)
+		if err != nil {
+			return err
+		}
+		// TODO: Handle all possible states
+		if machine.State == "running" {
+			setDockerHost(machine)
+			return nil
+		}
 		if machine.State == "stopped" {
 			err = StartPodmanMachine(machineName)
 			if err != nil {
-				return fmt.Errorf("error starting Podman machine: %s", err)
+				return fmt.Errorf("error stopping Podman machine: %s", err)
 			}
+			setDockerHost(machine)
+			return nil
 		}
-		setDockerHost(machine)
-		return nil
 	}
 
 	podmanCmd := Command{
@@ -233,4 +253,11 @@ func StopAndKillPodmanMachine() error {
 	}
 
 	return nil
+}
+
+func IsPodmanMachineRunning(machineName string) bool {
+	// List the running podman machines and find the one corresponding to this project.
+	machines, _ := ListPodmanMachines()
+	machine := FindMachineByName(machines, machineName)
+	return machine != nil && machine.State == "running"
 }
