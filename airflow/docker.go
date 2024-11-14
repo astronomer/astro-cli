@@ -212,8 +212,6 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		}
 	}
 
-	fmt.Println("Project started successfully with DOCKER_HOST set to:", os.Getenv("DOCKER_HOST"))
-
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,

@@ -83,7 +83,7 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 	if err != nil {
 		return fmt.Errorf("reading dockerfile: %w", err)
 	}
-	if dockerCommand == "podman" {
+	if containerRuntime == podmanCmd {
 		args = append(args, "--format", "docker")
 	}
 	if addPullFlag {
