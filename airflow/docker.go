@@ -46,7 +46,7 @@ const (
 	RuntimeImageLabel              = "io.astronomer.docker.runtime.version"
 	AirflowImageLabel              = "io.astronomer.docker.airflow.version"
 	componentName                  = "airflow"
-	podman                         = "podman"
+	podmanCmd                      = "podman"
 	dockerStateUp                  = "running"
 	dockerExitState                = "exited"
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
@@ -206,7 +206,11 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 //nolint:gocognit
 func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
 	// check if docker is up for macOS
-	if runtime.GOOS == "darwin" && config.CFG.DockerCommand.GetString() == dockerCmd {
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+	if runtime.GOOS == "darwin" && containerRuntime == dockerCmd {
 		err := startDocker()
 		if err != nil {
 			return err
@@ -1108,8 +1112,11 @@ func (d *DockerCompose) Bash(container string) error {
 		}
 	}
 	// exec into container
-	dockerCommand := config.CFG.DockerCommand.GetString()
-	err = cmdExec(dockerCommand, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+	err = cmdExec(containerRuntime, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
 	if err != nil {
 		return err
 	}
@@ -1350,7 +1357,11 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 }
 
 var checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
-	if config.CFG.DockerCommand.GetString() == podman {
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+	if containerRuntime == podmanCmd {
 		err := printStatus(settingsFile, envConns, project, composeService, airflowDockerVersion, noBrowser)
 		if err != nil {
 			if !errors.Is(err, errComposeProjectRunning) {
@@ -1416,7 +1427,11 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 			}
 		}
 	}
-	if config.CFG.DockerCommand.GetString() == podman {
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+	if containerRuntime == podmanCmd {
 		fmt.Println("\nComponents will be available soon. If they are not running in the next few minutes, run 'astro dev logs --webserver | --scheduler' for details.")
 	} else {
 		fmt.Println("\nProject is running! All components are now available.")
@@ -1484,10 +1499,13 @@ func checkServiceState(serviceState, expectedState string) bool {
 }
 
 func startDocker() error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
 
 	buf := new(bytes.Buffer)
-	err := cmdExec(dockerCommand, buf, buf, "ps")
+	err = cmdExec(containerRuntime, buf, buf, "ps")
 	if err != nil {
 		// open docker
 		fmt.Println("\nDocker is not running. Starting up the Docker engine…")
@@ -1508,7 +1526,10 @@ func startDocker() error {
 }
 
 func waitForDocker() error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
 
 	buf := new(bytes.Buffer)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
@@ -1521,7 +1542,7 @@ func waitForDocker() error {
 		// Got a tick, we should check if docker is up & running
 		case <-ticker.C:
 			buf.Reset()
-			err := cmdExec(dockerCommand, buf, buf, "ps")
+			err := cmdExec(containerRuntime, buf, buf, "ps")
 			if err != nil {
 				continue
 			} else {
