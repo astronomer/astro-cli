@@ -109,12 +109,6 @@ services:
       {{if .DuplicateImageVolumes}}
       - airflow_logs:/usr/local/airflow/logs
       {{end}}
-    healthcheck:
-      test: curl --fail http://webserver:8080/health || exit 1
-      interval: 2s
-      retries: 15
-      start_period: 5s
-      timeout: 60s
     {{ .AirflowEnvFile }}
 {{if .TriggererEnabled}}
   triggerer:
