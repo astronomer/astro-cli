@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/briandowns/spinner"
@@ -85,7 +86,10 @@ func StartPodmanMachine(name string) error {
 	}
 	output, err := podmanCmd.Execute(" starting podman machine...")
 	if err != nil {
-		return fmt.Errorf("error stopping Podman machine: %s, output: %s", err, output)
+		if strings.Contains(output, "VM already running or starting") {
+			return fmt.Errorf("please stop the existing running Podman machine and restart the astro project")
+		}
+		return fmt.Errorf("error starting Podman machine: %s, output: %s", err, output)
 	}
 	return nil
 }
@@ -205,7 +209,7 @@ func InitPodmanMachineCMD() error {
 		if machine.State == "stopped" {
 			err = StartPodmanMachine(machineName)
 			if err != nil {
-				return fmt.Errorf("error stopping Podman machine: %s", err)
+				return fmt.Errorf("error starting Podman machine: %s", err)
 			}
 			setDockerHost(machine)
 			return nil
@@ -218,6 +222,9 @@ func InitPodmanMachineCMD() error {
 	}
 	output, err := podmanCmd.Execute(" initializing podman machine")
 	if err != nil {
+		if strings.Contains(output, "VM already running or starting") {
+			return fmt.Errorf("please stop the existing running Podman machine and restart the astro project")
+		}
 		return fmt.Errorf("error starting Podman machine: %s, output: %s", err, output)
 	}
 
