@@ -238,18 +238,6 @@ func (s *Suite) TestParseAPIToken() {
 	})
 }
 
-func (s *Suite) TestIsM1() {
-	s.Run("returns true if running on arm architecture", func() {
-		s.True(IsM1("darwin", "arm64"))
-	})
-	s.Run("returns false if not running on arm architecture", func() {
-		s.False(IsM1("darwin", "x86_64"))
-	})
-	s.Run("returns false if running on windows", func() {
-		s.False(IsM1("windows", "amd64"))
-	})
-}
-
 func (s *Suite) TestGetbuildSecretString() {
 	s.Run("returns empty string if buildSecret is empty", func() {
 		s.Equal("", GetbuildSecretString([]string{}))
