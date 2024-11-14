@@ -63,6 +63,46 @@ func (s *Suite) TestDockerImageBuild() {
 		s.NoError(err)
 	})
 
+	s.Run("build with no --pull", func() {
+		dockerfileContent := "FROM nginx"
+		dockerfile, _ := os.CreateTemp(os.TempDir(), "temp-Dockerfile")
+		defer os.Remove(dockerfile.Name())
+		dockerfile.WriteString(dockerfileContent)
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.NotContains(args, "--pull")
+			return nil
+		}
+		err = handler.Build(dockerfile.Name(), "", options)
+		s.NoError(err)
+	})
+
+	s.Run("build with no --pull with multiple images", func() {
+		dockerfileContent := `FROM nginx
+FROM quay.io/astronomer/astro-runtime:12.0.0`
+		dockerfile, _ := os.CreateTemp(os.TempDir(), "temp-Dockerfile")
+		defer os.Remove(dockerfile.Name())
+		dockerfile.WriteString(dockerfileContent)
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.NotContains(args, "--pull")
+			return nil
+		}
+		err = handler.Build(dockerfile.Name(), "", options)
+		s.NoError(err)
+	})
+
+	s.Run("build with --pull", func() {
+		dockerfileContent := "FROM quay.io/astronomer/astro-runtime:12.0.0"
+		dockerfile, _ := os.CreateTemp(os.TempDir(), "temp-Dockerfile")
+		defer os.Remove(dockerfile.Name())
+		dockerfile.WriteString(dockerfileContent)
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "--pull")
+			return nil
+		}
+		err = handler.Build(dockerfile.Name(), "", options)
+		s.NoError(err)
+	})
+
 	s.Run("build --label", func() {
 		options.Labels = []string{"io.astronomer.skip.revision=true"}
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
