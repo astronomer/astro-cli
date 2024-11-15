@@ -38,15 +38,6 @@ type Container struct {
 }
 
 // Execute runs the Podman command and returns the output.
-//func (p *Command) Execute() (string, error) {
-//	err := cmdExec(p.Command, os.Stdout, os.Stderr, p.Args...)
-//	if err != nil {
-//		return err
-//	}
-//	return nil
-//}
-
-// Execute runs the Podman command and returns the output.
 func (p *Command) Execute(suffix string) (string, error) {
 	cmd := exec.Command(p.Command, p.Args...)
 	var out bytes.Buffer

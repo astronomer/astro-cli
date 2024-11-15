@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -200,18 +199,6 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 //
 //nolint:gocognit
 func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
-	// check if docker is up for macOS
-	containerRuntime, err := GetContainerRuntimeBinary()
-	if err != nil {
-		return err
-	}
-	if runtime.GOOS == "darwin" && containerRuntime == dockerCmd {
-		err := startDocker()
-		if err != nil {
-			return err
-		}
-	}
-
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
