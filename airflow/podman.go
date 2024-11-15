@@ -38,11 +38,14 @@ type Container struct {
 }
 
 // Execute runs the Podman command and returns the output.
-func (p *Command) Execute(suffix string) (string, error) {
+func (p *Command) Execute(message, finalMessage string) (string, error) {
 	cmd := exec.Command(p.Command, p.Args...)
 	var out bytes.Buffer
 	s := spinner.New(spinner.CharSets[14], 200*time.Millisecond) // Use a character set and speed
-	s.Suffix = suffix
+	s.Suffix = " " + message
+	if finalMessage != "" {
+		s.FinalMSG = finalMessage + "\n"
+	}
 	s.Start()
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -62,7 +65,7 @@ func setDockerHost(machine *Machine) error {
 		Command: "podman",
 		Args:    []string{"system", "connection", "default", machine.Name},
 	}
-	output, err := podmanCmd.Execute("")
+	output, err := podmanCmd.Execute("", "")
 	if err != nil {
 		return fmt.Errorf("error initalizing Podman machine: %s, output: %s", err, output)
 	}
@@ -75,7 +78,7 @@ func StartPodmanMachine(name string) error {
 		Command: "podman",
 		Args:    []string{"machine", "start", name},
 	}
-	output, err := podmanCmd.Execute(" starting podman machine...")
+	output, err := podmanCmd.Execute("Starting machine...", "Machine started successfully.")
 	if err != nil {
 		if strings.Contains(output, "VM already running or starting") {
 			return fmt.Errorf("please stop the existing running Podman machine and restart the astro project")
@@ -91,7 +94,7 @@ func StopPodmanMachine(name string) error {
 		Command: "podman",
 		Args:    []string{"machine", "stop", name},
 	}
-	output, err := podmanCmd.Execute(" stopping podman machine...")
+	output, err := podmanCmd.Execute("Stopping machine...", "Machine stopped successfully.")
 	if err != nil {
 		return fmt.Errorf("error stopping Podman machine: %s, output: %s", err, output)
 	}
@@ -104,7 +107,7 @@ func ListContainers() ([]Container, error) {
 		Command: "podman",
 		Args:    []string{"ps", "--format", "json"},
 	}
-	output, err := podmanCmd.Execute("")
+	output, err := podmanCmd.Execute("", "")
 	if err != nil {
 		return nil, fmt.Errorf("error listing Podman containers: %s, output: %s", err, output)
 	}
@@ -121,7 +124,7 @@ func deletePodmanMachine(name string) error {
 		Command: "podman",
 		Args:    []string{"machine", "rm", "-f", name},
 	}
-	output, err := podmanCmd.Execute(" removing podman machine...")
+	output, err := podmanCmd.Execute("Removing machine...", "Machine removed successfully.")
 	if err != nil {
 		return fmt.Errorf("error removing Podman machine: %s, output: %s", err, output)
 	}
@@ -134,7 +137,7 @@ func InspectPodmanMachine(machineName string) (*Machine, error) {
 		Command: "podman",
 		Args:    []string{"machine", "inspect", machineName},
 	}
-	output, err := podmanCmd.Execute("")
+	output, err := podmanCmd.Execute("", "")
 	if err != nil {
 		return nil, fmt.Errorf("error inspecting Podman machine: %s, output: %s", err, output)
 	}
@@ -157,7 +160,7 @@ func ListPodmanMachines() ([]Machine, error) {
 		Command: "podman",
 		Args:    []string{"machine", "ls", "--format", "json"},
 	}
-	output, err := podmanCmd.Execute("Listing podman machine...")
+	output, err := podmanCmd.Execute("", "")
 	if err != nil {
 		return nil, fmt.Errorf("error listing Podman machines: %s, output: %s", err, output)
 	}
@@ -178,7 +181,7 @@ func FindMachineByName(items []Machine, name string) *Machine {
 	return nil // Return nil if no item was found
 }
 
-func InitPodmanMachineCMD() error {
+func InitPodmanMachine() error {
 	machineName := "astro"
 
 	machines, err := ListPodmanMachines()
@@ -211,7 +214,8 @@ func InitPodmanMachineCMD() error {
 		Command: "podman",
 		Args:    []string{"machine", "init", machineName, "--memory", "4096", "--now"},
 	}
-	output, err := podmanCmd.Execute(" initializing podman machine")
+	output, err := podmanCmd.Execute("Astro uses container technology to run your Airflow project. "+
+		"Please wait while we get things ready. This may take a few moments...", "Machine initialized successfully.")
 	if err != nil {
 		if strings.Contains(output, "VM already running or starting") {
 			return fmt.Errorf("please stop the existing running Podman machine and restart the astro project")

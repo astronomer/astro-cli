@@ -24,7 +24,7 @@ func PreRunHook(cmd *cobra.Command, args []string) error {
 	}
 
 	if containerRuntime == podmanCmd {
-		if err := InitPodmanMachineCMD(); err != nil {
+		if err := InitPodmanMachine(); err != nil {
 			return err
 		}
 	}

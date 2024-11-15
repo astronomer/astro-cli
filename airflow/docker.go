@@ -262,7 +262,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		return errors.Wrap(err, composeRecreateErrMsg)
 	}
 
-	fmt.Println("\n\nAirflow is starting up!")
+	fmt.Println("\nAirflow is starting up!")
 
 	airflowDockerVersion, err := d.checkAiflowVersion()
 	if err != nil {
