@@ -127,7 +127,6 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 		stdout = nil
 		stderr = nil
 	}
-	fmt.Println(args)
 	err = cmdExec(containerRuntime, stdout, stderr, args...)
 	if err != nil {
 		return fmt.Errorf("command '%s build -t %s failed: %w", containerRuntime, d.imageName, err)

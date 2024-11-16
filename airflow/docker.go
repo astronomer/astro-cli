@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/briandowns/spinner"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -262,7 +263,10 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		return errors.Wrap(err, composeRecreateErrMsg)
 	}
 
-	fmt.Println("\nAirflow is starting up!")
+	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Use a character set and speed
+	s.Suffix = " Airflow is starting up..."
+	s.FinalMSG = "Airflow is up and running!\n"
+	s.Start()
 
 	airflowDockerVersion, err := d.checkAiflowVersion()
 	if err != nil {
@@ -280,6 +284,8 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	if err != nil {
 		return err
 	}
+
+	s.Stop()
 
 	// If we've successfully gotten a healthcheck response, print the status.
 	err = printStatus(settingsFile, envConns, project, d.composeService, airflowDockerVersion, noBrowser)
@@ -1358,11 +1364,10 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 			}
 		}
 	}
-	fmt.Println("\nProject is running! All components are now available.")
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
 	webserverURL := "http://localhost:" + parts[len(parts)-1]
-	fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
-	fmt.Printf(composeLinkPostgresMsg+"\n", ansi.Bold("localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
+	fmt.Printf(composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
+	fmt.Printf(composeLinkPostgresMsg+"\n", ansi.Bold("postgresql://localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
 	fmt.Printf(composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
 	fmt.Printf(postgresUserPasswordMsg+"\n", ansi.Bold("postgres:postgres"))
 	if !(noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {

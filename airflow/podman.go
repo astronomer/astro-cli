@@ -3,6 +3,7 @@ package airflow
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,7 +27,17 @@ type ConnectionInfo struct {
 	PodmanSocket PodmanSocket
 }
 
-type Machine struct {
+type ListMachine struct {
+	Name     string
+	Running  bool
+	Starting bool
+	LastUp   string
+	//CPUs     string
+	//Memory   string
+	//DiskSize string
+}
+
+type InspectMachine struct {
 	Name           string
 	ConnectionInfo ConnectionInfo
 	State          string
@@ -41,7 +52,7 @@ type Container struct {
 func (p *Command) Execute(message, finalMessage string) (string, error) {
 	cmd := exec.Command(p.Command, p.Args...)
 	var out bytes.Buffer
-	s := spinner.New(spinner.CharSets[14], 200*time.Millisecond) // Use a character set and speed
+	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Use a character set and speed
 	s.Suffix = " " + message
 	if finalMessage != "" {
 		s.FinalMSG = finalMessage + "\n"
@@ -54,7 +65,7 @@ func (p *Command) Execute(message, finalMessage string) (string, error) {
 	return out.String(), err
 }
 
-func setDockerHost(machine *Machine) error {
+func setDockerHost(machine *InspectMachine) error {
 	if machine == nil {
 		return fmt.Errorf("Machine does not exist")
 	}
@@ -94,7 +105,7 @@ func StopPodmanMachine(name string) error {
 		Command: "podman",
 		Args:    []string{"machine", "stop", name},
 	}
-	output, err := podmanCmd.Execute("Stopping machine...", "Machine stopped successfully.")
+	output, err := podmanCmd.Execute("Stopping machine...", "")
 	if err != nil {
 		return fmt.Errorf("error stopping Podman machine: %s, output: %s", err, output)
 	}
@@ -119,12 +130,12 @@ func ListContainers() ([]Container, error) {
 	return containers, nil
 }
 
-func deletePodmanMachine(name string) error {
+func RemovePodmanMachine(name string) error {
 	podmanCmd := Command{
 		Command: "podman",
 		Args:    []string{"machine", "rm", "-f", name},
 	}
-	output, err := podmanCmd.Execute("Removing machine...", "Machine removed successfully.")
+	output, err := podmanCmd.Execute("Removing machine...", "Machine removed successfully")
 	if err != nil {
 		return fmt.Errorf("error removing Podman machine: %s, output: %s", err, output)
 	}
@@ -132,7 +143,7 @@ func deletePodmanMachine(name string) error {
 }
 
 // InspectPodmanMachine inspects a given podman machine name.
-func InspectPodmanMachine(machineName string) (*Machine, error) {
+func InspectPodmanMachine(machineName string) (*InspectMachine, error) {
 	podmanCmd := Command{
 		Command: "podman",
 		Args:    []string{"machine", "inspect", machineName},
@@ -142,7 +153,7 @@ func InspectPodmanMachine(machineName string) (*Machine, error) {
 		return nil, fmt.Errorf("error inspecting Podman machine: %s, output: %s", err, output)
 	}
 
-	var machines []Machine
+	var machines []InspectMachine
 	err = json.Unmarshal([]byte(output), &machines)
 	if err != nil {
 		return nil, err
@@ -155,7 +166,7 @@ func InspectPodmanMachine(machineName string) (*Machine, error) {
 }
 
 // ListPodmanMachines lists all Podman machines.
-func ListPodmanMachines() ([]Machine, error) {
+func ListPodmanMachines() ([]ListMachine, error) {
 	podmanCmd := Command{
 		Command: "podman",
 		Args:    []string{"machine", "ls", "--format", "json"},
@@ -164,7 +175,7 @@ func ListPodmanMachines() ([]Machine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error listing Podman machines: %s, output: %s", err, output)
 	}
-	var machines []Machine
+	var machines []ListMachine
 	err = json.Unmarshal([]byte(output), &machines)
 	if err != nil {
 		return nil, err
@@ -172,7 +183,7 @@ func ListPodmanMachines() ([]Machine, error) {
 	return machines, nil
 }
 
-func FindMachineByName(items []Machine, name string) *Machine {
+func FindMachineByName(items []ListMachine, name string) *ListMachine {
 	for _, item := range items {
 		if item.Name == name {
 			return &item // Return a pointer to the found item
@@ -191,21 +202,21 @@ func InitPodmanMachine() error {
 	machine := FindMachineByName(machines, machineName)
 
 	if machine != nil {
-		machine, err = InspectPodmanMachine(machineName)
+		m, err := InspectPodmanMachine(machineName)
 		if err != nil {
 			return err
 		}
 		// TODO: Handle all possible states
-		if machine.State == "running" {
-			setDockerHost(machine)
+		if m.State == "running" {
+			setDockerHost(m)
 			return nil
 		}
-		if machine.State == "stopped" {
+		if m.State == "stopped" {
 			err = StartPodmanMachine(machineName)
 			if err != nil {
 				return fmt.Errorf("error starting Podman machine: %s", err)
 			}
-			setDockerHost(machine)
+			setDockerHost(m)
 			return nil
 		}
 	}
@@ -223,23 +234,25 @@ func InitPodmanMachine() error {
 		return fmt.Errorf("error starting Podman machine: %s, output: %s", err, output)
 	}
 
-	machine, err = InspectPodmanMachine(machineName)
+	m, err := InspectPodmanMachine(machineName)
 	if err != nil {
 		return err
 	}
-	setDockerHost(machine)
+	setDockerHost(m)
 	return nil
 }
 
 func SetPodmanDockerHost() error {
 	machineName := "astro"
-	machine, err := InspectPodmanMachine(machineName)
-	if err != nil {
-		return err
+	if IsPodmanMachineRunning(machineName) {
+		machine, err := InspectPodmanMachine(machineName)
+		if err != nil {
+			return err
+		}
+		setDockerHost(machine)
+		return nil
 	}
-	setDockerHost(machine)
-	return nil
-
+	return errors.New("project is not running")
 }
 
 func StopAndKillPodmanMachine() error {
@@ -265,7 +278,7 @@ func StopAndKillPodmanMachine() error {
 			}
 		}
 		// At this point our project has already been stopped, and
-		// we are checking to see if any additional proejcts are running
+		// we are checking to see if any additional projects are running
 		if len(projectNames) > 0 {
 			return nil
 		}
@@ -275,7 +288,7 @@ func StopAndKillPodmanMachine() error {
 			return err
 		}
 
-		err = deletePodmanMachine(machineName)
+		err = RemovePodmanMachine(machineName)
 		if err != nil {
 			return err
 		}
@@ -288,5 +301,11 @@ func IsPodmanMachineRunning(machineName string) bool {
 	// List the running podman machines and find the one corresponding to this project.
 	machines, _ := ListPodmanMachines()
 	machine := FindMachineByName(machines, machineName)
-	return machine != nil && machine.State == "running"
+	return machine != nil && machine.Running == true
+}
+func PodmanMachineExists(machineName string) bool {
+	// List the running podman machines and find the one corresponding to this project.
+	machines, _ := ListPodmanMachines()
+	machine := FindMachineByName(machines, machineName)
+	return machine != nil
 }

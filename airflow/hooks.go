@@ -1,6 +1,7 @@
 package airflow
 
 import (
+	"errors"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/spf13/cobra"
 	"runtime"
@@ -48,6 +49,30 @@ func StopPreRunHook(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	return nil
+}
+
+func KillPreRunHook(cmd *cobra.Command, args []string) error {
+	if err := utils.EnsureProjectDir(cmd, args); err != nil {
+		return err
+	}
+
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+
+	if containerRuntime == podmanCmd {
+		if !IsPodmanMachineRunning("astro") {
+			if err := StopAndKillPodmanMachine(); err != nil {
+				return err
+			}
+			return errors.New("project is not running")
+		}
+		if err := SetPodmanDockerHost(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

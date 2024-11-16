@@ -323,7 +323,7 @@ func newAirflowKillCmd() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		PreRunE:  airflow.PreRunHook,
+		PreRunE:  airflow.KillPreRunHook,
 		RunE:     airflowKill,
 		PostRunE: airflow.KillPostRunHook,
 	}
