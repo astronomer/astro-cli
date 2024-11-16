@@ -63,7 +63,7 @@ func KillPreRunHook(cmd *cobra.Command, args []string) error {
 	}
 
 	if containerRuntime == podmanCmd {
-		if !IsPodmanMachineRunning("astro") {
+		if !IsPodmanMachineRunning() {
 			if err := StopAndKillPodmanMachine(); err != nil {
 				return err
 			}

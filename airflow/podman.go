@@ -13,6 +13,8 @@ import (
 	"github.com/briandowns/spinner"
 )
 
+var podmanMachineName = "astro"
+
 // Command represents a command to be executed.
 type Command struct {
 	Command string
@@ -32,9 +34,6 @@ type ListMachine struct {
 	Running  bool
 	Starting bool
 	LastUp   string
-	//CPUs     string
-	//Memory   string
-	//DiskSize string
 }
 
 type InspectMachine struct {
@@ -84,10 +83,10 @@ func setDockerHost(machine *InspectMachine) error {
 	return err
 }
 
-func StartPodmanMachine(name string) error {
+func StartPodmanMachine() error {
 	podmanCmd := Command{
 		Command: "podman",
-		Args:    []string{"machine", "start", name},
+		Args:    []string{"machine", "start", podmanMachineName},
 	}
 	output, err := podmanCmd.Execute("Starting machine...", "Machine started successfully.")
 	if err != nil {
@@ -143,10 +142,10 @@ func RemovePodmanMachine(name string) error {
 }
 
 // InspectPodmanMachine inspects a given podman machine name.
-func InspectPodmanMachine(machineName string) (*InspectMachine, error) {
+func InspectPodmanMachine() (*InspectMachine, error) {
 	podmanCmd := Command{
 		Command: "podman",
-		Args:    []string{"machine", "inspect", machineName},
+		Args:    []string{"machine", "inspect", podmanMachineName},
 	}
 	output, err := podmanCmd.Execute("", "")
 	if err != nil {
@@ -159,7 +158,7 @@ func InspectPodmanMachine(machineName string) (*InspectMachine, error) {
 		return nil, err
 	}
 	if len(machines) == 0 {
-		return nil, fmt.Errorf("machine not found: %s", machineName)
+		return nil, fmt.Errorf("machine not found: %s", podmanMachineName)
 	}
 
 	return &machines[0], nil
@@ -193,16 +192,10 @@ func FindMachineByName(items []ListMachine, name string) *ListMachine {
 }
 
 func InitPodmanMachine() error {
-	machineName := "astro"
-
-	machines, err := ListPodmanMachines()
-	if err != nil {
-		return err
-	}
-	machine := FindMachineByName(machines, machineName)
+	machine := GetPodmanMachine()
 
 	if machine != nil {
-		m, err := InspectPodmanMachine(machineName)
+		m, err := InspectPodmanMachine()
 		if err != nil {
 			return err
 		}
@@ -212,7 +205,7 @@ func InitPodmanMachine() error {
 			return nil
 		}
 		if m.State == "stopped" {
-			err = StartPodmanMachine(machineName)
+			err = StartPodmanMachine()
 			if err != nil {
 				return fmt.Errorf("error starting Podman machine: %s", err)
 			}
@@ -223,7 +216,7 @@ func InitPodmanMachine() error {
 
 	podmanCmd := Command{
 		Command: "podman",
-		Args:    []string{"machine", "init", machineName, "--memory", "4096", "--now"},
+		Args:    []string{"machine", "init", podmanMachineName, "--memory", "4096", "--now"},
 	}
 	output, err := podmanCmd.Execute("Astro uses container technology to run your Airflow project. "+
 		"Please wait while we get things ready. This may take a few moments...", "Machine initialized successfully.")
@@ -234,7 +227,7 @@ func InitPodmanMachine() error {
 		return fmt.Errorf("error starting Podman machine: %s, output: %s", err, output)
 	}
 
-	m, err := InspectPodmanMachine(machineName)
+	m, err := InspectPodmanMachine()
 	if err != nil {
 		return err
 	}
@@ -243,9 +236,8 @@ func InitPodmanMachine() error {
 }
 
 func SetPodmanDockerHost() error {
-	machineName := "astro"
-	if IsPodmanMachineRunning(machineName) {
-		machine, err := InspectPodmanMachine(machineName)
+	if IsPodmanMachineRunning() {
+		machine, err := InspectPodmanMachine()
 		if err != nil {
 			return err
 		}
@@ -297,15 +289,15 @@ func StopAndKillPodmanMachine() error {
 	return nil
 }
 
-func IsPodmanMachineRunning(machineName string) bool {
+func IsPodmanMachineRunning() bool {
 	// List the running podman machines and find the one corresponding to this project.
 	machines, _ := ListPodmanMachines()
-	machine := FindMachineByName(machines, machineName)
+	machine := FindMachineByName(machines, podmanMachineName)
 	return machine != nil && machine.Running == true
 }
-func PodmanMachineExists(machineName string) bool {
-	// List the running podman machines and find the one corresponding to this project.
+
+func GetPodmanMachine() *ListMachine {
 	machines, _ := ListPodmanMachines()
-	machine := FindMachineByName(machines, machineName)
-	return machine != nil
+	machine := FindMachineByName(machines, podmanMachineName)
+	return machine
 }
