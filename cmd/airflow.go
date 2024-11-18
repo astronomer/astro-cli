@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ var (
 	projectName            string
 	runtimeVersion         string
 	airflowVersion         string
+	fromTemplate           string
 	envFile                string
 	customImageName        string
 	settingsFile           string
@@ -90,6 +92,9 @@ astro dev init --runtime-version 4.1.0
 
 # Initialize a new Astro project with the latest Astro Runtime version based on Airflow 2.2.3
 astro dev init --airflow-version 2.2.3
+
+# Initialize a new template based Astro project with the latest Astro Runtime version
+astro dev init --from-template
 `
 	dockerfile = "Dockerfile"
 
@@ -107,6 +112,7 @@ astro dev init --airflow-version 2.2.3
 	errPytestArgs          = errors.New("you can only pass one pytest file or directory")
 	buildSecrets           = []string{}
 	errNoCompose           = errors.New("cannot use '--compose-file' without '--compose' flag")
+	TemplateList           = airflow.FetchTemplateList
 	defaultWaitTime        = 1 * time.Minute
 )
 
@@ -151,6 +157,8 @@ func newAirflowInitCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
+	cmd.Flags().StringVarP(&fromTemplate, "from-template", "t", "", "Provides a list of templates to select from and create the local astro project based on the selected template. Please note template based astro projects use the latest runtime version, so runtime-version and airflow-version flags will be ignored when creating a project with template flag")
+	cmd.Flag("from-template").NoOptDefVal = "select-template"
 	var err error
 	var avoidACFlag bool
 
@@ -510,6 +518,22 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 
+	if fromTemplate == "select-template" {
+		selectedTemplate, err := selectedTemplate()
+		if err != nil {
+			return fmt.Errorf("unable to select template from list: %w", err)
+		}
+		fromTemplate = selectedTemplate
+	} else if fromTemplate != "" {
+		templateList, err := TemplateList()
+		if err != nil {
+			return fmt.Errorf("unable to fetch template list: %w", err)
+		}
+		if !isValidTemplate(templateList, fromTemplate) {
+			return fmt.Errorf("%s is not a valid template name. Available templates are: %s", fromTemplate, templateList)
+		}
+	}
+
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersions
@@ -561,7 +585,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag)
+	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag, fromTemplate)
 	if err != nil {
 		return err
 	}
@@ -616,7 +640,7 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 	}
 
 	// add upgrade-test* to the gitignore
-	err = fileutil.AddLineToFile("./.gitignore", "upgrade-test*", "")
+	err = fileutil.AddLineToFile(filepath.Join(config.WorkingPath, ".gitignore"), "upgrade-test*", "")
 	if err != nil {
 		fmt.Printf("failed to add 'upgrade-test*' to .gitignore: %s", err.Error())
 	}
@@ -944,4 +968,21 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		}
 	}
 	return defaultImageTag
+}
+
+func isValidTemplate(templateList []string, template string) bool {
+	return slices.Contains(templateList, template)
+}
+
+func selectedTemplate() (string, error) {
+	templateList, err := TemplateList()
+	if err != nil {
+		return "", fmt.Errorf("unable to fetch template list: %w", err)
+	}
+	selectedTemplate, err := airflow.SelectTemplate(templateList)
+	if err != nil {
+		return "", fmt.Errorf("unable to select template from list: %w", err)
+	}
+
+	return selectedTemplate, nil
 }
