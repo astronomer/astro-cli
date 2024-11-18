@@ -72,7 +72,7 @@ func FetchTemplateList() ([]string, error) {
 }
 
 func SelectTemplate(templateList []string) (string, error) {
-	TemplatesTab := printutil.Table{
+	templatesTab := printutil.Table{
 		Padding:        []int{5, 30},
 		DynamicPadding: true,
 		Header:         []string{"#", "TEMPLATE"},
@@ -86,11 +86,11 @@ func SelectTemplate(templateList []string) (string, error) {
 	// Add rows for each template and index them
 	for i, template := range templateList {
 		index := i + 1
-		TemplatesTab.AddRow([]string{strconv.Itoa(index), template}, false)
+		templatesTab.AddRow([]string{strconv.Itoa(index), template}, false)
 		templateMap[strconv.Itoa(index)] = template
 	}
 
-	TemplatesTab.Print(os.Stdout)
+	templatesTab.Print(os.Stdout)
 
 	// Prompt user for selection
 	choice := input.Text("\n> ")
