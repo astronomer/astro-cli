@@ -3,7 +3,6 @@ package airflow
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -64,7 +63,7 @@ func (p *Command) Execute(message, finalMessage string) (string, error) {
 	return out.String(), err
 }
 
-func setDockerHost(machine *InspectMachine) error {
+func ConfigureMachineEnvironment(machine *InspectMachine) error {
 	if machine == nil {
 		return fmt.Errorf("Machine does not exist")
 	}
@@ -201,7 +200,7 @@ func InitPodmanMachine() error {
 		}
 		// TODO: Handle all possible states
 		if m.State == "running" {
-			setDockerHost(m)
+			ConfigureMachineEnvironment(m)
 			return nil
 		}
 		if m.State == "stopped" {
@@ -209,7 +208,7 @@ func InitPodmanMachine() error {
 			if err != nil {
 				return fmt.Errorf("error starting Podman machine: %s", err)
 			}
-			setDockerHost(m)
+			ConfigureMachineEnvironment(m)
 			return nil
 		}
 	}
@@ -231,20 +230,8 @@ func InitPodmanMachine() error {
 	if err != nil {
 		return err
 	}
-	setDockerHost(m)
+	ConfigureMachineEnvironment(m)
 	return nil
-}
-
-func SetPodmanDockerHost() error {
-	if IsPodmanMachineRunning() {
-		machine, err := InspectPodmanMachine()
-		if err != nil {
-			return err
-		}
-		setDockerHost(machine)
-		return nil
-	}
-	return errors.New("project is not running")
 }
 
 func StopAndKillPodmanMachine() error {

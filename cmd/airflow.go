@@ -228,7 +228,7 @@ func newAirflowStartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		PreRunE: airflow.PreRunHook,
+		PreRunE: airflow.EnsureRuntimePreRunHook,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return airflowStart(cmd, args, astroCoreClient)
 		},
@@ -258,7 +258,7 @@ func newAirflowPSCmd() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		PreRunE: airflow.PreRunHook,
+		PreRunE: airflow.SetRuntimeIfExistsPreRunHook,
 		RunE:    airflowPS,
 	}
 	return cmd
@@ -269,7 +269,7 @@ func newAirflowRunCmd() *cobra.Command {
 		Use:                "run",
 		Short:              "Run Airflow CLI commands within your local Airflow environment",
 		Long:               "Run Airflow CLI commands within your local Airflow environment. These commands run in the webserver container but can interact with your local scheduler, workers, and metadata database.",
-		PreRunE:            airflow.PreRunHook,
+		PreRunE:            airflow.EnsureRuntimePreRunHook,
 		RunE:               airflowRun,
 		Example:            RunExample,
 		DisableFlagParsing: true,
@@ -286,7 +286,7 @@ func newAirflowLogsCmd() *cobra.Command {
 		Use:     "logs",
 		Short:   "Display component logs for your local Airflow environment",
 		Long:    "Display scheduler, worker, and webserver logs for your local Airflow environment",
-		PreRunE: airflow.PreRunHook,
+		PreRunE: airflow.SetRuntimeIfExistsPreRunHook,
 		RunE:    airflowLogs,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -308,7 +308,7 @@ func newAirflowStopCmd() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		PreRunE: airflow.StopPreRunHook,
+		PreRunE: airflow.SetRuntimeIfExistsPreRunHook,
 		RunE:    airflowStop,
 	}
 	return cmd
@@ -339,7 +339,7 @@ func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		PreRunE: airflow.PreRunHook,
+		PreRunE: airflow.SetRuntimeIfExistsPreRunHook,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return airflowRestart(cmd, args, astroCoreClient)
 		},
@@ -407,7 +407,7 @@ func newAirflowUpgradeCheckCmd() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		PreRunE:            airflow.PreRunHook,
+		PreRunE:            airflow.EnsureRuntimePreRunHook,
 		RunE:               airflowUpgradeCheck,
 		DisableFlagParsing: true,
 	}
@@ -424,7 +424,7 @@ func newAirflowBashCmd() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		PreRunE: airflow.PreRunHook,
+		PreRunE: airflow.EnsureRuntimePreRunHook,
 		RunE:    airflowBash,
 	}
 	cmd.Flags().BoolVarP(&schedulerExec, "scheduler", "s", false, "Exec into the scheduler container")
@@ -457,7 +457,7 @@ func newObjectImportCmd() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		PreRunE: airflow.PreRunHook,
+		PreRunE: airflow.EnsureRuntimePreRunHook,
 		RunE:    airflowSettingsImport,
 	}
 	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Import connections from a settings YAML file")
@@ -477,7 +477,7 @@ func newObjectExportCmd() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		PreRunE: airflow.PreRunHook,
+		PreRunE: airflow.EnsureRuntimePreRunHook,
 		RunE:    airflowSettingsExport,
 	}
 	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Export connections to a settings YAML or env file")

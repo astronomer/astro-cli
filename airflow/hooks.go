@@ -7,7 +7,9 @@ import (
 	"runtime"
 )
 
-func PreRunHook(cmd *cobra.Command, args []string) error {
+// EnsureRuntimePreRunHook ensures that the project directory exists
+// and starts the container runtime if necessary.
+func EnsureRuntimePreRunHook(cmd *cobra.Command, args []string) error {
 	if err := utils.EnsureProjectDir(cmd, args); err != nil {
 		return err
 	}
@@ -33,7 +35,9 @@ func PreRunHook(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func StopPreRunHook(cmd *cobra.Command, args []string) error {
+// SetRuntimeIfExistsPreRunHook sets the container runtime if its running,
+// otherwise we bail with an error message.
+func SetRuntimeIfExistsPreRunHook(cmd *cobra.Command, args []string) error {
 	if err := utils.EnsureProjectDir(cmd, args); err != nil {
 		return err
 	}
@@ -44,14 +48,22 @@ func StopPreRunHook(cmd *cobra.Command, args []string) error {
 	}
 
 	if containerRuntime == podmanCmd {
-		if err := SetPodmanDockerHost(); err != nil {
-			return err
+		if IsPodmanMachineRunning() {
+			machine, err := InspectPodmanMachine()
+			if err != nil {
+				return err
+			}
+			ConfigureMachineEnvironment(machine)
+			return nil
 		}
+		return errors.New("project is not running")
 	}
 
 	return nil
 }
 
+// KillPreRunHook sets the container runtime if its running,
+// otherwise we bail with an error message.
 func KillPreRunHook(cmd *cobra.Command, args []string) error {
 	if err := utils.EnsureProjectDir(cmd, args); err != nil {
 		return err
@@ -63,15 +75,18 @@ func KillPreRunHook(cmd *cobra.Command, args []string) error {
 	}
 
 	if containerRuntime == podmanCmd {
-		if !IsPodmanMachineRunning() {
-			if err := StopAndKillPodmanMachine(); err != nil {
+		if IsPodmanMachineRunning() {
+			machine, err := InspectPodmanMachine()
+			if err != nil {
 				return err
 			}
-			return errors.New("project is not running")
+			ConfigureMachineEnvironment(machine)
+			return nil
 		}
-		if err := SetPodmanDockerHost(); err != nil {
+		if err := StopAndKillPodmanMachine(); err != nil {
 			return err
 		}
+		return errors.New("project is not running")
 	}
 	return nil
 }
