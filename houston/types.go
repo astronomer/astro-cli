@@ -32,6 +32,7 @@ type ResponseData struct {
 	DeleteWorkspace                *Workspace                  `json:"deleteWorkspace,omitempty"`
 	GetDeployment                  Deployment                  `json:"deployment,omitempty"`
 	GetDeployments                 []Deployment                `json:"workspaceDeployments,omitempty"`
+	PaginatedDeployments           []Deployment                `json:"paginatedDeployments,omitempty"`
 	GetAuthConfig                  *AuthConfig                 `json:"authConfig,omitempty"`
 	GetAppConfig                   *AppConfig                  `json:"appConfig,omitempty"`
 	GetDeploymentServiceAccounts   []ServiceAccount            `json:"deploymentServiceAccounts,omitempty"`

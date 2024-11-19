@@ -97,6 +97,7 @@ type ClientInterface interface {
 	ListWorkspaceTeamsAndRoles(workspaceID string) ([]Team, error)
 	UpdateWorkspaceTeamRole(req UpdateWorkspaceTeamRoleRequest) (string, error)
 	GetWorkspaceTeamRole(req GetWorkspaceTeamRoleRequest) (*Team, error)
+	ListPaginatedDeployments(req PaginatedDeploymentsRequest) ([]Deployment, error)
 }
 
 // ClientImplementation - implementation of the Houston Client Interface

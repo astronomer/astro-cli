@@ -1,11 +1,17 @@
 package houston
 
-import "time"
+import (
+	"time"
+)
 
 // ListDeploymentsRequest - filters to list deployments according to set values
 type ListDeploymentsRequest struct {
 	WorkspaceID string `json:"workspaceId"`
 	ReleaseName string `json:"releaseName"`
+}
+
+type PaginatedDeploymentsRequest struct {
+	Take int `json:"take"`
 }
 
 // ListDeploymentLogsRequest - filters to list logs from a deployment
@@ -230,6 +236,38 @@ var (
 					updatedAt
 				}
 			}`,
+		},
+	}
+
+	PaginatedDeploymentsGetRequest = queryList{
+		{
+			version: "0.32.0",
+			query: `
+			query paginatedDeployments( $take: Int, $name: String, $cursor: Uuid, $pageNumber: Int) {
+                paginatedDeployments(
+                    take: $take
+                    name: $name
+                    cursor: $cursor
+                    pageNumber: $pageNumber
+                ) {
+                    id
+					type
+					label
+					releaseName
+					workspace {
+						id
+					}
+					deployInfo {
+						nextCli
+						current
+					}
+					version
+					airflowVersion
+					runtimeVersion
+					createdAt
+					updatedAt
+                }
+            }`,
 		},
 	}
 
@@ -524,6 +562,23 @@ func (h ClientImplementation) ListDeployments(filters ListDeploymentsRequest) ([
 	}
 
 	return res.Data.GetDeployments, nil
+}
+
+func (h ClientImplementation) ListPaginatedDeployments(filters PaginatedDeploymentsRequest) ([]Deployment, error) {
+	variables := map[string]interface{}{}
+	variables["take"] = filters.Take
+	reqQuery := PaginatedDeploymentsGetRequest.GreatestLowerBound(version)
+	req := Request{
+		Query: reqQuery,
+	}
+	if len(variables) > 0 {
+		req.Variables = variables
+	}
+	res, err := req.DoWithClient(h.client)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+	return res.Data.PaginatedDeployments, nil
 }
 
 // UpdateDeployment - update a deployment
