@@ -1,6 +1,7 @@
 package airflow
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -55,7 +56,7 @@ func (s *Suite) TestInit() {
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = Init(tmpDir, "astro-runtime", "test")
+	err = Init(tmpDir, "astro-runtime", "test", "")
 	s.NoError(err)
 
 	expectedFiles := []string{
@@ -75,6 +76,46 @@ func (s *Suite) TestInit() {
 		s.NoError(err)
 		s.True(exist)
 	}
+}
+
+func (s *Suite) TestTemplateInit() {
+	ExtractTemplate = func(templateDir, destDir string) error {
+		err := os.MkdirAll(destDir, os.ModePerm)
+		s.NoError(err)
+		mockFile := filepath.Join(destDir, "requirements.txt")
+		file, err := os.Create(mockFile)
+		s.NoError(err)
+		defer file.Close()
+		return nil
+	}
+
+	tmpDir, err := os.MkdirTemp("", "temp")
+	s.Require().NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = Init(tmpDir, "astro-runtime", "test", "etl")
+	s.NoError(err)
+
+	expectedFiles := []string{
+		"requirements.txt",
+	}
+	for _, file := range expectedFiles {
+		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
+		s.NoError(err)
+		s.True(exist)
+	}
+}
+
+func (s *Suite) TestTemplateInitFail() {
+	ExtractTemplate = func(templateDir, destDir string) error {
+		err := errors.New("error extracting files")
+		return err
+	}
+	tmpDir, err := os.MkdirTemp("", "temp")
+	s.Require().NoError(err)
+	defer os.RemoveAll(tmpDir)
+	err = Init(tmpDir, "astro-runtime", "test", "etl")
+	s.EqualError(err, "failed to set up template-based astro project: error extracting files")
 }
 
 func (s *Suite) TestInitConflictTest() {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 	coreMocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -25,14 +27,21 @@ var errMock = errors.New("mock error")
 
 type AirflowSuite struct {
 	suite.Suite
+	tempDir string
 }
 
 func TestAirflow(t *testing.T) {
 	suite.Run(t, new(AirflowSuite))
 }
 
-func (s *AirflowSuite) SetupTest() {
+func (s *AirflowSuite) SetupSubTest() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	dir, err := os.MkdirTemp("", "test_temp_dir_*")
+	if err != nil {
+		s.T().Fatalf("failed to create temp dir: %v", err)
+	}
+	s.tempDir = dir
+	config.WorkingPath = s.tempDir
 }
 
 func (s *AirflowSuite) TearDownTest() {
@@ -46,7 +55,7 @@ func (s *AirflowSuite) TearDownSubTest() {
 }
 
 var (
-	_ suite.SetupTestSuite  = (*AirflowSuite)(nil)
+	_ suite.SetupSubTest    = (*AirflowSuite)(nil)
 	_ suite.TearDownSubTest = (*AirflowSuite)(nil)
 )
 
@@ -70,9 +79,8 @@ func (s *AirflowSuite) TestDevInitCommand() {
 }
 
 func (s *AirflowSuite) TestDevInitCommandSoftware() {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
 	s.Run("unknown software version", func() {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		houstonVersion = ""
 		cmd := newAirflowInitCmd()
 		buf := new(bytes.Buffer)
@@ -88,6 +96,7 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 	})
 
 	s.Run("0.28.0 software version", func() {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		houstonVersion = "0.28.0"
 		cmd := newAirflowInitCmd()
 		buf := new(bytes.Buffer)
@@ -103,6 +112,7 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 	})
 
 	s.Run("0.29.0 software version", func() {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		houstonVersion = "0.29.0"
 		cmd := newAirflowInitCmd()
 		buf := new(bytes.Buffer)
@@ -154,59 +164,42 @@ func (s *AirflowSuite) TestNewAirflowUpgradeCheckCmd() {
 }
 
 func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
-	cmd := newAirflowInitCmd()
-	var args []string
+	s.Run("test airflow init with non empty dir", func() {
+		cmd := newAirflowInitCmd()
+		var args []string
 
-	defer testUtil.MockUserInput(s.T(), "y")()
-	err := airflowInit(cmd, args)
-	s.NoError(err)
+		defer testUtil.MockUserInput(s.T(), "y")()
+		err := airflowInit(cmd, args)
+		s.NoError(err)
 
-	b, _ := os.ReadFile("Dockerfile")
-	dockerfileContents := string(b)
-	s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
+		dockerfileContents := string(b)
+		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+	})
 }
 
 func (s *AirflowSuite) Test_airflowInitNoDefaultImageTag() {
-	cmd := newAirflowInitCmd()
-	var args []string
+	s.Run("test airflow init with non empty dir", func() {
+		cmd := newAirflowInitCmd()
+		var args []string
 
-	defer testUtil.MockUserInput(s.T(), "y")()
+		defer testUtil.MockUserInput(s.T(), "y")()
 
-	err := airflowInit(cmd, args)
-	s.NoError(err)
-	// assert contents of Dockerfile
-	b, _ := os.ReadFile("Dockerfile")
-	dockerfileContents := string(b)
-	s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+		err := airflowInit(cmd, args)
+		s.NoError(err)
+		// assert contents of Dockerfile
+		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
+		dockerfileContents := string(b)
+		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+	})
 }
 
 func (s *AirflowSuite) cleanUpInitFiles() {
 	s.T().Helper()
-	files := []string{
-		".dockerignore",
-		".gitignore",
-		".env",
-		"Dockerfile",
-		"airflow_settings.yaml",
-		"packages.txt",
-		"requirements.txt",
-		"dags/exampledag.py",
-		"plugins/example-plugin.py",
-		"include",
-		"plugins",
-		"README.md",
-		".astro/config.yaml",
-		".astro/test_dag_integrity.py",
-		"./astro",
-		"tests/dags/test_dag_example.py",
-		"tests/dags",
-		"tests",
-		"dags",
-	}
-	for _, f := range files {
-		e := os.Remove(f)
-		if e != nil && !errors.Is(e, os.ErrNotExist) {
-			s.T().Log(e)
+	if s.tempDir != "" {
+		err := os.RemoveAll(s.tempDir)
+		if err != nil {
+			s.T().Fatalf("failed to remove temp dir: %v", err)
 		}
 	}
 }
@@ -223,6 +216,72 @@ func (s *AirflowSuite) mockUserInput(i string) (r, stdin *os.File) {
 }
 
 func (s *AirflowSuite) TestAirflowInit() {
+	TemplateList = func() ([]string, error) { return []string{"A", "B", "C", "D"}, nil }
+	s.Run("initialize template based project via select-template flag", func() {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		cmd.Flag("from-template").Value.Set("select-template")
+		var args []string
+
+		input := []byte("1")
+		r, w, inputErr := os.Pipe()
+		s.Require().NoError(inputErr)
+		_, writeErr := w.Write(input)
+		s.NoError(writeErr)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err := airflowInit(cmd, args)
+		s.NoError(err)
+	})
+
+	s.Run("invalid template name", func() {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		cmd.Flag("from-template").Value.Set("E")
+		var args []string
+
+		r, stdin := s.mockUserInput("y")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err := airflowInit(cmd, args)
+		s.EqualError(err, "E is not a valid template name. Available templates are: [A B C D]")
+	})
+
+	s.Run("successfully initialize template based project ", func() {
+		airflow.ExtractTemplate = func(templateDir, destDir string) error {
+			err := os.MkdirAll(destDir, os.ModePerm)
+			s.NoError(err)
+			mockFile := filepath.Join(destDir, "requirements.txt")
+			file, err := os.Create(mockFile)
+			s.NoError(err)
+			defer file.Close()
+			_, err = file.WriteString("test requirements file.")
+			s.NoError(err)
+			return nil
+		}
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		cmd.Flag("from-template").Value.Set("A")
+		var args []string
+
+		r, stdin := s.mockUserInput("y")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err := airflowInit(cmd, args)
+		s.NoError(err)
+
+		b, _ := os.ReadFile(filepath.Join(s.tempDir, "requirements.txt"))
+		fileContents := string(b)
+		s.True(strings.Contains(fileContents, "test requirements file"))
+	})
+
 	s.Run("success", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
@@ -236,7 +295,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 		err := airflowInit(cmd, args)
 		s.NoError(err)
 
-		b, _ := os.ReadFile("Dockerfile")
+		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
 		dockerfileContents := string(b)
 		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
 	})
@@ -285,8 +344,8 @@ func (s *AirflowSuite) TestAirflowInit() {
 		s.ErrorIs(err, errInvalidBothAirflowAndRuntimeVersions)
 	})
 
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	s.Run("runtime version passed alongside AC flag", func() {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("use-astronomer-certified").Value.Set("true")
@@ -314,6 +373,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("use AC flag", func() {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("use-astronomer-certified").Value.Set("true")
@@ -340,6 +400,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 	})
 
 	s.Run("cancel non empty dir warning", func() {
+		config.WorkingPath = ""
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		args := []string{}
