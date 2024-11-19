@@ -3,8 +3,8 @@ package version
 import (
 	"context"
 	"fmt"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -74,7 +74,7 @@ func CompareVersions(client *github.Client, owner, repo string) error {
 
 	// Compare the versions and print a message to the user if the current version is outdated
 	if currentSemver.LessThan(latestSemver) {
-		if runtime.GOOS == "darwin" {
+		if utils.IsMac() {
 			fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease update to the latest version using 'brew upgrade astro'\n\n", latestSemver)
 		} else {
 			fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease see https://www.astronomer.io/docs/astro/cli/install-cli#upgrade-the-astro-cli for information on how to update the Astro CLI\n\n", latestSemver)

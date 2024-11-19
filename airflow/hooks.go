@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/spf13/cobra"
-	"runtime"
 )
 
 // EnsureRuntimePreRunHook ensures that the project directory exists
@@ -19,7 +18,7 @@ func EnsureRuntimePreRunHook(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if containerRuntime == dockerCmd && runtime.GOOS == "darwin" {
+	if containerRuntime == dockerCmd && utils.IsMac() {
 		err := startDocker()
 		if err != nil {
 			return err

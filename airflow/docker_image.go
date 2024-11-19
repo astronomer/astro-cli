@@ -28,7 +28,6 @@ import (
 )
 
 const (
-	EchoCmd            = "echo"
 	pushingImagePrompt = "Pushing image to Astronomer registry"
 	astroRunContainer  = "astro-run"
 	pullingImagePrompt = "Pulling image from Astronomer registry"

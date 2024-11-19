@@ -5,6 +5,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"runtime"
 )
 
 func EnsureProjectDir(cmd *cobra.Command, args []string) error {
@@ -26,4 +27,8 @@ func GetDefaultDeployDescription(isDagOnlyDeploy bool) string {
 	}
 
 	return "Deployed via <astro deploy>"
+}
+
+func IsMac() bool {
+	return runtime.GOOS == "darwin"
 }
