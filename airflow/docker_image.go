@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/briandowns/spinner"
 	"io"
 	"os"
 	"os/exec"
@@ -70,6 +71,12 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 }
 
 func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
+	s := spinner.New(spinnerCharSet, spinnerRefresh)
+	s.Suffix = " Building project image..."
+	s.Start()
+	defer s.Stop()
+	buildConfig.Output = false
+
 	containerRuntime, err := GetContainerRuntimeBinary()
 	if err != nil {
 		return err

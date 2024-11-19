@@ -12,7 +12,11 @@ import (
 	"github.com/briandowns/spinner"
 )
 
-var podmanMachineName = "astro"
+var (
+	podmanMachineName = "astro"
+	spinnerCharSet    = spinner.CharSets[14]
+	spinnerRefresh    = 100 * time.Millisecond
+)
 
 // Command represents a command to be executed.
 type Command struct {
@@ -47,49 +51,21 @@ type Container struct {
 }
 
 // Execute runs the Podman command and returns the output.
-func (p *Command) Execute(message, finalMessageSuccess, finalMessageError string) (string, error) {
+func (p *Command) Execute() (string, error) {
 	cmd := exec.Command(p.Command, p.Args...)
 	var out bytes.Buffer
-	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Use a character set and speed
-	s.Suffix = " " + message
-	if finalMessageSuccess != "" {
-		s.FinalMSG = finalMessageSuccess + "\n"
-	}
-	s.Start()
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 	err := cmd.Run()
-	if err != nil {
-		if finalMessageError != "" {
-			s.FinalMSG = finalMessageError + "\n"
-		} else {
-			s.FinalMSG = message + "\n"
-		}
-	}
-	s.Stop()
 	return out.String(), err
 }
 
-func ConfigureMachineEnvironment(machine *InspectMachine) error {
-	if machine == nil {
-		return fmt.Errorf("machine does not exist")
-	}
-	dockerHost := "unix://" + machine.ConnectionInfo.PodmanSocket.Path
-	err := os.Setenv("DOCKER_HOST", dockerHost)
-
-	podmanCmd := Command{
-		Command: "podman",
-		Args:    []string{"system", "connection", "default", machine.Name},
-	}
-	_, err = podmanCmd.Execute("", "", "")
-	if err != nil {
-		return fmt.Errorf("error configuring default podman connection: %s", err)
-	}
-
-	return err
-}
-
 func InitPodmanMachine() error {
+	s := spinner.New(spinnerCharSet, spinnerRefresh)
+	s.Suffix = " Astro uses container technology to run your Airflow project. " +
+		"Please wait while we get things ready. This may take a few moments..."
+	defer s.Stop()
+
 	// Check if another, non-astro Podman machine is running
 	nonAstroMachine := IsAnotherPodmanMachineRunning()
 	if nonAstroMachine != "" && utils.IsMac() {
@@ -105,6 +81,7 @@ func InitPodmanMachine() error {
 				"Mac hosts are limited to one running machine at a time. " +
 				"Please stop the other machine and try again")
 		}
+		s.Start()
 		err = StopPodmanMachine(nonAstroMachine)
 		if err != nil {
 			return err
@@ -122,18 +99,19 @@ func InitPodmanMachine() error {
 		}
 		// TODO: Handle all possible states
 		if m.State == "running" {
-			err = ConfigureMachineEnvironment(m)
+			err = ConfigureMachineForUsage(m)
 			if err != nil {
 				return err
 			}
 			return nil
 		}
 		if m.State == "stopped" {
+			s.Start()
 			err = StartPodmanMachine(podmanMachineName)
 			if err != nil {
 				return err
 			}
-			err = ConfigureMachineEnvironment(m)
+			err = ConfigureMachineForUsage(m)
 			if err != nil {
 				return err
 			}
@@ -142,12 +120,12 @@ func InitPodmanMachine() error {
 	}
 
 	// Otherwise, initialize the machine
+	s.Start()
 	podmanCmd := Command{
 		Command: "podman",
 		Args:    []string{"machine", "init", podmanMachineName, "--memory", "4096", "--now"},
 	}
-	_, err := podmanCmd.Execute("Astro uses container technology to run your Airflow project. "+
-		"Please wait while we get things ready. This may take a few moments...", "Machine initialized successfully.", "")
+	_, err := podmanCmd.Execute()
 	if err != nil {
 		return err
 	}
@@ -156,7 +134,7 @@ func InitPodmanMachine() error {
 	if err != nil {
 		return err
 	}
-	err = ConfigureMachineEnvironment(m)
+	err = ConfigureMachineForUsage(m)
 	if err != nil {
 		return err
 	}
@@ -168,7 +146,7 @@ func StartPodmanMachine(name string) error {
 		Command: "podman",
 		Args:    []string{"machine", "start", name},
 	}
-	_, err := podmanCmd.Execute("Starting machine...", "Machine started successfully.", "")
+	_, err := podmanCmd.Execute()
 	if err != nil {
 		return fmt.Errorf("error starting machine: %s", err)
 	}
@@ -181,9 +159,9 @@ func StopPodmanMachine(name string) error {
 		Command: "podman",
 		Args:    []string{"machine", "stop", name},
 	}
-	_, err := podmanCmd.Execute("Stopping machine...", "", "")
+	_, err := podmanCmd.Execute()
 	if err != nil {
-		return fmt.Errorf("error stopping machine: %s", err)
+		return fmt.Errorf("error stopping podman machine: %s", err)
 	}
 	return nil
 }
@@ -193,9 +171,9 @@ func RemovePodmanMachine(name string) error {
 		Command: "podman",
 		Args:    []string{"machine", "rm", "-f", name},
 	}
-	output, err := podmanCmd.Execute("Removing machine...", "Machine removed successfully", "")
+	_, err := podmanCmd.Execute()
 	if err != nil {
-		return fmt.Errorf("error removing podman machine: %s, output: %s", err, output)
+		return fmt.Errorf("error removing podman machine: %s", err)
 	}
 	return nil
 }
@@ -206,7 +184,7 @@ func InspectPodmanMachine() (*InspectMachine, error) {
 		Command: "podman",
 		Args:    []string{"machine", "inspect", podmanMachineName},
 	}
-	output, err := podmanCmd.Execute("", "", "")
+	output, err := podmanCmd.Execute()
 	if err != nil {
 		return nil, fmt.Errorf("error inspecting podman machine: %s, output: %s", err, output)
 	}
@@ -229,9 +207,9 @@ func ListPodmanMachines() ([]ListMachine, error) {
 		Command: "podman",
 		Args:    []string{"machine", "ls", "--format", "json"},
 	}
-	output, err := podmanCmd.Execute("", "", "")
+	output, err := podmanCmd.Execute()
 	if err != nil {
-		return nil, fmt.Errorf("error listing Podman machines: %s, output: %s", err, output)
+		return nil, fmt.Errorf("error listing podman machines: %s", err)
 	}
 	var machines []ListMachine
 	err = json.Unmarshal([]byte(output), &machines)
@@ -247,9 +225,9 @@ func ListContainers() ([]Container, error) {
 		Command: "podman",
 		Args:    []string{"ps", "--format", "json"},
 	}
-	output, err := podmanCmd.Execute("", "", "")
+	output, err := podmanCmd.Execute()
 	if err != nil {
-		return nil, fmt.Errorf("error listing Podman containers: %s, output: %s", err, output)
+		return nil, fmt.Errorf("error listing podman containers: %s", err)
 	}
 	var containers []Container
 	err = json.Unmarshal([]byte(output), &containers)
@@ -269,45 +247,75 @@ func FindMachineByName(items []ListMachine, name string) *ListMachine {
 }
 
 func StopAndKillPodmanMachine() error {
-	machineName := "astro"
+	if DoesPodmanMachineExist() {
+		if IsPodmanMachineRunning() {
+			containers, err := ListContainers()
+			if err != nil {
+				return err
+			}
+			projectNames := make(map[string]struct{})
+			for _, item := range containers {
+				// Check if "project.name" exists in the Labels map
+				if projectName, exists := item.Labels["com.docker.compose.project"]; exists {
+					// Add the project name to the map (map keys are unique)
+					projectNames[projectName] = struct{}{}
+				}
+			}
+			// At this point our project has already been stopped, and
+			// we are checking to see if any additional projects are running
+			if len(projectNames) > 0 {
+				return nil
+			}
 
-	machines, err := ListPodmanMachines()
-	if err != nil {
-		return err
-	}
-	machine := FindMachineByName(machines, machineName)
-
-	if machine != nil {
-		containers, err := ListContainers()
-		if err != nil {
-			return err
-		}
-		projectNames := make(map[string]struct{})
-		for _, item := range containers {
-			// Check if "project.name" exists in the Labels map
-			if projectName, exists := item.Labels["com.docker.compose.project"]; exists {
-				// Add the project name to the map (map keys are unique)
-				projectNames[projectName] = struct{}{}
+			err = StopPodmanMachine(podmanMachineName)
+			if err != nil {
+				return err
 			}
 		}
-		// At this point our project has already been stopped, and
-		// we are checking to see if any additional projects are running
-		if len(projectNames) > 0 {
-			return nil
-		}
 
-		err = StopPodmanMachine(machineName)
-		if err != nil {
-			return err
-		}
-
-		err = RemovePodmanMachine(machineName)
+		err := RemovePodmanMachine(podmanMachineName)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func ConfigureMachineForUsage(machine *InspectMachine) error {
+	if machine == nil {
+		return fmt.Errorf("machine does not exist")
+	}
+	dockerHost := "unix://" + machine.ConnectionInfo.PodmanSocket.Path
+	err := os.Setenv("DOCKER_HOST", dockerHost)
+
+	podmanCmd := Command{
+		Command: "podman",
+		Args:    []string{"system", "connection", "default", machine.Name},
+	}
+	_, err = podmanCmd.Execute()
+	if err != nil {
+		return fmt.Errorf("error configuring default podman connection: %s", err)
+	}
+
+	return err
+}
+
+func GetAndConfigureMachineForUsage() error {
+	machine, err := InspectPodmanMachine()
+	if err != nil {
+		return err
+	}
+	if err := ConfigureMachineForUsage(machine); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DoesPodmanMachineExist() bool {
+	machines, _ := ListPodmanMachines()
+	machine := FindMachineByName(machines, podmanMachineName)
+	return machine != nil
 }
 
 func IsPodmanMachineRunning() bool {

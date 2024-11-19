@@ -31,7 +31,7 @@ var checkWebserverHealth = func(url string, timeout time.Duration) error {
 		// This means the healthcheck has reached its deadline.
 		// We return an error message to the user.
 		case <-ctx.Done():
-			return fmt.Errorf("There might be a problem with your project starting up. "+ //nolint:stylecheck
+			return fmt.Errorf("there might be a problem with your project starting up. "+
 				"The webserver health check timed out after %s but your project will continue trying to start. "+
 				"Run 'astro dev logs --webserver | --scheduler' for details.\n"+
 				"Try again or use the --wait flag to increase the time out", timeout)

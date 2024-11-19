@@ -72,9 +72,9 @@ const (
 	composeUserPasswordMsg  = "The default Airflow UI credentials are: %s"
 	postgresUserPasswordMsg = "The default Postgres DB credentials are: %s"
 
-	envPathMsg     = "Error looking for \"%s\""
-	envFoundMsg    = "Env file \"%s\" found. Loading...\n"
-	envNotFoundMsg = "Env file \"%s\" not found. Skipping...\n"
+	envPathMsg = "Error looking for \"%s\""
+	//envFoundMsg    = "Env file \"%s\" found. Loading...\n"
+	//envNotFoundMsg = "Env file \"%s\" not found. Skipping...\n"
 )
 
 var (
@@ -211,7 +211,8 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		// Ensure project is not already running
 		for i := range psInfo {
 			if checkServiceState(psInfo[i].State, dockerStateUp) {
-				return errors.New("cannot start, project already running")
+				fmt.Println("This astro project is already running")
+				return nil
 			}
 		}
 	}
@@ -227,7 +228,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		}
 		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
 		if !config.CFG.DisableAstroRun.GetBool() {
-			// remove astro-run-dag from requirments.txt
+			// remove astro-run-dag from requirements.txt
 			err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
 			if err != nil {
 				fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
@@ -257,7 +258,9 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 
 	// Start up our project
 	err = d.composeService.Up(context.Background(), project, api.UpOptions{
-		Create: api.CreateOptions{},
+		Create: api.CreateOptions{
+			QuietPull: true,
+		},
 	})
 	if err != nil {
 		return errors.Wrap(err, composeRecreateErrMsg)

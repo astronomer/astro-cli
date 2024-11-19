@@ -48,14 +48,9 @@ func SetRuntimeIfExistsPreRunHook(cmd *cobra.Command, args []string) error {
 
 	if containerRuntime == podmanCmd {
 		if IsPodmanMachineRunning() {
-			machine, err := InspectPodmanMachine()
-			if err != nil {
-				return err
-			}
-			ConfigureMachineEnvironment(machine)
-			return nil
+			return GetAndConfigureMachineForUsage()
 		}
-		return errors.New("project is not running")
+		return errors.New("this astro project is not running")
 	}
 
 	return nil
@@ -75,17 +70,13 @@ func KillPreRunHook(cmd *cobra.Command, args []string) error {
 
 	if containerRuntime == podmanCmd {
 		if IsPodmanMachineRunning() {
-			machine, err := InspectPodmanMachine()
-			if err != nil {
+			return GetAndConfigureMachineForUsage()
+		} else {
+			if err := StopAndKillPodmanMachine(); err != nil {
 				return err
 			}
-			ConfigureMachineEnvironment(machine)
-			return nil
+			return errors.New("this astro project is not running")
 		}
-		if err := StopAndKillPodmanMachine(); err != nil {
-			return err
-		}
-		return errors.New("project is not running")
 	}
 	return nil
 }
