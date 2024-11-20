@@ -22,7 +22,7 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error
+	Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection, verboseLevel string) error
 	Stop(waitForExit bool) error
 	PS() error
 	Kill() error

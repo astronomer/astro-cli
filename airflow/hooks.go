@@ -81,7 +81,7 @@ func KillPreRunHook(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func KillPostRunHook(cmd *cobra.Command, args []string) error {
+func KillPostRunHook(_ *cobra.Command, _ []string) error {
 	containerRuntime, err := GetContainerRuntimeBinary()
 	if err != nil {
 		return err

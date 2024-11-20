@@ -73,9 +73,11 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
 	s := spinner.New(spinnerCharSet, spinnerRefresh)
 	s.Suffix = " Building project image..."
-	s.Start()
-	defer s.Stop()
-	buildConfig.Output = false
+	s.FinalMSG = "Project image build complete\n"
+	if !buildConfig.Output {
+		s.Start()
+		defer s.Stop()
+	}
 
 	containerRuntime, err := GetContainerRuntimeBinary()
 	if err != nil {
@@ -126,16 +128,18 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 	}
 	// Build image
 	var stdout, stderr io.Writer
+	var stdoutb, stderrb bytes.Buffer
 	if buildConfig.Output {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
-		stdout = nil
-		stderr = nil
+		stdout = &stdoutb
+		stderr = &stderrb
 	}
 	err = cmdExec(containerRuntime, stdout, stderr, args...)
 	if err != nil {
-		return fmt.Errorf("command '%s build -t %s failed: %w", containerRuntime, d.imageName, err)
+		s.FinalMSG = "Project image build failed\n"
+		return errors.New(strings.Trim(strings.TrimSpace(stderrb.String()), "Error: "))
 	}
 	return err
 }

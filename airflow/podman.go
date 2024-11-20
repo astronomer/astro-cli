@@ -63,7 +63,8 @@ func (p *Command) Execute() (string, error) {
 func InitPodmanMachine() error {
 	s := spinner.New(spinnerCharSet, spinnerRefresh)
 	s.Suffix = " Astro uses container technology to run your Airflow project. " +
-		"Please wait while we get things ready. This may take a few moments..."
+		"Please wait while we get things ready. " +
+		"This may take a few moments..."
 	defer s.Stop()
 
 	// Check if another, non-astro Podman machine is running
@@ -97,7 +98,6 @@ func InitPodmanMachine() error {
 		if err != nil {
 			return err
 		}
-		// TODO: Handle all possible states
 		if m.State == "running" {
 			err = ConfigureMachineForUsage(m)
 			if err != nil {

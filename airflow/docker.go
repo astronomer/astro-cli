@@ -199,7 +199,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 // Start starts a local airflow development cluster
 //
 //nolint:gocognit
-func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection, verboseLevel string) error {
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
@@ -226,7 +226,11 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 				fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 			}
 		}
-		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+		buildOpts := airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: false, NoCache: noCache}
+		if verboseLevel == "debug" {
+			buildOpts.Output = true
+		}
+		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, buildOpts)
 		if !config.CFG.DisableAstroRun.GetBool() {
 			// remove astro-run-dag from requirements.txt
 			err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")

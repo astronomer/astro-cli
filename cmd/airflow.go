@@ -658,7 +658,7 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	return containerHandler.Start(customImageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns)
+	return containerHandler.Start(customImageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns, verboseLevel)
 }
 
 // airflowRun
@@ -779,7 +779,7 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	return containerHandler.Start(customImageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns)
+	return containerHandler.Start(customImageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns, verboseLevel)
 }
 
 // run pytest on an airflow project
