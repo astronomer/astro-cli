@@ -16,8 +16,10 @@ import (
 )
 
 const (
-	PodmanStatusRunning = "running"
-	PodmanStatusStopped = "stopped"
+	podmanMachineName   = "astro-machine"
+	podmanMachineMemory = "4096" // 4GB
+	podmanStatusRunning = "running"
+	podmanStatusStopped = "stopped"
 	composeProjectLabel = "com.docker.compose.project"
 	podmanInitMessage   = " Astro uses container technology to run your Airflow project. " +
 		"Please wait while we get things started..."
@@ -27,13 +29,10 @@ const (
 		"but it looks like a machine is already running. " +
 		"Mac hosts are limited to one running machine at a time. " +
 		"Please stop the other machine and try again"
+	spinnerRefresh = 100 * time.Millisecond
 )
 
-var (
-	podmanMachineName = "astro"
-	spinnerCharSet    = spinner.CharSets[14]
-	spinnerRefresh    = 100 * time.Millisecond
-)
+var spinnerCharSet = spinner.CharSets[14]
 
 // Command represents a command to be executed.
 type Command struct {
@@ -41,18 +40,18 @@ type Command struct {
 	Args    []string
 }
 
-// ListMachine contains information about a Podman machine
+// ListedMachine contains information about a Podman machine
 // as it is provided from the `podman machine ls --format json` command.
-type ListMachine struct {
+type ListedMachine struct {
 	Name     string
 	Running  bool
 	Starting bool
 	LastUp   string
 }
 
-// InspectMachine contains information about a Podman machine
+// InspectedMachine contains information about a Podman machine
 // as it is provided from the `podman machine inspect` command.
-type InspectMachine struct {
+type InspectedMachine struct {
 	Name           string
 	ConnectionInfo struct {
 		PodmanSocket struct {
@@ -62,9 +61,9 @@ type InspectMachine struct {
 	State string
 }
 
-// ListContainer contains information about a Podman container
+// ListedContainer contains information about a Podman container
 // as it is provided from the `podman ps --format json` command.
-type ListContainer struct {
+type ListedContainer struct {
 	Name   string
 	Labels map[string]string
 }
@@ -79,7 +78,7 @@ func (p *Command) Execute() (string, error) {
 	return out.String(), err
 }
 
-func InitPodmanMachine() error {
+func InitMachine() error {
 	s := spinner.New(spinnerCharSet, spinnerRefresh)
 	s.Suffix = podmanInitMessage
 	defer s.Stop()
@@ -90,51 +89,61 @@ func InitPodmanMachine() error {
 	}()
 
 	// Check if another, non-astro Podman machine is running
-	nonAstroMachine := IsAnotherPodmanMachineRunning()
-	if nonAstroMachine != "" && utils.IsMac() {
-		// If there is another machine running, and it has no running containers, stop it.
-		// Otherwise, we assume the user has some other project running that we don't want to interfere with.
+	nonAstroMachineName := IsAnotherMachineRunning()
+	// If there is another machine running, and it has no running containers, stop it.
+	// Otherwise, we assume the user has some other project running that we don't want to interfere with.
+	if nonAstroMachineName != "" && utils.IsMac() {
+		// First, configure the other running machine for usage.
+		if err := GetAndConfigureMachineForUsage(nonAstroMachineName); err != nil {
+			return err
+		}
+
+		// Then check the machine for running containers.
 		containers, err := ListContainers()
 		if err != nil {
 			return err
 		}
+
+		// There's some other containers running on this machine, so we don't want to stop it.
+		// We want the user to stop it manually and restart astro.
 		if len(containers) > 0 {
 			return errors.New(podmanMachineAlreadyRunningErrMsg)
 		}
+
+		// If we made it here, we're going to stop the other machine
+		// and start our own machine, so start the spinner and begin the process.
 		s.Start()
-		err = StopPodmanMachine(nonAstroMachine)
+		err = StopMachine(nonAstroMachineName)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Check if our astro Podman machine is running
-	machine := GetAstroPodmanMachine()
+	// Check if our astro Podman machine exists.
+	machine := GetAstroMachine()
 
-	// If the machine exists, inspect it and decide what to do
+	// If the machine exists, inspect it and decide what to do.
 	if machine != nil {
-		m, err := InspectPodmanMachine()
+		// Inspect the machine and get its details.
+		iMachine, err := InspectMachine(podmanMachineName)
 		if err != nil {
 			return err
 		}
-		if m.State == PodmanStatusRunning {
-			err = ConfigureMachineForUsage(m)
-			if err != nil {
-				return err
-			}
-			return nil
+
+		// If the machine is already running,
+		// just go ahead and configure it for usage.
+		if iMachine.State == podmanStatusRunning {
+			return ConfigureMachineForUsage(iMachine)
 		}
-		if m.State == PodmanStatusStopped {
+
+		// If the machine is stopped,
+		// start it, then configure it for usage.
+		if iMachine.State == podmanStatusStopped {
 			s.Start()
-			err = StartPodmanMachine(podmanMachineName)
-			if err != nil {
+			if err = StartMachine(podmanMachineName); err != nil {
 				return err
 			}
-			err = ConfigureMachineForUsage(m)
-			if err != nil {
-				return err
-			}
-			return nil
+			return ConfigureMachineForUsage(iMachine)
 		}
 	}
 
@@ -142,17 +151,18 @@ func InitPodmanMachine() error {
 	s.Start()
 	podmanCmd := Command{
 		Command: "podman",
-		Args:    []string{"machine", "init", podmanMachineName, "--memory", "4096", "--now"},
+		Args:    []string{"machine", "init", podmanMachineName, "--memory", podmanMachineMemory, "--now"},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
 		return ErrorFromOutput("error initializing machine: %s", output)
 	}
 
-	return GetAndConfigureMachineForUsage()
+	return GetAndConfigureMachineForUsage(podmanMachineName)
 }
 
-func StartPodmanMachine(name string) error {
+// StartMachine starts our astro Podman machine.
+func StartMachine(name string) error {
 	podmanCmd := Command{
 		Command: "podman",
 		Args:    []string{"machine", "start", name},
@@ -164,8 +174,8 @@ func StartPodmanMachine(name string) error {
 	return nil
 }
 
-// StopPodmanMachine stops the Podman machine.
-func StopPodmanMachine(name string) error {
+// StopMachine stops the given Podman machine.
+func StopMachine(name string) error {
 	podmanCmd := Command{
 		Command: "podman",
 		Args:    []string{"machine", "stop", name},
@@ -177,7 +187,9 @@ func StopPodmanMachine(name string) error {
 	return nil
 }
 
-func RemovePodmanMachine(name string) error {
+// RemoveMachine removes the given Podman machine completely,
+// such that it can only be started again by re-initializing.
+func RemoveMachine(name string) error {
 	podmanCmd := Command{
 		Command: "podman",
 		Args:    []string{"machine", "rm", "-f", name},
@@ -189,31 +201,31 @@ func RemovePodmanMachine(name string) error {
 	return nil
 }
 
-// InspectPodmanMachine inspects a given podman machine name.
-func InspectPodmanMachine() (*InspectMachine, error) {
+// InspectMachine inspects a given podman machine name.
+func InspectMachine(name string) (*InspectedMachine, error) {
 	podmanCmd := Command{
 		Command: "podman",
-		Args:    []string{"machine", "inspect", podmanMachineName},
+		Args:    []string{"machine", "inspect", name},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
 		return nil, ErrorFromOutput("error inspecting machine: %s", output)
 	}
 
-	var machines []InspectMachine
+	var machines []InspectedMachine
 	err = json.Unmarshal([]byte(output), &machines)
 	if err != nil {
 		return nil, err
 	}
 	if len(machines) == 0 {
-		return nil, fmt.Errorf("machine not found: %s", podmanMachineName)
+		return nil, fmt.Errorf("machine not found: %s", name)
 	}
 
 	return &machines[0], nil
 }
 
-// ListPodmanMachines lists all Podman machines.
-func ListPodmanMachines() ([]ListMachine, error) {
+// ListMachines lists all Podman machines.
+func ListMachines() ([]ListedMachine, error) {
 	podmanCmd := Command{
 		Command: "podman",
 		Args:    []string{"machine", "ls", "--format", "json"},
@@ -222,7 +234,7 @@ func ListPodmanMachines() ([]ListMachine, error) {
 	if err != nil {
 		return nil, ErrorFromOutput("error listing machines: %s", output)
 	}
-	var machines []ListMachine
+	var machines []ListedMachine
 	err = json.Unmarshal([]byte(output), &machines)
 	if err != nil {
 		return nil, err
@@ -231,7 +243,7 @@ func ListPodmanMachines() ([]ListMachine, error) {
 }
 
 // ListContainers lists all pods in the machine.
-func ListContainers() ([]ListContainer, error) {
+func ListContainers() ([]ListedContainer, error) {
 	podmanCmd := Command{
 		Command: "podman",
 		Args:    []string{"ps", "--format", "json"},
@@ -240,7 +252,7 @@ func ListContainers() ([]ListContainer, error) {
 	if err != nil {
 		return nil, ErrorFromOutput("error listing containers: %s", output)
 	}
-	var containers []ListContainer
+	var containers []ListedContainer
 	err = json.Unmarshal([]byte(output), &containers)
 	if err != nil {
 		return nil, err
@@ -248,18 +260,18 @@ func ListContainers() ([]ListContainer, error) {
 	return containers, nil
 }
 
-// StopAndKillPodmanMachine attempts to stop and kill the Podman machine.
+// StopAndKillMachine attempts to stop and kill the Podman machine.
 // If other projects are running, it will leave the machine up.
-func StopAndKillPodmanMachine() error {
+func StopAndKillMachine() error {
 	// If the machine doesn't exist, exist early.
-	if !AstroPodmanMachineExists() {
+	if !AstroMachineExists() {
 		return nil
 	}
 
 	// If the machine exists, and its running, we need to check
 	// if any other projects are running. If other projects are running,
 	// we'll leave the machine up, otherwise we stop and kill it.
-	if AstroPodmanMachineIsRunning() {
+	if AstroMachineIsRunning() {
 		// Get the containers that are running on our machine.
 		containers, err := ListContainers()
 		if err != nil {
@@ -284,7 +296,7 @@ func StopAndKillPodmanMachine() error {
 
 		// If we made it this far, we can stop the machine,
 		// as there are no more projects running.
-		err = StopPodmanMachine(podmanMachineName)
+		err = StopMachine(podmanMachineName)
 		if err != nil {
 			return err
 		}
@@ -292,7 +304,7 @@ func StopAndKillPodmanMachine() error {
 
 	// If we make it here, the machine was already stopped, or was just stopped above.
 	// We can now remove it.
-	err := RemovePodmanMachine(podmanMachineName)
+	err := RemoveMachine(podmanMachineName)
 	if err != nil {
 		return err
 	}
@@ -300,16 +312,24 @@ func StopAndKillPodmanMachine() error {
 	return nil
 }
 
-func ConfigureMachineForUsage(machine *InspectMachine) error {
+// ConfigureMachineForUsage does two things:
+//   - Sets the DOCKER_HOST environment variable to the machine's socket path
+//     This allows the docker compose library to function as expected.
+//   - Sets the podman default connection to the machine
+//     This allows the podman command to function as expected.
+func ConfigureMachineForUsage(machine *InspectedMachine) error {
 	if machine == nil {
 		return fmt.Errorf("machine does not exist")
 	}
+
+	// Set the DOCKER_HOST environment variable for compose.
 	dockerHost := "unix://" + machine.ConnectionInfo.PodmanSocket.Path
 	err := os.Setenv("DOCKER_HOST", dockerHost)
 	if err != nil {
 		return fmt.Errorf("error setting DOCKER_HOST: %s", err)
 	}
 
+	// Set the podman default connection to our machine.
 	podmanCmd := Command{
 		Command: "podman",
 		Args:    []string{"system", "connection", "default", machine.Name},
@@ -322,15 +342,18 @@ func ConfigureMachineForUsage(machine *InspectMachine) error {
 	return nil
 }
 
-func GetAndConfigureMachineForUsage() error {
-	machine, err := InspectPodmanMachine()
+// GetAndConfigureMachineForUsage gets our astro machine
+// then configures the host machine to use it.
+func GetAndConfigureMachineForUsage(name string) error {
+	machine, err := InspectMachine(name)
 	if err != nil {
 		return err
 	}
 	return ConfigureMachineForUsage(machine)
 }
 
-func FindMachineByName(items []ListMachine, name string) *ListMachine {
+// FindMachineByName finds a machine by name from a list of machines.
+func FindMachineByName(items []ListedMachine, name string) *ListedMachine {
 	for _, item := range items {
 		if item.Name == name {
 			return &item
@@ -339,23 +362,27 @@ func FindMachineByName(items []ListMachine, name string) *ListMachine {
 	return nil
 }
 
-func GetAstroPodmanMachine() *ListMachine {
-	machines, _ := ListPodmanMachines()
+// GetAstroMachine gets our astro podman machine.
+func GetAstroMachine() *ListedMachine {
+	machines, _ := ListMachines()
 	return FindMachineByName(machines, podmanMachineName)
 }
 
-func AstroPodmanMachineExists() bool {
-	machine := GetAstroPodmanMachine()
+// AstroMachineExists checks if our astro podman machine exists.
+func AstroMachineExists() bool {
+	machine := GetAstroMachine()
 	return machine != nil
 }
 
-func AstroPodmanMachineIsRunning() bool {
-	machine := GetAstroPodmanMachine()
+// AstroMachineIsRunning checks if our astro podman machine is running.
+func AstroMachineIsRunning() bool {
+	machine := GetAstroMachine()
 	return machine != nil && machine.Running
 }
 
-func IsAnotherPodmanMachineRunning() string {
-	machines, _ := ListPodmanMachines()
+// IsAnotherMachineRunning checks if another, non-astro podman machine is running.
+func IsAnotherMachineRunning() string {
+	machines, _ := ListMachines()
 	for _, machine := range machines {
 		if machine.Running && machine.Name != podmanMachineName {
 			return machine.Name
@@ -377,4 +404,15 @@ func ErrorFromOutput(prefix, output string) error {
 	// If we didn't find an error message, return the entire output
 	errMsg := strings.TrimSpace(output)
 	return fmt.Errorf(prefix, errMsg)
+}
+
+// IsDockerHostSet checks if the DOCKER_HOST environment variable is set.
+func IsDockerHostSet() bool {
+	return os.Getenv("DOCKER_HOST") != ""
+}
+
+// IsDockerHostSetToAstroMachine checks if the DOCKER_HOST environment variable
+// is pointing to the astro machine.
+func IsDockerHostSetToAstroMachine() bool {
+	return strings.Contains(os.Getenv("DOCKER_HOST"), podmanMachineName)
 }

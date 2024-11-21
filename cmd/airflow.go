@@ -426,7 +426,7 @@ func newAirflowBashCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bash",
 		Short: "Exec into a running an Airflow container",
-		Long:  "Use this command to Exec into either the Webserver, Sechduler, Postgres, or Triggerer ListContainer to run bash commands",
+		Long:  "Use this command to Exec into either the Webserver, Sechduler, Postgres, or Triggerer ListedContainer to run bash commands",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
