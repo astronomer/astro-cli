@@ -546,8 +546,13 @@ func ExportVariables(id string) error {
 				vs = vt
 			default:
 				// Re-encode complex types as JSON.
-				b, _ := json.Marshal(v)
-				vs = string(b)
+				b, err := json.Marshal(v)
+				if err == nil {
+					vs = string(b)
+				} else {
+					fmt.Println("variable json encode unsuccessful")
+					vs = v
+				}
 			}
 			newVariables := Variables{{k, vs}}
 			fmt.Println("Exporting Variable: " + k)
