@@ -12,6 +12,41 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	containerRuntimeNotFoundErrMsg = "Failed to find a container runtime. " +
+		"See the Astro CLI prerequisites for more information. " +
+		"https://www.astronomer.io/docs/astro/cli/install-cli"
+)
+
+// ContainerRuntime interface defines the methods that manage
+// the container runtime lifecycle.
+type ContainerRuntime interface {
+	Initialize() error
+	Configure() error
+	ConfigureOrKill() error
+	Kill() error
+}
+
+// GetContainerRuntime creates a new container runtime based on the runtime string
+// derived from the host machine configuration.
+func GetContainerRuntime() (ContainerRuntime, error) {
+	// Scan the environment for the container runtime binary.
+	containerRuntime, err := GetContainerRuntimeBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	// Return the appropriate container runtime based on the binary discovered.
+	switch containerRuntime {
+	case dockerCmd:
+		return DockerRuntime{}, nil
+	case podmanCmd:
+		return PodmanRuntime{}, nil
+	default:
+		return nil, errors.New(containerRuntimeNotFoundErrMsg)
+	}
+}
+
 // FileChecker interface defines a method to check if a file exists.
 // This is here mostly for testing purposes. This allows us to mock
 // around actually checking for binaries on a live system as that
@@ -110,9 +145,7 @@ func GetContainerRuntimeBinary() (string, error) {
 
 	// If we made it here, no runtime was found, so we show a helpful error message
 	// and halt the command execution.
-	return "", errors.New("Failed to find a container runtime. " +
-		"See the Astro CLI prerequisites for more information. " +
-		"https://www.astronomer.io/docs/astro/cli/install-cli")
+	return "", errors.New(containerRuntimeNotFoundErrMsg)
 }
 
 // isWindows is a utility function to determine if the CLI host machine
