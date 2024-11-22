@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"io"
 	"os"
 	"os/exec"
@@ -71,7 +72,7 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 }
 
 func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
@@ -134,7 +135,7 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 
 func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
 	// delete container
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return "", err
 	}
@@ -245,7 +246,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 }
 
 func (d *DockerImage) ConflictTest(workingDirectory, testHomeDirectory string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return "", err
 	}
@@ -321,7 +322,7 @@ func parseExitCode(logs string) string {
 }
 
 func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error {
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
@@ -349,7 +350,7 @@ func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error 
 }
 
 func (d *DockerImage) Push(remoteImage, username, token string) error {
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
@@ -454,7 +455,7 @@ func (d *DockerImage) getRegistryToAuth(imageName string) (string, error) {
 func (d *DockerImage) Pull(remoteImage, username, token string) error {
 	// Pulling image to registry
 	fmt.Println(pullingImagePrompt)
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
@@ -490,7 +491,7 @@ var displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback f
 }
 
 func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return "", err
 	}
@@ -516,7 +517,7 @@ func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 }
 
 func (d *DockerImage) DoesImageExist(image string) error {
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
@@ -533,7 +534,7 @@ func (d *DockerImage) DoesImageExist(image string) error {
 func (d *DockerImage) ListLabels() (map[string]string, error) {
 	var labels map[string]string
 
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return labels, err
 	}
@@ -556,7 +557,7 @@ func (d *DockerImage) ListLabels() (map[string]string, error) {
 }
 
 func (d *DockerImage) TagLocalImage(localImage string) error {
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
@@ -569,7 +570,7 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 }
 
 func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error {
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
@@ -689,7 +690,7 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 
 // When login and push do not work use bash to run docker commands, this function is for users using colima
 func pushWithBash(authConfig *cliTypes.AuthConfig, image string) error {
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}

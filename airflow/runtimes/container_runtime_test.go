@@ -1,4 +1,17 @@
-package airflow
+package runtimes
+
+import (
+	"github.com/stretchr/testify/suite"
+	"testing"
+)
+
+type Suite struct {
+	suite.Suite
+}
+
+func TestConfig(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
 
 // MockFileChecker is a mock implementation of FileChecker for tests.
 type MockFileChecker struct {

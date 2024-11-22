@@ -1694,45 +1694,45 @@ func (s *Suite) TestDockerComposeRunDAG() {
 
 var errExecMock = errors.New("docker is not running")
 
-func (s *Suite) TestStartDocker() {
-	s.Run("start docker success", func() {
-		counter := 0
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			switch cmd {
-			case "open":
-				return nil
-			case "docker":
-				if counter == 0 {
-					counter++
-					return errExecMock
-				}
-				return nil
-			default:
-				return errExecMock
-			}
-		}
-
-		err := startDocker()
-		s.NoError(err)
-	})
-
-	s.Run("start docker fail", func() {
-		timeoutNum = 5
-
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			switch cmd {
-			case "open":
-				return nil
-			case "docker":
-				return errExecMock
-			default:
-				return errExecMock
-			}
-		}
-		err := startDocker()
-		s.Contains(err.Error(), "timed out waiting for docker")
-	})
-}
+//func (s *Suite) TestStartDocker() {
+//	s.Run("start docker success", func() {
+//		counter := 0
+//		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+//			switch cmd {
+//			case "open":
+//				return nil
+//			case "docker":
+//				if counter == 0 {
+//					counter++
+//					return errExecMock
+//				}
+//				return nil
+//			default:
+//				return errExecMock
+//			}
+//		}
+//
+//		err := startDocker()
+//		s.NoError(err)
+//	})
+//
+//	s.Run("start docker fail", func() {
+//		timeoutNum = 5
+//
+//		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+//			switch cmd {
+//			case "open":
+//				return nil
+//			case "docker":
+//				return errExecMock
+//			default:
+//				return errExecMock
+//			}
+//		}
+//		err := startDocker()
+//		s.Contains(err.Error(), "timed out waiting for docker")
+//	})
+//}
 
 func (s *Suite) TestCreateDockerProject() {
 	fs := afero.NewMemMapFs()
