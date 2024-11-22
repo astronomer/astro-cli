@@ -45,15 +45,12 @@ const (
 	RuntimeImageLabel              = "io.astronomer.docker.runtime.version"
 	AirflowImageLabel              = "io.astronomer.docker.airflow.version"
 	componentName                  = "airflow"
-	podmanCmd                      = "podman"
 	dockerStateUp                  = "running"
 	dockerExitState                = "exited"
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
 	pytestDirectory                = "tests"
-	OpenCmd                        = "open"
-	dockerCmd                      = "docker"
 	registryUsername               = "cli"
 	unknown                        = "unknown"
 	major                          = "major"
@@ -86,9 +83,7 @@ var (
 	exportSettings    = settings.Export
 	envExportSettings = settings.EnvExport
 
-	openURL    = browser.OpenURL
-	timeoutNum = 60
-	tickNum    = 500
+	openURL = browser.OpenURL
 
 	majorUpdatesAirflowProviders    = []string{}
 	minorUpdatesAirflowProviders    = []string{}

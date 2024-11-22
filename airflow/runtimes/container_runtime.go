@@ -130,7 +130,9 @@ func FindBinary(pathEnv, binaryName string, checker FileChecker) bool {
 // to use alternative container runtimes without needing to explicitly configure it.
 // Manual configuration should only be needed when both runtimes are installed and
 // need to override to use one or the other and not use the auto-detection.
-func GetContainerRuntimeBinary() (string, error) {
+// We define this function as a variable so it can be mocked in unit tests to test
+// higher-level functions.
+var GetContainerRuntimeBinary = func() (string, error) {
 	// Supported container runtime binaries
 	binaries := []string{docker, podman}
 

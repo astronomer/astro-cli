@@ -1,7 +1,12 @@
 package runtimes
 
 import (
+	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -12,6 +17,67 @@ type ContainerRuntimeSuite struct {
 
 func TestConfig(t *testing.T) {
 	suite.Run(t, new(ContainerRuntimeSuite))
+}
+
+// Mock for GetContainerRuntimeBinary
+type MockRuntimeChecker struct {
+	mock.Mock
+}
+
+func (m *MockRuntimeChecker) GetContainerRuntimeBinary() (string, error) {
+	args := m.Called()
+	return args.String(0), args.Error(1)
+}
+
+func (s *ContainerRuntimeSuite) TestGetContainerRuntime() {
+	s.Run("GetContainerRuntime_Docker", func() {
+		mockChecker := new(MockRuntimeChecker)
+		mockChecker.On("GetContainerRuntimeBinary").Return(docker, nil)
+
+		// Inject the mock and make sure we restore after the test.
+		originalGetContainerRuntimeBinary := GetContainerRuntimeBinary
+		defer func() { GetContainerRuntimeBinary = originalGetContainerRuntimeBinary }()
+		GetContainerRuntimeBinary = mockChecker.GetContainerRuntimeBinary
+
+		runtime, err := GetContainerRuntime()
+
+		assert.Nil(s.T(), err)
+		assert.IsType(s.T(), DockerRuntime{}, runtime)
+		mockChecker.AssertExpectations(s.T())
+	})
+
+	s.Run("GetContainerRuntime_Podman", func() {
+		mockChecker := new(MockRuntimeChecker)
+		mockChecker.On("GetContainerRuntimeBinary").Return(podman, nil)
+
+		// Inject the mock and make sure we restore after the test.
+		originalGetContainerRuntimeBinary := GetContainerRuntimeBinary
+		defer func() { GetContainerRuntimeBinary = originalGetContainerRuntimeBinary }()
+		GetContainerRuntimeBinary = mockChecker.GetContainerRuntimeBinary
+
+		runtime, err := GetContainerRuntime()
+
+		assert.Nil(s.T(), err)
+		assert.IsType(s.T(), PodmanRuntime{}, runtime)
+		mockChecker.AssertExpectations(s.T())
+	})
+
+	s.Run("GetContainerRuntime_Error", func() {
+		mockChecker := new(MockRuntimeChecker)
+		mockChecker.On("GetContainerRuntimeBinary").Return("", errors.New(containerRuntimeNotFoundErrMsg))
+
+		// Inject the mock and make sure we restore after the test.
+		originalGetContainerRuntimeBinary := GetContainerRuntimeBinary
+		defer func() { GetContainerRuntimeBinary = originalGetContainerRuntimeBinary }()
+		GetContainerRuntimeBinary = mockChecker.GetContainerRuntimeBinary
+
+		runtime, err := GetContainerRuntime()
+
+		assert.NotNil(s.T(), err)
+		assert.Nil(s.T(), runtime)
+		assert.Equal(s.T(), containerRuntimeNotFoundErrMsg, err.Error())
+		mockChecker.AssertExpectations(s.T())
+	})
 }
 
 // MockFileChecker is a mock implementation of FileChecker for tests.
