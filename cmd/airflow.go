@@ -2,12 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/astronomer/astro-cli/airflow/runtimes"
 
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
@@ -62,8 +63,8 @@ var (
 	conflictTest           bool
 	versionTest            bool
 	dagTest                bool
-	containerRuntime       runtimes.ContainerRuntime
 	waitTime               time.Duration
+	containerRuntime       runtimes.ContainerRuntime
 	RunExample             = `
 # Create default admin user.
 astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin
@@ -411,11 +412,10 @@ func newAirflowBashCmd() *cobra.Command {
 
 func newAirflowObjectRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "object",
-		Aliases:           []string{"obj", "objects"},
-		Short:             "Configure your local Airflow environment.",
-		Long:              "Manage local Airflow connections, variables, and pools. Import or export your objects to your Airflow settings file. Configure Airflow's startup behavior using a Compose file.",
-		PersistentPreRunE: DoNothing,
+		Use:     "object",
+		Aliases: []string{"obj", "objects"},
+		Short:   "Configure your local Airflow environment.",
+		Long:    "Manage local Airflow connections, variables, and pools. Import or export your objects to your Airflow settings file. Configure Airflow's startup behavior using a Compose file.",
 	}
 	cmd.AddCommand(
 		newObjectImportCmd(),
@@ -426,11 +426,12 @@ func newAirflowObjectRootCmd() *cobra.Command {
 
 func newObjectImportCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "import",
-		Short:   "Create and update local Airflow connections, variables, and pools from a local YAML file",
-		Long:    "This command creates all connections, variables, and pools from a YAML configuration file in your local Airflow environment. Airflow must be running locally for this command to work",
-		PreRunE: utils.EnsureProjectDir,
-		RunE:    airflowSettingsImport,
+		Use:               "import",
+		Short:             "Create and update local Airflow connections, variables, and pools from a local YAML file",
+		Long:              "This command creates all connections, variables, and pools from a YAML configuration file in your local Airflow environment. Airflow must be running locally for this command to work",
+		PersistentPreRunE: DoNothing,
+		PreRunE:           utils.EnsureProjectDir,
+		RunE:              airflowSettingsImport,
 	}
 	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Import connections from a settings YAML file")
 	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Import variables from a settings YAML file")
@@ -441,12 +442,13 @@ func newObjectImportCmd() *cobra.Command {
 
 func newObjectExportCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "export",
-		Short:   "Export local Airflow connections, variables, pools, and startup configurations as YAML or environment variables.",
-		Long:    "Export local Airflow connections, variables, or pools as YAML or environment variables. Airflow must be running locally to export Airflow objects. Use the '--compose' flag to export the Compose file used to start up Airflow.",
-		Args:    cobra.MaximumNArgs(1),
-		PreRunE: utils.EnsureProjectDir,
-		RunE:    airflowSettingsExport,
+		Use:               "export",
+		Short:             "Export local Airflow connections, variables, pools, and startup configurations as YAML or environment variables.",
+		Long:              "Export local Airflow connections, variables, or pools as YAML or environment variables. Airflow must be running locally to export Airflow objects. Use the '--compose' flag to export the Compose file used to start up Airflow.",
+		Args:              cobra.MaximumNArgs(1),
+		PersistentPreRunE: DoNothing,
+		PreRunE:           utils.EnsureProjectDir,
+		RunE:              airflowSettingsExport,
 	}
 	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Export connections to a settings YAML or env file")
 	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Export variables to a settings YAML or env file")

@@ -8,12 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"io"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/astronomer/astro-cli/airflow/runtimes"
 
 	"github.com/astronomer/astro-cli/pkg/util"
 	cliCommand "github.com/docker/cli/cli/command"

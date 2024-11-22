@@ -1,16 +1,17 @@
 package runtimes
 
 import (
-	"github.com/stretchr/testify/suite"
 	"testing"
+
+	"github.com/stretchr/testify/suite"
 )
 
-type Suite struct {
+type ContainerRuntimeSuite struct {
 	suite.Suite
 }
 
 func TestConfig(t *testing.T) {
-	suite.Run(t, new(Suite))
+	suite.Run(t, new(ContainerRuntimeSuite))
 }
 
 // MockFileChecker is a mock implementation of FileChecker for tests.
@@ -26,7 +27,7 @@ func (m MockFileChecker) Exists(path string) bool {
 
 // TestGetContainerRuntimeBinary runs a suite of tests against GetContainerRuntimeBinary,
 // using the MockFileChecker defined above.
-func (s *Suite) TestGetContainerRuntimeBinary() {
+func (s *ContainerRuntimeSuite) TestGetContainerRuntimeBinary() {
 	tests := []struct {
 		name      string
 		pathEnv   string

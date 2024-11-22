@@ -32,4 +32,5 @@ func EnsureRuntime(cmd *cobra.Command, args []string) error {
 	}
 	// Initialize the runtime if it's not running.
 	return containerRuntime.Initialize()
+	return nil
 }

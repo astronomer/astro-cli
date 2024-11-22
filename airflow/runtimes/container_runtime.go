@@ -1,12 +1,13 @@
 package runtimes
 
 import (
-	"github.com/briandowns/spinner"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/briandowns/spinner"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
