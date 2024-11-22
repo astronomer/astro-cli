@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/astronomer/astro-cli/airflow"
+	"github.com/astronomer/astro-cli/airflow/container-runtime"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/spf13/cobra"
 )
@@ -17,7 +17,7 @@ func DoNothing(_ *cobra.Command, _ []string) error {
 // defined here.
 func ConfigureContainerRuntime(_ *cobra.Command, _ []string) error {
 	var err error
-	containerRuntime, err = airflow.GetContainerRuntime()
+	containerRuntime, err = container_runtime.GetContainerRuntime()
 	if err != nil {
 		return err
 	}

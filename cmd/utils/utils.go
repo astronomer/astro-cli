@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"runtime"
-
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/pkg/errors"
@@ -28,8 +26,4 @@ func GetDefaultDeployDescription(isDagOnlyDeploy bool) string {
 	}
 
 	return "Deployed via <astro deploy>"
-}
-
-func IsMac() bool {
-	return runtime.GOOS == "darwin"
 }

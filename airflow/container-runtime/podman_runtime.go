@@ -1,4 +1,4 @@
-package airflow
+package container_runtime
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ func (p PodmanRuntime) Initialize() error {
 	if IsDockerHostSet() {
 		return nil
 	}
-	return InitMachine()
+	return InitializeMachine()
 }
 
 func (p PodmanRuntime) Configure() error {

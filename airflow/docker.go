@@ -2,7 +2,6 @@ package airflow
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"io/fs"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/astronomer/astro-cli/airflow/container-runtime"
 
 	semver "github.com/Masterminds/semver/v3"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
@@ -44,15 +45,12 @@ const (
 	RuntimeImageLabel              = "io.astronomer.docker.runtime.version"
 	AirflowImageLabel              = "io.astronomer.docker.airflow.version"
 	componentName                  = "airflow"
-	podmanCmd                      = "podman"
 	dockerStateUp                  = "running"
 	dockerExitState                = "exited"
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
 	pytestDirectory                = "tests"
-	OpenCmd                        = "open"
-	dockerCmd                      = "docker"
 	registryUsername               = "cli"
 	unknown                        = "unknown"
 	major                          = "major"
@@ -85,9 +83,7 @@ var (
 	exportSettings    = settings.Export
 	envExportSettings = settings.EnvExport
 
-	openURL    = browser.OpenURL
-	timeoutNum = 60
-	tickNum    = 500
+	openURL = browser.OpenURL
 
 	majorUpdatesAirflowProviders    = []string{}
 	minorUpdatesAirflowProviders    = []string{}
@@ -1090,7 +1086,7 @@ func (d *DockerCompose) Bash(container string) error {
 		}
 	}
 	// exec into container
-	containerRuntime, err := GetContainerRuntimeBinary()
+	containerRuntime, err := container_runtime.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
@@ -1402,58 +1398,4 @@ var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 func checkServiceState(serviceState, expectedState string) bool {
 	scrubbedState := strings.Split(serviceState, " ")[0]
 	return scrubbedState == expectedState
-}
-
-func startDocker() error {
-	containerRuntime, err := GetContainerRuntimeBinary()
-	if err != nil {
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	err = cmdExec(containerRuntime, buf, buf, "ps")
-	if err != nil {
-		// open docker
-		fmt.Println("\nDocker is not running. Starting up the Docker engine…")
-		err = cmdExec(OpenCmd, buf, os.Stderr, "-a", dockerCmd)
-		if err != nil {
-			return err
-		}
-		fmt.Println("\nIf you don't see Docker Desktop starting, exit this command and start it manually.")
-		fmt.Println("If you don't have Docker Desktop installed, install it (https://www.docker.com/products/docker-desktop/) and try again.")
-		fmt.Println("If you are using Colima or another Docker alternative, start the engine manually.")
-		// poll for docker
-		err = waitForDocker()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func waitForDocker() error {
-	containerRuntime, err := GetContainerRuntimeBinary()
-	if err != nil {
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	timeout := time.After(time.Duration(timeoutNum) * time.Second)
-	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
-	for {
-		select {
-		// Got a timeout! fail with a timeout error
-		case <-timeout:
-			return errors.New("timed out waiting for docker")
-		// Got a tick, we should check if docker is up & running
-		case <-ticker.C:
-			buf.Reset()
-			err := cmdExec(containerRuntime, buf, buf, "ps")
-			if err != nil {
-				continue
-			} else {
-				return nil
-			}
-		}
-	}
 }

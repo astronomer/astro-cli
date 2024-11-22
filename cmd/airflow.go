@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/airflow/container-runtime"
+
 	"github.com/astronomer/astro-cli/cmd/utils"
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -63,7 +65,7 @@ var (
 	versionTest            bool
 	dagTest                bool
 	waitTime               time.Duration
-	containerRuntime       airflow.ContainerRuntime
+	containerRuntime       container_runtime.ContainerRuntime
 	RunExample             = `
 # Create default admin user.
 astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin

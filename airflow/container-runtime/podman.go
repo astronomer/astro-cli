@@ -1,44 +1,29 @@
-package airflow
+package container_runtime
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
-
-	"github.com/astronomer/astro-cli/cmd/utils"
 
 	"github.com/briandowns/spinner"
 )
 
 const (
-	podmanMachineName   = "astro-machine"
-	podmanMachineMemory = "4096" // 4GB
-	podmanStatusRunning = "running"
-	podmanStatusStopped = "stopped"
-	composeProjectLabel = "com.docker.compose.project"
-	podmanInitMessage   = " Astro uses container technology to run your Airflow project. " +
-		"Please wait while we get things started..."
+	podmanMachineName     = "astro-machine"
+	podmanMachineMemory   = "4096" // 4GB
+	podmanStatusRunning   = "running"
+	podmanStatusStopped   = "stopped"
+	composeProjectLabel   = "com.docker.compose.project"
 	podmanInitSlowMessage = " Sorry for the wait, this is taking a bit longer than expected. " +
 		"This initial download will be cached once finished."
 	podmanMachineAlreadyRunningErrMsg = "astro needs a podman machine to run your project, " +
 		"but it looks like a machine is already running. " +
 		"Mac hosts are limited to one running machine at a time. " +
 		"Please stop the other machine and try again"
-	spinnerRefresh = 100 * time.Millisecond
 )
-
-var spinnerCharSet = spinner.CharSets[14]
-
-// Command represents a command to be executed.
-type Command struct {
-	Command string
-	Args    []string
-}
 
 // ListedMachine contains information about a Podman machine
 // as it is provided from the `podman machine ls --format json` command.
@@ -68,19 +53,9 @@ type ListedContainer struct {
 	Labels map[string]string
 }
 
-// Execute runs the Podman command and returns the output.
-func (p *Command) Execute() (string, error) {
-	cmd := exec.Command(p.Command, p.Args...) //nolint:gosec
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err := cmd.Run()
-	return out.String(), err
-}
-
-func InitMachine() error {
+func InitializeMachine() error {
 	s := spinner.New(spinnerCharSet, spinnerRefresh)
-	s.Suffix = podmanInitMessage
+	s.Suffix = containerRuntimeInitMessage
 	defer s.Stop()
 
 	go func() {
@@ -92,7 +67,7 @@ func InitMachine() error {
 	nonAstroMachineName := IsAnotherMachineRunning()
 	// If there is another machine running, and it has no running containers, stop it.
 	// Otherwise, we assume the user has some other project running that we don't want to interfere with.
-	if nonAstroMachineName != "" && utils.IsMac() {
+	if nonAstroMachineName != "" && isMac() {
 		// First, configure the other running machine for usage.
 		if err := GetAndConfigureMachineForUsage(nonAstroMachineName); err != nil {
 			return err
@@ -150,7 +125,7 @@ func InitMachine() error {
 	// Otherwise, initialize the machine
 	s.Start()
 	podmanCmd := Command{
-		Command: "podman",
+		Command: podman,
 		Args:    []string{"machine", "init", podmanMachineName, "--memory", podmanMachineMemory, "--now"},
 	}
 	output, err := podmanCmd.Execute()
@@ -164,7 +139,7 @@ func InitMachine() error {
 // StartMachine starts our astro Podman machine.
 func StartMachine(name string) error {
 	podmanCmd := Command{
-		Command: "podman",
+		Command: podman,
 		Args:    []string{"machine", "start", name},
 	}
 	output, err := podmanCmd.Execute()
@@ -177,7 +152,7 @@ func StartMachine(name string) error {
 // StopMachine stops the given Podman machine.
 func StopMachine(name string) error {
 	podmanCmd := Command{
-		Command: "podman",
+		Command: podman,
 		Args:    []string{"machine", "stop", name},
 	}
 	output, err := podmanCmd.Execute()
@@ -191,7 +166,7 @@ func StopMachine(name string) error {
 // such that it can only be started again by re-initializing.
 func RemoveMachine(name string) error {
 	podmanCmd := Command{
-		Command: "podman",
+		Command: podman,
 		Args:    []string{"machine", "rm", "-f", name},
 	}
 	output, err := podmanCmd.Execute()
@@ -204,7 +179,7 @@ func RemoveMachine(name string) error {
 // InspectMachine inspects a given podman machine name.
 func InspectMachine(name string) (*InspectedMachine, error) {
 	podmanCmd := Command{
-		Command: "podman",
+		Command: podman,
 		Args:    []string{"machine", "inspect", name},
 	}
 	output, err := podmanCmd.Execute()
@@ -227,7 +202,7 @@ func InspectMachine(name string) (*InspectedMachine, error) {
 // ListMachines lists all Podman machines.
 func ListMachines() ([]ListedMachine, error) {
 	podmanCmd := Command{
-		Command: "podman",
+		Command: podman,
 		Args:    []string{"machine", "ls", "--format", "json"},
 	}
 	output, err := podmanCmd.Execute()
@@ -245,7 +220,7 @@ func ListMachines() ([]ListedMachine, error) {
 // ListContainers lists all pods in the machine.
 func ListContainers() ([]ListedContainer, error) {
 	podmanCmd := Command{
-		Command: "podman",
+		Command: podman,
 		Args:    []string{"ps", "--format", "json"},
 	}
 	output, err := podmanCmd.Execute()
@@ -331,7 +306,7 @@ func ConfigureMachineForUsage(machine *InspectedMachine) error {
 
 	// Set the podman default connection to our machine.
 	podmanCmd := Command{
-		Command: "podman",
+		Command: podman,
 		Args:    []string{"system", "connection", "default", machine.Name},
 	}
 	output, err := podmanCmd.Execute()

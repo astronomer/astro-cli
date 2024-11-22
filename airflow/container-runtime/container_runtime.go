@@ -1,21 +1,30 @@
-package airflow
+package container_runtime
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/util"
+	"github.com/briandowns/spinner"
 	"github.com/pkg/errors"
 )
 
+var spinnerCharSet = spinner.CharSets[14]
+
 const (
+	docker                         = "docker"
+	podman                         = "podman"
 	containerRuntimeNotFoundErrMsg = "Failed to find a container runtime. " +
 		"See the Astro CLI prerequisites for more information. " +
 		"https://www.astronomer.io/docs/astro/cli/install-cli"
+	containerRuntimeInitMessage = " Astro uses container technology to run your Airflow project. " +
+		"Please wait while we get things started…"
+	spinnerRefresh = 100 * time.Millisecond
 )
 
 // ContainerRuntime interface defines the methods that manage
@@ -38,9 +47,9 @@ func GetContainerRuntime() (ContainerRuntime, error) {
 
 	// Return the appropriate container runtime based on the binary discovered.
 	switch containerRuntime {
-	case dockerCmd:
+	case docker:
 		return DockerRuntime{}, nil
-	case podmanCmd:
+	case podman:
 		return PodmanRuntime{}, nil
 	default:
 		return nil, errors.New(containerRuntimeNotFoundErrMsg)
@@ -125,7 +134,7 @@ func FindBinary(pathEnv, binaryName string, checker FileChecker) bool {
 // need to override to use one or the other and not use the auto-detection.
 func GetContainerRuntimeBinary() (string, error) {
 	// Supported container runtime binaries
-	binaries := []string{dockerCmd, podmanCmd}
+	binaries := []string{docker, podman}
 
 	// If the binary is manually configured to an acceptable runtime, return it directly.
 	// If a manual configuration exists, but it's not an appropriate runtime, we'll still
@@ -146,10 +155,4 @@ func GetContainerRuntimeBinary() (string, error) {
 	// If we made it here, no runtime was found, so we show a helpful error message
 	// and halt the command execution.
 	return "", errors.New(containerRuntimeNotFoundErrMsg)
-}
-
-// isWindows is a utility function to determine if the CLI host machine
-// is running on Microsoft Windows OS.
-func isWindows() bool {
-	return strings.Contains(strings.ToLower(os.Getenv("OS")), "windows")
 }

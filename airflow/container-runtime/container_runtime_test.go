@@ -1,4 +1,6 @@
-package airflow
+package container_runtime
+
+import "github.com/astronomer/astro-cli/airflow"
 
 // MockFileChecker is a mock implementation of FileChecker for tests.
 type MockFileChecker struct {
@@ -13,7 +15,7 @@ func (m MockFileChecker) Exists(path string) bool {
 
 // TestGetContainerRuntimeBinary runs a suite of tests against GetContainerRuntimeBinary,
 // using the MockFileChecker defined above.
-func (s *Suite) TestGetContainerRuntimeBinary() {
+func (s *airflow.Suite) TestGetContainerRuntimeBinary() {
 	tests := []struct {
 		name      string
 		pathEnv   string

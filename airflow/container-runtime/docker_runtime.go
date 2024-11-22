@@ -1,16 +1,12 @@
-package airflow
-
-import "github.com/astronomer/astro-cli/cmd/utils"
+package container_runtime
 
 type DockerRuntime struct{}
 
 func (p DockerRuntime) Initialize() error {
-	if utils.IsMac() {
-		if err := startDocker(); err != nil {
-			return err
-		}
+	if !isMac() {
+		return nil
 	}
-	return nil
+	return InitializeDocker()
 }
 
 func (p DockerRuntime) Configure() error {
