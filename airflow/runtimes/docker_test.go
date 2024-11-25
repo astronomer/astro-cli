@@ -11,12 +11,12 @@ type MockDockerInitializer struct {
 	mock.Mock
 }
 
-func (d MockDockerInitializer) CheckDockerCmd() (string, error) {
+func (d *MockDockerInitializer) CheckDockerCmd() (string, error) {
 	args := d.Called()
 	return args.String(0), args.Error(1)
 }
 
-func (d MockDockerInitializer) OpenDockerCmd() (string, error) {
+func (d *MockDockerInitializer) OpenDockerCmd() (string, error) {
 	args := d.Called()
 	return args.String(0), args.Error(1)
 }
