@@ -7,96 +7,71 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type MockCommand struct {
+type MockDockerInitializer struct {
 	mock.Mock
 }
 
-func (m *MockCommand) Execute() (string, error) {
-	args := m.Called()
+func (d MockDockerInitializer) CheckDockerCmd() (string, error) {
+	args := d.Called()
+	return args.String(0), args.Error(1)
+}
+
+func (d MockDockerInitializer) OpenDockerCmd() (string, error) {
+	args := d.Called()
 	return args.String(0), args.Error(1)
 }
 
 func (s *ContainerRuntimeSuite) TestStartDocker() {
 	s.Run("Docker is running, returns nil", func() {
-		checkDockerCmd := new(MockCommand)
-		// Simulate that `docker ps` runs successfully
-		checkDockerCmd.On("Execute").Return("", nil).Once()
-
-		openDockerCmd := new(MockCommand)
-		// Simulate that `docker ps` runs successfully
-		openDockerCmd.On("Execute").Return("", nil).Once()
-
-		initializer := DockerInitializer{
-			CheckDockerCmd: checkDockerCmd.Execute,
-			OpenDockerCmd:  checkDockerCmd.Execute,
-		}
-
-		err := InitializeDocker(initializer, defaultTimeoutSeconds)
+		// Create mock initializer.
+		mockInitializer := new(MockDockerInitializer)
+		// Simulate that the initial `docker ps` succeeds and we exit early.
+		mockInitializer.On("CheckDockerCmd").Return("", nil).Once()
+		// Run our test and assert expectations.
+		err := InitializeDocker(mockInitializer, defaultTimeoutSeconds)
 		assert.Nil(s.T(), err, "Expected no error when docker is running")
-		checkDockerCmd.AssertExpectations(s.T())
-		openDockerCmd.AssertNotCalled(s.T(), "Execute")
+		mockInitializer.AssertExpectations(s.T())
 	})
 
 	s.Run("Docker is not running, tries to start and waits", func() {
-		checkDockerCmd := new(MockCommand)
+		// Create mock initializer.
+		mockInitializer := new(MockDockerInitializer)
 		// Simulate that the initial `docker ps` fails.
-		checkDockerCmd.On("Execute").Return("", fmt.Errorf("docker not running")).Once()
-		// Simulate that `docker ps` works after trying to open docker.
-		checkDockerCmd.On("Execute").Return("", nil).Once()
-
-		openDockerCmd := new(MockCommand)
+		mockInitializer.On("CheckDockerCmd").Return("", fmt.Errorf("docker not running")).Once()
 		// Simulate that `open -a docker` succeeds.
-		openDockerCmd.On("Execute").Return("", nil).Once()
-
-		dockerInitializer := DockerInitializer{
-			CheckDockerCmd: checkDockerCmd.Execute,
-			OpenDockerCmd:  openDockerCmd.Execute,
-		}
-
-		err := InitializeDocker(dockerInitializer, defaultTimeoutSeconds)
+		mockInitializer.On("OpenDockerCmd").Return("", nil).Once()
+		// Simulate that `docker ps` works after trying to open docker.
+		mockInitializer.On("CheckDockerCmd").Return("", nil).Once()
+		// Run our test and assert expectations.
+		err := InitializeDocker(mockInitializer, defaultTimeoutSeconds)
 		assert.Nil(s.T(), err, "Expected no error when docker starts after retry")
-		checkDockerCmd.AssertExpectations(s.T())
-		openDockerCmd.AssertExpectations(s.T())
+		mockInitializer.AssertExpectations(s.T())
 	})
 
 	s.Run("Docker fails to open", func() {
-		checkDockerCmd := new(MockCommand)
+		// Create mock initializer.
+		mockInitializer := new(MockDockerInitializer)
 		// Simulate `docker ps` failing.
-		checkDockerCmd.On("Execute").Return("", fmt.Errorf("docker not running")).Once()
-
-		openDockerCmd := new(MockCommand)
+		mockInitializer.On("CheckDockerCmd").Return("", fmt.Errorf("docker not running")).Once()
 		// Simulate `open -a docker` failing.
-		openDockerCmd.On("Execute").Return("", fmt.Errorf("failed to open docker")).Once()
-
-		dockerInitializer := DockerInitializer{
-			CheckDockerCmd: checkDockerCmd.Execute,
-			OpenDockerCmd:  openDockerCmd.Execute,
-		}
-
-		err := InitializeDocker(dockerInitializer, defaultTimeoutSeconds)
+		mockInitializer.On("OpenDockerCmd").Return("", fmt.Errorf("failed to open docker")).Once()
+		// Run our test and assert expectations.
+		err := InitializeDocker(mockInitializer, defaultTimeoutSeconds)
 		assert.Equal(s.T(), fmt.Errorf(dockerOpenNotice), err, "Expected timeout error")
-		checkDockerCmd.AssertExpectations(s.T())
-		openDockerCmd.AssertExpectations(s.T())
+		mockInitializer.AssertExpectations(s.T())
 	})
 
 	s.Run("Docker open succeeds but check times out", func() {
-		checkDockerCmd := new(MockCommand)
-		// Simulate `docker ps` failing indefinitely.
-		checkDockerCmd.On("Execute").Return("", fmt.Errorf("docker not running"))
-
-		openDockerCmd := new(MockCommand)
-		// Simulate `open -a docker` succeeding.
-		openDockerCmd.On("Execute").Return("", nil).Once()
-
-		dockerInitializer := DockerInitializer{
-			CheckDockerCmd: checkDockerCmd.Execute,
-			OpenDockerCmd:  openDockerCmd.Execute,
-		}
-
+		// Create mock initializer.
+		mockInitializer := new(MockDockerInitializer)
+		// Simulate `docker ps` failing continuously.
+		mockInitializer.On("CheckDockerCmd").Return("", fmt.Errorf("docker not running"))
+		// Simulate `open -a docker` failing.
+		mockInitializer.On("OpenDockerCmd").Return("", nil).Once()
+		// Run our test and assert expectations.
 		// Simulate the timeout after 1 second.
-		err := InitializeDocker(dockerInitializer, 1)
+		err := InitializeDocker(mockInitializer, 1)
 		assert.Equal(s.T(), fmt.Errorf(timeoutErrMsg), err, "Expected timeout error")
-		checkDockerCmd.AssertExpectations(s.T())
-		openDockerCmd.AssertExpectations(s.T())
+		mockInitializer.AssertExpectations(s.T())
 	})
 }

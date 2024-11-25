@@ -10,5 +10,5 @@ func (p DockerRuntime) Initialize() error {
 	if !isMac() {
 		return nil
 	}
-	return InitializeDocker(DefaultDockerInitializer, defaultTimeoutSeconds)
+	return InitializeDocker(new(DefaultDockerInitializer), defaultTimeoutSeconds)
 }

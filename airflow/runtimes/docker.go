@@ -18,28 +18,29 @@ const (
 // DockerInitializer is a struct that contains the functions needed to initialize Docker.
 // The concrete implementation that we use is DefaultDockerInitializer below.
 // When running the tests, we substitute the default implementation with a mock implementation.
-type DockerInitializer struct {
-	CheckDockerCmd func() (string, error)
-	OpenDockerCmd  func() (string, error)
+type DockerInitializer interface {
+	CheckDockerCmd() (string, error)
+	OpenDockerCmd() (string, error)
 }
 
 // DefaultDockerInitializer is the default implementation of DockerInitializer.
 // The concrete functions defined here are called from the InitializeDocker function below.
-var DefaultDockerInitializer = DockerInitializer{
-	CheckDockerCmd: func() (string, error) {
-		checkDockerCmd := Command{
-			Command: docker,
-			Args:    []string{"ps"},
-		}
-		return checkDockerCmd.Execute()
-	},
-	OpenDockerCmd: func() (string, error) {
-		openDockerCmd := Command{
-			Command: open,
-			Args:    []string{"-a", docker},
-		}
-		return openDockerCmd.Execute()
-	},
+type DefaultDockerInitializer struct{}
+
+func (d DefaultDockerInitializer) CheckDockerCmd() (string, error) {
+	checkDockerCmd := Command{
+		Command: docker,
+		Args:    []string{"ps"},
+	}
+	return checkDockerCmd.Execute()
+}
+
+func (d DefaultDockerInitializer) OpenDockerCmd() (string, error) {
+	openDockerCmd := Command{
+		Command: open,
+		Args:    []string{"-a", docker},
+	}
+	return openDockerCmd.Execute()
 }
 
 // InitializeDocker initializes the Docker runtime.
