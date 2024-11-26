@@ -32,6 +32,9 @@ const (
 // the container runtime lifecycle.
 type ContainerRuntime interface {
 	Initialize() error
+	Configure() error
+	ConfigureOrKill() error
+	Kill() error
 }
 
 // GetContainerRuntime creates a new container runtime based on the runtime string

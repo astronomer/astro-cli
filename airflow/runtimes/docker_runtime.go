@@ -12,3 +12,15 @@ func (p DockerRuntime) Initialize() error {
 	}
 	return InitializeDocker(new(DefaultDockerInitializer), defaultTimeoutSeconds)
 }
+
+func (p DockerRuntime) Configure() error {
+	return nil
+}
+
+func (p DockerRuntime) ConfigureOrKill() error {
+	return nil
+}
+
+func (p DockerRuntime) Kill() error {
+	return nil
+}

@@ -33,3 +33,28 @@ func EnsureRuntime(cmd *cobra.Command, args []string) error {
 	// Initialize the runtime if it's not running.
 	return containerRuntime.Initialize()
 }
+
+// SetRuntimeIfExists is a pre-run hook that ensures the project directory exists
+// and sets the container runtime if its running, otherwise we bail with an error message.
+func SetRuntimeIfExists(cmd *cobra.Command, args []string) error {
+	if err := utils.EnsureProjectDir(cmd, args); err != nil {
+		return err
+	}
+	return containerRuntime.Configure()
+}
+
+// KillPreRunHook sets the container runtime if its running,
+// otherwise we bail with an error message.
+func KillPreRunHook(cmd *cobra.Command, args []string) error {
+	if err := utils.EnsureProjectDir(cmd, args); err != nil {
+		return err
+	}
+	return containerRuntime.ConfigureOrKill()
+}
+
+// KillPostRunHook ensures that we stop and kill the
+// podman machine once a project has been killed.
+func KillPostRunHook(_ *cobra.Command, _ []string) error {
+	// Kill the runtime.
+	return containerRuntime.Kill()
+}
