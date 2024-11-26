@@ -244,13 +244,13 @@ var (
 			version: "0.32.0",
 			query: `
 			query paginatedDeployments( $take: Int, $name: String, $cursor: Uuid, $pageNumber: Int) {
-                paginatedDeployments(
-                    take: $take
-                    name: $name
-                    cursor: $cursor
-                    pageNumber: $pageNumber
-                ) {
-                    id
+				paginatedDeployments(
+					take: $take
+					name: $name
+					cursor: $cursor
+					pageNumber: $pageNumber
+				) {
+					id
 					type
 					label
 					releaseName
@@ -266,8 +266,8 @@ var (
 					runtimeVersion
 					createdAt
 					updatedAt
-                }
-            }`,
+				}
+			}`,
 		},
 	}
 
