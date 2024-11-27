@@ -128,13 +128,13 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 	})
 }
 
-func (s *AirflowSuite) TestNewAirflowInitCmd() {
-	cmd := newAirflowInitCmd()
+func (s *AirflowSuite) TestNewAirflowDevRootCmd() {
+	cmd := newDevRootCmd(nil, nil)
 	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
-func (s *AirflowSuite) TestNewAirflowStartCmd() {
-	cmd := newAirflowStartCmd(nil)
+func (s *AirflowSuite) TestNewAirflowInitCmd() {
+	cmd := newAirflowInitCmd()
 	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
