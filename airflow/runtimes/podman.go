@@ -115,7 +115,7 @@ func InitializeMachine() error {
 		// start it, then configure it for usage.
 		if iMachine.State == podmanStatusStopped {
 			s.Start()
-			if err = StartMachine(podmanMachineName); err != nil {
+			if err := StartMachine(podmanMachineName); err != nil {
 				return err
 			}
 			return ConfigureMachineForUsage(iMachine)
@@ -374,7 +374,7 @@ func ErrorFromOutput(prefix, output string) error {
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		if strings.HasPrefix(line, "Error: ") {
-			errMsg := strings.Trim(strings.TrimSpace(line), "Error: ")
+			errMsg := strings.Trim(strings.TrimSpace(line), "Error: ") //nolint
 			return fmt.Errorf(prefix, errMsg)
 		}
 	}
