@@ -297,11 +297,13 @@ func ConfigureMachineForUsage(machine *InspectedMachine) error {
 		return fmt.Errorf("machine does not exist")
 	}
 
-	// Set the DOCKER_HOST environment variable for compose.
-	dockerHost := "unix://" + machine.ConnectionInfo.PodmanSocket.Path
-	err := os.Setenv("DOCKER_HOST", dockerHost)
-	if err != nil {
-		return fmt.Errorf("error setting DOCKER_HOST: %s", err)
+	if !isWindows() {
+		// Set the DOCKER_HOST environment variable for compose.
+		dockerHost := "unix://" + machine.ConnectionInfo.PodmanSocket.Path
+		err := os.Setenv("DOCKER_HOST", dockerHost)
+		if err != nil {
+			return fmt.Errorf("error setting DOCKER_HOST: %s", err)
+		}
 	}
 
 	// Set the podman default connection to our machine.
