@@ -1,8 +1,13 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"github.com/astronomer/astro-cli/cmd/utils"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/spf13/cobra"
 )
 
@@ -29,6 +34,18 @@ func ConfigureContainerRuntime(_ *cobra.Command, _ []string) error {
 func EnsureRuntime(cmd *cobra.Command, args []string) error {
 	if err := utils.EnsureProjectDir(cmd, args); err != nil {
 		return err
+	}
+
+	if runtimes.IsWindows() {
+		pluginsDir := filepath.Join(config.WorkingPath, "plugins")
+		if _, err := os.Stat(pluginsDir); os.IsNotExist(err) {
+			err := os.MkdirAll(pluginsDir, os.ModePerm)
+			if err != nil {
+				return fmt.Errorf("failed to create plugins directory: %w", err)
+			}
+		} else if err != nil {
+			return fmt.Errorf("failed to check plugins directory: %w", err)
+		}
 	}
 	// Initialize the runtime if it's not running.
 	return containerRuntime.Initialize()

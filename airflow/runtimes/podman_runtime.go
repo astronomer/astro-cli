@@ -70,7 +70,7 @@ func (p PodmanRuntime) ConfigureOrKill() error {
 func (p PodmanRuntime) Kill() error {
 	// If we're in podman mode, and DOCKER_HOST is set to the astro machine (in the pre-run hook),
 	// we'll ensure that the machine is killed.
-	if !isWindows() {
+	if !IsWindows() {
 		if !IsDockerHostSetToAstroMachine() {
 			return nil
 		}

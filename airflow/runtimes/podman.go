@@ -297,7 +297,7 @@ func ConfigureMachineForUsage(machine *InspectedMachine) error {
 		return fmt.Errorf("machine does not exist")
 	}
 
-	if !isWindows() {
+	if !IsWindows() {
 		// Set the DOCKER_HOST environment variable for compose.
 		dockerHost := "unix://" + machine.ConnectionInfo.PodmanSocket.Path
 		err := os.Setenv("DOCKER_HOST", dockerHost)

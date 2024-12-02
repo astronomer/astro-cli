@@ -86,7 +86,7 @@ func FindBinary(pathEnv, binaryName string, checker FileChecker) bool {
 
 	// Although programs can be called without the .exe extension,
 	// we need to append it here when searching the file system.
-	if isWindows() {
+	if IsWindows() {
 		binaryName += ".exe"
 	}
 
