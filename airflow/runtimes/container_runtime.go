@@ -49,9 +49,9 @@ func GetContainerRuntime() (ContainerRuntime, error) {
 	// Return the appropriate container runtime based on the binary discovered.
 	switch containerRuntime {
 	case docker:
-		return DockerRuntime{}, nil
+		return CreateDockerRuntime(new(DefaultDockerEngine)), nil
 	case podman:
-		return PodmanRuntime{}, nil
+		return CreatePodmanRuntime(new(DefaultPodmanEngine)), nil
 	default:
 		return nil, errors.New(containerRuntimeNotFoundErrMsg)
 	}
