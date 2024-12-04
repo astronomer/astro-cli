@@ -45,6 +45,8 @@ type cfgs struct {
 	DisableAstroRun       cfg
 	DisableEnvObjects     cfg
 	AutoSelect            cfg
+	PodmanCPU             cfg
+	PodmanMEM             cfg
 }
 
 // Creates a new cfg struct

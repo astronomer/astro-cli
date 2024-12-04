@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/briandowns/spinner"
 )
 
 const (
 	podmanMachineName     = "astro-machine"
-	podmanMachineMemory   = "4096" // 4GB
 	podmanStatusRunning   = "running"
 	podmanStatusStopped   = "stopped"
 	composeProjectLabel   = "com.docker.compose.project"
@@ -133,9 +133,11 @@ func EnsureMachine() error {
 
 // InitializeMachine initializes our astro Podman machine.
 func InitializeMachine(name string) error {
+	podmanMachineMemory := config.CFG.PodmanMEM.GetString()
+	podmanMachineCpu := config.CFG.PodmanCPU.GetString()
 	podmanCmd := Command{
 		Command: podman,
-		Args:    []string{"machine", "init", name, "--memory", podmanMachineMemory, "--now"},
+		Args:    []string{"machine", "init", name, "--memory", podmanMachineMemory, "--cpus", podmanMachineCpu, "--now"},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {

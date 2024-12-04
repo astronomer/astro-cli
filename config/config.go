@@ -86,6 +86,8 @@ var (
 		DisableAstroRun:       newCfg("disable_astro_run", "false"),
 		DisableEnvObjects:     newCfg("disable_env_objects", "false"),
 		AutoSelect:            newCfg("auto_select", "false"),
+		PodmanCPU:             newCfg("podman.cpu", "2"),
+		PodmanMEM:             newCfg("podman.mem", "2048"),
 	}
 
 	// viperHome is the viper object in the users home directory
