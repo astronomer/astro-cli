@@ -53,7 +53,7 @@ type ListedContainer struct {
 	Labels map[string]string
 }
 
-func InitializeMachine() error {
+func EnsureMachine() error {
 	s := spinner.New(spinnerCharSet, spinnerRefresh)
 	s.Suffix = containerRuntimeInitMessage
 	defer s.Stop()
@@ -124,16 +124,24 @@ func InitializeMachine() error {
 
 	// Otherwise, initialize the machine
 	s.Start()
+	if err := InitializeMachine(podmanMachineName); err != nil {
+		return err
+	}
+
+	return GetAndConfigureMachineForUsage(podmanMachineName)
+}
+
+// InitializeMachine initializes our astro Podman machine.
+func InitializeMachine(name string) error {
 	podmanCmd := Command{
 		Command: podman,
-		Args:    []string{"machine", "init", podmanMachineName, "--memory", podmanMachineMemory, "--now"},
+		Args:    []string{"machine", "init", name, "--memory", podmanMachineMemory, "--now"},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
 		return ErrorFromOutput("error initializing machine: %s", output)
 	}
-
-	return GetAndConfigureMachineForUsage(podmanMachineName)
+	return nil
 }
 
 // StartMachine starts our astro Podman machine.
@@ -197,6 +205,19 @@ func InspectMachine(name string) (*InspectedMachine, error) {
 	}
 
 	return &machines[0], nil
+}
+
+// SetMachineAsDefault sets the given Podman machine as the default.
+func SetMachineAsDefault(name string) error {
+	podmanCmd := Command{
+		Command: podman,
+		Args:    []string{"system", "connection", "default", name},
+	}
+	output, err := podmanCmd.Execute()
+	if err != nil {
+		return ErrorFromOutput("error setting default connection: %s", output)
+	}
+	return nil
 }
 
 // ListMachines lists all Podman machines.
@@ -307,16 +328,7 @@ func ConfigureMachineForUsage(machine *InspectedMachine) error {
 	}
 
 	// Set the podman default connection to our machine.
-	podmanCmd := Command{
-		Command: podman,
-		Args:    []string{"system", "connection", "default", machine.Name},
-	}
-	output, err := podmanCmd.Execute()
-	if err != nil {
-		return ErrorFromOutput("error configuring default connection: %s", output)
-	}
-
-	return nil
+	return SetMachineAsDefault(machine.Name)
 }
 
 // GetAndConfigureMachineForUsage gets our astro machine

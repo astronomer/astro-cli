@@ -18,7 +18,7 @@ func (p PodmanRuntime) Initialize() error {
 	if IsDockerHostSet() {
 		return nil
 	}
-	return InitializeMachine()
+	return EnsureMachine()
 }
 
 func (p PodmanRuntime) Configure() error {
