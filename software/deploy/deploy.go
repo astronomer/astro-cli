@@ -44,6 +44,8 @@ var (
 	ErrDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
 	ErrEmptyDagFolderUserCancelledOperation = errors.New("no DAGs found in the dags folder. User canceled the operation")
 	ErrBYORegistryDomainNotSet              = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
+	ErrNoRuntimeVersionPassed               = errors.New("no runtime version was provided")
+	ErrNoImageNamePassed                    = errors.New("no image name was provided")
 )
 
 const (
@@ -204,12 +206,16 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 	if byoRegistryEnabled {
 		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel)
 		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel)
-		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
-		_, err := houston.Call(houstonClient.UpdateDeploymentImage)(req)
+		_, err := updateDeploymentImageAPICall(houstonClient, remoteImage, name, airflowVersion, runtimeVersion)
 		return err
 	}
 
 	return nil
+}
+
+func updateDeploymentImageAPICall(houstonClient houston.ClientInterface, imageName, releaseName, airflowVersion, runtimeVersion string) (interface{}, error) {
+	req := houston.UpdateDeploymentImageRequest{ReleaseName: releaseName, Image: imageName, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
+	return houston.Call(houstonClient.UpdateDeploymentImage)(req)
 }
 
 func validAirflowImageRepo(image string) bool {
@@ -426,4 +432,27 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		RetryDisplayMessage: "please wait, attempting to upload the dags",
 	}
 	return fileutil.UploadFile(&uploadFileArgs)
+}
+
+func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string) error {
+	if runtimeVersion == "" {
+		return ErrNoRuntimeVersionPassed
+	}
+	if imageName == "" {
+		return ErrNoImageNamePassed
+	}
+	deploymentIDForCurrentCmd, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
+	if err != nil {
+		return err
+	}
+	deploymentID = deploymentIDForCurrentCmd
+	if deploymentID == "" {
+		return errInvalidDeploymentID
+	}
+	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment info: %w", err)
+	}
+	_, err = updateDeploymentImageAPICall(houstonClient, imageName, deploymentInfo.ReleaseName, "", runtimeVersion)
+	return err
 }
