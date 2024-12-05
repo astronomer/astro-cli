@@ -46,7 +46,7 @@ type cfgs struct {
 	DisableEnvObjects     cfg
 	AutoSelect            cfg
 	PodmanCPU             cfg
-	PodmanMEM             cfg
+	PodmanMemory          cfg
 }
 
 // Creates a new cfg struct

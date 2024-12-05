@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/airflow/runtimes/types"
+
 	"github.com/briandowns/spinner"
 )
 
@@ -15,15 +17,27 @@ const (
 	projectNotRunningErrMsg = "this astro project is not running"
 )
 
+type PodmanEngine interface {
+	InitializeMachine(name string) error
+	StartMachine(name string) error
+	StopMachine(name string) error
+	RemoveMachine(name string) error
+	InspectMachine(name string) (*types.InspectedMachine, error)
+	SetMachineAsDefault(name string) error
+	ListMachines() ([]types.ListedMachine, error)
+	ListContainers() ([]types.ListedContainer, error)
+}
+
 type PodmanRuntime struct {
-	Engine PodmanEngine
+	Engine    PodmanEngine
+	OSChecker OSChecker
 }
 
 // CreatePodmanRuntime creates a new PodmanRuntime using the provided PodmanEngine.
 // The engine allows us to interact with the external podman environment. For unit testing,
 // we provide a mock engine that can be used to simulate the podman environment.
-func CreatePodmanRuntime(engine PodmanEngine) PodmanRuntime {
-	return PodmanRuntime{Engine: engine}
+func CreatePodmanRuntime(engine PodmanEngine, osChecker OSChecker) PodmanRuntime {
+	return PodmanRuntime{Engine: engine, OSChecker: osChecker}
 }
 
 func (rt PodmanRuntime) Initialize() error {
@@ -31,10 +45,10 @@ func (rt PodmanRuntime) Initialize() error {
 	// we need to initialize our astro machine.
 	// If DOCKER_HOST is already set, we assume the user already has a
 	// workflow with podman that we don't want to interfere with.
-	if IsDockerHostSet() {
+	if isDockerHostSet() {
 		return nil
 	}
-	return rt.EnsureMachine()
+	return rt.ensureMachine()
 }
 
 func (rt PodmanRuntime) Configure() error {
@@ -42,14 +56,14 @@ func (rt PodmanRuntime) Configure() error {
 	// we need to set things up for our astro machine.
 	// If DOCKER_HOST is already set, we assume the user already has a
 	// workflow with podman that we don't want to interfere with.
-	if IsDockerHostSet() {
+	if isDockerHostSet() {
 		return nil
 	}
 
 	// If the astro machine is running, we just configure it
 	// for usage, so the regular compose commands can carry out.
-	if rt.AstroMachineIsRunning() {
-		return rt.GetAndConfigureMachineForUsage(podmanMachineName)
+	if rt.astroMachineIsRunning() {
+		return rt.getAndConfigureMachineForUsage(podmanMachineName)
 	}
 
 	// Otherwise, we return an error indicating that the project isn't running.
@@ -61,20 +75,20 @@ func (rt PodmanRuntime) ConfigureOrKill() error {
 	// we need to set things up for our astro machine.
 	// If DOCKER_HOST is already set, we assume the user already has a
 	// workflow with podman that we don't want to interfere with.
-	if IsDockerHostSet() {
+	if isDockerHostSet() {
 		return nil
 	}
 
 	// If the astro machine is running, we just configure it
 	// for usage, so the regular compose kill can carry out.
 	// We follow up with a machine kill in the post run hook.
-	if rt.AstroMachineIsRunning() {
-		return rt.GetAndConfigureMachineForUsage(podmanMachineName)
+	if rt.astroMachineIsRunning() {
+		return rt.getAndConfigureMachineForUsage(podmanMachineName)
 	}
 
 	// The machine is already not running,
 	// so we can just ensure its fully killed.
-	if err := rt.StopAndKillMachine(); err != nil {
+	if err := rt.stopAndKillMachine(); err != nil {
 		return err
 	}
 
@@ -86,31 +100,31 @@ func (rt PodmanRuntime) ConfigureOrKill() error {
 func (rt PodmanRuntime) Kill() error {
 	// If we're in podman mode, and DOCKER_HOST is set to the astro machine (in the pre-run hook),
 	// we'll ensure that the machine is killed.
-	if !IsWindows() {
-		if !IsDockerHostSetToAstroMachine() {
-			return nil
-		}
+	if rt.OSChecker.IsWindows() || isDockerHostSetToAstroMachine() {
+		return rt.stopAndKillMachine()
 	}
-	return rt.StopAndKillMachine()
+	return nil
 }
 
-func (rt PodmanRuntime) EnsureMachine() error {
+func (rt PodmanRuntime) ensureMachine() error {
+	// Show a spinner message while we're initializing the machine.
 	s := spinner.New(spinnerCharSet, spinnerRefresh)
 	s.Suffix = containerRuntimeInitMessage
 	defer s.Stop()
 
+	// Update the message after a bit if it's still running.
 	go func() {
 		<-time.After(1 * time.Minute)
 		s.Suffix = podmanInitSlowMessage
 	}()
 
 	// Check if another, non-astro Podman machine is running
-	nonAstroMachineName := rt.IsAnotherMachineRunning()
+	nonAstroMachineName := rt.isAnotherMachineRunning()
 	// If there is another machine running, and it has no running containers, stop it.
 	// Otherwise, we assume the user has some other project running that we don't want to interfere with.
-	if nonAstroMachineName != "" && isMac() {
-		// First, configure the other running machine for usage.
-		if err := rt.GetAndConfigureMachineForUsage(nonAstroMachineName); err != nil {
+	if nonAstroMachineName != "" && rt.OSChecker.IsMac() {
+		// First, configure the other running machine for usage, so we can check it for containers.
+		if err := rt.getAndConfigureMachineForUsage(nonAstroMachineName); err != nil {
 			return err
 		}
 
@@ -136,7 +150,7 @@ func (rt PodmanRuntime) EnsureMachine() error {
 	}
 
 	// Check if our astro Podman machine exists.
-	machine := rt.GetAstroMachine()
+	machine := rt.getAstroMachine()
 
 	// If the machine exists, inspect it and decide what to do.
 	if machine != nil {
@@ -149,7 +163,7 @@ func (rt PodmanRuntime) EnsureMachine() error {
 		// If the machine is already running,
 		// just go ahead and configure it for usage.
 		if iMachine.State == podmanStatusRunning {
-			return rt.ConfigureMachineForUsage(iMachine)
+			return rt.configureMachineForUsage(iMachine)
 		}
 
 		// If the machine is stopped,
@@ -159,7 +173,7 @@ func (rt PodmanRuntime) EnsureMachine() error {
 			if err := rt.Engine.StartMachine(podmanMachineName); err != nil {
 				return err
 			}
-			return rt.ConfigureMachineForUsage(iMachine)
+			return rt.configureMachineForUsage(iMachine)
 		}
 	}
 
@@ -169,21 +183,21 @@ func (rt PodmanRuntime) EnsureMachine() error {
 		return err
 	}
 
-	return rt.GetAndConfigureMachineForUsage(podmanMachineName)
+	return rt.getAndConfigureMachineForUsage(podmanMachineName)
 }
 
-// StopAndKillMachine attempts to stop and kill the Podman machine.
+// stopAndKillMachine attempts to stop and kill the Podman machine.
 // If other projects are running, it will leave the machine up.
-func (rt PodmanRuntime) StopAndKillMachine() error {
+func (rt PodmanRuntime) stopAndKillMachine() error {
 	// If the machine doesn't exist, exist early.
-	if !rt.AstroMachineExists() {
+	if !rt.astroMachineExists() {
 		return nil
 	}
 
 	// If the machine exists, and its running, we need to check
 	// if any other projects are running. If other projects are running,
 	// we'll leave the machine up, otherwise we stop and kill it.
-	if rt.AstroMachineIsRunning() {
+	if rt.astroMachineIsRunning() {
 		// Get the containers that are running on our machine.
 		containers, err := rt.Engine.ListContainers()
 		if err != nil {
@@ -224,17 +238,17 @@ func (rt PodmanRuntime) StopAndKillMachine() error {
 	return nil
 }
 
-// ConfigureMachineForUsage does two things:
+// configureMachineForUsage does two things:
 //   - Sets the DOCKER_HOST environment variable to the machine's socket path
 //     This allows the docker compose library to function as expected.
 //   - Sets the podman default connection to the machine
 //     This allows the podman command to function as expected.
-func (rt PodmanRuntime) ConfigureMachineForUsage(machine *InspectedMachine) error {
+func (rt PodmanRuntime) configureMachineForUsage(machine *types.InspectedMachine) error {
 	if machine == nil {
 		return fmt.Errorf("machine does not exist")
 	}
 
-	if !IsWindows() {
+	if !rt.OSChecker.IsWindows() {
 		// Set the DOCKER_HOST environment variable for compose.
 		dockerHost := "unix://" + machine.ConnectionInfo.PodmanSocket.Path
 		err := os.Setenv("DOCKER_HOST", dockerHost)
@@ -247,36 +261,36 @@ func (rt PodmanRuntime) ConfigureMachineForUsage(machine *InspectedMachine) erro
 	return rt.Engine.SetMachineAsDefault(machine.Name)
 }
 
-// GetAndConfigureMachineForUsage gets our astro machine
+// getAndConfigureMachineForUsage gets our astro machine
 // then configures the host machine to use it.
-func (rt PodmanRuntime) GetAndConfigureMachineForUsage(name string) error {
+func (rt PodmanRuntime) getAndConfigureMachineForUsage(name string) error {
 	machine, err := rt.Engine.InspectMachine(name)
 	if err != nil {
 		return err
 	}
-	return rt.ConfigureMachineForUsage(machine)
+	return rt.configureMachineForUsage(machine)
 }
 
-// GetAstroMachine gets our astro podman machine.
-func (rt PodmanRuntime) GetAstroMachine() *ListedMachine {
+// getAstroMachine gets our astro podman machine.
+func (rt PodmanRuntime) getAstroMachine() *types.ListedMachine {
 	machines, _ := rt.Engine.ListMachines()
-	return FindMachineByName(machines, podmanMachineName)
+	return findMachineByName(machines, podmanMachineName)
 }
 
-// AstroMachineExists checks if our astro podman machine exists.
-func (rt PodmanRuntime) AstroMachineExists() bool {
-	machine := rt.GetAstroMachine()
+// astroMachineExists checks if our astro podman machine exists.
+func (rt PodmanRuntime) astroMachineExists() bool {
+	machine := rt.getAstroMachine()
 	return machine != nil
 }
 
-// AstroMachineIsRunning checks if our astro podman machine is running.
-func (rt PodmanRuntime) AstroMachineIsRunning() bool {
-	machine := rt.GetAstroMachine()
+// astroMachineIsRunning checks if our astro podman machine is running.
+func (rt PodmanRuntime) astroMachineIsRunning() bool {
+	machine := rt.getAstroMachine()
 	return machine != nil && machine.Running
 }
 
-// IsAnotherMachineRunning checks if another, non-astro podman machine is running.
-func (rt PodmanRuntime) IsAnotherMachineRunning() string {
+// isAnotherMachineRunning checks if another, non-astro podman machine is running.
+func (rt PodmanRuntime) isAnotherMachineRunning() string {
 	machines, _ := rt.Engine.ListMachines()
 	for _, machine := range machines {
 		if machine.Running && machine.Name != podmanMachineName {
@@ -286,8 +300,8 @@ func (rt PodmanRuntime) IsAnotherMachineRunning() string {
 	return ""
 }
 
-// FindMachineByName finds a machine by name from a list of machines.
-func FindMachineByName(items []ListedMachine, name string) *ListedMachine {
+// findMachineByName finds a machine by name from a list of machines.
+func findMachineByName(items []types.ListedMachine, name string) *types.ListedMachine {
 	for _, item := range items {
 		if item.Name == name {
 			return &item
@@ -296,13 +310,13 @@ func FindMachineByName(items []ListedMachine, name string) *ListedMachine {
 	return nil
 }
 
-// IsDockerHostSet checks if the DOCKER_HOST environment variable is set.
-func IsDockerHostSet() bool {
+// isDockerHostSet checks if the DOCKER_HOST environment variable is set.
+func isDockerHostSet() bool {
 	return os.Getenv("DOCKER_HOST") != ""
 }
 
-// IsDockerHostSetToAstroMachine checks if the DOCKER_HOST environment variable
+// isDockerHostSetToAstroMachine checks if the DOCKER_HOST environment variable
 // is pointing to the astro machine.
-func IsDockerHostSetToAstroMachine() bool {
+func isDockerHostSetToAstroMachine() bool {
 	return strings.Contains(os.Getenv("DOCKER_HOST"), podmanMachineName)
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/astronomer/astro-cli/airflow/runtimes/types"
 	"github.com/astronomer/astro-cli/config"
 )
 
@@ -20,50 +21,12 @@ const (
 		"Please stop the other machine and try again"
 )
 
-// ListedMachine contains information about a Podman machine
-// as it is provided from the `podman machine ls --format json` command.
-type ListedMachine struct {
-	Name     string
-	Running  bool
-	Starting bool
-	LastUp   string
-}
-
-// InspectedMachine contains information about a Podman machine
-// as it is provided from the `podman machine inspect` command.
-type InspectedMachine struct {
-	Name           string
-	ConnectionInfo struct {
-		PodmanSocket struct {
-			Path string
-		}
-	}
-	State string
-}
-
-// ListedContainer contains information about a Podman container
-// as it is provided from the `podman ps --format json` command.
-type ListedContainer struct {
-	Name   string
-	Labels map[string]string
-}
-
-type PodmanEngine interface {
-	InitializeMachine(name string) error
-	StartMachine(name string) error
-	StopMachine(name string) error
-	RemoveMachine(name string) error
-	InspectMachine(name string) (*InspectedMachine, error)
-	SetMachineAsDefault(name string) error
-	ListMachines() ([]ListedMachine, error)
-	ListContainers() ([]ListedContainer, error)
-}
-
 type DefaultPodmanEngine struct{}
 
 // InitializeMachine initializes our astro Podman machine.
 func (e DefaultPodmanEngine) InitializeMachine(name string) error {
-	podmanMachineMemory := config.CFG.PodmanMEM.GetString()
+	// Grab some optional configurations from the config file.
+	podmanMachineMemory := config.CFG.PodmanMemory.GetString()
 	podmanMachineCPU := config.CFG.PodmanCPU.GetString()
 	podmanCmd := Command{
 		Command: podman,
@@ -117,7 +80,7 @@ func (e DefaultPodmanEngine) RemoveMachine(name string) error {
 }
 
 // InspectMachine inspects a given podman machine name.
-func (e DefaultPodmanEngine) InspectMachine(name string) (*InspectedMachine, error) {
+func (e DefaultPodmanEngine) InspectMachine(name string) (*types.InspectedMachine, error) {
 	podmanCmd := Command{
 		Command: podman,
 		Args:    []string{"machine", "inspect", name},
@@ -127,7 +90,7 @@ func (e DefaultPodmanEngine) InspectMachine(name string) (*InspectedMachine, err
 		return nil, ErrorFromOutput("error inspecting machine: %s", output)
 	}
 
-	var machines []InspectedMachine
+	var machines []types.InspectedMachine
 	err = json.Unmarshal([]byte(output), &machines)
 	if err != nil {
 		return nil, err
@@ -153,7 +116,7 @@ func (e DefaultPodmanEngine) SetMachineAsDefault(name string) error {
 }
 
 // ListMachines lists all Podman machines.
-func (e DefaultPodmanEngine) ListMachines() ([]ListedMachine, error) {
+func (e DefaultPodmanEngine) ListMachines() ([]types.ListedMachine, error) {
 	podmanCmd := Command{
 		Command: podman,
 		Args:    []string{"machine", "ls", "--format", "json"},
@@ -162,7 +125,7 @@ func (e DefaultPodmanEngine) ListMachines() ([]ListedMachine, error) {
 	if err != nil {
 		return nil, ErrorFromOutput("error listing machines: %s", output)
 	}
-	var machines []ListedMachine
+	var machines []types.ListedMachine
 	err = json.Unmarshal([]byte(output), &machines)
 	if err != nil {
 		return nil, err
@@ -171,7 +134,7 @@ func (e DefaultPodmanEngine) ListMachines() ([]ListedMachine, error) {
 }
 
 // ListContainers lists all pods in the machine.
-func (e DefaultPodmanEngine) ListContainers() ([]ListedContainer, error) {
+func (e DefaultPodmanEngine) ListContainers() ([]types.ListedContainer, error) {
 	podmanCmd := Command{
 		Command: podman,
 		Args:    []string{"ps", "--format", "json"},
@@ -180,7 +143,7 @@ func (e DefaultPodmanEngine) ListContainers() ([]ListedContainer, error) {
 	if err != nil {
 		return nil, ErrorFromOutput("error listing containers: %s", output)
 	}
-	var containers []ListedContainer
+	var containers []types.ListedContainer
 	err = json.Unmarshal([]byte(output), &containers)
 	if err != nil {
 		return nil, err

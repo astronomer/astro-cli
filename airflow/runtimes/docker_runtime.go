@@ -7,23 +7,32 @@ import (
 	"github.com/briandowns/spinner"
 )
 
+// DockerEngine is a struct that contains the functions needed to initialize Docker.
+// The concrete implementation that we use is DefaultDockerEngine below.
+// When running the tests, we substitute the default implementation with a mock implementation.
+type DockerEngine interface {
+	IsRunning() (string, error)
+	Start() (string, error)
+}
+
 // DockerRuntime is a concrete implementation of the ContainerRuntime interface.
 // When the docker binary is chosen, this implementation is used.
 type DockerRuntime struct {
-	Engine DockerEngine
+	Engine    DockerEngine
+	OSChecker OSChecker
 }
 
-func CreateDockerRuntime(engine DockerEngine) DockerRuntime {
-	return DockerRuntime{Engine: engine}
+func CreateDockerRuntime(engine DockerEngine, osChecker OSChecker) DockerRuntime {
+	return DockerRuntime{Engine: engine, OSChecker: osChecker}
 }
 
 // Initialize initializes the Docker runtime.
 // We only attempt to initialize Docker on Mac today.
 func (rt DockerRuntime) Initialize() error {
-	if !isMac() {
+	if !rt.OSChecker.IsMac() {
 		return nil
 	}
-	return rt.InitializeDocker(defaultTimeoutSeconds)
+	return rt.initializeDocker(defaultTimeoutSeconds)
 }
 
 func (rt DockerRuntime) Configure() error {
@@ -38,9 +47,9 @@ func (rt DockerRuntime) Kill() error {
 	return nil
 }
 
-// InitializeDocker initializes the Docker runtime.
+// initializeDocker initializes the Docker runtime.
 // It checks if Docker is running, and if it is not, it attempts to start it.
-func (rt DockerRuntime) InitializeDocker(timeoutSeconds int) error {
+func (rt DockerRuntime) initializeDocker(timeoutSeconds int) error {
 	// Initialize spinner.
 	timeout := time.After(time.Duration(timeoutSeconds) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
