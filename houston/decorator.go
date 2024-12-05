@@ -28,6 +28,7 @@ type VersionRestrictions struct {
 
 // APIs availability based on the version they were added/removed in Houston
 var houstonAPIAvailabilityByVersion = map[string]VersionRestrictions{
+	"ListPaginatedDeployments":          {GTE: "0.32.0"},
 	"WorkspacesPaginatedGetRequest":     {GTE: "0.30.0"},
 	"WorkspacePaginatedGetUsersRequest": {GTE: "0.30.0"},
 
