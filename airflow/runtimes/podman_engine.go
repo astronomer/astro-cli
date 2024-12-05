@@ -64,10 +64,10 @@ type DefaultPodmanEngine struct{}
 // InitializeMachine initializes our astro Podman machine.
 func (e DefaultPodmanEngine) InitializeMachine(name string) error {
 	podmanMachineMemory := config.CFG.PodmanMEM.GetString()
-	podmanMachineCpu := config.CFG.PodmanCPU.GetString()
+	podmanMachineCPU := config.CFG.PodmanCPU.GetString()
 	podmanCmd := Command{
 		Command: podman,
-		Args:    []string{"machine", "init", name, "--memory", podmanMachineMemory, "--cpus", podmanMachineCpu, "--now"},
+		Args:    []string{"machine", "init", name, "--memory", podmanMachineMemory, "--cpus", podmanMachineCPU, "--now"},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
