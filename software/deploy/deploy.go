@@ -454,5 +454,6 @@ func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, 
 		return fmt.Errorf("failed to get deployment info: %w", err)
 	}
 	_, err = updateDeploymentImageAPICall(houstonClient, imageName, deploymentInfo.ReleaseName, "", runtimeVersion)
+	fmt.Println("Image successfully updated")
 	return err
 }
