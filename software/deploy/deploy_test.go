@@ -920,5 +920,4 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		houstonMock.AssertExpectations(s.T())
 		s.ErrorIs(err, nil)
 	})
-
 }
