@@ -369,7 +369,6 @@ func (s *PodmanRuntimeSuite) TestPodmanRuntimeKillOtherProjectRunning() {
 			},
 		}
 		mockPodmanEngine.On("ListMachines").Return(mockListedMachines, nil)
-		mockPodmanOSChecker.On("IsWindows").Return(false)
 		mockPodmanEngine.On("ListContainers").Return(mockListedContainers, nil)
 		// Create the runtime with our mock engine and os checker.
 		rt := CreatePodmanRuntime(mockPodmanEngine, mockPodmanOSChecker)
@@ -392,7 +391,6 @@ func (s *PodmanRuntimeSuite) TestPodmanRuntimeKill() {
 			},
 		}
 		mockPodmanEngine.On("ListMachines").Return(mockListedMachines, nil)
-		mockPodmanOSChecker.On("IsWindows").Return(false)
 		mockPodmanEngine.On("ListContainers").Return(mockListedContainers, nil)
 		mockPodmanEngine.On("StopMachine", podmanMachineName).Return(nil)
 		mockPodmanEngine.On("RemoveMachine", podmanMachineName).Return(nil)

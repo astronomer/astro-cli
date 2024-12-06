@@ -244,18 +244,17 @@ func (rt PodmanRuntime) stopAndKillMachine() error {
 //   - Sets the podman default connection to the machine
 //     This allows the podman command to function as expected.
 func (rt PodmanRuntime) configureMachineForUsage(machine *types.InspectedMachine) error {
-	var dockerHost string
 	if machine == nil {
 		return fmt.Errorf("machine does not exist")
 	}
 
-	// Set the DOCKER_HOST environment variable for compose.
+	// Compute our DOCKER_HOST value depending on the OS.
+	dockerHost := "unix://" + machine.ConnectionInfo.PodmanSocket.Path
 	if rt.OSChecker.IsWindows() {
-		dockerHost = "npipe:////./pipe/podman-" + podmanMachineName
-	} else {
-		dockerHost = "unix://" + machine.ConnectionInfo.PodmanSocket.Path
+		dockerHost = "npipe:////./pipe/podman-" + machine.Name
 	}
 
+	// Set the DOCKER_HOST environment variable for compose.
 	err := os.Setenv("DOCKER_HOST", dockerHost)
 	if err != nil {
 		return fmt.Errorf("error setting DOCKER_HOST: %s", err)
