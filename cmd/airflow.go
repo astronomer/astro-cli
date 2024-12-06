@@ -464,11 +464,9 @@ func newObjectExportCmd() *cobra.Command {
 
 // Use project name for image name
 func airflowInit(cmd *cobra.Command, args []string) error {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
+	// The first positional argument is the project name.
+	// If the project name is provided in this way, we'll
+	// attempt to create a directory with that name.
 	if len(args) > 0 {
 		projectName = args[0]
 		config.WorkingPath = filepath.Join(config.WorkingPath, projectName)
@@ -525,16 +523,27 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		defaultImageName = airflow.AstronomerCertifiedImageName
 	}
 
+	// Determine if the project directory exists.
 	projectDirExists, err := fileutil.Exists(config.WorkingPath, nil)
 	if err != nil {
 		return err
 	}
+
+	// If the project directory does not exist, create it.
 	if !projectDirExists {
-		err := os.Mkdir(config.WorkingPath, 0755)
+		err := os.Mkdir(config.WorkingPath, 0o755)
 		if err != nil {
 			return err
 		}
 	}
+
+	// Save the directory we are in when the init command is run.
+	initialDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	// Change into the new project directory.
 	err = os.Chdir(config.WorkingPath)
 	if err != nil {
 		return err
@@ -580,8 +589,11 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf(configInitProjectConfigMsg+"\n", config.WorkingPath)
 	}
 
-	if pwd != config.WorkingPath {
-		fmt.Println("To begin developing, change to your project directory with `cd " + config.WorkingPath + "`")
+	// If we started in a different directory, that means the positional argument for projectName was used.
+	// This means the users shell pwd is not the project directory, so we print a message
+	// to cd into the project directory.
+	if initialDir != config.WorkingPath {
+		fmt.Println("To begin developing, change to your project directory with `cd " + projectName + "`")
 	}
 
 	return nil
