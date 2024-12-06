@@ -11,15 +11,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const failedToCreatePluginsDir = "failed to create plugins directory: %w"
+
 // DoNothing is a persistent pre-run hook that does nothing.
 // Used to clobber the standard astro dev persistent pre-run hook for select commands.
 func DoNothing(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
-// ConfigureContainerRuntime sets up the containerRuntime variable.
-// The containerRuntime variable is then used in the following pre-run and post-run hooks
-// defined here.
+// ConfigureContainerRuntime sets up the containerRuntime variable and is defined
+// as a PersistentPreRunE hook for all astro dev sub-commands. The containerRuntime
+// variable is then used in the following pre-run and post-run hooks defined here.
 func ConfigureContainerRuntime(_ *cobra.Command, _ []string) error {
 	var err error
 	containerRuntime, err = runtimes.GetContainerRuntime()
@@ -36,18 +38,17 @@ func EnsureRuntime(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Check if the OS is Windows and create the plugins project directory if it doesn't exist.
+	// In Windows, the compose project will fail if the plugins directory doesn't exist, due
+	// to the volume mounts we specify.
 	osChecker := new(runtimes.DefaultOSChecker)
 	if osChecker.IsWindows() {
 		pluginsDir := filepath.Join(config.WorkingPath, "plugins")
-		if _, err := os.Stat(pluginsDir); os.IsNotExist(err) {
-			err := os.MkdirAll(pluginsDir, os.ModePerm)
-			if err != nil {
-				return fmt.Errorf("failed to create plugins directory: %w", err)
-			}
-		} else if err != nil {
-			return fmt.Errorf("failed to check plugins directory: %w", err)
+		if err := os.MkdirAll(pluginsDir, os.ModePerm); err != nil && !os.IsExist(err) {
+			return fmt.Errorf(failedToCreatePluginsDir, err)
 		}
 	}
+
 	// Initialize the runtime if it's not running.
 	return containerRuntime.Initialize()
 }
