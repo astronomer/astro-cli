@@ -100,7 +100,7 @@ func (rt PodmanRuntime) ConfigureOrKill() error {
 func (rt PodmanRuntime) Kill() error {
 	// If we're in podman mode, and DOCKER_HOST is set to the astro machine (in the pre-run hook),
 	// we'll ensure that the machine is killed.
-	if rt.OSChecker.IsWindows() || isDockerHostSetToAstroMachine() {
+	if isDockerHostSetToAstroMachine() {
 		return rt.stopAndKillMachine()
 	}
 	return nil
@@ -244,17 +244,21 @@ func (rt PodmanRuntime) stopAndKillMachine() error {
 //   - Sets the podman default connection to the machine
 //     This allows the podman command to function as expected.
 func (rt PodmanRuntime) configureMachineForUsage(machine *types.InspectedMachine) error {
+	var dockerHost string
 	if machine == nil {
 		return fmt.Errorf("machine does not exist")
 	}
 
-	if !rt.OSChecker.IsWindows() {
-		// Set the DOCKER_HOST environment variable for compose.
-		dockerHost := "unix://" + machine.ConnectionInfo.PodmanSocket.Path
-		err := os.Setenv("DOCKER_HOST", dockerHost)
-		if err != nil {
-			return fmt.Errorf("error setting DOCKER_HOST: %s", err)
-		}
+	// Set the DOCKER_HOST environment variable for compose.
+	if rt.OSChecker.IsWindows() {
+		dockerHost = "npipe:////./pipe/podman-" + podmanMachineName
+	} else {
+		dockerHost = "unix://" + machine.ConnectionInfo.PodmanSocket.Path
+	}
+
+	err := os.Setenv("DOCKER_HOST", dockerHost)
+	if err != nil {
+		return fmt.Errorf("error setting DOCKER_HOST: %s", err)
 	}
 
 	// Set the podman default connection to our machine.
