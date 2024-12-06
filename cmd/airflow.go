@@ -103,7 +103,8 @@ astro dev init --from-template
 	dockerfile = "Dockerfile"
 
 	configReinitProjectConfigMsg = "Reinitialized existing Astro project in %s\n"
-	configInitProjectConfigMsg   = "Initialized empty Astro project in %s"
+	configInitProjectConfigMsg   = "Initialized empty Astro project in %s\n"
+	changeDirectoryMsg           = "To begin developing, change to your project directory with `cd %s`\n"
 
 	// this is used to monkey patch the function in order to write unit test cases
 	containerHandlerInit = airflow.ContainerHandlerInit
@@ -118,6 +119,7 @@ astro dev init --from-template
 	errNoCompose           = errors.New("cannot use '--compose-file' without '--compose' flag")
 	TemplateList           = airflow.FetchTemplateList
 	defaultWaitTime        = 1 * time.Minute
+	directoryPermissions   = 0o755
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
@@ -469,7 +471,12 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	// attempt to create a directory with that name.
 	if len(args) > 0 {
 		projectName = args[0]
-		config.WorkingPath = filepath.Join(config.WorkingPath, projectName)
+	}
+
+	// Save the directory we are in when the init command is run.
+	initialDir, err := fileutil.GetWorkingDir()
+	if err != nil {
+		return err
 	}
 
 	// Validate project name
@@ -523,31 +530,14 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		defaultImageName = airflow.AstronomerCertifiedImageName
 	}
 
-	// Determine if the project directory exists.
-	projectDirExists, err := fileutil.Exists(config.WorkingPath, nil)
+	// Ensure the project directory is created if a positional argument is provided.
+	newProjectPath, err := ensureProjectDirectory(args, config.WorkingPath, projectName)
 	if err != nil {
 		return err
 	}
 
-	// If the project directory does not exist, create it.
-	if !projectDirExists {
-		err := os.Mkdir(config.WorkingPath, 0o755)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Save the directory we are in when the init command is run.
-	initialDir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	// Change into the new project directory.
-	err = os.Chdir(config.WorkingPath)
-	if err != nil {
-		return err
-	}
+	// Update the config setting.
+	config.WorkingPath = newProjectPath
 
 	emptyDir := fileutil.IsEmptyDir(config.WorkingPath)
 
@@ -584,19 +574,47 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	}
 
 	if exists {
-		fmt.Printf(configReinitProjectConfigMsg+"\n", config.WorkingPath)
+		fmt.Printf(configReinitProjectConfigMsg, config.WorkingPath)
 	} else {
-		fmt.Printf(configInitProjectConfigMsg+"\n", config.WorkingPath)
+		fmt.Printf(configInitProjectConfigMsg, config.WorkingPath)
 	}
 
 	// If we started in a different directory, that means the positional argument for projectName was used.
 	// This means the users shell pwd is not the project directory, so we print a message
 	// to cd into the project directory.
 	if initialDir != config.WorkingPath {
-		fmt.Println("To begin developing, change to your project directory with `cd " + projectName + "`")
+		fmt.Printf(changeDirectoryMsg, projectName)
 	}
 
 	return nil
+}
+
+// ensureProjectDirectory creates a new project directory if a positional argument is provided.
+func ensureProjectDirectory(args []string, workingPath, projectName string) (string, error) {
+	// Return early if no positional argument was provided.
+	if len(args) == 0 {
+		return workingPath, nil
+	}
+
+	// Construct the path to our desired project directory.
+	newProjectPath := filepath.Join(workingPath, projectName)
+
+	// Determine if the project directory already exists.
+	projectDirExists, err := fileutil.Exists(newProjectPath, nil)
+	if err != nil {
+		return "", err
+	}
+
+	// If the project directory does not exist, create it.
+	if !projectDirExists {
+		err := os.Mkdir(newProjectPath, os.FileMode(directoryPermissions))
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// Return the path we just created.
+	return newProjectPath, nil
 }
 
 func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocognit

@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -300,20 +301,6 @@ func (s *AirflowSuite) TestAirflowInit() {
 		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
 	})
 
-	s.Run("invalid args", func() {
-		cmd := newAirflowInitCmd()
-		cmd.Flag("name").Value.Set("test-project-name")
-		args := []string{"invalid-arg"}
-
-		r, stdin := s.mockUserInput("y")
-
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-		err := airflowInit(cmd, args)
-		s.ErrorIs(err, errProjectNameSpaces)
-	})
-
 	s.Run("invalid project name", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test@project-name")
@@ -387,16 +374,19 @@ func (s *AirflowSuite) TestAirflowInit() {
 
 		orgStdout := os.Stdout
 		defer func() { os.Stdout = orgStdout }()
-		r, w, _ := os.Pipe()
+		_, w, _ := os.Pipe()
 		os.Stdout = w
 
 		err := airflowInit(cmd, args)
 
 		w.Close()
-		out, _ := io.ReadAll(r)
 
 		s.NoError(err)
-		s.Contains(string(out), "Pulling Airflow development files from Astronomer Certified Airflow Version")
+
+		// Check the Dockerfile to ensure we are using the AC image.
+		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
+		dockerfileContents := string(b)
+		s.True(strings.Contains(dockerfileContents, airflow.AstronomerCertifiedImageName))
 	})
 
 	s.Run("cancel non empty dir warning", func() {
@@ -457,6 +447,30 @@ func (s *AirflowSuite) TestAirflowInit() {
 
 		s.NoError(err)
 		s.Contains(string(out), "Reinitialized existing Astro project in")
+	})
+
+	s.Run("specify positional argument for project name", func() {
+		cmd := newAirflowInitCmd()
+		args := []string{"test-project-name"}
+
+		r, stdin := s.mockUserInput("n")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		orgStdout := os.Stdout
+		defer func() { os.Stdout = orgStdout }()
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := airflowInit(cmd, args)
+
+		w.Close()
+		out, _ := io.ReadAll(r)
+
+		s.NoError(err)
+		s.Contains(string(out), fmt.Sprintf(changeDirectoryMsg, args[0]))
 	})
 }
 
