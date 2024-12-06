@@ -857,9 +857,12 @@ func (s *Suite) TestDeploymentDelete() {
 }
 
 func (s *Suite) TestDeploymentList() {
+	expectedRequest := houston.PaginatedDeploymentsRequest{
+		Take: -1,
+	}
+
 	api := new(mocks.ClientInterface)
-	api.On("ListDeployments", houston.ListDeploymentsRequest{}).Return([]houston.Deployment{*mockDeployment}, nil)
-	allDeployments = true
+	api.On("ListPaginatedDeployments", expectedRequest).Return([]houston.Deployment{*mockDeployment}, nil)
 
 	houstonClient = api
 	output, err := execDeploymentCmd("list", "--all")

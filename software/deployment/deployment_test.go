@@ -553,10 +553,12 @@ func (s *Suite) TestList() {
 	})
 
 	s.Run("list namespace all enabled", func() {
-		expectedRequest.WorkspaceID = ""
+		expectedRequest := houston.PaginatedDeploymentsRequest{
+			Take: -1,
+		}
 
 		api := new(mocks.ClientInterface)
-		api.On("ListDeployments", expectedRequest).Return(mockDeployments, nil)
+		api.On("ListPaginatedDeployments", expectedRequest).Return(mockDeployments, nil)
 
 		buf := new(bytes.Buffer)
 		err := List(mockDeployments[0].Workspace.ID, true, api, buf)

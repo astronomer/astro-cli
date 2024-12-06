@@ -966,6 +966,32 @@ func (_m *ClientInterface) ListDeployments(filters houston.ListDeploymentsReques
 	return r0, r1
 }
 
+// ListPaginatedDeployments provides a mock function with given fields: req
+func (_m *ClientInterface) ListPaginatedDeployments(req houston.PaginatedDeploymentsRequest) ([]houston.Deployment, error) {
+	ret := _m.Called(req)
+
+	var r0 []houston.Deployment
+	var r1 error
+	if rf, ok := ret.Get(0).(func(houston.PaginatedDeploymentsRequest) ([]houston.Deployment, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(houston.PaginatedDeploymentsRequest) []houston.Deployment); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]houston.Deployment)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(houston.PaginatedDeploymentsRequest) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListTeams provides a mock function with given fields: req
 func (_m *ClientInterface) ListTeams(req houston.ListTeamsRequest) (houston.ListTeamsResp, error) {
 	ret := _m.Called(req)
