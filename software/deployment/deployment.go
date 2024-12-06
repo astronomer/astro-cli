@@ -292,14 +292,20 @@ func getDeploymentNamespaceName() (string, error) {
 	return namespaceName, nil
 }
 
+func getDeploymentsFromHouston(ws string, all bool, client houston.ClientInterface) ([]houston.Deployment, error) {
+	if all {
+		return houston.Call(client.ListPaginatedDeployments)(houston.PaginatedDeploymentsRequest{
+			Take: -1,
+		})
+	}
+	listDeploymentRequest := houston.ListDeploymentsRequest{}
+	listDeploymentRequest.WorkspaceID = ws
+	return houston.Call(client.ListDeployments)(listDeploymentRequest)
+}
+
 // List all airflow deployments
 func List(ws string, all bool, client houston.ClientInterface, out io.Writer) error {
-	listDeploymentRequest := houston.ListDeploymentsRequest{}
-	if !all {
-		listDeploymentRequest.WorkspaceID = ws
-	}
-
-	deployments, err := houston.Call(client.ListDeployments)(listDeploymentRequest)
+	deployments, err := getDeploymentsFromHouston(ws, all, client)
 	if err != nil {
 		return err
 	}

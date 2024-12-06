@@ -2,18 +2,17 @@ package airflow
 
 import (
 	"bufio"
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/astronomer/astro-cli/airflow/runtimes"
 
 	semver "github.com/Masterminds/semver/v3"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
@@ -46,16 +45,12 @@ const (
 	RuntimeImageLabel              = "io.astronomer.docker.runtime.version"
 	AirflowImageLabel              = "io.astronomer.docker.airflow.version"
 	componentName                  = "airflow"
-	podman                         = "podman"
 	dockerStateUp                  = "running"
 	dockerExitState                = "exited"
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
-	M1ImageRuntimeVersion          = "6.0.4"
 	pytestDirectory                = "tests"
-	OpenCmd                        = "open"
-	dockerCmd                      = "docker"
 	registryUsername               = "cli"
 	unknown                        = "unknown"
 	major                          = "major"
@@ -82,18 +77,13 @@ const (
 var (
 	errNoFile                  = errors.New("file specified does not exist")
 	errSettingsPath            = "error looking for settings.yaml"
-	errComposeProjectRunning   = errors.New("project is up and running")
 	errCustomImageDoesNotExist = errors.New("The custom image provided either does not exist or Docker is unable to connect to the repository")
 
 	initSettings      = settings.ConfigSettings
 	exportSettings    = settings.Export
 	envExportSettings = settings.EnvExport
 
-	openURL        = browser.OpenURL
-	timeoutNum     = 60
-	tickNum        = 500
-	startupTimeout time.Duration
-	isM1           = util.IsM1
+	openURL = browser.OpenURL
 
 	majorUpdatesAirflowProviders    = []string{}
 	minorUpdatesAirflowProviders    = []string{}
@@ -205,14 +195,6 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 //
 //nolint:gocognit
 func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
-	// check if docker is up for macOS
-	if runtime.GOOS == "darwin" && config.CFG.DockerCommand.GetString() == dockerCmd {
-		err := startDocker()
-		if err != nil {
-			return err
-		}
-	}
-
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
@@ -275,36 +257,32 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	if err != nil {
 		return errors.Wrap(err, composeRecreateErrMsg)
 	}
-	var airflowMessage string
-	if CheckM1Image(imageLabels) {
-		airflowMessage = " This might take a few minutes…"
-	} else {
-		airflowMessage = ""
-	}
 
-	fmt.Println("\n\nAirflow is starting up!" + airflowMessage)
+	fmt.Println("\n\nAirflow is starting up!")
 
 	airflowDockerVersion, err := d.checkAiflowVersion()
 	if err != nil {
 		return err
 	}
 
-	startupTimeout = waitTime
-	// check if user provided a waitTime
-	// default is 1 minute
-	if waitTime != 1*time.Minute {
-		startupTimeout = waitTime
-	} else if CheckM1Image(imageLabels) {
-		// user did not provide a waitTime
-		// if running darwin/M1 architecture
-		// we wait for a longer startup time
-		startupTimeout = 5 * time.Minute
-	}
+	// Airflow webserver should be hosted at localhost
+	// from the perspective of the CLI running on the host machine.
+	webserverPort := config.CFG.WebserverPort.GetString()
+	healthURL := fmt.Sprintf("http://localhost:%s/health", webserverPort)
 
-	err = checkWebserverHealth(settingsFile, envConns, project, d.composeService, airflowDockerVersion, noBrowser, startupTimeout)
+	// Check the health of the webserver, up to the timeout.
+	// If we fail to get a 200 status code, we'll return an error message.
+	err = checkWebserverHealth(healthURL, waitTime)
 	if err != nil {
 		return err
 	}
+
+	// If we've successfully gotten a healthcheck response, print the status.
+	err = printStatus(settingsFile, envConns, project, d.composeService, airflowDockerVersion, noBrowser)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1108,8 +1086,11 @@ func (d *DockerCompose) Bash(container string) error {
 		}
 	}
 	// exec into container
-	dockerCommand := config.CFG.DockerCommand.GetString()
-	err = cmdExec(dockerCommand, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+	err = cmdExec(containerRuntime, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
 	if err != nil {
 		return err
 	}
@@ -1349,49 +1330,6 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 	return project, err
 }
 
-var checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
-	if config.CFG.DockerCommand.GetString() == podman {
-		err := printStatus(settingsFile, envConns, project, composeService, airflowDockerVersion, noBrowser)
-		if err != nil {
-			if !errors.Is(err, errComposeProjectRunning) {
-				return err
-			}
-		}
-	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		// check if webserver is healthy for user
-		err := composeService.Events(ctx, project.Name, api.EventsOptions{
-			Services: []string{WebserverDockerContainerName}, Consumer: func(event api.Event) error {
-				marshal, err := json.Marshal(map[string]interface{}{
-					"action": event.Status,
-				})
-				if err != nil {
-					return err
-				}
-				if string(marshal) == `{"action":"health_status: healthy"}` {
-					err := printStatus(settingsFile, envConns, project, composeService, airflowDockerVersion, noBrowser)
-					if err != nil {
-						return err
-					}
-				}
-
-				return nil
-			},
-		})
-		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				fmt.Printf("\n")
-				return fmt.Errorf("there might be a problem with your project starting up. The webserver health check timed out after %s but your project will continue trying to start. Run 'astro dev logs --webserver | --scheduler' for details.\n\nTry again or use the --wait flag to increase the time out", timeout)
-			}
-			if !errors.Is(err, errComposeProjectRunning) {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
 	psInfo, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
 		All: true,
@@ -1416,11 +1354,7 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 			}
 		}
 	}
-	if config.CFG.DockerCommand.GetString() == podman {
-		fmt.Println("\nComponents will be available soon. If they are not running in the next few minutes, run 'astro dev logs --webserver | --scheduler' for details.")
-	} else {
-		fmt.Println("\nProject is running! All components are now available.")
-	}
+	fmt.Println("\nProject is running! All components are now available.")
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
 	webserverURL := "http://localhost:" + parts[len(parts)-1]
 	fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
@@ -1433,7 +1367,7 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 			fmt.Println("\nUnable to open the webserver URL, please visit the following link: " + webserverURL)
 		}
 	}
-	return errComposeProjectRunning
+	return nil
 }
 
 // CheckTriggererEnabled checks if the airflow triggerer component should be enabled.
@@ -1461,72 +1395,7 @@ var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 	return versions.GreaterThanOrEqualTo(runtimeVersion, triggererAllowedRuntimeVersion), nil
 }
 
-// CheckM1Image checks if the CLI is currently running on M1 architecture
-// next it checks if the runtime version of the image building is above 6.0.4
-// if the image is M1 architecture and runtime version is less than or equal to 6.0.4 it will print true
-var CheckM1Image = func(imageLabels map[string]string) bool {
-	if !isM1(runtime.GOOS, runtime.GOARCH) {
-		// the architecture is not arm64 no need to print message
-		return false
-	}
-	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
-	if !ok {
-		// cannot determine runtime version print message by default
-		return true
-	}
-
-	return versions.LessThanOrEqualTo(runtimeVersion, M1ImageRuntimeVersion)
-}
-
 func checkServiceState(serviceState, expectedState string) bool {
 	scrubbedState := strings.Split(serviceState, " ")[0]
 	return scrubbedState == expectedState
-}
-
-func startDocker() error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
-
-	buf := new(bytes.Buffer)
-	err := cmdExec(dockerCommand, buf, buf, "ps")
-	if err != nil {
-		// open docker
-		fmt.Println("\nDocker is not running. Starting up the Docker engine…")
-		err = cmdExec(OpenCmd, buf, os.Stderr, "-a", dockerCmd)
-		if err != nil {
-			return err
-		}
-		fmt.Println("\nIf you don't see Docker Desktop starting, exit this command and start it manually.")
-		fmt.Println("If you don't have Docker Desktop installed, install it (https://www.docker.com/products/docker-desktop/) and try again.")
-		fmt.Println("If you are using Colima or another Docker alternative, start the engine manually.")
-		// poll for docker
-		err = waitForDocker()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func waitForDocker() error {
-	dockerCommand := config.CFG.DockerCommand.GetString()
-
-	buf := new(bytes.Buffer)
-	timeout := time.After(time.Duration(timeoutNum) * time.Second)
-	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
-	for {
-		select {
-		// Got a timeout! fail with a timeout error
-		case <-timeout:
-			return errors.New("timed out waiting for docker")
-		// Got a tick, we should check if docker is up & running
-		case <-ticker.C:
-			buf.Reset()
-			err := cmdExec(dockerCommand, buf, buf, "ps")
-			if err != nil {
-				continue
-			} else {
-				return nil
-			}
-		}
-	}
 }

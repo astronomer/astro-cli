@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -188,19 +187,9 @@ services:
       
       - airflow_logs:/usr/local/airflow/logs
       
-    healthcheck:
-      test: curl --fail http://webserver:8080/health || exit 1
-      interval: 2s
-      retries: 15
-      start_period: 5s
-      timeout: 60s
     
 
 `
-		mockM1Checker := func(myOS, myArch string) bool {
-			return false
-		}
-		isM1 = mockM1Checker
 		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{})
 		s.NoError(err)
 		s.Equal(expectedCfg, cfg)
@@ -305,12 +294,6 @@ services:
       
       - airflow_logs:/usr/local/airflow/logs
       
-    healthcheck:
-      test: curl --fail http://webserver:8080/health || exit 1
-      interval: 2s
-      retries: 15
-      start_period: 5s
-      timeout: 60s
     
 
   triggerer:
@@ -338,10 +321,6 @@ services:
     
 
 `
-		mockM1Checker := func(myOS, myArch string) bool {
-			return false
-		}
-		isM1 = mockM1Checker
 		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{runtimeVersionLabelName: triggererAllowedRuntimeVersion})
 		s.NoError(err)
 		s.Equal(expectedCfg, cfg)
@@ -390,10 +369,10 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("TagLocalImage", mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Twice()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(4)
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Twice()
 
-		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
 		}
 
@@ -418,15 +397,10 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Times(2)
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
 
-		mockIsM1 := func(myOS, myArch string) bool {
-			return false
-		}
-		isM1 = mockIsM1
-
-		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			s.Equal(defaultTimeOut, timeout)
 			return nil
 		}
@@ -442,23 +416,17 @@ func (s *Suite) TestDockerComposeStart() {
 	})
 
 	s.Run("success with longer default startup time", func() {
-		defaultTimeOut := 1 * time.Minute
-		expectedTimeout := 5 * time.Minute
+		expectedTimeout := 10 * time.Minute
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: noCache}).Return(nil).Once()
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Times(2)
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
 
-		mockIsM1 := func(myOS, myArch string) bool {
-			return true
-		}
-		isM1 = mockIsM1
-
-		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			s.Equal(expectedTimeout, timeout)
 			return nil
 		}
@@ -466,7 +434,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, false, defaultTimeOut, nil)
+		err := mockDockerCompose.Start("", "", "", "", noCache, false, expectedTimeout, nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -481,10 +449,10 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Times(2)
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
 
-		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			s.Equal(userProvidedTimeOut, timeout)
 			return nil
 		}
@@ -507,10 +475,10 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("TagLocalImage", mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Twice()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(4)
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Twice()
 
-		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
 		}
 
@@ -559,7 +527,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 
-		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
 		}
 
@@ -582,7 +550,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 
-		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
 		}
 
@@ -606,7 +574,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(errMockDocker).Once()
 
-		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
 		}
 
@@ -630,7 +598,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
 
-		checkWebserverHealth = func(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return errMockDocker
 		}
 
@@ -1724,197 +1692,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 	})
 }
 
-func (s *Suite) TestCheckWebserverHealth() {
-	s.Run("success", func() {
-		settingsFile := "docker_test.go" // any file which exists
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mock.AnythingOfType("string"), api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", Name: fmt.Sprintf("test-%s", WebserverDockerContainerName), State: "running"}}, nil).Once()
-		mockEventsCall := composeMock.On("Events", mock.AnythingOfType("*context.timerCtx"), "test", mock.Anything)
-		mockEventsCall.RunFn = func(args mock.Arguments) {
-			consumer := args.Get(2).(api.EventsOptions).Consumer
-			err := consumer(api.Event{Status: "exec_create"})
-			s.NoError(err)
-			err = consumer(api.Event{Status: "exec_start"})
-			s.NoError(err)
-			err = consumer(api.Event{Status: "exec_die"})
-			s.NoError(err)
-			err = consumer(api.Event{Status: "health_status: healthy"})
-			s.ErrorIs(err, errComposeProjectRunning)
-			mockEventsCall.ReturnArguments = mock.Arguments{err}
-		}
-
-		openURL = func(url string) error {
-			return nil
-		}
-
-		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
-			return nil
-		}
-
-		r, w, _ := os.Pipe()
-		os.Stdout = w
-
-		err := checkWebserverHealth(settingsFile, nil, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
-		s.NoError(err)
-
-		w.Close()
-		out, _ := io.ReadAll(r)
-		s.Contains(string(out), "Project is running! All components are now available.")
-	})
-
-	s.Run("success with podman", func() {
-		settingsFile := "docker_test.go" // any file which exists
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mock.AnythingOfType("string"), api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", Name: fmt.Sprintf("test-%s", WebserverDockerContainerName), State: "running"}}, nil).Once()
-
-		openURL = func(url string) error {
-			return nil
-		}
-
-		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
-			return nil
-		}
-		r, w, _ := os.Pipe()
-		os.Stdout = w
-
-		// set config to podman
-		config.CFG.DockerCommand.SetHomeString("podman")
-		err := checkWebserverHealth(settingsFile, nil, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
-		s.NoError(err)
-
-		w.Close()
-		out, _ := io.ReadAll(r)
-		s.Contains(string(out), "Components will be available soon.")
-	})
-
-	// set config to docker
-	config.CFG.DockerCommand.SetHomeString("docker")
-
-	s.Run("compose ps failure", func() {
-		settingsFile := "./testfiles/test_dag_inegrity_file.py" // any file which exists
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mock.AnythingOfType("string"), api.PsOptions{All: true}).Return([]api.ContainerSummary{}, errMockDocker).Once()
-		mockEventsCall := composeMock.On("Events", mock.AnythingOfType("*context.timerCtx"), "test", mock.Anything)
-		mockEventsCall.RunFn = func(args mock.Arguments) {
-			consumer := args.Get(2).(api.EventsOptions).Consumer
-			err := consumer(api.Event{Status: "exec_create"})
-			s.NoError(err)
-			err = consumer(api.Event{Status: "exec_start"})
-			s.NoError(err)
-			err = consumer(api.Event{Status: "exec_die"})
-			s.NoError(err)
-			err = consumer(api.Event{Status: "health_status: healthy"})
-			s.ErrorIs(err, errMockDocker)
-			mockEventsCall.ReturnArguments = mock.Arguments{err}
-		}
-
-		openURL = func(url string) error {
-			return nil
-		}
-
-		err := checkWebserverHealth(settingsFile, nil, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
-		s.ErrorIs(err, errMockDocker)
-	})
-
-	s.Run("timeout waiting for webserver to get to healthy with short timeout", func() {
-		settingsFile := "./testfiles/test_dag_inegrity_file.py" // any file which exists
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mock.AnythingOfType("string"), api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", Name: fmt.Sprintf("test-%s", WebserverDockerContainerName), State: "exec_die"}}, nil).Once()
-		mockEventsCall := composeMock.On("Events", mock.AnythingOfType("*context.timerCtx"), "test", mock.Anything)
-		mockEventsCall.RunFn = func(args mock.Arguments) {
-			consumer := args.Get(2).(api.EventsOptions).Consumer
-			err := consumer(api.Event{Status: "exec_create"})
-			s.NoError(err)
-			err = consumer(api.Event{Status: "exec_start"})
-			s.NoError(err)
-			err = consumer(api.Event{Status: "exec_die"})
-			s.NoError(err)
-			err = context.DeadlineExceeded
-			mockEventsCall.ReturnArguments = mock.Arguments{err}
-		}
-
-		openURL = func(url string) error {
-			return nil
-		}
-		mockIsM1 := func(myOS, myArch string) bool {
-			return false
-		}
-		isM1 = mockIsM1
-
-		err := checkWebserverHealth(settingsFile, nil, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
-		s.ErrorContains(err, "The webserver health check timed out after 1s")
-	})
-	s.Run("timeout waiting for webserver to get to healthy with long timeout", func() {
-		settingsFile := "./testfiles/test_dag_inegrity_file.py" // any file which exists
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mock.AnythingOfType("string"), api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", Name: fmt.Sprintf("test-%s", WebserverDockerContainerName), State: "exec_die"}}, nil).Once()
-		mockEventsCall := composeMock.On("Events", mock.AnythingOfType("*context.timerCtx"), "test", mock.Anything)
-		mockEventsCall.RunFn = func(args mock.Arguments) {
-			consumer := args.Get(2).(api.EventsOptions).Consumer
-			err := consumer(api.Event{Status: "exec_create"})
-			s.NoError(err)
-			err = consumer(api.Event{Status: "exec_start"})
-			s.NoError(err)
-			err = consumer(api.Event{Status: "exec_die"})
-			s.NoError(err)
-			err = context.DeadlineExceeded
-			mockEventsCall.ReturnArguments = mock.Arguments{err}
-		}
-
-		openURL = func(url string) error {
-			return nil
-		}
-		mockIsM1 := func(myOS, myArch string) bool {
-			return true
-		}
-		isM1 = mockIsM1
-
-		err := checkWebserverHealth(settingsFile, nil, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
-		s.ErrorContains(err, "The webserver health check timed out after 1s")
-	})
-}
-
 var errExecMock = errors.New("docker is not running")
-
-func (s *Suite) TestStartDocker() {
-	s.Run("start docker success", func() {
-		counter := 0
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			switch cmd {
-			case "open":
-				return nil
-			case "docker":
-				if counter == 0 {
-					counter++
-					return errExecMock
-				}
-				return nil
-			default:
-				return errExecMock
-			}
-		}
-
-		err := startDocker()
-		s.NoError(err)
-	})
-
-	s.Run("start docker fail", func() {
-		timeoutNum = 5
-
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			switch cmd {
-			case "open":
-				return nil
-			case "docker":
-				return errExecMock
-			default:
-				return errExecMock
-			}
-		}
-		err := startDocker()
-		s.Contains(err.Error(), "timed out waiting for docker")
-	})
-}
 
 func (s *Suite) TestCreateDockerProject() {
 	fs := afero.NewMemMapFs()
