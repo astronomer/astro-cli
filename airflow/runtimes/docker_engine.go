@@ -15,7 +15,9 @@ type DefaultDockerEngine struct{}
 func (d DefaultDockerEngine) IsRunning() (string, error) {
 	checkDockerCmd := Command{
 		Command: docker,
-		Args:    []string{"ps"},
+		Args: []string{
+			"ps",
+		},
 	}
 	return checkDockerCmd.Execute()
 }
@@ -23,7 +25,10 @@ func (d DefaultDockerEngine) IsRunning() (string, error) {
 func (d DefaultDockerEngine) Start() (string, error) {
 	openDockerCmd := Command{
 		Command: open,
-		Args:    []string{"-a", docker},
+		Args: []string{
+			"-a",
+			docker,
+		},
 	}
 	return openDockerCmd.Execute()
 }

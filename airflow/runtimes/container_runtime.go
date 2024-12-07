@@ -142,3 +142,10 @@ var GetContainerRuntimeBinary = func() (string, error) {
 		"See the Astro CLI prerequisites for more information. " +
 		"https://www.astronomer.io/docs/astro/cli/install-cli")
 }
+
+// IsPodman is just a small helper to avoid exporting the podman constant,
+// and used in other places that haven't been refactored to use the runtime package.
+// This could probably be removed in the future.
+func IsPodman(binaryName string) bool {
+	return binaryName == podman
+}

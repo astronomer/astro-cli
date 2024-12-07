@@ -26,11 +26,18 @@ type DefaultPodmanEngine struct{}
 // InitializeMachine initializes our astro Podman machine.
 func (e DefaultPodmanEngine) InitializeMachine(name string) error {
 	// Grab some optional configurations from the config file.
-	podmanMachineMemory := config.CFG.PodmanMemory.GetString()
-	podmanMachineCPU := config.CFG.PodmanCPU.GetString()
 	podmanCmd := Command{
 		Command: podman,
-		Args:    []string{"machine", "init", name, "--memory", podmanMachineMemory, "--cpus", podmanMachineCPU, "--now"},
+		Args: []string{
+			"machine",
+			"init",
+			name,
+			"--memory",
+			config.CFG.MachineMemory.GetString(),
+			"--cpus",
+			config.CFG.MachineCPU.GetString(),
+			"--now",
+		},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
@@ -43,7 +50,11 @@ func (e DefaultPodmanEngine) InitializeMachine(name string) error {
 func (e DefaultPodmanEngine) StartMachine(name string) error {
 	podmanCmd := Command{
 		Command: podman,
-		Args:    []string{"machine", "start", name},
+		Args: []string{
+			"machine",
+			"start",
+			name,
+		},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
@@ -56,7 +67,11 @@ func (e DefaultPodmanEngine) StartMachine(name string) error {
 func (e DefaultPodmanEngine) StopMachine(name string) error {
 	podmanCmd := Command{
 		Command: podman,
-		Args:    []string{"machine", "stop", name},
+		Args: []string{
+			"machine",
+			"stop",
+			name,
+		},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
@@ -70,7 +85,12 @@ func (e DefaultPodmanEngine) StopMachine(name string) error {
 func (e DefaultPodmanEngine) RemoveMachine(name string) error {
 	podmanCmd := Command{
 		Command: podman,
-		Args:    []string{"machine", "rm", "-f", name},
+		Args: []string{
+			"machine",
+			"rm",
+			"-f",
+			name,
+		},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
@@ -83,7 +103,11 @@ func (e DefaultPodmanEngine) RemoveMachine(name string) error {
 func (e DefaultPodmanEngine) InspectMachine(name string) (*types.InspectedMachine, error) {
 	podmanCmd := Command{
 		Command: podman,
-		Args:    []string{"machine", "inspect", name},
+		Args: []string{
+			"machine",
+			"inspect",
+			name,
+		},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
@@ -106,7 +130,12 @@ func (e DefaultPodmanEngine) InspectMachine(name string) (*types.InspectedMachin
 func (e DefaultPodmanEngine) SetMachineAsDefault(name string) error {
 	podmanCmd := Command{
 		Command: podman,
-		Args:    []string{"system", "connection", "default", name},
+		Args: []string{
+			"system",
+			"connection",
+			"default",
+			name,
+		},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
@@ -119,7 +148,12 @@ func (e DefaultPodmanEngine) SetMachineAsDefault(name string) error {
 func (e DefaultPodmanEngine) ListMachines() ([]types.ListedMachine, error) {
 	podmanCmd := Command{
 		Command: podman,
-		Args:    []string{"machine", "ls", "--format", "json"},
+		Args: []string{
+			"machine",
+			"ls",
+			"--format",
+			"json",
+		},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
@@ -137,7 +171,11 @@ func (e DefaultPodmanEngine) ListMachines() ([]types.ListedMachine, error) {
 func (e DefaultPodmanEngine) ListContainers() ([]types.ListedContainer, error) {
 	podmanCmd := Command{
 		Command: podman,
-		Args:    []string{"ps", "--format", "json"},
+		Args: []string{
+			"ps",
+			"--format",
+			"json",
+		},
 	}
 	output, err := podmanCmd.Execute()
 	if err != nil {
