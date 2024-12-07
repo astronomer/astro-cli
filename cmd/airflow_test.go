@@ -34,6 +34,16 @@ func TestAirflow(t *testing.T) {
 	suite.Run(t, new(AirflowSuite))
 }
 
+func (s *AirflowSuite) SetupTest() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	dir, err := os.MkdirTemp("", "test_temp_dir_*")
+	if err != nil {
+		s.T().Fatalf("failed to create temp dir: %v", err)
+	}
+	s.tempDir = dir
+	config.WorkingPath = s.tempDir
+}
+
 func (s *AirflowSuite) SetupSubTest() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	dir, err := os.MkdirTemp("", "test_temp_dir_*")
@@ -139,28 +149,38 @@ func (s *AirflowSuite) TestNewAirflowInitCmd() {
 }
 
 func (s *AirflowSuite) TestNewAirflowRunCmd() {
-	cmd := newAirflowRunCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	cmd := newAirflowInitCmd()
+	cmd.RunE(new(cobra.Command), []string{})
+	cmd = newAirflowRunCmd()
+	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
 }
 
 func (s *AirflowSuite) TestNewAirflowPSCmd() {
-	cmd := newAirflowPSCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	cmd := newAirflowInitCmd()
+	cmd.RunE(new(cobra.Command), []string{})
+	cmd = newAirflowPSCmd()
+	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
 }
 
 func (s *AirflowSuite) TestNewAirflowLogsCmd() {
-	cmd := newAirflowLogsCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	cmd := newAirflowInitCmd()
+	cmd.RunE(new(cobra.Command), []string{})
+	cmd = newAirflowLogsCmd()
+	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
 }
 
 func (s *AirflowSuite) TestNewAirflowKillCmd() {
-	cmd := newAirflowKillCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	cmd := newAirflowInitCmd()
+	cmd.RunE(new(cobra.Command), []string{})
+	cmd = newAirflowKillCmd()
+	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
 }
 
 func (s *AirflowSuite) TestNewAirflowUpgradeCheckCmd() {
-	cmd := newAirflowUpgradeCheckCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	cmd := newAirflowInitCmd()
+	cmd.RunE(new(cobra.Command), []string{})
+	cmd = newAirflowUpgradeCheckCmd()
+	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
 }
 
 func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {

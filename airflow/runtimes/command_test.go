@@ -1,10 +1,21 @@
 package runtimes
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func (s *ContainerRuntimeSuite) TestCommandExecution() {
+type ContainerRuntimeCommandSuite struct {
+	suite.Suite
+}
+
+func TestContainerRuntimeCommand(t *testing.T) {
+	suite.Run(t, new(ContainerRuntimeCommandSuite))
+}
+
+func (s *ContainerRuntimeCommandSuite) TestCommandExecution() {
 	s.Run("Command executes successfully", func() {
 		cmd := &Command{
 			Command: "echo",
