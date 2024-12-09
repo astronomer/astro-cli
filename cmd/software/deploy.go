@@ -21,11 +21,14 @@ var (
 
 	ignoreCacheDeploy = false
 
-	EnsureProjectDir   = utils.EnsureProjectDir
-	DeployAirflowImage = deploy.Airflow
-	DagsOnlyDeploy     = deploy.DagsOnlyDeploy
-	isDagOnlyDeploy    bool
-	description        string
+	EnsureProjectDir           = utils.EnsureProjectDir
+	DeployAirflowImage         = deploy.Airflow
+	DagsOnlyDeploy             = deploy.DagsOnlyDeploy
+	UpdateDeploymentImage      = deploy.UpdateDeploymentImage
+	isDagOnlyDeploy            bool
+	description                string
+	imageName                  string
+	runtimeVersionForImageName string
 )
 
 var deployExample = `
@@ -58,6 +61,8 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&ignoreCacheDeploy, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	cmd.Flags().StringVar(&description, "description", "", "Improve traceability by attaching a description to a code deploy. If you don't provide a description, the system automatically assigns a default description based on the deploy type.")
+	cmd.Flags().StringVar(&imageName, "image-name", "", "Name of the image to deploy. Example - quay.io/astronomer/astro-runtime:12.1.1 or quay.io/astronomer/astro-runtime@sha256:77d85a8b6cd3bdfbcb25cbdb6ffbdb4ac2c1bb390b5951b836451dbdefb6c325")
+	cmd.Flags().StringVar(&runtimeVersionForImageName, "runtime-version", "", "Runtime version of the image to deploy. Example - 12.1.1. Mandatory if image-name is provided")
 
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
 		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only DAGs to your Deployment")
@@ -112,6 +117,9 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true, description)
 	}
 
+	if imageName != "" || runtimeVersionForImageName != "" {
+		return UpdateDeploymentImage(houstonClient, deploymentID, ws, runtimeVersionForImageName, imageName)
+	}
 	// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
 	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt, description)
 	if err != nil {
