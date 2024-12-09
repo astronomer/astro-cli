@@ -189,7 +189,7 @@ func (rt PodmanRuntime) ensureMachine() error {
 // stopAndKillMachine attempts to stop and kill the Podman machine.
 // If other projects are running, it will leave the machine up.
 func (rt PodmanRuntime) stopAndKillMachine() error {
-	// If the machine doesn't exist, exist early.
+	// If the machine doesn't exist, exit early.
 	if !rt.astroMachineExists() {
 		return nil
 	}
