@@ -472,6 +472,28 @@ func (s *AirflowSuite) TestAirflowInit() {
 		s.NoError(err)
 		s.Contains(string(out), fmt.Sprintf(changeDirectoryMsg, args[0]))
 	})
+
+	s.Run("specify flag and positional argument for project name, resulting in error", func() {
+		cmd := newAirflowInitCmd()
+		args := []string{"test-project-name"}
+		cmd.Flag("name").Value.Set("test-project-name")
+
+		r, stdin := s.mockUserInput("n")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		orgStdout := os.Stdout
+		defer func() { os.Stdout = orgStdout }()
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := airflowInit(cmd, args)
+
+		w.Close()
+		s.ErrorIs(err, errConfigProjectNameSpecifiedTwice)
+	})
 }
 
 func (s *AirflowSuite) TestAirflowStart() {

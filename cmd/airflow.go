@@ -466,10 +466,16 @@ func newObjectExportCmd() *cobra.Command {
 
 // Use project name for image name
 func airflowInit(cmd *cobra.Command, args []string) error {
+	// If the project name is specified with the --name flag,
+	// it cannot be specified as a positional argument as well, so return an error.
+	if projectName != "" && len(args) > 0 {
+		return errConfigProjectNameSpecifiedTwice
+	}
+
 	// The first positional argument is the project name.
 	// If the project name is provided in this way, we'll
 	// attempt to create a directory with that name.
-	if len(args) > 0 {
+	if projectName == "" && len(args) > 0 {
 		projectName = args[0]
 	}
 
