@@ -486,7 +486,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 
 		orgStdout := os.Stdout
 		defer func() { os.Stdout = orgStdout }()
-		r, w, _ := os.Pipe()
+		_, w, _ := os.Pipe()
 		os.Stdout = w
 
 		err := airflowInit(cmd, args)

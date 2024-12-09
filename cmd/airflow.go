@@ -466,37 +466,16 @@ func newObjectExportCmd() *cobra.Command {
 
 // Use project name for image name
 func airflowInit(cmd *cobra.Command, args []string) error {
-	// If the project name is specified with the --name flag,
-	// it cannot be specified as a positional argument as well, so return an error.
-	if projectName != "" && len(args) > 0 {
-		return errConfigProjectNameSpecifiedTwice
+	name, err := ensureProjectName(args, projectName)
+	if err != nil {
+		return err
 	}
-
-	// The first positional argument is the project name.
-	// If the project name is provided in this way, we'll
-	// attempt to create a directory with that name.
-	if projectName == "" && len(args) > 0 {
-		projectName = args[0]
-	}
+	projectName = name
 
 	// Save the directory we are in when the init command is run.
 	initialDir, err := fileutil.GetWorkingDir()
 	if err != nil {
 		return err
-	}
-
-	// Validate project name
-	if projectName != "" {
-		projectNameValid := regexp.
-			MustCompile(`^(?i)[a-z0-9]([a-z0-9_-]*[a-z0-9])$`).
-			MatchString
-
-		if !projectNameValid(projectName) {
-			return errConfigProjectName
-		}
-	} else {
-		projectDirectory := filepath.Base(config.WorkingPath)
-		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 
 	if fromTemplate == "select-template" {
@@ -621,6 +600,37 @@ func ensureProjectDirectory(args []string, workingPath, projectName string) (str
 
 	// Return the path we just created.
 	return newProjectPath, nil
+}
+
+func ensureProjectName(args []string, projectName string) (string, error) {
+	// If the project name is specified with the --name flag,
+	// it cannot be specified as a positional argument as well, so return an error.
+	if projectName != "" && len(args) > 0 {
+		return "", errConfigProjectNameSpecifiedTwice
+	}
+
+	// The first positional argument is the project name.
+	// If the project name is provided in this way, we'll
+	// attempt to create a directory with that name.
+	if projectName == "" && len(args) > 0 {
+		projectName = args[0]
+	}
+
+	// Validate project name
+	if projectName != "" {
+		projectNameValid := regexp.
+			MustCompile(`^(?i)[a-z0-9]([a-z0-9_-]*[a-z0-9])$`).
+			MatchString
+
+		if !projectNameValid(projectName) {
+			return "", errConfigProjectName
+		}
+	} else {
+		projectDirectory := filepath.Base(config.WorkingPath)
+		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
+	}
+
+	return projectName, nil
 }
 
 func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocognit
