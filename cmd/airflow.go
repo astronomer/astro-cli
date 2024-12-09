@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -101,7 +102,8 @@ astro dev init --from-template
 	dockerfile = "Dockerfile"
 
 	configReinitProjectConfigMsg = "Reinitialized existing Astro project in %s\n"
-	configInitProjectConfigMsg   = "Initialized empty Astro project in %s"
+	configInitProjectConfigMsg   = "Initialized empty Astro project in %s\n"
+	changeDirectoryMsg           = "To begin developing, change to your project directory with `cd %s`\n"
 
 	// this is used to monkey patch the function in order to write unit test cases
 	containerHandlerInit = airflow.ContainerHandlerInit
@@ -116,6 +118,7 @@ astro dev init --from-template
 	errNoCompose           = errors.New("cannot use '--compose-file' without '--compose' flag")
 	TemplateList           = airflow.FetchTemplateList
 	defaultWaitTime        = 1 * time.Minute
+	directoryPermissions   = 0o755
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
@@ -451,22 +454,16 @@ func newObjectExportCmd() *cobra.Command {
 
 // Use project name for image name
 func airflowInit(cmd *cobra.Command, args []string) error {
-	// Validate project name
-	if projectName != "" {
-		// error if project name has spaces
-		if len(args) > 0 {
-			return errProjectNameSpaces
-		}
-		projectNameValid := regexp.
-			MustCompile(`^(?i)[a-z0-9]([a-z0-9_-]*[a-z0-9])$`).
-			MatchString
+	name, err := ensureProjectName(args, projectName)
+	if err != nil {
+		return err
+	}
+	projectName = name
 
-		if !projectNameValid(projectName) {
-			return errConfigProjectName
-		}
-	} else {
-		projectDirectory := filepath.Base(config.WorkingPath)
-		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
+	// Save the directory we are in when the init command is run.
+	initialDir, err := fileutil.GetWorkingDir()
+	if err != nil {
+		return err
 	}
 
 	if fromTemplate == "select-template" {
@@ -495,7 +492,6 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided)
-	var err error
 	defaultImageTag := runtimeVersion
 	if defaultImageTag == "" {
 		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
@@ -505,16 +501,22 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	defaultImageName := airflow.AstroRuntimeImageName
 	if useAstronomerCertified {
 		defaultImageName = airflow.AstronomerCertifiedImageName
-		fmt.Printf("Initializing Astro project\nPulling Airflow development files from Astronomer Certified Airflow Version %s\n", defaultImageTag)
-	} else {
-		fmt.Printf("Initializing Astro project\nPulling Airflow development files from Astro Runtime %s\n", defaultImageTag)
 	}
+
+	// Ensure the project directory is created if a positional argument is provided.
+	newProjectPath, err := ensureProjectDirectory(args, config.WorkingPath, projectName)
+	if err != nil {
+		return err
+	}
+
+	// Update the config setting.
+	config.WorkingPath = newProjectPath
 
 	emptyDir := fileutil.IsEmptyDir(config.WorkingPath)
 
 	if !emptyDir {
 		i, _ := input.Confirm(
-			fmt.Sprintf("%s \nYou are not in an empty directory. Are you sure you want to initialize a project?", config.WorkingPath))
+			fmt.Sprintf("%s is not an empty directory. Are you sure you want to initialize a project here?", config.WorkingPath))
 
 		if !i {
 			fmt.Println("Canceling project initialization...")
@@ -522,7 +524,10 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	exists := config.ProjectConfigExists()
+	exists, err := config.IsProjectDir(config.WorkingPath)
+	if err != nil {
+		return err
+	}
 	if !exists {
 		config.CreateProjectConfig(config.WorkingPath)
 	}
@@ -542,12 +547,78 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	}
 
 	if exists {
-		fmt.Printf(configReinitProjectConfigMsg+"\n", config.WorkingPath)
+		fmt.Printf(configReinitProjectConfigMsg, config.WorkingPath)
 	} else {
-		fmt.Printf(configInitProjectConfigMsg+"\n", config.WorkingPath)
+		fmt.Printf(configInitProjectConfigMsg, config.WorkingPath)
+	}
+
+	// If we started in a different directory, that means the positional argument for projectName was used.
+	// This means the users shell pwd is not the project directory, so we print a message
+	// to cd into the project directory.
+	if initialDir != config.WorkingPath {
+		fmt.Printf(changeDirectoryMsg, projectName)
 	}
 
 	return nil
+}
+
+// ensureProjectDirectory creates a new project directory if a positional argument is provided.
+func ensureProjectDirectory(args []string, workingPath, projectName string) (string, error) {
+	// Return early if no positional argument was provided.
+	if len(args) == 0 {
+		return workingPath, nil
+	}
+
+	// Construct the path to our desired project directory.
+	newProjectPath := filepath.Join(workingPath, projectName)
+
+	// Determine if the project directory already exists.
+	projectDirExists, err := fileutil.Exists(newProjectPath, nil)
+	if err != nil {
+		return "", err
+	}
+
+	// If the project directory does not exist, create it.
+	if !projectDirExists {
+		err := os.Mkdir(newProjectPath, os.FileMode(directoryPermissions))
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// Return the path we just created.
+	return newProjectPath, nil
+}
+
+func ensureProjectName(args []string, projectName string) (string, error) {
+	// If the project name is specified with the --name flag,
+	// it cannot be specified as a positional argument as well, so return an error.
+	if projectName != "" && len(args) > 0 {
+		return "", errConfigProjectNameSpecifiedTwice
+	}
+
+	// The first positional argument is the project name.
+	// If the project name is provided in this way, we'll
+	// attempt to create a directory with that name.
+	if projectName == "" && len(args) > 0 {
+		projectName = args[0]
+	}
+
+	// Validate project name
+	if projectName != "" {
+		projectNameValid := regexp.
+			MustCompile(`^(?i)[a-z0-9]([a-z0-9_-]*[a-z0-9])$`).
+			MatchString
+
+		if !projectNameValid(projectName) {
+			return "", errConfigProjectName
+		}
+	} else {
+		projectDirectory := filepath.Base(config.WorkingPath)
+		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
+	}
+
+	return projectName, nil
 }
 
 func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocognit
