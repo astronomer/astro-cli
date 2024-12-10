@@ -45,6 +45,7 @@ type cfgs struct {
 	DisableAstroRun       cfg
 	DisableEnvObjects     cfg
 	AutoSelect            cfg
+	ShaAsTag              cfg
 }
 
 // Creates a new cfg struct
