@@ -64,7 +64,7 @@ type CustomClaims struct {
 }
 
 //nolint:gocognit
-func Setup(cmd *cobra.Command, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
+func AuthSetup(cmd *cobra.Command, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil

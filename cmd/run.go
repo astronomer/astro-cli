@@ -17,13 +17,10 @@ var (
 
 func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run DAG-ID",
-		Short: "Run a local DAG with Python by running its tasks sequentially",
-		Long:  "Run a local DAG by running its tasks sequentially. This command spins up a single Airflow worker to execute your DAG code. It parses all files in your dags folder if the --dag-file flag is not used. Use the --dag-file flag to only parse the DAG file where your DAG is defined.",
-		Args:  cobra.ExactArgs(1),
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
-		},
+		Use:     "run DAG-ID",
+		Short:   "Run a local DAG with Python by running its tasks sequentially",
+		Long:    "Run a local DAG by running its tasks sequentially. This command spins up a single Airflow worker to execute your DAG code. It parses all files in your dags folder if the --dag-file flag is not used. Use the --dag-file flag to only parse the DAG file where your DAG is defined.",
+		Args:    cobra.ExactArgs(1),
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    run,
 	}

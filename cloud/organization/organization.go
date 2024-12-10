@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 const (
@@ -222,7 +223,7 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astropl
 
 		currentTime := time.Now()
 		date := "-" + currentTime.Format("20060102")
-		filePath = fmt.Sprintf("%s-logs-%d-day%s%s.ndjson.gz", orgName, earliest, pluralize(earliest), date)
+		filePath = fmt.Sprintf("%s-logs-%d-day%s%s.ndjson.gz", orgName, earliest, util.Pluralize(earliest), date)
 	}
 
 	organizationAuditLogsParams := &astrocore.GetOrganizationAuditLogsParams{
@@ -244,13 +245,6 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astropl
 
 	fmt.Println("Finished exporting logs to local GZIP file")
 	return nil
-}
-
-func pluralize(count int) string {
-	if count > 1 {
-		return "s"
-	}
-	return ""
 }
 
 func IsOrgHosted() bool {

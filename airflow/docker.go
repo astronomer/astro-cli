@@ -260,7 +260,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 
 	fmt.Println("\n\nAirflow is starting up!")
 
-	airflowDockerVersion, err := d.checkAiflowVersion()
+	airflowDockerVersion, err := d.checkAirflowVersion()
 	if err != nil {
 		return err
 	}
@@ -1112,7 +1112,7 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 	}
 
 	// Get airflow version
-	airflowDockerVersion, err := d.checkAiflowVersion()
+	airflowDockerVersion, err := d.checkAirflowVersion()
 	if err != nil {
 		return err
 	}
@@ -1157,7 +1157,7 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 	}
 
 	// Get airflow version
-	airflowDockerVersion, err := d.checkAiflowVersion()
+	airflowDockerVersion, err := d.checkAirflowVersion()
 	if err != nil {
 		return err
 	}
@@ -1258,7 +1258,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile, executionDate strin
 	return nil
 }
 
-func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
+func (d *DockerCompose) checkAirflowVersion() (uint64, error) {
 	imageLabels, err := d.imageHandler.ListLabels()
 	if err != nil {
 		return 0, err
@@ -1338,22 +1338,21 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 		return errors.Wrap(err, composeStatusCheckErrMsg)
 	}
 
-	fileState, err := fileutil.Exists(settingsFile, nil)
-	if err != nil {
-		return errors.Wrap(err, errSettingsPath)
-	}
-
-	if fileState {
-		for i := range psInfo {
-			if strings.Contains(psInfo[i].Name, project.Name) &&
-				strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
-				err = initSettings(psInfo[i].ID, settingsFile, envConns, airflowDockerVersion, true, true, true)
-				if err != nil {
-					return err
-				}
-			}
+	var webserverContainer *api.ContainerSummary
+	for i := range psInfo {
+		if strings.Contains(psInfo[i].Name, project.Name) && strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
+			webserverContainer = &psInfo[i]
 		}
 	}
+	if webserverContainer != nil {
+		err = initSettings(webserverContainer.ID, settingsFile, envConns, airflowDockerVersion, true, true, true)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("Webserver container not found, skipping initializing settings and environment connections")
+	}
+
 	fmt.Println("\nProject is running! All components are now available.")
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
 	webserverURL := "http://localhost:" + parts[len(parts)-1]

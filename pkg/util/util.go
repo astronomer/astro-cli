@@ -143,3 +143,10 @@ func Filter[T any](ss []T, test func(T) bool) (ret []T) {
 	}
 	return
 }
+
+func Pluralize(count int) string {
+	if count != 1 {
+		return "s"
+	}
+	return ""
+}

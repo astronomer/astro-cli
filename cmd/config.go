@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 
 	"github.com/spf13/cobra"
@@ -31,7 +32,7 @@ func newConfigRootCmd(out io.Writer) *cobra.Command {
 		Use:               "config",
 		Short:             "Manage a project's configurations",
 		Long:              "Manage the project configurations stored at '.astro/config.yaml'. Please see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for list of available cli configurations",
-		PersistentPreRunE: ensureGlobalFlag,
+		PersistentPreRunE: utils.ChainRunEs(RootPersistentPreRunE, ensureGlobalFlag),
 	}
 	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
 	cmd.AddCommand(

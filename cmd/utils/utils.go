@@ -7,6 +7,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type RunE func(cmd *cobra.Command, args []string) error
+
+func ChainRunEs(runEs ...RunE) RunE {
+	return func(cmd *cobra.Command, args []string) error {
+		for _, runE := range runEs {
+			if err := runE(cmd, args); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
 func EnsureProjectDir(cmd *cobra.Command, args []string) error {
 	isProjectDir, err := config.IsProjectDir(config.WorkingPath)
 	if err != nil {

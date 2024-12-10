@@ -80,6 +80,15 @@ func ConfigSettings(id, settingsFile string, envConns map[string]astrocore.Envir
 
 // InitSettings initializes settings file
 func InitSettings(settingsFile string) error {
+	exists, err := fileutil.Exists(settingsFile, nil)
+	if err != nil {
+		return errors.Wrapf(err, "Could not detect existence of settings file")
+	}
+	if !exists {
+		logrus.Debug("Settings file not found")
+		return nil
+	}
+
 	// Set up viper object for project config
 	viperSettings = viper.New()
 	ConfigFileName := strings.Split(settingsFile, ".")[0]
@@ -96,7 +105,7 @@ func InitSettings(settingsFile string) error {
 		fmt.Printf(configReadErrorMsg, readErr)
 	}
 
-	err := viperSettings.Unmarshal(&settings)
+	err = viperSettings.Unmarshal(&settings)
 	// Try and use old settings file if error
 	if err != nil {
 		return errors.Wrap(err, "unable to decode file")
@@ -124,7 +133,7 @@ func AddVariables(id string, version uint64) {
 
 			airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
 			out := execAirflowCommand(id, airflowCommand)
-			logrus.Debugf("Adding variable logs:\n" + out)
+			logrus.Debugf("Add variable logs:\n%s", out)
 			fmt.Printf("Added Variable: %s\n", variable.VariableName)
 		}
 	}
@@ -175,6 +184,7 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 		var j int
 		conn := connections[i]
 		if !objectValidator(0, conn.ConnID) {
+			logrus.Debugf("Skipping connection with no ID")
 			continue
 		}
 
@@ -226,7 +236,7 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 		}
 
 		out := execAirflowCommand(id, airflowCommand)
-		logrus.Debugf("Adding Connection logs:\n\n" + out)
+		logrus.Debugf("Add Connection logs:\n\n%s", out)
 		fmt.Printf("Added Connection: %s\n", conn.ConnID)
 	}
 }
@@ -236,6 +246,7 @@ func AppendEnvironmentConnections(connections Connections, envConnections map[st
 		for i := range connections {
 			if connections[i].ConnID == envConnID {
 				// if connection already exists in settings file, skip it because the file takes precedence
+				logrus.Debugf("Skipping environment connection %s because already exists in settings file", envConnID)
 				continue
 			}
 		}
@@ -295,7 +306,7 @@ func AddPools(id string, version uint64) {
 				}
 				fmt.Println(airflowCommand)
 				out := execAirflowCommand(id, airflowCommand)
-				logrus.Debugf("Adding pool logs:\n" + out)
+				logrus.Debugf("Adding pool logs:\n%s", out)
 				fmt.Printf("Added Pool: %s\n", pool.PoolName)
 			} else {
 				fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)
@@ -348,7 +359,7 @@ func EnvExport(id, envFile string, version uint64, connections, variables bool) 
 func EnvExportVariables(id, envFile string) error {
 	// setup airflow command to export variables
 	out := execAirflowCommand(id, airflowVarExport)
-	logrus.Debugf("Env Export Variables logs:\n\n" + out)
+	logrus.Debugf("Env Export Variables logs:\n\n%s", out)
 
 	if strings.Contains(out, "successfully") {
 		// get variables from file created by airflow command
@@ -384,7 +395,7 @@ func EnvExportVariables(id, envFile string) error {
 func EnvExportConnections(id, envFile string) error {
 	// Airflow command to export connections to env uris
 	out := execAirflowCommand(id, airflowConnExport)
-	logrus.Debugf("Env Export Connections logs:\n" + out)
+	logrus.Debugf("Env Export Connections logs:\n%s", out)
 
 	if strings.Contains(out, "successfully") {
 		// get connections from file craeted by airflow command
@@ -461,7 +472,7 @@ func Export(id, settingsFile string, version uint64, connections, variables, poo
 func ExportConnections(id string) error {
 	// Setup airflow command to export connections
 	out := execAirflowCommand(id, airflowConnectionList)
-	logrus.Debugf("Export Connections logs:\n" + out)
+	logrus.Debugf("Export Connections logs:\n%s", out)
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 	// remove extra warning text
@@ -518,7 +529,7 @@ func ExportConnections(id string) error {
 func ExportVariables(id string) error {
 	// setup files
 	out := execAirflowCommand(id, airflowVarExport)
-	logrus.Debugf("Export Variables logs:\n" + out)
+	logrus.Debugf("Export Variables logs:\n%s", out)
 
 	if strings.Contains(out, "successfully") {
 		// get variables created by the airflow command
@@ -561,7 +572,7 @@ func ExportPools(id string) error {
 	// Setup airflow command to export pools
 	airflowCommand := ariflowPoolsList
 	out := execAirflowCommand(id, airflowCommand)
-	logrus.Debugf("Export Pools logs:\n" + out)
+	logrus.Debugf("Export Pools logs:\n%s", out)
 
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")

@@ -32,7 +32,16 @@ var (
 	verboseLevel   string
 	houstonClient  houston.ClientInterface
 	houstonVersion string
+
+	// The commands not to run cloud auth setup for
+	excludedCloudAuthSetupCommands = []string{
+		"astro config",
+		"astro dev",
+		"astro run",
+	}
 )
+
+var RootPersistentPreRunE func(*cobra.Command, []string) error
 
 const (
 	softwarePlatform = "Astronomer Software"
@@ -60,6 +69,42 @@ func NewRootCmd() *cobra.Command {
 		}
 	}
 
+	RootPersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		// common PersistentPreRunE component between software & cloud
+		// setting up log verbosity and dumping debug logs collected during CLI-initialization
+		if err := softwareCmd.SetUpLogs(os.Stdout, verboseLevel); err != nil {
+			return err
+		}
+		// Check for latest version
+		if config.CFG.UpgradeMessage.GetBool() {
+			// create github client with 3 second timeout, setting an aggressive timeout since its not mandatory to get a response in each command execution
+			githubClient := github.NewClient(&http.Client{Timeout: 3 * time.Second})
+			// compare current version to latest
+			err = version.CompareVersions(githubClient, "astronomer", "astro-cli")
+			if err != nil {
+				softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error comparing CLI versions: "+err.Error())
+			}
+		}
+		if isCloudCtx {
+			if shouldDoCloudAuthSetup(cmd) {
+				err = cloudCmd.AuthSetup(cmd, platformCoreClient, astroCoreClient)
+				if err != nil {
+					if strings.Contains(err.Error(), "token is invalid or malformed") {
+						return errors.New("API Token is invalid or malformed") //nolint
+					}
+					if strings.Contains(err.Error(), "the API token given has expired") {
+						return errors.New("API Token is expired") //nolint
+					}
+					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
+				}
+			} else {
+				logrus.Debug("Skipping cloud auth setup")
+			}
+		}
+		softwareCmd.PrintDebugLogs()
+		return nil
+	}
+
 	rootCmd := &cobra.Command{
 		Use:   "astro",
 		Short: "Run Apache Airflow locally and interact with Astronomer",
@@ -73,37 +118,7 @@ func NewRootCmd() *cobra.Command {
     \__\/\__\/ \_____\/   \__\/    \_\/ \_\/ \_____\/           \_____\/ \_____\/\________\/
 
 Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or Local Development.`,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Check for latest version
-			if config.CFG.UpgradeMessage.GetBool() {
-				// create github client with 3 second timeout, setting an aggressive timeout since its not mandatory to get a response in each command execution
-				githubClient := github.NewClient(&http.Client{Timeout: 3 * time.Second})
-				// compare current version to latest
-				err = version.CompareVersions(githubClient, "astronomer", "astro-cli")
-				if err != nil {
-					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error comparing CLI versions: "+err.Error())
-				}
-			}
-			if isCloudCtx {
-				err = cloudCmd.Setup(cmd, platformCoreClient, astroCoreClient)
-				if err != nil {
-					if strings.Contains(err.Error(), "token is invalid or malformed") {
-						return errors.New("API Token is invalid or malformed") //nolint
-					}
-					if strings.Contains(err.Error(), "the API token given has expired") {
-						return errors.New("API Token is expired") //nolint
-					}
-					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
-				}
-			}
-			// common PersistentPreRunE component between software & cloud
-			// setting up log verbosity and dumping debug logs collected during CLI-initialization
-			if err := softwareCmd.SetUpLogs(os.Stdout, verboseLevel); err != nil {
-				return err
-			}
-			softwareCmd.PrintDebugLogs()
-			return nil
-		},
+		PersistentPreRunE: RootPersistentPreRunE,
 	}
 
 	rootCmd.AddCommand(
@@ -145,4 +160,13 @@ Platform Version: %s{{end}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
 `, ansi.Bold(ctx), ctx, houstonVersion, ansi.Bold(houstonVersion))
+}
+
+func shouldDoCloudAuthSetup(cmd *cobra.Command) bool {
+	for _, prefix := range excludedCloudAuthSetupCommands {
+		if strings.HasPrefix(cmd.CommandPath(), prefix) {
+			return false
+		}
+	}
+	return true
 }

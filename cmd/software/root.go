@@ -58,6 +58,7 @@ func SetUpLogs(out io.Writer, level string) error {
 		return err
 	}
 	logrus.SetLevel(lvl)
+	logrus.Debug("Debug logs enabled!")
 	return nil
 }
 

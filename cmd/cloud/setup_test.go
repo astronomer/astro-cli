@@ -38,7 +38,7 @@ func TestSetup(t *testing.T) {
 		cmd := &cobra.Command{Use: "login"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
-		err = Setup(cmd, nil, nil)
+		err = AuthSetup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -50,7 +50,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = AuthSetup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -71,7 +71,7 @@ func TestSetup(t *testing.T) {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil)
+		err = AuthSetup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -92,7 +92,7 @@ func TestSetup(t *testing.T) {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil)
+		err = AuthSetup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -104,7 +104,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = AuthSetup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -116,7 +116,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = AuthSetup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -128,7 +128,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = AuthSetup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -140,7 +140,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "context"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = AuthSetup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -152,7 +152,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "completion"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = AuthSetup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -172,7 +172,7 @@ func TestSetup(t *testing.T) {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil)
+		err = AuthSetup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -192,7 +192,7 @@ func TestSetup(t *testing.T) {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil)
+		err = AuthSetup(cmd, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -241,7 +241,7 @@ func TestSetup(t *testing.T) {
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
-		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
+		err = AuthSetup(cmd, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
@@ -265,7 +265,7 @@ func TestSetup(t *testing.T) {
 
 		t.Setenv("ASTRO_API_TOKEN", "bad token")
 
-		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
+		err = AuthSetup(cmd, mockPlatformCoreClient, mockCoreClient)
 		assert.Error(t, err)
 	})
 
@@ -288,7 +288,7 @@ func TestSetup(t *testing.T) {
 
 		t.Setenv("ASTRO_API_TOKEN", "")
 
-		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
+		err = AuthSetup(cmd, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 	})
 
@@ -339,7 +339,7 @@ func TestSetup(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
+		err = AuthSetup(cmd, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
