@@ -473,11 +473,11 @@ func (s *Suite) TestDockerImagePush() {
 	})
 
 	for _, tc := range []struct {
-		input         string
-		username      string
-		platform      string
-		expected      string
-		expectedLogin string
+		input           string
+		username        string
+		platform        string
+		expected        string
+		expectedLogin   string
 		getRemoteShaTag bool
 	}{
 		{"images.astronomer.io/foo/bar:123", "username", testUtil.CloudPlatform, "images.astronomer.io/foo/bar:123", "images.astronomer.io", false},
