@@ -41,7 +41,7 @@ func EnsureRuntime(cmd *cobra.Command, args []string) error {
 	// Check if the OS is Windows and create the plugins project directory if it doesn't exist.
 	// In Windows, the compose project will fail if the plugins directory doesn't exist, due
 	// to the volume mounts we specify.
-	osChecker := new(runtimes.DefaultOSChecker)
+	osChecker := runtimes.CreateOSChecker()
 	if osChecker.IsWindows() {
 		pluginsDir := filepath.Join(config.WorkingPath, "plugins")
 		if err := os.MkdirAll(pluginsDir, os.ModePerm); err != nil && !os.IsExist(err) {

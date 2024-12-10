@@ -7,16 +7,20 @@ type OSChecker interface {
 	IsWindows() bool
 }
 
-type DefaultOSChecker struct{}
+type osChecker struct{}
+
+func CreateOSChecker() OSChecker {
+	return new(osChecker)
+}
 
 // IsWindows is a utility function to determine if the CLI host machine
 // is running on Microsoft Windows OS.
-func (o DefaultOSChecker) IsWindows() bool {
+func (o osChecker) IsWindows() bool {
 	return runtime.GOOS == "windows"
 }
 
 // IsMac is a utility function to determine if the CLI host machine
 // is running on Apple macOS.
-func (o DefaultOSChecker) IsMac() bool {
+func (o osChecker) IsMac() bool {
 	return runtime.GOOS == "darwin"
 }

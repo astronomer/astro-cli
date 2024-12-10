@@ -21,10 +21,11 @@ const (
 		"Please stop the other machine and try again"
 )
 
-type DefaultPodmanEngine struct{}
+// podmanEngine is the default implementation of PodmanEngine.
+type podmanEngine struct{}
 
 // InitializeMachine initializes our astro Podman machine.
-func (e DefaultPodmanEngine) InitializeMachine(name string) error {
+func (e podmanEngine) InitializeMachine(name string) error {
 	// Grab some optional configurations from the config file.
 	podmanCmd := Command{
 		Command: podman,
@@ -47,7 +48,7 @@ func (e DefaultPodmanEngine) InitializeMachine(name string) error {
 }
 
 // StartMachine starts our astro Podman machine.
-func (e DefaultPodmanEngine) StartMachine(name string) error {
+func (e podmanEngine) StartMachine(name string) error {
 	podmanCmd := Command{
 		Command: podman,
 		Args: []string{
@@ -64,7 +65,7 @@ func (e DefaultPodmanEngine) StartMachine(name string) error {
 }
 
 // StopMachine stops the given Podman machine.
-func (e DefaultPodmanEngine) StopMachine(name string) error {
+func (e podmanEngine) StopMachine(name string) error {
 	podmanCmd := Command{
 		Command: podman,
 		Args: []string{
@@ -82,7 +83,7 @@ func (e DefaultPodmanEngine) StopMachine(name string) error {
 
 // RemoveMachine removes the given Podman machine completely,
 // such that it can only be started again by re-initializing.
-func (e DefaultPodmanEngine) RemoveMachine(name string) error {
+func (e podmanEngine) RemoveMachine(name string) error {
 	podmanCmd := Command{
 		Command: podman,
 		Args: []string{
@@ -100,7 +101,7 @@ func (e DefaultPodmanEngine) RemoveMachine(name string) error {
 }
 
 // InspectMachine inspects a given podman machine name.
-func (e DefaultPodmanEngine) InspectMachine(name string) (*types.InspectedMachine, error) {
+func (e podmanEngine) InspectMachine(name string) (*types.InspectedMachine, error) {
 	podmanCmd := Command{
 		Command: podman,
 		Args: []string{
@@ -127,7 +128,7 @@ func (e DefaultPodmanEngine) InspectMachine(name string) (*types.InspectedMachin
 }
 
 // SetMachineAsDefault sets the given Podman machine as the default.
-func (e DefaultPodmanEngine) SetMachineAsDefault(name string) error {
+func (e podmanEngine) SetMachineAsDefault(name string) error {
 	podmanCmd := Command{
 		Command: podman,
 		Args: []string{
@@ -145,7 +146,7 @@ func (e DefaultPodmanEngine) SetMachineAsDefault(name string) error {
 }
 
 // ListMachines lists all Podman machines.
-func (e DefaultPodmanEngine) ListMachines() ([]types.ListedMachine, error) {
+func (e podmanEngine) ListMachines() ([]types.ListedMachine, error) {
 	podmanCmd := Command{
 		Command: podman,
 		Args: []string{
@@ -168,7 +169,7 @@ func (e DefaultPodmanEngine) ListMachines() ([]types.ListedMachine, error) {
 }
 
 // ListContainers lists all pods in the machine.
-func (e DefaultPodmanEngine) ListContainers() ([]types.ListedContainer, error) {
+func (e podmanEngine) ListContainers() ([]types.ListedContainer, error) {
 	podmanCmd := Command{
 		Command: podman,
 		Args: []string{

@@ -143,7 +143,7 @@ func (s *ContainerRuntimeSuite) TestGetContainerRuntimeBinary() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			mockChecker := mocks.FileChecker{ExistingFiles: tt.mockFiles}
-			result := FindBinary(tt.pathEnv, tt.binary, mockChecker, new(DefaultOSChecker))
+			result := FindBinary(tt.pathEnv, tt.binary, mockChecker, new(osChecker))
 			s.Equal(tt.expected, result)
 		})
 	}

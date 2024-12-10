@@ -11,11 +11,15 @@ type FileChecker interface {
 	Exists(path string) bool
 }
 
-// DefaultOSFileChecker is a concrete implementation of FileChecker.
-type DefaultOSFileChecker struct{}
+// fileChecker is a concrete implementation of FileChecker.
+type fileChecker struct{}
+
+func CreateFileChecker() FileChecker {
+	return new(fileChecker)
+}
 
 // Exists checks if the file exists in the file system.
-func (f DefaultOSFileChecker) Exists(path string) bool {
+func (f fileChecker) Exists(path string) bool {
 	exists, _ := fileutil.Exists(path, nil)
 	return exists
 }

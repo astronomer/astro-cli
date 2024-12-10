@@ -48,9 +48,9 @@ func GetContainerRuntime() (ContainerRuntime, error) {
 	// Return the appropriate container runtime based on the binary discovered.
 	switch containerRuntime {
 	case docker:
-		return CreateDockerRuntime(new(DefaultDockerEngine), new(DefaultOSChecker)), nil
+		return CreateDockerRuntime(new(dockerEngine), new(osChecker)), nil
 	case podman:
-		return CreatePodmanRuntime(new(DefaultPodmanEngine), new(DefaultOSChecker)), nil
+		return CreatePodmanRuntime(new(podmanEngine), new(osChecker)), nil
 	default:
 		return nil, errors.New(containerRuntimeNotFoundErrMsg)
 	}
@@ -131,7 +131,7 @@ var GetContainerRuntimeBinary = func() (string, error) {
 	// Get the $PATH environment variable.
 	pathEnv := os.Getenv("PATH")
 	for _, binary := range binaries {
-		if found := FindBinary(pathEnv, binary, new(DefaultOSFileChecker), new(DefaultOSChecker)); found {
+		if found := FindBinary(pathEnv, binary, CreateFileChecker(), CreateOSChecker()); found {
 			return binary, nil
 		}
 	}

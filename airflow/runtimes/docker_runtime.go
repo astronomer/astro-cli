@@ -8,7 +8,7 @@ import (
 )
 
 // DockerEngine is a struct that contains the functions needed to initialize Docker.
-// The concrete implementation that we use is DefaultDockerEngine below.
+// The concrete implementation that we use is dockerEngine.
 // When running the tests, we substitute the default implementation with a mock implementation.
 type DockerEngine interface {
 	IsRunning() (string, error)

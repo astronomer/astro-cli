@@ -8,11 +8,10 @@ const (
 	dockerOpenNotice      = "We couldn't start the docker engine automatically. Please start it manually and try again."
 )
 
-// DefaultDockerEngine is the default implementation of DockerEngine.
-// The concrete functions defined here are called from the initializeDocker function below.
-type DefaultDockerEngine struct{}
+// dockerEngine is the default implementation of DockerEngine.
+type dockerEngine struct{}
 
-func (d DefaultDockerEngine) IsRunning() (string, error) {
+func (d dockerEngine) IsRunning() (string, error) {
 	checkDockerCmd := Command{
 		Command: docker,
 		Args: []string{
@@ -22,7 +21,7 @@ func (d DefaultDockerEngine) IsRunning() (string, error) {
 	return checkDockerCmd.Execute()
 }
 
-func (d DefaultDockerEngine) Start() (string, error) {
+func (d dockerEngine) Start() (string, error) {
 	openDockerCmd := Command{
 		Command: open,
 		Args: []string{
