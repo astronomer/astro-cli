@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/briandowns/spinner"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -220,7 +221,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 				fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 			}
 		}
-		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: false, NoCache: noCache})
 		if !config.CFG.DisableAstroRun.GetBool() {
 			// remove astro-run-dag from requirments.txt
 			err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
@@ -258,7 +259,10 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		return errors.Wrap(err, composeRecreateErrMsg)
 	}
 
-	fmt.Println("\n\nAirflow is starting up!")
+	s := spinner.New(runtimes.SpinnerCharSet, runtimes.SpinnerRefresh) // Use a character set and speed
+	s.Suffix = " Airflow is starting up…"
+	s.FinalMSG = "Airflow is up and running!\n"
+	s.Start()
 
 	airflowDockerVersion, err := d.checkAiflowVersion()
 	if err != nil {
@@ -276,6 +280,8 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	if err != nil {
 		return err
 	}
+
+	s.Stop()
 
 	// If we've successfully gotten a healthcheck response, print the status.
 	err = printStatus(settingsFile, envConns, project, d.composeService, airflowDockerVersion, noBrowser)
@@ -478,7 +484,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	if deployImageName == "" {
 		// build image
 		if customImageName == "" {
-			err := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+			err := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: false})
 			if err != nil {
 				return "", err
 			}
@@ -504,7 +510,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	}
 
 	// run pytests
-	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, "", pytestArgs, false, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, "", pytestArgs, false, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: false})
 	if err != nil {
 		return exitCode, err
 	}
@@ -538,7 +544,7 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 	} else {
 		// build image for current Airflow version to get current Airflow version
 		fmt.Println("\nBuilding image for current Airflow version")
-		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: false})
 		if imageBuildErr != nil {
 			return imageBuildErr
 		}
@@ -633,7 +639,7 @@ func (d *DockerCompose) conflictTest(testHomeDirectory, newImageName, newAirflow
 		return err
 	}
 
-	exitCode, conflictErr := d.imageHandler.ConflictTest(d.airflowHome, testHomeDirectory, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+	exitCode, conflictErr := d.imageHandler.ConflictTest(d.airflowHome, testHomeDirectory, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: false})
 	if conflictErr != nil {
 		return conflictErr
 	}
@@ -663,7 +669,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, de
 		return err
 	}
 	fmt.Println("\nBuilding image for new Airflow version")
-	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: false})
 	if imageBuildErr != nil {
 		return imageBuildErr
 	}
@@ -701,7 +707,7 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerF
 		fmt.Printf("Adding 'pytest-html' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 	}
 	fmt.Println("\nBuilding image for new Airflow version")
-	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: false})
 
 	// remove pytest-html to the requirements
 	err = fileutil.RemoveLineFromFile(reqFile, "pytest-html", " # This package is needed for the upgrade dag test. It will be removed once the test is over")
@@ -728,7 +734,7 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerF
 	htmlReportArgs := "--html=dag-test-report.html --self-contained-html"
 	// compare pip freeze files
 	fmt.Println("\nRunning DAG parse test with the new Airflow version")
-	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, testHomeDirectory, strings.Fields(htmlReportArgs), true, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, testHomeDirectory, strings.Fields(htmlReportArgs), true, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: false})
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			fmt.Println("See above for errors detected in your DAGs")
@@ -1246,7 +1252,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile, executionDate strin
 			fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
 		}
 	}()
-	err = d.imageHandler.Build(d.dockerfile, "", airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+	err = d.imageHandler.Build(d.dockerfile, "", airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: false, NoCache: noCache})
 	if err != nil {
 		return err
 	}
@@ -1354,11 +1360,10 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 			}
 		}
 	}
-	fmt.Println("\nProject is running! All components are now available.")
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
 	webserverURL := "http://localhost:" + parts[len(parts)-1]
-	fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
-	fmt.Printf(composeLinkPostgresMsg+"\n", ansi.Bold("localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
+	fmt.Printf(composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
+	fmt.Printf(composeLinkPostgresMsg+"\n", ansi.Bold("postgresql://localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
 	fmt.Printf(composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
 	fmt.Printf(postgresUserPasswordMsg+"\n", ansi.Bold("postgres:postgres"))
 	if !(noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {

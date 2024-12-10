@@ -40,6 +40,14 @@ func CreatePodmanRuntime(engine PodmanEngine, osChecker OSChecker) PodmanRuntime
 	return PodmanRuntime{Engine: engine, OSChecker: osChecker}
 }
 
+func CreatePodmanRuntimeWithDefaults() PodmanRuntime {
+	return PodmanRuntime{Engine: GetPodmanEngine(), OSChecker: CreateOSChecker()}
+}
+
+func GetPodmanEngine() PodmanEngine {
+	return new(podmanEngine)
+}
+
 func (rt PodmanRuntime) Initialize() error {
 	// If we're in podman mode, and DOCKER_HOST is not already set
 	// we need to initialize our astro machine.
@@ -108,7 +116,7 @@ func (rt PodmanRuntime) Kill() error {
 
 func (rt PodmanRuntime) ensureMachine() error {
 	// Show a spinner message while we're initializing the machine.
-	s := spinner.New(spinnerCharSet, spinnerRefresh)
+	s := spinner.New(SpinnerCharSet, SpinnerRefresh)
 	s.Suffix = containerRuntimeInitMessage
 	defer s.Stop()
 

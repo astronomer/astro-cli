@@ -26,3 +26,10 @@ mock:
 
 codecov:
 	@eval $$(curl -s https://codecov.io/bash)
+
+install: build
+	cp astro ~/go/bin
+
+uninstall:
+	rm ~/go/bin/astro
+

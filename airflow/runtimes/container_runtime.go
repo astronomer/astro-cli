@@ -14,17 +14,19 @@ import (
 	"github.com/pkg/errors"
 )
 
-var spinnerCharSet = spinner.CharSets[14]
+var SpinnerCharSet = spinner.CharSets[14]
 
 const (
 	docker                         = "docker"
 	podman                         = "podman"
+	orbstack                       = "orbstack"
+	orbctl                         = "orbctl"
 	containerRuntimeNotFoundErrMsg = "Failed to find a container runtime. " +
 		"See the Astro CLI prerequisites for more information. " +
 		"https://www.astronomer.io/docs/astro/cli/install-cli"
 	containerRuntimeInitMessage = " Astro uses container technology to run your Airflow project. " +
 		"Please wait while we get things started…"
-	spinnerRefresh = 100 * time.Millisecond
+	SpinnerRefresh = 100 * time.Millisecond
 )
 
 // ContainerRuntime interface defines the methods that manage
@@ -48,9 +50,9 @@ func GetContainerRuntime() (ContainerRuntime, error) {
 	// Return the appropriate container runtime based on the binary discovered.
 	switch containerRuntime {
 	case docker:
-		return CreateDockerRuntime(new(dockerEngine), new(osChecker)), nil
+		return CreateDockerRuntimeWithDefaults(), nil
 	case podman:
-		return CreatePodmanRuntime(new(podmanEngine), new(osChecker)), nil
+		return CreatePodmanRuntimeWithDefaults(), nil
 	default:
 		return nil, errors.New(containerRuntimeNotFoundErrMsg)
 	}
