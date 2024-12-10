@@ -364,7 +364,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
 
 		imageHandler := airflowImageHandler(deployInfo.deployImage)
-		_, err = imageHandler.Push(remoteImage, registryUsername, c.Token, false)
+		err = imageHandler.Push(remoteImage, registryUsername, c.Token)
 		if err != nil {
 			return err
 		}

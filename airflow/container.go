@@ -46,7 +46,7 @@ type RegistryHandler interface {
 // ImageHandler defines methods require to handle all operations on/for container images
 type ImageHandler interface {
 	Build(dockerfile, buildSecretString string, config types.ImageBuildConfig) error
-	Push(remoteImage, username, token string, getRemoteShaTag bool) (string, error)
+	Push(remoteImage, username, token string) error
 	Pull(remoteImage, username, token string) error
 	GetLabel(altImageName, labelName string) (string, error)
 	DoesImageExist(image string) error
@@ -56,6 +56,7 @@ type ImageHandler interface {
 	Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, config types.ImageBuildConfig) (string, error)
 	ConflictTest(workingDirectory, testHomeDirectory string, buildConfig types.ImageBuildConfig) (string, error)
 	CreatePipFreeze(altImageName, pipFreezeFile string) error
+	GetBuiltImageSha() (string, error)
 }
 
 type DockerComposeAPI interface {

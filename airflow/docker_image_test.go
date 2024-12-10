@@ -445,7 +445,7 @@ func (s *Suite) TestDockerImagePush() {
 			return errMockDocker
 		}
 
-		_, err := handler.Push("test", "", "test", false)
+		err := handler.Push("test", "", "test")
 		s.ErrorIs(err, errMockDocker)
 	})
 
@@ -459,7 +459,7 @@ func (s *Suite) TestDockerImagePush() {
 			return nil
 		}
 
-		_, err := handler.Push("test", "test-username", "test", false)
+		err := handler.Push("test", "test-username", "test")
 		s.NoError(err)
 	})
 
@@ -468,25 +468,22 @@ func (s *Suite) TestDockerImagePush() {
 			return nil
 		}
 
-		_, err := handler.Push("test", "", "", false)
+		err := handler.Push("test", "", "")
 		s.NoError(err)
 	})
 
 	for _, tc := range []struct {
-		input           string
-		username        string
-		platform        string
-		expected        string
-		expectedLogin   string
-		getRemoteShaTag bool
+		input         string
+		username      string
+		platform      string
+		expected      string
+		expectedLogin string
 	}{
-		{"images.astronomer.io/foo/bar:123", "username", testUtil.CloudPlatform, "images.astronomer.io/foo/bar:123", "images.astronomer.io", false},
-		{"images.dataplane/foo/bar:123", "username", testUtil.CloudPlatform, "images.dataplane/foo/bar:123", "images.dataplane", false},
-		{"images.astronomer.io/foo/bar:123", "username", testUtil.LocalPlatform, "images.astronomer.io/foo/bar:123", "localhost:5555", false},
+		{"images.astronomer.io/foo/bar:123", "username", testUtil.CloudPlatform, "images.astronomer.io/foo/bar:123", "images.astronomer.io"},
+		{"images.dataplane/foo/bar:123", "username", testUtil.CloudPlatform, "images.dataplane/foo/bar:123", "images.dataplane"},
+		{"images.astronomer.io/foo/bar:123", "username", testUtil.LocalPlatform, "images.astronomer.io/foo/bar:123", "localhost:5555"},
 		// Software doesn't pass a username to Push
-		{"images.software/foo/bar:123", "", testUtil.SoftwarePlatform, "images.software/foo/bar:123", "", false},
-		// When getRemoteShaTag is true
-		{"images.software/foo/bar:123", "", testUtil.SoftwarePlatform, "images.software/foo/bar:123", "", true},
+		{"images.software/foo/bar:123", "", testUtil.SoftwarePlatform, "images.software/foo/bar:123", ""},
 	} {
 		tc := tc // capture range variable
 		s.Run(tc.input, func() {
@@ -519,7 +516,7 @@ func (s *Suite) TestDockerImagePush() {
 
 			getDockerClient = func() (client.APIClient, error) { return mockClient, nil }
 
-			_, err := handler.Push(tc.input, tc.username, "", tc.getRemoteShaTag)
+			err := handler.Push(tc.input, tc.username, "")
 			s.NoError(err)
 			mockClient.AssertExpectations(s.T())
 		})
@@ -529,7 +526,7 @@ func (s *Suite) TestDockerImagePush() {
 		// This path is used to support running Colima whichn is "docker-cli compatible" but wasn't 100% library compatible in the past.
 		// That was 3 years ago though, so we should re-test and work out if this fallback to using bash is still needed or not
 		getDockerClient = func() (client.APIClient, error) { return nil, fmt.Errorf("foreced error") }
-		_, err := handler.Push("repo/test/image", "username", "", false)
+		err := handler.Push("repo/test/image", "username", "")
 		s.NoError(err)
 	})
 }

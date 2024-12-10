@@ -78,6 +78,30 @@ func (_m *ImageHandler) DoesImageExist(image string) error {
 	return r0
 }
 
+// GetBuiltImageSha provides a mock function with given fields:
+func (_m *ImageHandler) GetBuiltImageSha() (string, error) {
+	ret := _m.Called()
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (string, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetLabel provides a mock function with given fields: altImageName, labelName
 func (_m *ImageHandler) GetLabel(altImageName string, labelName string) (string, error) {
 	ret := _m.Called(altImageName, labelName)
@@ -142,28 +166,18 @@ func (_m *ImageHandler) Pull(remoteImage string, username string, token string) 
 	return r0
 }
 
-// Push provides a mock function with given fields: remoteImage, username, token, getRemoteShaTag
-func (_m *ImageHandler) Push(remoteImage string, username string, token string, getRemoteShaTag bool) (string, error) {
-	ret := _m.Called(remoteImage, username, token, getRemoteShaTag)
+// Push provides a mock function with given fields: remoteImage, username, token
+func (_m *ImageHandler) Push(remoteImage string, username string, token string) error {
+	ret := _m.Called(remoteImage, username, token)
 
-	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, string, bool) (string, error)); ok {
-		return rf(remoteImage, username, token, getRemoteShaTag)
-	}
-	if rf, ok := ret.Get(0).(func(string, string, string, bool) string); ok {
-		r0 = rf(remoteImage, username, token, getRemoteShaTag)
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(remoteImage, username, token)
 	} else {
-		r0 = ret.Get(0).(string)
+		r0 = ret.Error(0)
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, string, bool) error); ok {
-		r1 = rf(remoteImage, username, token, getRemoteShaTag)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // Pytest provides a mock function with given fields: pytestFile, airflowHome, envFile, testHomeDirectory, pytestArgs, htmlReport, config

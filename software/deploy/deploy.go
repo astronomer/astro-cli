@@ -186,7 +186,13 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 	if err != nil {
 		return err
 	}
-
+	sha := ""
+	if useShaAsTag {
+		sha, err = imageHandler.GetBuiltImageSha()
+		if (sha == "") || (err != nil) {
+			return fmt.Errorf("failed to get image sha: %w", err)
+		}
+	}
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
 		registry = byoRegistryDomain
@@ -196,11 +202,10 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
 		token = c.Token
 	}
-	sha, err := imageHandler.Push(remoteImage, "", token, useShaAsTag)
+	err = imageHandler.Push(remoteImage, "", token)
 	if err != nil {
 		return err
 	}
-
 	if byoRegistryEnabled {
 		if useShaAsTag {
 			remoteImage = fmt.Sprintf("%s@%s", registry, sha)

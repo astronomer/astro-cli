@@ -350,19 +350,19 @@ func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error 
 	return nil
 }
 
-func (d *DockerImage) Push(remoteImage, username, token string, getRemoteShaTag bool) (string, error) {
+func (d *DockerImage) Push(remoteImage, username, token string) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
-		return "", err
+		return err
 	}
 	err = cmdExec(containerRuntime, nil, nil, "tag", d.imageName, remoteImage)
 	if err != nil {
-		return "", fmt.Errorf("command '%s tag %s %s' failed: %w", containerRuntime, d.imageName, remoteImage, err)
+		return fmt.Errorf("command '%s tag %s %s' failed: %w", containerRuntime, d.imageName, remoteImage, err)
 	}
 
 	registry, err := d.getRegistryToAuth(remoteImage)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	// Push image to registry
@@ -373,7 +373,7 @@ func (d *DockerImage) Push(remoteImage, username, token string, getRemoteShaTag 
 	authConfig, err := configFile.GetAuthConfig(registry)
 	if err != nil {
 		log.Debugf("Error reading credentials: %v", err)
-		return "", fmt.Errorf("error reading credentials: %w", err)
+		return fmt.Errorf("error reading credentials: %w", err)
 	}
 
 	if username == "" && token == "" {
@@ -398,32 +398,37 @@ func (d *DockerImage) Push(remoteImage, username, token string, getRemoteShaTag 
 		// if it does not work with the go library use bash to run docker commands. Support for (old?) versions of Colima
 		err = pushWithBash(&authConfig, remoteImage)
 		if err != nil {
-			return "", err
-		}
-	}
-
-	// Get the digest of the pushed image
-	remoteDigest := ""
-	if getRemoteShaTag {
-		out := &bytes.Buffer{}
-		err = cmdExec(containerRuntime, out, nil, "inspect", "--format={{index .RepoDigests 0}}", remoteImage)
-		if err != nil {
-			return remoteDigest, fmt.Errorf("failed to get digest for image %s: %w", remoteImage, err)
-		}
-		// Parse and clean the output
-		digestOutput := strings.TrimSpace(out.String())
-		if digestOutput != "" {
-			parts := strings.Split(digestOutput, "@")
-			if len(parts) == 2 {
-				remoteDigest = parts[1] // Extract the digest part (after '@')
-			}
+			return err
 		}
 	}
 
 	// Delete the image tags we just generated
 	err = cmdExec(containerRuntime, nil, nil, "rmi", remoteImage)
 	if err != nil {
-		return remoteDigest, fmt.Errorf("command '%s rmi %s' failed: %w", containerRuntime, remoteImage, err)
+		return fmt.Errorf("command '%s rmi %s' failed: %w", containerRuntime, remoteImage, err)
+	}
+	return nil
+}
+
+func (d *DockerImage) GetBuiltImageSha() (string, error) {
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	if err != nil {
+		return "", err
+	}
+	// Get the digest of the pushed image
+	remoteDigest := ""
+	out := &bytes.Buffer{}
+	err = cmdExec(containerRuntime, out, nil, "inspect", "--format={{index .RepoDigests 0}}", d.imageName)
+	if err != nil {
+		return remoteDigest, fmt.Errorf("failed to get digest for image %s: %w", d.imageName, err)
+	}
+	// Parse and clean the output
+	digestOutput := strings.TrimSpace(out.String())
+	if digestOutput != "" {
+		parts := strings.Split(digestOutput, "@")
+		if len(parts) == 2 {
+			remoteDigest = parts[1] // Extract the digest part (after '@')
+		}
 	}
 	return remoteDigest, nil
 }
