@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/briandowns/spinner"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -168,7 +169,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
 	composeFile := Composeyml
 
-	dockerCli, err := command.NewDockerCli()
+	dockerCli, err := command.NewDockerCli(command.WithOutputStream(io.Discard), command.WithErrorStream(io.Discard))
 	if err != nil {
 		logrus.Fatalf("error creating compose client %s", err)
 	}
@@ -253,7 +254,9 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 
 	// Start up our project
 	err = d.composeService.Up(context.Background(), project, api.UpOptions{
-		Create: api.CreateOptions{},
+		Create: api.CreateOptions{
+			QuietPull: true,
+		},
 	})
 	if err != nil {
 		return errors.Wrap(err, composeRecreateErrMsg)

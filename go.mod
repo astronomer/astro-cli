@@ -31,7 +31,7 @@ require (
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.4.1
 	github.com/deepmap/oapi-codegen v1.12.4
-	github.com/docker/distribution v2.7.1+incompatible
+	github.com/docker/distribution v2.8.3+incompatible
 	github.com/fatih/camelcase v1.0.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang-jwt/jwt/v4 v4.5.1
@@ -82,6 +82,7 @@ require (
 	github.com/curioswitch/go-reassign v0.2.0 // indirect
 	github.com/daixiang0/gci v0.11.2 // indirect
 	github.com/denis-tingaikin/go-header v0.4.3 // indirect
+	github.com/distribution/reference v0.5.0 // indirect
 	github.com/esimonov/ifshort v1.0.4 // indirect
 	github.com/ettle/strcase v0.1.1 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
