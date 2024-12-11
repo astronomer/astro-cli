@@ -241,7 +241,6 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 	assert.Contains(s.T(), capturedBuildConfig.Labels, expectedLabel)
 	mockImageHandler.AssertExpectations(s.T())
 	houstonMock.AssertExpectations(s.T())
-
 }
 
 func (s *Suite) TestBuildPushDockerImageFailure() {
