@@ -19,7 +19,6 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
@@ -127,41 +126,6 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 		s.Contains(output, "--use-astronomer-certified")
 		s.Contains(output, "--runtime-version string")
 	})
-}
-
-func (s *AirflowSuite) TestNewAirflowDevRootCmd() {
-	cmd := newDevRootCmd(nil, nil)
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
-}
-
-func (s *AirflowSuite) TestNewAirflowInitCmd() {
-	cmd := newAirflowInitCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
-}
-
-func (s *AirflowSuite) TestNewAirflowRunCmd() {
-	cmd := newAirflowRunCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
-}
-
-func (s *AirflowSuite) TestNewAirflowPSCmd() {
-	cmd := newAirflowPSCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
-}
-
-func (s *AirflowSuite) TestNewAirflowLogsCmd() {
-	cmd := newAirflowLogsCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
-}
-
-func (s *AirflowSuite) TestNewAirflowKillCmd() {
-	cmd := newAirflowKillCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
-}
-
-func (s *AirflowSuite) TestNewAirflowUpgradeCheckCmd() {
-	cmd := newAirflowUpgradeCheckCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {

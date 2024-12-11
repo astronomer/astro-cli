@@ -80,7 +80,15 @@ func ConfigSettings(id, settingsFile string, envConns map[string]astrocore.Envir
 
 // InitSettings initializes settings file
 func InitSettings(settingsFile string) error {
-	exists, err := fileutil.Exists(settingsFile, nil)
+	// Set up viper object for project config
+	viperSettings = viper.New()
+	ConfigFileName := strings.Split(settingsFile, ".")[0]
+	viperSettings.SetConfigName(ConfigFileName)
+	viperSettings.SetConfigType(ConfigFileType)
+	workingConfigFile := filepath.Join(WorkingPath, fmt.Sprintf("%s.%s", ConfigFileName, ConfigFileType))
+
+	// Check the config file exists
+	exists, err := fileutil.Exists(workingConfigFile, nil)
 	if err != nil {
 		return errors.Wrapf(err, "Could not detect existence of settings file")
 	}
@@ -89,24 +97,16 @@ func InitSettings(settingsFile string) error {
 		return nil
 	}
 
-	// Set up viper object for project config
-	viperSettings = viper.New()
-	ConfigFileName := strings.Split(settingsFile, ".")[0]
-	viperSettings.SetConfigName(ConfigFileName)
-	viperSettings.SetConfigType(ConfigFileType)
-	workingConfigFile := filepath.Join(WorkingPath, fmt.Sprintf("%s.%s", ConfigFileName, ConfigFileType))
 	// Add the path we discovered
 	viperSettings.SetConfigFile(workingConfigFile)
 
 	// Read in project config
 	readErr := viperSettings.ReadInConfig()
-
 	if readErr != nil {
 		fmt.Printf(configReadErrorMsg, readErr)
 	}
 
 	err = viperSettings.Unmarshal(&settings)
-	// Try and use old settings file if error
 	if err != nil {
 		return errors.Wrap(err, "unable to decode file")
 	}

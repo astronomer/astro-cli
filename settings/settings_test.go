@@ -234,7 +234,7 @@ func (s *Suite) TestInitSettingsSuccess() {
 
 func (s *Suite) TestInitSettingsFailure() {
 	WorkingPath = "./testfiles/"
-	ConfigFileName := "airflow_settings_invalid"
+	ConfigFileName := "airflow_settings_invalid.yaml"
 	err := InitSettings(ConfigFileName)
 	s.Error(err)
 	s.Contains(err.Error(), "unable to decode file")
@@ -419,13 +419,17 @@ func (s *Suite) TestJsonString() {
 
 func (s *Suite) TestWriteAirflowSettingstoYAML() {
 	s.Run("success", func() {
+		WorkingPath = "./testfiles/"
+		defer func() { WorkingPath = "" }()
 		err := WriteAirflowSettingstoYAML("airflow_settings.yaml")
 		s.NoError(err)
 		os.Remove("./connections.yaml")
 		os.Remove("./variables.yaml")
 	})
 
-	s.Run("invalid setttings file", func() {
+	s.Run("invalid settings file", func() {
+		WorkingPath = "./testfiles/"
+		defer func() { WorkingPath = "" }()
 		err := WriteAirflowSettingstoYAML("airflow_settings_invalid.yaml")
 		s.Error(err)
 		s.Contains(err.Error(), "unable to decode file")
