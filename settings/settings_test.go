@@ -342,7 +342,7 @@ func (s *Suite) TestExport() {
 			}
 		}
 
-		err := Export("id", "airflow_settings_export.yaml", 2, true, true, true)
+		err := Export("id", "testfiles/airflow_settings_export.yaml", 2, true, true, true)
 		s.NoError(err)
 	})
 
