@@ -313,7 +313,7 @@ func (s *Suite) TestExport() {
 - conn_id: local_postgres
   conn_type: postgres
   description: null
-  extra_dejson: {}
+  extra_dejson:
   get_uri: postgres://username:password@example.db.example.com:5432/schema
   host: example.db.example.com
   id: '11'

@@ -437,34 +437,22 @@ func Export(id, settingsFile string, version uint64, connections, variables, poo
 	if err != nil {
 		return err
 	}
-	var parseErr bool
 	// export Airflow Objects
 	if version < AirflowVersionTwo {
 		return errors.New("Command must be used with Airflow 2.X")
 	}
+	var exportErr error
 	if pools {
-		err = ExportPools(id)
-		if err != nil {
-			fmt.Println(err)
-			parseErr = true
-		}
+		exportErr = ExportPools(id)
 	}
 	if variables {
-		err = ExportVariables(id)
-		if err != nil {
-			fmt.Println(err)
-			parseErr = true
-		}
+		exportErr = ExportVariables(id)
 	}
 	if connections {
-		err := ExportConnections(id)
-		if err != nil {
-			fmt.Println(err)
-			parseErr = true
-		}
+		exportErr = ExportConnections(id)
 	}
-	if parseErr {
-		return errors.New("there was an error during export")
+	if exportErr != nil {
+		return errors.Wrap(exportErr, "there was an error during export")
 	}
 	return nil
 }
@@ -644,7 +632,7 @@ func jsonString(conn *Connection) string {
 		return ""
 	default:
 		// if the extra type is something else entirely, we log a warning and proceed with an empty extra
-		fmt.Printf("Error converting extra to map for %s, found type: %T\n", conn.ConnID, conn.ConnExtra)
+		fmt.Printf("Error converting extra to map for connection id '%s', found type: %T\n", conn.ConnID, conn.ConnExtra)
 		return ""
 	}
 
