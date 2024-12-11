@@ -209,6 +209,38 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 	assert.Contains(s.T(), capturedBuildConfig.Labels, expectedLabel)
 	mockImageHandler.AssertExpectations(s.T())
 	houstonMock.AssertExpectations(s.T())
+
+	// Case when SHA is used as tag
+	houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io@image_sha", AirflowVersion: "1.10.12", RuntimeVersion: ""}).Return(nil, nil)
+	imageHandlerInit = func(image string) airflow.ImageHandler {
+		// Mock the Build function, capturing the buildConfig
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.MatchedBy(func(buildConfig types.ImageBuildConfig) bool {
+			// Capture buildConfig for later assertions
+			capturedBuildConfig = buildConfig
+			// Check if the deploy label contains the correct description
+			for _, label := range buildConfig.Labels {
+				if label == deployRevisionDescriptionLabel+"="+description {
+					return true
+				}
+			}
+			return false
+		})).Return(nil).Once()
+
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("", nil).Once()
+		mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("1.10.12", nil).Once()
+		mockImageHandler.On("GetImageSha", mock.Anything, mock.Anything).Return("image_sha", nil).Once()
+
+		return mockImageHandler
+	}
+	config.CFG.ShaAsTag.SetHomeString("true")
+	defer config.CFG.ShaAsTag.SetHomeString("false")
+	err = buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description)
+	s.NoError(err)
+	expectedLabel = deployRevisionDescriptionLabel + "=" + description
+	assert.Contains(s.T(), capturedBuildConfig.Labels, expectedLabel)
+	mockImageHandler.AssertExpectations(s.T())
+	houstonMock.AssertExpectations(s.T())
 }
 
 func (s *Suite) TestBuildPushDockerImageFailure() {

@@ -47,6 +47,7 @@ type cfgs struct {
 	AutoSelect            cfg
 	MachineCPU            cfg
 	MachineMemory         cfg
+	ShaAsTag              cfg
 }
 
 // Creates a new cfg struct
