@@ -10,7 +10,6 @@ import (
 	"github.com/briandowns/spinner"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
 )
@@ -32,6 +31,9 @@ const (
 // the container runtime lifecycle.
 type ContainerRuntime interface {
 	Initialize() error
+	Configure() error
+	ConfigureOrKill() error
+	Kill() error
 }
 
 // GetContainerRuntime creates a new container runtime based on the runtime string
@@ -46,44 +48,26 @@ func GetContainerRuntime() (ContainerRuntime, error) {
 	// Return the appropriate container runtime based on the binary discovered.
 	switch containerRuntime {
 	case docker:
-		return DockerRuntime{}, nil
+		return CreateDockerRuntime(new(dockerEngine), new(osChecker)), nil
 	case podman:
-		return PodmanRuntime{}, nil
+		return CreatePodmanRuntime(new(podmanEngine), new(osChecker)), nil
 	default:
 		return nil, errors.New(containerRuntimeNotFoundErrMsg)
 	}
-}
-
-// FileChecker interface defines a method to check if a file exists.
-// This is here mostly for testing purposes. This allows us to mock
-// around actually checking for binaries on a live system as that
-// would create inconsistencies across developer machines when
-// working with the unit tests.
-type FileChecker interface {
-	Exists(path string) bool
-}
-
-// OSFileChecker is a concrete implementation of FileChecker.
-type OSFileChecker struct{}
-
-// Exists checks if the file exists in the file system.
-func (f OSFileChecker) Exists(path string) bool {
-	exists, _ := fileutil.Exists(path, nil)
-	return exists
 }
 
 // FindBinary searches for the specified binary name in the provided $PATH directories,
 // using the provided FileChecker. It searches each specific path within the systems
 // $PATH environment variable for the binary concurrently and returns a boolean result
 // indicating if the binary was found or not.
-func FindBinary(pathEnv, binaryName string, checker FileChecker) bool {
+func FindBinary(pathEnv, binaryName string, checker FileChecker, osChecker OSChecker) bool {
 	// Split the $PATH variable into it's individual paths,
 	// using the OS specific path separator character.
 	paths := strings.Split(pathEnv, string(os.PathListSeparator))
 
 	// Although programs can be called without the .exe extension,
 	// we need to append it here when searching the file system.
-	if isWindows() {
+	if osChecker.IsWindows() {
 		binaryName += ".exe"
 	}
 
@@ -147,7 +131,7 @@ var GetContainerRuntimeBinary = func() (string, error) {
 	// Get the $PATH environment variable.
 	pathEnv := os.Getenv("PATH")
 	for _, binary := range binaries {
-		if found := FindBinary(pathEnv, binary, OSFileChecker{}); found {
+		if found := FindBinary(pathEnv, binary, CreateFileChecker(), CreateOSChecker()); found {
 			return binary, nil
 		}
 	}
@@ -157,4 +141,11 @@ var GetContainerRuntimeBinary = func() (string, error) {
 	return "", errors.New("Failed to find a container runtime. " +
 		"See the Astro CLI prerequisites for more information. " +
 		"https://www.astronomer.io/docs/astro/cli/install-cli")
+}
+
+// IsPodman is just a small helper to avoid exporting the podman constant,
+// and used in other places that haven't been refactored to use the runtime package.
+// This could probably be removed in the future.
+func IsPodman(binaryName string) bool {
+	return binaryName == podman
 }
