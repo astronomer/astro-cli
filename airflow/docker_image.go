@@ -410,7 +410,7 @@ func (d *DockerImage) Push(remoteImage, username, token string) error {
 	return nil
 }
 
-func (d *DockerImage) GetBuiltImageSha() (string, error) {
+func (d *DockerImage) GetImageSha() (string, error) {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return "", err

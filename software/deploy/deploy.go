@@ -181,17 +181,10 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		Output:          true,
 		Labels:          deployLabels,
 	}
-	useShaAsTag := config.CFG.ShaAsTag.GetBool()
+
 	err = imageHandler.Build("", "", buildConfig)
 	if err != nil {
 		return err
-	}
-	sha := ""
-	if useShaAsTag {
-		sha, err = imageHandler.GetBuiltImageSha()
-		if (sha == "") || (err != nil) {
-			return fmt.Errorf("failed to get image sha: %w", err)
-		}
 	}
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
@@ -207,7 +200,12 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		return err
 	}
 	if byoRegistryEnabled {
+		useShaAsTag := config.CFG.ShaAsTag.GetBool()
 		if useShaAsTag {
+			sha, err := imageHandler.GetImageSha()
+			if (sha == "") || (err != nil) {
+				return fmt.Errorf("failed to get image sha: %w", err)
+			}
 			remoteImage = fmt.Sprintf("%s@%s", registry, sha)
 		}
 		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel)
