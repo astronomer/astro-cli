@@ -78,8 +78,8 @@ func (_m *ImageHandler) DoesImageExist(image string) error {
 	return r0
 }
 
-// GetBuiltImageSha provides a mock function with given fields:
-func (_m *ImageHandler) GetBuiltImageSha() (string, error) {
+// GetImageSha provides a mock function with given fields:
+func (_m *ImageHandler) GetImageSha() (string, error) {
 	ret := _m.Called()
 
 	var r0 string
