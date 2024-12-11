@@ -211,7 +211,10 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	// open browser
 	if !shouldDisplayLoginLink {
 		fmt.Printf("\n%s to open the browser to log in or %s to quit…", ansi.Green("Press Enter"), ansi.Red("^C"))
-		fmt.Scanln()
+		_, err := fmt.Scanln()
+		if err != nil {
+			return Result{}, err
+		}
 		err = openURL(authorizeURL)
 		if err != nil {
 			fmt.Println("\nUnable to open the URL, please visit the following link: " + authorizeURL)

@@ -42,7 +42,7 @@ var (
 
 const (
 	airflowConnectionList = "airflow connections list -o yaml"
-	ariflowPoolsList      = "airflow pools list -o yaml"
+	airflowPoolsList      = "airflow pools list -o yaml"
 	airflowConnExport     = "airflow connections export tmp.connections --file-format env"
 	airflowVarExport      = "airflow variables export tmp.var"
 	catVarFile            = "cat tmp.var"
@@ -570,7 +570,7 @@ func ExportVariables(id string) error {
 
 func ExportPools(id string) error {
 	// Setup airflow command to export pools
-	airflowCommand := ariflowPoolsList
+	airflowCommand := airflowPoolsList
 	out := execAirflowCommand(id, airflowCommand)
 	logrus.Debugf("Export Pools logs:\n%s", out)
 

@@ -681,7 +681,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, de
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Pip Freeze comparison can be found at \n" + pipFreezeCompareFile)
+	fmt.Printf("Pip Freeze comparison can be found at \n%s", pipFreezeCompareFile)
 	return nil
 }
 

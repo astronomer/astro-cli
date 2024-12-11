@@ -57,7 +57,7 @@ func (s *ContainerRuntimeSuite) TestStartDocker() {
 		mockInitializer.On("OpenDockerCmd").Return("", fmt.Errorf("failed to open docker")).Once()
 		// Run our test and assert expectations.
 		err := InitializeDocker(mockInitializer, defaultTimeoutSeconds)
-		assert.Equal(s.T(), fmt.Errorf(dockerOpenNotice), err, "Expected timeout error")
+		assert.Equal(s.T(), dockerOpenNotice, err.Error(), "Expected timeout error")
 		mockInitializer.AssertExpectations(s.T())
 	})
 
@@ -71,7 +71,7 @@ func (s *ContainerRuntimeSuite) TestStartDocker() {
 		// Run our test and assert expectations.
 		// Simulate the timeout after 1 second.
 		err := InitializeDocker(mockInitializer, 1)
-		assert.Equal(s.T(), fmt.Errorf(timeoutErrMsg), err, "Expected timeout error")
+		assert.Equal(s.T(), timeoutErrMsg, err.Error(), "Expected timeout error")
 		mockInitializer.AssertExpectations(s.T())
 	})
 }
