@@ -8,8 +8,8 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -86,7 +86,7 @@ func (s *AddCmdSuite) TestSetupLogs() {
 	buf := new(bytes.Buffer)
 	err := SetUpLogs(buf, "info")
 	s.NoError(err)
-	s.Equal("info", logrus.GetLevel().String())
+	s.Equal("info", logger.Logger.GetLevel().String())
 
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	err = config.CFG.Verbosity.SetHomeString("error")
@@ -94,7 +94,7 @@ func (s *AddCmdSuite) TestSetupLogs() {
 
 	err = SetUpLogs(buf, "warning")
 	s.NoError(err)
-	s.Equal("error", logrus.GetLevel().String())
+	s.Equal("error", logger.Logger.GetLevel().String())
 
 	err = SetUpLogs(buf, "invalid-level")
 	s.EqualError(err, "not a valid logrus Level: \"invalid-level\"")

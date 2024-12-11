@@ -14,11 +14,11 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 type ContainerHandler interface {
@@ -143,7 +143,7 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 
 	settingsFileExist, err := util.Exists("./" + settingsFile)
 	if err != nil {
-		log.Debug(err)
+		logger.Logger.Debug(err)
 	}
 
 	cfg := ComposeConfig{

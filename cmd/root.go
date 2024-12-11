@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/cmd/registry"
+	"github.com/sirupsen/logrus"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -21,10 +22,10 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/version"
 
 	"github.com/google/go-github/v48/github"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -59,7 +60,7 @@ func NewRootCmd() *cobra.Command {
 
 	ctx, isCloudCtx := initializeContext()
 
-	RootPersistentPreRunE = createRootPersistentPreRunE(isCloudCtx, platformCoreClient, astroCoreClient)
+	createRootPersistentPreRunE(isCloudCtx, platformCoreClient, astroCoreClient)
 
 	rootCmd := createRootCommand()
 
@@ -87,8 +88,8 @@ func initializeContext() (string, bool) {
 	return ctx, isCloudCtx
 }
 
-func createRootPersistentPreRunE(isCloudCtx bool, platformCoreClient *astroplatformcore.ClientWithResponses, astroCoreClient *astrocore.ClientWithResponses) func(*cobra.Command, []string) error {
-	return func(cmd *cobra.Command, args []string) error {
+func createRootPersistentPreRunE(isCloudCtx bool, platformCoreClient *astroplatformcore.ClientWithResponses, astroCoreClient *astrocore.ClientWithResponses) {
+	RootPersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		if err := softwareCmd.SetUpLogs(os.Stdout, verboseLevel); err != nil {
 			return err
 		}
@@ -104,15 +105,15 @@ func createRootPersistentPreRunE(isCloudCtx bool, platformCoreClient *astroplatf
 				err := cloudCmd.AuthSetup(cmd, platformCoreClient, astroCoreClient)
 				if err != nil {
 					if strings.Contains(err.Error(), "token is invalid or malformed") {
-						return errors.New("API Token is invalid or malformed") //nolint
+						return errors.New("API Token is invalid or malformed")
 					}
 					if strings.Contains(err.Error(), "the API token given has expired") {
-						return errors.New("API Token is expired") //nolint
+						return errors.New("API Token is expired")
 					}
 					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 				}
 			} else {
-				logrus.Debug("Skipping cloud auth setup")
+				logger.Logger.Debug("Skipping cloud auth validation")
 			}
 		}
 		softwareCmd.PrintDebugLogs()
@@ -176,8 +177,9 @@ Platform Version: %s{{end}}
 }
 
 func shouldDoCloudAuthSetup(cmd *cobra.Command) bool {
+	commandPath := cmd.CommandPath()
 	for _, prefix := range excludedCloudAuthSetupCommands {
-		if strings.HasPrefix(cmd.CommandPath(), prefix) {
+		if strings.HasPrefix(commandPath, prefix) {
 			return false
 		}
 	}

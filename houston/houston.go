@@ -14,8 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-
-	newLogger "github.com/sirupsen/logrus"
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 var (
@@ -183,13 +182,13 @@ func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) 
 	if ctx.Token != "" {
 		doOpts.Headers["authorization"] = ctx.Token
 	}
-	newLogger.Debugf("Request Data: %v\n", string(doOpts.Data))
+	logger.Logger.Debugf("Request Data: %v\n", string(doOpts.Data))
 	doOpts.Method = http.MethodPost
 	doOpts.Path = ctx.GetSoftwareAPIURL()
 	var response httputil.HTTPResponse
 	httpResponse, err := c.HTTPClient.Do(doOpts)
 	if err != nil {
-		newLogger.Debugf("HTTP request ERROR: %s", err.Error())
+		logger.Logger.Debugf("HTTP request ERROR: %s", err.Error())
 		return nil, err
 	}
 	defer httpResponse.Body.Close()
@@ -208,7 +207,7 @@ func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to JSON decode Houston response: %w", err)
 	}
-	newLogger.Debugf("Response Data: %v\n", string(body))
+	logger.Logger.Debugf("Response Data: %v\n", string(body))
 	// Houston Specific Errors
 	if decode.Errors != nil {
 		errMsg := decode.Errors[0].Message

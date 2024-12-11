@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow/runtimes"
-	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
@@ -25,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
@@ -125,14 +125,10 @@ astro dev init --from-template
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "dev",
-		Aliases: []string{"d"},
-		Short:   "Run your Astro project in a local Airflow environment",
-		Long:    "Run an Apache Airflow environment on your local machine to test your project, including DAGs, Python Packages, and plugins.",
-		// Most astro dev sub-commands require the container runtime,
-		// so we set that configuration in this persistent pre-run hook.
-		// A few sub-commands don't require this, so they explicitly
-		// clobber it with a no-op function.
+		Use:               "dev",
+		Aliases:           []string{"d"},
+		Short:             "Run your Astro project in a local Airflow environment",
+		Long:              "Run an Apache Airflow environment on your local machine to test your project, including DAGs, Python Packages, and plugins.",
 		PersistentPreRunE: utils.ChainRunEs(RootPersistentPreRunE, ConfigureContainerRuntime),
 	}
 	cmd.AddCommand(
@@ -320,10 +316,10 @@ func newAirflowKillCmd() *cobra.Command {
 
 func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "restart",
-		Short:   "Restart all locally running Airflow containers",
-		Long:    "Restart all Airflow containers running on your local machine. This command stops and then starts locally running containers to apply changes to your local environment.",
-		PreRunE: utils.EnsureProjectDir,
+		Use:   "restart",
+		Short: "Restart all locally running Airflow containers",
+		Long:  "Restart all Airflow containers running on your local machine. This command stops and then starts locally running containers to apply changes to your local environment.",
+		// PreRunE: utils.EnsureProjectDir,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return airflowRestart(cmd, args, astroCoreClient)
 		},
@@ -693,7 +689,7 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 		if err != nil {
 			return err
 		}
-		logrus.Debugf("Listed %d environment connection%s", len(envConns), util.Pluralize(len(envConns)))
+		logger.Logger.Debugf("Listed %d environment connection%s", len(envConns), util.Pluralize(len(envConns)))
 	}
 
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
@@ -820,7 +816,7 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 		if err != nil {
 			return err
 		}
-		logrus.Debugf("Listed %d environment connection%s", len(envConns), util.Pluralize(len(envConns)))
+		logger.Logger.Debugf("Listed %d environment connection%s", len(envConns), util.Pluralize(len(envConns)))
 	}
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
