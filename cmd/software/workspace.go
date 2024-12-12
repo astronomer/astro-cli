@@ -6,8 +6,8 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/software/workspace"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -197,7 +197,7 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 		}
 
 		if !(workspacePageSize > 0 && workspacePageSize <= defaultPageSize) {
-			logrus.Warnf("Page size cannot be more than %d, reducing the page size to %d", defaultPageSize, defaultPageSize)
+			logger.Logger.Warnf("Page size cannot be more than %d, reducing the page size to %d", defaultPageSize, defaultPageSize)
 			workspacePageSize = defaultPageSize
 		}
 	}

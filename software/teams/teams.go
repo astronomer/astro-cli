@@ -6,11 +6,11 @@ import (
 	"io"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/software/deployment"
 	"github.com/astronomer/astro-cli/software/utils"
 	"github.com/astronomer/astro-cli/software/workspace"
-	"github.com/sirupsen/logrus"
 )
 
 const ListTeamLimit = 20
@@ -70,7 +70,7 @@ func Get(teamID string, getUserInfo, getRoleInfo, allFilters bool, client housto
 	}
 
 	if getUserInfo || allFilters {
-		logrus.Debug("retrieving users part of team")
+		logger.Logger.Debug("retrieving users part of team")
 		fmt.Fprintln(out, "\nUsers part of Team:")
 		users, err := houston.Call(client.GetTeamUsers)(teamID)
 		if err != nil {

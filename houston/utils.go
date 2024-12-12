@@ -3,7 +3,7 @@ package houston
 import (
 	"sort"
 
-	"github.com/sirupsen/logrus"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"golang.org/x/mod/semver"
 )
 
@@ -41,6 +41,6 @@ func (s queryList) GreatestLowerBound(v string) string {
 			return s[idx].query
 		}
 	}
-	logrus.Debugf("GraphQL query not defined for the given Platform version: %s, falling back to latest query", v)
+	logger.Logger.Debugf("GraphQL query not defined for the given Platform version: %s, falling back to latest query", v)
 	return s[len(s)-1].query
 }
