@@ -127,6 +127,9 @@ func (s *Suite) TestDeploy() {
 		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 			return deploymentID, nil
 		}
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+			return nil
+		}
 		err := execDeployCmd([]string{"test-deployment-id", "--image-name", "--force", "--workspace-id=" + mockWorkspace.ID}...)
 		s.ErrorIs(err, nil)
 	})
