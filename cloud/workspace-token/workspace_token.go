@@ -438,7 +438,7 @@ func getWorkspaceToken(id, name, workspaceID, message string, tokens []astrocore
 
 func TimeAgo(date time.Time) string {
 	duration := time.Since(date)
-	days := int(duration.Hours() / 24) //nolint:gomnd
+	days := int(duration.Hours() / 24) //nolint:mnd
 	hours := int(duration.Hours())
 	minutes := int(duration.Minutes())
 

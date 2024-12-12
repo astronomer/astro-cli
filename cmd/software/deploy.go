@@ -79,7 +79,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	}
 
 	// Save release name in config if specified
-	if len(deploymentID) > 0 && saveDeployConfig {
+	if deploymentID != "" && saveDeployConfig {
 		err = config.CFG.ProjectDeployment.SetProjectString(deploymentID)
 		if err != nil {
 			return err

@@ -187,7 +187,7 @@ func authorizeCallbackHandler() (string, error) {
 
 func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
 	// Generate PKCE verifier and challenge
-	token := make([]byte, 32)                            //nolint:gomnd
+	token := make([]byte, 32)                            //nolint:mnd
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 	r.Read(token)
 	verifier := util.Base64URLEncode(token)
@@ -211,7 +211,10 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	// open browser
 	if !shouldDisplayLoginLink {
 		fmt.Printf("\n%s to open the browser to log in or %s to quit…", ansi.Green("Press Enter"), ansi.Red("^C"))
-		fmt.Scanln()
+		_, err := fmt.Scanln()
+		if err != nil {
+			return Result{}, err
+		}
 		err = openURL(authorizeURL)
 		if err != nil {
 			fmt.Println("\nUnable to open the URL, please visit the following link: " + authorizeURL)
@@ -367,7 +370,7 @@ func Login(domain, token string, coreClient astrocore.CoreClient, platformCoreCl
 		fmt.Print("You are logging into Astro via an OAuth token\nThis token will expire in 1 hour and will not refresh\n\n")
 		res = Result{
 			AccessToken: token,
-			ExpiresIn:   3600, //nolint:gomnd
+			ExpiresIn:   3600, //nolint:mnd
 		}
 	}
 

@@ -67,7 +67,7 @@ func (rt PodmanRuntime) Configure() error {
 	}
 
 	// Otherwise, we return an error indicating that the project isn't running.
-	return fmt.Errorf(projectNotRunningErrMsg)
+	return errors.New(projectNotRunningErrMsg)
 }
 
 func (rt PodmanRuntime) ConfigureOrKill() error {
@@ -94,7 +94,7 @@ func (rt PodmanRuntime) ConfigureOrKill() error {
 
 	// We also return an error indicating that you can't kill
 	// a project that isn't running.
-	return fmt.Errorf(projectNotRunningErrMsg)
+	return errors.New(projectNotRunningErrMsg)
 }
 
 func (rt PodmanRuntime) Kill() error {

@@ -1,10 +1,10 @@
 package runtimes
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/pkg/errors"
 )
 
 // DockerEngine is a struct that contains the functions needed to initialize Docker.
@@ -68,7 +68,7 @@ func (rt DockerRuntime) initializeDocker(timeoutSeconds int) error {
 	// If we got an error, Docker is not running, so we attempt to start it.
 	_, err = rt.Engine.Start()
 	if err != nil {
-		return fmt.Errorf(dockerOpenNotice) //nolint:stylecheck
+		return errors.New(dockerOpenNotice)
 	}
 
 	// Wait for Docker to start.
@@ -76,7 +76,7 @@ func (rt DockerRuntime) initializeDocker(timeoutSeconds int) error {
 	for {
 		select {
 		case <-timeout:
-			return fmt.Errorf(timeoutErrMsg)
+			return errors.New(timeoutErrMsg)
 		case <-ticker.C:
 			_, err := rt.Engine.IsRunning()
 			if err != nil {

@@ -232,7 +232,7 @@ func GetFilesWithSpecificExtension(folderPath, ext string) []string {
 }
 
 func AddLineToFile(filePath, lineText, commentText string) error {
-	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
+	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:mnd
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func AddLineToFile(filePath, lineText, commentText string) error {
 
 // This function removes airflow db init from the Dockerfile. Needed by astro run command
 func RemoveLineFromFile(filePath, lineText, commentText string) error {
-	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
+	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:mnd
 	if err != nil {
 		return err
 	}

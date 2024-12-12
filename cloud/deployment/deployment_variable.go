@@ -190,7 +190,7 @@ func readLines(path string) ([]string, error) {
 
 // writes vars from cloud into a file
 func writeVarToFile(environmentVariablesObjects []astroplatformcore.DeploymentEnvironmentVariable, envFile string) error {
-	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
+	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
 	if err != nil {
 		return err
 	}
@@ -284,13 +284,13 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 		if vars[i] == "" {
 			continue
 		}
-		if len(strings.SplitN(vars[i], "=", 2)) == 1 { //nolint:gomnd
+		if len(strings.SplitN(vars[i], "=", 2)) == 1 { //nolint:mnd
 			fmt.Printf("%s is an improperly formatted variable, no variable created\n", vars[i])
 			errVarBool = true
 			continue
 		}
-		key := strings.SplitN(vars[i], "=", 2)[0]   //nolint:gomnd
-		value := strings.SplitN(vars[i], "=", 2)[1] //nolint:gomnd
+		key := strings.SplitN(vars[i], "=", 2)[0]   //nolint:mnd
+		value := strings.SplitN(vars[i], "=", 2)[1] //nolint:mnd
 		if key == "" {
 			fmt.Printf("empty key! skipping creating variable with key: %s\n", key)
 			errVarBool = true

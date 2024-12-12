@@ -124,7 +124,7 @@ func AddVariables(id string, version uint64) {
 
 			airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
 			out := execAirflowCommand(id, airflowCommand)
-			logrus.Debugf("Adding variable logs:\n" + out)
+			logrus.Debugf("Adding variable logs:\n%s", out)
 			fmt.Printf("Added Variable: %s\n", variable.VariableName)
 		}
 	}
@@ -226,7 +226,7 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 		}
 
 		out := execAirflowCommand(id, airflowCommand)
-		logrus.Debugf("Adding Connection logs:\n\n" + out)
+		logrus.Debugf("Adding Connection logs:\n\n%s", out)
 		fmt.Printf("Added Connection: %s\n", conn.ConnID)
 	}
 }
@@ -295,7 +295,7 @@ func AddPools(id string, version uint64) {
 				}
 				fmt.Println(airflowCommand)
 				out := execAirflowCommand(id, airflowCommand)
-				logrus.Debugf("Adding pool logs:\n" + out)
+				logrus.Debugf("Adding pool logs:\n%s", out)
 				fmt.Printf("Added Pool: %s\n", pool.PoolName)
 			} else {
 				fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)
@@ -348,7 +348,7 @@ func EnvExport(id, envFile string, version uint64, connections, variables bool) 
 func EnvExportVariables(id, envFile string) error {
 	// setup airflow command to export variables
 	out := execAirflowCommand(id, airflowVarExport)
-	logrus.Debugf("Env Export Variables logs:\n\n" + out)
+	logrus.Debugf("Env Export Variables logs:\n\n%s", out)
 
 	if strings.Contains(out, "successfully") {
 		// get variables from file created by airflow command
@@ -360,7 +360,7 @@ func EnvExportVariables(id, envFile string) error {
 			fmt.Printf("variable json decode unsuccessful: %s", err.Error())
 		}
 		// add variables to the env file
-		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
+		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
 		if err != nil {
 			return errors.Wrap(err, "Writing variables to file unsuccessful")
 		}
@@ -384,7 +384,7 @@ func EnvExportVariables(id, envFile string) error {
 func EnvExportConnections(id, envFile string) error {
 	// Airflow command to export connections to env uris
 	out := execAirflowCommand(id, airflowConnExport)
-	logrus.Debugf("Env Export Connections logs:\n" + out)
+	logrus.Debugf("Env Export Connections logs:\n%s", out)
 
 	if strings.Contains(out, "successfully") {
 		// get connections from file craeted by airflow command
@@ -392,7 +392,7 @@ func EnvExportConnections(id, envFile string) error {
 
 		vars := strings.Split(out, "\n")
 		// add connections to the env file
-		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
+		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
 		if err != nil {
 			return errors.Wrap(err, "Writing connections to file unsuccessful")
 		}
@@ -400,7 +400,7 @@ func EnvExportConnections(id, envFile string) error {
 		defer f.Close()
 
 		for i := range vars {
-			varSplit := strings.SplitN(vars[i], "=", 2) //nolint:gomnd
+			varSplit := strings.SplitN(vars[i], "=", 2) //nolint:mnd
 			if len(varSplit) > 1 {
 				fmt.Println("Exporting Connection: " + varSplit[0])
 				_, err := f.WriteString("\nAIRFLOW_CONN_" + strings.ToUpper(varSplit[0]) + "=" + varSplit[1])
@@ -461,11 +461,11 @@ func Export(id, settingsFile string, version uint64, connections, variables, poo
 func ExportConnections(id string) error {
 	// Setup airflow command to export connections
 	out := execAirflowCommand(id, airflowConnectionList)
-	logrus.Debugf("Export Connections logs:\n" + out)
+	logrus.Debugf("Export Connections logs:\n%s", out)
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 	// remove extra warning text
-	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1] //nolint:gomnd
+	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1] //nolint:mnd
 
 	var connections AirflowConnections
 
@@ -518,7 +518,7 @@ func ExportConnections(id string) error {
 func ExportVariables(id string) error {
 	// setup files
 	out := execAirflowCommand(id, airflowVarExport)
-	logrus.Debugf("Export Variables logs:\n" + out)
+	logrus.Debugf("Export Variables logs:\n%s", out)
 
 	if strings.Contains(out, "successfully") {
 		// get variables created by the airflow command
@@ -561,14 +561,14 @@ func ExportPools(id string) error {
 	// Setup airflow command to export pools
 	airflowCommand := ariflowPoolsList
 	out := execAirflowCommand(id, airflowCommand)
-	logrus.Debugf("Export Pools logs:\n" + out)
+	logrus.Debugf("Export Pools logs:\n%s", out)
 
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 
 	var pools AirflowPools
 	// remove warnings and extra text from the the output
-	yamlpools := "- description:" + strings.SplitN(plainOut, "- description:", 2)[1] //nolint:gomnd
+	yamlpools := "- description:" + strings.SplitN(plainOut, "- description:", 2)[1] //nolint:mnd
 
 	err := yaml.Unmarshal([]byte(yamlpools), &pools)
 	if err != nil {

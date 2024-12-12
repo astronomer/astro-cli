@@ -373,7 +373,7 @@ func getDeploymentToken(id, name, deploymentID, message string, tokens []astroco
 
 func TimeAgo(date time.Time) string {
 	duration := time.Since(date)
-	days := int(duration.Hours() / 24) //nolint:gomnd
+	days := int(duration.Hours() / 24) //nolint:mnd
 	hours := int(duration.Hours())
 	minutes := int(duration.Minutes())
 

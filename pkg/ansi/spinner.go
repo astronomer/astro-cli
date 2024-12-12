@@ -34,7 +34,7 @@ func loading(initialMsg, doneMsg, failMsg string, fn func() error) error {
 		defer close(done)
 
 		spinnerSet := []string{"●   ", "●   ", " ●  ", "  ● ", "    ●", "  ● ", " ●  "}
-		s := spinner.New(spinnerSet, 100*time.Millisecond, spinner.WithWriter(Messages)) //nolint:gomnd
+		s := spinner.New(spinnerSet, 100*time.Millisecond, spinner.WithWriter(Messages)) //nolint:mnd
 		s.Prefix = initialMsg
 		s.FinalMSG = doneMsg
 		s.HideCursor = true

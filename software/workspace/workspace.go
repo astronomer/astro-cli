@@ -189,7 +189,7 @@ var workspacesPromptPaginatedOption = func(pageSize, pageNumber, totalRecord int
 
 		in := input.Text("\n\nPlease select one of the following options or enter index to select the row.\n" + gotoOptionMessage)
 		value, found := gotoOptions[in]
-		i, err := strconv.ParseInt(in, 10, 8) //nolint:gomnd
+		i, err := strconv.ParseInt(in, 10, 8) //nolint:mnd
 
 		if found {
 			return value
@@ -255,7 +255,7 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 	}
 
 	in := input.Text("\n> ")
-	i, err := strconv.ParseInt(in, 10, 64) //nolint:gomnd
+	i, err := strconv.ParseInt(in, 10, 64) //nolint:mnd
 	if err != nil {
 		return workspaceSelection{id: "", quit: false, err: fmt.Errorf("cannot parse %s to int: %w", in, err)}
 	}

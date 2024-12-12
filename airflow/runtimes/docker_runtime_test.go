@@ -68,7 +68,7 @@ func (s *DockerRuntimeSuite) TestStartDocker() {
 		rt := CreateDockerRuntime(mockDockerEngine, mockDockerOSChecker)
 		// Run our test and assert expectations.
 		err := rt.Initialize()
-		assert.Equal(s.T(), fmt.Errorf(dockerOpenNotice), err, "Expected timeout error")
+		assert.Equal(s.T(), dockerOpenNotice, err.Error(), "Expected timeout error")
 		mockDockerEngine.AssertExpectations(s.T())
 	})
 
@@ -83,7 +83,7 @@ func (s *DockerRuntimeSuite) TestStartDocker() {
 		// Call the helper method directly with custom timeout.
 		// Simulate the timeout after 1 second.
 		err := rt.initializeDocker(1)
-		assert.Equal(s.T(), fmt.Errorf(timeoutErrMsg), err, "Expected timeout error")
+		assert.Equal(s.T(), timeoutErrMsg, err.Error(), "Expected timeout error")
 		mockDockerEngine.AssertExpectations(s.T())
 	})
 }
