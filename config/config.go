@@ -86,6 +86,8 @@ var (
 		DisableAstroRun:       newCfg("disable_astro_run", "false"),
 		DisableEnvObjects:     newCfg("disable_env_objects", "false"),
 		AutoSelect:            newCfg("auto_select", "false"),
+		MachineCPU:            newCfg("machine.cpu", "2"),
+		MachineMemory:         newCfg("machine.memory", "4096"),
 		ShaAsTag:              newCfg("sha_as_tag", "false"),
 	}
 
