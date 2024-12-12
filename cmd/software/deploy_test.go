@@ -123,6 +123,14 @@ func (s *Suite) TestDeploy() {
 		s.ErrorIs(err, nil)
 	})
 
+	s.Run("Test for the flag --image-name for image deployment", func() {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+			return deploymentID, nil
+		}
+		err := execDeployCmd([]string{"test-deployment-id", "--image-name", "--force"}...)
+		s.ErrorIs(err, nil)
+	})
+
 	s.Run("error should be returned if BYORegistryEnabled is true but BYORegistryDomain is empty", func() {
 		appConfig = &houston.AppConfig{
 			BYORegistryDomain: "",
@@ -136,13 +144,5 @@ func (s *Suite) TestDeploy() {
 		err := execDeployCmd([]string{"-f"}...)
 		s.ErrorIs(err, deploy.ErrBYORegistryDomainNotSet)
 		DagsOnlyDeploy = deploy.DagsOnlyDeploy
-	})
-
-	s.Run("Test for the flag --image-name for image deployment", func() {
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
-			return deploymentID, nil
-		}
-		err := execDeployCmd([]string{"test-deployment-id", "--image-name", "--force"}...)
-		s.ErrorIs(err, nil)
 	})
 }
