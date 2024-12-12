@@ -19,6 +19,8 @@ var spinnerCharSet = spinner.CharSets[14]
 const (
 	docker                         = "docker"
 	podman                         = "podman"
+	orbstack                       = "orbstack"
+	orbctl                         = "orbctl"
 	containerRuntimeNotFoundErrMsg = "Failed to find a container runtime. " +
 		"See the Astro CLI prerequisites for more information. " +
 		"https://www.astronomer.io/docs/astro/cli/install-cli"
@@ -48,9 +50,9 @@ func GetContainerRuntime() (ContainerRuntime, error) {
 	// Return the appropriate container runtime based on the binary discovered.
 	switch containerRuntime {
 	case docker:
-		return CreateDockerRuntime(new(dockerEngine), new(osChecker)), nil
+		return CreateDockerRuntimeWithDefaults(), nil
 	case podman:
-		return CreatePodmanRuntime(new(podmanEngine), new(osChecker)), nil
+		return CreatePodmanRuntimeWithDefaults(), nil
 	default:
 		return nil, errors.New(containerRuntimeNotFoundErrMsg)
 	}
@@ -60,14 +62,14 @@ func GetContainerRuntime() (ContainerRuntime, error) {
 // using the provided FileChecker. It searches each specific path within the systems
 // $PATH environment variable for the binary concurrently and returns a boolean result
 // indicating if the binary was found or not.
-func FindBinary(pathEnv, binaryName string, checker FileChecker, osChecker OSChecker) bool {
+func FindBinary(pathEnv, binaryName string, inspector HostInterrogator) bool {
 	// Split the $PATH variable into it's individual paths,
 	// using the OS specific path separator character.
 	paths := strings.Split(pathEnv, string(os.PathListSeparator))
 
 	// Although programs can be called without the .exe extension,
 	// we need to append it here when searching the file system.
-	if osChecker.IsWindows() {
+	if inspector.IsWindows() {
 		binaryName += ".exe"
 	}
 
@@ -82,7 +84,7 @@ func FindBinary(pathEnv, binaryName string, checker FileChecker, osChecker OSChe
 		go func(dir string) {
 			defer wg.Done()
 			binaryPath := filepath.Join(dir, binaryName)
-			if exists := checker.Exists(binaryPath); exists {
+			if exists := inspector.FileExists(binaryPath); exists {
 				select {
 				// If the channel is open, send the path in, indicating a found binary.
 				case found <- binaryPath:
@@ -128,10 +130,13 @@ var GetContainerRuntimeBinary = func() (string, error) {
 		return configuredBinary, nil
 	}
 
+	// Create a host interrogator with default implementations.
+	interrogator := CreateHostInspectorWithDefaults()
+
 	// Get the $PATH environment variable.
 	pathEnv := os.Getenv("PATH")
 	for _, binary := range binaries {
-		if found := FindBinary(pathEnv, binary, CreateFileChecker(), CreateOSChecker()); found {
+		if found := FindBinary(pathEnv, binary, interrogator); found {
 			return binary, nil
 		}
 	}
