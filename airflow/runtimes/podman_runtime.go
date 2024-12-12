@@ -3,6 +3,7 @@ package runtimes
 import (
 	"errors"
 	"fmt"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"os"
 	"strings"
 	"time"
@@ -191,12 +192,24 @@ func (rt PodmanRuntime) ensureMachine() error {
 		return err
 	}
 
-	return rt.getAndConfigureMachineForUsage(podmanMachineName)
+	if err := rt.getAndConfigureMachineForUsage(podmanMachineName); err != nil {
+		return err
+	}
+
+	s.FinalMSG = ansi.Green("\u2714") + containerRuntimeInitFinalMessage
+	s.Stop()
+	return nil
 }
 
 // stopAndKillMachine attempts to stop and kill the Podman machine.
 // If other projects are running, it will leave the machine up.
 func (rt PodmanRuntime) stopAndKillMachine() error {
+	// Show a spinner message while we're initializing the machine.
+	s := spinner.New(SpinnerCharSet, SpinnerRefresh)
+	s.Suffix = containerRuntimeShutdownMessage
+	s.Start()
+	defer s.Stop()
+
 	// If the machine doesn't exist, exit early.
 	if !rt.astroMachineExists() {
 		return nil
@@ -243,6 +256,7 @@ func (rt PodmanRuntime) stopAndKillMachine() error {
 		return err
 	}
 
+	s.FinalMSG = ansi.Green("\u2714") + containerRuntimeShutdownFinalMessage
 	return nil
 }
 

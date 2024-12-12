@@ -8,7 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/briandowns/spinner"
+	"github.com/docker/cli/cli/streams"
+	"github.com/docker/docker/api/types/image"
 	"io"
 	"os"
 	"os/exec"
@@ -18,10 +21,8 @@ import (
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 
 	"github.com/astronomer/astro-cli/pkg/util"
-	cliCommand "github.com/docker/cli/cli/command"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	log "github.com/sirupsen/logrus"
@@ -76,7 +77,7 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
 	s := spinner.New(runtimes.SpinnerCharSet, runtimes.SpinnerRefresh)
 	s.Suffix = " Building project image…"
-	s.FinalMSG = "Project image build complete\n"
+	s.FinalMSG = ansi.Green("\u2714") + " Project image has been updated\n"
 	if !buildConfig.Output {
 		s.Start()
 		defer s.Stop()
@@ -439,7 +440,7 @@ func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImag
 		return err
 	}
 	encodedAuth := base64.URLEncoding.EncodeToString(buf)
-	responseBody, err := cli.ImagePush(ctx, remoteImage, types.ImagePushOptions{RegistryAuth: encodedAuth})
+	responseBody, err := cli.ImagePush(ctx, remoteImage, image.PushOptions{RegistryAuth: encodedAuth})
 	if err != nil {
 		log.Debugf("Error pushing image to docker: %v", err)
 		// if NewClientWithOpt does not work use bash to run docker commands
@@ -497,7 +498,7 @@ func (d *DockerImage) Pull(remoteImage, username, token string) error {
 }
 
 var displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback func(jsonmessage.JSONMessage)) error {
-	out := cliCommand.NewOutStream(os.Stdout)
+	out := streams.NewOut(os.Stdout)
 	err := jsonmessage.DisplayJSONMessagesToStream(responseBody, out, nil)
 	if err != nil {
 		return err

@@ -49,6 +49,7 @@ func AddCmds(client houston.ClientInterface, out io.Writer) []*cobra.Command {
 // SetUpLogs set the log output and the log level
 func SetUpLogs(out io.Writer, level string) error {
 	// if level is default means nothing was passed override with config setting
+	fmt.Println(level)
 	if level == "warning" {
 		level = config.CFG.Verbosity.GetString()
 	}
@@ -58,6 +59,7 @@ func SetUpLogs(out io.Writer, level string) error {
 		return err
 	}
 	logrus.SetLevel(lvl)
+	fmt.Println(logrus.GetLevel())
 	return nil
 }
 

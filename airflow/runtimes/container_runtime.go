@@ -26,7 +26,10 @@ const (
 		"https://www.astronomer.io/docs/astro/cli/install-cli"
 	containerRuntimeInitMessage = " Astro uses container technology to run your Airflow project. " +
 		"Please wait while we get things started…"
-	SpinnerRefresh = 100 * time.Millisecond
+	containerRuntimeInitFinalMessage     = " Container runtime has been started\n"
+	containerRuntimeShutdownMessage      = " Shutting down the container runtime"
+	containerRuntimeShutdownFinalMessage = " Container runtime has been shut down\n"
+	SpinnerRefresh                       = 100 * time.Millisecond
 )
 
 // ContainerRuntime interface defines the methods that manage

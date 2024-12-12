@@ -293,10 +293,8 @@ func AddPools(id string, version uint64) {
 				} else {
 					airflowCommand += "''"
 				}
-				fmt.Println(airflowCommand)
 				out := execAirflowCommand(id, airflowCommand)
 				logrus.Debugf("Adding pool logs:\n" + out)
-				fmt.Printf("Added Pool: %s\n", pool.PoolName)
 			} else {
 				fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)
 			}
