@@ -67,7 +67,7 @@ var (
 		PostgresPassword:      newCfg("postgres.password", "postgres"),
 		PostgresHost:          newCfg("postgres.host", "postgres"),
 		PostgresPort:          newCfg("postgres.port", "5432"),
-		PostgresRepository:    newCfg("postgres.repository", "docker.io/postgres"),
+		PostgresRepository:    newCfg("postgres.repository", "postgres"),
 		PostgresTag:           newCfg("postgres.tag", "12.6"),
 		ProjectDeployment:     newCfg("project.deployment", ""),
 		ProjectName:           newCfg("project.name", ""),

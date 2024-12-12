@@ -2,7 +2,7 @@ package airflow
 
 import (
 	"bytes"
-	"crypto/md5" //nolint:gosec
+	//nolint:gosec
 	"fmt"
 	"html/template"
 	"regexp"
@@ -89,16 +89,17 @@ func ImageHandlerInit(image string) ImageHandler {
 func ProjectNameUnique() (string, error) {
 	projectName := config.CFG.ProjectName.GetString()
 
-	pwd, err := fileutil.GetWorkingDir()
-	if err != nil {
-		return "", errors.Wrap(err, "error retrieving working directory")
-	}
+	//pwd, err := fileutil.GetWorkingDir()
+	//if err != nil {
+	//	return "", errors.Wrap(err, "error retrieving working directory")
+	//}
 
 	// #nosec
-	b := md5.Sum([]byte(pwd))
-	s := fmt.Sprintf("%x", b[:])
-
-	return projectName + "_" + s[0:6], nil
+	//b := md5.Sum([]byte(pwd))
+	//s := fmt.Sprintf("%x", b[:])
+	//
+	//return projectName + "_" + s[0:6], nil
+	return projectName, nil
 }
 
 func normalizeName(s string) string {
@@ -124,10 +125,10 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 
 	if envFile != "" {
 		if !envExists {
-			fmt.Printf(envNotFoundMsg, envFile)
+			//fmt.Printf(envNotFoundMsg, envFile)
 			envFile = ""
 		} else {
-			fmt.Printf(envFoundMsg, envFile)
+			//fmt.Printf(envFoundMsg, envFile)
 			envFile = fmt.Sprintf("env_file: %s", envFile)
 		}
 	}

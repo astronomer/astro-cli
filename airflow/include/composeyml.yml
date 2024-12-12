@@ -1,5 +1,3 @@
-version: '3.4'
-
 x-common-env-vars: &common-env-vars
   AIRFLOW__CORE__EXECUTOR: LocalExecutor
   AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:5432

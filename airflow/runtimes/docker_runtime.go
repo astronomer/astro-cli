@@ -2,6 +2,7 @@ package runtimes
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/briandowns/spinner"
@@ -24,6 +25,39 @@ type DockerRuntime struct {
 
 func CreateDockerRuntime(engine DockerEngine, osChecker OSChecker) DockerRuntime {
 	return DockerRuntime{Engine: engine, OSChecker: osChecker}
+}
+
+func CreateDockerRuntimeWithDefaults() DockerRuntime {
+	return DockerRuntime{Engine: GetDockerEngine(), OSChecker: CreateOSChecker()}
+}
+
+func GetDockerEngine() DockerEngine {
+	engine, err := GetDockerEngineBinary()
+	if err != nil {
+		return new(dockerEngine)
+	}
+
+	// Return the appropriate container runtime based on the binary discovered.
+	switch engine {
+	case orbctl:
+		return new(orbstackEngine)
+	default:
+		return new(dockerEngine)
+	}
+}
+
+var GetDockerEngineBinary = func() (string, error) {
+	binaries := []string{orbctl, docker}
+
+	// Get the $PATH environment variable.
+	pathEnv := os.Getenv("PATH")
+	for _, binary := range binaries {
+		if found := FindBinary(pathEnv, binary, CreateFileChecker(), CreateOSChecker()); found {
+			return binary, nil
+		}
+	}
+
+	return docker, nil
 }
 
 // Initialize initializes the Docker runtime.
@@ -53,7 +87,7 @@ func (rt DockerRuntime) initializeDocker(timeoutSeconds int) error {
 	// Initialize spinner.
 	timeout := time.After(time.Duration(timeoutSeconds) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
-	s := spinner.New(spinnerCharSet, spinnerRefresh)
+	s := spinner.New(SpinnerCharSet, SpinnerRefresh)
 	s.Suffix = containerRuntimeInitMessage
 	defer s.Stop()
 

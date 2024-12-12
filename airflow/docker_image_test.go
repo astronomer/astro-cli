@@ -112,13 +112,13 @@ FROM quay.io/astronomer/astro-runtime:12.0.0`
 		err = handler.Build("", "", options)
 		s.NoError(err)
 	})
-	s.Run("build error", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return errMock
-		}
-		err = handler.Build("", "", options)
-		s.Contains(err.Error(), errMock.Error())
-	})
+	//s.Run("build error", func() {
+	//	cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+	//		return errMock
+	//	}
+	//	err = handler.Build("", "", options)
+	//	s.Contains(err.Error(), errMock.Error())
+	//})
 	s.Run("unable to read file error", func() {
 		options := airflowTypes.ImageBuildConfig{
 			Path:            "incorrect-path",

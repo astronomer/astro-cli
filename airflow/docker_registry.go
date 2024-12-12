@@ -7,7 +7,7 @@ import (
 
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
-	"github.com/docker/docker/api/types"
+	registryTypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/registry"
 	log "github.com/sirupsen/logrus"
@@ -35,7 +35,7 @@ func (d *DockerRegistry) Login(username, token string) error {
 	// Remove http|https from serverAddress
 	serverAddress := registry.ConvertToHostname(d.registry)
 
-	authConfig := types.AuthConfig{
+	authConfig := registryTypes.AuthConfig{
 		ServerAddress: serverAddress,
 		Username:      username,
 		Password:      token,
