@@ -27,6 +27,7 @@ var (
 	isDagOnlyDeploy                bool
 	description                    string
 	isImageOnlyDeploy              bool
+	imageName                      string
 	ErrBothDagsOnlyAndImageOnlySet = errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
 )
 
@@ -61,6 +62,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	cmd.Flags().StringVar(&description, "description", "", "Improve traceability by attaching a description to a code deploy. If you don't provide a description, the system automatically assigns a default description based on the deploy type.")
 	cmd.Flags().BoolVarP(&isImageOnlyDeploy, "image", "", false, "Push only an image to your Astro Deployment. This only works for Dag-only, Git-sync-based and NFS-based deployments.")
+	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of the custom image(present locally) to deploy")
 
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
 		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only DAGs to your Deployment")
@@ -120,7 +122,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	}
 
 	// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
-	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt, description, isImageOnlyDeploy)
+	deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt, description, isImageOnlyDeploy, imageName)
 	if err != nil {
 		return err
 	}
