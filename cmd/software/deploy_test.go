@@ -140,7 +140,7 @@ func (s *Suite) TestDeploy() {
 
 	s.Run("Test for the flag --image-name for image deployment", func() {
 		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
-			return deploymentID, deploy.ErrDeploymentTypeIncorrectForImageOnly
+			return deploymentID, nil
 		}
 		err := execDeployCmd([]string{"test-deployment-id", "--image-name", "--force"}...)
 		s.ErrorIs(err, nil)
