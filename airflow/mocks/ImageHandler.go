@@ -78,6 +78,30 @@ func (_m *ImageHandler) DoesImageExist(image string) error {
 	return r0
 }
 
+// GetImageSha provides a mock function with given fields:
+func (_m *ImageHandler) GetImageSha() (string, error) {
+	ret := _m.Called()
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (string, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetLabel provides a mock function with given fields: altImageName, labelName
 func (_m *ImageHandler) GetLabel(altImageName string, labelName string) (string, error) {
 	ret := _m.Called(altImageName, labelName)

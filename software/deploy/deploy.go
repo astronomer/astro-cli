@@ -44,6 +44,7 @@ var (
 	ErrDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
 	ErrEmptyDagFolderUserCancelledOperation = errors.New("no DAGs found in the dags folder. User canceled the operation")
 	ErrBYORegistryDomainNotSet              = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
+	ErrDeploymentTypeIncorrectForImageOnly  = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
 )
 
 const (
@@ -68,7 +69,7 @@ var tab = printutil.Table{
 	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
 }
 
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
+func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool) (string, error) {
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
 		return deploymentID, err
@@ -94,6 +95,14 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	if err != nil {
 		return deploymentID, fmt.Errorf("failed to get deployment info: %w", err)
 	}
+
+	// isImageOnlyDeploy is not valid for image-based deployments since image-based deployments inherently mean that the image itself contains dags.
+	// If we deploy only the image, the deployment will not have any dags for image-based deployments.
+	// Even on astro, image-based deployments are not allowed to be deployed with --image flag.
+	if isImageOnlyDeploy && deploymentInfo.DagDeployment.Type == houston.ImageDeploymentType {
+		return "", ErrDeploymentTypeIncorrectForImageOnly
+	}
+	// We don't need to exclude the dags from the image because the dags present in the image are not respected anyways for non-image based deployments
 
 	fmt.Printf(houstonDeploymentPrompt, releaseName)
 
@@ -181,11 +190,11 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		Output:          true,
 		Labels:          deployLabels,
 	}
+
 	err = imageHandler.Build("", "", buildConfig)
 	if err != nil {
 		return err
 	}
-
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
 		registry = byoRegistryDomain
@@ -195,13 +204,19 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
 		token = c.Token
 	}
-
 	err = imageHandler.Push(remoteImage, "", token)
 	if err != nil {
 		return err
 	}
-
 	if byoRegistryEnabled {
+		useShaAsTag := config.CFG.ShaAsTag.GetBool()
+		if useShaAsTag {
+			sha, err := imageHandler.GetImageSha()
+			if (sha == "") || (err != nil) {
+				return fmt.Errorf("failed to get image sha: %w", err)
+			}
+			remoteImage = fmt.Sprintf("%s@%s", registry, sha)
+		}
 		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel)
 		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel)
 		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}

@@ -425,6 +425,29 @@ func (d *DockerImage) Push(remoteImage, username, token string) error {
 	return nil
 }
 
+func (d *DockerImage) GetImageSha() (string, error) {
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	if err != nil {
+		return "", err
+	}
+	// Get the digest of the pushed image
+	remoteDigest := ""
+	out := &bytes.Buffer{}
+	err = cmdExec(containerRuntime, out, nil, "inspect", "--format={{index .RepoDigests 0}}", d.imageName)
+	if err != nil {
+		return remoteDigest, fmt.Errorf("failed to get digest for image %s: %w", d.imageName, err)
+	}
+	// Parse and clean the output
+	digestOutput := strings.TrimSpace(out.String())
+	if digestOutput != "" {
+		parts := strings.Split(digestOutput, "@")
+		if len(parts) == 2 {
+			remoteDigest = parts[1] // Extract the digest part (after '@')
+		}
+	}
+	return remoteDigest, nil
+}
+
 func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImage string) error {
 	ctx := context.Background()
 
