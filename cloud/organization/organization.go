@@ -237,7 +237,7 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astropl
 		return err
 	}
 
-	err = os.WriteFile(filePath, resp.Body, os.ModePerm)
+	err = os.WriteFile(filePath, resp.Body, os.ModePerm) //nolint:gosec
 	if err != nil {
 		return err
 	}

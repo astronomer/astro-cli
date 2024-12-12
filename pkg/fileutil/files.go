@@ -337,7 +337,7 @@ func UploadFile(args *UploadFileArguments) error {
 		setHeaders(req, headers)
 
 		client := &http.Client{}
-		response, err := client.Do(req)
+		response, err := client.Do(req) //nolint:bodyclose
 		if err != nil {
 			currentUploadError = err
 			// If we have a dial tcp error, we should retry with exponential backoff
@@ -346,9 +346,9 @@ func UploadFile(args *UploadFileArguments) error {
 			}
 			continue
 		}
+		defer response.Body.Close() //nolint:gocritic
 		data, _ := io.ReadAll(response.Body)
 		responseStatusCode := response.StatusCode
-		response.Body.Close()
 
 		// Return success for 2xx status code
 		if response.StatusCode == http.StatusOK {

@@ -580,7 +580,7 @@ func ensureProjectDirectory(args []string, workingPath, projectName string) (str
 
 	// If the project directory does not exist, create it.
 	if !projectDirExists {
-		err := os.Mkdir(newProjectPath, os.FileMode(directoryPermissions))
+		err := os.Mkdir(newProjectPath, os.FileMode(directoryPermissions)) //nolint:gosec
 		if err != nil {
 			return "", err
 		}

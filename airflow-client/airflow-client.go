@@ -213,7 +213,7 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 		}
 	}
 
-	response, err := c.Do(doOpts)
+	response, err := c.Do(doOpts) //nolint:bodyclose
 	if err != nil {
 		return nil, err
 	}

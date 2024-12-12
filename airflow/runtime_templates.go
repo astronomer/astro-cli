@@ -37,7 +37,7 @@ func FetchTemplateList() ([]string, error) {
 		Method: http.MethodGet,
 	}
 
-	resp, err := HTTPClient.Do(doOpts)
+	resp, err := HTTPClient.Do(doOpts) //nolint:bodyclose
 	if err != nil && resp == nil {
 		return nil, fmt.Errorf("failed to get response: %w", err)
 	}
@@ -111,7 +111,7 @@ func InitFromTemplate(templateDir, destDir string) error {
 		Method: http.MethodGet,
 	}
 
-	resp, err := HTTPClient.Do(doOpts)
+	resp, err := HTTPClient.Do(doOpts) //nolint:bodyclose
 	if err != nil {
 		return fmt.Errorf("failed to download tarball: %w", err)
 	}

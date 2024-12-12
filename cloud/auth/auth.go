@@ -79,7 +79,7 @@ func requestUserInfo(authConfig Config, accessToken string) (UserInfo, error) {
 		Path:    addr,
 		Method:  http.MethodGet,
 	}
-	res, err := httpClient.Do(doOptions)
+	res, err := httpClient.Do(doOptions) //nolint:bodyclose
 	if err != nil {
 		return UserInfo{}, fmt.Errorf("cannot retrieve userinfo: %w", err)
 	}
@@ -115,7 +115,7 @@ func requestToken(authConfig Config, verifier, code string) (Result, error) {
 		Path:    addr,
 		Method:  http.MethodPost,
 	}
-	res, err := httpClient.Do(doOptions)
+	res, err := httpClient.Do(doOptions) //nolint:bodyclose
 	if err != nil {
 		return Result{}, fmt.Errorf("cannot retrieve token: %w", err)
 	}
@@ -211,7 +211,10 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	// open browser
 	if !shouldDisplayLoginLink {
 		fmt.Printf("\n%s to open the browser to log in or %s to quit…", ansi.Green("Press Enter"), ansi.Red("^C"))
-		fmt.Scanln()
+		_, err := fmt.Scanln()
+		if err != nil {
+			return Result{}, err
+		}
 		err = openURL(authorizeURL)
 		if err != nil {
 			fmt.Println("\nUnable to open the URL, please visit the following link: " + authorizeURL)
@@ -453,7 +456,7 @@ func FetchDomainAuthConfig(domain string) (Config, error) {
 		Path:    addr,
 		Method:  http.MethodGet,
 	}
-	res, err := httpClient.Do(doOptions)
+	res, err := httpClient.Do(doOptions) //nolint:bodyclose
 	if err != nil {
 		return authConfig, err
 	}

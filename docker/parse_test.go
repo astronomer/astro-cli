@@ -21,7 +21,7 @@ func (s *Suite) TestParseReader() {
 	s.NoError(err)
 	expected := []Command{
 		{
-			Cmd:       "from",
+			Cmd:       "FROM",
 			Original:  "FROM quay.io/astronomer/astro-runtime:3.0.2",
 			StartLine: 1,
 			EndLine:   1,
@@ -43,7 +43,7 @@ func (s *Suite) TestParseFile() {
 	s.NoError(err)
 	expected := []Command{
 		{
-			Cmd:       "from",
+			Cmd:       "FROM",
 			Original:  "FROM quay.io/astronomer/astro-runtime:3.0.2",
 			StartLine: 1,
 			EndLine:   1,

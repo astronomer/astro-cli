@@ -12,6 +12,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
+
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 
 	semver "github.com/Masterminds/semver/v3"
@@ -25,16 +27,14 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/astronomer/astro-cli/settings"
-	composeInterp "github.com/compose-spec/compose-go/interpolation"
-	"github.com/compose-spec/compose-go/loader"
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/interpolation"
+	"github.com/compose-spec/compose-go/v2/loader"
+	composetypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
-	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
@@ -177,7 +177,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 		logrus.Fatalf("error init compose client %s", err)
 	}
 
-	composeService := compose.NewComposeService(dockerCli.Client(), &configfile.ConfigFile{})
+	composeService := compose.NewComposeService(dockerCli)
 
 	return &DockerCompose{
 		airflowHome:    airflowHome,
@@ -253,6 +253,9 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	// Start up our project
 	err = d.composeService.Up(context.Background(), project, api.UpOptions{
 		Create: api.CreateOptions{},
+		Start: api.StartOptions{
+			Project: project,
+		},
 	})
 	if err != nil {
 		return errors.Wrap(err, composeRecreateErrMsg)
@@ -330,7 +333,7 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 	}
 
 	// Pause our project
-	err = d.composeService.Stop(context.Background(), project, api.StopOptions{})
+	err = d.composeService.Stop(context.Background(), project.Name, api.StopOptions{})
 	if err != nil {
 		return errors.Wrap(err, composePauseErrMsg)
 	}
@@ -400,11 +403,20 @@ func (d *DockerCompose) PS() error {
 
 // Kill stops a local airflow development cluster
 func (d *DockerCompose) Kill() error {
+	// Killing an already killed project produces an unsightly warning,
+	// so we briefly switch to a higher level before running the kill command.
+	// We then swap back to the original level.
+	originalLevel := logrus.GetLevel()
+	logrus.SetLevel(logrus.ErrorLevel)
+
 	// Shut down our project
 	err := d.composeService.Down(context.Background(), d.projectName, api.DownOptions{Volumes: true, RemoveOrphans: true})
 	if err != nil {
 		return errors.Wrap(err, composeStopErrMsg)
 	}
+
+	// Restore the log level.
+	logrus.SetLevel(originalLevel)
 
 	return nil
 }
@@ -421,7 +433,7 @@ func (d *DockerCompose) Logs(follow bool, containerNames ...string) error {
 		return errors.New("cannot view logs, project not running")
 	}
 
-	consumer := formatter.NewLogConsumer(context.Background(), os.Stdout, true, false)
+	consumer := formatter.NewLogConsumer(context.Background(), os.Stdout, os.Stderr, true, false, true)
 
 	err = d.composeService.Logs(context.Background(), d.projectName, consumer, api.LogOptions{
 		Services: containerNames,
@@ -437,7 +449,7 @@ func (d *DockerCompose) Logs(follow bool, containerNames ...string) error {
 // Run creates using docker exec
 // inspired from https://github.com/docker/cli/tree/master/cli/command/container
 func (d *DockerCompose) Run(args []string, user string) error {
-	execConfig := &docker_types.ExecConfig{
+	execConfig := &container.ExecOptions{
 		AttachStdout: true,
 		Cmd:          args,
 	}
@@ -462,7 +474,7 @@ func (d *DockerCompose) Run(args []string, user string) error {
 		return errors.New("exec ID is empty")
 	}
 
-	execStartCheck := docker_types.ExecStartCheck{
+	execStartCheck := container.ExecStartOptions{
 		Detach: execConfig.Detach,
 	}
 
@@ -681,7 +693,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, de
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Pip Freeze comparison can be found at \n" + pipFreezeCompareFile)
+	fmt.Print("Pip Freeze comparison can be found at \n" + pipFreezeCompareFile)
 	return nil
 }
 
@@ -1062,10 +1074,10 @@ func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretStrin
 	return err
 }
 
-func (d *DockerCompose) Bash(container string) error {
+func (d *DockerCompose) Bash(component string) error {
 	// exec into schedueler by default
-	if container == "" {
-		container = SchedulerDockerContainerName
+	if component == "" {
+		component = SchedulerDockerContainerName
 	}
 
 	// query for container names
@@ -1081,7 +1093,7 @@ func (d *DockerCompose) Bash(container string) error {
 	// find container name of specified container
 	var containerName string
 	for i := range psInfo {
-		if strings.Contains(psInfo[i].Name, container) {
+		if strings.Contains(psInfo[i].Name, component) {
 			containerName = psInfo[i].Name
 		}
 	}
@@ -1277,7 +1289,7 @@ func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
 }
 
 // createProject creates project with yaml config as context
-var createDockerProject = func(projectName, airflowHome, envFile, buildImage, settingsFile, composeFile string, imageLabels map[string]string) (*types.Project, error) {
+var createDockerProject = func(projectName, airflowHome, envFile, buildImage, settingsFile, composeFile string, imageLabels map[string]string) (*composetypes.Project, error) {
 	// Generate the docker-compose yaml
 	var yaml string
 	var err error
@@ -1293,9 +1305,9 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 		}
 	}
 
-	var configs []types.ConfigFile
+	var configs []composetypes.ConfigFile
 
-	configs = append(configs, types.ConfigFile{
+	configs = append(configs, composetypes.ConfigFile{
 		Filename: "compose.yaml",
 		Content:  []byte(yaml),
 	})
@@ -1305,7 +1317,7 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 		return nil, errors.Wrapf(err, "Failed to open the compose file: %s", composeOverrideFilename)
 	}
 	if err == nil {
-		configs = append(configs, types.ConfigFile{
+		configs = append(configs, composetypes.ConfigFile{
 			Filename: "docker-compose.override.yml",
 			Content:  composeBytes,
 		})
@@ -1314,23 +1326,37 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 	var loadOptions []func(*loader.Options)
 
 	nameLoadOpt := func(opts *loader.Options) {
-		opts.Name = projectName
-		opts.Name = normalizeName(opts.Name)
-		opts.Interpolate = &composeInterp.Options{
+		opts.SetProjectName(normalizeName(projectName), true)
+		opts.Interpolate = &interpolation.Options{
 			LookupValue: os.LookupEnv,
 		}
 	}
 
 	loadOptions = append(loadOptions, nameLoadOpt)
 
-	project, err := loader.Load(types.ConfigDetails{
+	project, err := loader.LoadWithContext(context.Background(), composetypes.ConfigDetails{
 		ConfigFiles: configs,
 		WorkingDir:  airflowHome,
 	}, loadOptions...)
+
+	// The latest versions of compose libs handle adding these labels at an outer layer,
+	// near the cobra entrypoint. Without these labels, compose will lose track of the containers its
+	// starting for a given project and downstream library calls will fail.
+	for name, s := range project.Services {
+		s.CustomLabels = map[string]string{
+			api.ProjectLabel:     project.Name,
+			api.ServiceLabel:     name,
+			api.VersionLabel:     api.ComposeVersion,
+			api.WorkingDirLabel:  project.WorkingDir,
+			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
+			api.OneoffLabel:      "False",
+		}
+		project.Services[name] = s
+	}
 	return project, err
 }
 
-func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
+func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *composetypes.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
 	psInfo, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
 		All: true,
 	})

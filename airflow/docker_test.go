@@ -10,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
+
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -21,7 +23,7 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
@@ -88,9 +90,7 @@ func (s *Suite) TestGenerateConfig() {
 	s.NoError(err)
 	config.InitConfig(fs)
 	s.Run("returns config with default healthcheck", func() {
-		expectedCfg := `version: '3.4'
-
-x-common-env-vars: &common-env-vars
+		expectedCfg := `x-common-env-vars: &common-env-vars
   AIRFLOW__CORE__EXECUTOR: LocalExecutor
   AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
@@ -195,9 +195,7 @@ services:
 		s.Equal(expectedCfg, cfg)
 	})
 	s.Run("returns config with triggerer enabled", func() {
-		expectedCfg := `version: '3.4'
-
-x-common-env-vars: &common-env-vars
+		expectedCfg := `x-common-env-vars: &common-env-vars
   AIRFLOW__CORE__EXECUTOR: LocalExecutor
   AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
@@ -370,7 +368,7 @@ func (s *Suite) TestDockerComposeStart() {
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(4)
-		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Twice()
+		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
@@ -398,7 +396,7 @@ func (s *Suite) TestDockerComposeStart() {
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
-		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
+		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			s.Equal(defaultTimeOut, timeout)
@@ -424,7 +422,7 @@ func (s *Suite) TestDockerComposeStart() {
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
-		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
+		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			s.Equal(expectedTimeout, timeout)
@@ -450,7 +448,7 @@ func (s *Suite) TestDockerComposeStart() {
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
-		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
+		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			s.Equal(userProvidedTimeOut, timeout)
@@ -476,7 +474,7 @@ func (s *Suite) TestDockerComposeStart() {
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(4)
-		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Twice()
+		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
@@ -572,7 +570,7 @@ func (s *Suite) TestDockerComposeStart() {
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
-		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(errMockDocker).Once()
+		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
@@ -596,7 +594,7 @@ func (s *Suite) TestDockerComposeStart() {
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
-		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
+		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return errMockDocker
@@ -927,8 +925,8 @@ func (s *Suite) TestDockerComposeRun() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", Name: "test-webserver", State: "running"}}, nil).Once()
 		mockCLIClient := new(mocks.DockerCLIClient)
-		mockCLIClient.On("ContainerExecCreate", context.Background(), "test-webserver-id", docker_types.ExecConfig{User: "test-user", AttachStdout: true, Cmd: testCmd}).Return(docker_types.IDResponse{ID: "test-exec-id"}, nil).Once()
-		mockCLIClient.On("ContainerExecAttach", context.Background(), "test-exec-id", docker_types.ExecStartCheck{Detach: false}).Return(docker_types.HijackedResponse{Reader: mockResp}, nil).Once()
+		mockCLIClient.On("ContainerExecCreate", context.Background(), "test-webserver-id", container.ExecOptions{User: "test-user", AttachStdout: true, Cmd: testCmd}).Return(docker_types.IDResponse{ID: "test-exec-id"}, nil).Once()
+		mockCLIClient.On("ContainerExecAttach", context.Background(), "test-exec-id", container.ExecStartOptions{Detach: false}).Return(docker_types.HijackedResponse{Reader: mockResp}, nil).Once()
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.cliClient = mockCLIClient
 
@@ -943,7 +941,7 @@ func (s *Suite) TestDockerComposeRun() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", Name: "test-webserver", State: "running"}}, nil).Once()
 		mockCLIClient := new(mocks.DockerCLIClient)
-		mockCLIClient.On("ContainerExecCreate", context.Background(), "test-webserver-id", docker_types.ExecConfig{User: "test-user", AttachStdout: true, Cmd: testCmd}).Return(docker_types.IDResponse{}, nil).Once()
+		mockCLIClient.On("ContainerExecCreate", context.Background(), "test-webserver-id", container.ExecOptions{User: "test-user", AttachStdout: true, Cmd: testCmd}).Return(docker_types.IDResponse{}, nil).Once()
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.cliClient = mockCLIClient
 
@@ -958,7 +956,7 @@ func (s *Suite) TestDockerComposeRun() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", Name: "test-webserver", State: "running"}}, nil).Once()
 		mockCLIClient := new(mocks.DockerCLIClient)
-		mockCLIClient.On("ContainerExecCreate", context.Background(), "test-webserver-id", docker_types.ExecConfig{User: "test-user", AttachStdout: true, Cmd: testCmd}).Return(docker_types.IDResponse{}, errMockDocker).Once()
+		mockCLIClient.On("ContainerExecCreate", context.Background(), "test-webserver-id", container.ExecOptions{User: "test-user", AttachStdout: true, Cmd: testCmd}).Return(docker_types.IDResponse{}, errMockDocker).Once()
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.cliClient = mockCLIClient
 
@@ -1329,7 +1327,7 @@ func (s *Suite) TestDockerComposeParse() {
 
 func (s *Suite) TestDockerComposeBash() {
 	mockDockerCompose := DockerCompose{projectName: "test"}
-	container := "scheduler"
+	component := "scheduler"
 	s.Run("success", func() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running"}}, nil).Once()
@@ -1338,7 +1336,7 @@ func (s *Suite) TestDockerComposeBash() {
 		}
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.Bash(container)
+		err := mockDockerCompose.Bash(component)
 		s.NoError(err)
 		composeMock.AssertExpectations(s.T())
 	})
@@ -1351,7 +1349,7 @@ func (s *Suite) TestDockerComposeBash() {
 		}
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.Bash(container)
+		err := mockDockerCompose.Bash(component)
 		s.Contains(err.Error(), errMock.Error())
 		composeMock.AssertExpectations(s.T())
 	})
@@ -1362,7 +1360,7 @@ func (s *Suite) TestDockerComposeBash() {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.Bash(container)
+		err := mockDockerCompose.Bash(component)
 		s.ErrorIs(err, errMockDocker)
 		composeMock.AssertExpectations(s.T())
 	})
@@ -1373,7 +1371,7 @@ func (s *Suite) TestDockerComposeBash() {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.Bash(container)
+		err := mockDockerCompose.Bash(component)
 		s.Contains(err.Error(), "cannot exec into container, project not running")
 		composeMock.AssertExpectations(s.T())
 	})
@@ -1706,9 +1704,9 @@ func (s *Suite) TestCreateDockerProject() {
 		postgresService := &types.ServiceConfig{}
 		serviceFound := false
 		for i := range prj.Services {
-			service := &prj.Services[i]
+			service := prj.Services[i]
 			if service.Name == "webserver" {
-				postgresService = service
+				postgresService = &service
 				serviceFound = true
 				break
 			}
@@ -1724,16 +1722,16 @@ func (s *Suite) TestCreateDockerProject() {
 		postgresService := &types.ServiceConfig{}
 		serviceFound := false
 		for i := range prj.Services {
-			service := &prj.Services[i]
+			service := prj.Services[i]
 			if service.Name == "postgres" {
-				postgresService = service
+				postgresService = &service
 				serviceFound = true
 				break
 			}
 		}
 		s.True(serviceFound)
 		s.Equal("postgres", postgresService.Name)
-		s.Equal(5433, int(postgresService.Ports[len(prj.Services[0].Ports)-1].Published))
+		s.Equal("5433", postgresService.Ports[len(prj.Services["postgres"].Ports)-1].Published)
 	})
 }
 

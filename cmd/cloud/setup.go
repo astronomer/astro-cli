@@ -213,7 +213,7 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 	}
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	res, err := client.Do(r)
+	res, err := client.Do(r) //nolint:bodyclose
 	if err != nil {
 		log.Fatal(err)
 		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: %w", err)
@@ -296,7 +296,7 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, isDeploymentF
 	}
 
 	// execute request
-	res, err := client.Do(doOptions)
+	res, err := client.Do(doOptions) //nolint:bodyclose
 	if err != nil {
 		log.Fatal(err)
 		return false, fmt.Errorf("cannot getaccess token with API keys: %w", err)

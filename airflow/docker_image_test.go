@@ -11,12 +11,13 @@ import (
 	"os"
 	"strings"
 
+	"github.com/docker/docker/api/types/image"
+
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/docker/cli/cli/config/types"
-	dockerTypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/spf13/afero"
@@ -405,7 +406,6 @@ func (s *Suite) TestDockerPull() {
 		// Software doesn't pass a username to Push
 		{"images.software/foo/bar:123", "", testUtil.SoftwarePlatform, "images.software/foo/bar:123", ""},
 	} {
-		tc := tc // capture range variable
 		s.Run(tc.input, func() {
 			testUtil.InitTestConfig(tc.platform)
 			pullSeen := false
@@ -485,13 +485,12 @@ func (s *Suite) TestDockerImagePush() {
 		// Software doesn't pass a username to Push
 		{"images.software/foo/bar:123", "", testUtil.SoftwarePlatform, "images.software/foo/bar:123", ""},
 	} {
-		tc := tc // capture range variable
 		s.Run(tc.input, func() {
 			testUtil.InitTestConfig(tc.platform)
 
 			mockClient := new(mocks.DockerCLIClient)
 			mockClient.On("NegotiateAPIVersion", context.Background()).Once()
-			mockClient.On("ImagePush", context.Background(), tc.expected, mock.MatchedBy(func(opts dockerTypes.ImagePushOptions) bool {
+			mockClient.On("ImagePush", context.Background(), tc.expected, mock.MatchedBy(func(opts image.PushOptions) bool {
 				decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
 				if err != nil {
 					return false
