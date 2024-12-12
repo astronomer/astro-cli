@@ -45,6 +45,8 @@ var (
 	ErrEmptyDagFolderUserCancelledOperation = errors.New("no DAGs found in the dags folder. User canceled the operation")
 	ErrBYORegistryDomainNotSet              = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
 	ErrDeploymentTypeIncorrectForImageOnly  = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
+	WarningInvalidImageNameMsg              = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
+	ErrNoRuntimeLabelOnCustomImage          = errors.New("the image should have label io.astronomer.docker.runtime.version")
 )
 
 const (
@@ -58,9 +60,10 @@ const (
 	warningInvalidNameTag                     = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nPlease use one of the following tags: %s.\nAre you sure you want to continue?"
 	warningInvalidNameTagEmptyRecommendations = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nAre you sure you want to continue?"
 
-	registryDomainPrefix = "registry."
-	runtimeImageLabel    = "io.astronomer.docker.runtime.version"
-	airflowImageLabel    = "io.astronomer.docker.airflow.version"
+	registryDomainPrefix              = "registry."
+	runtimeImageLabel                 = "io.astronomer.docker.runtime.version"
+	airflowImageLabel                 = "io.astronomer.docker.airflow.version"
+	composeSkipImageBuildingPromptMsg = "Skipping building image since --image-name flag is used..."
 )
 
 var tab = printutil.Table{
@@ -69,7 +72,7 @@ var tab = printutil.Table{
 	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
 }
 
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool) (string, error) {
+func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
 		return deploymentID, err
@@ -107,7 +110,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	fmt.Printf(houstonDeploymentPrompt, releaseName)
 
 	// Build the image to deploy
-	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, description)
+	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, description, imageName)
 	if err != nil {
 		return deploymentID, err
 	}
@@ -129,24 +132,7 @@ func deploymentExists(deploymentID string, deployments []houston.Deployment) boo
 	return false
 }
 
-func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool, description string) error {
-	// Build our image
-	fmt.Println(imageBuildingPrompt)
-
-	// parse dockerfile
-	cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
-	if err != nil {
-		return fmt.Errorf("failed to parse dockerfile: %s: %w", filepath.Join(path, dockerfile), err)
-	}
-
-	image, tag := docker.GetImageTagFromParsedFile(cmds)
-	if config.CFG.ShowWarnings.GetBool() && !validAirflowImageRepo(image) && !validRuntimeImageRepo(image) {
-		i, _ := input.Confirm(fmt.Sprintf(warningInvalidImageName, image))
-		if !i {
-			fmt.Println("Canceling deploy...")
-			os.Exit(1)
-		}
-	}
+func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, deploymentInfo *houston.Deployment) error {
 	// Get valid image tags for platform using Deployment Info request
 	deploymentConfig, err := houston.Call(houstonClient.GetDeploymentConfig)(nil)
 	if err != nil {
@@ -175,26 +161,72 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 			os.Exit(1)
 		}
 	}
+	return nil
+}
+
+func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool, description, customImageName string) error {
 	imageName := airflow.ImageName(name, "latest")
-
 	imageHandler := imageHandlerInit(imageName)
-
 	if description != "" {
 		deployLabels = append(deployLabels, "io.astronomer.deploy.revision.description="+description)
 	}
 
-	buildConfig := types.ImageBuildConfig{
-		Path:            config.WorkingPath,
-		NoCache:         ignoreCacheDeploy,
-		TargetPlatforms: deployImagePlatformSupport,
-		Output:          true,
-		Labels:          deployLabels,
+	var err error
+	if customImageName == "" {
+		// all these checks inside Dockerfile should happen only when no image-name is provided
+		// parse dockerfile
+		cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
+		if err != nil {
+			return fmt.Errorf("failed to parse dockerfile: %s: %w", filepath.Join(path, dockerfile), err)
+		}
+
+		image, tag := docker.GetImageTagFromParsedFile(cmds)
+		if config.CFG.ShowWarnings.GetBool() && !validAirflowImageRepo(image) && !validRuntimeImageRepo(image) {
+			i, _ := input.Confirm(fmt.Sprintf(warningInvalidImageName, image))
+			if !i {
+				fmt.Println("Canceling deploy...")
+				os.Exit(1)
+			}
+		}
+		// Get valid image tags for platform using Deployment Info request
+		err = validateRuntimeVersion(houstonClient, tag, deploymentInfo)
+		if err != nil {
+			return err
+		}
+		// Build our image
+		fmt.Println(imageBuildingPrompt)
+		buildConfig := types.ImageBuildConfig{
+			Path:            config.WorkingPath,
+			NoCache:         ignoreCacheDeploy,
+			TargetPlatforms: deployImagePlatformSupport,
+			Output:          true,
+			Labels:          deployLabels,
+		}
+
+		err = imageHandler.Build("", "", buildConfig)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Println(composeSkipImageBuildingPromptMsg)
+		err = imageHandler.TagLocalImage(customImageName)
+		if err != nil {
+			return err
+		}
+		runtimeLabel, err := imageHandler.GetLabel("", airflow.RuntimeImageLabel)
+		if err != nil {
+			fmt.Println("unable get runtime version from image")
+			return err
+		}
+		if runtimeLabel == "" {
+			return ErrNoRuntimeLabelOnCustomImage
+		}
+		err = validateRuntimeVersion(houstonClient, runtimeLabel, deploymentInfo)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = imageHandler.Build("", "", buildConfig)
-	if err != nil {
-		return err
-	}
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
 		registry = byoRegistryDomain
