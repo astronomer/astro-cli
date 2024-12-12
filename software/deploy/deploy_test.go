@@ -323,14 +323,14 @@ func (s *Suite) TestGetAirflowUILinkFailure() {
 
 func (s *Suite) TestAirflowFailure() {
 	// No workspace ID test case
-	_, err := Airflow(nil, "", "", "", "", false, false, false, description)
+	_, err := Airflow(nil, "", "", "", "", false, false, false, description, false)
 	s.ErrorIs(err, ErrNoWorkspaceID)
 
 	// houston GetWorkspace failure case
 	houstonMock := new(houston_mocks.ClientInterface)
 	houstonMock.On("GetWorkspace", mock.Anything).Return(nil, errMockHouston).Once()
 
-	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false, description)
+	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false, description, false)
 	s.ErrorIs(err, errMockHouston)
 	houstonMock.AssertExpectations(s.T())
 
@@ -338,7 +338,7 @@ func (s *Suite) TestAirflowFailure() {
 	houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil)
 	houstonMock.On("ListDeployments", mock.Anything).Return(nil, errMockHouston).Once()
 
-	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false, description)
+	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false, description, false)
 	s.ErrorIs(err, errMockHouston)
 	houstonMock.AssertExpectations(s.T())
 
@@ -352,35 +352,35 @@ func (s *Suite) TestAirflowFailure() {
 	// config GetCurrentContext failure case
 	config.ResetCurrentContext()
 
-	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false, description)
+	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false, description, false)
 	s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 
 	context.Switch("localhost")
 
 	// Invalid deployment name case
-	_, err = Airflow(houstonMock, "", "test-deployment-id", "test-workspace-id", "", false, false, false, description)
+	_, err = Airflow(houstonMock, "", "test-deployment-id", "test-workspace-id", "", false, false, false, description, false)
 	s.ErrorIs(err, errInvalidDeploymentID)
 
 	// No deployment in the current workspace case
-	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false, description)
+	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false, description, false)
 	s.ErrorIs(err, errDeploymentNotFound)
 	houstonMock.AssertExpectations(s.T())
 
 	// Invalid deployment selection case
 	houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil)
-	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false, description)
+	_, err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false, description, false)
 	s.ErrorIs(err, errInvalidDeploymentSelected)
 
 	// return error When houston get deployment throws an error
 	houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil)
 	houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
-	_, err = Airflow(houstonMock, "", "test-deployment-id", "test-workspace-id", "", false, false, false, description)
+	_, err = Airflow(houstonMock, "", "test-deployment-id", "test-workspace-id", "", false, false, false, description, false)
 	s.Equal(err.Error(), "failed to get deployment info: "+errMockHouston.Error())
 
 	// buildPushDockerImage failure case
 	houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{}, nil)
 	dockerfile = "Dockerfile.invalid"
-	_, err = Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description)
+	_, err = Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, false)
 	dockerfile = "Dockerfile"
 	s.Error(err)
 	s.Contains(err.Error(), "failed to parse dockerfile")
@@ -413,8 +413,76 @@ func (s *Suite) TestAirflowSuccess() {
 	houstonMock.On("GetDeployment", mock.Anything).Return(&houston.Deployment{}, nil).Once()
 	houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
 
-	_, err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description)
+	_, err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, false)
 	s.NoError(err)
+	houstonMock.AssertExpectations(s.T())
+}
+
+func (s *Suite) TestAirflowSuccessForImageOnly() {
+	fs := afero.NewMemMapFs()
+	configYaml := testUtil.NewTestConfig("localhost")
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	config.InitConfig(fs)
+
+	mockImageHandler := new(mocks.ImageHandler)
+	imageHandlerInit = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		return mockImageHandler
+	}
+
+	mockedDeploymentConfig := &houston.DeploymentConfig{
+		AirflowImages: mockAirflowImageList,
+	}
+	mockRuntimeReleases := houston.RuntimeReleases{
+		houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.5"},
+		houston.RuntimeRelease{Version: "4.2.5", AirflowVersion: "2.2.5"},
+	}
+	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
+	houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
+	houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Once()
+	dagDeployment := &houston.DagDeploymentConfig{
+		Type: "dag-only",
+	}
+	deployment := &houston.Deployment{
+		DagDeployment: *dagDeployment,
+	}
+
+	houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+	houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
+
+	_, err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true)
+	s.NoError(err)
+	houstonMock.AssertExpectations(s.T())
+}
+
+func (s *Suite) TestAirflowFailureForImageOnly() {
+	fs := afero.NewMemMapFs()
+	configYaml := testUtil.NewTestConfig("localhost")
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	config.InitConfig(fs)
+
+	mockImageHandler := new(mocks.ImageHandler)
+	imageHandlerInit = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		return mockImageHandler
+	}
+	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
+	houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
+	dagDeployment := &houston.DagDeploymentConfig{
+		Type: "image",
+	}
+	deployment := &houston.Deployment{
+		DagDeployment: *dagDeployment,
+	}
+
+	houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+
+	_, err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true)
+	s.Error(err, ErrDeploymentTypeIncorrectForImageOnly)
 	houstonMock.AssertExpectations(s.T())
 }
 
