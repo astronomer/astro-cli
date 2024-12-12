@@ -147,7 +147,7 @@ func removeDagsFromDockerIgnore(fullpath string) error {
 	if err := scanner.Err(); err != nil {
 		return err
 	}
-	err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
+	err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, mnd
 	if err != nil {
 		return err
 	}
@@ -608,7 +608,7 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 	}
 	contains, _ := fileutil.Contains(lines, "dags/")
 	if !contains {
-		f, err := os.OpenFile(fullpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
+		f, err := os.OpenFile(fullpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
 		if err != nil {
 			return err
 		}

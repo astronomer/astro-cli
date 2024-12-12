@@ -542,7 +542,7 @@ func DeleteToken(id, name string, force bool, out io.Writer, client astrocore.Co
 
 func TimeAgo(date time.Time) string {
 	duration := time.Since(date)
-	days := int(duration.Hours() / 24) //nolint:gomnd
+	days := int(duration.Hours() / 24) //nolint:mnd
 	hours := int(duration.Hours())
 	minutes := int(duration.Minutes())
 
