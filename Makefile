@@ -32,4 +32,3 @@ install: build
 
 uninstall:
 	rm ~/go/bin/astro
-
