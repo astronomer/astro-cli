@@ -126,6 +126,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	}
 	// Don't deploy dags even for dags-only deployments --image is passed
 	if isImageOnlyDeploy {
+		fmt.Println("Dags in the project will not be deployed since --image is passed.")
 		return nil
 	}
 
