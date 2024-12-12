@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 )
 
@@ -156,13 +156,13 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 			// ignore excluded paths
 			for _, excludePathPrefix := range excludePathPrefixes {
 				if strings.HasPrefix(headerName, excludePathPrefix) {
-					logrus.Debugf("Excluding tarball path: %s", headerName)
+					logger.Logger.Debugf("Excluding tarball path: %s", headerName)
 					return nil
 				}
 			}
 
 			header.Name = headerName
-			logrus.Debugf("Adding to tarball: %s", header.Name)
+			logger.Logger.Debugf("Adding to tarball: %s", header.Name)
 
 			if err := tarball.WriteHeader(header); err != nil {
 				return err

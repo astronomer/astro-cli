@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/cmd/registry"
+	"github.com/sirupsen/logrus"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -24,7 +25,6 @@ import (
 	"github.com/astronomer/astro-cli/version"
 
 	"github.com/google/go-github/v48/github"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 

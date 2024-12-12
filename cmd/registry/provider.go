@@ -8,11 +8,11 @@ import (
 	"os"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 const writeAndReadPermissions = 0o655
@@ -74,7 +74,7 @@ func addProviderByName(providerName string, out io.Writer) {
 	providers, exists := providersJSON["providers"].([]interface{})
 	if !exists {
 		jsonString, _ := json.Marshal(providersJSON)
-		log.Fatalf("Couldn't find key 'providers' in Response! %s", jsonString)
+		logger.Logger.Fatalf("Couldn't find key 'providers' in Response! %s", jsonString)
 	}
 
 	for _, provider := range providers {
@@ -83,12 +83,12 @@ func addProviderByName(providerName string, out io.Writer) {
 		providerID, childExists := childProvidersJSON["name"].(string) // displayName??
 		if !childExists {
 			jsonString, _ := json.Marshal(childProvidersJSON)
-			log.Fatalf("Couldn't find key 'name' in Response! %s", jsonString)
+			logger.Logger.Fatalf("Couldn't find key 'name' in Response! %s", jsonString)
 		}
 		thisProviderVersion, childExists := childProvidersJSON["version"].(string) // displayName??
 		if !childExists {
 			jsonString, _ := json.Marshal(childProvidersJSON)
-			log.Fatalf("Couldn't find key 'version' in Response! %s", jsonString)
+			logger.Logger.Fatalf("Couldn't find key 'version' in Response! %s", jsonString)
 		}
 		addProviderByIDAndVersion(providerID, thisProviderVersion, out)
 	}
@@ -101,13 +101,13 @@ func addProviderByIDAndVersion(providerID, providerVersion string, out io.Writer
 	name, exists := providersJSON["name"].(string)
 	if !exists {
 		jsonString, _ := json.Marshal(providersJSON)
-		log.Fatalf("Couldn't find key 'name' in Response! %s", jsonString)
+		logger.Logger.Fatalf("Couldn't find key 'name' in Response! %s", jsonString)
 	}
 
 	version, exists := providersJSON["version"].(string)
 	if !exists {
 		jsonString, _ := json.Marshal(providersJSON)
-		log.Fatalf("Couldn't find key 'version' in Response! %s", jsonString)
+		logger.Logger.Fatalf("Couldn't find key 'version' in Response! %s", jsonString)
 	}
 	addProviderToRequirementsTxt(name, version, out)
 }
@@ -116,23 +116,23 @@ func addProviderToRequirementsTxt(name, version string, out io.Writer) {
 	const filename = "requirements.txt"
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, writeAndReadPermissions)
 	if err != nil {
-		log.Fatal(err)
+		logger.Logger.Fatal(err)
 	}
 
 	b, err := os.ReadFile(filename)
 	if err != nil {
-		log.Fatal(err)
+		logger.Logger.Fatal(err)
 	}
 
 	exists := strings.Contains(string(b), name)
 	if exists {
 		fmt.Printf("%s already exists in %s", name, filename)
 	} else {
-		log.Debugf("Couldn't find %s already in %s", name, string(b))
+		logger.Logger.Debugf("Couldn't find %s already in %s", name, string(b))
 		providerString := fmt.Sprintf("%s==%s", name, version)
 		_, err = f.WriteString(providerString + "\n")
 		if err != nil {
-			log.Fatal(err)
+			logger.Logger.Fatal(err)
 		}
 		_, _ = fmt.Fprintf(out, "\nWrote %s to %s", providerString, filename)
 	}

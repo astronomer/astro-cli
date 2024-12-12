@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/sirupsen/logrus"
+	"github.com/astronomer/astro-cli/pkg/logger"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 
@@ -117,7 +117,7 @@ func (e *Error) Error() string {
 func DownloadResponseToFile(sourceURL, path string) {
 	file, err := fileutil.CreateFile(path)
 	if err != nil {
-		logrus.Fatal(err)
+		logger.Logger.Fatal(err)
 	}
 
 	client := http.Client{
@@ -128,38 +128,38 @@ func DownloadResponseToFile(sourceURL, path string) {
 	}
 	resp, err := client.Get(sourceURL) //nolint
 	if err != nil {
-		logrus.Fatal(err)
+		logger.Logger.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	err = fileutil.WriteToFile(path, resp.Body)
 	if err != nil {
-		logrus.Fatal(err)
+		logger.Logger.Fatal(err)
 	}
 	defer file.Close()
-	logrus.Infof("Downloaded %s from %s", path, sourceURL)
+	logger.Logger.Infof("Downloaded %s from %s", path, sourceURL)
 }
 
 func RequestAndGetJSONBody(route string) map[string]interface{} {
 	res, err := http.Get(route) //nolint
 	if err != nil {
-		logrus.Fatal(err)
+		logger.Logger.Fatal(err)
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		logrus.Fatal(err)
+		logger.Logger.Fatal(err)
 	}
 	if res.StatusCode > LastSuccessfulHTTPResponseCode {
-		logrus.Fatalf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
+		logger.Logger.Fatalf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
 	}
 
 	var bodyJSON map[string]interface{}
 	err = json.Unmarshal(body, &bodyJSON)
 	if err != nil {
-		logrus.Fatal(err)
+		logger.Logger.Fatal(err)
 	}
-	logrus.Debugf("%s - GET %s %s", res.Status, route, string(body))
+	logger.Logger.Debugf("%s - GET %s %s", res.Status, route, string(body))
 	return bodyJSON
 }
