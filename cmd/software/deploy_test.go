@@ -123,11 +123,11 @@ func (s *Suite) TestDeploy() {
 		s.ErrorIs(err, nil)
 	})
 
-	s.Run("Test for the flag --image-name for image deployment", func() {
+	s.Run("Test for the flag --image-name", func() {
 		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 			return deploymentID, nil
 		}
-		err := execDeployCmd([]string{"test-deployment-id", "--image-name", "--force"}...)
+		err := execDeployCmd([]string{"test-deployment-id", "--image-name", "--force", "--workspace-id=" + mockWorkspace.ID}...)
 		s.ErrorIs(err, nil)
 	})
 
