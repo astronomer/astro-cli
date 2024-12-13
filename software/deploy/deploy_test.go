@@ -455,6 +455,7 @@ func (s *Suite) TestAirflowSuccessForImageOnly() {
 	_, err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, "")
 	s.NoError(err)
 	houstonMock.AssertExpectations(s.T())
+	mockImageHandler.AssertExpectations(s.T())
 }
 
 func (s *Suite) TestAirflowSuccessForImageName() {
@@ -496,6 +497,7 @@ func (s *Suite) TestAirflowSuccessForImageName() {
 	_, err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, customImageName)
 	s.NoError(err)
 	houstonMock.AssertExpectations(s.T())
+	mockImageHandler.AssertExpectations(s.T())
 }
 
 func (s *Suite) TestAirflowFailForImageNameWhenImageHasNoRuntimeLabel() {
@@ -507,7 +509,6 @@ func (s *Suite) TestAirflowFailForImageNameWhenImageHasNoRuntimeLabel() {
 	customImageName := "test-image-name"
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("TagLocalImage", customImageName).Return(nil)
 		mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("", nil)
 		return mockImageHandler
@@ -528,6 +529,7 @@ func (s *Suite) TestAirflowFailForImageNameWhenImageHasNoRuntimeLabel() {
 	_, err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, customImageName)
 	s.Error(err, ErrNoRuntimeLabelOnCustomImage)
 	houstonMock.AssertExpectations(s.T())
+	mockImageHandler.AssertExpectations(s.T())
 }
 
 func (s *Suite) TestAirflowFailureForImageOnly() {
@@ -557,6 +559,7 @@ func (s *Suite) TestAirflowFailureForImageOnly() {
 	_, err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, "")
 	s.Error(err, ErrDeploymentTypeIncorrectForImageOnly)
 	houstonMock.AssertExpectations(s.T())
+	mockImageHandler.AssertExpectations(s.T())
 }
 
 func (s *Suite) TestDeployDagsOnlyFailure() {

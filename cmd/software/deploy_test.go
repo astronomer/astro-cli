@@ -124,14 +124,19 @@ func (s *Suite) TestDeploy() {
 	})
 
 	s.Run("Test for the flag --image-name", func() {
+		var capturedImageName string
 		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+			capturedImageName = imageName // Capture the imageName
 			return deploymentID, nil
 		}
 		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 			return nil
 		}
-		err := execDeployCmd([]string{"test-deployment-id", "--image-name", "--force", "--workspace-id=" + mockWorkspace.ID}...)
+		testImageName := "test-image-name" // Set the expected image name
+		err := execDeployCmd([]string{"test-deployment-id", "--image-name=" + testImageName, "--force", "--workspace-id=" + mockWorkspace.ID}...)
+
 		s.ErrorIs(err, nil)
+		s.Equal(testImageName, capturedImageName, "The imageName passed to DeployAirflowImage is incorrect")
 	})
 
 	s.Run("error should be returned if BYORegistryEnabled is true but BYORegistryDomain is empty", func() {
