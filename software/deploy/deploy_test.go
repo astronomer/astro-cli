@@ -1044,10 +1044,10 @@ func (s *Suite) TestUpdateDeploymentImage() {
 
 	s.Run("When runtimeVersion is empty", func() {
 		houstonMock := new(houston_mocks.ClientInterface)
-		returnedDeploymentId, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, "", imageName)
+		returnedDeploymentID, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, "", imageName)
 		s.ErrorIs(err, ErrRuntimeVersionNotPassedForRemoteImage)
 		houstonMock.AssertExpectations(s.T())
-		s.Equal(returnedDeploymentId, "")
+		s.Equal(returnedDeploymentID, "")
 	})
 
 	s.Run("When getDeploymentIDForCurrentCommandVar gives an error", func() {
@@ -1055,10 +1055,10 @@ func (s *Suite) TestUpdateDeploymentImage() {
 			return deploymentID, nil, errDeploymentNotFound
 		}
 		houstonMock := new(houston_mocks.ClientInterface)
-		returnedDeploymentId, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
+		returnedDeploymentID, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
 		s.ErrorIs(err, errDeploymentNotFound)
 		houstonMock.AssertExpectations(s.T())
-		s.Equal(returnedDeploymentId, "")
+		s.Equal(returnedDeploymentID, "")
 	})
 
 	s.Run("When an error occurs in the GetDeployment api call", func() {
@@ -1068,10 +1068,10 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		houstonMock := new(houston_mocks.ClientInterface)
 		houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
 
-		returnedDeploymentId, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
+		returnedDeploymentID, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
 		s.ErrorContains(err, "failed to get deployment info: some houston error")
 		houstonMock.AssertExpectations(s.T())
-		s.Equal(returnedDeploymentId, "")
+		s.Equal(returnedDeploymentID, "")
 	})
 
 	s.Run("Houston API call throws error", func() {
@@ -1084,10 +1084,10 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		}
 		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
 		houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(nil, errMockHouston).Once()
-		returnedDeploymentId, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
+		returnedDeploymentID, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
 		s.ErrorContains(err, "some houston error")
 		houstonMock.AssertExpectations(s.T())
-		s.Equal(returnedDeploymentId, deploymentID)
+		s.Equal(returnedDeploymentID, deploymentID)
 	})
 
 	s.Run("Successful API call", func() {
@@ -1105,9 +1105,9 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		}
 		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
 		houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(updateDeploymentImageResp, nil).Once()
-		returnedDeploymentId, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
+		returnedDeploymentID, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
 		houstonMock.AssertExpectations(s.T())
 		s.ErrorIs(err, nil)
-		s.Equal(returnedDeploymentId, deploymentID)
+		s.Equal(returnedDeploymentID, deploymentID)
 	})
 }
