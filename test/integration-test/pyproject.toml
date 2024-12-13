@@ -10,6 +10,7 @@ package-mode = false
 python = "^3.10"
 pytest = "8.3.4"
 docker = "7.1.0"
+pyyaml = "6.0.2"
 
 
 [build-system]

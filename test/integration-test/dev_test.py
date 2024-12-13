@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import docker
 import pytest
+import yaml
 from datetime import datetime
 
 ASTRO = os.path.abspath("../../astro")
@@ -129,6 +130,7 @@ def test_dev_logs():
     )
 
     output = result.stdout
+    assert result.returncode == 0
     # Validate that scheduler logs
     assert "Starting the scheduler" in output
 
@@ -144,14 +146,15 @@ def test_dev_parse():
     )
 
     output = result.stdout
+    assert result.returncode == 0
     # Validate dag has been parsed successfully
     assert "no errors detected in your DAGs" in output
 
 
 def test_dev_run():
-    # Run `astro dev run dags list` command
+    # Run `astro dev run variables set foo bar` command
     result = subprocess.run(
-        [ASTRO, "dev", "run", "dags", "list"],
+        [ASTRO, "dev", "run", "variables", "set", "foo", "bar"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -159,8 +162,9 @@ def test_dev_run():
     )
 
     output = result.stdout
-    # Validate deployed example dag has been listed in output
-    assert "example_astronauts" in output
+    assert result.returncode == 0
+    # Validate that variable has been created
+    assert "Variable foo created" in output
 
 
 def test_dev_restart(docker_client):
@@ -212,8 +216,35 @@ def test_dev_restart(docker_client):
             ), f"Container with keyword '{keyword}' was not restarted."
 
 
+def test_dev_export():
+    # Run `astro dev object export -v` command
+    result = subprocess.run(
+        [ASTRO, "dev", "object", "export", "-v"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout
+    assert result.returncode == 0
+    # Validate variables are exported and listed in airflow_setting.yaml file
+    assert "successfully exported variables" in output
+
+    with open("airflow_settings.yaml", "r") as file:
+        data = yaml.safe_load(file)
+    af_data = data.get("airflow", {})
+    variables = af_data.get("variables", [])
+    target_variable = next(
+        (item for item in variables if item.get("variable_name") == "foo"), None
+    )
+    assert (
+        target_variable.get("variable_value") == "bar"
+    ), f"Expected value for 'foo' is 'bar', but got '{target_variable.get('variable_value')}'."
+
+
 def test_dev_kill(docker_client):
-    # Run `astro dev stop` command
+    # Run `astro dev kill` command
     result = subprocess.run(
         [ASTRO, "dev", "kill"],
         stdout=subprocess.PIPE,
