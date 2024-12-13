@@ -249,7 +249,7 @@ func buildDockerImageForWorkingDir(path string, imageHandler airflow.ImageHandle
 	return err
 }
 
-func buildDockerImage(ignoreCacheDeploy bool, deploymentInfo *houston.Deployment, customImageName, path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context) error {
+func buildDockerImage(ignoreCacheDeploy bool, deploymentInfo *houston.Deployment, customImageName, path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface) error {
 	if customImageName == "" {
 		return buildDockerImageForWorkingDir(path, imageHandler, houstonClient, deploymentInfo, ignoreCacheDeploy)
 	}
@@ -262,7 +262,7 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 	if description != "" {
 		deployLabels = append(deployLabels, "io.astronomer.deploy.revision.description="+description)
 	}
-	err := buildDockerImage(ignoreCacheDeploy, deploymentInfo, customImageName, path, imageHandler, houstonClient, c)
+	err := buildDockerImage(ignoreCacheDeploy, deploymentInfo, customImageName, path, imageHandler, houstonClient)
 	if err != nil {
 		return err
 	}
