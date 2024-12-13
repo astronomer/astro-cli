@@ -139,6 +139,29 @@ func (s *Suite) TestDeploy() {
 		s.Equal(testImageName, capturedImageName, "The imageName passed to DeployAirflowImage is incorrect")
 	})
 
+	s.Run("Test for the flag --image-name with --remote. Dags should be deployed but DeployAirflowImage shouldn't be called", func() {
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+			return nil
+		}
+		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string) (string, error) {
+			return "", nil
+		}
+		testImageName := "test-image-name" // Set the expected image name
+		err := execDeployCmd([]string{"test-deployment-id", "--image-name=" + testImageName, "--force", "--remote", "--workspace-id=" + mockWorkspace.ID}...)
+		s.ErrorIs(err, nil)
+		UpdateDeploymentImage = deploy.UpdateDeploymentImage
+	})
+
+	s.Run("Test for the flag --image-name with --remote. Dags should not be deployed if UpdateDeploymentImage throws an error", func() {
+		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string) (string, error) {
+			return "", errNoWorkspaceFound
+		}
+		testImageName := "test-image-name" // Set the expected image name
+		err := execDeployCmd([]string{"test-deployment-id", "--image-name=" + testImageName, "--force", "--remote", "--workspace-id=" + mockWorkspace.ID}...)
+		s.ErrorIs(err, errNoWorkspaceFound)
+		UpdateDeploymentImage = deploy.UpdateDeploymentImage
+	})
+
 	s.Run("error should be returned if BYORegistryEnabled is true but BYORegistryDomain is empty", func() {
 		appConfig = &houston.AppConfig{
 			BYORegistryDomain: "",

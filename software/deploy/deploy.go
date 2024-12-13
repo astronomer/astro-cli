@@ -33,18 +33,19 @@ var (
 )
 
 var (
-	ErrNoWorkspaceID                        = errors.New("no workspace id provided")
-	errNoDomainSet                          = errors.New("no domain set, re-authenticate")
-	errInvalidDeploymentID                  = errors.New("please specify a valid deployment ID")
-	errDeploymentNotFound                   = errors.New("no airflow deployments found")
-	errInvalidDeploymentSelected            = errors.New("invalid deployment selection\n") //nolint
-	ErrDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your Astronomer cluster")
-	ErrDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
-	ErrEmptyDagFolderUserCancelledOperation = errors.New("no DAGs found in the dags folder. User canceled the operation")
-	ErrBYORegistryDomainNotSet              = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
-	ErrDeploymentTypeIncorrectForImageOnly  = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
-	WarningInvalidImageNameMsg              = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
-	ErrNoRuntimeLabelOnCustomImage          = errors.New("the image should have label io.astronomer.docker.runtime.version")
+	ErrNoWorkspaceID                         = errors.New("no workspace id provided")
+	errNoDomainSet                           = errors.New("no domain set, re-authenticate")
+	errInvalidDeploymentID                   = errors.New("please specify a valid deployment ID")
+	errDeploymentNotFound                    = errors.New("no airflow deployments found")
+	errInvalidDeploymentSelected             = errors.New("invalid deployment selection\n") //nolint
+	ErrDagOnlyDeployDisabledInConfig         = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your Astronomer cluster")
+	ErrDagOnlyDeployNotEnabledForDeployment  = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
+	ErrEmptyDagFolderUserCancelledOperation  = errors.New("no DAGs found in the dags folder. User canceled the operation")
+	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
+	ErrDeploymentTypeIncorrectForImageOnly   = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
+	WarningInvalidImageNameMsg               = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
+	ErrNoRuntimeLabelOnCustomImage           = errors.New("the image should have label io.astronomer.docker.runtime.version")
+	ErrRuntimeVersionNotPassedForRemoteImage = errors.New("if --image-name and --remote is passed, it's mandatory to pass --runtime-version")
 )
 
 const (
@@ -162,6 +163,33 @@ func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, d
 	return nil
 }
 
+func updateDeploymentImageAPICall(houstonClient houston.ClientInterface, imageName, releaseName, airflowVersion, runtimeVersion string) (interface{}, error) {
+	req := houston.UpdateDeploymentImageRequest{ReleaseName: releaseName, Image: imageName, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
+	return houston.Call(houstonClient.UpdateDeploymentImage)(req)
+}
+
+func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string) (string, error) {
+	if runtimeVersion == "" {
+		return "", ErrRuntimeVersionNotPassedForRemoteImage
+	}
+	deploymentIDForCurrentCmd, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
+	if err != nil {
+		return "", err
+	}
+	deploymentID = deploymentIDForCurrentCmd
+	if deploymentID == "" {
+		return "", errInvalidDeploymentID
+	}
+	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get deployment info: %w", err)
+	}
+	fmt.Println("Skipping building the image since --image-name flag is used...")
+	_, err = updateDeploymentImageAPICall(houstonClient, imageName, deploymentInfo.ReleaseName, "", runtimeVersion)
+	fmt.Println("Image successfully updated")
+	return deploymentIDForCurrentCmd, err
+}
+
 func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context) error {
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
@@ -187,8 +215,7 @@ func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, 
 		}
 		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel)
 		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel)
-		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
-		_, err := houston.Call(houstonClient.UpdateDeploymentImage)(req)
+		_, err := updateDeploymentImageAPICall(houstonClient, remoteImage, name, airflowVersion, runtimeVersion)
 		return err
 	}
 	return nil
