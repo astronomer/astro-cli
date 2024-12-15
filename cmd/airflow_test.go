@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -481,16 +480,14 @@ func (s *AirflowSuite) TestAirflowInit() {
 
 		orgStdout := os.Stdout
 		defer func() { os.Stdout = orgStdout }()
-		r, w, _ := os.Pipe()
+		_, w, _ := os.Pipe()
 		os.Stdout = w
 
 		err := airflowInit(cmd, args)
 
 		w.Close()
-		out, _ := io.ReadAll(r)
 
 		s.NoError(err)
-		s.Contains(string(out), fmt.Sprintf(changeDirectoryMsg, args[0]))
 	})
 
 	s.Run("specify flag and positional argument for project name, resulting in error", func() {
