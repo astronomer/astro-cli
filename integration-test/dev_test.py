@@ -8,8 +8,8 @@ import pytest
 import yaml
 from datetime import datetime
 
-ASTRO = os.path.abspath("../../astro")
-AIRFLOW_CONTAINERS = ["postgres", "webserver", "scheduler", "triggerer"]
+ASTRO = os.path.abspath("../astro")
+AIRFLOW_COMPONENT = ["postgres", "webserver", "scheduler", "triggerer"]
 
 
 @pytest.fixture(scope="module")
@@ -28,19 +28,21 @@ def docker_client():
     return docker.from_env()
 
 
-def get_container_status(keywords, client):
+def get_container_status(components, client):
     running_containers = client.containers.list()
     client.containers
 
     container_status = {}
     for container in running_containers:
-        for keyword in keywords:
-            if keyword in container.name:
+        for component in components:
+            if component in container.name:
                 container_status[container.name] = container.status
 
-    for keyword in keywords:
-        if not any(keyword in name for name in container_status.keys()):
-            raise AssertionError(f"Container with keyword '{keyword}' not found.")
+    for component in components:
+        if not any(component in name for name in container_status.keys()):
+            raise AssertionError(
+                f"No containers found for airflow component '{component}'"
+            )
 
     return container_status
 
@@ -98,7 +100,7 @@ def test_dev_start(docker_client):
     time.sleep(5)
 
     # Validate airflow containers are up and running
-    container_status = get_container_status(AIRFLOW_CONTAINERS, docker_client)
+    container_status = get_container_status(AIRFLOW_COMPONENT, docker_client)
     for name, status in container_status.items():
         assert status == "running", f"Container '{name}' is not running as expected."
 
@@ -113,10 +115,10 @@ def test_dev_ps():
 
     # Validate airflow conrtainers are listed in output
     output = result.stdout
-    for keyword in AIRFLOW_CONTAINERS:
+    for component in AIRFLOW_COMPONENT:
         assert any(
-            keyword in line for line in output.splitlines()
-        ), f"Container '{keyword}' not listed in output."
+            component in line for line in output.splitlines()
+        ), f"Container '{component}' not listed in output."
 
 
 def test_dev_logs():
@@ -170,14 +172,16 @@ def test_dev_run():
 def test_dev_restart(docker_client):
     # Get initial container start times
     pre_restart_times = {}
-    for keyword in AIRFLOW_CONTAINERS:
+    for component in AIRFLOW_COMPONENT:
         matching_containers = [
             container.name
             for container in docker_client.containers.list()
-            if keyword in container.name
+            if component in container.name
         ]
-        assert matching_containers, f"No containers found with keyword '{keyword}'."
-        pre_restart_times[keyword] = [
+        assert (
+            matching_containers
+        ), f"No containers found for airflow component '{component}'."
+        pre_restart_times[component] = [
             get_container_start_time(name, docker_client)
             for name in matching_containers
         ]
@@ -194,26 +198,28 @@ def test_dev_restart(docker_client):
 
     # Get post-restart container start times
     post_restart_times = {}
-    for keyword in AIRFLOW_CONTAINERS:
+    for component in AIRFLOW_COMPONENT:
         matching_containers = [
             container.name
             for container in docker_client.containers.list()
-            if keyword in container.name
+            if component in container.name
         ]
-        assert matching_containers, f"No containers found with keyword '{keyword}'."
-        post_restart_times[keyword] = [
+        assert (
+            matching_containers
+        ), f"No containers found for airflow component '{component}'."
+        post_restart_times[component] = [
             get_container_start_time(name, docker_client)
             for name in matching_containers
         ]
 
     # Compare pre-restart and post-restart container start times
-    for keyword in AIRFLOW_CONTAINERS:
+    for component in AIRFLOW_COMPONENT:
         for pre_time, post_time in zip(
-            pre_restart_times[keyword], post_restart_times[keyword]
+            pre_restart_times[component], post_restart_times[component]
         ):
             assert (
                 post_time > pre_time
-            ), f"Container with keyword '{keyword}' was not restarted."
+            ), f"Container of airflow component '{component}' was not restarted."
 
 
 def test_dev_export():
