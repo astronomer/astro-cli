@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 
@@ -54,11 +55,12 @@ func (s *Suite) TestAddConnectionsAirflowOne() {
 
 	expectedAddCmd := "airflow connections -a  --conn_id 'test-id' --conn_type 'test-type' --conn_host 'test-host' --conn_login 'test-login' --conn_password 'test-password' --conn_schema 'test-schema' --conn_port 1"
 	expectedListCmd := "airflow connections -l "
-	execAirflowCommand = func(id, airflowCommand string) string {
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
 		s.Contains([]string{expectedAddCmd, expectedListCmd}, airflowCommand)
-		return ""
+		return "", nil
 	}
-	AddConnections("test-conn-id", 1, nil)
+	err := AddConnections("test-conn-id", 1, nil)
+	s.NoError(err)
 }
 
 func (s *Suite) TestAddConnectionsAirflowTwo() {
@@ -80,14 +82,15 @@ func (s *Suite) TestAddConnectionsAirflowTwo() {
 	expectedAddCmd := "airflow connections add   'test-id' --conn-type 'test-type' --conn-host 'test-host' --conn-login 'test-login' --conn-password 'test-password' --conn-schema 'test-schema' --conn-port 1"
 	expectedDelCmd := "airflow connections delete   \"test-id\""
 	expectedListCmd := "airflow connections list -o plain"
-	execAirflowCommand = func(id, airflowCommand string) string {
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
 		s.Contains([]string{expectedAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
 		if airflowCommand == expectedListCmd {
-			return "'test-id' 'test-type' 'test-host' 'test-uri'"
+			return "'test-id' 'test-type' 'test-host' 'test-uri'", nil
 		}
-		return ""
+		return "", nil
 	}
-	AddConnections("test-conn-id", 2, nil)
+	err := AddConnections("test-conn-id", 2, nil)
+	s.NoError(err)
 }
 
 func ptr[T any](t T) *T {
@@ -130,14 +133,15 @@ func (s *Suite) TestAddConnectionsAirflowTwoWithEnvConns() {
 
 	expectedEnvAddCmd := "airflow connections add   'test-env-id' --conn-type 'test-env-type' --conn-extra '{\"test-extra-key\":\"test-extra-value\"}' --conn-host 'test-env-host' --conn-login 'test-env-login' --conn-password 'test-env-password' --conn-schema 'test-env-schema' --conn-port 2"
 
-	execAirflowCommand = func(id, airflowCommand string) string {
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
 		s.Contains([]string{expectedAddCmd, expectedEnvAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
 		if airflowCommand == expectedListCmd {
-			return "'test-id' 'test-type' 'test-host' 'test-uri'"
+			return "'test-id' 'test-type' 'test-host' 'test-uri'", nil
 		}
-		return ""
+		return "", nil
 	}
-	AddConnections("test-conn-id", 2, envConns)
+	err := AddConnections("test-conn-id", 2, envConns)
+	s.NoError(err)
 }
 
 func (s *Suite) TestAddConnectionsAirflowTwoURI() {
@@ -149,14 +153,41 @@ func (s *Suite) TestAddConnectionsAirflowTwoURI() {
 	expectedAddCmd := "airflow connections add   'test-id' --conn-uri 'test-uri'"
 	expectedDelCmd := "airflow connections delete   \"test-id\""
 	expectedListCmd := "airflow connections list -o plain"
-	execAirflowCommand = func(id, airflowCommand string) string {
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
 		s.Contains([]string{expectedAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
 		if airflowCommand == expectedListCmd {
-			return "'test-id' 'test-type' 'test-host' 'test-uri'"
+			return "'test-id' 'test-type' 'test-host' 'test-uri'", nil
 		}
-		return ""
+		return "", nil
 	}
-	AddConnections("test-conn-id", 2, nil)
+	err := AddConnections("test-conn-id", 2, nil)
+	s.NoError(err)
+}
+
+func (s *Suite) TestAddConnectionsFailure() {
+	var testExtra map[string]string
+
+	testConn := Connection{
+		ConnID:       "test-id",
+		ConnType:     "test-type",
+		ConnHost:     "test-host",
+		ConnSchema:   "test-schema",
+		ConnLogin:    "test-login",
+		ConnPassword: "test-password",
+		ConnPort:     1,
+		ConnURI:      "test-uri",
+		ConnExtra:    testExtra,
+	}
+	settings.Airflow.Connections = []Connection{testConn}
+
+	expectedAddCmd := "airflow connections -a  --conn_id 'test-id' --conn_type 'test-type' --conn_host 'test-host' --conn_login 'test-login' --conn_password 'test-password' --conn_schema 'test-schema' --conn_port 1"
+	expectedListCmd := "airflow connections -l "
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
+		s.Contains([]string{expectedAddCmd, expectedListCmd}, airflowCommand)
+		return "", fmt.Errorf("mock error")
+	}
+	err := AddConnections("test-conn-id", 1, nil)
+	s.Contains(err.Error(), "mock error")
 }
 
 func (s *Suite) TestAddVariableAirflowOne() {
@@ -168,11 +199,12 @@ func (s *Suite) TestAddVariableAirflowOne() {
 	}
 
 	expectedAddCmd := "airflow variables -s test-var-name'test-var-val'"
-	execAirflowCommand = func(id, airflowCommand string) string {
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
 		s.Equal(expectedAddCmd, airflowCommand)
-		return ""
+		return "", nil
 	}
-	AddVariables("test-conn-id", 1)
+	err := AddVariables("test-conn-id", 1)
+	s.NoError(err)
 }
 
 func (s *Suite) TestAddVariableAirflowTwo() {
@@ -184,11 +216,12 @@ func (s *Suite) TestAddVariableAirflowTwo() {
 	}
 
 	expectedAddCmd := "airflow variables set test-var-name 'test-var-val'"
-	execAirflowCommand = func(id, airflowCommand string) string {
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
 		s.Equal(expectedAddCmd, airflowCommand)
-		return ""
+		return "", nil
 	}
-	AddVariables("test-conn-id", 2)
+	err := AddVariables("test-conn-id", 2)
+	s.NoError(err)
 }
 
 func (s *Suite) TestAddPoolsAirflowOne() {
@@ -201,11 +234,12 @@ func (s *Suite) TestAddPoolsAirflowOne() {
 	}
 
 	expectedAddCmd := "airflow pool -s  test-pool-name 1 'test-pool-description' "
-	execAirflowCommand = func(id, airflowCommand string) string {
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
 		s.Equal(expectedAddCmd, airflowCommand)
-		return ""
+		return "", nil
 	}
-	AddPools("test-conn-id", 1)
+	err := AddPools("test-conn-id", 1)
+	s.NoError(err)
 }
 
 func (s *Suite) TestAddPoolsAirflowTwo() {
@@ -218,11 +252,29 @@ func (s *Suite) TestAddPoolsAirflowTwo() {
 	}
 
 	expectedAddCmd := "airflow pools set  test-pool-name 1 'test-pool-description' "
-	execAirflowCommand = func(id, airflowCommand string) string {
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
 		s.Equal(expectedAddCmd, airflowCommand)
-		return ""
+		return "", nil
 	}
-	AddPools("test-conn-id", 2)
+	err := AddPools("test-conn-id", 2)
+	s.NoError(err)
+}
+
+func (s *Suite) TestAddVariableFailure() {
+	settings.Airflow.Variables = Variables{
+		{
+			VariableName:  "test-var-name",
+			VariableValue: "test-var-val",
+		},
+	}
+
+	expectedAddCmd := "airflow variables -s test-var-name'test-var-val'"
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
+		s.Equal(expectedAddCmd, airflowCommand)
+		return "", fmt.Errorf("mock error")
+	}
+	err := AddVariables("test-conn-id", 1)
+	s.Contains(err.Error(), "mock error")
 }
 
 func (s *Suite) TestInitSettingsSuccess() {
@@ -242,20 +294,20 @@ func (s *Suite) TestInitSettingsFailure() {
 
 func (s *Suite) TestEnvExport() {
 	s.Run("success", func() {
-		execAirflowCommand = func(id, airflowCommand string) string {
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
 			switch airflowCommand {
 			case airflowVarExport:
-				return "1 variables successfully exported to tmp.var"
+				return "1 variables successfully exported to tmp.var", nil
 			case catVarFile:
 				return `{
 					"myvar": "myval"
-				}`
+				}`, nil
 			case airflowConnExport:
-				return "Connections successfully exported to tmp.json"
+				return "Connections successfully exported to tmp.json", nil
 			case catConnFile:
-				return "local_postgres=postgres://username:password@example.db.example.com:5432/schema"
+				return "local_postgres=postgres://username:password@example.db.example.com:5432/schema", nil
 			default:
-				return ""
+				return "", nil
 			}
 		}
 
@@ -269,12 +321,12 @@ func (s *Suite) TestEnvExport() {
 	})
 
 	s.Run("variable failure", func() {
-		execAirflowCommand = func(id, airflowCommand string) string {
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
 			switch airflowCommand {
 			case airflowVarExport:
-				return ""
+				return "", nil
 			default:
-				return ""
+				return "", nil
 			}
 		}
 
@@ -284,12 +336,12 @@ func (s *Suite) TestEnvExport() {
 	})
 
 	s.Run("connection failure", func() {
-		execAirflowCommand = func(id, airflowCommand string) string {
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
 			switch airflowCommand {
 			case airflowConnExport:
-				return ""
+				return "", nil
 			default:
-				return ""
+				return "", nil
 			}
 		}
 
@@ -306,7 +358,7 @@ func (s *Suite) TestEnvExport() {
 
 func (s *Suite) TestExport() {
 	s.Run("success", func() {
-		execAirflowCommand = func(id, airflowCommand string) string {
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
 			switch airflowCommand {
 			case airflowConnectionList:
 				return `
@@ -322,13 +374,13 @@ func (s *Suite) TestExport() {
   login: username
   password: password
   port: '5432'
-  schema: schema`
+  schema: schema`, nil
 			case airflowVarExport:
-				return "1 variables successfully exported to tmp.var"
+				return "1 variables successfully exported to tmp.var", nil
 			case catVarFile:
 				return `{
 					"myvar": "myval"
-				}`
+				}`, nil
 			case ariflowPoolsList:
 				return `
 - description: Default pool
@@ -336,9 +388,9 @@ func (s *Suite) TestExport() {
   slots: '128'
 - description: ''
   pool: subdag_limit
-  slots: '3'`
+  slots: '3'`, nil
 			default:
-				return ""
+				return "", nil
 			}
 		}
 
@@ -347,12 +399,12 @@ func (s *Suite) TestExport() {
 	})
 
 	s.Run("variable failure", func() {
-		execAirflowCommand = func(id, airflowCommand string) string {
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
 			switch airflowCommand {
 			case airflowVarExport:
-				return ""
+				return "", nil
 			default:
-				return ""
+				return "", nil
 			}
 		}
 
