@@ -30,8 +30,6 @@ var (
 	gzipFile = fileutil.GzipFile
 
 	getDeploymentIDForCurrentCommandVar = getDeploymentIDForCurrentCommand
-
-	deployLabels = []string{"io.astronomer.skip.revision=true"}
 )
 
 var (
@@ -214,7 +212,7 @@ func buildDockerImageForCustomImage(imageHandler airflow.ImageHandler, customIma
 	return err
 }
 
-func buildDockerImageForWorkingDir(path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, deploymentInfo *houston.Deployment, ignoreCacheDeploy bool) error {
+func buildDockerImageFromWorkingDir(path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, deploymentInfo *houston.Deployment, ignoreCacheDeploy bool, description string) error {
 	// all these checks inside Dockerfile should happen only when no image-name is provided
 	// parse dockerfile
 	cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
@@ -237,6 +235,10 @@ func buildDockerImageForWorkingDir(path string, imageHandler airflow.ImageHandle
 	}
 	// Build our image
 	fmt.Println(imageBuildingPrompt)
+	deployLabels := []string{"io.astronomer.skip.revision=true"}
+	if description != "" {
+		deployLabels = append(deployLabels, "io.astronomer.deploy.revision.description="+description)
+	}
 	buildConfig := types.ImageBuildConfig{
 		Path:            config.WorkingPath,
 		NoCache:         ignoreCacheDeploy,
@@ -249,9 +251,9 @@ func buildDockerImageForWorkingDir(path string, imageHandler airflow.ImageHandle
 	return err
 }
 
-func buildDockerImage(ignoreCacheDeploy bool, deploymentInfo *houston.Deployment, customImageName, path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface) error {
+func buildDockerImage(ignoreCacheDeploy bool, deploymentInfo *houston.Deployment, customImageName, path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, description string) error {
 	if customImageName == "" {
-		return buildDockerImageForWorkingDir(path, imageHandler, houstonClient, deploymentInfo, ignoreCacheDeploy)
+		return buildDockerImageFromWorkingDir(path, imageHandler, houstonClient, deploymentInfo, ignoreCacheDeploy, description)
 	}
 	return buildDockerImageForCustomImage(imageHandler, customImageName, deploymentInfo, houstonClient)
 }
@@ -259,10 +261,7 @@ func buildDockerImage(ignoreCacheDeploy bool, deploymentInfo *houston.Deployment
 func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool, description, customImageName string) error {
 	imageName := airflow.ImageName(name, "latest")
 	imageHandler := imageHandlerInit(imageName)
-	if description != "" {
-		deployLabels = append(deployLabels, "io.astronomer.deploy.revision.description="+description)
-	}
-	err := buildDockerImage(ignoreCacheDeploy, deploymentInfo, customImageName, path, imageHandler, houstonClient)
+	err := buildDockerImage(ignoreCacheDeploy, deploymentInfo, customImageName, path, imageHandler, houstonClient, description)
 	if err != nil {
 		return err
 	}
