@@ -23,6 +23,11 @@ func (s *Suite) SetupSuite() {
 func (s *Suite) SetupTest() {
 	// Reset the version once this is torn down
 	houstonVersion = "0.34.0"
+	DagsOnlyDeploy = deploy.DagsOnlyDeploy
+}
+
+func (s *Suite) SetupSubTest() {
+	DagsOnlyDeploy = deploy.DagsOnlyDeploy
 }
 
 func (s *Suite) TearDownSuite() {

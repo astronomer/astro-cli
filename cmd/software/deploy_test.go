@@ -63,6 +63,9 @@ func (s *Suite) TestDeploy() {
 	err = execDeployCmd([]string{"test-deployment-id", "--force"}...)
 	s.NoError(err)
 
+	// Restore DagsOnlyDeploy to default behavior
+	DagsOnlyDeploy = deploy.DagsOnlyDeploy
+
 	s.Run("error should be returned for astro deploy, if DeployAirflowImage throws error", func() {
 		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 			return deploymentID, deploy.ErrNoWorkspaceID
