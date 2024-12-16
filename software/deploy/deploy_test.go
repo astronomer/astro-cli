@@ -103,7 +103,7 @@ func (s *Suite) TestValidRuntimeImageRepo() {
 	s.False(validRuntimeImageRepo("personal-repo/ap-airflow"))
 }
 
-func (s *Suite) SetupTest() {
+func (s *Suite) SetupSuite() {
 	// Common setup logic for the test suite
 	s.fsForLocalConfig = afero.NewMemMapFs()
 	afero.WriteFile(s.fsForLocalConfig, config.HomeConfigFile, testUtil.NewTestConfig("localhost"), 0o777)
