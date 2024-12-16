@@ -110,12 +110,13 @@ func (s *Suite) SetupSuite() {
 
 	s.fsForDockerConfig = afero.NewMemMapFs()
 	afero.WriteFile(s.fsForLocalConfig, config.HomeConfigFile, testUtil.NewTestConfig("docker"), 0o777)
+}
 
+func (s *Suite) SetupTest() {
 	s.mockImageHandler = new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		return s.mockImageHandler
 	}
-
 	s.houstonMock = new(houston_mocks.ClientInterface)
 }
 
