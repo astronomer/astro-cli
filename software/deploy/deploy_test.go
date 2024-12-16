@@ -113,6 +113,7 @@ func (s *Suite) SetupSuite() {
 }
 
 func (s *Suite) SetupTest() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	s.mockImageHandler = new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		return s.mockImageHandler
@@ -120,8 +121,21 @@ func (s *Suite) SetupTest() {
 	s.houstonMock = new(houston_mocks.ClientInterface)
 }
 
+func (s *Suite) SetupSubTest() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.mockImageHandler = new(mocks.ImageHandler)
+	imageHandlerInit = func(image string) airflow.ImageHandler {
+		return s.mockImageHandler
+	}
+	s.houstonMock = new(houston_mocks.ClientInterface)
+}
+
+func (s *Suite) TearDownSubTest() {
+	s.houstonMock.AssertExpectations(s.T())
+	s.mockImageHandler.AssertExpectations(s.T())
+}
+
 func (s *Suite) TearDownSuite() {
-	// Cleanup logic, if any (e.g., clearing mocks)
 	s.mockImageHandler = nil
 	s.houstonMock = nil
 	s.fsForDockerConfig = nil
@@ -290,10 +304,7 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 	s.EqualError(err, "failed to parse dockerfile: testfiles/Dockerfile.invalid: when using JSON array syntax, arrays must be comprised of strings only")
 	dockerfile = "Dockerfile"
 
-	fs := afero.NewMemMapFs()
-	configYaml := testUtil.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+	config.InitConfig(s.fsForDockerConfig)
 
 	mockedDeploymentConfig := &houston.DeploymentConfig{
 		AirflowImages: mockAirflowImageList,
@@ -459,16 +470,12 @@ func (s *Suite) TestAirflowSuccess() {
 }
 
 func (s *Suite) TestAirflowSuccessForImageOnly() {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtil.NewTestConfig("localhost")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+	config.InitConfig(s.fsForLocalConfig)
 
-	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		return mockImageHandler
+		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		return s.mockImageHandler
 	}
 
 	mockedDeploymentConfig := &houston.DeploymentConfig{
@@ -478,10 +485,9 @@ func (s *Suite) TestAirflowSuccessForImageOnly() {
 		houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.5"},
 		houston.RuntimeRelease{Version: "4.2.5", AirflowVersion: "2.2.5"},
 	}
-	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
-	houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
-	houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Once()
+	s.houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
+	s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
+	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Once()
 	dagDeployment := &houston.DagDeploymentConfig{
 		Type: "dag-only",
 	}
@@ -489,13 +495,11 @@ func (s *Suite) TestAirflowSuccessForImageOnly() {
 		DagDeployment: *dagDeployment,
 	}
 
-	houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-	houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
+	s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+	s.houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
 
-	_, err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, "")
+	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, "")
 	s.NoError(err)
-	houstonMock.AssertExpectations(s.T())
-	mockImageHandler.AssertExpectations(s.T())
 }
 
 func (s *Suite) TestAirflowSuccessForImageName() {
@@ -540,7 +544,6 @@ func (s *Suite) TestAirflowFailForImageNameWhenImageHasNoRuntimeLabel() {
 		s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("", nil)
 		return s.mockImageHandler
 	}
-
 	s.houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
 	s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
 	dagDeployment := &houston.DagDeploymentConfig{
@@ -1035,7 +1038,6 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 }
 
 func (s *Suite) TestUpdateDeploymentImage() {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	deploymentID := "test-deployment-id"
 	wsID := "test-workspace-id"
 	runtimeVersion := "12.1.1"
@@ -1043,10 +1045,8 @@ func (s *Suite) TestUpdateDeploymentImage() {
 	releaseName := "releaseName"
 
 	s.Run("When runtimeVersion is empty", func() {
-		houstonMock := new(houston_mocks.ClientInterface)
-		returnedDeploymentID, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, "", imageName)
+		returnedDeploymentID, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, "", imageName)
 		s.ErrorIs(err, ErrRuntimeVersionNotPassedForRemoteImage)
-		houstonMock.AssertExpectations(s.T())
 		s.Equal(returnedDeploymentID, "")
 	})
 
@@ -1054,10 +1054,8 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, errDeploymentNotFound
 		}
-		houstonMock := new(houston_mocks.ClientInterface)
-		returnedDeploymentID, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
+		returnedDeploymentID, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName)
 		s.ErrorIs(err, errDeploymentNotFound)
-		houstonMock.AssertExpectations(s.T())
 		s.Equal(returnedDeploymentID, "")
 	})
 
@@ -1065,12 +1063,10 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
-		houstonMock := new(houston_mocks.ClientInterface)
-		houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
+		s.houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
 
-		returnedDeploymentID, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
+		returnedDeploymentID, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName)
 		s.ErrorContains(err, "failed to get deployment info: some houston error")
-		houstonMock.AssertExpectations(s.T())
 		s.Equal(returnedDeploymentID, "")
 	})
 
@@ -1078,15 +1074,13 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
-		houstonMock := new(houston_mocks.ClientInterface)
 		deployment := &houston.Deployment{
 			ReleaseName: releaseName,
 		}
-		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-		houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(nil, errMockHouston).Once()
-		returnedDeploymentID, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
+		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		s.houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(nil, errMockHouston).Once()
+		returnedDeploymentID, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName)
 		s.ErrorContains(err, "some houston error")
-		houstonMock.AssertExpectations(s.T())
 		s.Equal(returnedDeploymentID, deploymentID)
 	})
 
@@ -1094,7 +1088,6 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
-		houstonMock := new(houston_mocks.ClientInterface)
 		updateDeploymentImageResp := &houston.UpdateDeploymentImageResp{
 			ReleaseName:    releaseName,
 			AirflowVersion: "",
@@ -1103,10 +1096,9 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		deployment := &houston.Deployment{
 			ReleaseName: releaseName,
 		}
-		houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-		houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(updateDeploymentImageResp, nil).Once()
-		returnedDeploymentID, err := UpdateDeploymentImage(houstonMock, deploymentID, wsID, runtimeVersion, imageName)
-		houstonMock.AssertExpectations(s.T())
+		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		s.houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(updateDeploymentImageResp, nil).Once()
+		returnedDeploymentID, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName)
 		s.ErrorIs(err, nil)
 		s.Equal(returnedDeploymentID, deploymentID)
 	})

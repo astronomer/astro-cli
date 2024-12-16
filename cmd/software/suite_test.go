@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/software/deploy"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -24,7 +25,13 @@ func (s *Suite) SetupTest() {
 	houstonVersion = "0.34.0"
 }
 
+func (s *Suite) TearDownSuite() {
+	DagsOnlyDeploy = deploy.DagsOnlyDeploy
+	UpdateDeploymentImage = deploy.UpdateDeploymentImage
+}
+
 var (
-	_ suite.SetupAllSuite  = (*Suite)(nil)
-	_ suite.SetupTestSuite = (*Suite)(nil)
+	_ suite.SetupAllSuite    = (*Suite)(nil)
+	_ suite.SetupTestSuite   = (*Suite)(nil)
+	_ suite.TearDownAllSuite = (*Suite)(nil)
 )

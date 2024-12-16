@@ -21,17 +21,18 @@ var (
 
 	ignoreCacheDeploy = false
 
-	EnsureProjectDir               = utils.EnsureProjectDir
-	DeployAirflowImage             = deploy.Airflow
-	DagsOnlyDeploy                 = deploy.DagsOnlyDeploy
-	UpdateDeploymentImage          = deploy.UpdateDeploymentImage
-	isDagOnlyDeploy                bool
-	description                    string
-	isImageOnlyDeploy              bool
-	imageName                      string
-	runtimeVersionForImageName     string
-	imagePresentOnRemote           bool
-	ErrBothDagsOnlyAndImageOnlySet = errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
+	EnsureProjectDir                   = utils.EnsureProjectDir
+	DeployAirflowImage                 = deploy.Airflow
+	DagsOnlyDeploy                     = deploy.DagsOnlyDeploy
+	UpdateDeploymentImage              = deploy.UpdateDeploymentImage
+	isDagOnlyDeploy                    bool
+	description                        string
+	isImageOnlyDeploy                  bool
+	imageName                          string
+	runtimeVersionForImageName         string
+	imagePresentOnRemote               bool
+	ErrBothDagsOnlyAndImageOnlySet     = errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
+	ErrImageNameNotPassedForRemoteFlag = errors.New("--image-name is mandatory when --remote flag is passed")
 )
 
 var deployExample = `
@@ -67,7 +68,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&isImageOnlyDeploy, "image", "", false, "Push only an image to your Astro Deployment. This only works for Dag-only, Git-sync-based and NFS-based deployments.")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of the custom image(should be present locally unless --remote is specified) to deploy")
 	cmd.Flags().StringVar(&runtimeVersionForImageName, "runtime-version", "", "Runtime version of the image to deploy. Example - 12.1.1. Mandatory if --image-name --remote is provided")
-	cmd.Flags().BoolVarP(&imagePresentOnRemote, "remote", "", false, "Custom image is present on remote registry")
+	cmd.Flags().BoolVarP(&imagePresentOnRemote, "remote", "", false, "Custom image which is present on the remote registry. Can only be used with --image-name flag")
 
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
 		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only DAGs to your Deployment")
@@ -126,7 +127,10 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true, description)
 	}
 
-	if imagePresentOnRemote && imageName != "" {
+	if imagePresentOnRemote {
+		if imageName == "" {
+			return ErrImageNameNotPassedForRemoteFlag
+		}
 		deploymentID, err = UpdateDeploymentImage(houstonClient, deploymentID, ws, runtimeVersionForImageName, imageName)
 		if err != nil {
 			return err

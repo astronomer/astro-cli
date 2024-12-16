@@ -172,11 +172,10 @@ func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, 
 	if runtimeVersion == "" {
 		return "", ErrRuntimeVersionNotPassedForRemoteImage
 	}
-	deploymentIDForCurrentCmd, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
+	deploymentID, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
 	if err != nil {
 		return "", err
 	}
-	deploymentID = deploymentIDForCurrentCmd
 	if deploymentID == "" {
 		return "", errInvalidDeploymentID
 	}
@@ -187,7 +186,7 @@ func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, 
 	fmt.Println("Skipping building the image since --image-name flag is used...")
 	_, err = updateDeploymentImageAPICall(houstonClient, imageName, deploymentInfo.ReleaseName, "", runtimeVersion)
 	fmt.Println("Image successfully updated")
-	return deploymentIDForCurrentCmd, err
+	return deploymentID, err
 }
 
 func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context) error {
@@ -429,11 +428,10 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 		return ErrDagOnlyDeployDisabledInConfig
 	}
 
-	deploymentIDForCurrentCmd, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
+	deploymentID, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
 	if err != nil {
 		return err
 	}
-	deploymentID = deploymentIDForCurrentCmd
 
 	if deploymentID == "" {
 		return errInvalidDeploymentID
