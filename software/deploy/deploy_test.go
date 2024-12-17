@@ -129,6 +129,16 @@ func (s *Suite) TearDownSuite() {
 	imageHandlerInit = airflow.ImageHandlerInit
 }
 
+func (s *Suite) TearDownSubTest() {
+	s.houstonMock.AssertExpectations(s.T())
+	s.mockImageHandler.AssertExpectations(s.T())
+}
+
+func (s *Suite) TearDownTest() {
+	s.houstonMock.AssertExpectations(s.T())
+	s.mockImageHandler.AssertExpectations(s.T())
+}
+
 func (s *Suite) TestBuildPushDockerImageSuccessWithTagWarning() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("docker")
@@ -520,8 +530,6 @@ func (s *Suite) TestAirflowSuccessForImageName() {
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, customImageName)
 	s.NoError(err)
-	s.houstonMock.AssertExpectations(s.T())
-	s.mockImageHandler.AssertExpectations(s.T())
 }
 
 func (s *Suite) TestAirflowFailForImageNameWhenImageHasNoRuntimeLabel() {
@@ -546,8 +554,6 @@ func (s *Suite) TestAirflowFailForImageNameWhenImageHasNoRuntimeLabel() {
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, customImageName)
 	s.Error(err, ErrNoRuntimeLabelOnCustomImage)
-	s.houstonMock.AssertExpectations(s.T())
-	s.mockImageHandler.AssertExpectations(s.T())
 }
 
 func (s *Suite) TestAirflowFailureForImageOnly() {
@@ -570,8 +576,6 @@ func (s *Suite) TestAirflowFailureForImageOnly() {
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, "")
 	s.Error(err, ErrDeploymentTypeIncorrectForImageOnly)
-	s.houstonMock.AssertExpectations(s.T())
-	s.mockImageHandler.AssertExpectations(s.T())
 }
 
 func (s *Suite) TestDeployDagsOnlyFailure() {
