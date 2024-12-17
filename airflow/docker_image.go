@@ -14,20 +14,17 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/docker/cli/cli/streams"
-	"github.com/docker/docker/api/types/image"
-
 	"github.com/astronomer/astro-cli/airflow/runtimes"
-
+	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
+	"github.com/docker/cli/cli/streams"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
-
-	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
-	"github.com/astronomer/astro-cli/config"
 )
 
 const (
