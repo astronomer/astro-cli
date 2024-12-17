@@ -411,15 +411,13 @@ func (d *DockerCompose) Kill() error {
 	// We then swap back to the original level.
 	originalLevel := logrus.GetLevel()
 	logrus.SetLevel(logrus.ErrorLevel)
+	defer logrus.SetLevel(originalLevel)
 
 	// Shut down our project
 	err := d.composeService.Down(context.Background(), d.projectName, api.DownOptions{Volumes: true, RemoveOrphans: true})
 	if err != nil {
 		return errors.Wrap(err, composeStopErrMsg)
 	}
-
-	// Restore the log level.
-	logrus.SetLevel(originalLevel)
 
 	return nil
 }
