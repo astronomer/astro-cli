@@ -94,7 +94,7 @@ func configGet(cmd *cobra.Command, args []string) error {
 }
 
 func configSet(cmd *cobra.Command, args []string) error {
-	if len(args) != 2 { //nolint:gomnd
+	if len(args) != 2 { //nolint:mnd
 		return errInvalidSetArgs
 	}
 
