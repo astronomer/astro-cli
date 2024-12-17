@@ -103,7 +103,6 @@ astro dev init --from-template
 
 	configReinitProjectConfigMsg = "Reinitialized existing Astro project in %s\n"
 	configInitProjectConfigMsg   = "Initialized empty Astro project in %s\n"
-	changeDirectoryMsg           = "To begin developing, change to your project directory with `cd %s`\n"
 
 	// this is used to monkey patch the function in order to write unit test cases
 	containerHandlerInit = airflow.ContainerHandlerInit
@@ -112,13 +111,13 @@ astro dev init --from-template
 
 	pytestDir = "/tests"
 
-	airflowUpgradeCheckCmd = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
-	errPytestArgs          = errors.New("you can only pass one pytest file or directory")
-	buildSecrets           = []string{}
-	errNoCompose           = errors.New("cannot use '--compose-file' without '--compose' flag")
-	TemplateList           = airflow.FetchTemplateList
-	defaultWaitTime        = 1 * time.Minute
-	directoryPermissions   = 0o755
+	airflowUpgradeCheckCmd        = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
+	errPytestArgs                 = errors.New("you can only pass one pytest file or directory")
+	buildSecrets                  = []string{}
+	errNoCompose                  = errors.New("cannot use '--compose-file' without '--compose' flag")
+	TemplateList                  = airflow.FetchTemplateList
+	defaultWaitTime               = 1 * time.Minute
+	directoryPermissions   uint32 = 0o755
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
@@ -460,12 +459,6 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	}
 	projectName = name
 
-	// Save the directory we are in when the init command is run.
-	initialDir, err := fileutil.GetWorkingDir()
-	if err != nil {
-		return err
-	}
-
 	if fromTemplate == "select-template" {
 		selectedTemplate, err := selectedTemplate()
 		if err != nil {
@@ -550,13 +543,6 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf(configReinitProjectConfigMsg, config.WorkingPath)
 	} else {
 		fmt.Printf(configInitProjectConfigMsg, config.WorkingPath)
-	}
-
-	// If we started in a different directory, that means the positional argument for projectName was used.
-	// This means the users shell pwd is not the project directory, so we print a message
-	// to cd into the project directory.
-	if initialDir != config.WorkingPath {
-		fmt.Printf(changeDirectoryMsg, projectName)
 	}
 
 	return nil

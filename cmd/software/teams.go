@@ -4,8 +4,8 @@ import (
 	"io"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/software/teams"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -86,7 +86,7 @@ func listTeam(_ *cobra.Command, out io.Writer, paginated bool, pageSize int) err
 		}
 
 		if !(pageSize > 0 && pageSize <= teams.ListTeamLimit) {
-			logrus.Warnf("Page size cannot be more than %d, reducing the page size to %d", teams.ListTeamLimit, teams.ListTeamLimit)
+			logger.Warnf("Page size cannot be more than %d, reducing the page size to %d", teams.ListTeamLimit, teams.ListTeamLimit)
 			pageSize = teams.ListTeamLimit
 		}
 

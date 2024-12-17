@@ -95,7 +95,7 @@ func Delete(domain string, noPrompt bool) error {
 	c := config.Context{Domain: domain}
 	err := c.DeleteContext()
 	if err != nil {
-		fmt.Printf(failCtxDeleteMsg, domain) //nolint:staticcheck
+		fmt.Printf(failCtxDeleteMsg, domain)
 		return err
 	}
 

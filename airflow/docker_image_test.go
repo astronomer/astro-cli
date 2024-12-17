@@ -455,7 +455,7 @@ func (s *Suite) TestDockerImagePush() {
 	s.Run("success", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error { return nil }
 
-		displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback func(jsonmessage.JSONMessage)) error {
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
 			return nil
 		}
 
@@ -464,7 +464,7 @@ func (s *Suite) TestDockerImagePush() {
 	})
 
 	s.Run("success with docker cred store", func() {
-		displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback func(jsonmessage.JSONMessage)) error {
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
 			return nil
 		}
 

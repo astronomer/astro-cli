@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 )
 
@@ -156,13 +156,13 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 			// ignore excluded paths
 			for _, excludePathPrefix := range excludePathPrefixes {
 				if strings.HasPrefix(headerName, excludePathPrefix) {
-					logrus.Debugf("Excluding tarball path: %s", headerName)
+					logger.Debugf("Excluding tarball path: %s", headerName)
 					return nil
 				}
 			}
 
 			header.Name = headerName
-			logrus.Debugf("Adding to tarball: %s", header.Name)
+			logger.Debugf("Adding to tarball: %s", header.Name)
 
 			if err := tarball.WriteHeader(header); err != nil {
 				return err
@@ -232,7 +232,7 @@ func GetFilesWithSpecificExtension(folderPath, ext string) []string {
 }
 
 func AddLineToFile(filePath, lineText, commentText string) error {
-	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
+	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:mnd
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func AddLineToFile(filePath, lineText, commentText string) error {
 
 // This function removes airflow db init from the Dockerfile. Needed by astro run command
 func RemoveLineFromFile(filePath, lineText, commentText string) error {
-	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
+	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:mnd
 	if err != nil {
 		return err
 	}

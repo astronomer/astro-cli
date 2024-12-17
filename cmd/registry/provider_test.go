@@ -5,17 +5,17 @@ import (
 	"os"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	log "github.com/sirupsen/logrus"
 )
 
 func execProviderCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
 	cmd := newRegistryProviderCmd(os.Stdout)
 	cmd.SetOut(buf)
-	log.SetOutput(buf)
+	logger.SetOutput(buf)
 	defer func() {
-		log.SetOutput(os.Stderr)
+		logger.SetOutput(os.Stderr)
 	}()
 	cmd.SetArgs(args)
 	testUtil.SetupOSArgsForGinkgo()

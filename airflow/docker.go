@@ -12,9 +12,12 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/docker/docker/api/types/container"
 
 	"github.com/astronomer/astro-cli/airflow/runtimes"
+	"github.com/astronomer/astro-cli/pkg/logger"
 
 	semver "github.com/Masterminds/semver/v3"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
@@ -38,7 +41,6 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -47,7 +49,7 @@ const (
 	componentName                  = "airflow"
 	dockerStateUp                  = "running"
 	dockerExitState                = "exited"
-	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
+	defaultAirflowVersion          = uint64(0x2) //nolint:mnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
 	pytestDirectory                = "tests"
@@ -169,12 +171,12 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 
 	dockerCli, err := command.NewDockerCli()
 	if err != nil {
-		logrus.Fatalf("error creating compose client %s", err)
+		logger.Fatalf("error creating compose client %s", err)
 	}
 
 	err = dockerCli.Initialize(flags.NewClientOptions())
 	if err != nil {
-		logrus.Fatalf("error init compose client %s", err)
+		logger.Fatalf("error init compose client %s", err)
 	}
 
 	composeService := compose.NewComposeService(dockerCli)
@@ -311,7 +313,8 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 	}
 
 	// write the yaml to a file
-	err = os.WriteFile(composeFile, []byte(yaml), 0o666) //nolint:gosec, gomnd
+	composeFilePerms := 0o666
+	err = os.WriteFile(composeFile, []byte(yaml), fs.FileMode(composeFilePerms))
 	if err != nil {
 		return errors.Wrap(err, "failed to write to compose file")
 	}
@@ -350,7 +353,7 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 	for {
 		select {
 		case <-timeout:
-			logrus.Debug("timed out waiting for postgres container to be in exited state")
+			logger.Debug("timed out waiting for postgres container to be in exited state")
 			return nil
 		case <-ticker.C:
 			psInfo, _ := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
@@ -361,10 +364,10 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 				// so docker compose will ensure that postgres container going in shutting down phase only after all other containers have exited
 				if strings.Contains(psInfo[i].Name, PostgresDockerContainerName) {
 					if psInfo[i].State == dockerExitState {
-						logrus.Debug("postgres container reached exited state")
+						logger.Debug("postgres container reached exited state")
 						return nil
 					}
-					logrus.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
+					logger.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
 				}
 			}
 		}
@@ -385,7 +388,7 @@ func (d *DockerCompose) PS() error {
 
 	// Create a new tabwriter
 	tw := new(tabwriter.Writer)
-	tw.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight) //nolint:gomnd
+	tw.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight) //nolint:mnd
 
 	// Append data to table
 	fmt.Fprintln(tw, strings.Join(infoColumns, "\t"))
@@ -693,7 +696,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, de
 	if err != nil {
 		return err
 	}
-	fmt.Print("Pip Freeze comparison can be found at \n" + pipFreezeCompareFile)
+	fmt.Printf("Pip Freeze comparison can be found at %s", pipFreezeCompareFile)
 	return nil
 }
 
@@ -775,7 +778,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/ap-airflow:") {
 				isRuntime, err := isRuntimeVersion(newTag)
 				if err != nil {
-					logrus.Debug(err)
+					logger.Debug(err)
 				}
 				if isRuntime {
 					// Replace the tag on the matching line
@@ -807,7 +810,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 	}
 
 	// Write the new content to the new Dockerfile
-	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0o600) //nolint:gomnd
+	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0o600) //nolint:mnd
 	if err != nil {
 		return err
 	}
@@ -1008,17 +1011,17 @@ func writeToCompareFile(title string, pkgList []string, writer *bufio.Writer) {
 	if len(pkgList) > 0 {
 		_, err := writer.WriteString(title)
 		if err != nil {
-			logrus.Debug(err)
+			logger.Debug(err)
 		}
 		for _, pkg := range pkgList {
 			_, err = writer.WriteString(pkg + "\n")
 			if err != nil {
-				logrus.Debug(err)
+				logger.Debug(err)
 			}
 		}
 		_, err = writer.WriteString("\n")
 		if err != nil {
-			logrus.Debug(err)
+			logger.Debug(err)
 		}
 	}
 }

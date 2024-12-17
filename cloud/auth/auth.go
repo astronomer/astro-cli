@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -25,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -155,7 +155,7 @@ func authorizeCallbackHandler() (string, error) {
 	})
 	go func() {
 		if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 	}()
 
@@ -187,7 +187,7 @@ func authorizeCallbackHandler() (string, error) {
 
 func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
 	// Generate PKCE verifier and challenge
-	token := make([]byte, 32)                            //nolint:gomnd
+	token := make([]byte, 32)                            //nolint:mnd
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 	r.Read(token)
 	verifier := util.Base64URLEncode(token)
@@ -370,7 +370,7 @@ func Login(domain, token string, coreClient astrocore.CoreClient, platformCoreCl
 		fmt.Print("You are logging into Astro via an OAuth token\nThis token will expire in 1 hour and will not refresh\n\n")
 		res = Result{
 			AccessToken: token,
-			ExpiresIn:   3600, //nolint:gomnd
+			ExpiresIn:   3600, //nolint:mnd
 		}
 	}
 

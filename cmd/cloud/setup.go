@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/golang-jwt/jwt/v4"
 
@@ -208,14 +208,14 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 
 	r, err := http.NewRequestWithContext(http_context.Background(), http.MethodPost, addr, strings.NewReader(data.Encode())) // URL-encoded payload
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: %w", err)
 	}
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	res, err := client.Do(r) //nolint:bodyclose
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: %w", err)
 	}
 	defer res.Body.Close()
@@ -298,7 +298,7 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, isDeploymentF
 	// execute request
 	res, err := client.Do(doOptions) //nolint:bodyclose
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 		return false, fmt.Errorf("cannot getaccess token with API keys: %w", err)
 	}
 	defer res.Body.Close()
