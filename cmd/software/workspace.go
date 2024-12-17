@@ -197,7 +197,7 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 		}
 
 		if !(workspacePageSize > 0 && workspacePageSize <= defaultPageSize) {
-			logger.Logger.Warnf("Page size cannot be more than %d, reducing the page size to %d", defaultPageSize, defaultPageSize)
+			logger.Warnf("Page size cannot be more than %d, reducing the page size to %d", defaultPageSize, defaultPageSize)
 			workspacePageSize = defaultPageSize
 		}
 	}

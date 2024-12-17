@@ -169,12 +169,12 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 
 	dockerCli, err := command.NewDockerCli()
 	if err != nil {
-		logger.Logger.Fatalf("error creating compose client %s", err)
+		logger.Fatalf("error creating compose client %s", err)
 	}
 
 	err = dockerCli.Initialize(flags.NewClientOptions())
 	if err != nil {
-		logger.Logger.Fatalf("error init compose client %s", err)
+		logger.Fatalf("error init compose client %s", err)
 	}
 
 	composeService := compose.NewComposeService(dockerCli.Client(), &configfile.ConfigFile{})
@@ -347,7 +347,7 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 	for {
 		select {
 		case <-timeout:
-			logger.Logger.Debug("timed out waiting for postgres container to be in exited state")
+			logger.Debug("timed out waiting for postgres container to be in exited state")
 			return nil
 		case <-ticker.C:
 			psInfo, _ := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
@@ -358,10 +358,10 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 				// so docker compose will ensure that postgres container going in shutting down phase only after all other containers have exited
 				if strings.Contains(psInfo[i].Name, PostgresDockerContainerName) {
 					if psInfo[i].State == dockerExitState {
-						logger.Logger.Debug("postgres container reached exited state")
+						logger.Debug("postgres container reached exited state")
 						return nil
 					}
-					logger.Logger.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
+					logger.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
 				}
 			}
 		}
@@ -763,7 +763,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/ap-airflow:") {
 				isRuntime, err := isRuntimeVersion(newTag)
 				if err != nil {
-					logger.Logger.Debug(err)
+					logger.Debug(err)
 				}
 				if isRuntime {
 					// Replace the tag on the matching line
@@ -996,17 +996,17 @@ func writeToCompareFile(title string, pkgList []string, writer *bufio.Writer) {
 	if len(pkgList) > 0 {
 		_, err := writer.WriteString(title)
 		if err != nil {
-			logger.Logger.Debug(err)
+			logger.Debug(err)
 		}
 		for _, pkg := range pkgList {
 			_, err = writer.WriteString(pkg + "\n")
 			if err != nil {
-				logger.Logger.Debug(err)
+				logger.Debug(err)
 			}
 		}
 		_, err = writer.WriteString("\n")
 		if err != nil {
-			logger.Logger.Debug(err)
+			logger.Debug(err)
 		}
 	}
 }

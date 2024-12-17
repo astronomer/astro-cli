@@ -155,7 +155,7 @@ func authorizeCallbackHandler() (string, error) {
 	})
 	go func() {
 		if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Logger.Fatal(err)
+			logger.Fatal(err)
 		}
 	}()
 

@@ -156,13 +156,13 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 			// ignore excluded paths
 			for _, excludePathPrefix := range excludePathPrefixes {
 				if strings.HasPrefix(headerName, excludePathPrefix) {
-					logger.Logger.Debugf("Excluding tarball path: %s", headerName)
+					logger.Debugf("Excluding tarball path: %s", headerName)
 					return nil
 				}
 			}
 
 			header.Name = headerName
-			logger.Logger.Debugf("Adding to tarball: %s", header.Name)
+			logger.Debugf("Adding to tarball: %s", header.Name)
 
 			if err := tarball.WriteHeader(header); err != nil {
 				return err

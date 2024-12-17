@@ -13,9 +13,9 @@ func execProviderCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
 	cmd := newRegistryProviderCmd(os.Stdout)
 	cmd.SetOut(buf)
-	logger.Logger.SetOutput(buf)
+	logger.SetOutput(buf)
 	defer func() {
-		logger.Logger.SetOutput(os.Stderr)
+		logger.SetOutput(os.Stderr)
 	}()
 	cmd.SetArgs(args)
 	testUtil.SetupOSArgsForGinkgo()

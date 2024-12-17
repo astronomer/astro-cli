@@ -144,7 +144,7 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 
 	settingsFileExist, err := util.Exists("./" + settingsFile)
 	if err != nil {
-		logger.Logger.Debug(err)
+		logger.Debug(err)
 	}
 
 	cfg := ComposeConfig{

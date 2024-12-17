@@ -53,18 +53,18 @@ func SetUpLogs(out io.Writer, level string) error {
 	if level == "warning" {
 		level = config.CFG.Verbosity.GetString()
 	}
-	logger.Logger.SetOutput(out)
+	logger.SetOutput(out)
 	lvl, err := logrus.ParseLevel(level)
 	if err != nil {
 		return err
 	}
-	logger.Logger.SetLevel(lvl)
+	logger.SetLevel(lvl)
 	return nil
 }
 
 func PrintDebugLogs() {
 	for _, log := range InitDebugLogs {
-		logger.Logger.Debug(log)
+		logger.Debug(log)
 	}
 	// Free-up memory used by init logs
 	InitDebugLogs = nil

@@ -86,7 +86,7 @@ func listTeam(_ *cobra.Command, out io.Writer, paginated bool, pageSize int) err
 		}
 
 		if !(pageSize > 0 && pageSize <= teams.ListTeamLimit) {
-			logger.Logger.Warnf("Page size cannot be more than %d, reducing the page size to %d", teams.ListTeamLimit, teams.ListTeamLimit)
+			logger.Warnf("Page size cannot be more than %d, reducing the page size to %d", teams.ListTeamLimit, teams.ListTeamLimit)
 			pageSize = teams.ListTeamLimit
 		}
 

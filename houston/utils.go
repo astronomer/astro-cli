@@ -41,6 +41,6 @@ func (s queryList) GreatestLowerBound(v string) string {
 			return s[idx].query
 		}
 	}
-	logger.Logger.Debugf("GraphQL query not defined for the given Platform version: %s, falling back to latest query", v)
+	logger.Debugf("GraphQL query not defined for the given Platform version: %s, falling back to latest query", v)
 	return s[len(s)-1].query
 }

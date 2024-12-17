@@ -70,7 +70,7 @@ func Get(teamID string, getUserInfo, getRoleInfo, allFilters bool, client housto
 	}
 
 	if getUserInfo || allFilters {
-		logger.Logger.Debug("retrieving users part of team")
+		logger.Debug("retrieving users part of team")
 		fmt.Fprintln(out, "\nUsers part of Team:")
 		users, err := houston.Call(client.GetTeamUsers)(teamID)
 		if err != nil {

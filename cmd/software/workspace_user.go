@@ -160,7 +160,7 @@ func workspaceUserList(_ *cobra.Command, out io.Writer) error {
 		}
 
 		if !(pageSize > 0 && pageSize <= defaultWorkspaceUserPageSize) {
-			logger.Logger.Warnf("Page size cannot be more than %d, reducing the page size to %d", defaultWorkspaceUserPageSize, defaultWorkspaceUserPageSize)
+			logger.Warnf("Page size cannot be more than %d, reducing the page size to %d", defaultWorkspaceUserPageSize, defaultWorkspaceUserPageSize)
 			pageSize = defaultWorkspaceUserPageSize
 		}
 

@@ -86,7 +86,7 @@ func (s *AddCmdSuite) TestSetupLogs() {
 	buf := new(bytes.Buffer)
 	err := SetUpLogs(buf, "info")
 	s.NoError(err)
-	s.Equal("info", logger.Logger.GetLevel().String())
+	s.Equal("info", logger.GetLevel().String())
 
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	err = config.CFG.Verbosity.SetHomeString("error")
@@ -94,7 +94,7 @@ func (s *AddCmdSuite) TestSetupLogs() {
 
 	err = SetUpLogs(buf, "warning")
 	s.NoError(err)
-	s.Equal("error", logger.Logger.GetLevel().String())
+	s.Equal("error", logger.GetLevel().String())
 
 	err = SetUpLogs(buf, "invalid-level")
 	s.EqualError(err, "not a valid logrus Level: \"invalid-level\"")

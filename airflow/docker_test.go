@@ -712,9 +712,9 @@ func (s *Suite) TestDockerComposeStop() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		logger.Logger.SetLevel(5) // debug level
+		logger.SetLevel(5) // debug level
 		var out bytes.Buffer
-		logger.Logger.SetOutput(&out)
+		logger.SetOutput(&out)
 
 		err := mockDockerCompose.Stop(true)
 		s.NoError(err)
@@ -736,9 +736,9 @@ func (s *Suite) TestDockerComposeStop() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		logger.Logger.SetLevel(5) // debug level
+		logger.SetLevel(5) // debug level
 		var out bytes.Buffer
-		logger.Logger.SetOutput(&out)
+		logger.SetOutput(&out)
 
 		err := mockDockerCompose.Stop(true)
 		s.NoError(err)
@@ -764,9 +764,9 @@ func (s *Suite) TestDockerComposeStop() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		logger.Logger.SetLevel(5) // debug level
+		logger.SetLevel(5) // debug level
 		var out bytes.Buffer
-		logger.Logger.SetOutput(&out)
+		logger.SetOutput(&out)
 
 		err := mockDockerCompose.Stop(true)
 		s.NoError(err)

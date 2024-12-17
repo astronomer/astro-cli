@@ -53,7 +53,7 @@ func (d *DockerRegistry) Login(username, token string) error {
 		authConfig.Password = auth.Password
 	}
 
-	logger.Logger.Debugf("docker creds %v \n", authConfig)
+	logger.Debugf("docker creds %v \n", authConfig)
 	_, err := d.cli.RegistryLogin(ctx, authConfig)
 	if err != nil {
 		return fmt.Errorf("registry login error: %w", err)
