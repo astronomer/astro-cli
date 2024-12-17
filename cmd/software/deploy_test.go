@@ -156,7 +156,6 @@ func (s *Suite) TestDeploy() {
 		testImageName := "test-image-name" // Set the expected image name
 		err := execDeployCmd([]string{"test-deployment-id", "--image-name=" + testImageName, "--force", "--remote", "--workspace-id=" + mockWorkspace.ID}...)
 		s.ErrorIs(err, nil)
-
 		// Assert that DeployAirflowImage was NOT called
 		s.False(deployAirflowImageCalled, "DeployAirflowImage should not be called when --remote is specified")
 	})
