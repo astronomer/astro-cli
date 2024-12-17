@@ -22,8 +22,51 @@ type DockerRuntime struct {
 	OSChecker OSChecker
 }
 
+// CreateDockerRuntime creates a new DockerRuntime with the provided DockerEngine and OSChecker.
 func CreateDockerRuntime(engine DockerEngine, osChecker OSChecker) DockerRuntime {
 	return DockerRuntime{Engine: engine, OSChecker: osChecker}
+}
+
+// CreateDockerRuntimeWithDefaults creates a new DockerRuntime with the default DockerEngine and OSChecker.
+func CreateDockerRuntimeWithDefaults() DockerRuntime {
+	return DockerRuntime{Engine: GetDockerEngine(CreateHostInspectorWithDefaults()), OSChecker: CreateOSChecker()}
+}
+
+// GetDockerEngine returns the appropriate DockerEngine based on the binary discovered.
+func GetDockerEngine(interrogator HostInterrogator) DockerEngine {
+	engine, err := GetDockerEngineBinary(interrogator)
+	if err != nil {
+		return new(dockerEngine)
+	}
+
+	// Return the appropriate container runtime based on the binary discovered.
+	switch engine {
+	case orbctl:
+		return new(orbstackEngine)
+	default:
+		return new(dockerEngine)
+	}
+}
+
+// GetDockerEngineBinary returns the first Docker binary found in the $PATH environment variable.
+// This is used to determine which Engine to use. Eg: orbctl or docker.
+func GetDockerEngineBinary(inspector HostInterrogator) (string, error) {
+	// If the orbctl binary is found, it means orbstack is installed. The docker binary would also exist
+	// in this case, but we use this as a signal to use the orbstack engine. We'll still end up
+	// shelling our docker commands out using the docker binary.
+	binaries := []string{orbctl, docker}
+
+	// Get the $PATH environment variable.
+	pathEnv := inspector.GetEnvVar("PATH")
+	for _, binary := range binaries {
+		if found := FindBinary(pathEnv, binary, inspector); found {
+			return binary, nil
+		}
+	}
+
+	// If no binary is found, we just return our default docker binary.
+	// The higher level check for the container runtime binary will handle the user-facing error.
+	return docker, nil
 }
 
 // Initialize initializes the Docker runtime.
