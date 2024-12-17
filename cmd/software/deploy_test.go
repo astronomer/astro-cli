@@ -85,7 +85,6 @@ func (s *Suite) TestDeploy() {
 		}
 		err := execDeployCmd([]string{"-f"}...)
 		s.ErrorIs(err, deploy.ErrNoWorkspaceID)
-		DagsOnlyDeploy = deploy.DagsOnlyDeploy
 	})
 
 	s.Run("No error should be returned for astro deploy, if dags deploy throws error but the feature itself is disabled", func() {
@@ -139,6 +138,45 @@ func (s *Suite) TestDeploy() {
 		s.Equal(testImageName, capturedImageName, "The imageName passed to DeployAirflowImage is incorrect")
 	})
 
+	s.Run("Test for the flag --image-name with --remote. Dags should be deployed but DeployAirflowImage shouldn't be called", func() {
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+			return nil
+		}
+		// Create a flag to track if DeployAirflowImage is called
+		deployAirflowImageCalled := false
+
+		// Mock function for DeployAirflowImage
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+			deployAirflowImageCalled = true // Set the flag if this function is called
+			return deploymentID, nil
+		}
+		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string) (string, error) {
+			return "", nil
+		}
+		testImageName := "test-image-name" // Set the expected image name
+		err := execDeployCmd([]string{"test-deployment-id", "--image-name=" + testImageName, "--force", "--remote", "--workspace-id=" + mockWorkspace.ID}...)
+		s.ErrorIs(err, nil)
+		// Assert that DeployAirflowImage was NOT called
+		s.False(deployAirflowImageCalled, "DeployAirflowImage should not be called when --remote is specified")
+	})
+
+	s.Run("Test for the flag --image-name with --remote. Dags should not be deployed if UpdateDeploymentImage throws an error", func() {
+		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string) (string, error) {
+			return "", errNoWorkspaceFound
+		}
+		testImageName := "test-image-name" // Set the expected image name
+		err := execDeployCmd([]string{"test-deployment-id", "--image-name=" + testImageName, "--force", "--remote", "--workspace-id=" + mockWorkspace.ID}...)
+		s.ErrorIs(err, errNoWorkspaceFound)
+	})
+
+	s.Run("Test for the flag --remote without --image-name. It should throw an error", func() {
+		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string) (string, error) {
+			return "", errNoWorkspaceFound
+		}
+		err := execDeployCmd([]string{"test-deployment-id", "--force", "--remote", "--workspace-id=" + mockWorkspace.ID}...)
+		s.ErrorIs(err, ErrImageNameNotPassedForRemoteFlag)
+	})
+
 	s.Run("error should be returned if BYORegistryEnabled is true but BYORegistryDomain is empty", func() {
 		appConfig = &houston.AppConfig{
 			BYORegistryDomain: "",
@@ -151,6 +189,5 @@ func (s *Suite) TestDeploy() {
 		}
 		err := execDeployCmd([]string{"-f"}...)
 		s.ErrorIs(err, deploy.ErrBYORegistryDomainNotSet)
-		DagsOnlyDeploy = deploy.DagsOnlyDeploy
 	})
 }
