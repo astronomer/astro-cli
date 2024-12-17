@@ -187,7 +187,7 @@ func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) 
 	doOpts.Method = http.MethodPost
 	doOpts.Path = ctx.GetSoftwareAPIURL()
 	var response httputil.HTTPResponse
-	httpResponse, err := c.HTTPClient.Do(doOpts) //nolint:bodyclose
+	httpResponse, err := c.HTTPClient.Do(doOpts)
 	if err != nil {
 		newLogger.Debugf("HTTP request ERROR: %s", err.Error())
 		return nil, err

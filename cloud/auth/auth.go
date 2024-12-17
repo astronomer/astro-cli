@@ -79,7 +79,7 @@ func requestUserInfo(authConfig Config, accessToken string) (UserInfo, error) {
 		Path:    addr,
 		Method:  http.MethodGet,
 	}
-	res, err := httpClient.Do(doOptions) //nolint:bodyclose
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return UserInfo{}, fmt.Errorf("cannot retrieve userinfo: %w", err)
 	}
@@ -115,7 +115,7 @@ func requestToken(authConfig Config, verifier, code string) (Result, error) {
 		Path:    addr,
 		Method:  http.MethodPost,
 	}
-	res, err := httpClient.Do(doOptions) //nolint:bodyclose
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return Result{}, fmt.Errorf("cannot retrieve token: %w", err)
 	}
@@ -456,7 +456,7 @@ func FetchDomainAuthConfig(domain string) (Config, error) {
 		Path:    addr,
 		Method:  http.MethodGet,
 	}
-	res, err := httpClient.Do(doOptions) //nolint:bodyclose
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return authConfig, err
 	}

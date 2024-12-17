@@ -337,7 +337,7 @@ func UploadFile(args *UploadFileArguments) error {
 		setHeaders(req, headers)
 
 		client := &http.Client{}
-		response, err := client.Do(req) //nolint:bodyclose
+		response, err := client.Do(req)
 		if err != nil {
 			currentUploadError = err
 			// If we have a dial tcp error, we should retry with exponential backoff
