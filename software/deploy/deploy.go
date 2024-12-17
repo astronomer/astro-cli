@@ -163,11 +163,6 @@ func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, d
 	return nil
 }
 
-func updateDeploymentImageAPICall(houstonClient houston.ClientInterface, imageName, releaseName, airflowVersion, runtimeVersion string) (interface{}, error) {
-	req := houston.UpdateDeploymentImageRequest{ReleaseName: releaseName, Image: imageName, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
-	return houston.Call(houstonClient.UpdateDeploymentImage)(req)
-}
-
 func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string) (string, error) {
 	if runtimeVersion == "" {
 		return "", ErrRuntimeVersionNotPassedForRemoteImage
@@ -184,7 +179,8 @@ func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, 
 		return "", fmt.Errorf("failed to get deployment info: %w", err)
 	}
 	fmt.Println("Skipping building the image since --image-name flag is used...")
-	_, err = updateDeploymentImageAPICall(houstonClient, imageName, deploymentInfo.ReleaseName, "", runtimeVersion)
+	req := houston.UpdateDeploymentImageRequest{ReleaseName: deploymentInfo.ReleaseName, Image: imageName, AirflowVersion: "", RuntimeVersion: runtimeVersion}
+	_, err = houston.Call(houstonClient.UpdateDeploymentImage)(req)
 	fmt.Println("Image successfully updated")
 	return deploymentID, err
 }
@@ -214,7 +210,8 @@ func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, 
 		}
 		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel)
 		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel)
-		_, err := updateDeploymentImageAPICall(houstonClient, remoteImage, name, airflowVersion, runtimeVersion)
+		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
+		_, err = houston.Call(houstonClient.UpdateDeploymentImage)(req)
 		return err
 	}
 	return nil
