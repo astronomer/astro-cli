@@ -15,9 +15,9 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/pkg/logger"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -712,9 +712,9 @@ func (s *Suite) TestDockerComposeStop() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		logrus.SetLevel(5) // debug level
+		logger.SetLevel(5) // debug level
 		var out bytes.Buffer
-		logrus.SetOutput(&out)
+		logger.SetOutput(&out)
 
 		err := mockDockerCompose.Stop(true)
 		s.NoError(err)
@@ -736,9 +736,9 @@ func (s *Suite) TestDockerComposeStop() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		logrus.SetLevel(5) // debug level
+		logger.SetLevel(5) // debug level
 		var out bytes.Buffer
-		logrus.SetOutput(&out)
+		logger.SetOutput(&out)
 
 		err := mockDockerCompose.Stop(true)
 		s.NoError(err)
@@ -764,9 +764,9 @@ func (s *Suite) TestDockerComposeStop() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		logrus.SetLevel(5) // debug level
+		logger.SetLevel(5) // debug level
 		var out bytes.Buffer
-		logrus.SetOutput(&out)
+		logger.SetOutput(&out)
 
 		err := mockDockerCompose.Stop(true)
 		s.NoError(err)

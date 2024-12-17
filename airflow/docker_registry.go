@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/astronomer/astro-cli/pkg/logger"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/registry"
-	log "github.com/sirupsen/logrus"
 )
 
 type DockerRegistry struct {
@@ -53,7 +53,7 @@ func (d *DockerRegistry) Login(username, token string) error {
 		authConfig.Password = auth.Password
 	}
 
-	log.Debugf("docker creds %v \n", authConfig)
+	logger.Debugf("docker creds %v \n", authConfig)
 	_, err := d.cli.RegistryLogin(ctx, authConfig)
 	if err != nil {
 		return fmt.Errorf("registry login error: %w", err)

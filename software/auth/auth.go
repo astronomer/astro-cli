@@ -11,9 +11,8 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/software/workspace"
-
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -56,19 +55,19 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 
 var switchToLastUsedWorkspace = func(client houston.ClientInterface, c *config.Context) bool {
 	if c.LastUsedWorkspace == "" {
-		log.Debug("last used workspace was empty")
+		logger.Debug("last used workspace was empty")
 		return false
 	}
 
 	// validate workspace
 	workspace, err := client.ValidateWorkspaceID(c.LastUsedWorkspace)
 	if err != nil || workspace != nil && workspace.ID != c.LastUsedWorkspace {
-		log.Debugf("last used workspace id is not valid: %s", err.Error())
+		logger.Debugf("last used workspace id is not valid: %s", err.Error())
 		return false
 	}
 
 	if err := c.SetContextKey("workspace", workspace.ID); err != nil {
-		log.Debugf("unable to set workspace context: %s", err.Error())
+		logger.Debugf("unable to set workspace context: %s", err.Error())
 		return false
 	}
 
@@ -237,7 +236,7 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 
 	err = registryAuth(client, out)
 	if err != nil {
-		log.Debugf("There was an error logging into registry: %s", err.Error())
+		logger.Debugf("There was an error logging into registry: %s", err.Error())
 	}
 
 	return nil

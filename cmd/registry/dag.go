@@ -6,11 +6,11 @@ import (
 	"io"
 	"net/url"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 const (
@@ -70,13 +70,13 @@ func downloadDag(dagID, dagVersion string, addProviders bool, out io.Writer) {
 
 	githubRawSourceURL, exists := dagJSON["githubRawSourceUrl"].(string)
 	if !exists {
-		log.Fatalf("Couldn't find key githubRawSourceUrl in Response! %v", dagJSON)
+		logger.Fatalf("Couldn't find key githubRawSourceUrl in Response! %v", dagJSON)
 	}
 
 	filePath, exists := dagJSON["filePath"].(string)
 	if !exists {
 		jsonString, _ := json.Marshal(dagJSON)
-		log.Fatalf("Couldn't find key 'filePath' in Response! %s", jsonString)
+		logger.Fatalf("Couldn't find key 'filePath' in Response! %s", jsonString)
 	}
 	httputil.DownloadResponseToFile(githubRawSourceURL, filePath)
 	_, _ = fmt.Fprintf(out, "Successfully added DAG %s:%s to %s ", dagID, dagVersion, filePath)
@@ -85,16 +85,16 @@ func downloadDag(dagID, dagVersion string, addProviders bool, out io.Writer) {
 		providers, providersExists := dagJSON["providers"].([]interface{})
 		if !providersExists {
 			jsonString, _ := json.Marshal(dagJSON)
-			log.Fatalf("Couldn't find key 'providers' in Response! %s", jsonString)
+			logger.Fatalf("Couldn't find key 'providers' in Response! %s", jsonString)
 		}
 		for _, provider := range providers {
 			providerJSON := provider.(map[string]interface{})
 			providerID, nameExists := providerJSON["name"].(string) // displayName??
 			if !nameExists {
 				jsonString, _ := json.Marshal(providerJSON)
-				log.Fatalf("Couldn't find key 'name' in Response! %s", jsonString)
+				logger.Fatalf("Couldn't find key 'name' in Response! %s", jsonString)
 			}
-			log.Infof("Adding provider required for DAG: %s", providerID)
+			logger.Infof("Adding provider required for DAG: %s", providerID)
 			addProviderByName(providerID, out)
 		}
 	}
