@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/logger"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -19,7 +20,6 @@ import (
 
 	semver "github.com/Masterminds/semver/v3"
 	"github.com/fatih/camelcase"
-	"github.com/sirupsen/logrus"
 	giturls "github.com/whilp/git-urls"
 )
 
@@ -85,7 +85,7 @@ func newTableOut() *printutil.Table {
 }
 
 func checkManualReleaseNames(client houston.ClientInterface) bool {
-	logrus.Debug("Checking checkManualReleaseNames through appConfig from houston-api")
+	logger.Debug("Checking checkManualReleaseNames through appConfig from houston-api")
 
 	config, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
@@ -97,7 +97,7 @@ func checkManualReleaseNames(client houston.ClientInterface) bool {
 
 // CheckNFSMountDagDeployment returns true when we can set custom NFS location for dags
 func CheckNFSMountDagDeployment(client houston.ClientInterface) bool {
-	logrus.Debug("Checking checkNFSMountDagDeployment through appConfig from houston-api")
+	logger.Debug("Checking checkNFSMountDagDeployment through appConfig from houston-api")
 
 	config, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
@@ -108,7 +108,7 @@ func CheckNFSMountDagDeployment(client houston.ClientInterface) bool {
 }
 
 func CheckHardDeleteDeployment(client houston.ClientInterface) bool {
-	logrus.Debug("Checking for hard delete deployment flag")
+	logger.Debug("Checking for hard delete deployment flag")
 	config, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		return false
@@ -117,7 +117,7 @@ func CheckHardDeleteDeployment(client houston.ClientInterface) bool {
 }
 
 func CheckPreCreateNamespaceDeployment(client houston.ClientInterface) bool {
-	logrus.Debug("Checking for pre created deployment flag")
+	logger.Debug("Checking for pre created deployment flag")
 	config, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		return false
@@ -134,7 +134,7 @@ func CheckNamespaceFreeFormEntryDeployment(client houston.ClientInterface) bool 
 }
 
 func CheckTriggererEnabled(client houston.ClientInterface) bool {
-	logrus.Debug("Checking for triggerer flag")
+	logger.Debug("Checking for triggerer flag")
 	config, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		return false
@@ -252,7 +252,7 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 		Header:         []string{"AVAILABLE KUBERNETES NAMESPACES"},
 	}
 
-	logrus.Debug("checking namespaces available for platform")
+	logger.Debug("checking namespaces available for platform")
 	tab.GetUserInput = true
 
 	names, err := houston.Call(client.GetAvailableNamespaces)(nil)
