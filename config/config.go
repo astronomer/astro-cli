@@ -124,7 +124,7 @@ func initHome(fs afero.Fs) {
 	viperHome.SetConfigFile(HomeConfigFile)
 
 	for _, cfg := range CFGStrMap {
-		if len(cfg.Default) > 0 {
+		if cfg.Default != "" {
 			viperHome.SetDefault(cfg.Path, cfg.Default)
 		}
 	}
@@ -194,7 +194,7 @@ func CreateProjectConfig(projectPath string) {
 
 // configExists returns a boolean indicating if the config is backed by a file
 func configExists(v *viper.Viper) bool {
-	return len(v.ConfigFileUsed()) > 0
+	return v.ConfigFileUsed() != ""
 }
 
 // CreateConfig creates a config file in the given directory

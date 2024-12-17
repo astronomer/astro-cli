@@ -273,7 +273,7 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 	tab.Print(out)
 
 	in := input.Text("\n> ")
-	i, err := strconv.ParseInt(in, 10, 64) //nolint:gomnd
+	i, err := strconv.ParseInt(in, 10, 64) //nolint:mnd
 	if err != nil {
 		return "", ErrParsingInt{in: in}
 	}
@@ -687,7 +687,7 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion string, client ho
 	t.Print(out)
 
 	in := input.Text("\n> ")
-	i, err := strconv.ParseInt(in, 10, 64) //nolint:gomnd
+	i, err := strconv.ParseInt(in, 10, 64) //nolint:mnd
 	if err != nil {
 		return "", err
 	}
@@ -695,7 +695,7 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion string, client ho
 }
 
 func meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion string) error {
-	upgradeVersion := strconv.FormatUint(settings.AirflowVersionTwo, 10) //nolint:gomnd
+	upgradeVersion := strconv.FormatUint(settings.AirflowVersionTwo, 10) //nolint:mnd
 	minRequiredVersion := minAirflowVersion
 	airflowUpgradeVersion, err := semver.NewVersion(upgradeVersion)
 	if err != nil {

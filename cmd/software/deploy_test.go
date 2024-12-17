@@ -27,7 +27,7 @@ func (s *Suite) TestDeploy() {
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
-	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool) (string, error) {
 		if description == "" {
 			return deploymentID, fmt.Errorf("description should not be empty")
 		}
@@ -52,7 +52,7 @@ func (s *Suite) TestDeploy() {
 	s.NoError(err)
 
 	// Test when the default description is used
-	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool) (string, error) {
 		expectedDesc := "Deployed via <astro deploy>"
 		if description != expectedDesc {
 			return deploymentID, fmt.Errorf("expected description to be '%s', but got '%s'", expectedDesc, description)
@@ -67,14 +67,14 @@ func (s *Suite) TestDeploy() {
 	DagsOnlyDeploy = deploy.DagsOnlyDeploy
 
 	s.Run("error should be returned for astro deploy, if DeployAirflowImage throws error", func() {
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool) (string, error) {
 			return deploymentID, deploy.ErrNoWorkspaceID
 		}
 
 		err := execDeployCmd([]string{"-f"}...)
 		s.ErrorIs(err, deploy.ErrNoWorkspaceID)
 
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool) (string, error) {
 			return deploymentID, nil
 		}
 	})
@@ -96,6 +96,31 @@ func (s *Suite) TestDeploy() {
 	s.Run("Test for the flag --dags", func() {
 		err := execDeployCmd([]string{"test-deployment-id", "--dags", "--force"}...)
 		s.ErrorIs(err, deploy.ErrDagOnlyDeployDisabledInConfig)
+	})
+
+	s.Run("Test when both the flags --dags and --image are passed", func() {
+		err := execDeployCmd([]string{"test-deployment-id", "--dags", "--image", "--force"}...)
+		s.ErrorIs(err, ErrBothDagsOnlyAndImageOnlySet)
+	})
+
+	s.Run("Test for the flag --image for image deployment", func() {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool) (string, error) {
+			return deploymentID, deploy.ErrDeploymentTypeIncorrectForImageOnly
+		}
+		err := execDeployCmd([]string{"test-deployment-id", "--image", "--force"}...)
+		s.ErrorIs(err, deploy.ErrDeploymentTypeIncorrectForImageOnly)
+	})
+
+	s.Run("Test for the flag --image for dags-only deployment", func() {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool) (string, error) {
+			return deploymentID, nil
+		}
+		// This function is not called since --image is passed
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+			return deploy.ErrNoWorkspaceID
+		}
+		err := execDeployCmd([]string{"test-deployment-id", "--image", "--force"}...)
+		s.ErrorIs(err, nil)
 	})
 
 	s.Run("error should be returned if BYORegistryEnabled is true but BYORegistryDomain is empty", func() {
