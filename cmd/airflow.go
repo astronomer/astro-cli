@@ -111,13 +111,13 @@ astro dev init --from-template
 
 	pytestDir = "/tests"
 
-	airflowUpgradeCheckCmd = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
-	errPytestArgs          = errors.New("you can only pass one pytest file or directory")
-	buildSecrets           = []string{}
-	errNoCompose           = errors.New("cannot use '--compose-file' without '--compose' flag")
-	TemplateList           = airflow.FetchTemplateList
-	defaultWaitTime        = 1 * time.Minute
-	directoryPermissions   = 0o755
+	airflowUpgradeCheckCmd        = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
+	errPytestArgs                 = errors.New("you can only pass one pytest file or directory")
+	buildSecrets                  = []string{}
+	errNoCompose                  = errors.New("cannot use '--compose-file' without '--compose' flag")
+	TemplateList                  = airflow.FetchTemplateList
+	defaultWaitTime               = 1 * time.Minute
+	directoryPermissions   uint32 = 0o755
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {

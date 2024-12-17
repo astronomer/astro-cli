@@ -47,7 +47,7 @@ const (
 	componentName                  = "airflow"
 	dockerStateUp                  = "running"
 	dockerExitState                = "exited"
-	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
+	defaultAirflowVersion          = uint64(0x2) //nolint:mnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
 	pytestDirectory                = "tests"
@@ -308,7 +308,8 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 	}
 
 	// write the yaml to a file
-	err = os.WriteFile(composeFile, []byte(yaml), 0o666) //nolint:gosec, gomnd
+	composeFilePerms := 0o666
+	err = os.WriteFile(composeFile, []byte(yaml), fs.FileMode(composeFilePerms))
 	if err != nil {
 		return errors.Wrap(err, "failed to write to compose file")
 	}
@@ -382,7 +383,7 @@ func (d *DockerCompose) PS() error {
 
 	// Create a new tabwriter
 	tw := new(tabwriter.Writer)
-	tw.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight) //nolint:gomnd
+	tw.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight) //nolint:mnd
 
 	// Append data to table
 	fmt.Fprintln(tw, strings.Join(infoColumns, "\t"))
@@ -681,7 +682,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, de
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Pip Freeze comparison can be found at \n" + pipFreezeCompareFile)
+	fmt.Printf("Pip Freeze comparison can be found at %s", pipFreezeCompareFile)
 	return nil
 }
 
@@ -795,7 +796,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 	}
 
 	// Write the new content to the new Dockerfile
-	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0o600) //nolint:gomnd
+	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0o600) //nolint:mnd
 	if err != nil {
 		return err
 	}
