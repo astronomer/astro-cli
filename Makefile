@@ -9,7 +9,7 @@ generate:
 
 lint:
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint version
-	go run github.com/golangci/golangci-lint/cmd/golangci-lint run --timeout 15m0s
+	go run github.com/golangci/golangci-lint/cmd/golangci-lint run --timeout 15m0s --verbose
 
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go

@@ -15,18 +15,16 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/airflow/runtimes"
-
-	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/astronomer/astro-cli/pkg/util"
-	cliCommand "github.com/docker/cli/cli/command"
-	cliConfig "github.com/docker/cli/cli/config"
-	cliTypes "github.com/docker/cli/cli/config/types"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/jsonmessage"
-
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/util"
+	cliConfig "github.com/docker/cli/cli/config"
+	cliTypes "github.com/docker/cli/cli/config/types"
+	"github.com/docker/cli/cli/streams"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/jsonmessage"
 )
 
 const (
@@ -47,8 +45,8 @@ type DockerImage struct {
 	imageName string
 }
 
-func DockerImageInit(image string) *DockerImage {
-	return &DockerImage{imageName: image}
+func DockerImageInit(imageName string) *DockerImage {
+	return &DockerImage{imageName: imageName}
 }
 
 func shouldAddPullFlag(dockerfilePath string) (bool, error) {
@@ -451,7 +449,7 @@ func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImag
 		return err
 	}
 	encodedAuth := base64.URLEncoding.EncodeToString(buf)
-	responseBody, err := cli.ImagePush(ctx, remoteImage, types.ImagePushOptions{RegistryAuth: encodedAuth})
+	responseBody, err := cli.ImagePush(ctx, remoteImage, image.PushOptions{RegistryAuth: encodedAuth})
 	if err != nil {
 		logger.Debugf("Error pushing image to docker: %v", err)
 		// if NewClientWithOpt does not work use bash to run docker commands
@@ -509,7 +507,7 @@ func (d *DockerImage) Pull(remoteImage, username, token string) error {
 }
 
 var displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback func(jsonmessage.JSONMessage)) error {
-	out := cliCommand.NewOutStream(os.Stdout)
+	out := streams.NewOut(os.Stdout)
 	err := jsonmessage.DisplayJSONMessagesToStream(responseBody, out, nil)
 	if err != nil {
 		return err
@@ -543,7 +541,7 @@ func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 	return label, nil
 }
 
-func (d *DockerImage) DoesImageExist(image string) error {
+func (d *DockerImage) DoesImageExist(imageName string) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
@@ -551,7 +549,7 @@ func (d *DockerImage) DoesImageExist(image string) error {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = cmdExec(containerRuntime, stdout, stderr, "manifest", "inspect", image)
+	err = cmdExec(containerRuntime, stdout, stderr, "manifest", "inspect", imageName)
 	if err != nil {
 		return err
 	}
@@ -716,7 +714,7 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 }
 
 // When login and push do not work use bash to run docker commands, this function is for users using colima
-func pushWithBash(authConfig *cliTypes.AuthConfig, image string) error {
+func pushWithBash(authConfig *cliTypes.AuthConfig, imageName string) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
@@ -731,6 +729,6 @@ func pushWithBash(authConfig *cliTypes.AuthConfig, image string) error {
 			return err
 		}
 	}
-	// docker push <image>
-	return cmdExec(containerRuntime, os.Stdout, os.Stderr, "push", image)
+	// docker push <imageName>
+	return cmdExec(containerRuntime, os.Stdout, os.Stderr, "push", imageName)
 }

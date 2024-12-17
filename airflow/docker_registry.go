@@ -8,7 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
-	"github.com/docker/docker/api/types"
+	registrytypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/registry"
 )
@@ -35,7 +35,7 @@ func (d *DockerRegistry) Login(username, token string) error {
 	// Remove http|https from serverAddress
 	serverAddress := registry.ConvertToHostname(d.registry)
 
-	authConfig := types.AuthConfig{
+	authConfig := registrytypes.AuthConfig{
 		ServerAddress: serverAddress,
 		Username:      username,
 		Password:      token,

@@ -111,7 +111,7 @@ func (rt DockerRuntime) initializeDocker(timeoutSeconds int) error {
 	// If we got an error, Docker is not running, so we attempt to start it.
 	_, err = rt.Engine.Start()
 	if err != nil {
-		return errors.New(dockerOpenNotice) //nolint: stylecheck
+		return errors.New(dockerOpenNotice) //nolint:staticcheck,stylecheck
 	}
 
 	// Wait for Docker to start.

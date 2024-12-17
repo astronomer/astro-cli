@@ -18,7 +18,7 @@ func (s *Suite) TestRegistryLogin() {
 	s.Run("success", func() {
 		mockClient := new(mocks.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
-		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("types.AuthConfig")).Return(registry.AuthenticateOKBody{}, nil).Once()
+		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("registry.AuthConfig")).Return(registry.AuthenticateOKBody{}, nil).Once()
 
 		handler := DockerRegistry{
 			registry: "test",
@@ -33,7 +33,7 @@ func (s *Suite) TestRegistryLogin() {
 	s.Run("registry error", func() {
 		mockClient := new(mocks.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
-		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("types.AuthConfig")).Return(registry.AuthenticateOKBody{}, errMockDocker).Once()
+		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("registry.AuthConfig")).Return(registry.AuthenticateOKBody{}, errMockDocker).Once()
 
 		handler := DockerRegistry{
 			registry: "test",

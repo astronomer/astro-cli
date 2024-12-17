@@ -346,9 +346,9 @@ func UploadFile(args *UploadFileArguments) error {
 			}
 			continue
 		}
+		defer response.Body.Close() //nolint:gocritic
 		data, _ := io.ReadAll(response.Body)
 		responseStatusCode := response.StatusCode
-		response.Body.Close()
 
 		// Return success for 2xx status code
 		if response.StatusCode == http.StatusOK {
