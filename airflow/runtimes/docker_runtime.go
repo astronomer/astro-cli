@@ -3,8 +3,9 @@ package runtimes
 import (
 	"time"
 
+	"errors"
+
 	"github.com/briandowns/spinner"
-	"github.com/pkg/errors"
 )
 
 // DockerEngine is a struct that contains the functions needed to initialize Docker.
