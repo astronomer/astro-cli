@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/logger"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/sirupsen/logrus"
@@ -52,18 +53,18 @@ func SetUpLogs(out io.Writer, level string) error {
 	if level == "warning" {
 		level = config.CFG.Verbosity.GetString()
 	}
-	logrus.SetOutput(out)
+	logger.SetOutput(out)
 	lvl, err := logrus.ParseLevel(level)
 	if err != nil {
 		return err
 	}
-	logrus.SetLevel(lvl)
+	logger.SetLevel(lvl)
 	return nil
 }
 
 func PrintDebugLogs() {
 	for _, log := range InitDebugLogs {
-		logrus.Debug(log)
+		logger.Debug(log)
 	}
 	// Free-up memory used by init logs
 	InitDebugLogs = nil

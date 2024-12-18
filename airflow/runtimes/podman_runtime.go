@@ -40,6 +40,16 @@ func CreatePodmanRuntime(engine PodmanEngine, osChecker OSChecker) PodmanRuntime
 	return PodmanRuntime{Engine: engine, OSChecker: osChecker}
 }
 
+// CreatePodmanRuntimeWithDefaults creates a new PodmanRuntime using the default PodmanEngine and OSChecker.
+func CreatePodmanRuntimeWithDefaults() PodmanRuntime {
+	return PodmanRuntime{Engine: GetPodmanEngine(), OSChecker: CreateOSChecker()}
+}
+
+// GetPodmanEngine creates a new PodmanEngine using the default implementation.
+func GetPodmanEngine() PodmanEngine {
+	return new(podmanEngine)
+}
+
 func (rt PodmanRuntime) Initialize() error {
 	// If we're in podman mode, and DOCKER_HOST is not already set
 	// we need to initialize our astro machine.
@@ -67,7 +77,7 @@ func (rt PodmanRuntime) Configure() error {
 	}
 
 	// Otherwise, we return an error indicating that the project isn't running.
-	return fmt.Errorf(projectNotRunningErrMsg)
+	return errors.New(projectNotRunningErrMsg)
 }
 
 func (rt PodmanRuntime) ConfigureOrKill() error {
@@ -94,7 +104,7 @@ func (rt PodmanRuntime) ConfigureOrKill() error {
 
 	// We also return an error indicating that you can't kill
 	// a project that isn't running.
-	return fmt.Errorf(projectNotRunningErrMsg)
+	return errors.New(projectNotRunningErrMsg)
 }
 
 func (rt PodmanRuntime) Kill() error {

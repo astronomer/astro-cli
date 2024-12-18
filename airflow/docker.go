@@ -12,9 +12,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/astronomer/astro-cli/airflow/runtimes"
-
-	semver "github.com/Masterminds/semver/v3"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -23,18 +22,18 @@ import (
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/astronomer/astro-cli/settings"
-	composeInterp "github.com/compose-spec/compose-go/interpolation"
-	"github.com/compose-spec/compose-go/loader"
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/interpolation"
+	"github.com/compose-spec/compose-go/v2/loader"
+	composetypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
-	docker_types "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
@@ -47,7 +46,7 @@ const (
 	componentName                  = "airflow"
 	dockerStateUp                  = "running"
 	dockerExitState                = "exited"
-	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
+	defaultAirflowVersion          = uint64(0x2) //nolint:mnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
 	pytestDirectory                = "tests"
@@ -169,15 +168,15 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 
 	dockerCli, err := command.NewDockerCli()
 	if err != nil {
-		logrus.Fatalf("error creating compose client %s", err)
+		logger.Fatalf("error creating compose client %s", err)
 	}
 
 	err = dockerCli.Initialize(flags.NewClientOptions())
 	if err != nil {
-		logrus.Fatalf("error init compose client %s", err)
+		logger.Fatalf("error init compose client %s", err)
 	}
 
-	composeService := compose.NewComposeService(dockerCli.Client(), &configfile.ConfigFile{})
+	composeService := compose.NewComposeService(dockerCli)
 
 	return &DockerCompose{
 		airflowHome:    airflowHome,
@@ -253,6 +252,9 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	// Start up our project
 	err = d.composeService.Up(context.Background(), project, api.UpOptions{
 		Create: api.CreateOptions{},
+		Start: api.StartOptions{
+			Project: project,
+		},
 	})
 	if err != nil {
 		return errors.Wrap(err, composeRecreateErrMsg)
@@ -308,7 +310,8 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 	}
 
 	// write the yaml to a file
-	err = os.WriteFile(composeFile, []byte(yaml), 0o666) //nolint:gosec, gomnd
+	composeFilePerms := 0o666
+	err = os.WriteFile(composeFile, []byte(yaml), fs.FileMode(composeFilePerms))
 	if err != nil {
 		return errors.Wrap(err, "failed to write to compose file")
 	}
@@ -330,7 +333,7 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 	}
 
 	// Pause our project
-	err = d.composeService.Stop(context.Background(), project, api.StopOptions{})
+	err = d.composeService.Stop(context.Background(), project.Name, api.StopOptions{})
 	if err != nil {
 		return errors.Wrap(err, composePauseErrMsg)
 	}
@@ -347,7 +350,7 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 	for {
 		select {
 		case <-timeout:
-			logrus.Debug("timed out waiting for postgres container to be in exited state")
+			logger.Debug("timed out waiting for postgres container to be in exited state")
 			return nil
 		case <-ticker.C:
 			psInfo, _ := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
@@ -358,10 +361,10 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 				// so docker compose will ensure that postgres container going in shutting down phase only after all other containers have exited
 				if strings.Contains(psInfo[i].Name, PostgresDockerContainerName) {
 					if psInfo[i].State == dockerExitState {
-						logrus.Debug("postgres container reached exited state")
+						logger.Debug("postgres container reached exited state")
 						return nil
 					}
-					logrus.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
+					logger.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
 				}
 			}
 		}
@@ -382,7 +385,7 @@ func (d *DockerCompose) PS() error {
 
 	// Create a new tabwriter
 	tw := new(tabwriter.Writer)
-	tw.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight) //nolint:gomnd
+	tw.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight) //nolint:mnd
 
 	// Append data to table
 	fmt.Fprintln(tw, strings.Join(infoColumns, "\t"))
@@ -400,6 +403,13 @@ func (d *DockerCompose) PS() error {
 
 // Kill stops a local airflow development cluster
 func (d *DockerCompose) Kill() error {
+	// Killing an already killed project produces an unsightly warning,
+	// so we briefly switch to a higher level before running the kill command.
+	// We then swap back to the original level.
+	originalLevel := logrus.GetLevel()
+	logrus.SetLevel(logrus.ErrorLevel)
+	defer logrus.SetLevel(originalLevel)
+
 	// Shut down our project
 	err := d.composeService.Down(context.Background(), d.projectName, api.DownOptions{Volumes: true, RemoveOrphans: true})
 	if err != nil {
@@ -421,7 +431,7 @@ func (d *DockerCompose) Logs(follow bool, containerNames ...string) error {
 		return errors.New("cannot view logs, project not running")
 	}
 
-	consumer := formatter.NewLogConsumer(context.Background(), os.Stdout, true, false)
+	consumer := formatter.NewLogConsumer(context.Background(), os.Stdout, os.Stderr, true, false, true)
 
 	err = d.composeService.Logs(context.Background(), d.projectName, consumer, api.LogOptions{
 		Services: containerNames,
@@ -437,7 +447,7 @@ func (d *DockerCompose) Logs(follow bool, containerNames ...string) error {
 // Run creates using docker exec
 // inspired from https://github.com/docker/cli/tree/master/cli/command/container
 func (d *DockerCompose) Run(args []string, user string) error {
-	execConfig := &docker_types.ExecConfig{
+	execConfig := &container.ExecOptions{
 		AttachStdout: true,
 		Cmd:          args,
 	}
@@ -462,7 +472,7 @@ func (d *DockerCompose) Run(args []string, user string) error {
 		return errors.New("exec ID is empty")
 	}
 
-	execStartCheck := docker_types.ExecStartCheck{
+	execStartCheck := container.ExecStartOptions{
 		Detach: execConfig.Detach,
 	}
 
@@ -681,7 +691,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentAirflowVersion, de
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Pip Freeze comparison can be found at \n" + pipFreezeCompareFile)
+	fmt.Printf("Pip Freeze comparison can be found at %s", pipFreezeCompareFile)
 	return nil
 }
 
@@ -763,7 +773,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/ap-airflow:") {
 				isRuntime, err := isRuntimeVersion(newTag)
 				if err != nil {
-					logrus.Debug(err)
+					logger.Debug(err)
 				}
 				if isRuntime {
 					// Replace the tag on the matching line
@@ -795,7 +805,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 	}
 
 	// Write the new content to the new Dockerfile
-	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0o600) //nolint:gomnd
+	err = os.WriteFile(newDockerfilePath, []byte(newContent.String()), 0o600) //nolint:mnd
 	if err != nil {
 		return err
 	}
@@ -996,17 +1006,17 @@ func writeToCompareFile(title string, pkgList []string, writer *bufio.Writer) {
 	if len(pkgList) > 0 {
 		_, err := writer.WriteString(title)
 		if err != nil {
-			logrus.Debug(err)
+			logger.Debug(err)
 		}
 		for _, pkg := range pkgList {
 			_, err = writer.WriteString(pkg + "\n")
 			if err != nil {
-				logrus.Debug(err)
+				logger.Debug(err)
 			}
 		}
 		_, err = writer.WriteString("\n")
 		if err != nil {
-			logrus.Debug(err)
+			logger.Debug(err)
 		}
 	}
 }
@@ -1062,10 +1072,10 @@ func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretStrin
 	return err
 }
 
-func (d *DockerCompose) Bash(container string) error {
+func (d *DockerCompose) Bash(component string) error {
 	// exec into schedueler by default
-	if container == "" {
-		container = SchedulerDockerContainerName
+	if component == "" {
+		component = SchedulerDockerContainerName
 	}
 
 	// query for container names
@@ -1081,7 +1091,7 @@ func (d *DockerCompose) Bash(container string) error {
 	// find container name of specified container
 	var containerName string
 	for i := range psInfo {
-		if strings.Contains(psInfo[i].Name, container) {
+		if strings.Contains(psInfo[i].Name, component) {
 			containerName = psInfo[i].Name
 		}
 	}
@@ -1277,7 +1287,7 @@ func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
 }
 
 // createProject creates project with yaml config as context
-var createDockerProject = func(projectName, airflowHome, envFile, buildImage, settingsFile, composeFile string, imageLabels map[string]string) (*types.Project, error) {
+var createDockerProject = func(projectName, airflowHome, envFile, buildImage, settingsFile, composeFile string, imageLabels map[string]string) (*composetypes.Project, error) {
 	// Generate the docker-compose yaml
 	var yaml string
 	var err error
@@ -1293,9 +1303,9 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 		}
 	}
 
-	var configs []types.ConfigFile
+	var configs []composetypes.ConfigFile
 
-	configs = append(configs, types.ConfigFile{
+	configs = append(configs, composetypes.ConfigFile{
 		Filename: "compose.yaml",
 		Content:  []byte(yaml),
 	})
@@ -1305,7 +1315,7 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 		return nil, errors.Wrapf(err, "Failed to open the compose file: %s", composeOverrideFilename)
 	}
 	if err == nil {
-		configs = append(configs, types.ConfigFile{
+		configs = append(configs, composetypes.ConfigFile{
 			Filename: "docker-compose.override.yml",
 			Content:  composeBytes,
 		})
@@ -1314,23 +1324,37 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 	var loadOptions []func(*loader.Options)
 
 	nameLoadOpt := func(opts *loader.Options) {
-		opts.Name = projectName
-		opts.Name = normalizeName(opts.Name)
-		opts.Interpolate = &composeInterp.Options{
+		opts.SetProjectName(normalizeName(projectName), true)
+		opts.Interpolate = &interpolation.Options{
 			LookupValue: os.LookupEnv,
 		}
 	}
 
 	loadOptions = append(loadOptions, nameLoadOpt)
 
-	project, err := loader.Load(types.ConfigDetails{
+	project, err := loader.LoadWithContext(context.Background(), composetypes.ConfigDetails{
 		ConfigFiles: configs,
 		WorkingDir:  airflowHome,
 	}, loadOptions...)
+
+	// The latest versions of compose libs handle adding these labels at an outer layer,
+	// near the cobra entrypoint. Without these labels, compose will lose track of the containers its
+	// starting for a given project and downstream library calls will fail.
+	for name, s := range project.Services {
+		s.CustomLabels = map[string]string{
+			api.ProjectLabel:     project.Name,
+			api.ServiceLabel:     name,
+			api.VersionLabel:     api.ComposeVersion,
+			api.WorkingDirLabel:  project.WorkingDir,
+			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
+			api.OneoffLabel:      "False",
+		}
+		project.Services[name] = s
+	}
 	return project, err
 }
 
-func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
+func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *composetypes.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
 	psInfo, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
 		All: true,
 	})

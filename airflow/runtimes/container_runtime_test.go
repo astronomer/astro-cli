@@ -11,6 +11,17 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+// mockFileChecker is a mock implementation of FileChecker for tests in this file.
+type mockFileChecker struct {
+	ExistingFiles map[string]bool
+}
+
+// FileExists is just a mock for os.Stat(). In our test implementation, we just check
+// if the file exists in the list of mocked files for a given test.
+func (m mockFileChecker) FileExists(path string) bool {
+	return m.ExistingFiles[path]
+}
+
 type ContainerRuntimeSuite struct {
 	suite.Suite
 }
@@ -142,8 +153,9 @@ func (s *ContainerRuntimeSuite) TestGetContainerRuntimeBinary() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			mockChecker := mocks.FileChecker{ExistingFiles: tt.mockFiles}
-			result := FindBinary(tt.pathEnv, tt.binary, mockChecker, new(osChecker))
+			mockChecker := mockFileChecker{ExistingFiles: tt.mockFiles}
+			inspector := CreateHostInspector(CreateOSChecker(), mockChecker, CreateEnvChecker())
+			result := FindBinary(tt.pathEnv, tt.binary, inspector)
 			s.Equal(tt.expected, result)
 		})
 	}

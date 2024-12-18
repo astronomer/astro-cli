@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/gorilla/websocket"
 )
 
@@ -77,7 +78,7 @@ func Subscribe(jwtToken, url, queryMessage string) error {
 	h := http.Header{"Sec-WebSocket-Protocol": []string{"graphql-ws"}}
 	ws, resp, err := websocket.DefaultDialer.Dial(url, h)
 	if err != nil {
-		log.Fatal("dial:", err)
+		logger.Fatal("dial:", err)
 	}
 	defer func() {
 		ws.Close()
@@ -112,12 +113,12 @@ func Subscribe(jwtToken, url, queryMessage string) error {
 					fmt.Println("Your token has expired. Please log in again.")
 					return
 				default:
-					log.Fatal(err)
+					logger.Fatal(err)
 				}
 			}
 			var resp WSResponse
 			if err = json.Unmarshal(message, &resp); err != nil {
-				log.Fatal(err)
+				logger.Fatal(err)
 			}
 			fmt.Print(resp.Payload.Data.Log.Log)
 		}
