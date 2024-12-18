@@ -10,6 +10,8 @@ from datetime import datetime
 
 ASTRO = os.path.abspath("../astro")
 AIRFLOW_COMPONENT = ["postgres", "webserver", "scheduler", "triggerer"]
+VAR_KEY = "foo"
+VAR_VALUE = "bar"
 
 
 @pytest.fixture(scope="module")
@@ -156,7 +158,7 @@ def test_dev_parse():
 def test_dev_run():
     # Run `astro dev run variables set foo bar` command
     result = subprocess.run(
-        [ASTRO, "dev", "run", "variables", "set", "foo", "bar"],
+        [ASTRO, "dev", "run", "variables", "set", VAR_KEY, VAR_VALUE],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -166,7 +168,7 @@ def test_dev_run():
     output = result.stdout
     assert result.returncode == 0
     # Validate that variable has been created
-    assert "Variable foo created" in output
+    assert f"Variable {VAR_KEY} created" in output
 
 
 def test_dev_restart(docker_client):
@@ -242,11 +244,11 @@ def test_dev_export():
     af_data = data.get("airflow", {})
     variables = af_data.get("variables", [])
     target_variable = next(
-        (item for item in variables if item.get("variable_name") == "foo"), None
+        (item for item in variables if item.get("variable_name") == VAR_KEY), None
     )
     assert (
-        target_variable.get("variable_value") == "bar"
-    ), f"Expected value for 'foo' is 'bar', but got '{target_variable.get('variable_value')}'."
+        target_variable.get("variable_value") == VAR_VALUE
+    ), f"Expected value for `{VAR_KEY}' is '{VAR_VALUE}', but got '{target_variable.get('variable_value')}'."
 
 
 def test_dev_kill(docker_client):
