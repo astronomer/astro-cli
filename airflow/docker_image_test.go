@@ -41,7 +41,6 @@ func (s *Suite) TestDockerImageBuild() {
 		Path:            cwd,
 		TargetPlatforms: []string{"linux/amd64"},
 		NoCache:         false,
-		Output:          true,
 	}
 
 	s.Run("build success", func() {
@@ -124,7 +123,6 @@ FROM quay.io/astronomer/astro-runtime:12.0.0`
 			Path:            "incorrect-path",
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
-			Output:          false,
 		}
 
 		err = handler.Build("", "", options)
@@ -148,7 +146,6 @@ func (s *Suite) TestDockerImagePytest() {
 		Path:            cwd,
 		TargetPlatforms: []string{"linux/amd64"},
 		NoCache:         false,
-		Output:          true,
 	}
 
 	s.Run("pytest success", func() {
@@ -207,7 +204,6 @@ func (s *Suite) TestDockerImagePytest() {
 			Path:            cwd,
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
-			Output:          false,
 		}
 
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
@@ -244,7 +240,6 @@ func (s *Suite) TestDockerImageConflictTest() {
 		Path:            cwd,
 		TargetPlatforms: []string{"linux/amd64"},
 		NoCache:         false,
-		Output:          true,
 	}
 
 	s.Run("conflict test success", func() {
@@ -260,7 +255,6 @@ func (s *Suite) TestDockerImageConflictTest() {
 			Path:            cwd,
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
-			Output:          false,
 		}
 
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
@@ -275,7 +269,6 @@ func (s *Suite) TestDockerImageConflictTest() {
 			Path:            cwd,
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
-			Output:          false,
 		}
 
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
@@ -295,7 +288,6 @@ func (s *Suite) TestDockerImageConflictTest() {
 			Path:            cwd,
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
-			Output:          false,
 		}
 
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {

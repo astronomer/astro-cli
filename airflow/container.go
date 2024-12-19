@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5" //nolint:gosec
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"html/template"
 	"regexp"
 	"strings"
@@ -21,8 +22,20 @@ import (
 	"github.com/pkg/errors"
 )
 
+type StartInput struct {
+	ImageName         string
+	SettingsFile      string
+	ComposeFile       string
+	BuildSecretString string
+	NoCache           bool
+	NoBrowser         bool
+	WaitTime          time.Duration
+	EnvConns          map[string]astrocore.EnvironmentObjectConnection
+	Verbosity         logrus.Level
+}
+
 type ContainerHandler interface {
-	Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error
+	Start(input StartInput) error
 	Stop(waitForExit bool) error
 	PS() error
 	Kill() error
@@ -124,10 +137,8 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 
 	if envFile != "" {
 		if !envExists {
-			fmt.Printf(envNotFoundMsg, envFile)
 			envFile = ""
 		} else {
-			fmt.Printf(envFoundMsg, envFile)
 			envFile = fmt.Sprintf("env_file: %s", envFile)
 		}
 	}

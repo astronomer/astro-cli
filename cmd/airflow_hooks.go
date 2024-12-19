@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"os"
 	"path/filepath"
 
@@ -26,6 +27,10 @@ func ConfigureContainerRuntime(_ *cobra.Command, _ []string) error {
 	var err error
 	containerRuntime, err = runtimes.GetContainerRuntime()
 	if err != nil {
+		return err
+	}
+
+	if err := softwareCmd.SetUpLogs(os.Stdout, verboseLevel); err != nil {
 		return err
 	}
 	return nil

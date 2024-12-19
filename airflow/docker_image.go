@@ -8,6 +8,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/spinner"
+	"github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"os/exec"
@@ -71,6 +74,17 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 }
 
 func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
+	// Determine if we should output to terminal or buffer.
+	output := logger.GetLevel() >= logrus.DebugLevel
+
+	// Start the spinner.
+	s := spinner.NewSpinner(" Building project image…")
+	s.FinalMSG = ansi.Green("\u2714") + " Project image has been updated\n"
+	if !output {
+		s.Start()
+		defer s.Stop()
+	}
+
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
@@ -118,24 +132,34 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 		}
 		args = append(args, buildSecretArgs...)
 	}
-	// Build image
+
+	// Route output streams according to verbosity.
 	var stdout, stderr io.Writer
-	if buildConfig.Output {
+	var outBuff bytes.Buffer
+	if output {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
-		stdout = nil
-		stderr = nil
+		stdout = &outBuff
+		stderr = &outBuff
 	}
-	fmt.Println(args)
+
+	// Build the image
 	err = cmdExec(containerRuntime, stdout, stderr, args...)
 	if err != nil {
-		return fmt.Errorf("command '%s build -t %s failed: %w", containerRuntime, d.imageName, err)
+		s.FinalMSG = ""
+		s.Stop()
+		fmt.Println(strings.TrimSpace(outBuff.String()) + "\n")
+		return errors.New("an error was encountered while building the image, see the build logs for details")
 	}
-	return err
+
+	return nil
 }
 
 func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
+	// Determine if we should output to terminal or buffer.
+	output := logger.GetLevel() >= logrus.DebugLevel
+
 	// delete container
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
@@ -167,7 +191,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	args = append(args, pytestArgs...)
 	// run pytest image
 	var stdout, stderr io.Writer
-	if buildConfig.Output {
+	if output {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
