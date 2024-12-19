@@ -187,7 +187,6 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		Path:            config.WorkingPath,
 		NoCache:         ignoreCacheDeploy,
 		TargetPlatforms: deployImagePlatformSupport,
-		Output:          true,
 		Labels:          deployLabels,
 	}
 
