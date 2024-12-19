@@ -112,9 +112,14 @@ commands:
           name: Build astro cli
           command: make build
       - run:
+          name: Install Poetry
+          command: |
+            python3 --version
+            pip install poetry
+      - run:
           name: Run integration test
           command: |
-            python -m venv penv
+            python3 -m venv penv
             . penv/bin/activate
             cd integration-test && poetry install --no-root
             pytest -x -s -v dev_test.py
