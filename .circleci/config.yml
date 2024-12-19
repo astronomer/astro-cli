@@ -14,6 +14,12 @@ jobs:
       - image: quay.io/astronomer/ap-dind-golang:24.0.6
     steps:
       - test
+  integration-test:
+    working_directory: /go/src/github.com/astronomer/astro-cli
+    docker:
+      - image: quay.io/astronomer/ap-dind-golang:24.0.6
+    steps:
+      - integration-test
   new-tag:
     executor: docker-executor
     steps:
@@ -34,6 +40,13 @@ workflows:
     jobs:
       - lint
       - test
+      - approve-run-integration-tests:
+          type: approval
+      - integration-test:
+          requires:
+            - lint
+            - test
+            - approve-run-integration-tests
       - approve-release:
           requires:
             - lint
@@ -90,6 +103,21 @@ commands:
           command: |
             make test
             bash -c "bash <(curl -s https://codecov.io/bash)"
+  integration-test:
+    description: "Run integration tests"
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build astro cli
+          command: make build
+      - run:
+          name: Run integration test
+          command: |
+            python -m venv penv
+            . penv/bin/activate
+            cd integration-test && poetry install --no-root
+            pytest -x -s -v dev_test.py
   commit-next-tag:
     description: "Tag the commit to the release branch major.minor with the patch number incremented by one"
     parameters:
