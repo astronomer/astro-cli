@@ -15,9 +15,10 @@ jobs:
     steps:
       - test
   integration-test:
-    working_directory: /go/src/github.com/astronomer/astro-cli
-    docker:
-      - image: quay.io/astronomer/ap-dind-golang:24.0.6
+  #  working_directory: /go/src/github.com/astronomer/astro-cli
+    machine:
+      resource_class: medium
+      image: ubuntu-2204:2024.11.1
     steps:
       - integration-test
   new-tag:
@@ -107,19 +108,34 @@ commands:
     description: "Run integration tests"
     steps:
       - checkout
-      - setup_remote_docker
+      - run:
+          name: Install Go
+          command: |
+            set -e
+            cd /tmp
+            if [[ ! -f go.tar.gz ]]
+            then
+              curl -Lo go.tar.gz https://go.dev/dl/go1.23.4.linux-amd64.tar.gz
+            else
+              echo "using existing go"
+            fi
+            sudo rm -rf /usr/local/go
+            sudo tar -C /usr/local -xvf go.tar.gz
+            GOROOT=/usr/local/go go version
+            echo 'export GOROOT=/usr/local/go' >> $BASH_ENV
+      - run:
+          name: Setup python env
+          command: |
+            pyenv install --skip-existing 3.11.1
+            pyenv global 3.11.1
+            pip install poetry
       - run:
           name: Build astro cli
           command: make build
       - run:
-          name: Install Poetry
-          command: |
-            python3 --version
-            pip install poetry
-      - run:
           name: Run integration test
           command: |
-            python3 -m venv penv
+            python -m venv penv
             . penv/bin/activate
             cd integration-test && poetry install --no-root
             pytest -x -s -v dev_test.py
