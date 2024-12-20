@@ -15,7 +15,6 @@ jobs:
     steps:
       - test
   integration-test:
-  #  working_directory: /go/src/github.com/astronomer/astro-cli
     machine:
       resource_class: medium
       image: ubuntu-2204:2024.11.1
