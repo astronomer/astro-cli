@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/airflow/runtimes"
-	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/spf13/cobra"
@@ -27,10 +26,6 @@ func ConfigureContainerRuntime(_ *cobra.Command, _ []string) error {
 	var err error
 	containerRuntime, err = runtimes.GetContainerRuntime()
 	if err != nil {
-		return err
-	}
-
-	if err := softwareCmd.SetUpLogs(os.Stdout, verboseLevel); err != nil {
 		return err
 	}
 	return nil

@@ -364,7 +364,7 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("TagLocalImage", mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(4)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
@@ -392,7 +392,7 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Times(2)
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(1)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
@@ -418,7 +418,7 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Times(2)
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(1)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
@@ -444,7 +444,7 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Times(2)
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(1)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
@@ -470,7 +470,7 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("TagLocalImage", mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(4)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
@@ -490,37 +490,12 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.AssertExpectations(s.T())
 	})
 
-	s.Run("project already running", func() {
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running"}}, nil).Once()
-
-		mockDockerCompose.composeService = composeMock
-
-		err := mockDockerCompose.Start("", "", "", "", false, false, waitTime, nil)
-		s.Contains(err.Error(), "cannot start, project already running")
-
-		composeMock.AssertExpectations(s.T())
-	})
-
-	s.Run("compose ps failure", func() {
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, errMockDocker).Once()
-
-		mockDockerCompose.composeService = composeMock
-
-		err := mockDockerCompose.Start("", "", "", "", false, false, waitTime, nil)
-		s.ErrorIs(err, errMockDocker)
-
-		composeMock.AssertExpectations(s.T())
-	})
-
 	s.Run("image build failure", func() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(errMockDocker).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
@@ -543,7 +518,6 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("ListLabels").Return(map[string]string{}, errMockDocker).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
 			return nil
@@ -566,7 +540,6 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("ListLabels").Return(map[string]string{}, nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
@@ -590,7 +563,6 @@ func (s *Suite) TestDockerComposeStart() {
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Twice()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		checkWebserverHealth = func(url string, timeout time.Duration) error {
