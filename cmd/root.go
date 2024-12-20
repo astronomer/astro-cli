@@ -1,30 +1,22 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
 	"os"
-	"strings"
-	"time"
-
-	"github.com/astronomer/astro-cli/cmd/registry"
-	"github.com/sirupsen/logrus"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
+	"github.com/astronomer/astro-cli/cmd/registry"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
-	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/astronomer/astro-cli/version"
-
-	"github.com/google/go-github/v48/github"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -73,37 +65,10 @@ func NewRootCmd() *cobra.Command {
     \__\/\__\/ \_____\/   \__\/    \_\/ \_\/ \_____\/           \_____\/ \_____\/\________\/
 
 Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or Local Development.`,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Check for latest version
-			if config.CFG.UpgradeMessage.GetBool() {
-				// create github client with 3 second timeout, setting an aggressive timeout since its not mandatory to get a response in each command execution
-				githubClient := github.NewClient(&http.Client{Timeout: 3 * time.Second})
-				// compare current version to latest
-				err = version.CompareVersions(githubClient, "astronomer", "astro-cli")
-				if err != nil {
-					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error comparing CLI versions: "+err.Error())
-				}
-			}
-			if isCloudCtx {
-				err = cloudCmd.Setup(cmd, platformCoreClient, astroCoreClient)
-				if err != nil {
-					if strings.Contains(err.Error(), "token is invalid or malformed") {
-						return errors.New("API Token is invalid or malformed") //nolint
-					}
-					if strings.Contains(err.Error(), "the API token given has expired") {
-						return errors.New("API Token is expired") //nolint
-					}
-					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
-				}
-			}
-			// common PersistentPreRunE component between software & cloud
-			// setting up log verbosity and dumping debug logs collected during CLI-initialization
-			if err := softwareCmd.SetUpLogs(os.Stdout, verboseLevel); err != nil {
-				return err
-			}
-			softwareCmd.PrintDebugLogs()
-			return nil
-		},
+		PersistentPreRunE: utils.ChainRunEs(
+			SetupLoggingPersistentPreRunE,
+			CreateRootPersistentPreRunE(astroCoreClient, platformCoreClient),
+		),
 	}
 
 	rootCmd.AddCommand(
