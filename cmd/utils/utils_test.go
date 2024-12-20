@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/astronomer/astro-cli/config"
@@ -45,4 +46,43 @@ func TestGetDefaultDeployDescription(t *testing.T) {
 	// Test case where --dags flag is set
 	descriptionWithDags := GetDefaultDeployDescription(true)
 	assert.Equal(t, "Deployed via <astro deploy --dags>", descriptionWithDags)
+}
+
+func TestChainRunEsExecutesAllFunctionsSuccessfully(t *testing.T) {
+	runE1 := func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+	runE2 := func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+	chain := ChainRunEs(runE1, runE2)
+	err := chain(&cobra.Command{}, []string{})
+	assert.NoError(t, err)
+}
+
+func TestChainRunEsReturnsErrorIfAnyFunctionFails(t *testing.T) {
+	runE1 := func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+	runE2 := func(cmd *cobra.Command, args []string) error {
+		return errors.New("error in runE2")
+	}
+	chain := ChainRunEs(runE1, runE2)
+	err := chain(&cobra.Command{}, []string{})
+	assert.Error(t, err)
+	assert.Equal(t, "error in runE2", err.Error())
+}
+
+func TestChainRunEsStopsExecutionAfterError(t *testing.T) {
+	runE1 := func(cmd *cobra.Command, args []string) error {
+		return errors.New("error in runE1")
+	}
+	runE2 := func(cmd *cobra.Command, args []string) error {
+		t.FailNow() // This should not be called
+		return nil
+	}
+	chain := ChainRunEs(runE1, runE2)
+	err := chain(&cobra.Command{}, []string{})
+	assert.Error(t, err)
+	assert.Equal(t, "error in runE1", err.Error())
 }
