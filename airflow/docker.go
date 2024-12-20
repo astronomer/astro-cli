@@ -207,22 +207,6 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 //
 //nolint:gocognit
 func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
-	//// Get project containers
-	//psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
-	//	All: true,
-	//})
-	//if err != nil {
-	//	return errors.Wrap(err, composeCreateErrMsg)
-	//}
-	//if len(psInfo) > 0 {
-	//	// Ensure project is not already running
-	//	for i := range psInfo {
-	//		if checkServiceState(psInfo[i].State, dockerStateUp) {
-	//			return errors.New("cannot start, project already running")
-	//		}
-	//	}
-	//}
-
 	// Build this project image
 	if imageName == "" {
 		if !config.CFG.DisableAstroRun.GetBool() {
