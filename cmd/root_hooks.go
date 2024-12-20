@@ -18,9 +18,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// SetupLoggingPersistentPreRunE is a pre-run hook shared between software & cloud
+// SetupLogging is a pre-run hook shared between software & cloud
 // setting up log verbosity.
-func SetupLoggingPersistentPreRunE(_ *cobra.Command, _ []string) error {
+func SetupLogging(_ *cobra.Command, _ []string) error {
 	return softwareCmd.SetUpLogs(os.Stdout, verboseLevel)
 }
 
