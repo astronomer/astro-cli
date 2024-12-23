@@ -92,7 +92,7 @@ def test_dev_init(temp_dir):
 def test_dev_start(docker_client):
     # Run `astro dev start` command
     result = subprocess.run(
-        [ASTRO, "dev", "start"],
+        [ASTRO, "dev", "start", "--no-browser"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
