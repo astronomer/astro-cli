@@ -17,7 +17,7 @@ jobs:
   integration-test:
     machine:
       resource_class: medium
-      image: ubuntu-2204:2024.11.1
+      image: ubuntu-2204:current
     steps:
       - integration-test
   new-tag:
@@ -112,12 +112,7 @@ commands:
           command: |
             set -e
             cd /tmp
-            if [[ ! -f go.tar.gz ]]
-            then
-              curl -Lo go.tar.gz https://go.dev/dl/go1.23.4.linux-amd64.tar.gz
-            else
-              echo "using existing go"
-            fi
+            curl -Lo go.tar.gz https://go.dev/dl/go1.23.4.linux-amd64.tar.gz
             sudo rm -rf /usr/local/go
             sudo tar -C /usr/local -xvf go.tar.gz
             GOROOT=/usr/local/go go version
