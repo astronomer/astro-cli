@@ -70,7 +70,9 @@ const (
 	composeUserPasswordMsg  = "The default Airflow UI credentials are: %s"
 	postgresUserPasswordMsg = "The default Postgres DB credentials are: %s"
 
-	envPathMsg = "Error looking for \"%s\""
+	envPathMsg     = "Error looking for \"%s\""
+	envFoundMsg    = "Env file \"%s\" found. Loading...\n"
+	envNotFoundMsg = "Env file \"%s\" not found. Skipping...\n"
 )
 
 var (
