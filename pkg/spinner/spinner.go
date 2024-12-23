@@ -23,7 +23,6 @@ func NewSpinner(suffix string) *spinner.Spinner {
 
 func StopWithCheckmark(s *spinner.Spinner, suffix string) *spinner.Spinner {
 	s.Start() // Ensure we've started the spinner, so we can stop it. We still want the final checkmark to be displayed.
-	s.FinalMSG = " " + suffix
 	s.FinalMSG = ansi.Green("\u2714") + " " + suffix + "\n"
 	s.Stop()
 	return s

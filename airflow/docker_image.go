@@ -17,7 +17,6 @@ import (
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/spinner"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -79,7 +78,6 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 
 	// Start the spinner.
 	s := spinner.NewSpinner("Building project image…")
-	s.FinalMSG = ansi.Green("\u2714") + " Project image has been updated\n"
 	if !output {
 		s.Start()
 		defer s.Stop()
@@ -153,6 +151,7 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 		return errors.New("an error was encountered while building the image, see the build logs for details")
 	}
 
+	spinner.StopWithCheckmark(s, "Project image has been updated")
 	return nil
 }
 
