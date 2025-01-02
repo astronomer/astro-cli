@@ -27,7 +27,7 @@ jobs:
       - commit-next-tag
   release:
     docker:
-      - image: golang:1.21.6
+      - image: golang:1.23
     working_directory: /go/src/github.com/astronomer/astro-cli
     steps:
       - checkout
