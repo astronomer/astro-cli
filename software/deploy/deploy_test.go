@@ -144,11 +144,6 @@ func (s *Suite) TearDownSuite() {
 	imageHandlerInit = airflow.ImageHandlerInit
 }
 
-func (s *Suite) TearDownSubTest() {
-	s.houstonMock.AssertExpectations(s.T())
-	s.mockImageHandler.AssertExpectations(s.T())
-}
-
 func (s *Suite) TearDownTest() {
 	s.houstonMock.AssertExpectations(s.T())
 	s.mockImageHandler.AssertExpectations(s.T())
