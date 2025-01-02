@@ -29,6 +29,7 @@ jobs:
     docker:
       - image: golang:1.23
     working_directory: /go/src/github.com/astronomer/astro-cli
+    resource_class: large
     steps:
       - checkout
       - run:
