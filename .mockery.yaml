@@ -57,6 +57,9 @@ packages:
       outpkg: mocks
     interfaces:
       OSChecker:
+      EnvChecker:
+      FileChecker:
+      HostInspector:
       ContainerRuntime:
       PodmanEngine:
       DockerEngine:

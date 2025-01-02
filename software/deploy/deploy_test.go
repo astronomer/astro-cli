@@ -136,11 +136,17 @@ func (s *Suite) TearDownSubTest() {
 }
 
 func (s *Suite) TearDownSuite() {
+	// Cleanup logic, if any (e.g., clearing mocks)
 	s.mockImageHandler = nil
 	s.houstonMock = nil
 	s.fsForDockerConfig = nil
 	s.fsForLocalConfig = nil
 	imageHandlerInit = airflow.ImageHandlerInit
+}
+
+func (s *Suite) TearDownSubTest() {
+	s.houstonMock.AssertExpectations(s.T())
+	s.mockImageHandler.AssertExpectations(s.T())
 }
 
 func (s *Suite) TearDownTest() {

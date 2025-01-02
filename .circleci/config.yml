@@ -5,6 +5,7 @@ jobs:
     working_directory: /go/src/github.com/astronomer/astro-cli
     docker:
       - image: quay.io/astronomer/ap-dind-golang:24.0.6
+    resource_class: large
     steps:
       - lint
   test:
@@ -13,6 +14,12 @@ jobs:
       - image: quay.io/astronomer/ap-dind-golang:24.0.6
     steps:
       - test
+  integration-test:
+    machine:
+      resource_class: medium
+      image: ubuntu-2204:current
+    steps:
+      - integration-test
   new-tag:
     executor: docker-executor
     steps:
@@ -33,6 +40,13 @@ workflows:
     jobs:
       - lint
       - test
+      - approve-run-integration-tests:
+          type: approval
+      - integration-test:
+          requires:
+            - lint
+            - test
+            - approve-run-integration-tests
       - approve-release:
           requires:
             - lint
@@ -89,6 +103,36 @@ commands:
           command: |
             make test
             bash -c "bash <(curl -s https://codecov.io/bash)"
+  integration-test:
+    description: "Run integration tests"
+    steps:
+      - checkout
+      - run:
+          name: Install Go
+          command: |
+            set -e
+            cd /tmp
+            curl -Lo go.tar.gz https://go.dev/dl/go1.23.4.linux-amd64.tar.gz
+            sudo rm -rf /usr/local/go
+            sudo tar -C /usr/local -xvf go.tar.gz
+            GOROOT=/usr/local/go go version
+            echo 'export GOROOT=/usr/local/go' >> $BASH_ENV
+      - run:
+          name: Setup python env
+          command: |
+            pyenv install --skip-existing 3.11.1
+            pyenv global 3.11.1
+            pip install poetry
+      - run:
+          name: Build astro cli
+          command: make build
+      - run:
+          name: Run integration test
+          command: |
+            python -m venv penv
+            . penv/bin/activate
+            cd integration-test && poetry install --no-root
+            pytest -x -s -v dev_test.py
   commit-next-tag:
     description: "Tag the commit to the release branch major.minor with the patch number incremented by one"
     parameters:
