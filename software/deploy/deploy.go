@@ -266,7 +266,6 @@ func buildDockerImageFromWorkingDir(path string, imageHandler airflow.ImageHandl
 		Path:            config.WorkingPath,
 		NoCache:         ignoreCacheDeploy,
 		TargetPlatforms: deployImagePlatformSupport,
-		Output:          true,
 		Labels:          deployLabels,
 	}
 

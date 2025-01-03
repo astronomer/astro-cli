@@ -5,6 +5,5 @@ type ImageBuildConfig struct {
 	Path            string
 	TargetPlatforms []string
 	NoCache         bool
-	Output          bool
 	Labels          []string
 }
