@@ -14,6 +14,12 @@ jobs:
       - image: quay.io/astronomer/ap-dind-golang:24.0.6
     steps:
       - test
+  integration-test:
+    machine:
+      resource_class: medium
+      image: ubuntu-2204:current
+    steps:
+      - integration-test
   new-tag:
     executor: docker-executor
     steps:
@@ -21,10 +27,12 @@ jobs:
       - commit-next-tag
   release:
     docker:
-      - image: golang:1.21.6
+      - image: golang:1.23
     working_directory: /go/src/github.com/astronomer/astro-cli
+    resource_class: large
     steps:
       - checkout
+      - setup-cross-build-libs
       - run:
           name: goreleaser
           command: curl -sL https://raw.githubusercontent.com/goreleaser/get/master/get | bash
@@ -34,6 +42,13 @@ workflows:
     jobs:
       - lint
       - test
+      - approve-run-integration-tests:
+          type: approval
+      - integration-test:
+          requires:
+            - lint
+            - test
+            - approve-run-integration-tests
       - approve-release:
           requires:
             - lint
@@ -90,6 +105,36 @@ commands:
           command: |
             make test
             bash -c "bash <(curl -s https://codecov.io/bash)"
+  integration-test:
+    description: "Run integration tests"
+    steps:
+      - checkout
+      - run:
+          name: Install Go
+          command: |
+            set -e
+            cd /tmp
+            curl -Lo go.tar.gz https://go.dev/dl/go1.23.4.linux-amd64.tar.gz
+            sudo rm -rf /usr/local/go
+            sudo tar -C /usr/local -xvf go.tar.gz
+            GOROOT=/usr/local/go go version
+            echo 'export GOROOT=/usr/local/go' >> $BASH_ENV
+      - run:
+          name: Setup python env
+          command: |
+            pyenv install --skip-existing 3.11.1
+            pyenv global 3.11.1
+            pip install poetry
+      - run:
+          name: Build astro cli
+          command: make build
+      - run:
+          name: Run integration test
+          command: |
+            python -m venv penv
+            . penv/bin/activate
+            cd integration-test && poetry install --no-root
+            pytest -x -s -v dev_test.py
   commit-next-tag:
     description: "Tag the commit to the release branch major.minor with the patch number incremented by one"
     parameters:
@@ -115,3 +160,15 @@ commands:
             git remote set-url origin "https://astro-astronomer:${GITHUB_TOKEN}@github.com/${GIT_ORG}/${CIRCLE_PROJECT_REPONAME}.git"
             git tag $NEXT_TAG
             git push origin $NEXT_TAG
+
+  setup-cross-build-libs:
+    description: "Setup MacOS cross build libraries via osxcross"
+    steps:
+      - run:
+          name: Install cross build libraries
+          command: |
+            apt-get update && apt-get install -y clang llvm cmake libssl-dev patch zlib1g-dev xz-utils
+            git clone https://github.com/tpoechtrager/osxcross.git /osxcross
+            wget https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX11.3.sdk.tar.xz -P /osxcross/tarballs/
+            cd /osxcross && UNATTENDED=yes ./build.sh
+            echo 'export PATH="/osxcross/target/bin:$PATH"' >> $BASH_ENV
