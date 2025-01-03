@@ -142,11 +142,18 @@ func DeleteBundle(input *DeleteBundleInput) error {
 
 func uploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool) (string, error) {
 	tarFilePath := filepath.Join(tarDirPath, "bundle.tar")
+	tarGzFilePath := tarFilePath + ".gz"
 	defer func() {
-		err := os.Remove(tarFilePath)
-		if err != nil {
-			fmt.Println("\nFailed to delete tar file: ", err.Error())
-			fmt.Println("\nPlease delete the tar file manually from path: " + tarFilePath)
+		tarFiles := []string{tarFilePath, tarGzFilePath}
+		for _, file := range tarFiles {
+			err := os.Remove(file)
+			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
+				fmt.Println("\nFailed to delete archived file: ", err.Error())
+				fmt.Println("\nPlease delete the archived file manually from path: " + file)
+			}
 		}
 	}()
 
@@ -156,13 +163,19 @@ func uploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool)
 		return "", err
 	}
 
-	tarFile, err := os.Open(tarFilePath)
+	// Gzip the tar
+	err = fileutil.GzipFile(tarFilePath, tarGzFilePath)
 	if err != nil {
 		return "", err
 	}
-	defer tarFile.Close()
 
-	versionID, err := azureUploader(uploadURL, tarFile)
+	tarGzFile, err := os.Open(tarGzFilePath)
+	if err != nil {
+		return "", err
+	}
+	defer tarGzFile.Close()
+
+	versionID, err := azureUploader(uploadURL, tarGzFile)
 	if err != nil {
 		return "", err
 	}
