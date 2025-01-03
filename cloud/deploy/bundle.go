@@ -148,6 +148,9 @@ func uploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool)
 		for _, file := range tarFiles {
 			err := os.Remove(file)
 			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
 				fmt.Println("\nFailed to delete archived file: ", err.Error())
 				fmt.Println("\nPlease delete the archived file manually from path: " + file)
 			}
