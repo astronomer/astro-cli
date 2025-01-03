@@ -32,6 +32,7 @@ jobs:
     resource_class: large
     steps:
       - checkout
+      - setup-cross-build-libs
       - run:
           name: goreleaser
           command: curl -sL https://raw.githubusercontent.com/goreleaser/get/master/get | bash
@@ -159,3 +160,15 @@ commands:
             git remote set-url origin "https://astro-astronomer:${GITHUB_TOKEN}@github.com/${GIT_ORG}/${CIRCLE_PROJECT_REPONAME}.git"
             git tag $NEXT_TAG
             git push origin $NEXT_TAG
+
+  setup-cross-build-libs:
+    description: "Setup MacOS cross build libraries via osxcross"
+    steps:
+      - run:
+          name: Install cross build libraries
+          command: |
+            apt-get update && apt-get install -y clang llvm cmake libssl-dev patch zlib1g-dev xz-utils
+            git clone https://github.com/tpoechtrager/osxcross.git /osxcross
+            wget https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX11.3.sdk.tar.xz -P /osxcross/tarballs/
+            cd /osxcross && UNATTENDED=yes ./build.sh
+            echo 'export PATH="/osxcross/target/bin:$PATH"' >> $BASH_ENV
