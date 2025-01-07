@@ -24,9 +24,8 @@ const (
 	containerRuntimeNotFoundErrMsg = "Failed to find a container runtime. " +
 		"See the Astro CLI prerequisites for more information. " +
 		"https://www.astronomer.io/docs/astro/cli/install-cli"
-	containerRuntimeInitMessage = " Astro uses container technology to run your Airflow project.\n " +
-		" Please wait while we get things started…\n"
-	spinnerRefresh = 100 * time.Millisecond
+	containerRuntimeInitMessage = " Astro uses containers to run your project. Hang tight while we get started…"
+	spinnerRefresh              = 100 * time.Millisecond
 )
 
 // ContainerRuntime interface defines the methods that manage

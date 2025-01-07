@@ -3,11 +3,9 @@ package runtimes
 import (
 	"errors"
 	"fmt"
+	"github.com/astronomer/astro-cli/airflow/runtimes/types"
 	"os"
 	"strings"
-	"time"
-
-	"github.com/astronomer/astro-cli/airflow/runtimes/types"
 
 	"github.com/briandowns/spinner"
 )
@@ -121,12 +119,6 @@ func (rt PodmanRuntime) ensureMachine() error {
 	s := spinner.New(spinnerCharSet, spinnerRefresh)
 	s.Suffix = containerRuntimeInitMessage
 	defer s.Stop()
-
-	// Update the message after a bit if it's still running.
-	go func() {
-		<-time.After(1 * time.Minute)
-		s.Suffix = podmanInitSlowMessage
-	}()
 
 	// Check if another, non-astro Podman machine is running
 	nonAstroMachineName := rt.isAnotherMachineRunning()

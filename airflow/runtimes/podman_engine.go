@@ -10,11 +10,9 @@ import (
 )
 
 const (
-	podmanStatusRunning   = "running"
-	podmanStatusStopped   = "stopped"
-	composeProjectLabel   = "com.docker.compose.project"
-	podmanInitSlowMessage = " Sorry, this is taking a bit longer than expected.\n " +
-		" This initial download will be cached once finished.\n "
+	podmanStatusRunning               = "running"
+	podmanStatusStopped               = "stopped"
+	composeProjectLabel               = "com.docker.compose.project"
 	podmanMachineAlreadyRunningErrMsg = "astro needs a podman machine to run your project, " +
 		"but it looks like a machine is already running. " +
 		"Mac hosts are limited to one running machine at a time. " +
