@@ -156,7 +156,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithTagWarning() {
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return s.mockImageHandler
 	}
 
@@ -179,7 +179,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithImageRepoWarning() {
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return s.mockImageHandler
 	}
 
@@ -216,7 +216,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 			return false
 		})).Return(nil).Once()
 
-		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("image_sha", nil)
 		s.mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("", nil).Once()
 		s.mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("1.10.12", nil).Once()
 
@@ -254,11 +254,9 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 			return false
 		})).Return(nil).Once()
 
-		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("image_sha", nil)
 		s.mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("", nil).Once()
 		s.mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("1.10.12", nil).Once()
-		s.mockImageHandler.On("GetImageSha", mock.Anything, mock.Anything).Return("image_sha", nil).Once()
-
 		return s.mockImageHandler
 	}
 	config.CFG.ShaAsTag.SetHomeString("true")
@@ -267,6 +265,32 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 	s.NoError(err)
 	expectedLabel = deployRevisionDescriptionLabel + "=" + description
 	assert.Contains(s.T(), capturedBuildConfig.Labels, expectedLabel)
+}
+
+func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistryAndCustomImageName() {
+	config.InitConfig(s.fsForDockerConfig)
+	dockerfile = "Dockerfile"
+	defer func() { dockerfile = "Dockerfile" }()
+
+	customImageName := "test-image-name:latest"
+	imageHandlerInit = func(image string) airflow.ImageHandler {
+		s.mockImageHandler.On("TagLocalImage", customImageName).Return(nil)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("image_sha", nil)
+		s.mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("12.2.0", nil)
+		s.mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("1.10.12", nil)
+
+		return s.mockImageHandler
+	}
+
+	mockedDeploymentConfig := &houston.DeploymentConfig{
+		AirflowImages: mockAirflowImageList,
+	}
+	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
+	s.houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	s.houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:latest", AirflowVersion: "1.10.12", RuntimeVersion: "12.2.0"}).Return(nil, nil)
+
+	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description, customImageName)
+	s.NoError(err)
 }
 
 func (s *Suite) TestBuildPushDockerImageFailure() {
@@ -301,7 +325,7 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 	s.mockImageHandler = new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errSomeContainerIssue)
 		return s.mockImageHandler
 	}
 
@@ -398,7 +422,7 @@ func (s *Suite) TestAirflowSuccess() {
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return s.mockImageHandler
 	}
 
@@ -424,7 +448,7 @@ func (s *Suite) TestAirflowSuccessForImageOnly() {
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return s.mockImageHandler
 	}
 
@@ -456,7 +480,7 @@ func (s *Suite) TestAirflowSuccessForImageName() {
 	config.InitConfig(s.fsForLocalConfig)
 	customImageName := "test-image-name"
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		s.mockImageHandler.On("TagLocalImage", customImageName).Return(nil)
 		s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("test", nil)
 		return s.mockImageHandler
@@ -513,7 +537,7 @@ func (s *Suite) TestAirflowFailureForImageOnly() {
 	config.InitConfig(s.fsForLocalConfig)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return s.mockImageHandler
 	}
 	s.houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
