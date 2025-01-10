@@ -520,6 +520,20 @@ func (s *Suite) TestDockerImagePush() {
 		})
 	}
 
+	s.Run("docker library failure", func() {
+		// This path is used to support running Colima whichn is "docker-cli compatible" but wasn't 100% library compatible in the past.
+		// That was 3 years ago though, so we should re-test and work out if this fallback to using bash is still needed or not
+		getDockerClient = func() (client.APIClient, error) { return nil, fmt.Errorf("foreced error") }
+		_, err := handler.Push("repo/test/image", "username", "", false)
+		s.NoError(err)
+	})
+}
+
+func (s *Suite) TestDockerImagePushWithGetRepoImageSha() {
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
 	s.Run("When sha is expected to be returned from Push", func() {
 		expectedImage := "images.software/foo/bar:123"
 		username := ""
@@ -603,14 +617,6 @@ func (s *Suite) TestDockerImagePush() {
 		s.Equal("", sha)
 		s.Equal(expectedError, err)
 		mockClient.AssertExpectations(s.T())
-	})
-
-	s.Run("docker library failure", func() {
-		// This path is used to support running Colima whichn is "docker-cli compatible" but wasn't 100% library compatible in the past.
-		// That was 3 years ago though, so we should re-test and work out if this fallback to using bash is still needed or not
-		getDockerClient = func() (client.APIClient, error) { return nil, fmt.Errorf("foreced error") }
-		_, err := handler.Push("repo/test/image", "username", "", false)
-		s.NoError(err)
 	})
 }
 
