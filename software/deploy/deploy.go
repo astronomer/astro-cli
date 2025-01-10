@@ -196,8 +196,7 @@ func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, 
 		token = c.Token
 	}
 	if customImageName != "" {
-		tagFromImageName := getGetTagFromImageName(customImageName)
-		if tagFromImageName != "" {
+		if tagFromImageName := getGetTagFromImageName(customImageName); tagFromImageName != "" {
 			remoteImage = fmt.Sprintf("%s:%s", registry, tagFromImageName)
 		}
 	}

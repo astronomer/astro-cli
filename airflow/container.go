@@ -46,7 +46,7 @@ type RegistryHandler interface {
 // ImageHandler defines methods require to handle all operations on/for container images
 type ImageHandler interface {
 	Build(dockerfile, buildSecretString string, config types.ImageBuildConfig) error
-	Push(remoteImage, username, token string, getImageSha bool) (string, error)
+	Push(remoteImage, username, token string, getImageRepoSha bool) (string, error)
 	Pull(remoteImage, username, token string) error
 	GetLabel(altImageName, labelName string) (string, error)
 	DoesImageExist(image string) error

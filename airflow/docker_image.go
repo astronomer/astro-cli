@@ -351,7 +351,7 @@ func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error 
 	return nil
 }
 
-func (d *DockerImage) Push(remoteImage, username, token string, getImageSha bool) (string, error) {
+func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha bool) (string, error) {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return "", err
@@ -403,7 +403,7 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageSha bool
 		}
 	}
 	sha := ""
-	if getImageSha {
+	if getImageRepoSha {
 		sha, err = d.GetImageRepoSHA(registry)
 		if err != nil {
 			return "", err
