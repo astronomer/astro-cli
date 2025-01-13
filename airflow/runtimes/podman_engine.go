@@ -7,6 +7,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/runtimes/types"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/briandowns/spinner"
 )
 
 const (
@@ -23,7 +24,7 @@ const (
 type podmanEngine struct{}
 
 // InitializeMachine initializes our astro Podman machine.
-func (e podmanEngine) InitializeMachine(name string) error {
+func (e podmanEngine) InitializeMachine(name string, s *spinner.Spinner) error {
 	// Grab some optional configurations from the config file.
 	podmanCmd := Command{
 		Command: podman,
@@ -38,9 +39,22 @@ func (e podmanEngine) InitializeMachine(name string) error {
 			"--now",
 		},
 	}
-	output, err := podmanCmd.Execute()
+	err := podmanCmd.ExecuteWithProgress(func(line string) {
+		switch {
+		case strings.Contains(line, "Looking up Podman Machine image"):
+			s.Suffix = " Looking up for project Machine image..."
+		case strings.Contains(line, "Getting image source signatures"):
+			s.Suffix = " Getting image source signatures..."
+		case strings.Contains(line, "Copying blob"):
+			s.Suffix = " Copying blob and setting up astro-project..."
+		default:
+			s.Suffix = containerRuntimeInitMessage
+		}
+	})
+
+	//	output, err := podmanCmd.Execute()
 	if err != nil {
-		return ErrorFromOutput("error initializing machine: %s", output)
+		return fmt.Errorf("error initializing machine: %w", err)
 	}
 	return nil
 }

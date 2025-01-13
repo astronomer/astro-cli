@@ -3,9 +3,13 @@ package runtimes
 import (
 	"errors"
 	"fmt"
-	"github.com/astronomer/astro-cli/airflow/runtimes/types"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/astronomer/astro-cli/airflow/runtimes/types"
+
+	//	"golang.org/x/term"
 
 	"github.com/briandowns/spinner"
 )
@@ -16,7 +20,7 @@ const (
 )
 
 type PodmanEngine interface {
-	InitializeMachine(name string) error
+	InitializeMachine(name string, s *spinner.Spinner) error
 	StartMachine(name string) error
 	StopMachine(name string) error
 	RemoveMachine(name string) error
@@ -181,7 +185,8 @@ func (rt PodmanRuntime) ensureMachine() error {
 
 	// Otherwise, initialize the machine
 	s.Start()
-	if err := rt.Engine.InitializeMachine(podmanMachineName); err != nil {
+	time.Sleep(1 * time.Second)
+	if err := rt.Engine.InitializeMachine(podmanMachineName, s); err != nil {
 		return err
 	}
 
