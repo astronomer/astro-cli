@@ -18,7 +18,7 @@ const (
 )
 
 type PodmanEngine interface {
-	InitializeMachine(name string) error
+	InitializeMachine(name string, s *spinner.Spinner) error
 	StartMachine(name string) error
 	StopMachine(name string) error
 	RemoveMachine(name string) error
@@ -122,12 +122,6 @@ func (rt PodmanRuntime) ensureMachine() error {
 	s.Suffix = containerRuntimeInitMessage
 	defer s.Stop()
 
-	// Update the message after a bit if it's still running.
-	go func() {
-		<-time.After(1 * time.Minute)
-		s.Suffix = podmanInitSlowMessage
-	}()
-
 	// Check if another, non-astro Podman machine is running
 	nonAstroMachineName := rt.isAnotherMachineRunning()
 	// If there is another machine running, and it has no running containers, stop it.
@@ -189,7 +183,8 @@ func (rt PodmanRuntime) ensureMachine() error {
 
 	// Otherwise, initialize the machine
 	s.Start()
-	if err := rt.Engine.InitializeMachine(podmanMachineName); err != nil {
+	time.Sleep(1 * time.Second)
+	if err := rt.Engine.InitializeMachine(podmanMachineName, s); err != nil {
 		return err
 	}
 
