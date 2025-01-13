@@ -9,8 +9,6 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/runtimes/types"
 
-	//	"golang.org/x/term"
-
 	"github.com/briandowns/spinner"
 )
 

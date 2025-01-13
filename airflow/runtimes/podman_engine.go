@@ -51,8 +51,6 @@ func (e podmanEngine) InitializeMachine(name string, s *spinner.Spinner) error {
 			s.Suffix = containerRuntimeInitMessage
 		}
 	})
-
-	//	output, err := podmanCmd.Execute()
 	if err != nil {
 		return fmt.Errorf("error initializing machine: %w", err)
 	}
