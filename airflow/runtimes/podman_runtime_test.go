@@ -6,6 +6,8 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/runtimes/mocks"
 	"github.com/astronomer/astro-cli/airflow/runtimes/types"
+	"github.com/briandowns/spinner"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/stretchr/testify/assert"
@@ -87,7 +89,10 @@ func (s *PodmanRuntimeSuite) TestPodmanRuntimeInitialize() {
 	s.Run("No machines running on mac, initialize podman", func() {
 		// Set up mocks.
 		mockPodmanEngine.On("ListMachines").Return(mockListedMachines, nil)
-		mockPodmanEngine.On("InitializeMachine", podmanMachineName).Return(nil)
+		mockPodmanEngine.On("InitializeMachine", podmanMachineName, mock.MatchedBy(func(s interface{}) bool {
+			_, ok := s.(*spinner.Spinner)
+			return ok
+		})).Return(nil)
 		mockPodmanEngine.On("InspectMachine", podmanMachineName).Return(mockInspectedAstroMachine, nil)
 		mockPodmanEngine.On("SetMachineAsDefault", podmanMachineName).Return(nil)
 		mockPodmanOSChecker.On("IsWindows").Return(false)
@@ -105,7 +110,10 @@ func (s *PodmanRuntimeSuite) TestPodmanRuntimeInitializeWindows() {
 	s.Run("No machines running on windows, initialize podman", func() {
 		// Set up mocks.
 		mockPodmanEngine.On("ListMachines").Return(mockListedMachines, nil)
-		mockPodmanEngine.On("InitializeMachine", podmanMachineName).Return(nil)
+		mockPodmanEngine.On("InitializeMachine", podmanMachineName, mock.MatchedBy(func(s interface{}) bool {
+			_, ok := s.(*spinner.Spinner)
+			return ok
+		})).Return(nil)
 		mockPodmanEngine.On("InspectMachine", podmanMachineName).Return(mockInspectedAstroMachine, nil)
 		mockPodmanEngine.On("SetMachineAsDefault", podmanMachineName).Return(nil)
 		mockPodmanOSChecker.On("IsWindows").Return(true)
@@ -134,7 +142,10 @@ func (s *PodmanRuntimeSuite) TestPodmanRuntimeInitializeWithAnotherMachineRunnin
 		mockPodmanEngine.On("ListContainers").Return(mockListedContainers, nil)
 		mockPodmanEngine.On("StopMachine", mockListedMachines[0].Name).Return(nil)
 		mockPodmanEngine.On("ListMachines").Return([]types.ListedMachine{}, nil).Once()
-		mockPodmanEngine.On("InitializeMachine", podmanMachineName).Return(nil)
+		mockPodmanEngine.On("InitializeMachine", podmanMachineName, mock.MatchedBy(func(s interface{}) bool {
+			_, ok := s.(*spinner.Spinner)
+			return ok
+		})).Return(nil)
 		mockPodmanEngine.On("InspectMachine", podmanMachineName).Return(mockInspectedAstroMachine, nil).Once()
 		mockPodmanEngine.On("SetMachineAsDefault", podmanMachineName).Return(nil).Once()
 		mockPodmanOSChecker.On("IsMac").Return(true)
