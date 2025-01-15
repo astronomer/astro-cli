@@ -26,7 +26,6 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -73,12 +72,9 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 }
 
 func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
-	// Determine if we should output to terminal or buffer.
-	output := logger.GetLevel() >= logrus.DebugLevel
-
 	// Start the spinner.
 	s := spinner.NewSpinner("Building project image…")
-	if !output {
+	if !logger.IsLevelEnabled() {
 		s.Start()
 		defer s.Stop()
 	}
@@ -134,7 +130,7 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 	// Route output streams according to verbosity.
 	var stdout, stderr io.Writer
 	var outBuff bytes.Buffer
-	if output {
+	if logger.IsLevelEnabled() {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
@@ -156,9 +152,6 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 }
 
 func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
-	// Determine if we should output to terminal or buffer.
-	output := logger.GetLevel() >= logrus.DebugLevel
-
 	// delete container
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
@@ -190,7 +183,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	args = append(args, pytestArgs...)
 	// run pytest image
 	var stdout, stderr io.Writer
-	if output {
+	if logger.IsLevelEnabled() {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {

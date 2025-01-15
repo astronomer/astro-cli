@@ -59,3 +59,7 @@ func Warn(args ...interface{}) {
 func Warnf(format string, args ...interface{}) {
 	logger.Warnf(format, args...)
 }
+
+func IsLevelEnabled() bool {
+	return GetLevel() >= logrus.DebugLevel
+}
