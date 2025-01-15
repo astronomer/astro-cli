@@ -168,12 +168,9 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
 	composeFile := Composeyml
 
-	// Determine if we should output to terminal or buffer.
-	output := logger.GetLevel() >= logrus.DebugLevel
-
 	// Route output streams according to verbosity.
 	var stdout, stderr io.Writer
-	if output {
+	if logger.IsLevelEnabled() {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
@@ -242,11 +239,8 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		return err
 	}
 
-	// Determine if we should output to terminal or buffer.
-	output := logger.GetLevel() >= logrus.DebugLevel
-
 	s := spinner.NewSpinner("Project is starting up…")
-	if !output {
+	if !logger.IsLevelEnabled() {
 		s.Start()
 		defer s.Stop()
 	}
@@ -260,7 +254,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	// Start up our project
 	err = d.composeService.Up(context.Background(), project, api.UpOptions{
 		Create: api.CreateOptions{
-			QuietPull: output,
+			QuietPull: logger.IsLevelEnabled(),
 		},
 		Start: api.StartOptions{
 			Project: project,
@@ -291,7 +285,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		return err
 	}
 
-	spinner.StopWithCheckmark(s, "Project has been started")
+	spinner.StopWithCheckmark(s, "Project started")
 
 	// If we've successfully gotten a healthcheck response, print the status.
 	err = printStatus(settingsFile, envConns, project, d.composeService, airflowDockerVersion, noBrowser)
@@ -335,11 +329,8 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 
 // Stop a running docker project
 func (d *DockerCompose) Stop(waitForExit bool) error {
-	// Determine if we should output to terminal or buffer.
-	output := logger.GetLevel() >= logrus.DebugLevel
-
 	s := spinner.NewSpinner("Stopping project…")
-	if !output {
+	if !logger.IsLevelEnabled() {
 		s.Start()
 		defer s.Stop()
 	}
@@ -362,7 +353,7 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 	}
 
 	if !waitForExit {
-		spinner.StopWithCheckmark(s, "Project has been stopped")
+		spinner.StopWithCheckmark(s, "Project stopped")
 		return nil
 	}
 
@@ -386,7 +377,7 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 				if strings.Contains(psInfo[i].Name, PostgresDockerContainerName) {
 					if psInfo[i].State == dockerExitState {
 						logger.Debug("postgres container reached exited state")
-						spinner.StopWithCheckmark(s, "Project has been stopped")
+						spinner.StopWithCheckmark(s, "Project stopped")
 						return nil
 					}
 					logger.Debugf("postgres container is still in %s state, waiting for it to be in exited state", psInfo[i].State)
@@ -428,11 +419,8 @@ func (d *DockerCompose) PS() error {
 
 // Kill stops a local airflow development cluster
 func (d *DockerCompose) Kill() error {
-	// Determine if we should output to terminal or buffer.
-	output := logger.GetLevel() >= logrus.DebugLevel
-
 	s := spinner.NewSpinner("Killing project…")
-	if !output {
+	if !logger.IsLevelEnabled() {
 		s.Start()
 		defer s.Stop()
 	}
@@ -450,7 +438,7 @@ func (d *DockerCompose) Kill() error {
 	}
 	logrus.SetLevel(originalLevel)
 
-	spinner.StopWithCheckmark(s, "Project has been killed")
+	spinner.StopWithCheckmark(s, "Project killed")
 
 	return nil
 }
