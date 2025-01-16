@@ -37,9 +37,9 @@ const (
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
 
-	configSetDefaultWorkspace = "\n\"%s\" Workspace found. This is your default Workspace.\n"
+	configSetDefaultWorkspace = "\"%s\" Workspace found. This is your default Workspace.\n"
 
-	registryAuthSuccessMsg = "\nSuccessfully authenticated to Astronomer"
+	registryAuthSuccessMsg = "Successfully authenticated to Astronomer"
 )
 
 var (
@@ -210,7 +210,7 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 
 	// open browser
 	if !shouldDisplayLoginLink {
-		fmt.Printf("\n%s to open the browser to log in or %s to quit…", ansi.Green("Press Enter"), ansi.Red("^C"))
+		fmt.Printf("%s to open the browser to log in or %s to quit…", ansi.Green("Press Enter"), ansi.Red("^C"))
 		_, err := fmt.Scanln()
 		if err != nil {
 			return Result{}, err
@@ -232,8 +232,7 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 			return Result{}, err
 		}
 	} else {
-		fmt.Println("\nPlease visit the following link on a device with a browser: " + authorizeURL)
-		fmt.Printf("\n")
+		fmt.Println("Please visit the following link on a device with a browser: " + authorizeURL)
 		authorizationCode, err := a.callbackHandler()
 		if err != nil {
 			return Result{}, err
@@ -356,8 +355,8 @@ func Login(domain, token string, coreClient astrocore.CoreClient, platformCoreCl
 		return err
 	}
 	// Welcome User
-	fmt.Print("\nWelcome to the Astro CLI 🚀\n\n")
-	fmt.Print("To learn more about Astro, go to https://astronomer.io/docs\n\n")
+	fmt.Print("Welcome to the Astro CLI 🚀\n")
+	fmt.Print("To learn more about Astro, go to https://www.astronomer.io/docs\n")
 
 	c, _ := context.GetCurrentContext()
 
@@ -367,7 +366,7 @@ func Login(domain, token string, coreClient astrocore.CoreClient, platformCoreCl
 			return err
 		}
 	} else {
-		fmt.Print("You are logging into Astro via an OAuth token\nThis token will expire in 1 hour and will not refresh\n\n")
+		fmt.Print("You are logging into Astro via an OAuth token\nThis token will expire in 1 hour and will not refresh\n")
 		res = Result{
 			AccessToken: token,
 			ExpiresIn:   3600, //nolint:mnd
