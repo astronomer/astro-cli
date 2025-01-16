@@ -18,6 +18,7 @@ import (
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/spinner"
 	"github.com/astronomer/astro-cli/pkg/util"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
@@ -25,6 +26,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -71,6 +73,13 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 }
 
 func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
+	// Start the spinner.
+	s := spinner.NewSpinner("Building project image…")
+	if !logger.IsLevelEnabled(logrus.DebugLevel) {
+		s.Start()
+		defer s.Stop()
+	}
+
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
@@ -118,21 +127,29 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 		}
 		args = append(args, buildSecretArgs...)
 	}
-	// Build image
+
+	// Route output streams according to verbosity.
 	var stdout, stderr io.Writer
-	if buildConfig.Output {
+	var outBuff bytes.Buffer
+	if logger.IsLevelEnabled(logrus.DebugLevel) {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
-		stdout = nil
-		stderr = nil
+		stdout = &outBuff
+		stderr = &outBuff
 	}
-	fmt.Println(args)
+
+	// Build the image
 	err = cmdExec(containerRuntime, stdout, stderr, args...)
 	if err != nil {
-		return fmt.Errorf("command '%s build -t %s failed: %w", containerRuntime, d.imageName, err)
+		s.FinalMSG = ""
+		s.Stop()
+		fmt.Println(strings.TrimSpace(outBuff.String()) + "\n")
+		return errors.New("an error was encountered while building the image, see the build logs for details")
 	}
-	return err
+
+	spinner.StopWithCheckmark(s, "Project image has been updated")
+	return nil
 }
 
 func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
@@ -167,7 +184,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	args = append(args, pytestArgs...)
 	// run pytest image
 	var stdout, stderr io.Writer
-	if buildConfig.Output {
+	if logger.IsLevelEnabled(logrus.DebugLevel) {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
