@@ -170,7 +170,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 
 	// Route output streams according to verbosity.
 	var stdout, stderr io.Writer
-	if logger.IsLevelEnabled() {
+	if logger.IsLevelAbove(logrus.DebugLevel) {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
@@ -240,7 +240,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	}
 
 	s := spinner.NewSpinner("Project is starting up…")
-	if !logger.IsLevelEnabled() {
+	if !logger.IsLevelAbove(logrus.DebugLevel) {
 		s.Start()
 		defer s.Stop()
 	}
@@ -254,7 +254,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	// Start up our project
 	err = d.composeService.Up(context.Background(), project, api.UpOptions{
 		Create: api.CreateOptions{
-			QuietPull: logger.IsLevelEnabled(),
+			QuietPull: logger.IsLevelAbove(logrus.DebugLevel),
 		},
 		Start: api.StartOptions{
 			Project: project,
@@ -330,7 +330,7 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 // Stop a running docker project
 func (d *DockerCompose) Stop(waitForExit bool) error {
 	s := spinner.NewSpinner("Stopping project…")
-	if !logger.IsLevelEnabled() {
+	if !logger.IsLevelAbove(logrus.DebugLevel) {
 		s.Start()
 		defer s.Stop()
 	}
@@ -420,7 +420,7 @@ func (d *DockerCompose) PS() error {
 // Kill stops a local airflow development cluster
 func (d *DockerCompose) Kill() error {
 	s := spinner.NewSpinner("Killing project…")
-	if !logger.IsLevelEnabled() {
+	if !logger.IsLevelAbove(logrus.DebugLevel) {
 		s.Start()
 		defer s.Stop()
 	}
