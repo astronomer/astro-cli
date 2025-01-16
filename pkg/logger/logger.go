@@ -60,6 +60,6 @@ func Warnf(format string, args ...interface{}) {
 	logger.Warnf(format, args...)
 }
 
-func IsLevelAbove(level logrus.Level) bool {
-	return GetLevel() >= level
+func IsLevelEnabled(level logrus.Level) bool {
+	return logger.IsLevelEnabled(level)
 }

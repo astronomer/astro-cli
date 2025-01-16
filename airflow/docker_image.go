@@ -75,7 +75,7 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
 	// Start the spinner.
 	s := spinner.NewSpinner("Building project image…")
-	if !logger.IsLevelAbove(logrus.DebugLevel) {
+	if !logger.IsLevelEnabled(logrus.DebugLevel) {
 		s.Start()
 		defer s.Stop()
 	}
@@ -131,7 +131,7 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 	// Route output streams according to verbosity.
 	var stdout, stderr io.Writer
 	var outBuff bytes.Buffer
-	if logger.IsLevelAbove(logrus.DebugLevel) {
+	if logger.IsLevelEnabled(logrus.DebugLevel) {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
@@ -184,7 +184,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	args = append(args, pytestArgs...)
 	// run pytest image
 	var stdout, stderr io.Writer
-	if logger.IsLevelAbove(logrus.DebugLevel) {
+	if logger.IsLevelEnabled(logrus.DebugLevel) {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
