@@ -124,10 +124,10 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 
 	if envFile != "" {
 		if !envExists {
-			fmt.Printf(envNotFoundMsg, envFile)
+			logger.Debugf(envNotFoundMsg, envFile)
 			envFile = ""
 		} else {
-			fmt.Printf(envFoundMsg, envFile)
+			logger.Debugf(envFoundMsg, envFile)
 			envFile = fmt.Sprintf("env_file: %s", envFile)
 		}
 	}
