@@ -41,7 +41,6 @@ func (s *Suite) TestDockerImageBuild() {
 		Path:            cwd,
 		TargetPlatforms: []string{"linux/amd64"},
 		NoCache:         false,
-		Output:          true,
 	}
 
 	s.Run("build success", func() {
@@ -54,7 +53,6 @@ func (s *Suite) TestDockerImageBuild() {
 
 	s.Run("build --no-cache", func() {
 		options.NoCache = true
-		options.Output = false
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			s.Contains(args, "--no-cache")
 			return nil
@@ -117,14 +115,13 @@ FROM quay.io/astronomer/astro-runtime:12.0.0`
 			return errMock
 		}
 		err = handler.Build("", "", options)
-		s.Contains(err.Error(), errMock.Error())
+		s.Errorf(err, "expected build error")
 	})
 	s.Run("unable to read file error", func() {
 		options := airflowTypes.ImageBuildConfig{
 			Path:            "incorrect-path",
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
-			Output:          false,
 		}
 
 		err = handler.Build("", "", options)
@@ -148,7 +145,6 @@ func (s *Suite) TestDockerImagePytest() {
 		Path:            cwd,
 		TargetPlatforms: []string{"linux/amd64"},
 		NoCache:         false,
-		Output:          true,
 	}
 
 	s.Run("pytest success", func() {
@@ -207,7 +203,6 @@ func (s *Suite) TestDockerImagePytest() {
 			Path:            cwd,
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
-			Output:          false,
 		}
 
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
@@ -244,7 +239,6 @@ func (s *Suite) TestDockerImageConflictTest() {
 		Path:            cwd,
 		TargetPlatforms: []string{"linux/amd64"},
 		NoCache:         false,
-		Output:          true,
 	}
 
 	s.Run("conflict test success", func() {
@@ -260,7 +254,6 @@ func (s *Suite) TestDockerImageConflictTest() {
 			Path:            cwd,
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
-			Output:          false,
 		}
 
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
@@ -275,7 +268,6 @@ func (s *Suite) TestDockerImageConflictTest() {
 			Path:            cwd,
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
-			Output:          false,
 		}
 
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
@@ -295,7 +287,6 @@ func (s *Suite) TestDockerImageConflictTest() {
 			Path:            cwd,
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
-			Output:          false,
 		}
 
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
@@ -444,7 +435,7 @@ func (s *Suite) TestDockerImagePush() {
 			return errMockDocker
 		}
 
-		err := handler.Push("test", "", "test")
+		_, err := handler.Push("test", "", "test", false)
 		s.ErrorIs(err, errMockDocker)
 	})
 
@@ -458,7 +449,7 @@ func (s *Suite) TestDockerImagePush() {
 			return nil
 		}
 
-		err := handler.Push("test", "test-username", "test")
+		_, err := handler.Push("test", "test-username", "test", false)
 		s.NoError(err)
 	})
 
@@ -467,7 +458,7 @@ func (s *Suite) TestDockerImagePush() {
 			return nil
 		}
 
-		err := handler.Push("test", "", "")
+		_, err := handler.Push("test", "", "", false)
 		s.NoError(err)
 	})
 
@@ -514,7 +505,7 @@ func (s *Suite) TestDockerImagePush() {
 
 			getDockerClient = func() (client.APIClient, error) { return mockClient, nil }
 
-			err := handler.Push(tc.input, tc.username, "")
+			_, err := handler.Push(tc.input, tc.username, "", false)
 			s.NoError(err)
 			mockClient.AssertExpectations(s.T())
 		})
@@ -524,8 +515,99 @@ func (s *Suite) TestDockerImagePush() {
 		// This path is used to support running Colima whichn is "docker-cli compatible" but wasn't 100% library compatible in the past.
 		// That was 3 years ago though, so we should re-test and work out if this fallback to using bash is still needed or not
 		getDockerClient = func() (client.APIClient, error) { return nil, fmt.Errorf("foreced error") }
-		err := handler.Push("repo/test/image", "username", "")
+		_, err := handler.Push("repo/test/image", "username", "", false)
 		s.NoError(err)
+	})
+}
+
+func (s *Suite) TestDockerImagePushWithGetRepoImageSha() {
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
+	s.Run("When sha is expected to be returned from Push", func() {
+		expectedImage := "images.software/foo/bar:123"
+		username := ""
+		remoteImage := "images.software/foo/bar:123"
+		expectedSha := "sha256:test_sha"
+
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+		mockClient := new(mocks.DockerCLIClient)
+		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
+		mockClient.On("ImagePush", context.Background(), expectedImage, mock.MatchedBy(func(opts image.PushOptions) bool {
+			decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
+			if err != nil {
+				return false
+			}
+
+			authConfig := map[string]string{}
+			err = json.Unmarshal(decodedAuth, &authConfig)
+			if err != nil {
+				return false
+			}
+
+			expected := map[string]string{}
+
+			return s.Equal(expected, authConfig)
+		})).Return(io.NopCloser(strings.NewReader("{}")), nil).Once()
+
+		getDockerClient = func() (client.APIClient, error) { return mockClient, nil }
+
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			if stdout != nil {
+				io.WriteString(stdout, `["images.software/image@sha256:test_sha"]`)
+			}
+			return nil
+		}
+
+		sha, err := handler.Push(remoteImage, username, "", true)
+		s.Equal(expectedSha, sha)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
+	})
+
+	s.Run("When sha is expected to be returned from Push but GetImageRepoSHA throws an error", func() {
+		expectedImage := "images.software/foo/bar:123"
+		username := ""
+		remoteImage := "images.software/foo/bar:123"
+		expectedError := fmt.Errorf("failed to get digests for image %s: %w", handler.imageName, errors.New("test_error"))
+
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+		mockClient := new(mocks.DockerCLIClient)
+		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
+		mockClient.On("ImagePush", context.Background(), expectedImage, mock.MatchedBy(func(opts image.PushOptions) bool {
+			decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
+			if err != nil {
+				return false
+			}
+
+			authConfig := map[string]string{}
+			err = json.Unmarshal(decodedAuth, &authConfig)
+			if err != nil {
+				return false
+			}
+
+			expected := map[string]string{}
+
+			return s.Equal(expected, authConfig)
+		})).Return(io.NopCloser(strings.NewReader("{}")), nil).Once()
+
+		getDockerClient = func() (client.APIClient, error) { return mockClient, nil }
+
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			// if args[0] contain inspect, return error
+			if strings.Contains(args[0], "inspect") {
+				return errors.New("test_error")
+			}
+			return nil
+		}
+
+		sha, err := handler.Push(remoteImage, username, "", true)
+		s.Equal("", sha)
+		s.Equal(expectedError, err)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 

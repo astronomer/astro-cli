@@ -364,7 +364,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
 
 		imageHandler := airflowImageHandler(deployInfo.deployImage)
-		err = imageHandler.Push(remoteImage, registryUsername, c.Token)
+		_, err = imageHandler.Push(remoteImage, registryUsername, c.Token, false)
 		if err != nil {
 			return err
 		}
@@ -621,7 +621,7 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 
 		dagsIgnoreSet = true
 	}
-	err = imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
+	err = imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
 	if err != nil {
 		return err
 	}
@@ -650,7 +650,7 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 				return "", err
 			}
 		} else {
-			err := imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
+			err := imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
 			if err != nil {
 				return "", err
 			}

@@ -18,6 +18,7 @@ import (
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/spinner"
 	"github.com/astronomer/astro-cli/pkg/util"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
@@ -25,6 +26,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -71,6 +73,13 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 }
 
 func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
+	// Start the spinner.
+	s := spinner.NewSpinner("Building project image…")
+	if !logger.IsLevelEnabled(logrus.DebugLevel) {
+		s.Start()
+		defer s.Stop()
+	}
+
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
@@ -118,21 +127,29 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 		}
 		args = append(args, buildSecretArgs...)
 	}
-	// Build image
+
+	// Route output streams according to verbosity.
 	var stdout, stderr io.Writer
-	if buildConfig.Output {
+	var outBuff bytes.Buffer
+	if logger.IsLevelEnabled(logrus.DebugLevel) {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
-		stdout = nil
-		stderr = nil
+		stdout = &outBuff
+		stderr = &outBuff
 	}
-	fmt.Println(args)
+
+	// Build the image
 	err = cmdExec(containerRuntime, stdout, stderr, args...)
 	if err != nil {
-		return fmt.Errorf("command '%s build -t %s failed: %w", containerRuntime, d.imageName, err)
+		s.FinalMSG = ""
+		s.Stop()
+		fmt.Println(strings.TrimSpace(outBuff.String()) + "\n")
+		return errors.New("an error was encountered while building the image, see the build logs for details")
 	}
-	return err
+
+	spinner.StopWithCheckmark(s, "Project image has been updated")
+	return nil
 }
 
 func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
@@ -167,7 +184,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	args = append(args, pytestArgs...)
 	// run pytest image
 	var stdout, stderr io.Writer
-	if buildConfig.Output {
+	if logger.IsLevelEnabled(logrus.DebugLevel) {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
@@ -351,19 +368,19 @@ func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error 
 	return nil
 }
 
-func (d *DockerImage) Push(remoteImage, username, token string) error {
+func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha bool) (string, error) {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
-		return err
+		return "", err
 	}
 	err = cmdExec(containerRuntime, nil, nil, "tag", d.imageName, remoteImage)
 	if err != nil {
-		return fmt.Errorf("command '%s tag %s %s' failed: %w", containerRuntime, d.imageName, remoteImage, err)
+		return "", fmt.Errorf("command '%s tag %s %s' failed: %w", containerRuntime, d.imageName, remoteImage, err)
 	}
 
 	registry, err := d.getRegistryToAuth(remoteImage)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Push image to registry
@@ -374,7 +391,7 @@ func (d *DockerImage) Push(remoteImage, username, token string) error {
 	authConfig, err := configFile.GetAuthConfig(registry)
 	if err != nil {
 		logger.Debugf("Error reading credentials: %v", err)
-		return fmt.Errorf("error reading credentials: %w", err)
+		return "", fmt.Errorf("error reading credentials: %w", err)
 	}
 
 	if username == "" && token == "" {
@@ -399,39 +416,54 @@ func (d *DockerImage) Push(remoteImage, username, token string) error {
 		// if it does not work with the go library use bash to run docker commands. Support for (old?) versions of Colima
 		err = pushWithBash(&authConfig, remoteImage)
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
-
+	sha := ""
+	if getImageRepoSha {
+		sha, err = d.GetImageRepoSHA(registry)
+		if err != nil {
+			return "", err
+		}
+	}
 	// Delete the image tags we just generated
 	err = cmdExec(containerRuntime, nil, nil, "rmi", remoteImage)
 	if err != nil {
-		return fmt.Errorf("command '%s rmi %s' failed: %w", containerRuntime, remoteImage, err)
+		return "", fmt.Errorf("command '%s rmi %s' failed: %w", containerRuntime, remoteImage, err)
 	}
-	return nil
+	return sha, nil
 }
 
-func (d *DockerImage) GetImageSha() (string, error) {
+func (d *DockerImage) GetImageRepoSHA(registry string) (string, error) {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return "", err
 	}
-	// Get the digest of the pushed image
-	remoteDigest := ""
+
+	// Get all repo digests of the image
 	out := &bytes.Buffer{}
-	err = cmdExec(containerRuntime, out, nil, "inspect", "--format={{index .RepoDigests 0}}", d.imageName)
+	err = cmdExec(containerRuntime, out, nil, "inspect", "--format={{json .RepoDigests}}", d.imageName)
 	if err != nil {
-		return remoteDigest, fmt.Errorf("failed to get digest for image %s: %w", d.imageName, err)
+		return "", fmt.Errorf("failed to get digests for image %s: %w", d.imageName, err)
 	}
+
 	// Parse and clean the output
+	var repoDigests []string
 	digestOutput := strings.TrimSpace(out.String())
-	if digestOutput != "" {
-		parts := strings.Split(digestOutput, "@")
-		if len(parts) == 2 {
-			remoteDigest = parts[1] // Extract the digest part (after '@')
+	err = json.Unmarshal([]byte(digestOutput), &repoDigests)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse digests for image %s: %w", d.imageName, err)
+	}
+	// Filter repo digests based on the provided repo name
+	for _, digest := range repoDigests {
+		parts := strings.Split(digest, "@")
+		if len(parts) == 2 && strings.HasPrefix(parts[0], registry) {
+			return parts[1], nil // Return the digest for the matching repo name
 		}
 	}
-	return remoteDigest, nil
+
+	// If no matching digest is found
+	return "", fmt.Errorf("no matching digest found for registry %s in image %s", registry, d.imageName)
 }
 
 func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImage string) error {

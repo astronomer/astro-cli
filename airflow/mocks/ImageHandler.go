@@ -94,27 +94,27 @@ func (_m *ImageHandler) DoesImageExist(image string) error {
 	return r0
 }
 
-// GetImageSha provides a mock function with no fields
-func (_m *ImageHandler) GetImageSha() (string, error) {
-	ret := _m.Called()
+// GetImageRepoSHA provides a mock function with given fields: registry
+func (_m *ImageHandler) GetImageRepoSHA(registry string) (string, error) {
+	ret := _m.Called(registry)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetImageSha")
+		panic("no return value specified for GetImageRepoSHA")
 	}
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (string, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return rf(registry)
 	}
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(string) string); ok {
+		r0 = rf(registry)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(registry)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -198,22 +198,32 @@ func (_m *ImageHandler) Pull(remoteImage string, username string, token string) 
 	return r0
 }
 
-// Push provides a mock function with given fields: remoteImage, username, token
-func (_m *ImageHandler) Push(remoteImage string, username string, token string) error {
-	ret := _m.Called(remoteImage, username, token)
+// Push provides a mock function with given fields: remoteImage, username, token, getImageSha
+func (_m *ImageHandler) Push(remoteImage string, username string, token string, getImageSha bool) (string, error) {
+	ret := _m.Called(remoteImage, username, token, getImageSha)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Push")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(remoteImage, username, token)
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, string, string, bool) (string, error)); ok {
+		return rf(remoteImage, username, token, getImageSha)
+	}
+	if rf, ok := ret.Get(0).(func(string, string, string, bool) string); ok {
+		r0 = rf(remoteImage, username, token, getImageSha)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(string)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(string, string, string, bool) error); ok {
+		r1 = rf(remoteImage, username, token, getImageSha)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Pytest provides a mock function with given fields: pytestFile, airflowHome, envFile, testHomeDirectory, pytestArgs, htmlReport, config

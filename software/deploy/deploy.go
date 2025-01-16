@@ -185,7 +185,7 @@ func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, 
 	return deploymentID, err
 }
 
-func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context) error {
+func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string) error {
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
 		registry = byoRegistryDomain
@@ -195,17 +195,18 @@ func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, 
 		remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
 		token = c.Token
 	}
-	err := imageHandler.Push(remoteImage, "", token)
+	if customImageName != "" {
+		if tagFromImageName := getGetTagFromImageName(customImageName); tagFromImageName != "" {
+			remoteImage = fmt.Sprintf("%s:%s", registry, tagFromImageName)
+		}
+	}
+	useShaAsTag := config.CFG.ShaAsTag.GetBool()
+	sha, err := imageHandler.Push(remoteImage, "", token, useShaAsTag)
 	if err != nil {
 		return err
 	}
 	if byoRegistryEnabled {
-		useShaAsTag := config.CFG.ShaAsTag.GetBool()
 		if useShaAsTag {
-			sha, err := imageHandler.GetImageSha()
-			if (sha == "") || (err != nil) {
-				return fmt.Errorf("failed to get image sha: %w", err)
-			}
 			remoteImage = fmt.Sprintf("%s@%s", registry, sha)
 		}
 		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel)
@@ -266,7 +267,6 @@ func buildDockerImageFromWorkingDir(path string, imageHandler airflow.ImageHandl
 		Path:            config.WorkingPath,
 		NoCache:         ignoreCacheDeploy,
 		TargetPlatforms: deployImagePlatformSupport,
-		Output:          true,
 		Labels:          deployLabels,
 	}
 
@@ -281,6 +281,14 @@ func buildDockerImage(ignoreCacheDeploy bool, deploymentInfo *houston.Deployment
 	return buildDockerImageForCustomImage(imageHandler, customImageName, deploymentInfo, houstonClient)
 }
 
+func getGetTagFromImageName(imageName string) string {
+	parts := strings.Split(imageName, ":")
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return ""
+}
+
 func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool, description, customImageName string) error {
 	imageName := airflow.ImageName(name, "latest")
 	imageHandler := imageHandlerInit(imageName)
@@ -288,7 +296,7 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 	if err != nil {
 		return err
 	}
-	return pushDockerImage(byoRegistryEnabled, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, c)
+	return pushDockerImage(byoRegistryEnabled, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, c, customImageName)
 }
 
 func validAirflowImageRepo(image string) bool {

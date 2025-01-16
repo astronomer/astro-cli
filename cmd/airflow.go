@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/airflow/runtimes"
-
 	"github.com/astronomer/astro-cli/airflow"
+	"github.com/astronomer/astro-cli/airflow/runtimes"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/environment"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
@@ -130,7 +130,10 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 		// so we set that configuration in this persistent pre-run hook.
 		// A few sub-commands don't require this, so they explicitly
 		// clobber it with a no-op function.
-		PersistentPreRunE: ConfigureContainerRuntime,
+		PersistentPreRunE: utils.ChainRunEs(
+			SetupLogging,
+			ConfigureContainerRuntime,
+		),
 	}
 	cmd.AddCommand(
 		newAirflowInitCmd(),

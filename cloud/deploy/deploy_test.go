@@ -171,7 +171,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
@@ -315,7 +315,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
@@ -451,7 +451,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
@@ -529,7 +529,7 @@ func TestImageOnlyDeploySuccess(t *testing.T) {
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
@@ -857,7 +857,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
-		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
+		mockImageHandler.On("TagLocalImage", mock.Anything).Return("", nil)
 		return mockImageHandler
 	}
 
