@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow/runtimes/types"
-
+	sp "github.com/astronomer/astro-cli/pkg/spinner"
 	"github.com/briandowns/spinner"
 )
 
@@ -118,8 +118,7 @@ func (rt PodmanRuntime) Kill() error {
 
 func (rt PodmanRuntime) ensureMachine() error {
 	// Show a spinner message while we're initializing the machine.
-	s := spinner.New(spinnerCharSet, spinnerRefresh)
-	s.Suffix = containerRuntimeInitMessage
+	s := sp.NewSpinner(containerRuntimeInitMessage)
 	defer s.Stop()
 
 	// Check if another, non-astro Podman machine is running
@@ -187,6 +186,7 @@ func (rt PodmanRuntime) ensureMachine() error {
 	if err := rt.Engine.InitializeMachine(podmanMachineName, s); err != nil {
 		return err
 	}
+	sp.StopWithCheckmark(s, "astro-machine initialized")
 
 	return rt.getAndConfigureMachineForUsage(podmanMachineName)
 }

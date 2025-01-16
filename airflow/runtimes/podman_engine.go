@@ -42,13 +42,13 @@ func (e podmanEngine) InitializeMachine(name string, s *spinner.Spinner) error {
 	err := podmanCmd.ExecuteWithProgress(func(line string) {
 		switch {
 		case strings.Contains(line, "Looking up Podman Machine image"):
-			s.Suffix = " Looking up for project Machine image..."
+			s.Suffix = " Looking up for astro-machine image..."
 		case strings.Contains(line, "Getting image source signatures"):
 			s.Suffix = " Getting image source signatures..."
 		case strings.Contains(line, "Copying blob"):
-			s.Suffix = " Copying blob and setting up astro-project..."
+			s.Suffix = " Copying blob..."
 		default:
-			s.Suffix = containerRuntimeInitMessage
+			s.Suffix = " Initializing astro-machine..."
 		}
 	})
 	if err != nil {
