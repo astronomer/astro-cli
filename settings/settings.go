@@ -136,7 +136,7 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 	connections = AppendEnvironmentConnections(connections, envConns)
 
 	baseCmd := "airflow connections "
-	var baseAddCmd, baseRmCmd, baseListCmd, connIDArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
+	var baseAddCmd, baseRmCmd, baseListCmd, connIDArg, connDescriptionArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
 	if version >= AirflowVersionTwo {
 		// Airflow 2.0.0 command
 		// based on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html
@@ -144,6 +144,7 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 		baseRmCmd = baseCmd + "delete "
 		baseListCmd = baseCmd + "list -o plain"
 		connIDArg = ""
+		connDescriptionArg = "--conn-description"
 		connTypeArg = "--conn-type"
 		connURIArg = "--conn-uri"
 		connExtraArg = "--conn-extra"
@@ -194,6 +195,10 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 		}
 
 		airflowCommand = fmt.Sprintf("%s %s '%s' ", baseAddCmd, connIDArg, conn.ConnID)
+		if objectValidator(0, conn.ConnDescription) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connDescriptionArg, conn.ConnDescription)
+			j++
+		}
 		if objectValidator(0, conn.ConnType) {
 			airflowCommand += fmt.Sprintf("%s '%s' ", connTypeArg, conn.ConnType)
 			j++

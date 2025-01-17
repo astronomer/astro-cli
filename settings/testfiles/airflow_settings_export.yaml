@@ -1,6 +1,7 @@
 airflow:
   connections:
   - conn_id: local_postgres
+    conn_description: ""
     conn_type: postgres
     conn_host: example.db.example.com
     conn_schema: schema
