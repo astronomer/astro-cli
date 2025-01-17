@@ -70,7 +70,7 @@ func streamOutput(pipe io.ReadCloser, handler func(string), doneCh chan<- error)
 	// Notify completion or error
 	if err := scanner.Err(); err != nil {
 		doneCh <- fmt.Errorf("error reading output: %w", err)
-	} else {
-		doneCh <- nil
+		return
 	}
+	doneCh <- nil
 }

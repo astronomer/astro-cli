@@ -182,6 +182,7 @@ func (rt PodmanRuntime) ensureMachine() error {
 
 	// Otherwise, initialize the machine
 	s.Start()
+	// time delay of 1 second to display containerRuntimeInitMessage before initializing astro-machine
 	time.Sleep(1 * time.Second)
 	if err := rt.Engine.InitializeMachine(podmanMachineName, s); err != nil {
 		return err
