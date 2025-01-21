@@ -7,14 +7,13 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/runtimes/types"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/briandowns/spinner"
 )
 
 const (
-	podmanStatusRunning   = "running"
-	podmanStatusStopped   = "stopped"
-	composeProjectLabel   = "com.docker.compose.project"
-	podmanInitSlowMessage = " Sorry for the wait, this is taking a bit longer than expected. " +
-		"This initial download will be cached once finished."
+	podmanStatusRunning               = "running"
+	podmanStatusStopped               = "stopped"
+	composeProjectLabel               = "com.docker.compose.project"
 	podmanMachineAlreadyRunningErrMsg = "astro needs a podman machine to run your project, " +
 		"but it looks like a machine is already running. " +
 		"Mac hosts are limited to one running machine at a time. " +
@@ -25,7 +24,7 @@ const (
 type podmanEngine struct{}
 
 // InitializeMachine initializes our astro Podman machine.
-func (e podmanEngine) InitializeMachine(name string) error {
+func (e podmanEngine) InitializeMachine(name string, s *spinner.Spinner) error {
 	// Grab some optional configurations from the config file.
 	podmanCmd := Command{
 		Command: podman,
@@ -40,9 +39,18 @@ func (e podmanEngine) InitializeMachine(name string) error {
 			"--now",
 		},
 	}
-	output, err := podmanCmd.Execute()
+	err := podmanCmd.ExecuteWithProgress(func(line string) {
+		switch {
+		case strings.Contains(line, "Looking up Podman Machine image"):
+		case strings.Contains(line, "Getting image source signatures"):
+		case strings.Contains(line, "Copying blob"):
+			s.Suffix = " Downloading Astro machine image…"
+		default:
+			s.Suffix = " Starting Astro machine…"
+		}
+	})
 	if err != nil {
-		return ErrorFromOutput("error initializing machine: %s", output)
+		return fmt.Errorf("error initializing machine: %w", err)
 	}
 	return nil
 }

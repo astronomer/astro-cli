@@ -97,7 +97,7 @@ func (rt DockerRuntime) initializeDocker(timeoutSeconds int) error {
 	timeout := time.After(time.Duration(timeoutSeconds) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
 	s := spinner.New(spinnerCharSet, spinnerRefresh)
-	s.Suffix = containerRuntimeInitMessage
+	s.Suffix = " " + containerRuntimeInitMessage
 	defer s.Stop()
 
 	// Execute `docker ps` to check if Docker is running.

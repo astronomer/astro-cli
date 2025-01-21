@@ -5,6 +5,8 @@ package mocks
 import (
 	mock "github.com/stretchr/testify/mock"
 
+	spinner "github.com/briandowns/spinner"
+
 	types "github.com/astronomer/astro-cli/airflow/runtimes/types"
 )
 
@@ -13,17 +15,17 @@ type PodmanEngine struct {
 	mock.Mock
 }
 
-// InitializeMachine provides a mock function with given fields: name
-func (_m *PodmanEngine) InitializeMachine(name string) error {
-	ret := _m.Called(name)
+// InitializeMachine provides a mock function with given fields: name, s
+func (_m *PodmanEngine) InitializeMachine(name string, s *spinner.Spinner) error {
+	ret := _m.Called(name, s)
 
 	if len(ret) == 0 {
 		panic("no return value specified for InitializeMachine")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(name)
+	if rf, ok := ret.Get(0).(func(string, *spinner.Spinner) error); ok {
+		r0 = rf(name, s)
 	} else {
 		r0 = ret.Error(0)
 	}
