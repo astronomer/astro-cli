@@ -24,7 +24,7 @@ const (
 	containerRuntimeNotFoundErrMsg = "Failed to find a container runtime. " +
 		"See the Astro CLI prerequisites for more information. " +
 		"https://www.astronomer.io/docs/astro/cli/install-cli"
-	containerRuntimeInitMessage = " Astro uses containers to run your project. Hang tight while we get started…"
+	containerRuntimeInitMessage = "Astro uses containers to run your project. Please wait while we get started…"
 	spinnerRefresh              = 100 * time.Millisecond
 )
 

@@ -187,7 +187,7 @@ func (rt PodmanRuntime) ensureMachine() error {
 	if err := rt.Engine.InitializeMachine(podmanMachineName, s); err != nil {
 		return err
 	}
-	sp.StopWithCheckmark(s, "astro-machine initialized")
+	sp.StopWithCheckmark(s, "Astro machine initialized")
 
 	return rt.getAndConfigureMachineForUsage(podmanMachineName)
 }
