@@ -35,7 +35,7 @@ func setupTokenFile(token string) string {
 	return tmpFile.Name()
 }
 
-func withTokenFlag(cmd *cobra.Command, token string) *cobra.Command{
+func withTokenFlag(cmd *cobra.Command, token string) *cobra.Command {
 	cmd.Flags().Set("token-login", token)
 	return cmd
 }
