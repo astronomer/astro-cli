@@ -49,11 +49,13 @@ var (
 	schedulerLogs          bool
 	webserverLogs          bool
 	triggererLogs          bool
+	dagProcessorLogs       bool
 	noCache                bool
 	schedulerExec          bool
 	postgresExec           bool
 	webserverExec          bool
 	triggererExec          bool
+	dagProcessorExec       bool
 	connections            bool
 	variables              bool
 	pools                  bool
@@ -236,7 +238,7 @@ func newAirflowStartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "start",
 		Short:   "Start a local Airflow environment",
-		Long:    "Start a local Airflow environment. This command will spin up 4 Docker containers on your machine, each for a different Airflow component: Webserver, scheduler, triggerer and metadata database.",
+		Long:    "Start a local Airflow environment. This command will spin up 5 Docker containers on your machine, each for a different Airflow component: Webserver, scheduler, triggerer, dag processor, and metadata database.",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: EnsureRuntime,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -287,7 +289,7 @@ func newAirflowLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs",
 		Short:   "Display component logs for your local Airflow environment",
-		Long:    "Display scheduler, worker, and webserver logs for your local Airflow environment",
+		Long:    "Display scheduler, worker, webserver, or dag-processor logs for your local Airflow environment",
 		PreRunE: SetRuntimeIfExists,
 		RunE:    airflowLogs,
 	}
@@ -295,6 +297,7 @@ func newAirflowLogsCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&schedulerLogs, "scheduler", "s", false, "Output scheduler logs")
 	cmd.Flags().BoolVarP(&webserverLogs, "webserver", "w", false, "Output webserver logs")
 	cmd.Flags().BoolVarP(&triggererLogs, "triggerer", "t", false, "Output triggerer logs")
+	cmd.Flags().BoolVarP(&dagProcessorLogs, "dag-processor", "d", false, "Output dag-processor logs")
 	return cmd
 }
 
@@ -392,8 +395,8 @@ func newAirflowUpgradeCheckCmd() *cobra.Command {
 func newAirflowBashCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "bash",
-		Short:   "Exec into a running an Airflow container",
-		Long:    "Use this command to Exec into either the Webserver, Sechduler, Postgres, or Triggerer Container to run bash commands",
+		Short:   "Exec into a container",
+		Long:    "Use this command to exec into either the Webserver, Scheduler, Postgres, Triggerer, or Dag-Processor Container to run bash commands",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: EnsureRuntime,
 		RunE:    airflowBash,
@@ -402,6 +405,7 @@ func newAirflowBashCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&webserverExec, "webserver", "w", false, "Exec into the webserver container")
 	cmd.Flags().BoolVarP(&postgresExec, "postgres", "p", false, "Exec into the postgres container")
 	cmd.Flags().BoolVarP(&triggererExec, "triggerer", "t", false, "Exec into the triggerer container")
+	cmd.Flags().BoolVarP(&dagProcessorExec, "dag-processor", "d", false, "Exec into the dag-processor container")
 	return cmd
 }
 
@@ -730,8 +734,8 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	// default is to display all logs
 	containersNames := make([]string, 0)
 
-	if !schedulerLogs && !webserverLogs && !triggererLogs {
-		containersNames = append(containersNames, []string{airflow.WebserverDockerContainerName, airflow.SchedulerDockerContainerName, airflow.TriggererDockerContainerName}...)
+	if !schedulerLogs && !webserverLogs && !triggererLogs && !dagProcessorLogs {
+		containersNames = append(containersNames, []string{airflow.WebserverDockerContainerName, airflow.SchedulerDockerContainerName, airflow.TriggererDockerContainerName, airflow.DagProcessorDockerContainerName}...)
 	}
 	if webserverLogs {
 		containersNames = append(containersNames, []string{airflow.WebserverDockerContainerName}...)
@@ -741,6 +745,9 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	}
 	if triggererLogs {
 		containersNames = append(containersNames, []string{airflow.TriggererDockerContainerName}...)
+	}
+	if dagProcessorLogs {
+		containersNames = append(containersNames, []string{airflow.DagProcessorDockerContainerName}...)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -918,7 +925,10 @@ func airflowBash(cmd *cobra.Command, args []string) error {
 	if schedulerExec {
 		container = airflow.SchedulerDockerContainerName
 	}
-	// exec into secheduler by default
+	if dagProcessorExec {
+		container = airflow.DagProcessorDockerContainerName
+	}
+	// exec into scheduler by default
 	if container == "" {
 		container = airflow.SchedulerDockerContainerName
 	}
