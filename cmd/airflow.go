@@ -276,7 +276,7 @@ func newAirflowRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                "run",
 		Short:              "Run Airflow CLI commands within your local Airflow environment",
-		Long:               "Run Airflow CLI commands within your local Airflow environment. These commands run in the webserver container but can interact with your local scheduler, workers, and metadata database.",
+		Long:               "Run Airflow CLI commands within your local Airflow environment. These commands run in the webserver container but can interact with your local scheduler, dag processor, workers, and metadata database.",
 		PreRunE:            EnsureRuntime,
 		RunE:               airflowRun,
 		Example:            RunExample,
