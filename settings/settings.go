@@ -131,7 +131,7 @@ func AddVariables(id string, version uint64) error {
 			airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
 			out, err := execAirflowCommand(id, airflowCommand)
 			if err != nil {
-				return fmt.Errorf("Error adding variable %s: %w", variable.VariableName, err)
+				return fmt.Errorf("error adding variable %s: %w", variable.VariableName, err)
 			}
 			logger.Debugf("Adding variable logs:\n%s", out)
 			fmt.Printf("Added Variable: %s\n", variable.VariableName)
@@ -146,37 +146,19 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 	connections = AppendEnvironmentConnections(connections, envConns)
 
 	baseCmd := "airflow connections "
-	var baseAddCmd, baseRmCmd, baseListCmd, connIDArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
+	var baseRmCmd, baseListCmd, connIDArg string
 	if version >= AirflowVersionTwo {
 		// Airflow 2.0.0 command
 		// based on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html
-		baseAddCmd = baseCmd + "add "
 		baseRmCmd = baseCmd + "delete "
 		baseListCmd = baseCmd + "list -o plain"
 		connIDArg = ""
-		connTypeArg = "--conn-type"
-		connURIArg = "--conn-uri"
-		connExtraArg = "--conn-extra"
-		connHostArg = "--conn-host"
-		connLoginArg = "--conn-login"
-		connPasswordArg = "--conn-password"
-		connSchemaArg = "--conn-schema"
-		connPortArg = "--conn-port"
 	} else {
 		// Airflow 1.0.0 command based on
 		// https://airflow.readthedocs.io/en/1.10.12/cli-ref.html#connections
-		baseAddCmd = baseCmd + "-a "
 		baseRmCmd = baseCmd + "-d "
 		baseListCmd = baseCmd + "-l "
 		connIDArg = "--conn_id"
-		connTypeArg = "--conn_type"
-		connURIArg = "--conn_uri"
-		connExtraArg = "--conn_extra"
-		connHostArg = "--conn_host"
-		connLoginArg = "--conn_login"
-		connPasswordArg = "--conn_password"
-		connSchemaArg = "--conn_schema"
-		connPortArg = "--conn_port"
 	}
 	airflowCommand := baseListCmd
 	out, err := execAirflowCommand(id, airflowCommand)
@@ -185,7 +167,6 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 	}
 
 	for i := range connections {
-		var j int
 		conn := connections[i]
 		if !objectValidator(0, conn.ConnID) {
 			continue
@@ -209,46 +190,85 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 			continue
 		}
 
-		airflowCommand = fmt.Sprintf("%s %s '%s' ", baseAddCmd, connIDArg, conn.ConnID)
-		if objectValidator(0, conn.ConnType) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connTypeArg, conn.ConnType)
-			j++
+		airflowCommand = prepareAirflowConnectionAddCommand(version, &conn, extraString)
+		if airflowCommand != "" {
+			out, err := execAirflowCommand(id, airflowCommand)
+			if err != nil {
+				return fmt.Errorf("error adding connection %s: %w", conn.ConnID, err)
+			}
+			logger.Debugf("Adding Connection logs:\n\n%s", out)
+			fmt.Printf("Added Connection: %s\n", conn.ConnID)
 		}
-		if extraString != "" {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, extraString)
-		}
-		if objectValidator(0, conn.ConnHost) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connHostArg, conn.ConnHost)
-			j++
-		}
-		if objectValidator(0, conn.ConnLogin) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connLoginArg, conn.ConnLogin)
-			j++
-		}
-		if objectValidator(0, conn.ConnPassword) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connPasswordArg, conn.ConnPassword)
-			j++
-		}
-		if objectValidator(0, conn.ConnSchema) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connSchemaArg, conn.ConnSchema)
-			j++
-		}
-		if conn.ConnPort != 0 {
-			airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.ConnPort)
-			j++
-		}
-		if objectValidator(0, conn.ConnURI) && j == 0 {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connURIArg, conn.ConnURI)
-		}
-
-		out, err := execAirflowCommand(id, airflowCommand)
-		if err != nil {
-			return fmt.Errorf("error adding connection %s: %w", conn.ConnID, err)
-		}
-		logger.Debugf("Adding Connection logs:\n\n%s", out)
-		fmt.Printf("Added Connection: %s\n", conn.ConnID)
 	}
 	return nil
+}
+
+func prepareAirflowConnectionAddCommand(version uint64, conn *Connection, extraString string) string {
+	if conn == nil {
+		return ""
+	}
+	baseCmd := "airflow connections "
+	var baseAddCmd, connIDArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
+	if version >= AirflowVersionTwo {
+		// Airflow 2.0.0 command
+		// based on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html
+		baseAddCmd = baseCmd + "add "
+		connIDArg = ""
+		connTypeArg = "--conn-type"
+		connURIArg = "--conn-uri"
+		connExtraArg = "--conn-extra"
+		connHostArg = "--conn-host"
+		connLoginArg = "--conn-login"
+		connPasswordArg = "--conn-password"
+		connSchemaArg = "--conn-schema"
+		connPortArg = "--conn-port"
+	} else {
+		// Airflow 1.0.0 command based on
+		// https://airflow.readthedocs.io/en/1.10.12/cli-ref.html#connections
+		baseAddCmd = baseCmd + "-a "
+		connIDArg = "--conn_id"
+		connTypeArg = "--conn_type"
+		connURIArg = "--conn_uri"
+		connExtraArg = "--conn_extra"
+		connHostArg = "--conn_host"
+		connLoginArg = "--conn_login"
+		connPasswordArg = "--conn_password"
+		connSchemaArg = "--conn_schema"
+		connPortArg = "--conn_port"
+	}
+	var j int
+	airflowCommand := fmt.Sprintf("%s %s '%s' ", baseAddCmd, connIDArg, conn.ConnID)
+	if objectValidator(0, conn.ConnType) {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connTypeArg, conn.ConnType)
+		j++
+	}
+	if extraString != "" {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, extraString)
+	}
+	if objectValidator(0, conn.ConnHost) {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connHostArg, conn.ConnHost)
+		j++
+	}
+	if objectValidator(0, conn.ConnLogin) {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connLoginArg, conn.ConnLogin)
+		j++
+	}
+	if objectValidator(0, conn.ConnPassword) {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connPasswordArg, conn.ConnPassword)
+		j++
+	}
+	if objectValidator(0, conn.ConnSchema) {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connSchemaArg, conn.ConnSchema)
+		j++
+	}
+	if conn.ConnPort != 0 {
+		airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.ConnPort)
+		j++
+	}
+	if objectValidator(0, conn.ConnURI) && j == 0 {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connURIArg, conn.ConnURI)
+	}
+	return airflowCommand
 }
 
 func AppendEnvironmentConnections(connections Connections, envConnections map[string]astrocore.EnvironmentObjectConnection) Connections {

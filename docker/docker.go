@@ -9,7 +9,6 @@ import (
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -29,7 +28,7 @@ func AirflowCommand(id, airflowCommand string) (string, error) {
 
 	out, err := cmd.Output()
 	if err != nil {
-		_ = errors.Wrapf(err, "error encountered")
+		return "", fmt.Errorf("error encountered while running the airflow command: %w", err)
 	}
 
 	stringOut := string(out)
