@@ -4,34 +4,35 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/astronomer/astro-cli/airflow/runtimes/mocks"
 
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/suite"
 )
+
+// mockFileChecker is a mock implementation of FileChecker for tests in this file.
+type mockFileChecker struct {
+	ExistingFiles map[string]bool
+}
+
+// FileExists is just a mock for os.Stat(). In our test implementation, we just check
+// if the file exists in the list of mocked files for a given test.
+func (m mockFileChecker) FileExists(path string) bool {
+	return m.ExistingFiles[path]
+}
 
 type ContainerRuntimeSuite struct {
 	suite.Suite
 }
 
-func TestConfig(t *testing.T) {
+func TestContainerRuntime(t *testing.T) {
 	suite.Run(t, new(ContainerRuntimeSuite))
-}
-
-// Mock for GetContainerRuntimeBinary
-type MockRuntimeChecker struct {
-	mock.Mock
-}
-
-func (m *MockRuntimeChecker) GetContainerRuntimeBinary() (string, error) {
-	args := m.Called()
-	return args.String(0), args.Error(1)
 }
 
 func (s *ContainerRuntimeSuite) TestGetContainerRuntime() {
 	s.Run("GetContainerRuntime_Docker", func() {
-		mockChecker := new(MockRuntimeChecker)
+		mockChecker := new(mocks.RuntimeChecker)
 		mockChecker.On("GetContainerRuntimeBinary").Return(docker, nil)
 
 		// Inject the mock and make sure we restore after the test.
@@ -47,7 +48,7 @@ func (s *ContainerRuntimeSuite) TestGetContainerRuntime() {
 	})
 
 	s.Run("GetContainerRuntime_Podman", func() {
-		mockChecker := new(MockRuntimeChecker)
+		mockChecker := new(mocks.RuntimeChecker)
 		mockChecker.On("GetContainerRuntimeBinary").Return(podman, nil)
 
 		// Inject the mock and make sure we restore after the test.
@@ -63,7 +64,7 @@ func (s *ContainerRuntimeSuite) TestGetContainerRuntime() {
 	})
 
 	s.Run("GetContainerRuntime_Error", func() {
-		mockChecker := new(MockRuntimeChecker)
+		mockChecker := new(mocks.RuntimeChecker)
 		mockChecker.On("GetContainerRuntimeBinary").Return("", errors.New(containerRuntimeNotFoundErrMsg))
 
 		// Inject the mock and make sure we restore after the test.
@@ -78,17 +79,6 @@ func (s *ContainerRuntimeSuite) TestGetContainerRuntime() {
 		assert.Equal(s.T(), containerRuntimeNotFoundErrMsg, err.Error())
 		mockChecker.AssertExpectations(s.T())
 	})
-}
-
-// MockFileChecker is a mock implementation of FileChecker for tests.
-type MockFileChecker struct {
-	existingFiles map[string]bool
-}
-
-// Exists is just a mock for os.Stat(). In our test implementation, we just check
-// if the file exists in the list of mocked files for a given test.
-func (m MockFileChecker) Exists(path string) bool {
-	return m.existingFiles[path]
 }
 
 // TestGetContainerRuntimeBinary runs a suite of tests against GetContainerRuntimeBinary,
@@ -163,8 +153,9 @@ func (s *ContainerRuntimeSuite) TestGetContainerRuntimeBinary() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			mockChecker := MockFileChecker{existingFiles: tt.mockFiles}
-			result := FindBinary(tt.pathEnv, tt.binary, mockChecker)
+			mockChecker := mockFileChecker{ExistingFiles: tt.mockFiles}
+			inspector := CreateHostInspector(CreateOSChecker(), mockChecker, CreateEnvChecker())
+			result := FindBinary(tt.pathEnv, tt.binary, inspector)
 			s.Equal(tt.expected, result)
 		})
 	}

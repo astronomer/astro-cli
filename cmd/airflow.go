@@ -9,9 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/airflow/runtimes"
-
 	"github.com/astronomer/astro-cli/airflow"
+	"github.com/astronomer/astro-cli/airflow/runtimes"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -104,7 +103,6 @@ astro dev init --from-template
 
 	configReinitProjectConfigMsg = "Reinitialized existing Astro project in %s\n"
 	configInitProjectConfigMsg   = "Initialized empty Astro project in %s\n"
-	changeDirectoryMsg           = "To begin developing, change to your project directory with `cd %s`\n"
 
 	// this is used to monkey patch the function in order to write unit test cases
 	containerHandlerInit = airflow.ContainerHandlerInit
@@ -113,13 +111,13 @@ astro dev init --from-template
 
 	pytestDir = "/tests"
 
-	airflowUpgradeCheckCmd = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
-	errPytestArgs          = errors.New("you can only pass one pytest file or directory")
-	buildSecrets           = []string{}
-	errNoCompose           = errors.New("cannot use '--compose-file' without '--compose' flag")
-	TemplateList           = airflow.FetchTemplateList
-	defaultWaitTime        = 1 * time.Minute
-	directoryPermissions   = 0o755
+	airflowUpgradeCheckCmd        = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
+	errPytestArgs                 = errors.New("you can only pass one pytest file or directory")
+	buildSecrets                  = []string{}
+	errNoCompose                  = errors.New("cannot use '--compose-file' without '--compose' flag")
+	TemplateList                  = airflow.FetchTemplateList
+	defaultWaitTime               = 1 * time.Minute
+	directoryPermissions   uint32 = 0o755
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
@@ -132,7 +130,10 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 		// so we set that configuration in this persistent pre-run hook.
 		// A few sub-commands don't require this, so they explicitly
 		// clobber it with a no-op function.
-		PersistentPreRunE: ConfigureContainerRuntime,
+		PersistentPreRunE: utils.ChainRunEs(
+			SetupLogging,
+			ConfigureContainerRuntime,
+		),
 	}
 	cmd.AddCommand(
 		newAirflowInitCmd(),
@@ -193,10 +194,10 @@ func newAirflowInitCmd() *cobra.Command {
 
 func newAirflowUpgradeTestCmd(platformCoreClient astroplatformcore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "upgrade-test",
-		Short:             "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test results.",
-		Long:              "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test results.",
-		PersistentPreRunE: DoNothing,
+		Use:     "upgrade-test",
+		Short:   "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test results.",
+		Long:    "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test results.",
+		PreRunE: EnsureRuntime,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return airflowUpgradeTest(cmd, platformCoreClient)
 		},
@@ -260,12 +261,11 @@ func newAirflowStartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 
 func newAirflowPSCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "ps",
-		Short:             "List locally running Airflow containers",
-		Long:              "List locally running Airflow containers",
-		PersistentPreRunE: DoNothing,
-		PreRunE:           utils.EnsureProjectDir,
-		RunE:              airflowPS,
+		Use:     "ps",
+		Short:   "List locally running Airflow containers",
+		Long:    "List locally running Airflow containers",
+		PreRunE: SetRuntimeIfExists,
+		RunE:    airflowPS,
 	}
 	return cmd
 }
@@ -275,23 +275,21 @@ func newAirflowRunCmd() *cobra.Command {
 		Use:                "run",
 		Short:              "Run Airflow CLI commands within your local Airflow environment",
 		Long:               "Run Airflow CLI commands within your local Airflow environment. These commands run in the webserver container but can interact with your local scheduler, workers, and metadata database.",
-		PreRunE:            utils.EnsureProjectDir,
+		PreRunE:            EnsureRuntime,
 		RunE:               airflowRun,
 		Example:            RunExample,
 		DisableFlagParsing: true,
-		PersistentPreRunE:  DoNothing,
 	}
 	return cmd
 }
 
 func newAirflowLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "logs",
-		Short:             "Display component logs for your local Airflow environment",
-		Long:              "Display scheduler, worker, and webserver logs for your local Airflow environment",
-		PreRunE:           utils.EnsureProjectDir,
-		RunE:              airflowLogs,
-		PersistentPreRunE: DoNothing,
+		Use:     "logs",
+		Short:   "Display component logs for your local Airflow environment",
+		Long:    "Display scheduler, worker, and webserver logs for your local Airflow environment",
+		PreRunE: SetRuntimeIfExists,
+		RunE:    airflowLogs,
 	}
 	cmd.Flags().BoolVarP(&followLogs, "follow", "f", false, "Follow log output")
 	cmd.Flags().BoolVarP(&schedulerLogs, "scheduler", "s", false, "Output scheduler logs")
@@ -302,35 +300,33 @@ func newAirflowLogsCmd() *cobra.Command {
 
 func newAirflowStopCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "stop",
-		Short:             "Stop all locally running Airflow containers",
-		Long:              "Stop all Airflow containers running on your local machine. This command preserves container data.",
-		PersistentPreRunE: DoNothing,
-		PreRunE:           utils.EnsureProjectDir,
-		RunE:              airflowStop,
+		Use:     "stop",
+		Short:   "Stop all locally running Airflow containers",
+		Long:    "Stop all Airflow containers running on your local machine. This command preserves container data.",
+		PreRunE: SetRuntimeIfExists,
+		RunE:    airflowStop,
 	}
 	return cmd
 }
 
 func newAirflowKillCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "kill",
-		Short:             "Kill all locally running Airflow containers",
-		Long:              "Kill all Airflow containers running on your local machine. This command permanently deletes all container data.",
-		PersistentPreRunE: DoNothing,
-		PreRunE:           utils.EnsureProjectDir,
-		RunE:              airflowKill,
+		Use:      "kill",
+		Short:    "Kill all locally running Airflow containers",
+		Long:     "Kill all Airflow containers running on your local machine. This command permanently deletes all container data.",
+		PreRunE:  KillPreRunHook,
+		RunE:     airflowKill,
+		PostRunE: KillPostRunHook,
 	}
 	return cmd
 }
 
 func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "restart",
-		Short:             "Restart all locally running Airflow containers",
-		Long:              "Restart all Airflow containers running on your local machine. This command stops and then starts locally running containers to apply changes to your local environment.",
-		PersistentPreRunE: DoNothing,
-		PreRunE:           utils.EnsureProjectDir,
+		Use:     "restart",
+		Short:   "Restart all locally running Airflow containers",
+		Long:    "Restart all Airflow containers running on your local machine. This command stops and then starts locally running containers to apply changes to your local environment.",
+		PreRunE: SetRuntimeIfExists,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return airflowRestart(cmd, args, astroCoreClient)
 		},
@@ -351,12 +347,11 @@ func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 
 func newAirflowPytestCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "pytest [pytest file/directory]",
-		Short:             "Run pytests in a local Airflow environment",
-		Long:              "This command spins up a local Python environment to run pytests against your DAGs. If a specific pytest file is not specified, all pytests in the tests directory will be run. To run pytests with a different environment file, specify that with the '--env' flag. ",
-		PersistentPreRunE: DoNothing,
-		PreRunE:           utils.EnsureProjectDir,
-		RunE:              airflowPytest,
+		Use:     "pytest [pytest file/directory]",
+		Short:   "Run pytests in a local Airflow environment",
+		Long:    "This command spins up a local Python environment to run pytests against your DAGs. If a specific pytest file is not specified, all pytests in the tests directory will be run. To run pytests with a different environment file, specify that with the '--env' flag. ",
+		PreRunE: EnsureRuntime,
+		RunE:    airflowPytest,
 	}
 	cmd.Flags().StringVarP(&pytestArgs, "args", "a", "", "pytest arguments you'd like passed to the pytest command. Surround the args in quotes. For example 'astro dev pytest --args \"--cov-config path\"'")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
@@ -368,13 +363,12 @@ func newAirflowPytestCmd() *cobra.Command {
 
 func newAirflowParseCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "parse",
-		Short:             "parse all DAGs in your Astro project for errors",
-		Long:              "This command spins up a local Python environment and checks your DAGs for syntax and import errors.",
-		Args:              cobra.MaximumNArgs(1),
-		PersistentPreRunE: DoNothing,
-		PreRunE:           utils.EnsureProjectDir,
-		RunE:              airflowParse,
+		Use:     "parse",
+		Short:   "parse all DAGs in your Astro project for errors",
+		Long:    "This command spins up a local Python environment and checks your DAGs for syntax and import errors.",
+		Args:    cobra.MaximumNArgs(1),
+		PreRunE: EnsureRuntime,
+		RunE:    airflowParse,
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to run parse with")
@@ -388,8 +382,7 @@ func newAirflowUpgradeCheckCmd() *cobra.Command {
 		Use:                "upgrade-check",
 		Short:              "List DAG and config-level changes required to upgrade to Airflow 2.0",
 		Long:               "List DAG and config-level changes required to upgrade to Airflow 2.0",
-		PersistentPreRunE:  DoNothing,
-		PreRunE:            utils.EnsureProjectDir,
+		PreRunE:            EnsureRuntime,
 		RunE:               airflowUpgradeCheck,
 		DisableFlagParsing: true,
 	}
@@ -398,13 +391,12 @@ func newAirflowUpgradeCheckCmd() *cobra.Command {
 
 func newAirflowBashCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "bash",
-		Short:             "Exec into a running an Airflow container",
-		Long:              "Use this command to Exec into either the Webserver, Sechduler, Postgres, or Triggerer Container to run bash commands",
-		Args:              cobra.MaximumNArgs(1),
-		PersistentPreRunE: DoNothing,
-		PreRunE:           utils.EnsureProjectDir,
-		RunE:              airflowBash,
+		Use:     "bash",
+		Short:   "Exec into a running an Airflow container",
+		Long:    "Use this command to Exec into either the Webserver, Sechduler, Postgres, or Triggerer Container to run bash commands",
+		Args:    cobra.MaximumNArgs(1),
+		PreRunE: EnsureRuntime,
+		RunE:    airflowBash,
 	}
 	cmd.Flags().BoolVarP(&schedulerExec, "scheduler", "s", false, "Exec into the scheduler container")
 	cmd.Flags().BoolVarP(&webserverExec, "webserver", "w", false, "Exec into the webserver container")
@@ -429,12 +421,11 @@ func newAirflowObjectRootCmd() *cobra.Command {
 
 func newObjectImportCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "import",
-		Short:             "Create and update local Airflow connections, variables, and pools from a local YAML file",
-		Long:              "This command creates all connections, variables, and pools from a YAML configuration file in your local Airflow environment. Airflow must be running locally for this command to work",
-		PersistentPreRunE: DoNothing,
-		PreRunE:           utils.EnsureProjectDir,
-		RunE:              airflowSettingsImport,
+		Use:     "import",
+		Short:   "Create and update local Airflow connections, variables, and pools from a local YAML file",
+		Long:    "This command creates all connections, variables, and pools from a YAML configuration file in your local Airflow environment. Airflow must be running locally for this command to work",
+		PreRunE: EnsureRuntime,
+		RunE:    airflowSettingsImport,
 	}
 	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Import connections from a settings YAML file")
 	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Import variables from a settings YAML file")
@@ -445,13 +436,12 @@ func newObjectImportCmd() *cobra.Command {
 
 func newObjectExportCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "export",
-		Short:             "Export local Airflow connections, variables, pools, and startup configurations as YAML or environment variables.",
-		Long:              "Export local Airflow connections, variables, or pools as YAML or environment variables. Airflow must be running locally to export Airflow objects. Use the '--compose' flag to export the Compose file used to start up Airflow.",
-		Args:              cobra.MaximumNArgs(1),
-		PersistentPreRunE: DoNothing,
-		PreRunE:           utils.EnsureProjectDir,
-		RunE:              airflowSettingsExport,
+		Use:     "export",
+		Short:   "Export local Airflow connections, variables, pools, and startup configurations as YAML or environment variables.",
+		Long:    "Export local Airflow connections, variables, or pools as YAML or environment variables. Airflow must be running locally to export Airflow objects. Use the '--compose' flag to export the Compose file used to start up Airflow.",
+		Args:    cobra.MaximumNArgs(1),
+		PreRunE: EnsureRuntime,
+		RunE:    airflowSettingsExport,
 	}
 	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Export connections to a settings YAML or env file")
 	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Export variables to a settings YAML or env file")
@@ -471,12 +461,6 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	projectName = name
-
-	// Save the directory we are in when the init command is run.
-	initialDir, err := fileutil.GetWorkingDir()
-	if err != nil {
-		return err
-	}
 
 	if fromTemplate == "select-template" {
 		selectedTemplate, err := selectedTemplate()
@@ -564,13 +548,6 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf(configInitProjectConfigMsg, config.WorkingPath)
 	}
 
-	// If we started in a different directory, that means the positional argument for projectName was used.
-	// This means the users shell pwd is not the project directory, so we print a message
-	// to cd into the project directory.
-	if initialDir != config.WorkingPath {
-		fmt.Printf(changeDirectoryMsg, projectName)
-	}
-
 	return nil
 }
 
@@ -592,7 +569,7 @@ func ensureProjectDirectory(args []string, workingPath, projectName string) (str
 
 	// If the project directory does not exist, create it.
 	if !projectDirExists {
-		err := os.Mkdir(newProjectPath, os.FileMode(directoryPermissions))
+		err := os.Mkdir(newProjectPath, os.FileMode(directoryPermissions)) //nolint:gosec
 		if err != nil {
 			return "", err
 		}

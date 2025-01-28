@@ -51,3 +51,15 @@ packages:
       dir: pkg/azure/mocks
     interfaces:
       Azure:
+  github.com/astronomer/astro-cli/airflow/runtimes:
+    config:
+      dir: airflow/runtimes/mocks
+      outpkg: mocks
+    interfaces:
+      OSChecker:
+      EnvChecker:
+      FileChecker:
+      HostInspector:
+      ContainerRuntime:
+      PodmanEngine:
+      DockerEngine:

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -25,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -37,9 +37,9 @@ const (
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
 
-	configSetDefaultWorkspace = "\n\"%s\" Workspace found. This is your default Workspace.\n"
+	configSetDefaultWorkspace = "\"%s\" Workspace found. This is your default Workspace.\n"
 
-	registryAuthSuccessMsg = "\nSuccessfully authenticated to Astronomer"
+	registryAuthSuccessMsg = "Successfully authenticated to Astronomer"
 )
 
 var (
@@ -155,7 +155,7 @@ func authorizeCallbackHandler() (string, error) {
 	})
 	go func() {
 		if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 	}()
 
@@ -187,7 +187,7 @@ func authorizeCallbackHandler() (string, error) {
 
 func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
 	// Generate PKCE verifier and challenge
-	token := make([]byte, 32)                            //nolint:gomnd
+	token := make([]byte, 32)                            //nolint:mnd
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 	r.Read(token)
 	verifier := util.Base64URLEncode(token)
@@ -210,8 +210,11 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 
 	// open browser
 	if !shouldDisplayLoginLink {
-		fmt.Printf("\n%s to open the browser to log in or %s to quit…", ansi.Green("Press Enter"), ansi.Red("^C"))
-		fmt.Scanln()
+		fmt.Printf("%s to open the browser to log in or %s to quit…", ansi.Green("Press Enter"), ansi.Red("^C"))
+		_, err := fmt.Scanln()
+		if err != nil {
+			return Result{}, err
+		}
 		err = openURL(authorizeURL)
 		if err != nil {
 			fmt.Println("\nUnable to open the URL, please visit the following link: " + authorizeURL)
@@ -229,8 +232,7 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 			return Result{}, err
 		}
 	} else {
-		fmt.Println("\nPlease visit the following link on a device with a browser: " + authorizeURL)
-		fmt.Printf("\n")
+		fmt.Println("Please visit the following link on a device with a browser: " + authorizeURL)
 		authorizationCode, err := a.callbackHandler()
 		if err != nil {
 			return Result{}, err
@@ -353,8 +355,8 @@ func Login(domain, token string, coreClient astrocore.CoreClient, platformCoreCl
 		return err
 	}
 	// Welcome User
-	fmt.Print("\nWelcome to the Astro CLI 🚀\n\n")
-	fmt.Print("To learn more about Astro, go to https://astronomer.io/docs\n\n")
+	fmt.Print("Welcome to the Astro CLI 🚀\n")
+	fmt.Print("To learn more about Astro, go to https://www.astronomer.io/docs\n")
 
 	c, _ := context.GetCurrentContext()
 
@@ -364,10 +366,10 @@ func Login(domain, token string, coreClient astrocore.CoreClient, platformCoreCl
 			return err
 		}
 	} else {
-		fmt.Print("You are logging into Astro via an OAuth token\nThis token will expire in 1 hour and will not refresh\n\n")
+		fmt.Print("You are logging into Astro via an OAuth token\nThis token will expire in 1 hour and will not refresh\n")
 		res = Result{
 			AccessToken: token,
-			ExpiresIn:   3600, //nolint:gomnd
+			ExpiresIn:   3600, //nolint:mnd
 		}
 	}
 

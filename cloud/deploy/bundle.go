@@ -14,7 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/git"
-	"github.com/sirupsen/logrus"
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 type DeployBundleInput struct {
@@ -142,11 +142,18 @@ func DeleteBundle(input *DeleteBundleInput) error {
 
 func uploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool) (string, error) {
 	tarFilePath := filepath.Join(tarDirPath, "bundle.tar")
+	tarGzFilePath := tarFilePath + ".gz"
 	defer func() {
-		err := os.Remove(tarFilePath)
-		if err != nil {
-			fmt.Println("\nFailed to delete tar file: ", err.Error())
-			fmt.Println("\nPlease delete the tar file manually from path: " + tarFilePath)
+		tarFiles := []string{tarFilePath, tarGzFilePath}
+		for _, file := range tarFiles {
+			err := os.Remove(file)
+			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
+				fmt.Println("\nFailed to delete archived file: ", err.Error())
+				fmt.Println("\nPlease delete the archived file manually from path: " + file)
+			}
 		}
 	}()
 
@@ -156,13 +163,19 @@ func uploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool)
 		return "", err
 	}
 
-	tarFile, err := os.Open(tarFilePath)
+	// Gzip the tar
+	err = fileutil.GzipFile(tarFilePath, tarGzFilePath)
 	if err != nil {
 		return "", err
 	}
-	defer tarFile.Close()
 
-	versionID, err := azureUploader(uploadURL, tarFile)
+	tarGzFile, err := os.Open(tarGzFilePath)
+	if err != nil {
+		return "", err
+	}
+	defer tarGzFile.Close()
+
+	versionID, err := azureUploader(uploadURL, tarGzFile)
 	if err != nil {
 		return "", err
 	}
@@ -226,20 +239,20 @@ func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrocore.DeployGit
 	// get the remote repository details, assume the remote is named "origin"
 	repoURL, err := git.GetRemoteRepository(bundlePath, "origin")
 	if err != nil {
-		logrus.Debugf("Failed to retrieve remote repository details, skipping Git metadata retrieval: %s", err)
+		logger.Debugf("Failed to retrieve remote repository details, skipping Git metadata retrieval: %s", err)
 		return nil, ""
 	}
 	switch repoURL.Host {
 	case "github.com":
 		deployGit.Provider = astrocore.DeployGitProviderGITHUB
 	default:
-		logrus.Debugf("Unsupported Git provider, skipping Git metadata retrieval: %s", repoURL.Host)
+		logger.Debugf("Unsupported Git provider, skipping Git metadata retrieval: %s", repoURL.Host)
 		return nil, ""
 	}
 	urlPath := strings.TrimPrefix(repoURL.Path, "/")
 	firstSlashIndex := strings.Index(urlPath, "/")
 	if firstSlashIndex == -1 {
-		logrus.Debugf("Failed to parse remote repository path, skipping Git metadata retrieval: %s", repoURL.Path)
+		logger.Debugf("Failed to parse remote repository path, skipping Git metadata retrieval: %s", repoURL.Path)
 		return nil, ""
 	}
 	deployGit.Account = urlPath[:firstSlashIndex]
@@ -248,7 +261,7 @@ func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrocore.DeployGit
 	// get the path of the bundle within the repository
 	path, err := git.GetLocalRepositoryPathPrefix(bundlePath, bundlePath)
 	if err != nil {
-		logrus.Debugf("Failed to retrieve local repository path prefix, skipping Git metadata retrieval: %s", err)
+		logger.Debugf("Failed to retrieve local repository path prefix, skipping Git metadata retrieval: %s", err)
 		return nil, ""
 	}
 	if path != "" {
@@ -258,7 +271,7 @@ func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrocore.DeployGit
 	// get the branch of the local commit
 	branch, err := git.GetBranch(bundlePath)
 	if err != nil {
-		logrus.Debugf("Failed to retrieve branch name, skipping Git metadata retrieval: %s", err)
+		logger.Debugf("Failed to retrieve branch name, skipping Git metadata retrieval: %s", err)
 		return nil, ""
 	}
 	deployGit.Branch = branch
@@ -266,7 +279,7 @@ func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrocore.DeployGit
 	// get the local commit
 	sha, message, authorName, _, err := git.GetHeadCommit(bundlePath)
 	if err != nil {
-		logrus.Debugf("Failed to retrieve commit, skipping Git metadata retrieval: %s", err)
+		logger.Debugf("Failed to retrieve commit, skipping Git metadata retrieval: %s", err)
 		return nil, ""
 	}
 	deployGit.CommitSha = sha
@@ -279,11 +292,11 @@ func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrocore.DeployGit
 	case "github.com":
 		deployGit.CommitUrl = fmt.Sprintf("https://%s/%s/%s/commit/%s", repoURL.Host, deployGit.Account, deployGit.Repo, sha)
 	default:
-		logrus.Debugf("Unsupported Git provider, skipping Git metadata retrieval: %s", repoURL.Host)
+		logger.Debugf("Unsupported Git provider, skipping Git metadata retrieval: %s", repoURL.Host)
 		return nil, ""
 	}
 
-	logrus.Debugf("Retrieved Git metadata: %+v", deployGit)
+	logger.Debugf("Retrieved Git metadata: %+v", deployGit)
 
 	return deployGit, message
 }

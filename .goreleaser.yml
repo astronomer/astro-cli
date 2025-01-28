@@ -17,13 +17,29 @@ changelog:
   sort: asc
   use: github
 builds:
-  - main: main.go
+  - id: darwin-build
+    main: main.go
+    binary: astro
+    env:
+      - CGO_ENABLED=1
+      - CC=o64-clang
+      - CXX=o64-clang++
+    goos:
+      - darwin
+    goarch:
+      - 386
+      - arm64
+      - amd64
+    goarm:
+      - 7
+    ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
+  - id: linux-windows-build
+    main: main.go
     binary: astro
     env:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
       - windows
     goarch:
       - 386
@@ -53,7 +69,7 @@ archives:
     format_overrides:
       - goos: windows
         format: binary
-    name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - licence*
       - LICENCE*
@@ -66,4 +82,4 @@ archives:
 snapshot:
   name_template: SNAPSHOT-{{ .Commit }}
 checksum:
-  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"

@@ -14,8 +14,8 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -133,7 +133,7 @@ func AddVariables(id string, version uint64) error {
 			if err != nil {
 				return fmt.Errorf("Error adding variable %s: %w", variable.VariableName, err)
 			}
-			logrus.Debugf("Adding variable logs:\n" + out)
+			logger.Debugf("Adding variable logs:\n%s", out)
 			fmt.Printf("Added Variable: %s\n", variable.VariableName)
 		}
 	}
@@ -245,7 +245,7 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 		if err != nil {
 			return fmt.Errorf("error adding connection %s: %w", conn.ConnID, err)
 		}
-		logrus.Debugf("Adding Connection logs:\n\n" + out)
+		logger.Debugf("Adding Connection logs:\n\n%s", out)
 		fmt.Printf("Added Connection: %s\n", conn.ConnID)
 	}
 	return nil
@@ -318,7 +318,7 @@ func AddPools(id string, version uint64) error {
 				if err != nil {
 					return fmt.Errorf("error adding pool %s: %w", pool.PoolName, err)
 				}
-				logrus.Debugf("Adding pool logs:\n" + out)
+				logger.Debugf("Adding pool logs:\n%s", out)
 				fmt.Printf("Added Pool: %s\n", pool.PoolName)
 			} else {
 				fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)
@@ -375,7 +375,7 @@ func EnvExportVariables(id, envFile string) error {
 	if err != nil {
 		return fmt.Errorf("error exporting variables: %w", err)
 	}
-	logrus.Debugf("Env Export Variables logs:\n\n" + out)
+	logger.Debugf("Env Export Variables logs:\n\n%s", out)
 
 	if strings.Contains(out, "successfully") {
 		// get variables from file created by airflow command
@@ -390,7 +390,7 @@ func EnvExportVariables(id, envFile string) error {
 			fmt.Printf("variable json decode unsuccessful: %s", err.Error())
 		}
 		// add variables to the env file
-		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
+		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
 		if err != nil {
 			return errors.Wrap(err, "Writing variables to file unsuccessful")
 		}
@@ -420,7 +420,7 @@ func EnvExportConnections(id, envFile string) error {
 	if err != nil {
 		return fmt.Errorf("error exporting connections: %w", err)
 	}
-	logrus.Debugf("Env Export Connections logs:\n" + out)
+	logger.Debugf("Env Export Connections logs:\n%s", out)
 
 	if strings.Contains(out, "successfully") {
 		// get connections from file craeted by airflow command
@@ -431,7 +431,7 @@ func EnvExportConnections(id, envFile string) error {
 
 		vars := strings.Split(out, "\n")
 		// add connections to the env file
-		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
+		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
 		if err != nil {
 			return errors.Wrap(err, "Writing connections to file unsuccessful")
 		}
@@ -439,7 +439,7 @@ func EnvExportConnections(id, envFile string) error {
 		defer f.Close()
 
 		for i := range vars {
-			varSplit := strings.SplitN(vars[i], "=", 2) //nolint:gomnd
+			varSplit := strings.SplitN(vars[i], "=", 2) //nolint:mnd
 			if len(varSplit) > 1 {
 				fmt.Println("Exporting Connection: " + varSplit[0])
 				_, err := f.WriteString("\nAIRFLOW_CONN_" + strings.ToUpper(varSplit[0]) + "=" + varSplit[1])
@@ -506,11 +506,11 @@ func ExportConnections(id string) error {
 	if err != nil {
 		return fmt.Errorf("error listing connections: %w", err)
 	}
-	logrus.Debugf("Export Connections logs:\n" + out)
+	logger.Debugf("Export Connections logs:\n%s", out)
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 	// remove extra warning text
-	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1] //nolint:gomnd
+	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1] //nolint:mnd
 
 	var connections AirflowConnections
 
@@ -566,7 +566,7 @@ func ExportVariables(id string) error {
 	if err != nil {
 		return fmt.Errorf("error exporting variables: %w", err)
 	}
-	logrus.Debugf("Export Variables logs:\n" + out)
+	logger.Debugf("Export Variables logs:\n%s", out)
 
 	if strings.Contains(out, "successfully") {
 		// get variables created by the airflow command
@@ -618,14 +618,14 @@ func ExportPools(id string) error {
 	if err != nil {
 		return fmt.Errorf("error listing pools: %w", err)
 	}
-	logrus.Debugf("Export Pools logs:\n" + out)
+	logger.Debugf("Export Pools logs:\n%s", out)
 
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 
 	var pools AirflowPools
 	// remove warnings and extra text from the the output
-	yamlpools := "- description:" + strings.SplitN(plainOut, "- description:", 2)[1] //nolint:gomnd
+	yamlpools := "- description:" + strings.SplitN(plainOut, "- description:", 2)[1] //nolint:mnd
 
 	err = yaml.Unmarshal([]byte(yamlpools), &pools)
 	if err != nil {

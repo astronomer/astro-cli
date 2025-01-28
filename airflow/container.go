@@ -14,11 +14,11 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 type ContainerHandler interface {
@@ -46,7 +46,7 @@ type RegistryHandler interface {
 // ImageHandler defines methods require to handle all operations on/for container images
 type ImageHandler interface {
 	Build(dockerfile, buildSecretString string, config types.ImageBuildConfig) error
-	Push(remoteImage, username, token string) error
+	Push(remoteImage, username, token string, getImageRepoSha bool) (string, error)
 	Pull(remoteImage, username, token string) error
 	GetLabel(altImageName, labelName string) (string, error)
 	DoesImageExist(image string) error
@@ -56,6 +56,7 @@ type ImageHandler interface {
 	Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, config types.ImageBuildConfig) (string, error)
 	ConflictTest(workingDirectory, testHomeDirectory string, buildConfig types.ImageBuildConfig) (string, error)
 	CreatePipFreeze(altImageName, pipFreezeFile string) error
+	GetImageRepoSHA(registry string) (string, error)
 }
 
 type DockerComposeAPI interface {
@@ -123,10 +124,10 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 
 	if envFile != "" {
 		if !envExists {
-			fmt.Printf(envNotFoundMsg, envFile)
+			logger.Debugf(envNotFoundMsg, envFile)
 			envFile = ""
 		} else {
-			fmt.Printf(envFoundMsg, envFile)
+			logger.Debugf(envFoundMsg, envFile)
 			envFile = fmt.Sprintf("env_file: %s", envFile)
 		}
 	}
@@ -143,7 +144,7 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 
 	settingsFileExist, err := util.Exists("./" + settingsFile)
 	if err != nil {
-		log.Debug(err)
+		logger.Debug(err)
 	}
 
 	cfg := ComposeConfig{
