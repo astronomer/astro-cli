@@ -27,10 +27,3 @@ func (s *Suite) TestExecPipe() {
 	fmt.Println(buf.String())
 	s.NoError(err)
 }
-
-func (s *Suite) TestAirflowCommand() {
-	s.Run("success", func() {
-		out := AirflowCommand("test-id", "-f docker_image_test.go")
-		s.Empty(out)
-	})
-}

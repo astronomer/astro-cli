@@ -6,9 +6,9 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -17,18 +17,22 @@ const (
 )
 
 // AirflowCommand is the main method of interaction with Airflow
-func AirflowCommand(id, airflowCommand string) string {
-	cmd := exec.Command("docker", "exec", "-it", id, "bash", "-c", airflowCommand)
+func AirflowCommand(id, airflowCommand string) (string, error) {
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	if err != nil {
+		return "", err
+	}
+	cmd := exec.Command(containerRuntime, "exec", "-it", id, "bash", "-c", airflowCommand)
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 
 	out, err := cmd.Output()
 	if err != nil {
-		_ = errors.Wrapf(err, "error encountered")
+		return "", fmt.Errorf("error encountered while running the airflow command: %w", err)
 	}
 
 	stringOut := string(out)
-	return stringOut
+	return stringOut, nil
 }
 
 // ExecPipe does pipe stream into stdout/stdin and stderr
