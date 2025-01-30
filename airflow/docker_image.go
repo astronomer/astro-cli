@@ -184,7 +184,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	args = append(args, pytestArgs...)
 	// run pytest image
 	var stdout, stderr io.Writer
-	if logger.IsLevelEnabled(logrus.DebugLevel) {
+	if logger.IsLevelEnabled(logrus.WarnLevel) {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
