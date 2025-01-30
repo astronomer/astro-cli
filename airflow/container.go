@@ -35,7 +35,7 @@ type ContainerHandler interface {
 	ComposeExport(settingsFile, composeFile string) error
 	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString string) (string, error)
 	Parse(customImageName, deployImageName, buildSecretString string) error
-	UpgradeTest(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString string, dependencyTest, versionTest, dagTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error
+	UpgradeTest(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString string, versionTest, dagTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -54,7 +54,6 @@ type ImageHandler interface {
 	TagLocalImage(localImage string) error
 	Run(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error
 	Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, config types.ImageBuildConfig) (string, error)
-	ConflictTest(workingDirectory, testHomeDirectory string, buildConfig types.ImageBuildConfig) (string, error)
 	CreatePipFreeze(altImageName, pipFreezeFile string) error
 	GetImageRepoSHA(registry string) (string, error)
 }

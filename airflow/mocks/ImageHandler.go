@@ -30,34 +30,6 @@ func (_m *ImageHandler) Build(dockerfile string, buildSecretString string, confi
 	return r0
 }
 
-// ConflictTest provides a mock function with given fields: workingDirectory, testHomeDirectory, buildConfig
-func (_m *ImageHandler) ConflictTest(workingDirectory string, testHomeDirectory string, buildConfig types.ImageBuildConfig) (string, error) {
-	ret := _m.Called(workingDirectory, testHomeDirectory, buildConfig)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ConflictTest")
-	}
-
-	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, types.ImageBuildConfig) (string, error)); ok {
-		return rf(workingDirectory, testHomeDirectory, buildConfig)
-	}
-	if rf, ok := ret.Get(0).(func(string, string, types.ImageBuildConfig) string); ok {
-		r0 = rf(workingDirectory, testHomeDirectory, buildConfig)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	if rf, ok := ret.Get(1).(func(string, string, types.ImageBuildConfig) error); ok {
-		r1 = rf(workingDirectory, testHomeDirectory, buildConfig)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // CreatePipFreeze provides a mock function with given fields: altImageName, pipFreezeFile
 func (_m *ImageHandler) CreatePipFreeze(altImageName string, pipFreezeFile string) error {
 	ret := _m.Called(altImageName, pipFreezeFile)
@@ -198,9 +170,9 @@ func (_m *ImageHandler) Pull(remoteImage string, username string, token string) 
 	return r0
 }
 
-// Push provides a mock function with given fields: remoteImage, username, token, getImageSha
-func (_m *ImageHandler) Push(remoteImage string, username string, token string, getImageSha bool) (string, error) {
-	ret := _m.Called(remoteImage, username, token, getImageSha)
+// Push provides a mock function with given fields: remoteImage, username, token, getImageRepoSha
+func (_m *ImageHandler) Push(remoteImage string, username string, token string, getImageRepoSha bool) (string, error) {
+	ret := _m.Called(remoteImage, username, token, getImageRepoSha)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Push")
@@ -209,16 +181,16 @@ func (_m *ImageHandler) Push(remoteImage string, username string, token string, 
 	var r0 string
 	var r1 error
 	if rf, ok := ret.Get(0).(func(string, string, string, bool) (string, error)); ok {
-		return rf(remoteImage, username, token, getImageSha)
+		return rf(remoteImage, username, token, getImageRepoSha)
 	}
 	if rf, ok := ret.Get(0).(func(string, string, string, bool) string); ok {
-		r0 = rf(remoteImage, username, token, getImageSha)
+		r0 = rf(remoteImage, username, token, getImageRepoSha)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	if rf, ok := ret.Get(1).(func(string, string, string, bool) error); ok {
-		r1 = rf(remoteImage, username, token, getImageSha)
+		r1 = rf(remoteImage, username, token, getImageRepoSha)
 	} else {
 		r1 = ret.Error(1)
 	}

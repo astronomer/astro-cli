@@ -30,7 +30,6 @@ import (
 )
 
 const (
-	EchoCmd            = "echo"
 	pushingImagePrompt = "Pushing image to Astronomer registry"
 	astroRunContainer  = "astro-run"
 	pullingImagePrompt = "Pulling image from Astronomer registry"
@@ -262,73 +261,6 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	}
 
 	return outb.String(), err
-}
-
-func (d *DockerImage) ConflictTest(workingDirectory, testHomeDirectory string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
-	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
-	if err != nil {
-		return "", err
-	}
-	// delete container
-	err = cmdExec(containerRuntime, nil, nil, "rm", "astro-temp-container")
-	if err != nil {
-		logger.Debug(err)
-	}
-	// Change to location of Dockerfile
-	err = os.Chdir(buildConfig.Path)
-	if err != nil {
-		return "", err
-	}
-	args := []string{
-		"build",
-		"-t",
-		"conflict-check:latest",
-		"-f",
-		"conflict-check.Dockerfile",
-		".",
-	}
-
-	// Create a buffer to capture the command output
-	var stdout, stderr bytes.Buffer
-	multiStdout := io.MultiWriter(&stdout, os.Stdout)
-	multiStderr := io.MultiWriter(&stderr, os.Stdout)
-
-	// Start the command execution
-	err = cmdExec(containerRuntime, multiStdout, multiStderr, args...)
-	if err != nil {
-		return "", err
-	}
-	// Get the exit code
-	exitCode := ""
-	if _, ok := err.(*exec.ExitError); ok {
-		// The command exited with a non-zero status
-		exitCode = parseExitCode(stderr.String())
-	} else if err != nil {
-		// An error occurred while running the command
-		return "", err
-	}
-	// Run a temporary container to copy the file from the image
-	err = cmdExec(containerRuntime, nil, nil, "create", "--name", "astro-temp-container", "conflict-check:latest")
-	if err != nil {
-		return exitCode, err
-	}
-	// Copy the result.txt file from the container to the destination folder
-	err1 := cmdExec(containerRuntime, nil, nil, "cp", "astro-temp-container:/usr/local/airflow/conflict-test-results.txt", "./"+testHomeDirectory)
-	if err1 != nil {
-		// Remove the temporary container
-		err = cmdExec(containerRuntime, nil, nil, "rm", "astro-temp-container")
-		if err != nil {
-			return exitCode, err
-		}
-		return exitCode, err1
-	}
-
-	// Remove the temporary container
-	err = cmdExec(containerRuntime, nil, nil, "rm", "astro-temp-container")
-	if err != nil {
-		return exitCode, err
-	}
-	return exitCode, nil
 }
 
 func parseExitCode(logs string) string {
