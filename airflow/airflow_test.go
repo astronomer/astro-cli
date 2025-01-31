@@ -117,21 +117,3 @@ func (s *Suite) TestTemplateInitFail() {
 	err = Init(tmpDir, "astro-runtime", "test", "etl")
 	s.EqualError(err, "failed to set up template-based astro project: error extracting files")
 }
-
-func (s *Suite) TestInitConflictTest() {
-	tmpDir, err := os.MkdirTemp("", "temp")
-	s.Require().NoError(err)
-	defer os.RemoveAll(tmpDir)
-
-	err = initConflictTest(tmpDir, "astro-runtime", "test")
-	s.NoError(err)
-
-	expectedFiles := []string{
-		"conflict-check.Dockerfile",
-	}
-	for _, file := range expectedFiles {
-		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
-		s.NoError(err)
-		s.True(exist)
-	}
-}
