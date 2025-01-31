@@ -1708,7 +1708,7 @@ func (s *Suite) TestUpgradeDockerfile() {
 	s.Run("update Dockerfile with new tag", func() {
 		// Create a temporary old Dockerfile
 		oldDockerfilePath := "test_old_Dockerfile"
-		oldContent := "FROM quay.io/astronomer/astro-runtime:old-tag\n"
+		oldContent := "FROM astrocrpublic.azurecr.io/astronomer/astro-runtime:old-tag\n"
 		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0o644)
 		s.NoError(err)
 		defer os.Remove(oldDockerfilePath)
@@ -1727,13 +1727,13 @@ func (s *Suite) TestUpgradeDockerfile() {
 		// Read the new Dockerfile and check its content
 		newContent, err := os.ReadFile(newDockerfilePath)
 		s.NoError(err)
-		s.Contains(string(newContent), "FROM quay.io/astronomer/astro-runtime:new-tag")
+		s.Contains(string(newContent), "FROM astrocrpublic.azurecr.io/astronomer/astro-runtime:new-tag")
 	})
 
 	s.Run("update Dockerfile with new image", func() {
 		// Create a temporary old Dockerfile
 		oldDockerfilePath := "test_old_Dockerfile"
-		oldContent := "FROM quay.io/astronomer/astro-runtime:old-tag\n"
+		oldContent := "FROM astrocrpublic.azurecr.io/astronomer/astro-runtime:old-tag\n"
 		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0o644)
 		s.NoError(err)
 		defer os.Remove(oldDockerfilePath)
@@ -1758,7 +1758,7 @@ func (s *Suite) TestUpgradeDockerfile() {
 	s.Run("update Dockerfile for ap-airflow with runtime version", func() {
 		// Create a temporary old Dockerfile with a line matching the pattern
 		oldDockerfilePath := "test_old_Dockerfile"
-		oldContent := "FROM quay.io/astronomer/ap-airflow:old-tag"
+		oldContent := "FROM astrocrpublic.azurecr.io/astronomer/ap-airflow:old-tag"
 		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0o644)
 		s.NoError(err)
 		defer os.Remove(oldDockerfilePath)
@@ -1777,13 +1777,13 @@ func (s *Suite) TestUpgradeDockerfile() {
 		// Read the new Dockerfile and check its content
 		newContent, err := os.ReadFile(newDockerfilePath)
 		s.NoError(err)
-		s.Contains(string(newContent), "FROM quay.io/astronomer/astro-runtime:5.0.0\n")
+		s.Contains(string(newContent), "FROM astrocrpublic.azurecr.io/astronomer/astro-runtime:5.0.0\n")
 	})
 
 	s.Run("update Dockerfile for ap-airflow with non-runtime version", func() {
 		// Create a temporary old Dockerfile with a line matching the pattern
 		oldDockerfilePath := "test_old_Dockerfile"
-		oldContent := "FROM quay.io/astronomer/ap-airflow:old-tag\n"
+		oldContent := "FROM astrocrpublic.azurecr.io/astronomer/ap-airflow:old-tag\n"
 		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0o644)
 		s.NoError(err)
 		defer os.Remove(oldDockerfilePath)
@@ -1802,7 +1802,7 @@ func (s *Suite) TestUpgradeDockerfile() {
 		// Read the new Dockerfile and check its content
 		newContent, err := os.ReadFile(newDockerfilePath)
 		s.NoError(err)
-		s.Contains(string(newContent), "FROM quay.io/astronomer/ap-airflow:new-tag")
+		s.Contains(string(newContent), "FROM astrocrpublic.azurecr.io/astronomer/ap-airflow:new-tag")
 	})
 
 	s.Run("error reading old Dockerfile", func() {

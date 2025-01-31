@@ -787,14 +787,14 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, newImage st
 	var newContent strings.Builder
 	if newImage == "" {
 		for _, line := range lines {
-			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/astro-runtime:") {
+			if strings.HasPrefix(strings.TrimSpace(line), "FROM astrocrpublic.azurecr.io/astronomer/astro-runtime:") {
 				// Replace the tag on the matching line
 				parts := strings.SplitN(line, ":", partsNum)
 				if len(parts) == partsNum {
 					line = parts[0] + ":" + newTag
 				}
 			}
-			if strings.HasPrefix(strings.TrimSpace(line), "FROM quay.io/astronomer/ap-airflow:") {
+			if strings.HasPrefix(strings.TrimSpace(line), "FROM astrocrpublic.azurecr.io/astronomer/ap-airflow:") {
 				isRuntime, err := isRuntimeVersion(newTag)
 				if err != nil {
 					logger.Debug(err)
