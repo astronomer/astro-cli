@@ -1,1 +1,1 @@
-FROM quay.io/astronomer/%s:%s
+FROM astrocrpublic.azurecr.io/astronomer/%s:%s
