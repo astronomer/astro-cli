@@ -1047,7 +1047,7 @@ func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretStrin
 		return err
 	}
 
-	fmt.Println("\nChecking your DAGs for errors,\nthis might take a minute if you haven't run this command before…")
+	fmt.Println("Checking your DAGs for errors…")
 
 	pytestFile := DefaultTestPath
 	exitCode, err := d.Pytest(pytestFile, customImageName, deployImageName, "", buildSecretString)
@@ -1057,7 +1057,7 @@ func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretStrin
 		}
 		return errors.Wrap(err, "something went wrong while parsing your DAGs")
 	}
-	fmt.Println("\n" + ansi.Green("✔") + " no errors detected in your DAGs ")
+	fmt.Println(ansi.Green("✔") + " No errors detected in your DAGs ")
 	return err
 }
 
