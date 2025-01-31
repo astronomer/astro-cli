@@ -367,7 +367,7 @@ func newAirflowPytestCmd() *cobra.Command {
 func newAirflowParseCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "parse",
-		Short:   "parse all DAGs in your Astro project for errors",
+		Short:   "Parse all DAGs in your Astro project for errors",
 		Long:    "This command spins up a local Python environment and checks your DAGs for syntax and import errors.",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: EnsureRuntime,
@@ -852,7 +852,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Println("Running Pytest\nThis may take a minute if you have not run this command before…")
+	fmt.Println("Running your test suite…")
 
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
 	if err != nil {
@@ -864,12 +864,12 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 	exitCode, err := containerHandler.Pytest(pytestFile, customImageName, "", pytestArgs, buildSecretString)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
-			return errors.New("pytests failed")
+			return errors.New("pytest failed")
 		}
 		return err
 	}
 
-	fmt.Println("\n" + ansi.Green("✔") + " All Pytests passed!")
+	fmt.Println("\n" + ansi.Green("✔") + " All tests passed!")
 	return err
 }
 
