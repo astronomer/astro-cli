@@ -1024,14 +1024,13 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Times(3)
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
-		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("", nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze2).Return(nil).Once()
 		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("0", nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", "", true, false, false, nil)
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
 
 		s.NoError(err)
 		imageHandler.AssertExpectations(s.T())
@@ -1045,14 +1044,13 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Times(2)
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
-		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("", nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze2).Return(nil).Once()
 		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("0", nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", "", true, false, false, mockPlatformCoreClient)
+		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", "", false, false, mockPlatformCoreClient)
 
 		s.NoError(err)
 		imageHandler.AssertExpectations(s.T())
@@ -1064,7 +1062,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1076,7 +1074,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1088,20 +1086,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", true, false, false, nil)
-		s.Error(err)
-		imageHandler.AssertExpectations(s.T())
-	})
-
-	s.Run("ConflictTest failure", func() {
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
-		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
-		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("", errMockDocker).Once()
-
-		mockDockerCompose.imageHandler = imageHandler
-
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1110,12 +1095,11 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
-		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("", nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1124,13 +1108,12 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
-		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("", nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(nil).Once()
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1139,14 +1122,13 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Times(2)
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
-		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("", nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze2).Return(nil).Once()
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1155,14 +1137,13 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Times(3)
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
-		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("", nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze2).Return(nil).Once()
 		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("1", errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1174,7 +1155,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentsResponse, nil).Once()
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", "", true, false, false, mockPlatformCoreClient)
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", "", false, false, mockPlatformCoreClient)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1188,7 +1169,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", "", true, false, false, mockPlatformCoreClient)
+		err = mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", "", false, false, mockPlatformCoreClient)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1197,13 +1178,12 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Twice()
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
-		imageHandler.On("ConflictTest", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("", nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze2).Return(errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", true, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1212,7 +1192,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		err := config.ResetCurrentContext()
 		s.NoError(err)
 
-		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", "", false, false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", "", false, false, nil)
 		s.Error(err)
 	})
 }

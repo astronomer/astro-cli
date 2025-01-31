@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 
 	"github.com/astronomer/astro-cli/airflow/runtimes"
@@ -261,15 +260,6 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	}
 
 	return outb.String(), err
-}
-
-func parseExitCode(logs string) string {
-	re := regexp.MustCompile(`exit code: (\d+)`)
-	match := re.FindStringSubmatch(logs)
-	if len(match) > 1 {
-		return match[1]
-	}
-	return ""
 }
 
 func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error {
