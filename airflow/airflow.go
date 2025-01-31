@@ -31,9 +31,6 @@ var (
 	//go:embed include/dockerfile
 	Dockerfile string
 
-	//go:embed include/test-conflicts.dockerfile
-	testConflictsDockerfile string
-
 	//go:embed include/dockerignore
 	Dockerignore string
 
