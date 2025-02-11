@@ -548,7 +548,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName, customImage, buildSecretString string, conflictTest, versionTest, dagTest bool, astroPlatformCore astroplatformcore.CoreClient) error {
+func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageName, customImage, buildSecretString string, versionTest, dagTest bool, astroPlatformCore astroplatformcore.CoreClient) error {
 	// figure out which tests to run
 	if !versionTest && !dagTest {
 		versionTest = true
@@ -598,13 +598,6 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 	}
 	newDockerFile := destFolder + "/Dockerfile"
 
-	// check for dependency conflicts
-	if conflictTest {
-		err = d.conflictTest(testHomeDirectory, newImageName, newAirflowVersion)
-		if err != nil {
-			return err
-		}
-	}
 	if versionTest {
 		err := d.versionTest(testHomeDirectory, currentAirflowVersion, deploymentImage, newDockerFile, newAirflowVersion, customImage, buildSecretString)
 		if err != nil {
@@ -620,9 +613,6 @@ func (d *DockerCompose) UpgradeTest(newAirflowVersion, deploymentID, newImageNam
 	}
 	fmt.Println("\nTest Summary:")
 	fmt.Printf("\tUpgrade Test Results Directory: %s\n", testHomeDirectory)
-	if conflictTest {
-		fmt.Printf("\tDependency Conflict Test Results file: %s\n", "conflict-test-results.txt")
-	}
 	if versionTest {
 		fmt.Printf("\tDependency Version Comparison Results file: %s\n", "dependency_compare.txt")
 	}
@@ -651,31 +641,6 @@ func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCor
 	fmt.Printf("\nPulling image from Astro Deployment %s\n\n", currentDeployment.Name)
 	err = d.imageHandler.Pull(deploymentImage, registryUsername, token)
 	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (d *DockerCompose) conflictTest(testHomeDirectory, newImageName, newAirflowVersion string) error {
-	fmt.Println("\nChecking your 'requirements.txt' for dependency conflicts with the new version of Airflow")
-	fmt.Println("\nThis may take a few minutes...")
-
-	// create files needed for conflict test
-	err := initConflictTest(config.WorkingPath, newImageName, newAirflowVersion)
-	defer os.Remove("conflict-check.Dockerfile")
-	if err != nil {
-		return err
-	}
-
-	exitCode, conflictErr := d.imageHandler.ConflictTest(d.airflowHome, testHomeDirectory, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
-	if conflictErr != nil {
-		return conflictErr
-	}
-	if strings.Contains(exitCode, "0") || exitCode == "" { // if the error code is 0 the pytests passed
-		fmt.Println("There were no dependency conflicts found")
-	} else {
-		fmt.Println("\nSomething went wrong while compiling your dependencies check the logs above for conflicts")
-		fmt.Println("If there are conflicts remove them from your 'requirments.txt' and rerun this test\nYou will see the best candidate in the 'conflict-test-results.txt' file")
 		return err
 	}
 	return nil

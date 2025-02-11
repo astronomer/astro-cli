@@ -62,7 +62,6 @@ var (
 	envExport              bool
 	noBrowser              bool
 	compose                bool
-	conflictTest           bool
 	versionTest            bool
 	dagTest                bool
 	waitTime               time.Duration
@@ -662,7 +661,7 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, customImageName, buildSecretString, conflictTest, versionTest, dagTest, platformCoreClient)
+	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, customImageName, buildSecretString, versionTest, dagTest, platformCoreClient)
 	if err != nil {
 		return err
 	}
