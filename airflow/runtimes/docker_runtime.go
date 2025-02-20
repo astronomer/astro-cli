@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/docker/docker/client"
 )
 
 // DockerEngine is a struct that contains the functions needed to initialize Docker.
@@ -128,4 +129,12 @@ func (rt DockerRuntime) initializeDocker(timeoutSeconds int) error {
 			return nil
 		}
 	}
+}
+
+func (rt DockerRuntime) NewDockerClient() (*client.Client, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return nil, err
+	}
+	return cli, nil
 }

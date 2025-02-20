@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/docker/docker/client"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -35,6 +36,7 @@ type ContainerRuntime interface {
 	Configure() error
 	ConfigureOrKill() error
 	Kill() error
+	NewDockerClient() (*client.Client, error)
 }
 
 // GetContainerRuntime creates a new container runtime based on the runtime string

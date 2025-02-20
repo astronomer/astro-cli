@@ -391,7 +391,13 @@ func (d *DockerImage) GetImageRepoSHA(registry string) (string, error) {
 func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImage string) error {
 	ctx := context.Background()
 
-	cli, err := getDockerClient()
+	rt, err := runtimes.GetContainerRuntime()
+	if err != nil {
+		logger.Debugf("Error getting container runtime: %v", err)
+		return err
+	}
+	cli, err := rt.NewDockerClient()
+
 	if err != nil {
 		logger.Debugf("Error setting up new Client ops %v", err)
 		return err

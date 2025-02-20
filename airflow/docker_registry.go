@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
 	registrytypes "github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/client"
 	"github.com/docker/docker/registry"
 )
 
@@ -19,7 +19,12 @@ type DockerRegistry struct {
 }
 
 func DockerRegistryInit(registryName string) (*DockerRegistry, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	runtime, err := runtimes.GetContainerRuntime()
+	if err != nil {
+		logger.Info("Please make sure you have Docker or Podman installed and running.")
+		return nil, err
+	}
+	cli, err := runtime.NewDockerClient()
 	if err != nil {
 		return nil, err
 	}
