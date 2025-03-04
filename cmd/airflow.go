@@ -395,7 +395,7 @@ func newAirflowBashCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "bash",
 		Short:   "Exec into a container",
-		Long:    "Use this command to exec into either the Webserver, Scheduler, Postgres, Triggerer, or Dag-Processor Container to run bash commands",
+		Long:    "Use this command to exec into either the Webserver, Scheduler, Postgres, Triggerer, or Dag-Processor Container to run Bash commands",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: EnsureRuntime,
 		RunE:    airflowBash,
