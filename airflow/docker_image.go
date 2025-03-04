@@ -60,7 +60,7 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "FROM ") && !strings.HasPrefix(line, fmt.Sprintf("FROM %s:", FullAstroRuntimeImageName)) {
+		if strings.HasPrefix(line, "FROM ") && !strings.HasPrefix(line, fmt.Sprintf("FROM %s", QuayBaseImageName)) && !strings.HasPrefix(line, fmt.Sprintf("FROM %s", AstroImageRegistryBaseImageName)) {
 			return false, nil
 		}
 	}

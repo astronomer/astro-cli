@@ -3,9 +3,11 @@ package airflow
 import "fmt"
 
 const (
-	BaseImageName                = "quay.io/astronomer"
-	AstronomerCertifiedImageName = "ap-airflow"
-	AstroRuntimeImageName        = "astro-runtime"
+	QuayBaseImageName               = "quay.io/astronomer"
+	AstroImageRegistryBaseImageName = "air.astronomer.io"
+	AstronomerCertifiedImageName    = "ap-airflow"
+	AstroRuntimeAirflow2ImageName   = "astro-runtime"
+	AstroRuntimeAirflow3ImageName   = "runtime"
 
 	airflowVersionLabelName = "io.astronomer.docker.airflow.version"
 	runtimeVersionLabelName = "io.astronomer.docker.runtime.version"
@@ -15,13 +17,14 @@ const (
 	WebserverDockerContainerName = "webserver"
 	SchedulerDockerContainerName = "scheduler"
 	TriggererDockerContainerName = "triggerer"
+	APIServerDockerContainerName = "api-server"
 	PostgresDockerContainerName  = "postgres"
 )
 
 var (
 	// Pytest constants
-
-	DefaultTestPath                  = ".astro/test_dag_integrity_default.py"
-	FullAstronomerCertifiedImageName = fmt.Sprintf("%s/%s", BaseImageName, AstronomerCertifiedImageName)
-	FullAstroRuntimeImageName        = fmt.Sprintf("%s/%s", BaseImageName, AstroRuntimeImageName)
+	DefaultTestPath                   = ".astro/test_dag_integrity_default.py"
+	FullAstronomerCertifiedImageName  = fmt.Sprintf("%s/%s", QuayBaseImageName, AstronomerCertifiedImageName)
+	FullAstroRuntimeAirflow2ImageName = fmt.Sprintf("%s/%s", QuayBaseImageName, AstroRuntimeAirflow2ImageName)
+	FullAstroRuntimeAirflow3ImageName = fmt.Sprintf("%s/%s", AstroImageRegistryBaseImageName, AstroRuntimeAirflow3ImageName)
 )

@@ -122,25 +122,26 @@ var (
 
 // ComposeConfig is input data to docker compose yaml template
 type ComposeConfig struct {
-	PytestFile            string
-	PostgresUser          string
-	PostgresPassword      string
-	PostgresHost          string
-	PostgresPort          string
-	PostgresRepository    string
-	PostgresTag           string
-	AirflowEnvFile        string
-	AirflowImage          string
-	AirflowHome           string
-	AirflowUser           string
-	AirflowWebserverPort  string
-	AirflowExposePort     bool
-	MountLabel            string
-	SettingsFile          string
-	SettingsFileExist     bool
-	DuplicateImageVolumes bool
-	TriggererEnabled      bool
-	ProjectName           string
+	PytestFile               string
+	PostgresUser             string
+	PostgresPassword         string
+	PostgresHost             string
+	PostgresPort             string
+	PostgresRepository       string
+	PostgresTag              string
+	AirflowEnvFile           string
+	AirflowImage             string
+	AirflowHome              string
+	AirflowUser              string
+	AirflowWebserverPort     string
+	AirflowExposePort        bool
+	MountLabel               string
+	SettingsFile             string
+	SettingsFileExist        bool
+	DuplicateImageVolumes    bool
+	TriggererEnabled         bool
+	ProjectName              string
+	AuthCredentialsDirectory string
 }
 
 type DockerCompose struct {
@@ -148,7 +149,6 @@ type DockerCompose struct {
 	projectName    string
 	envFile        string
 	dockerfile     string
-	composefile    string
 	composeService DockerComposeAPI
 	cliClient      DockerCLIClient
 	imageHandler   ImageHandler
@@ -166,7 +166,6 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 	}
 
 	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
-	composeFile := Composeyml
 
 	// Route output streams according to verbosity.
 	var stdout, stderr io.Writer
@@ -195,7 +194,6 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 		projectName:    projectName,
 		envFile:        envFile,
 		dockerfile:     dockerfile,
-		composefile:    composeFile,
 		composeService: composeService,
 		cliClient:      dockerCli.Client(),
 		imageHandler:   imageHandler,
@@ -736,7 +734,7 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerF
 			return 1, errors.Wrap(err, "something went wrong while parsing your DAGs")
 		}
 	} else {
-		fmt.Println("\n" + ansi.Green("✔") + " no errors detected in your DAGs ")
+		fmt.Println("\n" + ansi.Green("✔") + " No errors detected in your DAGs ")
 	}
 	return 0, nil
 }
@@ -1325,6 +1323,9 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 		ConfigFiles: configs,
 		WorkingDir:  airflowHome,
 	}, loadOptions...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load project")
+	}
 
 	// The latest versions of compose libs handle adding these labels at an outer layer,
 	// near the cobra entrypoint. Without these labels, compose will lose track of the containers its
@@ -1340,7 +1341,7 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 		}
 		project.Services[name] = s
 	}
-	return project, err
+	return project, nil
 }
 
 func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *composetypes.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {

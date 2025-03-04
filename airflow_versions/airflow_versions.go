@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 const (
@@ -35,50 +37,49 @@ func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, erro
 		return getAstronomerCertifiedTag(resp.AvailableReleases, airflowVersion)
 	}
 
-	return getAstroRuntimeTag(resp.RuntimeVersions, airflowVersion)
+	return getAstroRuntimeTag(resp.RuntimeVersions, resp.RuntimeVersionsV3, airflowVersion)
 }
 
 // get latest runtime tag associated to provided airflow version or directly runtimeVersion
 // if no airflow version is provided, returns the latest astro runtime version available
-func getAstroRuntimeTag(runtimeVersions map[string]RuntimeVersion, airflowVersion string) (string, error) {
-	availableTags := []string{}
+func getAstroRuntimeTag(runtimeVersions, runtimeVersionsV3 map[string]RuntimeVersion, airflowVersion string) (string, error) {
 	availableVersions := []string{}
 
 	for runtimeVersion, r := range runtimeVersions {
 		if r.Metadata.Channel != VersionChannelStable {
 			continue
 		}
-
-		// if user wants specific airflow version, get all runtime version associated to this airflow version
-		if r.Metadata.AirflowVersion == airflowVersion {
-			availableTags = append(availableTags, runtimeVersion)
-		} else {
-			availableVersions = append(availableVersions, runtimeVersion)
+		if airflowVersion != "" && r.Metadata.AirflowVersion != airflowVersion {
+			continue
 		}
+		availableVersions = append(availableVersions, runtimeVersion)
+	}
+	for runtimeVersion, r := range runtimeVersionsV3 {
+		if r.Metadata.Channel != VersionChannelStable {
+			continue
+		}
+		if airflowVersion != "" && r.Metadata.AirflowVersion != airflowVersion {
+			continue
+		}
+		availableVersions = append(availableVersions, runtimeVersion)
 	}
 
-	tagsToUse := availableVersions
-	if airflowVersion != "" {
-		tagsToUse = availableTags
-	}
+	logger.Debugf("Available runtime versions: %v", availableVersions)
 
-	if len(tagsToUse) == 0 {
+	if airflowVersion != "" && len(availableVersions) == 0 {
 		return "", ErrNoTagAvailable{airflowVersion: airflowVersion}
 	}
 
-	// get latest runtime version
-	latestVersion, _ := NewAirflowVersion(tagsToUse[0], []string{tagsToUse[0]})
-	for i := 1; i < len(tagsToUse); i++ {
-		tag := tagsToUse[i]
-		nextVersion, err := NewAirflowVersion(tag, []string{tag})
-		if err == nil {
-			if nextVersion.GreaterThan(latestVersion) {
-				latestVersion = nextVersion
-			}
+	latestVersion := availableVersions[0]
+	for _, availableVersion := range availableVersions {
+		if CompareRuntimeVersions(availableVersion, latestVersion) > 0 {
+			latestVersion = availableVersion
 		}
 	}
 
-	return latestVersion.Version.String(), nil
+	logger.Debugf("Latest runtime version: %s", latestVersion)
+
+	return latestVersion, nil
 }
 
 func getAstronomerCertifiedTag(availableReleases []AirflowVersionRaw, airflowVersion string) (string, error) {

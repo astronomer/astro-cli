@@ -1,3 +1,4 @@
+*.ndjson.gz
 *.test
 .astro/
 .DS_Store
@@ -19,6 +20,7 @@ hello-astro/
 meta/
 packages.txt
 requirements.txt
+!airflow/include/*/requirements.txt
 sagemaker-batch-inference.py
 testbin/
 testbin/golangci-lint

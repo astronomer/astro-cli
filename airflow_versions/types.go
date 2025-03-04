@@ -18,6 +18,7 @@ type Response struct {
 	AvailableReleases []AirflowVersionRaw       `json:"available_releases"`
 	Version           string                    `json:"version"`
 	RuntimeVersions   map[string]RuntimeVersion `json:"runtimeVersions"`
+	RuntimeVersionsV3 map[string]RuntimeVersion `json:"runtimeVersionsV3"`
 }
 
 type RuntimeVersion struct {

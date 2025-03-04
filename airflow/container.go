@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow/types"
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
@@ -109,9 +110,23 @@ func normalizeName(s string) string {
 
 // generateConfig generates the docker-compose config
 func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string) (string, error) {
+	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
+	if !ok {
+		return "", errors.New("runtime version label not found")
+	}
+	var composeYml string
+	switch airflowversions.AirflowMajorVersionForRuntimeVersion(runtimeVersion) {
+	case "2":
+		composeYml = Af2Composeyml
+	case "3":
+		composeYml = Af3Composeyml
+	default:
+		return "", errors.New("unsupported Airflow major version for runtime version " + runtimeVersion)
+	}
+
 	var tmpl *template.Template
 	var err error
-	tmpl, err = template.New("yml").Parse(Composeyml)
+	tmpl, err = template.New("yml").Parse(composeYml)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate config")
 	}

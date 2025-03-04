@@ -6,47 +6,82 @@ import (
 	"os"
 	"path/filepath"
 
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
 )
 
 var perm os.FileMode = 0o777
 
+var ExtractTemplate = InitFromTemplate
+
+// Airflow 2 files
 var (
-	//go:embed include/astronomermonitoringdag.py
-	MonitoringDag string
+	//go:embed include/airflow2/astronomermonitoringdag.py
+	Af2MonitoringDag string
 
-	//go:embed include/exampledag.py
-	ExampleDag string
+	//go:embed include/airflow2/exampledag.py
+	Af2ExampleDag string
 
-	//go:embed include/composeyml.yml
-	Composeyml string
+	//go:embed include/airflow2/composeyml.go.tmpl
+	Af2Composeyml string
 
-	//go:embed include/dagexampletest.py
-	DagExampleTest string
+	//go:embed include/airflow2/dagexampletest.py
+	Af2DagExampleTest string
 
-	//go:embed include/dagintegritytestdefault.py
-	DagIntegrityTestDefault string
+	//go:embed include/airflow2/dagintegritytestdefault.py
+	Af2DagIntegrityTestDefault string
 
-	//go:embed include/dockerfile
-	Dockerfile string
+	//go:embed include/airflow2/dockerfile
+	Af2Dockerfile string
 
-	//go:embed include/dockerignore
-	Dockerignore string
+	//go:embed include/airflow2/dockerignore
+	Af2Dockerignore string
 
-	//go:embed include/gitignore
-	Gitignore string
+	//go:embed include/airflow2/gitignore
+	Af2Gitignore string
 
-	//go:embed include/readme
-	Readme string
+	//go:embed include/airflow2/readme
+	Af2Readme string
 
-	//go:embed include/settingsyml.yml
-	Settingsyml string
+	//go:embed include/airflow2/settingsyml.yml
+	Af2Settingsyml string
 
-	//go:embed include/requirements.txt
-	RequirementsTxt string
+	//go:embed include/airflow2/requirements.txt
+	Af2RequirementsTxt string
+)
 
-	ExtractTemplate = InitFromTemplate
+// Airflow 3 files
+var (
+	//go:embed include/airflow3/exampledag.py
+	Af3ExampleDag string
+
+	//go:embed include/airflow3/composeyml.go.tmpl
+	Af3Composeyml string
+
+	//go:embed include/airflow3/dagexampletest.py
+	Af3DagExampleTest string
+
+	//go:embed include/airflow3/dagintegritytestdefault.py
+	Af3DagIntegrityTestDefault string
+
+	//go:embed include/airflow3/dockerfile
+	Af3Dockerfile string
+
+	//go:embed include/airflow3/dockerignore
+	Af3Dockerignore string
+
+	//go:embed include/airflow3/gitignore
+	Af3Gitignore string
+
+	//go:embed include/airflow3/readme
+	Af3Readme string
+
+	//go:embed include/airflow3/settingsyml.yml
+	Af3Settingsyml string
+
+	//go:embed include/airflow3/requirements.txt
+	Af3RequirementsTxt string
 )
 
 func initDirs(root string, dirs []string) error {
@@ -104,31 +139,51 @@ func Init(path, airflowImageName, airflowImageTag, template string) error {
 		}
 		return nil
 	}
-	// List of directories to create
+
+	// Initialize directories
 	dirs := []string{"dags", "plugins", "include"}
-
-	// Map of files to create
-	files := map[string]string{
-		".dockerignore":                        Dockerignore,
-		"Dockerfile":                           fmt.Sprintf(Dockerfile, airflowImageName, airflowImageTag),
-		".gitignore":                           Gitignore,
-		"packages.txt":                         "",
-		"requirements.txt":                     RequirementsTxt,
-		".env":                                 "",
-		"airflow_settings.yaml":                Settingsyml,
-		"dags/exampledag.py":                   ExampleDag,
-		"dags/.airflowignore":                  "",
-		"README.md":                            Readme,
-		"tests/dags/test_dag_example.py":       DagExampleTest,
-		".astro/test_dag_integrity_default.py": DagIntegrityTestDefault,
-		".astro/dag_integrity_exceptions.txt":  "# Add dag files to exempt from parse test below. ex: dags/<test-file>",
-	}
-
-	// Initailize directories
 	if err := initDirs(path, dirs); err != nil {
 		return errors.Wrap(err, "failed to create project directories")
 	}
+
 	// Initialize files
+	var files map[string]string
+	switch airflowversions.AirflowMajorVersionForRuntimeVersion(airflowImageTag) {
+	case "3":
+		files = map[string]string{
+			".dockerignore":                        Af3Dockerignore,
+			"Dockerfile":                           fmt.Sprintf(Af3Dockerfile, airflowImageName, airflowImageTag),
+			".gitignore":                           Af3Gitignore,
+			"packages.txt":                         "",
+			"requirements.txt":                     Af3RequirementsTxt,
+			".env":                                 "",
+			"airflow_settings.yaml":                Af3Settingsyml,
+			"dags/exampledag.py":                   Af3ExampleDag,
+			"dags/.airflowignore":                  "",
+			"README.md":                            Af3Readme,
+			"tests/dags/test_dag_example.py":       Af3DagExampleTest,
+			".astro/test_dag_integrity_default.py": Af3DagIntegrityTestDefault,
+			".astro/dag_integrity_exceptions.txt":  "# Add dag files to exempt from parse test below. ex: dags/<test-file>",
+		}
+	case "2":
+		files = map[string]string{
+			".dockerignore":                        Af2Dockerignore,
+			"Dockerfile":                           fmt.Sprintf(Af2Dockerfile, airflowImageName, airflowImageTag),
+			".gitignore":                           Af2Gitignore,
+			"packages.txt":                         "",
+			"requirements.txt":                     Af2RequirementsTxt,
+			".env":                                 "",
+			"airflow_settings.yaml":                Af2Settingsyml,
+			"dags/exampledag.py":                   Af2ExampleDag,
+			"dags/.airflowignore":                  "",
+			"README.md":                            Af2Readme,
+			"tests/dags/test_dag_example.py":       Af2DagExampleTest,
+			".astro/test_dag_integrity_default.py": Af2DagIntegrityTestDefault,
+			".astro/dag_integrity_exceptions.txt":  "# Add dag files to exempt from parse test below. ex: dags/<test-file>",
+		}
+	default:
+		return errors.New("unsupported Airflow major version for runtime version " + airflowImageTag)
+	}
 	if err := initFiles(path, files); err != nil {
 		return errors.Wrap(err, "failed to create project files")
 	}
