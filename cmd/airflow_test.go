@@ -816,11 +816,12 @@ func (s *AirflowSuite) TestAirflowLogs() {
 		cmd.Flag("webserver").Value.Set("true")
 		cmd.Flag("scheduler").Value.Set("true")
 		cmd.Flag("triggerer").Value.Set("true")
+		cmd.Flag("dag-processor").Value.Set("true")
 		args := []string{}
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Logs", false, "webserver", "scheduler", "triggerer").Return(nil).Once()
+			mockContainerHandler.On("Logs", false, "webserver", "scheduler", "triggerer", "dag-processor").Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -836,7 +837,7 @@ func (s *AirflowSuite) TestAirflowLogs() {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Logs", true, "webserver", "scheduler", "triggerer").Return(nil).Once()
+			mockContainerHandler.On("Logs", true, "webserver", "scheduler", "triggerer", "dag-processor").Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -850,11 +851,12 @@ func (s *AirflowSuite) TestAirflowLogs() {
 		cmd.Flag("webserver").Value.Set("true")
 		cmd.Flag("scheduler").Value.Set("true")
 		cmd.Flag("triggerer").Value.Set("true")
+		cmd.Flag("dag-processor").Value.Set("true")
 		args := []string{}
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Logs", false, "webserver", "scheduler", "triggerer").Return(errMock).Once()
+			mockContainerHandler.On("Logs", false, "webserver", "scheduler", "triggerer", "dag-processor").Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1310,6 +1312,7 @@ func (s *AirflowSuite) TestAirflowBash() {
 		cmd.Flag("webserver").Value.Set("true")
 		cmd.Flag("scheduler").Value.Set("true")
 		cmd.Flag("triggerer").Value.Set("true")
+		cmd.Flag("dag-processor").Value.Set("true")
 		cmd.Flag("postgres").Value.Set("true")
 
 		args := []string{}
@@ -1345,6 +1348,7 @@ func (s *AirflowSuite) TestAirflowBash() {
 		cmd.Flag("webserver").Value.Set("true")
 		cmd.Flag("scheduler").Value.Set("true")
 		cmd.Flag("triggerer").Value.Set("true")
+		cmd.Flag("dag-processor").Value.Set("true")
 		cmd.Flag("postgres").Value.Set("true")
 		args := []string{}
 
