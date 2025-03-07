@@ -244,14 +244,8 @@ func buildDockerImageFromWorkingDir(path string, imageHandler airflow.ImageHandl
 		return fmt.Errorf("failed to parse dockerfile: %s: %w", filepath.Join(path, dockerfile), err)
 	}
 
-	image, tag := docker.GetImageTagFromParsedFile(cmds)
-	if config.CFG.ShowWarnings.GetBool() && !validAirflowImageRepo(image) && !validRuntimeImageRepo(image) {
-		i, _ := input.Confirm(fmt.Sprintf(warningInvalidImageName, image))
-		if !i {
-			fmt.Println("Canceling deploy...")
-			os.Exit(1)
-		}
-	}
+	_, tag := docker.GetImageTagFromParsedFile(cmds)
+
 	// Get valid image tags for platform using Deployment Info request
 	err = validateRuntimeVersion(houstonClient, tag, deploymentInfo)
 	if err != nil {
@@ -297,29 +291,6 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		return err
 	}
 	return pushDockerImage(byoRegistryEnabled, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, c, customImageName)
-}
-
-func validAirflowImageRepo(image string) bool {
-	validDockerfileBaseImages := map[string]bool{
-		"quay.io/astronomer/ap-airflow": true,
-		"astronomerinc/ap-airflow":      true,
-	}
-	result, ok := validDockerfileBaseImages[image]
-	if !ok {
-		return false
-	}
-	return result
-}
-
-func validRuntimeImageRepo(image string) bool {
-	validDockerfileBaseImages := map[string]bool{
-		"quay.io/astronomer/astro-runtime": true,
-	}
-	result, ok := validDockerfileBaseImages[image]
-	if !ok {
-		return false
-	}
-	return result
 }
 
 func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentURL) string {
