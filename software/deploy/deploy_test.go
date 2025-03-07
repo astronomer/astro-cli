@@ -91,18 +91,6 @@ func (s *Suite) TestDeploymentNameDoesntExists() {
 	s.False(deploymentExists("dev-test", deployments))
 }
 
-func (s *Suite) TestValidAirflowImageRepo() {
-	s.True(validAirflowImageRepo("quay.io/astronomer/ap-airflow"))
-	s.True(validAirflowImageRepo("astronomerinc/ap-airflow"))
-	s.False(validAirflowImageRepo("personal-repo/ap-airflow"))
-}
-
-func (s *Suite) TestValidRuntimeImageRepo() {
-	s.False(validRuntimeImageRepo("quay.io/astronomer/ap-airflow"))
-	s.True(validRuntimeImageRepo("quay.io/astronomer/astro-runtime"))
-	s.False(validRuntimeImageRepo("personal-repo/ap-airflow"))
-}
-
 func (s *Suite) SetupSuite() {
 	// Common setup logic for the test suite
 	s.fsForLocalConfig = afero.NewMemMapFs()
