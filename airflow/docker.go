@@ -1062,7 +1062,7 @@ func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretStrin
 }
 
 func (d *DockerCompose) Bash(component string) error {
-	// exec into schedueler by default
+	// exec into scheduler by default
 	if component == "" {
 		component = SchedulerDockerContainerName
 	}

@@ -93,6 +93,7 @@ func (s *Suite) TestGenerateConfig() {
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
   AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+  AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: "True"
   AIRFLOW__WEBSERVER__SECRET_KEY: "test-project-name"
   AIRFLOW__WEBSERVER__RBAC: "True"
   AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
@@ -186,6 +187,31 @@ services:
       
     
 
+
+  dag-processor:
+    image: test-project-name/airflow:latest
+    command: >
+      bash -c "(airflow db upgrade || airflow upgradedb) && airflow dag-processor"
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-dag-processor"
+    depends_on:
+      - postgres
+    environment: *common-env-vars
+    volumes:
+      - airflow_home/dags:/usr/local/airflow/dags:z
+      - airflow_home/plugins:/usr/local/airflow/plugins:z
+      - airflow_home/include:/usr/local/airflow/include:z
+      
+      
+      - airflow_logs:/usr/local/airflow/logs
+      
+    
 `
 		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{})
 		s.NoError(err)
@@ -198,6 +224,7 @@ services:
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
   AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+  AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: "True"
   AIRFLOW__WEBSERVER__SECRET_KEY: "test-project-name"
   AIRFLOW__WEBSERVER__RBAC: "True"
   AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
@@ -315,6 +342,31 @@ services:
       
     
 
+
+  dag-processor:
+    image: test-project-name/airflow:latest
+    command: >
+      bash -c "(airflow db upgrade || airflow upgradedb) && airflow dag-processor"
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-dag-processor"
+    depends_on:
+      - postgres
+    environment: *common-env-vars
+    volumes:
+      - airflow_home/dags:/usr/local/airflow/dags:z
+      - airflow_home/plugins:/usr/local/airflow/plugins:z
+      - airflow_home/include:/usr/local/airflow/include:z
+      
+      
+      - airflow_logs:/usr/local/airflow/logs
+      
+    
 `
 		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{runtimeVersionLabelName: triggererAllowedRuntimeVersion})
 		s.NoError(err)

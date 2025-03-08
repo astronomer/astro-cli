@@ -4,6 +4,7 @@ x-common-env-vars: &common-env-vars
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:5432
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
   AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+  AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: "True"
   AIRFLOW__WEBSERVER__SECRET_KEY: "{{ .ProjectName }}"
   AIRFLOW__WEBSERVER__RBAC: "True"
   AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
@@ -133,3 +134,30 @@ services:
       {{end}}
     {{ .AirflowEnvFile }}
 {{end}}
+
+  dag-processor:
+    image: {{ .AirflowImage }}
+    command: >
+      bash -c "(airflow db upgrade || airflow upgradedb) && airflow dag-processor"
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: {{ .AirflowUser }}
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-dag-processor"
+    depends_on:
+      - postgres
+    environment: *common-env-vars
+    volumes:
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:{{ .MountLabel }}
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
+      {{if .SettingsFileExist}}
+      - {{ .AirflowHome }}/{{ .SettingsFile }}:/usr/local/airflow/{{ .SettingsFile }}:{{ .MountLabel }}
+      {{end}}
+      {{if .DuplicateImageVolumes}}
+      - airflow_logs:/usr/local/airflow/logs
+      {{end}}
+    {{ .AirflowEnvFile }}
