@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
@@ -38,7 +39,7 @@ func newLoginCommand(coreClient astrocore.CoreClient, platformCoreClient astropl
 	}
 
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
-	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
+	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login. It is recommended to pass a file containing the token to avoid leaking into shell history and environment")
 	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for software login")
 	return cmd
 }
@@ -56,9 +57,28 @@ func newLogoutCommand(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+func isFilePath(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	return false
+}
+
 func login(cmd *cobra.Command, args []string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+
+	if isFilePath(token) {
+		tok, err := os.ReadFile(token)
+		if err != nil {
+			return err
+		}
+		token = string(tok)
+	}
 
 	if len(args) == 1 {
 		// check if user provided a valid cloud domain
