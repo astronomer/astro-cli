@@ -16,6 +16,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -134,6 +135,7 @@ type ComposeConfig struct {
 	AirflowHome              string
 	AirflowUser              string
 	AirflowWebserverPort     string
+	AirflowAPIServerPort     string
 	AirflowExposePort        bool
 	MountLabel               string
 	SettingsFile             string
@@ -262,7 +264,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		return errors.Wrap(err, composeRecreateErrMsg)
 	}
 
-	airflowDockerVersion, err := d.checkAiflowVersion()
+	airflowDockerVersion, err := d.checkAirflowVersion()
 	if err != nil {
 		return err
 	}
@@ -271,14 +273,20 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	s.Start()
 	defer s.Stop()
 
-	// Airflow webserver should be hosted at localhost
-	// from the perspective of the CLI running on the host machine.
-	webserverPort := config.CFG.WebserverPort.GetString()
-	healthURL := fmt.Sprintf("http://localhost:%s/health", webserverPort)
+	airflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(imageLabels[runtimeVersionLabelName])
+	var healthURL, healthComponent string
+	switch airflowMajorVersion {
+	case "3":
+		healthURL = fmt.Sprintf("http://localhost:%s/public/monitor/health", config.CFG.APIServerPort.GetString())
+		healthComponent = "api-server"
+	case "2":
+		healthURL = fmt.Sprintf("http://localhost:%s/health", config.CFG.WebserverPort.GetString())
+		healthComponent = "webserver"
+	}
 
 	// Check the health of the webserver, up to the timeout.
 	// If we fail to get a 200 status code, we'll return an error message.
-	err = checkWebserverHealth(healthURL, waitTime)
+	err = checkWebserverHealth(healthURL, waitTime, healthComponent)
 	if err != nil {
 		return err
 	}
@@ -1109,7 +1117,7 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 	}
 
 	// Get airflow version
-	airflowDockerVersion, err := d.checkAiflowVersion()
+	airflowDockerVersion, err := d.checkAirflowVersion()
 	if err != nil {
 		return err
 	}
@@ -1154,7 +1162,7 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 	}
 
 	// Get airflow version
-	airflowDockerVersion, err := d.checkAiflowVersion()
+	airflowDockerVersion, err := d.checkAirflowVersion()
 	if err != nil {
 		return err
 	}
@@ -1190,7 +1198,8 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	strippedProjectName := replacer.Replace(d.projectName)
 	for i := range psInfo {
 		if strings.Contains(replacer.Replace(psInfo[i].Name), strippedProjectName) &&
-			strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
+			(strings.Contains(psInfo[i].Name, WebserverDockerContainerName) ||
+				strings.Contains(psInfo[i].Name, APIServerDockerContainerName)) {
 			return psInfo[i].ID, nil
 		}
 	}
@@ -1255,7 +1264,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile, executionDate strin
 	return nil
 }
 
-func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
+func (d *DockerCompose) checkAirflowVersion() (uint64, error) {
 	imageLabels, err := d.imageHandler.ListLabels()
 	if err != nil {
 		return 0, err
@@ -1360,7 +1369,8 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 	if fileState {
 		for i := range psInfo {
 			if strings.Contains(psInfo[i].Name, project.Name) &&
-				strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
+				(strings.Contains(psInfo[i].Name, WebserverDockerContainerName) ||
+					strings.Contains(psInfo[i].Name, APIServerDockerContainerName)) {
 				err = initSettings(psInfo[i].ID, settingsFile, envConns, airflowDockerVersion, true, true, true)
 				if err != nil {
 					return err

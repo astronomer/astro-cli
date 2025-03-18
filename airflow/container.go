@@ -172,6 +172,7 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		AirflowHome:           airflowHome,
 		AirflowUser:           "astro",
 		AirflowWebserverPort:  config.CFG.WebserverPort.GetString(),
+		AirflowAPIServerPort:  config.CFG.APIServerPort.GetString(),
 		AirflowEnvFile:        envFile,
 		AirflowExposePort:     config.CFG.AirflowExposePort.GetBool(),
 		MountLabel:            "z",

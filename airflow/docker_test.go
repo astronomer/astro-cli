@@ -432,7 +432,11 @@ services:
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
+      
+      
       - airflow_logs:/usr/local/airflow/logs
+      
+    
 
   dag-processor:
     depends_on:
@@ -455,7 +459,10 @@ services:
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
+      
       - airflow_logs:/usr/local/airflow/logs
+      
+    
 
   api-server:
     depends_on:
@@ -480,7 +487,10 @@ services:
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
+      
       - airflow_logs:/usr/local/airflow/logs
+      
+    
 
   triggerer:
     depends_on:
@@ -502,7 +512,10 @@ services:
       - airflow_home/dags:/usr/local/airflow/dags:z
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
+      
       - airflow_logs:/usr/local/airflow/logs
+      
+    
 `
 		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{runtimeVersionLabelName: "3.0-1"})
 		s.NoError(err)
@@ -555,7 +568,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return nil
 		}
 
@@ -583,7 +596,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(1)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			s.Equal(defaultTimeOut, timeout)
 			return nil
 		}
@@ -609,7 +622,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(1)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			s.Equal(expectedTimeout, timeout)
 			return nil
 		}
@@ -635,7 +648,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(1)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			s.Equal(userProvidedTimeOut, timeout)
 			return nil
 		}
@@ -661,7 +674,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return nil
 		}
 
@@ -685,7 +698,7 @@ func (s *Suite) TestDockerComposeStart() {
 
 		composeMock := new(mocks.DockerComposeAPI)
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return nil
 		}
 
@@ -707,7 +720,7 @@ func (s *Suite) TestDockerComposeStart() {
 
 		composeMock := new(mocks.DockerComposeAPI)
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return nil
 		}
 
@@ -730,7 +743,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return nil
 		}
 
@@ -753,7 +766,7 @@ func (s *Suite) TestDockerComposeStart() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return errMockDocker
 		}
 

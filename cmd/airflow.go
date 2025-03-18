@@ -51,12 +51,14 @@ var (
 	webserverLogs          bool
 	apiServerLogs          bool
 	triggererLogs          bool
+	dagProcessorLogs       bool
 	noCache                bool
 	schedulerExec          bool
 	postgresExec           bool
 	webserverExec          bool
 	triggererExec          bool
 	apiServerExec          bool
+	dagProcessorExec       bool
 	connections            bool
 	variables              bool
 	pools                  bool
@@ -295,6 +297,7 @@ func newAirflowLogsCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&webserverLogs, "webserver", "w", false, "Output webserver logs")
 	cmd.Flags().BoolVarP(&apiServerLogs, "api-server", "a", false, "Output api-server logs")
 	cmd.Flags().BoolVarP(&triggererLogs, "triggerer", "t", false, "Output triggerer logs")
+	cmd.Flags().BoolVarP(&dagProcessorLogs, "dag-processor", "d", false, "Output dag-processor logs")
 	return cmd
 }
 
@@ -391,6 +394,7 @@ func newAirflowBashCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&postgresExec, "postgres", "p", false, "Exec into the postgres container")
 	cmd.Flags().BoolVarP(&triggererExec, "triggerer", "t", false, "Exec into the triggerer container")
 	cmd.Flags().BoolVarP(&apiServerExec, "api-server", "a", false, "Exec into the api-server container")
+	cmd.Flags().BoolVarP(&dagProcessorExec, "dag-processor", "d", false, "Exec into the dag-processor container")
 	return cmd
 }
 
@@ -743,6 +747,9 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	if triggererLogs {
 		containersNames = append(containersNames, []string{airflow.TriggererDockerContainerName}...)
 	}
+	if dagProcessorLogs {
+		containersNames = append(containersNames, []string{airflow.DAGProcessorDockerContainerName}...)
+	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
@@ -905,6 +912,9 @@ func airflowBash(cmd *cobra.Command, args []string) error {
 	}
 	if apiServerExec {
 		container = airflow.APIServerDockerContainerName
+	}
+	if dagProcessorExec {
+		container = airflow.DAGProcessorDockerContainerName
 	}
 	// exec into secheduler by default
 	if container == "" {

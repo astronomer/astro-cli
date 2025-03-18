@@ -14,11 +14,12 @@ const (
 
 	warningTriggererDisabledNoVersionDetectedMsg = "warning: could not find the version of Airflow or Runtime you're using, are you using an official Docker image for your project ? Disabling Airflow triggerer."
 
-	WebserverDockerContainerName = "webserver"
-	SchedulerDockerContainerName = "scheduler"
-	TriggererDockerContainerName = "triggerer"
-	APIServerDockerContainerName = "api-server"
-	PostgresDockerContainerName  = "postgres"
+	WebserverDockerContainerName    = "webserver"
+	SchedulerDockerContainerName    = "scheduler"
+	TriggererDockerContainerName    = "triggerer"
+	APIServerDockerContainerName    = "api-server"
+	PostgresDockerContainerName     = "postgres"
+	DAGProcessorDockerContainerName = "dag-processor"
 )
 
 var (

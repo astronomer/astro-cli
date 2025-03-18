@@ -52,7 +52,7 @@ services:
   db-migration:
     depends_on:
       - postgres
-    image: {{ .ProjectName }}/airflow:latest
+    image: {{ .AirflowImage }}
     command:
       - airflow
       - db
@@ -68,7 +68,7 @@ services:
   scheduler:
     depends_on:
       - db-migration
-    image: {{ .ProjectName }}/airflow:latest
+    image: {{ .AirflowImage }}
     command:
       - airflow
       - scheduler
@@ -86,12 +86,18 @@ services:
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:z
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:z
       - {{ .AirflowHome }}/tests:/usr/local/airflow/tests:z
+      {{ if .SettingsFileExist }}
+      - {{ .AirflowHome }}/{{ .SettingsFile }}:/usr/local/airflow/{{ .SettingsFile }}:{{ .MountLabel }}
+      {{ end }}
+      {{ if .DuplicateImageVolumes }}
       - airflow_logs:/usr/local/airflow/logs
+      {{ end }}
+    {{ .AirflowEnvFile }}
 
   dag-processor:
     depends_on:
       - db-migration
-    image: {{ .ProjectName }}/airflow:latest
+    image: {{ .AirflowImage }}
     command:
       - airflow
       - dag-processor
@@ -109,12 +115,15 @@ services:
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:z
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:z
       - {{ .AirflowHome }}/tests:/usr/local/airflow/tests:z
+      {{ if .DuplicateImageVolumes }}
       - airflow_logs:/usr/local/airflow/logs
+      {{ end }}
+    {{ .AirflowEnvFile }}
 
   api-server:
     depends_on:
       - db-migration
-    image: {{ .ProjectName }}/airflow:latest
+    image: {{ .AirflowImage }}
     command:
       - airflow
       - api-server
@@ -129,21 +138,24 @@ services:
     environment: *common-env-vars
     ports:
       {{- if not .AirflowExposePort }}
-      - 127.0.0.1:{{ .AirflowWebserverPort }}:8080
+      - 127.0.0.1:{{ .AirflowAPIServerPort }}:8080
       {{- else }}
-      - {{ .AirflowWebserverPort }}:8080
+      - {{ .AirflowAPIServerPort }}:8080
       {{- end }}
     volumes:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:z
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:z
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:z
       - {{ .AirflowHome }}/tests:/usr/local/airflow/tests:z
+      {{ if .DuplicateImageVolumes }}
       - airflow_logs:/usr/local/airflow/logs
+      {{ end }}
+    {{ .AirflowEnvFile }}
 
   triggerer:
     depends_on:
       - db-migration
-    image: {{ .ProjectName }}/airflow:latest
+    image: {{ .AirflowImage }}
     command:
       - airflow
       - triggerer
@@ -160,4 +172,7 @@ services:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:z
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:z
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:z
+      {{ if .DuplicateImageVolumes }}
       - airflow_logs:/usr/local/airflow/logs
+      {{ end }}
+    {{ .AirflowEnvFile }}
