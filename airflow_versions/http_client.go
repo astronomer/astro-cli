@@ -3,9 +3,7 @@ package airflowversions
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
@@ -50,7 +48,6 @@ func (r *Request) Do() (*Response, error) {
 
 // Do executes a query against the updates astronomer API, logging out any errors contained in the response object
 func (c *Client) Do(doOpts *httputil.DoOptions) (*Response, error) {
-	var response httputil.HTTPResponse
 	doOpts.Path = RuntimeReleaseURL
 	if c.useAstronomerCertified {
 		doOpts.Path = AirflowReleaseURL
@@ -62,17 +59,8 @@ func (c *Client) Do(doOpts *httputil.DoOptions) (*Response, error) {
 	}
 	defer httpResponse.Body.Close()
 
-	body, err := io.ReadAll(httpResponse.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	response = httputil.HTTPResponse{
-		Raw:  httpResponse,
-		Body: string(body),
-	}
 	decode := Response{}
-	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
+	err = json.NewDecoder(httpResponse.Body).Decode(&decode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to JSON decode %s response: %w", doOpts.Path, err)
 	}

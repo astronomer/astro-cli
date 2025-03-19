@@ -1,3 +1,5 @@
+!airflow/include/*/requirements.txt
+*.ndjson.gz
 *.test
 .astro/
 .DS_Store

@@ -1,0 +1,178 @@
+x-common-env-vars: &common-env-vars
+  AIRFLOW__API__BASE_URL: "http://localhost:8080"
+  AIRFLOW__API__PORT: 8080
+  AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
+  AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+  AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://api-server:8080/execution/"
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:5432
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:5432
+  AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: True
+  AIRFLOW__WEBSERVER__SECRET_KEY: "{{ .ProjectName }}"
+  AIRFLOW__WEBSERVER__RBAC: "True"
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+  ASTRONOMER_ENVIRONMENT: local
+
+networks:
+  airflow:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  airflow_logs:
+    driver: local
+
+services:
+  postgres:
+    image: {{ .PostgresRepository }}:{{ .PostgresTag }}
+    restart: unless-stopped
+    networks:
+      - airflow
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+    ports:
+      {{- if not .AirflowExposePort }}
+      - 127.0.0.1:{{ .PostgresPort }}:5432
+      {{- else }}
+      - {{ .PostgresPort }}:5432
+      {{- end }}
+    volumes:
+      {{- if .DuplicateImageVolumes }}
+      - postgres_data:/var/lib/postgresql/data
+      {{- else }}
+      []
+      {{- end }}
+    environment:
+      POSTGRES_USER: {{ .PostgresUser }}
+      POSTGRES_PASSWORD: {{ .PostgresPassword }}
+
+  db-migration:
+    depends_on:
+      - postgres
+    image: {{ .AirflowImage }}
+    command:
+      - airflow
+      - db
+      - migrate
+    networks:
+      - airflow
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-db-migration"
+    environment: *common-env-vars
+
+  scheduler:
+    depends_on:
+      - db-migration
+    image: {{ .AirflowImage }}
+    command:
+      - airflow
+      - scheduler
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-scheduler"
+    environment: *common-env-vars
+    volumes:
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:z
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:z
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:z
+      - {{ .AirflowHome }}/tests:/usr/local/airflow/tests:z
+      {{ if .SettingsFileExist }}
+      - {{ .AirflowHome }}/{{ .SettingsFile }}:/usr/local/airflow/{{ .SettingsFile }}:{{ .MountLabel }}
+      {{ end }}
+      {{ if .DuplicateImageVolumes }}
+      - airflow_logs:/usr/local/airflow/logs
+      {{ end }}
+    {{ .AirflowEnvFile }}
+
+  dag-processor:
+    depends_on:
+      - db-migration
+    image: {{ .AirflowImage }}
+    command:
+      - airflow
+      - dag-processor
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-dag-processor"
+    environment: *common-env-vars
+    volumes:
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:z
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:z
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:z
+      - {{ .AirflowHome }}/tests:/usr/local/airflow/tests:z
+      {{ if .DuplicateImageVolumes }}
+      - airflow_logs:/usr/local/airflow/logs
+      {{ end }}
+    {{ .AirflowEnvFile }}
+
+  api-server:
+    depends_on:
+      - db-migration
+    image: {{ .AirflowImage }}
+    command:
+      - airflow
+      - api-server
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-api-server"
+    environment: *common-env-vars
+    ports:
+      {{- if not .AirflowExposePort }}
+      - 127.0.0.1:{{ .AirflowAPIServerPort }}:8080
+      {{- else }}
+      - {{ .AirflowAPIServerPort }}:8080
+      {{- end }}
+    volumes:
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:z
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:z
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:z
+      - {{ .AirflowHome }}/tests:/usr/local/airflow/tests:z
+      {{ if .DuplicateImageVolumes }}
+      - airflow_logs:/usr/local/airflow/logs
+      {{ end }}
+    {{ .AirflowEnvFile }}
+
+  triggerer:
+    depends_on:
+      - db-migration
+    image: {{ .AirflowImage }}
+    command:
+      - airflow
+      - triggerer
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-triggerer"
+    environment: *common-env-vars
+    volumes:
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:z
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:z
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:z
+      {{ if .DuplicateImageVolumes }}
+      - airflow_logs:/usr/local/airflow/logs
+      {{ end }}
+    {{ .AirflowEnvFile }}

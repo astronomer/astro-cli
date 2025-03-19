@@ -39,6 +39,8 @@ var (
 
 var (
 	airflowVersionLabel        = "2.2.5"
+	runtimeVersionLabel        = "12.0.0"
+	labels                     = map[string]string{airflowVersionLabelName: airflowVersionLabel, runtimeVersionLabelName: runtimeVersionLabel}
 	deploymentID               = "test-deployment-id"
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 		{
@@ -86,6 +88,7 @@ func (s *Suite) TestGenerateConfig() {
 	err := afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	s.NoError(err)
 	config.InitConfig(fs)
+
 	s.Run("returns config with default healthcheck", func() {
 		expectedCfg := `x-common-env-vars: &common-env-vars
   AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -186,11 +189,38 @@ services:
       
     
 
+  triggerer:
+    image: test-project-name/airflow:latest
+    command: >
+      bash -c "(airflow db upgrade || airflow upgradedb) && airflow triggerer"
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-triggerer"
+    depends_on:
+      - postgres
+    environment: *common-env-vars
+    volumes:
+      - airflow_home/dags:/usr/local/airflow/dags:z
+      - airflow_home/plugins:/usr/local/airflow/plugins:z
+      - airflow_home/include:/usr/local/airflow/include:z
+      
+      - airflow_logs:/usr/local/airflow/logs
+      
+    
+
 `
-		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{})
+		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{
+			runtimeVersionLabelName: runtimeVersionLabel,
+		})
 		s.NoError(err)
 		s.Equal(expectedCfg, cfg)
 	})
+
 	s.Run("returns config with triggerer enabled", func() {
 		expectedCfg := `x-common-env-vars: &common-env-vars
   AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -320,6 +350,177 @@ services:
 		s.NoError(err)
 		s.Equal(expectedCfg, cfg)
 	})
+
+	s.Run("returns config for Airflow 3 runtime image", func() {
+		expectedCfg := `x-common-env-vars: &common-env-vars
+  AIRFLOW__API__BASE_URL: "http://localhost:8080"
+  AIRFLOW__API__PORT: 8080
+  AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
+  AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+  AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://api-server:8080/execution/"
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+  AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: True
+  AIRFLOW__WEBSERVER__SECRET_KEY: "test-project-name"
+  AIRFLOW__WEBSERVER__RBAC: "True"
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+  ASTRONOMER_ENVIRONMENT: local
+
+networks:
+  airflow:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  airflow_logs:
+    driver: local
+
+services:
+  postgres:
+    image: docker.io/postgres:12.6
+    restart: unless-stopped
+    networks:
+      - airflow
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+    ports:
+      - 127.0.0.1:5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+  db-migration:
+    depends_on:
+      - postgres
+    image: test-project-name/airflow:latest
+    command:
+      - airflow
+      - db
+      - migrate
+    networks:
+      - airflow
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-db-migration"
+    environment: *common-env-vars
+
+  scheduler:
+    depends_on:
+      - db-migration
+    image: test-project-name/airflow:latest
+    command:
+      - airflow
+      - scheduler
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-scheduler"
+    environment: *common-env-vars
+    volumes:
+      - airflow_home/dags:/usr/local/airflow/dags:z
+      - airflow_home/plugins:/usr/local/airflow/plugins:z
+      - airflow_home/include:/usr/local/airflow/include:z
+      - airflow_home/tests:/usr/local/airflow/tests:z
+      
+      
+      - airflow_logs:/usr/local/airflow/logs
+      
+    
+
+  dag-processor:
+    depends_on:
+      - db-migration
+    image: test-project-name/airflow:latest
+    command:
+      - airflow
+      - dag-processor
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-dag-processor"
+    environment: *common-env-vars
+    volumes:
+      - airflow_home/dags:/usr/local/airflow/dags:z
+      - airflow_home/plugins:/usr/local/airflow/plugins:z
+      - airflow_home/include:/usr/local/airflow/include:z
+      - airflow_home/tests:/usr/local/airflow/tests:z
+      
+      - airflow_logs:/usr/local/airflow/logs
+      
+    
+
+  api-server:
+    depends_on:
+      - db-migration
+    image: test-project-name/airflow:latest
+    command:
+      - airflow
+      - api-server
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-api-server"
+    environment: *common-env-vars
+    ports:
+      - 127.0.0.1:8080:8080
+    volumes:
+      - airflow_home/dags:/usr/local/airflow/dags:z
+      - airflow_home/plugins:/usr/local/airflow/plugins:z
+      - airflow_home/include:/usr/local/airflow/include:z
+      - airflow_home/tests:/usr/local/airflow/tests:z
+      
+      - airflow_logs:/usr/local/airflow/logs
+      
+    
+
+  triggerer:
+    depends_on:
+      - db-migration
+    image: test-project-name/airflow:latest
+    command:
+      - airflow
+      - triggerer
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-triggerer"
+    environment: *common-env-vars
+    volumes:
+      - airflow_home/dags:/usr/local/airflow/dags:z
+      - airflow_home/plugins:/usr/local/airflow/plugins:z
+      - airflow_home/include:/usr/local/airflow/include:z
+      
+      - airflow_logs:/usr/local/airflow/logs
+      
+    
+`
+		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{runtimeVersionLabelName: "3.0-1"})
+		s.NoError(err)
+		s.Equal(expectedCfg, cfg)
+	})
 }
 
 func (s *Suite) TestCheckTriggererEnabled() {
@@ -360,24 +561,24 @@ func (s *Suite) TestDockerComposeStart() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Times(4)
+		imageHandler.On("ListLabels").Return(labels, nil).Times(4)
 		imageHandler.On("TagLocalImage", mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return nil
 		}
 
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, false, waitTime, nil)
+		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
 		s.NoError(err)
 
-		err = mockDockerCompose.Start("custom-image", "", "", "", noCache, false, waitTime, nil)
+		err = mockDockerCompose.Start("custom-image", "", "", "", noCache, true, waitTime, nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -389,13 +590,13 @@ func (s *Suite) TestDockerComposeStart() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Times(2)
+		imageHandler.On("ListLabels").Return(labels, nil).Times(2)
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(1)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			s.Equal(defaultTimeOut, timeout)
 			return nil
 		}
@@ -403,7 +604,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, false, defaultTimeOut, nil)
+		err := mockDockerCompose.Start("", "", "", "", noCache, true, defaultTimeOut, nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -415,13 +616,13 @@ func (s *Suite) TestDockerComposeStart() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Times(2)
+		imageHandler.On("ListLabels").Return(labels, nil).Times(2)
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(1)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			s.Equal(expectedTimeout, timeout)
 			return nil
 		}
@@ -429,7 +630,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, false, expectedTimeout, nil)
+		err := mockDockerCompose.Start("", "", "", "", noCache, true, expectedTimeout, nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -441,13 +642,13 @@ func (s *Suite) TestDockerComposeStart() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Times(2)
+		imageHandler.On("ListLabels").Return(labels, nil).Times(2)
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(1)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			s.Equal(userProvidedTimeOut, timeout)
 			return nil
 		}
@@ -455,7 +656,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, false, userProvidedTimeOut, nil)
+		err := mockDockerCompose.Start("", "", "", "", noCache, true, userProvidedTimeOut, nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -466,24 +667,24 @@ func (s *Suite) TestDockerComposeStart() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.3.4.dev+astro1"}, nil).Times(4)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.3.4.dev+astro1", runtimeVersionLabelName: runtimeVersionLabel}, nil).Times(4)
 		imageHandler.On("TagLocalImage", mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Times(2)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return nil
 		}
 
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, false, waitTime, nil)
+		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
 		s.NoError(err)
 
-		err = mockDockerCompose.Start("custom-image", "", "", "", noCache, false, waitTime, nil)
+		err = mockDockerCompose.Start("custom-image", "", "", "", noCache, true, waitTime, nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -497,14 +698,14 @@ func (s *Suite) TestDockerComposeStart() {
 
 		composeMock := new(mocks.DockerComposeAPI)
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return nil
 		}
 
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, false, waitTime, nil)
+		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
@@ -519,14 +720,14 @@ func (s *Suite) TestDockerComposeStart() {
 
 		composeMock := new(mocks.DockerComposeAPI)
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return nil
 		}
 
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, false, waitTime, nil)
+		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
@@ -537,19 +738,19 @@ func (s *Suite) TestDockerComposeStart() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{}, nil).Once()
+		imageHandler.On("ListLabels").Return(labels, nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return nil
 		}
 
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, false, waitTime, nil)
+		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
@@ -560,19 +761,19 @@ func (s *Suite) TestDockerComposeStart() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Twice()
+		imageHandler.On("ListLabels").Return(labels, nil).Twice()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		checkWebserverHealth = func(url string, timeout time.Duration) error {
+		checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
 			return errMockDocker
 		}
 
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, false, waitTime, nil)
+		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
@@ -585,7 +786,7 @@ func (s *Suite) TestDockerComposeExport() {
 
 	s.Run("success", func() {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		imageHandler.On("ListLabels").Return(labels, nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mock.Anything, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
@@ -633,7 +834,7 @@ func (s *Suite) TestDockerComposeExport() {
 
 	s.Run("generate yaml failure", func() {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		imageHandler.On("ListLabels").Return(labels, nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mock.Anything, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
@@ -651,9 +852,10 @@ func (s *Suite) TestDockerComposeExport() {
 
 func (s *Suite) TestDockerComposeStop() {
 	mockDockerCompose := DockerCompose{projectName: "test"}
+
 	s.Run("success", func() {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		imageHandler.On("ListLabels").Return(labels, nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Stop", mock.Anything, mock.Anything, api.StopOptions{}).Return(nil).Once()
@@ -670,7 +872,7 @@ func (s *Suite) TestDockerComposeStop() {
 
 	s.Run("success with wait but on first try", func() {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		imageHandler.On("ListLabels").Return(labels, nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Stop", mock.Anything, mock.Anything, api.StopOptions{}).Return(nil).Once()
@@ -693,7 +895,7 @@ func (s *Suite) TestDockerComposeStop() {
 
 	s.Run("success after waiting for once", func() {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		imageHandler.On("ListLabels").Return(labels, nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Stop", mock.Anything, mock.Anything, api.StopOptions{}).Return(nil).Once()
@@ -718,7 +920,7 @@ func (s *Suite) TestDockerComposeStop() {
 
 	s.Run("time out during the wait for postgres exit", func() {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		imageHandler.On("ListLabels").Return(labels, nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Stop", mock.Anything, mock.Anything, api.StopOptions{}).Return(nil).Once()
@@ -746,7 +948,7 @@ func (s *Suite) TestDockerComposeStop() {
 
 	s.Run("list label failure", func() {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{}, errMockDocker).Once()
+		imageHandler.On("ListLabels").Return(labels, errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
@@ -758,7 +960,7 @@ func (s *Suite) TestDockerComposeStop() {
 
 	s.Run("compose stop failure", func() {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		imageHandler.On("ListLabels").Return(labels, nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Stop", mock.Anything, mock.Anything, api.StopOptions{}).Return(errMockDocker).Once()
@@ -1544,7 +1746,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunDAG("", "", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", "", noCache, true)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -1562,7 +1764,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunDAG("", "", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", "", noCache, true)
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
@@ -1581,7 +1783,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunDAG("", "", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", "", noCache, true)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -1600,7 +1802,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunDAG("", "", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", "", noCache, true)
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
@@ -1618,7 +1820,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunDAG("", "", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", "", noCache, true)
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
@@ -1632,7 +1834,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.RunDAG("", "", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", "", noCache, true)
 		s.ErrorIs(err, errMockDocker)
 
 		composeMock.AssertExpectations(s.T())
@@ -1648,7 +1850,7 @@ func (s *Suite) TestCreateDockerProject() {
 	s.NoError(err)
 	config.InitConfig(fs)
 	s.Run("case when project doesnot have docker-compose.override.yml", func() {
-		prj, err := createDockerProject("test", "", "", "test-image:latest", "", "", map[string]string{})
+		prj, err := createDockerProject("test", "", "", "test-image:latest", "", "", labels)
 		s.NoError(err)
 		postgresService := &types.ServiceConfig{}
 		serviceFound := false
@@ -1666,7 +1868,7 @@ func (s *Suite) TestCreateDockerProject() {
 
 	s.Run("case when project has docker-compose.override.yml", func() {
 		composeOverrideFilename = "./testfiles/docker-compose.override.yml"
-		prj, err := createDockerProject("test", "", "", "test-image:latest", "", "", map[string]string{})
+		prj, err := createDockerProject("test", "", "", "test-image:latest", "", "", labels)
 		s.NoError(err)
 		postgresService := &types.ServiceConfig{}
 		serviceFound := false

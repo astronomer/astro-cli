@@ -16,6 +16,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -122,25 +123,27 @@ var (
 
 // ComposeConfig is input data to docker compose yaml template
 type ComposeConfig struct {
-	PytestFile            string
-	PostgresUser          string
-	PostgresPassword      string
-	PostgresHost          string
-	PostgresPort          string
-	PostgresRepository    string
-	PostgresTag           string
-	AirflowEnvFile        string
-	AirflowImage          string
-	AirflowHome           string
-	AirflowUser           string
-	AirflowWebserverPort  string
-	AirflowExposePort     bool
-	MountLabel            string
-	SettingsFile          string
-	SettingsFileExist     bool
-	DuplicateImageVolumes bool
-	TriggererEnabled      bool
-	ProjectName           string
+	PytestFile               string
+	PostgresUser             string
+	PostgresPassword         string
+	PostgresHost             string
+	PostgresPort             string
+	PostgresRepository       string
+	PostgresTag              string
+	AirflowEnvFile           string
+	AirflowImage             string
+	AirflowHome              string
+	AirflowUser              string
+	AirflowWebserverPort     string
+	AirflowAPIServerPort     string
+	AirflowExposePort        bool
+	MountLabel               string
+	SettingsFile             string
+	SettingsFileExist        bool
+	DuplicateImageVolumes    bool
+	TriggererEnabled         bool
+	ProjectName              string
+	AuthCredentialsDirectory string
 }
 
 type DockerCompose struct {
@@ -148,7 +151,6 @@ type DockerCompose struct {
 	projectName    string
 	envFile        string
 	dockerfile     string
-	composefile    string
 	composeService DockerComposeAPI
 	cliClient      DockerCLIClient
 	imageHandler   ImageHandler
@@ -166,7 +168,6 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 	}
 
 	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
-	composeFile := Composeyml
 
 	// Route output streams according to verbosity.
 	var stdout, stderr io.Writer
@@ -195,7 +196,6 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 		projectName:    projectName,
 		envFile:        envFile,
 		dockerfile:     dockerfile,
-		composefile:    composeFile,
 		composeService: composeService,
 		cliClient:      dockerCli.Client(),
 		imageHandler:   imageHandler,
@@ -264,7 +264,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 		return errors.Wrap(err, composeRecreateErrMsg)
 	}
 
-	airflowDockerVersion, err := d.checkAiflowVersion()
+	airflowDockerVersion, err := d.checkAirflowVersion()
 	if err != nil {
 		return err
 	}
@@ -273,14 +273,20 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	s.Start()
 	defer s.Stop()
 
-	// Airflow webserver should be hosted at localhost
-	// from the perspective of the CLI running on the host machine.
-	webserverPort := config.CFG.WebserverPort.GetString()
-	healthURL := fmt.Sprintf("http://localhost:%s/health", webserverPort)
+	airflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(imageLabels[runtimeVersionLabelName])
+	var healthURL, healthComponent string
+	switch airflowMajorVersion {
+	case "3":
+		healthURL = fmt.Sprintf("http://localhost:%s/public/monitor/health", config.CFG.APIServerPort.GetString())
+		healthComponent = "api-server"
+	case "2":
+		healthURL = fmt.Sprintf("http://localhost:%s/health", config.CFG.WebserverPort.GetString())
+		healthComponent = "webserver"
+	}
 
 	// Check the health of the webserver, up to the timeout.
 	// If we fail to get a 200 status code, we'll return an error message.
-	err = checkWebserverHealth(healthURL, waitTime)
+	err = checkWebserverHealth(healthURL, waitTime, healthComponent)
 	if err != nil {
 		return err
 	}
@@ -736,7 +742,7 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newAirflowVersion, newDockerF
 			return 1, errors.Wrap(err, "something went wrong while parsing your DAGs")
 		}
 	} else {
-		fmt.Println("\n" + ansi.Green("✔") + " no errors detected in your DAGs ")
+		fmt.Println("\n" + ansi.Green("✔") + " No errors detected in your DAGs ")
 	}
 	return 0, nil
 }
@@ -1111,7 +1117,7 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 	}
 
 	// Get airflow version
-	airflowDockerVersion, err := d.checkAiflowVersion()
+	airflowDockerVersion, err := d.checkAirflowVersion()
 	if err != nil {
 		return err
 	}
@@ -1156,7 +1162,7 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 	}
 
 	// Get airflow version
-	airflowDockerVersion, err := d.checkAiflowVersion()
+	airflowDockerVersion, err := d.checkAirflowVersion()
 	if err != nil {
 		return err
 	}
@@ -1192,7 +1198,8 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	strippedProjectName := replacer.Replace(d.projectName)
 	for i := range psInfo {
 		if strings.Contains(replacer.Replace(psInfo[i].Name), strippedProjectName) &&
-			strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
+			(strings.Contains(psInfo[i].Name, WebserverDockerContainerName) ||
+				strings.Contains(psInfo[i].Name, APIServerDockerContainerName)) {
 			return psInfo[i].ID, nil
 		}
 	}
@@ -1257,7 +1264,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile, executionDate strin
 	return nil
 }
 
-func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
+func (d *DockerCompose) checkAirflowVersion() (uint64, error) {
 	imageLabels, err := d.imageHandler.ListLabels()
 	if err != nil {
 		return 0, err
@@ -1325,6 +1332,9 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 		ConfigFiles: configs,
 		WorkingDir:  airflowHome,
 	}, loadOptions...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load project")
+	}
 
 	// The latest versions of compose libs handle adding these labels at an outer layer,
 	// near the cobra entrypoint. Without these labels, compose will lose track of the containers its
@@ -1340,7 +1350,7 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 		}
 		project.Services[name] = s
 	}
-	return project, err
+	return project, nil
 }
 
 func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *composetypes.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
@@ -1359,7 +1369,8 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 	if fileState {
 		for i := range psInfo {
 			if strings.Contains(psInfo[i].Name, project.Name) &&
-				strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
+				(strings.Contains(psInfo[i].Name, WebserverDockerContainerName) ||
+					strings.Contains(psInfo[i].Name, APIServerDockerContainerName)) {
 				err = initSettings(psInfo[i].ID, settingsFile, envConns, airflowDockerVersion, true, true, true)
 				if err != nil {
 					return err

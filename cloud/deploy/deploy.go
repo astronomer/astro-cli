@@ -164,7 +164,7 @@ func deployDags(path, dagsPath, dagsUploadURL string, deploymentType astroplatfo
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 		// Create monitoring dag file
-		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
+		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.Af2MonitoringDag)
 		if err != nil {
 			return "", err
 		}
@@ -265,12 +265,12 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			}
 		}
 		if deployInput.Pytest != "" {
-			version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, platformCoreClient)
+			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, platformCoreClient)
 			if err != nil {
 				return err
 			}
 
-			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
+			err = parseOrPytestDAG(deployInput.Pytest, runtimeVersion, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
 			if err != nil {
 				return err
 			}
@@ -345,13 +345,13 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		// Build our image
-		version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, platformCoreClient)
+		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, platformCoreClient)
 		if err != nil {
 			return err
 		}
 
 		if len(dagFiles) > 0 {
-			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
+			err = parseOrPytestDAG(deployInput.Pytest, runtimeVersion, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
 			if err != nil {
 				return err
 			}
@@ -461,8 +461,8 @@ func getDeploymentInfo(
 	return deployInfo, nil
 }
 
-func parseOrPytestDAG(pytest, version, envFile, deployImage, namespace, buildSecretString string) error {
-	dagParseVersionCheck := versions.GreaterThanOrEqualTo(version, dagParseAllowedVersion)
+func parseOrPytestDAG(pytest, runtimeVersion, envFile, deployImage, namespace, buildSecretString string) error {
+	dagParseVersionCheck := versions.GreaterThanOrEqualTo(runtimeVersion, dagParseAllowedVersion)
 	if !dagParseVersionCheck {
 		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip DAG parse...")
 	}

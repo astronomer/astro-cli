@@ -15,7 +15,7 @@ func (s *Suite) TestWebserverHealthCheck() {
 		}))
 		defer server.Close()
 
-		err := checkWebserverHealth(server.URL, 5*time.Second)
+		err := checkWebserverHealth(server.URL, 5*time.Second, "webserver")
 		s.NoError(err)
 	})
 	s.Run("Failure", func() {
@@ -25,7 +25,7 @@ func (s *Suite) TestWebserverHealthCheck() {
 		}))
 		defer server.Close()
 
-		err := checkWebserverHealth(server.URL, 1*time.Second)
+		err := checkWebserverHealth(server.URL, 1*time.Second, "webserver")
 		s.Error(err)
 	})
 }

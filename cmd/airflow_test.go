@@ -144,8 +144,7 @@ func (s *AirflowSuite) TestNewAirflowDevRootCmd() {
 }
 
 func (s *AirflowSuite) TestNewAirflowInitCmd() {
-	cmd := newAirflowInitCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	s.NotNil(newAirflowInitCmd())
 }
 
 func (s *AirflowSuite) TestNewAirflowRunCmd() {
@@ -173,13 +172,6 @@ func (s *AirflowSuite) TestNewAirflowKillCmd() {
 	cmd := newAirflowInitCmd()
 	cmd.RunE(new(cobra.Command), []string{})
 	cmd = newAirflowKillCmd()
-	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
-}
-
-func (s *AirflowSuite) TestNewAirflowUpgradeCheckCmd() {
-	cmd := newAirflowInitCmd()
-	cmd.RunE(new(cobra.Command), []string{})
-	cmd = newAirflowUpgradeCheckCmd()
 	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
 }
 
@@ -1256,50 +1248,6 @@ func (s *AirflowSuite) TestAirflowParse() {
 		defer func() { projectNameUnique = airflow.ProjectNameUnique }()
 
 		err := airflowParse(cmd, args)
-		s.ErrorIs(err, errMock)
-	})
-}
-
-func (s *AirflowSuite) TestAirflowUpgradeCheck() {
-	s.Run("success", func() {
-		cmd := newAirflowUpgradeCheckCmd()
-		args := []string{}
-
-		mockContainerHandler := new(mocks.ContainerHandler)
-		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Run", airflowUpgradeCheckCmd, "root").Return(nil).Once()
-			return mockContainerHandler, nil
-		}
-
-		err := airflowUpgradeCheck(cmd, args)
-		s.NoError(err)
-		mockContainerHandler.AssertExpectations(s.T())
-	})
-
-	s.Run("failure", func() {
-		cmd := newAirflowUpgradeCheckCmd()
-		args := []string{}
-
-		mockContainerHandler := new(mocks.ContainerHandler)
-		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Run", airflowUpgradeCheckCmd, "root").Return(errMock).Once()
-			return mockContainerHandler, nil
-		}
-
-		err := airflowUpgradeCheck(cmd, args)
-		s.ErrorIs(err, errMock)
-		mockContainerHandler.AssertExpectations(s.T())
-	})
-
-	s.Run("containerHandlerInit failure", func() {
-		cmd := newAirflowUpgradeCheckCmd()
-		args := []string{}
-
-		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			return nil, errMock
-		}
-
-		err := airflowUpgradeCheck(cmd, args)
 		s.ErrorIs(err, errMock)
 	})
 }
