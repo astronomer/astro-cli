@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lucsky/cuid"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 
@@ -29,10 +28,7 @@ import (
 )
 
 const (
-	AuthFlowCurrent       = "ORG_FIRST"
-	AuthFlowIdentityFirst = "IDENTITY_FIRST"
-
-	authConfigEndpoint = "auth-config"
+	authConfigEndpoint = "private/v1alpha1/cli/auth-config"
 
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
@@ -63,14 +59,14 @@ var authenticator = Authenticator{
 	callbackHandler:   authorizeCallbackHandler,
 }
 
-// Config holds data related to oAuth and basic authentication
-type Config struct {
+// AuthConfig holds data related to oAuth and basic authentication
+type AuthConfig struct {
 	ClientID  string `json:"clientId"`
 	Audience  string `json:"audience"`
 	DomainURL string `json:"domainUrl"`
 }
 
-func requestUserInfo(authConfig Config, accessToken string) (UserInfo, error) {
+func requestUserInfo(authConfig AuthConfig, accessToken string) (UserInfo, error) {
 	addr := authConfig.DomainURL + "userinfo"
 	ctx := http_context.Background()
 	doOptions := &httputil.DoOptions{
@@ -98,7 +94,7 @@ func requestUserInfo(authConfig Config, accessToken string) (UserInfo, error) {
 
 // request a device code from auth0 for the user's cli
 // Get user's token using PKCE flow
-func requestToken(authConfig Config, verifier, code string) (Result, error) {
+func requestToken(authConfig AuthConfig, verifier, code string) (Result, error) {
 	addr := authConfig.DomainURL + "oauth/token"
 	data := url.Values{
 		"client_id":     {authConfig.ClientID},
@@ -185,7 +181,7 @@ func authorizeCallbackHandler() (string, error) {
 	return authorizationCode, nil
 }
 
-func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(authConfig AuthConfig, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
 	// Generate PKCE verifier and challenge
 	token := make([]byte, 32)                            //nolint:mnd
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
@@ -433,46 +429,39 @@ func Logout(domain string, out io.Writer) {
 	fmt.Fprintln(out, "Successfully logged out of Astronomer")
 }
 
-func FetchDomainAuthConfig(domain string) (Config, error) {
-	var (
-		authConfig  Config
-		addr        string
-		validDomain bool
-	)
-
-	validDomain = context.IsCloudDomain(domain)
-	if !validDomain {
-		return authConfig, errors.New("Error! Invalid domain. You are attempting to login into Astro. " +
+func FetchDomainAuthConfig(domain string) (AuthConfig, error) {
+	if !context.IsCloudDomain(domain) {
+		return AuthConfig{}, errors.New("Error! Invalid domain. You are attempting to login into Astro. " +
 			"Are you trying to authenticate to Astronomer Software? If so, please change your current context with 'astro context switch'")
 	}
 
-	addr = domainutil.GetURLToEndpoint("https", domain, authConfigEndpoint)
+	addr := domainutil.GetURLToEndpoint("https", domain, authConfigEndpoint)
+	addr = domainutil.TransformToCoreAPIEndpoint(addr)
 
 	ctx := http_context.Background()
 	doOptions := &httputil.DoOptions{
 		Context: ctx,
-		Headers: map[string]string{"x-request-id": "cli-auth-" + cuid.New(), "Content-Type": "application/json; charset=utf-8"},
-		Path:    addr,
-		Method:  http.MethodGet,
+		Headers: map[string]string{
+			"X-Astro-Client-Identifier": "cli",
+		},
+		Path:   addr,
+		Method: http.MethodGet,
 	}
 	res, err := httpClient.Do(doOptions)
 	if err != nil {
-		return authConfig, err
+		return AuthConfig{}, err
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode == http.StatusOK {
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		unMarshalErr := json.Unmarshal(body, &authConfig)
-		if unMarshalErr != nil {
-			return authConfig, fmt.Errorf("cannot decode response: %w", unMarshalErr)
-		}
-		return authConfig, nil
+	if res.StatusCode != http.StatusOK {
+		return AuthConfig{}, errors.New("something went wrong! Try again or contact Astronomer Support")
 	}
 
-	return authConfig, errors.New("something went wrong! Try again or contact Astronomer Support")
+	var authConfig AuthConfig
+	err = json.NewDecoder(res.Body).Decode(&authConfig)
+	if err != nil {
+		return AuthConfig{}, fmt.Errorf("cannot decode response: %w", err)
+	}
+
+	return authConfig, nil
 }

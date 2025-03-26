@@ -53,15 +53,6 @@ func PrintCurrentCloudContext(out io.Writer) error {
 	return nil
 }
 
-// GetPublicGraphQLAPIURL returns full Astrohub API Url for the provided Context
-func (c *Context) GetPublicGraphQLAPIURL() string {
-	if c.Domain == localhostDomain || c.Domain == astrohubDomain {
-		return CFG.LocalPublicAstro.GetString()
-	}
-	domain := domainutil.FormatDomain(c.Domain)
-	return domainutil.GetURLToEndpoint(CFG.CloudAPIProtocol.GetString(), domain, graphqlEndpoint)
-}
-
 // GetPublicRESTAPIURL returns full core API Url for the provided Context
 func (c *Context) GetPublicRESTAPIURL(version string) string {
 	if c.Domain == localhostDomain || c.Domain == astrohubDomain {

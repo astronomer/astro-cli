@@ -98,6 +98,7 @@ func chooseError(ctx httpContext.Context, err error) error {
 type Error struct {
 	Status  int
 	Message string
+	URL     string
 }
 
 func newError(resp *http.Response) *Error {
@@ -106,12 +107,12 @@ func newError(resp *http.Response) *Error {
 	if err != nil {
 		return &Error{Status: resp.StatusCode, Message: fmt.Sprintf("cannot read body, err: %v", err)}
 	}
-	return &Error{Status: resp.StatusCode, Message: string(data)}
+	return &Error{Status: resp.StatusCode, Message: string(data), URL: resp.Request.URL.String()}
 }
 
 // Error implemented to match Error interface
 func (e *Error) Error() string {
-	return fmt.Sprintf("API error (%d): %s", e.Status, e.Message)
+	return fmt.Sprintf("API error on %s (%d): %s", e.URL, e.Status, e.Message)
 }
 
 func DownloadResponseToFile(sourceURL, path string) {

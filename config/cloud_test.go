@@ -30,40 +30,6 @@ contexts:
 	InitConfig(fs)
 }
 
-func (s *Suite) TestContextGetPublicGraphQLAPIURL() {
-	initTestConfig()
-	CFG.CloudAPIProtocol.SetHomeString("https")
-	type fields struct {
-		Domain string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   string
-	}{
-		{
-			name:   "basic localhost case",
-			fields: fields{Domain: "localhost"},
-			want:   "http://localhost:8871/graphql",
-		},
-		{
-			name:   "basic cloud case",
-			fields: fields{Domain: "cloud.astro.io"},
-			want:   "https://api.astro.io/hub/graphql",
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := &Context{
-				Domain: tt.fields.Domain,
-			}
-			if got := c.GetPublicGraphQLAPIURL(); got != tt.want {
-				s.Fail("Context.GetPublicGraphQLAPIURL() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func (s *Suite) TestContextGetPublicRESTAPIURL() {
 	initTestConfig()
 	CFG.CloudAPIProtocol.SetHomeString("https")
