@@ -41,23 +41,15 @@ func GetURLToEndpoint(protocol, domain, endpoint string) string {
 
 	switch domain {
 	case LocalDomain:
-		addr = fmt.Sprintf("%s://%s:8871/%s", "http", domain, endpoint)
+		addr = fmt.Sprintf("%s://%s:8888/%s", "http", domain, endpoint)
 		return addr
 	default:
 		if isPrPreviewDomain(domain) {
 			prSubDomain, domain = GetPRSubDomain(domain)
-			addr = fmt.Sprintf("%s://%s.api.%s/hub/%s", protocol, prSubDomain, domain, endpoint)
+			addr = fmt.Sprintf("%s://%s.api.%s/%s", protocol, prSubDomain, domain, endpoint)
 			return addr
 		}
-		addr = fmt.Sprintf("%s://api.%s/hub/%s", protocol, domain, endpoint)
-	}
-	return addr
-}
-
-func TransformToCoreAPIEndpoint(addr string) string {
-	if strings.Contains(addr, "v1alpha1") || strings.Contains(addr, "v1beta1") {
-		addr = strings.Replace(addr, "/hub", "", 1)
-		addr = strings.Replace(addr, "localhost:8871", "localhost:8888", 1)
+		addr = fmt.Sprintf("%s://api.%s/%s", protocol, domain, endpoint)
 	}
 	return addr
 }

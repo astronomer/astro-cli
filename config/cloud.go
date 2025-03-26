@@ -7,10 +7,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-const (
-	graphqlEndpoint = "graphql"
-)
-
 // PrintCloudContext prints current context to stdOut
 func (c *Context) PrintCloudContext(out io.Writer) error {
 	context, err := c.GetContext()
@@ -53,22 +49,11 @@ func PrintCurrentCloudContext(out io.Writer) error {
 	return nil
 }
 
-// GetPublicGraphQLAPIURL returns full Astrohub API Url for the provided Context
-func (c *Context) GetPublicGraphQLAPIURL() string {
-	if c.Domain == localhostDomain || c.Domain == astrohubDomain {
-		return CFG.LocalPublicAstro.GetString()
-	}
-	domain := domainutil.FormatDomain(c.Domain)
-	return domainutil.GetURLToEndpoint(CFG.CloudAPIProtocol.GetString(), domain, graphqlEndpoint)
-}
-
 // GetPublicRESTAPIURL returns full core API Url for the provided Context
 func (c *Context) GetPublicRESTAPIURL(version string) string {
-	if c.Domain == localhostDomain || c.Domain == astrohubDomain {
+	if c.Domain == localhostDomain {
 		return CFG.LocalCore.GetString() + "/" + version
 	}
 
-	domain := domainutil.FormatDomain(c.Domain)
-	addr := domainutil.GetURLToEndpoint(CFG.CloudAPIProtocol.GetString(), domain, version)
-	return domainutil.TransformToCoreAPIEndpoint(addr)
+	return domainutil.GetURLToEndpoint(CFG.CloudAPIProtocol.GetString(), domainutil.FormatDomain(c.Domain), version)
 }
