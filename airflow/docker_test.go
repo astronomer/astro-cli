@@ -355,6 +355,7 @@ services:
 		expectedCfg := `x-common-env-vars: &common-env-vars
   AIRFLOW__API__BASE_URL: "http://localhost:8080"
   AIRFLOW__API__PORT: 8080
+  AIRFLOW__API_AUTH__JWT_SECRET: "test-project-name"
   AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
   AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
   AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://api-server:8080/execution/"
