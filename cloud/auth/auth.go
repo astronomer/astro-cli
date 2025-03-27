@@ -59,14 +59,14 @@ var authenticator = Authenticator{
 	callbackHandler:   authorizeCallbackHandler,
 }
 
-// AuthConfig holds data related to oAuth and basic authentication
-type AuthConfig struct {
+// Config holds data related to oAuth and basic authentication
+type Config struct {
 	ClientID  string `json:"clientId"`
 	Audience  string `json:"audience"`
 	DomainURL string `json:"domainUrl"`
 }
 
-func requestUserInfo(authConfig AuthConfig, accessToken string) (UserInfo, error) {
+func requestUserInfo(authConfig Config, accessToken string) (UserInfo, error) {
 	addr := authConfig.DomainURL + "userinfo"
 	ctx := http_context.Background()
 	doOptions := &httputil.DoOptions{
@@ -94,7 +94,7 @@ func requestUserInfo(authConfig AuthConfig, accessToken string) (UserInfo, error
 
 // request a device code from auth0 for the user's cli
 // Get user's token using PKCE flow
-func requestToken(authConfig AuthConfig, verifier, code string) (Result, error) {
+func requestToken(authConfig Config, verifier, code string) (Result, error) {
 	addr := authConfig.DomainURL + "oauth/token"
 	data := url.Values{
 		"client_id":     {authConfig.ClientID},
@@ -181,7 +181,7 @@ func authorizeCallbackHandler() (string, error) {
 	return authorizationCode, nil
 }
 
-func (a *Authenticator) authDeviceLogin(authConfig AuthConfig, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
 	// Generate PKCE verifier and challenge
 	token := make([]byte, 32)                            //nolint:mnd
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
@@ -429,9 +429,9 @@ func Logout(domain string, out io.Writer) {
 	fmt.Fprintln(out, "Successfully logged out of Astronomer")
 }
 
-func FetchDomainAuthConfig(domain string) (AuthConfig, error) {
+func FetchDomainAuthConfig(domain string) (Config, error) {
 	if !context.IsCloudDomain(domain) {
-		return AuthConfig{}, errors.New("Error! Invalid domain. You are attempting to login into Astro. " +
+		return Config{}, errors.New("Error! Invalid domain. You are attempting to login into Astro. " +
 			"Are you trying to authenticate to Astronomer Software? If so, please change your current context with 'astro context switch'")
 	}
 
@@ -449,18 +449,18 @@ func FetchDomainAuthConfig(domain string) (AuthConfig, error) {
 	}
 	res, err := httpClient.Do(doOptions)
 	if err != nil {
-		return AuthConfig{}, err
+		return Config{}, err
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return AuthConfig{}, errors.New("something went wrong! Try again or contact Astronomer Support")
+		return Config{}, errors.New("something went wrong! Try again or contact Astronomer Support")
 	}
 
-	var authConfig AuthConfig
+	var authConfig Config
 	err = json.NewDecoder(res.Body).Decode(&authConfig)
 	if err != nil {
-		return AuthConfig{}, fmt.Errorf("cannot decode response: %w", err)
+		return Config{}, fmt.Errorf("cannot decode response: %w", err)
 	}
 
 	return authConfig, nil
