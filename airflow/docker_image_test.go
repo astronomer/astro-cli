@@ -727,7 +727,7 @@ func (s *Suite) TestDockerImageRun() {
 			return nil
 		}
 
-		err = handler.Run("", "./testfiles/airflow_settings.yaml", "", "", "", "", true)
+		err = handler.RunDAG("", "./testfiles/airflow_settings.yaml", "", "", "", "", true)
 		s.NoError(err)
 	})
 
@@ -736,7 +736,7 @@ func (s *Suite) TestDockerImageRun() {
 			return nil
 		}
 
-		err = handler.Run("", "./testfiles/airflow_settings_invalid.yaml", "", "test-container", "", "", true)
+		err = handler.RunDAG("", "./testfiles/airflow_settings_invalid.yaml", "", "test-container", "", "", true)
 		s.NoError(err)
 	})
 
@@ -745,7 +745,7 @@ func (s *Suite) TestDockerImageRun() {
 			return errExecMock
 		}
 
-		err = handler.Run("", "./testfiles/airflow_settings.yaml", "", "", "", "", true)
+		err = handler.RunDAG("", "./testfiles/airflow_settings.yaml", "", "", "", "", true)
 		s.Contains(err.Error(), errExecMock.Error())
 	})
 }

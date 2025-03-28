@@ -808,7 +808,11 @@ func ValidTags(runtimeVersions []string, currentVersion string) []string {
 
 func CheckVersion(version string, out io.Writer) {
 	httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
-	latestRuntimeVersion, _ := airflowversions.GetDefaultImageTag(httpClient, "")
+	latestRuntimeVersion, err := airflowversions.GetDefaultImageTag(httpClient, "")
+	if err != nil {
+		fmt.Fprintf(out, "Could not check for latest Astro Runtime version: %s", err)
+		os.Exit(1)
+	}
 	switch {
 	case versions.LessThan(version, latestRuntimeVersion):
 		// if current runtime version is not greater than or equal to the latest runtime verion let the user know

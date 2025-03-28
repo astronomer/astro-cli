@@ -267,17 +267,17 @@ func (_m *ContainerHandler) Stop(waitForExit bool) error {
 	return r0
 }
 
-// UpgradeTest provides a mock function with given fields: runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString, versionTest, dagTest, astroPlatformCore
-func (_m *ContainerHandler) UpgradeTest(runtimeVersion string, deploymentID string, newImageName string, customImageName string, buildSecretString string, versionTest bool, dagTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error {
-	ret := _m.Called(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString, versionTest, dagTest, astroPlatformCore)
+// UpgradeTest provides a mock function with given fields: runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, ruffTest, astroPlatformCore
+func (_m *ContainerHandler) UpgradeTest(runtimeVersion string, deploymentID string, customImageName string, buildSecretString string, versionTest bool, dagTest bool, ruffTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error {
+	ret := _m.Called(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, ruffTest, astroPlatformCore)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpgradeTest")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, string, bool, bool, astroplatformcore.ClientWithResponsesInterface) error); ok {
-		r0 = rf(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString, versionTest, dagTest, astroPlatformCore)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, bool, bool, astroplatformcore.ClientWithResponsesInterface) error); ok {
+		r0 = rf(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, ruffTest, astroPlatformCore)
 	} else {
 		r0 = ret.Error(0)
 	}

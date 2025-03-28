@@ -53,7 +53,7 @@ def example_astronauts():
             r.raise_for_status()
             number_of_people_in_space = r.json()["number"]
             list_of_people_in_space = r.json()["people"]
-        except:
+        except Exception:
             print("API currently not available, using hardcoded data instead.")
             number_of_people_in_space = 12
             list_of_people_in_space = [

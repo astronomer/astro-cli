@@ -1233,7 +1233,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
 
 		s.NoError(err)
 		imageHandler.AssertExpectations(s.T())
@@ -1253,7 +1253,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", "", false, false, mockPlatformCoreClient)
+		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", false, false, false, mockPlatformCoreClient)
 
 		s.NoError(err)
 		imageHandler.AssertExpectations(s.T())
@@ -1265,7 +1265,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1277,7 +1277,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1289,7 +1289,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1302,7 +1302,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1316,7 +1316,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1331,7 +1331,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1346,7 +1346,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1358,7 +1358,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentsResponse, nil).Once()
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", "", false, false, mockPlatformCoreClient)
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, mockPlatformCoreClient)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1372,7 +1372,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", "", false, false, mockPlatformCoreClient)
+		err = mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", false, false, false, mockPlatformCoreClient)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1386,7 +1386,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", "", false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1395,8 +1395,62 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		err := config.ResetCurrentContext()
 		s.NoError(err)
 
-		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", "", false, false, nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, nil)
 		s.Error(err)
+	})
+
+	s.Run("success with ruff test", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", "Dockerfile", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+
+		ruffImageHandler := new(mocks.ImageHandler)
+		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff-airflow3.toml", "/app/dags"}, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+		mockDockerCompose.ruffImageHandler = ruffImageHandler
+
+		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, nil)
+		s.NoError(err)
+
+		imageHandler.AssertExpectations(s.T())
+		ruffImageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("ruff test failure", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", "Dockerfile", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+
+		ruffImageHandler := new(mocks.ImageHandler)
+		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff-airflow3.toml", "/app/dags"}, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+		mockDockerCompose.ruffImageHandler = ruffImageHandler
+
+		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, nil)
+		s.Error(err)
+		s.Contains(err.Error(), "one of the tests run above failed")
+
+		imageHandler.AssertExpectations(s.T())
+		ruffImageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("ruff test skipped for airflow 2", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", "Dockerfile", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+
+		ruffImageHandler := new(mocks.ImageHandler)
+
+		mockDockerCompose.imageHandler = imageHandler
+		mockDockerCompose.ruffImageHandler = ruffImageHandler
+
+		err := mockDockerCompose.UpgradeTest("2.0.0", "", "", "", false, false, true, nil)
+		s.NoError(err)
+
+		imageHandler.AssertExpectations(s.T())
+		ruffImageHandler.AssertExpectations(s.T())
 	})
 }
 
@@ -1739,7 +1793,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 	s.Run("success with container", func() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		imageHandler.On("RunDAG", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-scheduler-id", State: "running", Name: "test-scheduler"}}, nil).Once()
@@ -1757,7 +1811,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 	s.Run("error with container", func() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
+		imageHandler.On("RunDAG", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-scheduler-id", State: "running", Name: "test-scheduler"}}, nil).Once()
@@ -1776,7 +1830,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		imageHandler.On("RunDAG", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
@@ -1795,7 +1849,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
+		imageHandler.On("RunDAG", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
@@ -1891,14 +1945,14 @@ func (s *Suite) TestUpgradeDockerfile() {
 	s.Run("update Dockerfile with new tag", func() {
 		// Create a temporary old Dockerfile
 		oldDockerfilePath := "test_old_Dockerfile"
-		oldContent := "FROM quay.io/astronomer/astro-runtime:old-tag\n"
+		oldContent := "FROM quay.io/astronomer/astro-runtime:12.0.0\n"
 		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0o644)
 		s.NoError(err)
 		defer os.Remove(oldDockerfilePath)
 
 		// Define test data
 		newDockerfilePath := "test_new_Dockerfile"
-		newTag := "new-tag"
+		newTag := "13.0.0"
 
 		// Call the function
 		err = upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, "")
@@ -1910,7 +1964,32 @@ func (s *Suite) TestUpgradeDockerfile() {
 		// Read the new Dockerfile and check its content
 		newContent, err := os.ReadFile(newDockerfilePath)
 		s.NoError(err)
-		s.Contains(string(newContent), "FROM quay.io/astronomer/astro-runtime:new-tag")
+		s.Contains(string(newContent), "FROM quay.io/astronomer/astro-runtime:13.0.0")
+	})
+
+	s.Run("update Dockerfile with new major version", func() {
+		// Create a temporary old Dockerfile
+		oldDockerfilePath := "test_old_Dockerfile"
+		oldContent := "FROM quay.io/astronomer/astro-runtime:12.0.0\n"
+		err := os.WriteFile(oldDockerfilePath, []byte(oldContent), 0o644)
+		s.NoError(err)
+		defer os.Remove(oldDockerfilePath)
+
+		// Define test data
+		newDockerfilePath := "test_new_Dockerfile"
+		newTag := "3.0-1"
+
+		// Call the function
+		err = upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, "")
+		defer os.Remove(newDockerfilePath)
+
+		// Check for errors
+		s.NoError(err)
+
+		// Read the new Dockerfile and check its content
+		newContent, err := os.ReadFile(newDockerfilePath)
+		s.NoError(err)
+		s.Contains(string(newContent), "FROM air.astronomer.io/runtime:3.0-1")
 	})
 
 	s.Run("update Dockerfile with new image", func() {

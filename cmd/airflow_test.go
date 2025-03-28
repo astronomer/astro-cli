@@ -12,7 +12,6 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
-	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	coreMocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/astronomer/astro-cli/config"
@@ -1485,22 +1484,5 @@ func (s *AirflowSuite) TestAirflowObjectExport() {
 
 		err := airflowSettingsExport(cmd, args)
 		s.ErrorIs(err, errMock)
-	})
-}
-
-func (s *AirflowSuite) TestPrepareDefaultAirflowImageTag() {
-	getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string) (string, error) {
-		return "", nil
-	}
-	s.Run("default airflow version", func() {
-		useAstronomerCertified = true
-		resp := prepareDefaultAirflowImageTag("", nil)
-		s.Equal(airflowversions.DefaultAirflowVersion, resp)
-	})
-
-	s.Run("default runtime version", func() {
-		useAstronomerCertified = false
-		resp := prepareDefaultAirflowImageTag("", nil)
-		s.Equal(airflowversions.DefaultRuntimeVersion, resp)
 	})
 }
