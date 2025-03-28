@@ -5,6 +5,7 @@ import (
 	"crypto/md5" //nolint:gosec
 	"fmt"
 	"html/template"
+	"io"
 	"regexp"
 	"strings"
 	"time"
@@ -36,7 +37,7 @@ type ContainerHandler interface {
 	ComposeExport(settingsFile, composeFile string) error
 	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString string) (string, error)
 	Parse(customImageName, deployImageName, buildSecretString string) error
-	UpgradeTest(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString string, versionTest, dagTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error
+	UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString string, versionTest, dagTest, ruffTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -53,10 +54,11 @@ type ImageHandler interface {
 	DoesImageExist(image string) error
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
-	Run(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error
+	RunDAG(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error
 	Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, config types.ImageBuildConfig) (string, error)
 	CreatePipFreeze(altImageName, pipFreezeFile string) error
 	GetImageRepoSHA(registry string) (string, error)
+	RunCommand(args []string, mountDirs map[string]string, stdout, stderr io.Writer) error
 }
 
 type DockerComposeAPI interface {

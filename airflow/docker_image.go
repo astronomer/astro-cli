@@ -548,7 +548,7 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 	return nil
 }
 
-func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error {
+func (d *DockerImage) RunDAG(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
@@ -646,6 +646,29 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile, 
 		}
 	}
 	return cmdErr
+}
+
+func (d *DockerImage) RunCommand(args []string, mountDirs map[string]string, stdout, stderr io.Writer) error {
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+
+	// Default docker run arguments
+	dockerArgs := []string{"run", "--rm"}
+
+	// Add volume mounts from the map
+	for hostDir, containerDir := range mountDirs {
+		dockerArgs = append(dockerArgs, "-v", hostDir+":"+containerDir)
+	}
+
+	// Add the image name and the remaining arguments
+	dockerArgs = append(dockerArgs, d.imageName)
+	args = append(dockerArgs, args...)
+
+	logger.Debugf("Running command in container: '%s'", strings.Join(args, " "))
+
+	return cmdExec(containerRuntime, stdout, stderr, args...)
 }
 
 // Exec executes a docker command
