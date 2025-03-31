@@ -172,12 +172,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, platformCo
 }
 
 func getDeploymentInfo(coreDeployment astroplatformcore.Deployment) (map[string]interface{}, error) { //nolint
-	var (
-		deploymentURL string
-		err           error
-	)
-
-	deploymentURL, err = deployment.GetDeploymentURL(coreDeployment.Id, coreDeployment.WorkspaceId)
+	deploymentURL, err := deployment.GetDeploymentURL(coreDeployment.Id, coreDeployment.WorkspaceId)
 	if err != nil {
 		return nil, err
 	}
@@ -296,33 +291,23 @@ func getAdditionalNullableFields(coreDeployment *astroplatformcore.Deployment, n
 	}
 }
 
-func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatformCore astroplatformcore.CoreClient, coreClient astrocore.CoreClient, requestedField string) (value any, err error) {
-	var (
-		requestedDeployment                                                        astroplatformcore.Deployment
-		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
-	)
-	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, false, nil, astroPlatformCore, coreClient)
-	if err != nil {
-		return nil, err
-	}
-
+func ReturnSpecifiedValue(depl *astroplatformcore.Deployment, requestedField string, astroPlatformCore astroplatformcore.CoreClient) (value any, err error) {
 	showWorkloadIdentity := strings.Contains(requestedField, "workload_identity") // if the caller has requested for workload_identity, we set the flag to true to fetch the deployment workload_identity
 
 	// create a map for deployment.information
-	deploymentInfoMap, err = getDeploymentInfo(requestedDeployment)
+	deploymentInfoMap, err := getDeploymentInfo(*depl)
 	if err != nil {
 		return nil, err
 	}
 	// create a map for deployment.configuration
-	deploymentConfigMap, err = getDeploymentConfig(&requestedDeployment, astroPlatformCore, showWorkloadIdentity)
+	deploymentConfigMap, err := getDeploymentConfig(depl, astroPlatformCore, showWorkloadIdentity)
 	if err != nil {
 		return nil, err
 	}
 	nodePools := []astroplatformcore.NodePool{}
 	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.environment_variables
-	if requestedDeployment.ClusterId != nil {
-		cluster, err := deployment.CoreGetCluster("", *requestedDeployment.ClusterId, astroPlatformCore)
+	if depl.ClusterId != nil {
+		cluster, err := deployment.CoreGetCluster("", *depl.ClusterId, astroPlatformCore)
 		if err != nil {
 			return nil, err
 		}
@@ -330,9 +315,9 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, astroPlatfo
 			nodePools = *cluster.NodePools
 		}
 	}
-	additionalMap = getAdditionalNullableFields(&requestedDeployment, nodePools)
+	additionalMap := getAdditionalNullableFields(depl, nodePools)
 	// create a map for the entire deployment
-	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
+	printableDeployment := getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 	value, err = getSpecificField(printableDeployment, requestedField)
 	if err != nil {
 		return nil, err

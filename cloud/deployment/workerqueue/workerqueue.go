@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
 
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -64,6 +65,11 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	if requestedDeployment.Id == "" {
 		fmt.Printf("%s %s\n", deployment.NoDeploymentInWSMsg, ansi.Bold(ws))
 		return nil
+	}
+
+	// Check if deployment is using Airflow 3
+	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
+		return err
 	}
 
 	getDeploymentOptions := astroplatformcore.GetDeploymentOptionsParams{
@@ -507,6 +513,11 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 	if requestedDeployment.Id == "" {
 		fmt.Printf("%s %s\n", deployment.NoDeploymentInWSMsg, ansi.Bold(ws))
 		return nil
+	}
+
+	// Check if deployment is using Airflow 3
+	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
+		return err
 	}
 
 	// prompt for queue name if one was not provided

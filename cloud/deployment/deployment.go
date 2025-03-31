@@ -165,6 +165,11 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logWebserver, logSch
 		return err
 	}
 
+	// Check if deployment is using Airflow 3
+	if err := airflowversions.ValidateNoAirflow3Support(deployment.RuntimeVersion); err != nil {
+		return err
+	}
+
 	deploymentID = deployment.Id
 	timeRange := 86400
 	offset := 0
@@ -230,6 +235,11 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 
 	configOption, err := GetDeploymentOptions("", deploymentOptionsParams, coreClient)
 	if err != nil {
+		return err
+	}
+
+	// Check if the provided runtime version is for Airflow 3
+	if err := airflowversions.ValidateNoAirflow3Support(runtimeVersion); err != nil {
 		return err
 	}
 
@@ -756,6 +766,12 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	if err != nil {
 		return err
 	}
+
+	// Check if deployment is using Airflow 3
+	if err := airflowversions.ValidateNoAirflow3Support(currentDeployment.RuntimeVersion); err != nil {
+		return err
+	}
+
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
