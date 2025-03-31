@@ -1498,7 +1498,7 @@ var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 		return false, nil
 	}
 
-	return versions.GreaterThanOrEqualTo(runtimeVersion, triggererAllowedRuntimeVersion), nil
+	return airflowversions.CompareRuntimeVersions(runtimeVersion, triggererAllowedRuntimeVersion) >= 0, nil
 }
 
 func checkServiceState(serviceState, expectedState string) bool {
