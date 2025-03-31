@@ -171,7 +171,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 	}
 
 	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
-	ruffImageHandler := DockerImageInit("ghcr.io/astral-sh/ruff:latest")
+	ruffImageHandler := DockerImageInit(config.CFG.RuffImage.GetString())
 
 	// Route output streams according to verbosity.
 	var stdout, stderr io.Writer
@@ -630,11 +630,15 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	}
 
 	if ruffTest && airflowversions.AirflowMajorVersionForRuntimeVersion(newVersion) != "3" {
-		fmt.Println("Skipping ruff Airflow 3 test because not testing upgrade to Airflow 3.x")
+		fmt.Println("")
+		fmt.Println("Skipping ruff Airflow 3 linter because not testing upgrade to Airflow 3.x")
 		ruffTest = false
 	}
 
 	if ruffTest {
+		fmt.Println("")
+		fmt.Println("Running ruff Airflow 3 linter")
+
 		ruffTestPassed, err := d.ruffTest(testHomeDirectory)
 		if err != nil {
 			return err
@@ -651,7 +655,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 		fmt.Printf("\tDAG Parse Test HTML Report: %s\n", "dag-test-report.html")
 	}
 	if ruffTest {
-		fmt.Printf("\tRuff Test Results: %s\n", "ruff-airflow3.txt")
+		fmt.Printf("\tRuff Linter Results: %s\n", "ruff-airflow3.txt")
 	}
 	if failed {
 		return errors.New("one of the tests run above failed")
