@@ -701,7 +701,8 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Get latest runtime version
 	if runtimeVersion == "" {
 		airflowVersionClient := airflowversions.NewClient(httpClient, false)
-		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "")
+		// Excludes Airflow 3 until the command supports it
+		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "", true)
 		if err != nil {
 			return err
 		}

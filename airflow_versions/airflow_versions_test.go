@@ -279,7 +279,7 @@ func (s *Suite) TestGetDefaultImageTag() {
 		})
 		httpClient := NewClient(client, true)
 
-		defaultImageTag, err := GetDefaultImageTag(httpClient, "")
+		defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
 		s.NoError(err)
 		s.Equal("2.2.0-onbuild", defaultImageTag)
 	})
@@ -349,7 +349,7 @@ func (s *Suite) TestGetDefaultImageTag() {
 		})
 		httpClient := NewClient(client, false)
 
-		defaultImageTag, err := GetDefaultImageTag(httpClient, "")
+		defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
 		s.NoError(err)
 		s.Equal("4.0.0", defaultImageTag)
 	})
@@ -367,7 +367,7 @@ func (s *Suite) TestGetDefaultImageTagError() {
 	})
 	httpClient := NewClient(client, true)
 
-	defaultImageTag, err := GetDefaultImageTag(httpClient, "")
+	defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
 	s.Error(err)
 	s.Equal("", defaultImageTag)
 }

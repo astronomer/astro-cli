@@ -238,9 +238,9 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		return err
 	}
 
-	// Check if the provided runtime version is for Airflow 3
+	// check that runtime version is not for Airflow 3
 	if err := airflowversions.ValidateNoAirflow3Support(runtimeVersion); err != nil {
-		return fmt.Errorf("%w. Use --runtime-version to specify an Airflow 2 runtime version", err)
+		return err
 	}
 
 	// validate workspace
@@ -1738,7 +1738,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 	if currentDeployment.Id == "" {
 		// get latest runtime version
 		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
-		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "")
+		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "", false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
