@@ -240,7 +240,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 
 	// Check if the provided runtime version is for Airflow 3
 	if err := airflowversions.ValidateNoAirflow3Support(runtimeVersion); err != nil {
-		return err
+		return fmt.Errorf("%w. Use --runtime-version to specify an Airflow 2 runtime version", err)
 	}
 
 	// validate workspace
