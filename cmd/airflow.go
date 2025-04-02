@@ -485,7 +485,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	imageTag := runtimeVersion
 	if imageTag == "" {
 		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
-		imageTag, err = getDefaultImageTag(httpClient, airflowVersion)
+		imageTag, err = getDefaultImageTag(httpClient, airflowVersion, true)
 		if err != nil {
 			return fmt.Errorf("error getting default image tag: %w", err)
 		}
@@ -634,7 +634,7 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 		// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided
 		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
 		var err error
-		runtimeVersion, err = getDefaultImageTag(httpClient, airflowVersion)
+		runtimeVersion, err = getDefaultImageTag(httpClient, airflowVersion, true)
 		if err != nil {
 			return fmt.Errorf("error getting default image tag: %w", err)
 		}

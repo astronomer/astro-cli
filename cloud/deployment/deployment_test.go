@@ -2279,3 +2279,94 @@ func (s *Suite) TestDeleteDeploymentHibernationOverride() {
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 }
+
+func (s *Suite) TestAirflow3Blocking() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	// Set up a deployment with Airflow 3 runtime version
+	airflow3Version := "3.0-1"
+
+	// Create a local copy of the deployment response with Airflow 3
+	airflow3DeploymentResponse := astroplatformcore.GetDeploymentResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.Deployment{
+			Id:             "test-id-airflow3",
+			Name:           "test-airflow3",
+			RuntimeVersion: airflow3Version,
+			WorkspaceId:    ws,
+		},
+	}
+
+	// Mock list deployments response with Airflow 3 deployment
+	airflow3ListDeploymentsResponse := astroplatformcore.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.DeploymentsPaginated{
+			Deployments: []astroplatformcore.Deployment{
+				{
+					Id:             "test-id-airflow3",
+					Name:           "test-airflow3",
+					RuntimeVersion: airflow3Version,
+					WorkspaceId:    ws,
+				},
+			},
+		},
+	}
+
+	s.Run("Update blocks operation for Airflow 3 deployments", func() {
+		// Create a fresh local mock clients for this subtest
+		updateMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		updateMockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+
+		// Set expectations on the local mock client
+		// Mock the ListDeploymentsWithResponse method which is called by GetDeployment
+		updateMockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3ListDeploymentsResponse, nil)
+		updateMockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil)
+
+		// Test updating an Airflow 3 deployment
+		err := Update("test-id-airflow3", "new-name", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, updateMockCoreClient, updateMockPlatformCoreClient)
+
+		s.Error(err)
+		s.Contains(err.Error(), "This command is not yet supported on Airflow 3 deployments")
+		updateMockPlatformCoreClient.AssertExpectations(s.T())
+	})
+
+	s.Run("Create blocks operation for Airflow 3 runtime version", func() {
+		// Create a fresh local mock clients for this subtest
+		createMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		createMockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+
+		// Mock the GetDeploymentOptionsWithResponse method which is called by Create
+		// We don't need the actual validation to happen, just need to return before the Airflow 3 check
+		createMockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil)
+
+		// Test creating a deployment with Airflow 3 runtime version
+		err := Create("test-deployment", ws, "", "", airflow3Version, "", "", "", "", "", "", "", "", "", "", "", "", "", standardType, 0, 0, createMockPlatformCoreClient, createMockCoreClient, false)
+
+		s.Error(err)
+		s.Contains(err.Error(), "This command is not yet supported on Airflow 3 deployments")
+		createMockCoreClient.AssertExpectations(s.T())
+	})
+
+	s.Run("Logs blocks operation for Airflow 3 deployments", func() {
+		// Create a fresh local mock clients for this subtest
+		logsMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		logsMockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+
+		// Set expectations on the local mock client
+		// Mock the ListDeploymentsWithResponse method which is called by GetDeployment
+		logsMockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3ListDeploymentsResponse, nil)
+		logsMockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil)
+
+		// Test viewing logs for an Airflow 3 deployment
+		// logWebserver, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs
+		err := Logs("test-id-airflow3", ws, "", "", true, true, true, true, false, false, false, 10, logsMockPlatformCoreClient, logsMockCoreClient)
+
+		s.Error(err)
+		s.Contains(err.Error(), "This command is not yet supported on Airflow 3 deployments")
+		logsMockPlatformCoreClient.AssertExpectations(s.T())
+	})
+}

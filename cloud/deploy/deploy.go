@@ -777,7 +777,7 @@ func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVer
 
 func WarnIfNonLatestVersion(version string, httpClient *httputil.HTTPClient) {
 	client := airflowversions.NewClient(httpClient, false)
-	latestRuntimeVersion, err := airflowversions.GetDefaultImageTag(client, "")
+	latestRuntimeVersion, err := airflowversions.GetDefaultImageTag(client, "", false)
 	if err != nil {
 		logger.Debugf("unable to get latest runtime version: %s", err)
 		return
