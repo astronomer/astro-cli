@@ -25,7 +25,7 @@ func (e ErrNoTagAvailable) Error() string {
 }
 
 // GetDefaultImageTag returns default airflow image tag
-func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, error) {
+func GetDefaultImageTag(httpClient *Client, airflowVersion string, excludeAirflow3 bool) (string, error) {
 	r := Request{}
 
 	resp, err := r.DoWithClient(httpClient)
@@ -35,6 +35,10 @@ func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, erro
 
 	if httpClient.useAstronomerCertified {
 		return getAstronomerCertifiedTag(resp.AvailableReleases, airflowVersion)
+	}
+
+	if excludeAirflow3 {
+		return getAstroRuntimeTag(resp.RuntimeVersions, nil, airflowVersion)
 	}
 
 	return getAstroRuntimeTag(resp.RuntimeVersions, resp.RuntimeVersionsV3, airflowVersion)

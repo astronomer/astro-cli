@@ -102,19 +102,21 @@ var (
 	testCluster                = "cluster"
 	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
 		{
-			Id:            "test-deployment-id",
-			Name:          "test-deployment-label",
-			Status:        "HEALTHY",
-			Type:          &standardType,
-			Region:        &testRegion,
-			CloudProvider: &testProvider,
+			Id:             "test-deployment-id",
+			Name:           "test-deployment-label",
+			Status:         "HEALTHY",
+			Type:           &standardType,
+			Region:         &testRegion,
+			CloudProvider:  &testProvider,
+			RuntimeVersion: "4.2.5",
 		},
 		{
-			Id:          "test-id-2",
-			Name:        "test",
-			Status:      "HEALTHY",
-			Type:        &hybridType,
-			ClusterName: &testCluster,
+			Id:             "test-id-2",
+			Name:           "test",
+			Status:         "HEALTHY",
+			Type:           &hybridType,
+			ClusterName:    &testCluster,
+			RuntimeVersion: "4.2.5",
 		},
 	}
 	cloudProvider                = astroplatformcore.DeploymentCloudProviderAWS
@@ -1504,5 +1506,75 @@ func (s *Suite) TestSanitizeExistingQueues() {
 		}
 		actualQs = sanitizeExistingQueues(existingQs, deployment.KubeExecutor)
 		s.Equal(expectedQs, actualQs)
+	})
+}
+
+func (s *Suite) TestAirflow3Blocking() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	out := new(bytes.Buffer)
+
+	// Create local mock client for platform core (we'll use the existing mockCoreClient for the core client)
+	localMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+	// Setup a mock response with Airflow 3 runtime version
+	airflow3Version := "3.0-1"
+
+	// Create a local copy of the deployment list response
+	airflow3Deployment := astroplatformcore.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.DeploymentsPaginated{
+			Deployments: []astroplatformcore.Deployment{
+				{
+					Id:             "test-deployment-id",
+					Name:           "test-deployment-label",
+					Status:         "HEALTHY",
+					Type:           &standardType,
+					Region:         &testRegion,
+					CloudProvider:  &testProvider,
+					RuntimeVersion: airflow3Version,
+				},
+			},
+		},
+	}
+
+	// Create a local copy of the deployment response
+	airflow3DeploymentResponse := astroplatformcore.GetDeploymentResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.Deployment{
+			Id:             "test-deployment-id",
+			Name:           "test-deployment-label",
+			RuntimeVersion: airflow3Version,
+		},
+	}
+
+	s.Run("CreateOrUpdate blocks operation for Airflow 3 deployments", func() {
+		// Set expectations on the local mock client
+		localMockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3Deployment, nil).Times(1)
+		localMockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
+
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-queue", createAction, "", 0, 0, 0, false, localMockPlatformCoreClient, mockCoreClient, out)
+
+		s.Error(err)
+		s.Contains(err.Error(), "This command is not yet supported on Airflow 3 deployments")
+		localMockPlatformCoreClient.AssertExpectations(s.T())
+	})
+
+	s.Run("Delete blocks operation for Airflow 3 deployments", func() {
+		// Create a fresh local mock client for this subtest
+		localMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		// Set expectations on the fresh local mock client
+		localMockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3Deployment, nil).Times(1)
+		localMockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
+
+		err := Delete("test-ws-id", "test-deployment-id", "", "test-queue", true, localMockPlatformCoreClient, mockCoreClient, out)
+
+		s.Error(err)
+		s.Contains(err.Error(), "This command is not yet supported on Airflow 3 deployments")
+		localMockPlatformCoreClient.AssertExpectations(s.T())
 	})
 }
