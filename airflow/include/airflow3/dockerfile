@@ -1,1 +1,1 @@
-FROM air.astronomer.io/%s:%s
+FROM astrocrpublic.azurecr.io/%s:%s
