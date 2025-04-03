@@ -764,12 +764,18 @@ func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVer
 		return false
 	}
 
-	// If upgrading from Airflow 2 to Airflow 3, we require the user to force the upgrade
+	// If upgrading from Airflow 2 to Airflow 3, we require at least Runtime 8.7.0 (Airflow 2.6.3) and that the user has forced the upgrade
 	currentVersionAirflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(currentVersion)
 	tagAirflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(tag)
-	if currentVersionAirflowMajorVersion == "2" && tagAirflowMajorVersion == "3" && !forceUpgradeToAF3 {
-		fmt.Println("Cannot upgrade from Airflow 2 to Airflow 3 without the --force-upgrade-to-af3 flag")
-		return false
+	if currentVersionAirflowMajorVersion == "2" && tagAirflowMajorVersion == "3" {
+		if airflowversions.CompareRuntimeVersions(currentVersion, "8.7.0") < 0 {
+			fmt.Println("Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 8.7.0 or higher")
+			return false
+		}
+		if !forceUpgradeToAF3 {
+			fmt.Println("Can only upgrade deployment from Airflow 2 to Airflow 3 with the --force-upgrade-to-af3 flag")
+			return false
+		}
 	}
 
 	return true
