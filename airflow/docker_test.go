@@ -1989,7 +1989,7 @@ func (s *Suite) TestUpgradeDockerfile() {
 		// Read the new Dockerfile and check its content
 		newContent, err := os.ReadFile(newDockerfilePath)
 		s.NoError(err)
-		s.Contains(string(newContent), "FROM air.astronomer.io/runtime:3.0-1")
+		s.Contains(string(newContent), "FROM astrocrpublic.azurecr.io/runtime:3.0-1")
 	})
 
 	s.Run("update Dockerfile with new image", func() {
