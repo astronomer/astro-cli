@@ -820,7 +820,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, customImage
 	var newImage string
 	switch airflowversions.AirflowMajorVersionForRuntimeVersion(newTag) {
 	case "3":
-		newImage = "air.astronomer.io/runtime"
+		newImage = "astrocrpublic.azurecr.io/runtime"
 	case "2":
 		newImage = "quay.io/astronomer/astro-runtime"
 	}
@@ -837,7 +837,7 @@ func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, customImage
 		for _, line := range lines {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "FROM quay.io/astronomer/astro-runtime") ||
-				strings.HasPrefix(line, "FROM air.astronomer.io/runtime") {
+				strings.HasPrefix(line, "FROM astrocrpublic.azurecr.io/runtime") {
 				if strings.HasPrefix(line, fmt.Sprintf("FROM %s", newImage)) {
 					parts := strings.SplitN(line, ":", partsNum)
 					if len(parts) == partsNum {

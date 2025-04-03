@@ -4,7 +4,7 @@ import "fmt"
 
 const (
 	QuayBaseImageName               = "quay.io/astronomer"
-	AstroImageRegistryBaseImageName = "air.astronomer.io"
+	AstroImageRegistryBaseImageName = "astrocrpublic.azurecr.io"
 	AstronomerCertifiedImageName    = "ap-airflow"
 	AstroRuntimeAirflow2ImageName   = "astro-runtime"
 	AstroRuntimeAirflow3ImageName   = "runtime"
