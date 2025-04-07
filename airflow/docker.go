@@ -39,6 +39,7 @@ import (
 	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/versions"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -559,12 +560,12 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, ruffTest bool, astroPlatformCore astroplatformcore.CoreClient) error { //nolint:gocognit,gocyclo
+func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations bool, lintConfigFile string, astroPlatformCore astroplatformcore.CoreClient) error { //nolint:gocognit,gocyclo
 	// figure out which tests to run
-	if !versionTest && !dagTest && !ruffTest {
+	if !versionTest && !dagTest && !lintTest {
 		versionTest = true
 		dagTest = true
-		ruffTest = true
+		lintTest = true
 	}
 	var deploymentImage string
 	// if custom image is used get new Airflow version
@@ -629,21 +630,21 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 		failed = failed || !dagTestPassed
 	}
 
-	if ruffTest && airflowversions.AirflowMajorVersionForRuntimeVersion(newVersion) != "3" {
+	if lintTest && airflowversions.AirflowMajorVersionForRuntimeVersion(newVersion) != "3" {
 		fmt.Println("")
-		fmt.Println("Skipping ruff Airflow 3 linter because not testing upgrade to Airflow 3.x")
-		ruffTest = false
+		fmt.Println("Skipping ruff linter because not testing upgrade to Airflow 3.x")
+		lintTest = false
 	}
 
-	if ruffTest {
+	if lintTest {
 		fmt.Println("")
-		fmt.Println("Running ruff Airflow 3 linter")
+		fmt.Println("Running ruff linter")
 
-		ruffTestPassed, err := d.ruffTest(testHomeDirectory)
+		lintTestPassed, err := d.lintTest(testHomeDirectory, includeLintDeprecations, lintConfigFile)
 		if err != nil {
 			return err
 		}
-		failed = failed || !ruffTestPassed
+		failed = failed || !lintTestPassed
 	}
 
 	fmt.Println("\nTest Summary:")
@@ -654,8 +655,8 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	if dagTest {
 		fmt.Printf("\tDAG Parse Test HTML Report: %s\n", "dag-test-report.html")
 	}
-	if ruffTest {
-		fmt.Printf("\tRuff Linter Results: %s\n", "ruff-airflow3.txt")
+	if lintTest {
+		fmt.Printf("\tRuff Linter Results: %s\n", "ruff-lint-results.txt")
 	}
 	if failed {
 		return errors.New("one of the tests run above failed")
@@ -779,41 +780,80 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, cu
 	return true, nil
 }
 
-func (d *DockerCompose) ruffTest(testHomeDirectory string) (bool, error) {
-	ruffRules := `[lint]
-preview = true
-extend-select = ["AIR"]`
-
-	tempFile, err := os.CreateTemp("", "ruff-airflow3-*.toml")
-	if err != nil {
-		return false, fmt.Errorf("failed to create temporary ruff config file: %w", err)
-	}
-	defer os.Remove(tempFile.Name())
-	err = os.WriteFile(tempFile.Name(), []byte(ruffRules), ruffFilePermission)
-	if err != nil {
-		return false, fmt.Errorf("failed to write to temporary ruff config file: %w", err)
+func (d *DockerCompose) lintTest(testHomeDirectory string, includeDeprecations bool, configFile string) (bool, error) {
+	var err error
+	if configFile == "" {
+		configFile, err = createTempRuffConfigFile(includeDeprecations)
+		if err != nil {
+			return false, err
+		}
+		defer os.Remove(configFile)
+	} else {
+		configFile = filepath.Join(config.WorkingPath, configFile)
+		if _, err := os.Stat(configFile); os.IsNotExist(err) {
+			return false, fmt.Errorf("the specified lint config file '%s' does not exist", configFile)
+		}
 	}
 
 	// Mount the dags directory and the ruff config file
 	mountDirs := map[string]string{
 		filepath.Join(config.WorkingPath, "dags"): "/app/dags",
-		tempFile.Name(): "/app/ruff-airflow3.toml",
+		configFile: "/app/ruff.toml",
 	}
 
 	// Run ruff with the config file and the dags directory
-	ruffArgs := []string{"check", "--config", "/app/ruff-airflow3.toml", "/app/dags"}
+	ruffArgs := []string{"check", "--config", "/app/ruff.toml", "/app/dags"}
 	var buf bytes.Buffer
 	bufWriter := io.MultiWriter(os.Stdout, &buf)
 	ruffErr := d.ruffImageHandler.RunCommand(ruffArgs, mountDirs, bufWriter, bufWriter)
 
 	// Write the ruff output to a results file in the test directory
-	resultsFile := filepath.Join(d.airflowHome, testHomeDirectory, "ruff-airflow3.txt")
+	resultsFile := filepath.Join(d.airflowHome, testHomeDirectory, "ruff-lint-results.txt")
 	resultsErr := os.WriteFile(resultsFile, buf.Bytes(), ruffFilePermission)
 	if resultsErr != nil {
 		return false, fmt.Errorf("failed to write ruff output to file: %w", resultsErr)
 	}
 
 	return ruffErr == nil, nil
+}
+
+func createTempRuffConfigFile(includeDeprecations bool) (string, error) {
+	type LintConfig struct {
+		Preview bool     `toml:"preview"`
+		Select  []string `toml:"select"`
+		Ignore  []string `toml:"ignore"`
+	}
+	type RsetConfig struct {
+		Lint LintConfig `toml:"lint"`
+	}
+	ruffConfig := RsetConfig{
+		Lint: LintConfig{
+			Preview: true,
+			Select:  []string{"AIR30"},
+			Ignore:  []string{"ALL"},
+		},
+	}
+	if includeDeprecations {
+		ruffConfig.Lint.Select = append(ruffConfig.Lint.Select, "AIR31")
+	}
+
+	// create temporary ruff config file
+	tempFile, err := os.CreateTemp("", "ruff-airflow3-*.toml")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary ruff config file: %w", err)
+	}
+
+	// Encode the struct to TOML and write to the file
+	encoder := toml.NewEncoder(tempFile)
+	encoder.SetIndentTables(true)
+	if err := encoder.Encode(ruffConfig); err != nil {
+		return "", fmt.Errorf("failed to encode or write to temporary ruff config file: %w", err)
+	}
+	if err := tempFile.Close(); err != nil {
+		return "", fmt.Errorf("failed to close temporary ruff config file: %w", err)
+	}
+
+	return tempFile.Name(), nil
 }
 
 func upgradeDockerfile(oldDockerfilePath, newDockerfilePath, newTag, customImage string) error { //nolint:gocognit

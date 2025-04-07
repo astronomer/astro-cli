@@ -37,7 +37,7 @@ type ContainerHandler interface {
 	ComposeExport(settingsFile, composeFile string) error
 	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString string) (string, error)
 	Parse(customImageName, deployImageName, buildSecretString string) error
-	UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString string, versionTest, dagTest, ruffTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error
+	UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations bool, lintConfigFile string, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry

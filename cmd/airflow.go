@@ -66,7 +66,9 @@ var (
 	compose                bool
 	versionTest            bool
 	dagTest                bool
-	ruffTest               bool
+	lintTest               bool
+	lintDeprecations       bool
+	lintConfigFile         string
 	waitTime               time.Duration
 	containerRuntime       runtimes.ContainerRuntime
 	RunExample             = `
@@ -203,10 +205,12 @@ func newAirflowUpgradeTestCmd(platformCoreClient astroplatformcore.CoreClient) *
 			return airflowUpgradeTest(cmd, platformCoreClient)
 		},
 	}
-	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The version of Airflow you want to upgrade to. The default is the latest available version. Tests are run against the equivalent Astro Runtime version. ")
+	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The version of Airflow you want to upgrade to. The default is the latest available version. Tests are run against the equivalent Astro Runtime version.")
 	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "Only run version tests. These tests show you how the versions of your dependencies will change after you upgrade.")
 	cmd.Flags().BoolVarP(&dagTest, "dag-test", "d", false, "Only run DAG tests. These tests check whether your DAGs will generate import errors after you upgrade.")
-	cmd.Flags().BoolVarP(&ruffTest, "ruff-test", "r", false, "Only run ruff tests. These tests check whether your DAGs are compatible with Airflow 3.")
+	cmd.Flags().BoolVarP(&lintTest, "lint-test", "l", false, "Only run ruff lint tests. These tests check whether your DAGs are compatible with Airflow.")
+	cmd.Flags().BoolVarP(&lintDeprecations, "lint-deprecations", "", false, "Include Airflow deprecations in lint tests.")
+	cmd.Flags().StringVarP(&lintConfigFile, "lint-config-file", "", "", "Relative path within project to a custom ruff config file. If not specified, a default config will be used.")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against.")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "n", "", "Name of the upgraded image. Updates the FROM line in your Dockerfile to pull this image for the upgrade.")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Expose a secret to containers. Equivalent to 'docker build --secret'. Example input id=mysecret,src=secrets.txt")
@@ -658,7 +662,7 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	err = containerHandler.UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, ruffTest, platformCoreClient)
+	err = containerHandler.UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, lintDeprecations, lintConfigFile, platformCoreClient)
 	if err != nil {
 		return err
 	}
