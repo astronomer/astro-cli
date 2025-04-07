@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -69,8 +70,11 @@ func DeployBundle(input *DeployBundleInput) error {
 		return errors.New("no bundle upload URL received from Astro")
 	}
 
+	// only validate symlinks for Airflow 3.x (i.e. don't break backwards compatibility with Airflow 2.x deployments)
+	validateSymlinks := airflowversions.AirflowMajorVersionForRuntimeVersion(currentDeployment.RuntimeVersion) == "3"
+
 	// upload the bundle
-	tarballVersion, err := UploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false)
+	tarballVersion, err := UploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false, validateSymlinks)
 	if err != nil {
 		return err
 	}
@@ -186,11 +190,13 @@ func ValidateBundleSymlinks(bundlePath string) error {
 	return nil
 }
 
-func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool) (string, error) {
+func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir, validateSymlinks bool) (string, error) {
 	// Check for symlinks pointing outside the bundle directory
-	err := ValidateBundleSymlinks(bundlePath)
-	if err != nil {
-		return "", err
+	if validateSymlinks {
+		err := ValidateBundleSymlinks(bundlePath)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	tarFilePath := filepath.Join(tarDirPath, "bundle.tar")
@@ -210,7 +216,7 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool)
 	}()
 
 	// Generate the bundle tar
-	err = fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"})
+	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"})
 	if err != nil {
 		return "", err
 	}
