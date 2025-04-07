@@ -169,7 +169,7 @@ func deployDags(path, dagsPath, dagsUploadURL string, deploymentType astroplatfo
 		defer os.Remove(monitoringDagPath)
 	}
 
-	versionID, err := uploadBundle(path, dagsPath, dagsUploadURL, true)
+	versionID, err := UploadBundle(path, dagsPath, dagsUploadURL, true)
 	if err != nil {
 		return "", err
 	}
