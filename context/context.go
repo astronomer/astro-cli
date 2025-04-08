@@ -16,9 +16,6 @@ import (
 
 var (
 	// CloudDomainRegex is used to differentiate cloud domain from software domain
-	// See https://github.com/astronomer/astrohub-cli/issues/7 for regexp rationale
-	// This will need to be handled as part of the permanent solution to issue #432
-	// CloudDomainRegex     = regexp.MustCompile(`(?:(pr\d{4,6})\.|^)(?:cloud\.|)astronomer(?:-(dev|stage|perf))?\.io$`)
 	CloudDomainRegex     = regexp.MustCompile(`(?:https:\/\/|^)(?:(pr\d{4,6})\.|)(?:cloud\.|)astronomer(?:-(dev|stage|perf))?\.io(?:\/|)$`)
 	contextDeleteWarnMsg = "Are you sure you want to delete currently used context: %s"
 	cancelCtxDeleteMsg   = "Canceling context delete..."
