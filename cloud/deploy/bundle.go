@@ -70,11 +70,8 @@ func DeployBundle(input *DeployBundleInput) error {
 		return errors.New("no bundle upload URL received from Astro")
 	}
 
-	// only validate symlinks for Airflow 3.x (i.e. don't break backwards compatibility with Airflow 2.x deployments)
-	validateSymlinks := airflowversions.AirflowMajorVersionForRuntimeVersion(currentDeployment.RuntimeVersion) == "3"
-
 	// upload the bundle
-	tarballVersion, err := UploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false, validateSymlinks)
+	tarballVersion, err := UploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.RuntimeVersion)
 	if err != nil {
 		return err
 	}
@@ -190,9 +187,9 @@ func ValidateBundleSymlinks(bundlePath string) error {
 	return nil
 }
 
-func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir, validateSymlinks bool) (string, error) {
-	// Check for symlinks pointing outside the bundle directory
-	if validateSymlinks {
+func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool, currentRuntimeVersion string) (string, error) {
+	// If Airflow 3.x, check for symlinks pointing outside the bundle directory
+	if airflowversions.AirflowMajorVersionForRuntimeVersion(currentRuntimeVersion) == "3" {
 		err := ValidateBundleSymlinks(bundlePath)
 		if err != nil {
 			return "", err

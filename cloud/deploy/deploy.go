@@ -155,7 +155,7 @@ func shouldIncludeMonitoringDag(deploymentType astroplatformcore.DeploymentType)
 	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
 }
 
-func deployDags(path, dagsPath, dagsUploadURL string, validateSymlinks bool, deploymentType astroplatformcore.DeploymentType) (string, error) {
+func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, deploymentType astroplatformcore.DeploymentType) (string, error) {
 	if shouldIncludeMonitoringDag(deploymentType) {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
@@ -169,7 +169,7 @@ func deployDags(path, dagsPath, dagsUploadURL string, validateSymlinks bool, dep
 		defer os.Remove(monitoringDagPath)
 	}
 
-	versionID, err := UploadBundle(path, dagsPath, dagsUploadURL, true, validateSymlinks)
+	versionID, err := UploadBundle(path, dagsPath, dagsUploadURL, true, currentRuntimeVersion)
 	if err != nil {
 		return "", err
 	}
@@ -276,11 +276,8 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 		}
 
-		// only validate symlinks for Airflow 3.x (i.e. don't break backwards compatibility with Airflow 2.x deployments)
-		validateSymlinks := airflowversions.AirflowMajorVersionForRuntimeVersion(deployInfo.currentVersion) == "3"
-
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, validateSymlinks, astroplatformcore.DeploymentType(deployInfo.deploymentType))
+		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.currentVersion, astroplatformcore.DeploymentType(deployInfo.deploymentType))
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -370,10 +367,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
 			if !deployInput.Image {
-				// only validate symlinks for Airflow 3.x (i.e. don't break backwards compatibility with Airflow 2.x deployments)
-				validateSymlinks := airflowversions.AirflowMajorVersionForRuntimeVersion(deployInfo.currentVersion) == "3"
-
-				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, validateSymlinks, astroplatformcore.DeploymentType(deployInfo.deploymentType))
+				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.currentVersion, astroplatformcore.DeploymentType(deployInfo.deploymentType))
 				if err != nil {
 					return err
 				}
