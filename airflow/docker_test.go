@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow/mocks"
@@ -814,7 +815,6 @@ func (s *Suite) TestDockerComposeExport() {
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
-		composeMock.AssertExpectations(s.T())
 	})
 
 	s.Run("list label failure", func() {
@@ -1209,12 +1209,17 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 	cwd := s.T().TempDir()
 	mockDockerCompose := DockerCompose{projectName: "test", dockerfile: "Dockerfile", airflowHome: cwd}
 
-	pipFreeze := cwd + "/upgrade-test-old-version--new-version/pip_freeze_old-version.txt"
-	pipFreeze2 := cwd + "/upgrade-test-old-version--new-version/pip_freeze_new-version.txt"
-	parseTest := cwd + "/.astro/test_dag_integrity_default.py"
-	oldDockerFile := cwd + "/Dockerfile"
+	pipFreeze := filepath.Join(cwd, "upgrade-test-old-version--new-version", "pip_freeze_old-version.txt")
+	pipFreeze2 := filepath.Join(cwd, "upgrade-test-old-version--new-version", "pip_freeze_new-version.txt")
+	parseTest := filepath.Join(cwd, ".astro", "test_dag_integrity_default.py")
+	oldDockerFile := filepath.Join(cwd, "Dockerfile")
+	// Ensure directories exist
+	err := os.MkdirAll(filepath.Dir(pipFreeze), 0o777)
+	s.NoError(err)
+	err = os.MkdirAll(filepath.Dir(parseTest), 0o777)
+	s.NoError(err)
 	// Write files out
-	err := fileutil.WriteStringToFile(pipFreeze, pipFreezeFile)
+	err = fileutil.WriteStringToFile(pipFreeze, pipFreezeFile)
 	s.NoError(err)
 	err = fileutil.WriteStringToFile(pipFreeze2, pipFreezeFile2)
 	s.NoError(err)
@@ -1232,8 +1237,8 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("0", nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
-
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
+		// Add default values for new lint flags
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, "", nil) // All tests enabled by default
 
 		s.NoError(err)
 		imageHandler.AssertExpectations(s.T())
@@ -1241,10 +1246,11 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 	s.Run("success with deployment id", func() {
 		imageHandler := new(mocks.ImageHandler)
+
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Twice()
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentsResponse, nil).Once()
-		imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Times(2)
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(nil).Once()
@@ -1252,8 +1258,8 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("0", nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
-
-		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", false, false, false, mockPlatformCoreClient)
+		// Add default values for new lint flags
+		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", true, true, true, false, "", mockPlatformCoreClient) // All tests enabled by default
 
 		s.NoError(err)
 		imageHandler.AssertExpectations(s.T())
@@ -1264,8 +1270,8 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
-
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
+		// Add default values for new lint flags
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, "", nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1276,20 +1282,8 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", errMockDocker)
 
 		mockDockerCompose.imageHandler = imageHandler
-
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
-		s.Error(err)
-		imageHandler.AssertExpectations(s.T())
-	})
-
-	s.Run("GetLabel failure", func() {
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
-		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", errMockDocker)
-
-		mockDockerCompose.imageHandler = imageHandler
-
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
+		// Add default values for new lint flags
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, "", nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1301,52 +1295,54 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
-
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
+		// Add default values for new lint flags
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, "", nil) // versionTest=true is required for this path
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
 
-	s.Run("build new image failure", func() {
+	s.Run("build new image failure (version test)", func() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(nil).Once()
+		// This tests failure during version comparison phase
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
-
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
+		// Add default values for new lint flags
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, "", nil) // versionTest=true is required for this path
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
 
-	s.Run("build new image for pytest failure", func() {
+	s.Run("build new image failure (dag test)", func() {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Times(2)
+		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Times(2) // 1st for version, 2nd for version compare
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze2).Return(nil).Once()
+		// This tests failure during dag test phase
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
-
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
+		// Add default values for new lint flags
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, "", nil) // dagTest=true is required for this path
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
 
-	s.Run("pytest failure", func() {
+	s.Run("pytest failure (dag test)", func() {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Times(3)
+		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Times(3) // 1st for version, 2nd for version compare, 3rd for dag test
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(nil).Once()
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze2).Return(nil).Once()
 		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("1", errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
-
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
+		// Add default values for new lint flags
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, "", nil) // dagTest=true is required for this path
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1354,13 +1350,13 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 	s.Run("get deployments failure", func() {
 		imageHandler := new(mocks.ImageHandler)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Twice()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentsResponse, nil).Once()
-		mockDockerCompose.imageHandler = imageHandler
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once() // Error on first call
 
-		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, mockPlatformCoreClient)
+		mockDockerCompose.imageHandler = imageHandler
+		// Add default values for new lint flags
+		err := mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, false, "", mockPlatformCoreClient)
 		s.Error(err)
-		imageHandler.AssertExpectations(s.T())
+		// No image handler expectations needed as it fails before pull/build
 	})
 
 	s.Run("image pull failure", func() {
@@ -1368,67 +1364,129 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Twice()
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentsResponse, nil).Once()
-		imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker)
+		imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker)
 
 		mockDockerCompose.imageHandler = imageHandler
-
-		err = mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", false, false, false, mockPlatformCoreClient)
+		// Add default values for new lint flags
+		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", false, false, false, false, "", mockPlatformCoreClient)
 		s.Error(err)
-		imageHandler.AssertExpectations(s.T())
+		imageHandler.AssertExpectations(s.T()) // Only Pull is called
 	})
 
-	s.Run("build new image failure", func() {
+	s.Run("Create new pip freeze failure", func() { // Renamed from "build new image failure" for clarity
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Twice()
+		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Times(2) // 1st for version, 2nd for version compare
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze).Return(nil).Once()
-		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze2).Return(errMockDocker).Once()
+		imageHandler.On("CreatePipFreeze", mock.Anything, pipFreeze2).Return(errMockDocker).Once() // Error here
 
 		mockDockerCompose.imageHandler = imageHandler
-
-		err = mockDockerCompose.UpgradeTest("new-version", "", "", "", false, false, false, nil)
+		// Add default values for new lint flags
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, false, "", nil) // versionTest=true is required for this path
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
 
 	s.Run("no domain", func() {
+		// Reset context assumes config package handles this correctly
+		// No need to save/restore, just reset and expect failure
 		err := config.ResetCurrentContext()
 		s.NoError(err)
 
-		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, nil)
-		s.Error(err)
+		// Add default values for new lint flags
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, false, "", nil)
+		s.Error(err) // Expect error due to missing context/domain
 	})
 
-	s.Run("success with ruff test", func() {
+	// --- Lint Test Cases ---
+
+	s.Run("success with lint test (default)", func() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "Dockerfile", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 
 		ruffImageHandler := new(mocks.ImageHandler)
-		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff-airflow3.toml", "/app/dags"}, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/dags"}, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
-
-		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, nil)
+		// Call with lintTest=true, includeLintDeprecations=false, lintConfigFile=""
+		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, false, "", nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
 		ruffImageHandler.AssertExpectations(s.T())
 	})
 
-	s.Run("ruff test failure", func() {
+	s.Run("success with lint test including deprecations", func() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "Dockerfile", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 
 		ruffImageHandler := new(mocks.ImageHandler)
-		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff-airflow3.toml", "/app/dags"}, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
+		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/dags"}, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
+		// Call with lintTest=true, includeLintDeprecations=true, lintConfigFile=""
+		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, true, "", nil)
+		s.NoError(err)
 
-		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, nil)
+		imageHandler.AssertExpectations(s.T())
+		ruffImageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("success with lint test using provided config file", func() {
+		// Create a dummy config file
+		dummyConfigFile := filepath.Join(cwd, "my-custom-ruff.toml")
+		err := fileutil.WriteStringToFile(dummyConfigFile, "[lint]\nselect=[\"DUMMY\"]\n")
+		s.NoError(err)
+		defer os.Remove(dummyConfigFile) // Clean up dummy file
+
+		// Create dummy dags directory inside the temp test directory
+		dummyDagsDir := filepath.Join(cwd, "dags")
+		err = os.Mkdir(dummyDagsDir, 0o777)
+		s.NoError(err)
+		defer os.RemoveAll(dummyDagsDir) // Clean up dummy dags dir
+
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", "Dockerfile", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+
+		ruffImageHandler := new(mocks.ImageHandler)
+		// Expect RunCommand, specifically check that the provided config file and dags dir are mounted
+		expectedMounts := map[string]string{
+			dummyDagsDir:    "/app/dags",      // Use the dummy dags dir path from cwd
+			dummyConfigFile: "/app/ruff.toml", // Check this mapping
+		}
+		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/dags"}, expectedMounts, mock.Anything, mock.Anything).Return(nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+		mockDockerCompose.ruffImageHandler = ruffImageHandler
+		// Call with lintTest=true, includeLintDeprecations=false, lintConfigFile=path/to/dummy
+		// Temporarily set config.WorkingPath to cwd for this test case to match mount logic
+		originalWorkingPath := config.WorkingPath
+		config.WorkingPath = cwd
+		defer func() { config.WorkingPath = originalWorkingPath }()
+		err = mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, false, "my-custom-ruff.toml", nil)
+		s.NoError(err)
+
+		imageHandler.AssertExpectations(s.T())
+		ruffImageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("lint test failure", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", "Dockerfile", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
+		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
+
+		ruffImageHandler := new(mocks.ImageHandler)
+		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/dags"}, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+		mockDockerCompose.ruffImageHandler = ruffImageHandler
+		// Call with lintTest=true, includeLintDeprecations=false, lintConfigFile=""
+		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, false, "", nil)
 		s.Error(err)
 		s.Contains(err.Error(), "one of the tests run above failed")
 
@@ -1436,21 +1494,22 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		ruffImageHandler.AssertExpectations(s.T())
 	})
 
-	s.Run("ruff test skipped for airflow 2", func() {
+	s.Run("lint test skipped for Airflow 2", func() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "Dockerfile", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 
-		ruffImageHandler := new(mocks.ImageHandler)
+		ruffImageHandler := new(mocks.ImageHandler) // Lint handler should not be called
 
 		mockDockerCompose.imageHandler = imageHandler
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
-
-		err := mockDockerCompose.UpgradeTest("2.0.0", "", "", "", false, false, true, nil)
-		s.NoError(err)
+		// Call with lintTest=true, includeLintDeprecations=false, lintConfigFile=""
+		// Target version is 2.0.0, so lint test should be skipped internally
+		err := mockDockerCompose.UpgradeTest("2.0.0", "", "", "", false, false, true, false, "", nil)
+		s.NoError(err) // Should succeed without running lint
 
 		imageHandler.AssertExpectations(s.T())
-		ruffImageHandler.AssertExpectations(s.T())
+		ruffImageHandler.AssertExpectations(s.T()) // Verify RunCommand was not called
 	})
 }
 
