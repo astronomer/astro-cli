@@ -139,60 +139,45 @@ func (s *Suite) TestGetURLToEndpoint() {
 	endpoint = "myendpoint"
 	s.Run("returns localhost endpoint", func() {
 		domain = "localhost"
-		expectedURL = fmt.Sprintf("http://%s:8871/%s", domain, endpoint)
-		actualURL := GetURLToEndpoint("https", domain, endpoint)
+		expectedURL = fmt.Sprintf("http://%s:8888/%s", domain, endpoint)
+		actualURL := GetURLToEndpoint("http", domain, endpoint)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns pr preview endpoint", func() {
 		prSubDomain = "pr1234"
 		domain = "pr1234.astronomer-dev.io"
-		expectedURL = fmt.Sprintf("https://%s.api.%s/hub/%s", prSubDomain, "astronomer-dev.io", endpoint)
+		expectedURL = fmt.Sprintf("https://%s.api.%s/%s", prSubDomain, "astronomer-dev.io", endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns cloud endpoint for prod", func() {
 		domain = "astronomer.io"
-		expectedURL = fmt.Sprintf("https://api.%s/hub/%s", domain, endpoint)
+		expectedURL = fmt.Sprintf("https://api.%s/%s", domain, endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns cloud endpoint for dev", func() {
 		domain = "astronomer-dev.io"
-		expectedURL = fmt.Sprintf("https://api.%s/hub/%s", domain, endpoint)
+		expectedURL = fmt.Sprintf("https://api.%s/%s", domain, endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns cloud endpoint for stage", func() {
 		domain = "astronomer-stage.io"
-		expectedURL = fmt.Sprintf("https://api.%s/hub/%s", domain, endpoint)
+		expectedURL = fmt.Sprintf("https://api.%s/%s", domain, endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns cloud endpoint for perf", func() {
 		domain = "astronomer-perf.io"
-		expectedURL = fmt.Sprintf("https://api.%s/hub/%s", domain, endpoint)
+		expectedURL = fmt.Sprintf("https://api.%s/%s", domain, endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns cloud endpoint for everything else", func() {
 		domain = "someotherdomain.io"
-		expectedURL = fmt.Sprintf("https://api.%s/hub/%s", domain, endpoint)
+		expectedURL = fmt.Sprintf("https://api.%s/%s", domain, endpoint)
 		actualURL := GetURLToEndpoint("https", domain, endpoint)
 		s.Equal(expectedURL, actualURL)
-	})
-}
-
-func (s *Suite) TestTransformToCoreApiEndpoint() {
-	s.Run("transforms non-local url to core api endpoint", func() {
-		actual := TransformToCoreAPIEndpoint("https://somedomain.io/hub/v1alpha1/great-endpoint")
-		s.Equal("https://somedomain.io/v1alpha1/great-endpoint", actual)
-	})
-	s.Run("transforms local url to core api endpoint", func() {
-		actual := TransformToCoreAPIEndpoint("http://localhost:8871/v1alpha1/great-endpoint")
-		s.Equal("http://localhost:8888/v1alpha1/great-endpoint", actual)
-	})
-	s.Run("returns without changes if url is not meant for core api", func() {
-		actual := TransformToCoreAPIEndpoint("https://somedomain.io/hub/valpha1/great-enedpoint")
-		s.Equal("https://somedomain.io/hub/valpha1/great-enedpoint", actual)
 	})
 }
