@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -70,7 +71,7 @@ func DeployBundle(input *DeployBundleInput) error {
 	}
 
 	// upload the bundle
-	tarballVersion, err := uploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false)
+	tarballVersion, err := UploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.RuntimeVersion)
 	if err != nil {
 		return err
 	}
@@ -140,7 +141,61 @@ func DeleteBundle(input *DeleteBundleInput) error {
 	return nil
 }
 
-func uploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool) (string, error) {
+// ValidateBundleSymlinks checks if any symlinks within the bundlePath point outside of it
+func ValidateBundleSymlinks(bundlePath string) error {
+	absBundlePath, err := filepath.Abs(bundlePath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for bundle directory: %w", err)
+	}
+
+	err = filepath.WalkDir(bundlePath, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err // Propagate errors from WalkDir itself
+		}
+
+		// Check only for symlinks
+		if d.Type()&os.ModeSymlink != 0 {
+			target, err := os.Readlink(path)
+			if err != nil {
+				logger.Debugf("Could not read symlink %s: %v", path, err)
+				return nil
+			}
+
+			// If the target is not absolute, join it with the directory containing the link
+			if !filepath.IsAbs(target) {
+				target = filepath.Join(filepath.Dir(path), target)
+			}
+
+			// Get the absolute path of the target
+			absTarget, err := filepath.Abs(target)
+			if err != nil {
+				logger.Debugf("Could not get absolute path for symlink target %s -> %s: %v", path, target, err)
+				return nil
+			}
+
+			// Check if the absolute target path is outside the absolute bundle path directory
+			if !strings.HasPrefix(absTarget, absBundlePath) {
+				return fmt.Errorf("symlink %s points to %s which is outside the bundle directory %s", path, target, absBundlePath)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("bundle validation failed: %w", err)
+	}
+
+	return nil
+}
+
+func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool, currentRuntimeVersion string) (string, error) {
+	// If Airflow 3.x, check for symlinks pointing outside the bundle directory
+	if airflowversions.AirflowMajorVersionForRuntimeVersion(currentRuntimeVersion) == "3" {
+		err := ValidateBundleSymlinks(bundlePath)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	tarFilePath := filepath.Join(tarDirPath, "bundle.tar")
 	tarGzFilePath := tarFilePath + ".gz"
 	defer func() {

@@ -42,8 +42,13 @@ func (s *BundleSuite) TestBundleDeploy_Success() {
 		return true
 	}
 
+	// Create a temporary directory for the bundle path
+	tmpDir := s.T().TempDir()
+	testBundlePath := filepath.Join(tmpDir, "test-bundle-path")
+	require.NoError(s.T(), os.Mkdir(testBundlePath, 0o755))
+
 	input := &DeployBundleInput{
-		BundlePath:         "test-bundle-path",
+		BundlePath:         testBundlePath,
 		MountPath:          "test-mount-path",
 		DeploymentID:       "test-deployment-id",
 		BundleType:         "test-bundle-type",
@@ -222,6 +227,117 @@ func (s *BundleSuite) TestBundleDelete_Success() {
 
 	s.mockCoreClient.AssertExpectations(s.T())
 	s.mockPlatformCoreClient.AssertExpectations(s.T())
+}
+
+func (s *BundleSuite) TestValidateBundleSymlinks() {
+	t := s.T()
+
+	// Helper function to create a structure
+	setup := func(t *testing.T, files map[string]string, links map[string]string) string {
+		tmpDir := t.TempDir()
+		for name, content := range files {
+			filePath := filepath.Join(tmpDir, name)
+			require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0o755))
+			require.NoError(t, os.WriteFile(filePath, []byte(content), 0o644))
+		}
+		for linkPath, target := range links {
+			fullLinkPath := filepath.Join(tmpDir, linkPath)
+			require.NoError(t, os.MkdirAll(filepath.Dir(fullLinkPath), 0o755))
+			// Make target absolute if it starts with / for the test setup
+			linkTarget := target
+			require.NoError(t, os.Symlink(linkTarget, fullLinkPath))
+		}
+		return tmpDir
+	}
+
+	// Case 1: Valid - No symlinks
+	t.Run("Valid - No Symlinks", func(t *testing.T) {
+		bundlePath := setup(t, map[string]string{"file1.txt": "hello"}, nil)
+		err := ValidateBundleSymlinks(bundlePath)
+		assert.NoError(t, err)
+	})
+
+	// Case 2: Valid - Symlink inside directory
+	t.Run("Valid - Symlink Inside", func(t *testing.T) {
+		bundlePath := setup(t,
+			map[string]string{"file1.txt": "hello"},
+			map[string]string{"link1": "file1.txt"},
+		)
+		err := ValidateBundleSymlinks(bundlePath)
+		assert.NoError(t, err)
+	})
+
+	// Case 3: Valid - Symlink to subdir
+	t.Run("Valid - Symlink To Subdir", func(t *testing.T) {
+		bundlePath := setup(t,
+			map[string]string{"subdir/file2.txt": "world"},
+			map[string]string{"link2": "subdir/file2.txt"},
+		)
+		err := ValidateBundleSymlinks(bundlePath)
+		assert.NoError(t, err)
+	})
+
+	// Case 4: Valid - Symlink from subdir back to parent (inside)
+	t.Run("Valid - Symlink From Subdir To Parent Inside", func(t *testing.T) {
+		bundlePath := setup(t,
+			map[string]string{"file1.txt": "hello"},
+			map[string]string{"subdir/link3": "../file1.txt"},
+		)
+		err := ValidateBundleSymlinks(bundlePath)
+		assert.NoError(t, err)
+	})
+
+	// Case 5: Valid - Broken symlink (relative path would be inside)
+	t.Run("Valid - Broken Symlink Inside", func(t *testing.T) {
+		bundlePath := setup(t,
+			nil,
+			map[string]string{"broken_link": "non_existent_file.txt"},
+		)
+		err := ValidateBundleSymlinks(bundlePath)
+		assert.NoError(t, err)
+	})
+
+	// Case 6: Invalid - Symlink points relatively outside
+	t.Run("Invalid - Relative Symlink Outside", func(t *testing.T) {
+		bundlePath := setup(t, nil, map[string]string{"link_outside": "../outside_file"})
+		// Create the target file outside for resolution
+		outsideFile := filepath.Join(filepath.Dir(bundlePath), "outside_file")
+		require.NoError(t, os.WriteFile(outsideFile, []byte("outside"), 0o644))
+		defer os.Remove(outsideFile)
+
+		err := ValidateBundleSymlinks(bundlePath)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "points to")
+		assert.Contains(t, err.Error(), "which is outside the bundle directory")
+	})
+
+	// Case 7: Invalid - Symlink points absolutely outside
+	t.Run("Invalid - Absolute Symlink Outside", func(t *testing.T) {
+		// Create a temporary file outside the bundle dir to link to
+		outsideDir := t.TempDir()
+		outsideFilePath := filepath.Join(outsideDir, "real_outside_file")
+		require.NoError(t, os.WriteFile(outsideFilePath, []byte("absolute"), 0o644))
+
+		bundlePath := setup(t, nil, map[string]string{"link_abs_outside": outsideFilePath})
+		err := ValidateBundleSymlinks(bundlePath)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "points to")
+		assert.Contains(t, err.Error(), "which is outside the bundle directory")
+	})
+
+	// Case 8: Invalid - Symlink from subdir points relatively outside
+	t.Run("Invalid - Relative Symlink From Subdir Outside", func(t *testing.T) {
+		bundlePath := setup(t, nil, map[string]string{"subdir/link_outside": "../../outside_file"})
+		// Create the target file outside for resolution
+		outsideFile := filepath.Join(filepath.Dir(bundlePath), "outside_file")
+		require.NoError(t, os.WriteFile(outsideFile, []byte("outside"), 0o644))
+		defer os.Remove(outsideFile)
+
+		err := ValidateBundleSymlinks(bundlePath)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "points to")
+		assert.Contains(t, err.Error(), "which is outside the bundle directory")
+	})
 }
 
 func mockCreateDeploy(client *astrocore_mocks.ClientWithResponsesInterface, bundleUploadURL string, expectedDeploy *astrocore.CreateDeployRequest) {

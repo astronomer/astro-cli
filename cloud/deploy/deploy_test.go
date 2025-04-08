@@ -816,6 +816,11 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 }
 
 func TestDeployNoMonitoringDAGHosted(t *testing.T) {
+	dagsDir := "./testfiles/dags"
+	err := os.MkdirAll(dagsDir, os.ModePerm)
+	assert.NoError(t, err)
+	defer os.RemoveAll(dagsDir)
+
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      deploymentID,
