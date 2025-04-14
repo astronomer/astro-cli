@@ -28,7 +28,7 @@ func (s *Suite) TestListConnections() {
 	context, _ := config.GetCurrentContext()
 	organization := context.Organization
 	deploymentID := cuid.New()
-	objectType := astrocore.ListEnvironmentObjectsParamsObjectTypeCONNECTION
+	objectType := astrocore.CONNECTION
 	showSecrets := true
 	resolvedLinked := true
 	limit := 1000
