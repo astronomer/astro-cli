@@ -1371,25 +1371,24 @@ func TestGetTemplate(t *testing.T) {
 
 func TestReturnSpecifiedValue(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	workspaceID := "test-ws-id"
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	deploymentName := "test-deployment-label"
 
 	t.Run("run function successfully", func(t *testing.T) {
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		value, err := ReturnSpecifiedValue(workspaceID, "", deploymentID, mockPlatformCoreClient, mockCoreClient, "configuration.name")
+		value, err := ReturnSpecifiedValue(&sourceDeployment, "configuration.name", mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Contains(t, value, deploymentName)
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("get deployment error", func(t *testing.T) {
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMarshal).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, errMarshal).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		// Mock an error when trying to get cluster information
+		clusterErr := errors.New("test cluster error")
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, clusterErr).Once()
 
-		_, err := ReturnSpecifiedValue(workspaceID, "", deploymentID, mockPlatformCoreClient, mockCoreClient, "configuration.name")
-		assert.ErrorIs(t, err, errMarshal)
+		_, err := ReturnSpecifiedValue(&sourceDeployment, "configuration.name", mockPlatformCoreClient)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "test cluster error")
+		mockPlatformCoreClient.AssertExpectations(t)
 	})
 }

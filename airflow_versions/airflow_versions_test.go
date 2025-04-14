@@ -150,18 +150,62 @@ func (s *Suite) TestGetAstroRuntimeTag() {
 		},
 	}
 
+	tagToRuntimeVersion3 := map[string]RuntimeVersion{
+		"3.0-1": {
+			Metadata: RuntimeVersionMetadata{
+				AirflowVersion: "3.0.0",
+				Channel:        VersionChannelStable,
+				ReleaseDate:    "2025-01-01",
+			},
+			Migrations: RuntimeVersionMigrations{
+				AirflowDatabase: false,
+			},
+		},
+		"3.0-2": {
+			Metadata: RuntimeVersionMetadata{
+				AirflowVersion: "3.0.1",
+				Channel:        VersionChannelStable,
+				ReleaseDate:    "2025-01-01",
+			},
+			Migrations: RuntimeVersionMigrations{
+				AirflowDatabase: false,
+			},
+		},
+		"3.0-3": {
+			Metadata: RuntimeVersionMetadata{
+				AirflowVersion: "3.0.1",
+				Channel:        VersionChannelStable,
+				ReleaseDate:    "2025-01-01",
+			},
+			Migrations: RuntimeVersionMigrations{
+				AirflowDatabase: false,
+			},
+		},
+		"3.0-4": {
+			Metadata: RuntimeVersionMetadata{
+				AirflowVersion: "3.0.1",
+				Channel:        "alpha",
+				ReleaseDate:    "2025-01-01",
+			},
+			Migrations: RuntimeVersionMigrations{
+				AirflowDatabase: false,
+			},
+		},
+	}
+
 	tests := []struct {
 		airflowVersion string
 		output         string
 		err            error
 	}{
-		{airflowVersion: "", output: "4.0.0", err: nil},
+		{airflowVersion: "", output: "3.0-3", err: nil},
 		{airflowVersion: "2.1.1", output: "3.0.1", err: nil},
 		{airflowVersion: "2.2.2", output: "", err: ErrNoTagAvailable{airflowVersion: "2.2.2"}},
+		{airflowVersion: "3.0.0", output: "3.0-1", err: nil},
 	}
 
 	for _, tt := range tests {
-		defaultImageTag, err := getAstroRuntimeTag(tagToRuntimeVersion, tt.airflowVersion)
+		defaultImageTag, err := getAstroRuntimeTag(tagToRuntimeVersion, tagToRuntimeVersion3, tt.airflowVersion)
 		if tt.err == nil {
 			s.NoError(err)
 		} else {
@@ -235,7 +279,7 @@ func (s *Suite) TestGetDefaultImageTag() {
 		})
 		httpClient := NewClient(client, true)
 
-		defaultImageTag, err := GetDefaultImageTag(httpClient, "")
+		defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
 		s.NoError(err)
 		s.Equal("2.2.0-onbuild", defaultImageTag)
 	})
@@ -305,7 +349,7 @@ func (s *Suite) TestGetDefaultImageTag() {
 		})
 		httpClient := NewClient(client, false)
 
-		defaultImageTag, err := GetDefaultImageTag(httpClient, "")
+		defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
 		s.NoError(err)
 		s.Equal("4.0.0", defaultImageTag)
 	})
@@ -323,7 +367,7 @@ func (s *Suite) TestGetDefaultImageTagError() {
 	})
 	httpClient := NewClient(client, true)
 
-	defaultImageTag, err := GetDefaultImageTag(httpClient, "")
+	defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
 	s.Error(err)
 	s.Equal("", defaultImageTag)
 }

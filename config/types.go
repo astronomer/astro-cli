@@ -32,6 +32,7 @@ type cfgs struct {
 	ProjectDeployment     cfg
 	ProjectWorkspace      cfg
 	WebserverPort         cfg
+	APIServerPort         cfg
 	AirflowExposePort     cfg
 	ShowWarnings          cfg
 	Verbosity             cfg
@@ -48,6 +49,7 @@ type cfgs struct {
 	MachineCPU            cfg
 	MachineMemory         cfg
 	ShaAsTag              cfg
+	RuffImage             cfg
 }
 
 // Creates a new cfg struct

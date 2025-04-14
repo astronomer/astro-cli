@@ -152,7 +152,7 @@ def test_dev_parse():
     output = result.stdout
     assert result.returncode == 0
     # Validate dag has been parsed successfully
-    assert "no errors detected in your DAGs" in output
+    assert "No errors detected in your DAGs" in output
 
 
 def test_dev_run():

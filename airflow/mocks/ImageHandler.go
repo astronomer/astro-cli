@@ -3,6 +3,8 @@
 package mocks
 
 import (
+	io "io"
+
 	types "github.com/astronomer/astro-cli/airflow/types"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -226,12 +228,30 @@ func (_m *ImageHandler) Pytest(pytestFile string, airflowHome string, envFile st
 	return r0, r1
 }
 
-// Run provides a mock function with given fields: dagID, envFile, settingsFile, containerName, dagFile, executionDate, taskLogs
-func (_m *ImageHandler) Run(dagID string, envFile string, settingsFile string, containerName string, dagFile string, executionDate string, taskLogs bool) error {
+// RunCommand provides a mock function with given fields: args, mountDirs, stdout, stderr
+func (_m *ImageHandler) RunCommand(args []string, mountDirs map[string]string, stdout io.Writer, stderr io.Writer) error {
+	ret := _m.Called(args, mountDirs, stdout, stderr)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RunCommand")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]string, map[string]string, io.Writer, io.Writer) error); ok {
+		r0 = rf(args, mountDirs, stdout, stderr)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// RunDAG provides a mock function with given fields: dagID, envFile, settingsFile, containerName, dagFile, executionDate, taskLogs
+func (_m *ImageHandler) RunDAG(dagID string, envFile string, settingsFile string, containerName string, dagFile string, executionDate string, taskLogs bool) error {
 	ret := _m.Called(dagID, envFile, settingsFile, containerName, dagFile, executionDate, taskLogs)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Run")
+		panic("no return value specified for RunDAG")
 	}
 
 	var r0 error

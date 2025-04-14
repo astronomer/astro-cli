@@ -12,7 +12,6 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
-	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	coreMocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/astronomer/astro-cli/config"
@@ -144,8 +143,7 @@ func (s *AirflowSuite) TestNewAirflowDevRootCmd() {
 }
 
 func (s *AirflowSuite) TestNewAirflowInitCmd() {
-	cmd := newAirflowInitCmd()
-	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	s.NotNil(newAirflowInitCmd())
 }
 
 func (s *AirflowSuite) TestNewAirflowRunCmd() {
@@ -173,13 +171,6 @@ func (s *AirflowSuite) TestNewAirflowKillCmd() {
 	cmd := newAirflowInitCmd()
 	cmd.RunE(new(cobra.Command), []string{})
 	cmd = newAirflowKillCmd()
-	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
-}
-
-func (s *AirflowSuite) TestNewAirflowUpgradeCheckCmd() {
-	cmd := newAirflowInitCmd()
-	cmd.RunE(new(cobra.Command), []string{})
-	cmd = newAirflowUpgradeCheckCmd()
 	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
 }
 
@@ -657,7 +648,7 @@ func (s *AirflowSuite) TestAirflowUpgradeTest() {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, nil).Return(nil).Once()
+			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, "", nil).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -671,7 +662,7 @@ func (s *AirflowSuite) TestAirflowUpgradeTest() {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, nil).Return(errMock).Once()
+			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, "", nil).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1260,50 +1251,6 @@ func (s *AirflowSuite) TestAirflowParse() {
 	})
 }
 
-func (s *AirflowSuite) TestAirflowUpgradeCheck() {
-	s.Run("success", func() {
-		cmd := newAirflowUpgradeCheckCmd()
-		args := []string{}
-
-		mockContainerHandler := new(mocks.ContainerHandler)
-		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Run", airflowUpgradeCheckCmd, "root").Return(nil).Once()
-			return mockContainerHandler, nil
-		}
-
-		err := airflowUpgradeCheck(cmd, args)
-		s.NoError(err)
-		mockContainerHandler.AssertExpectations(s.T())
-	})
-
-	s.Run("failure", func() {
-		cmd := newAirflowUpgradeCheckCmd()
-		args := []string{}
-
-		mockContainerHandler := new(mocks.ContainerHandler)
-		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Run", airflowUpgradeCheckCmd, "root").Return(errMock).Once()
-			return mockContainerHandler, nil
-		}
-
-		err := airflowUpgradeCheck(cmd, args)
-		s.ErrorIs(err, errMock)
-		mockContainerHandler.AssertExpectations(s.T())
-	})
-
-	s.Run("containerHandlerInit failure", func() {
-		cmd := newAirflowUpgradeCheckCmd()
-		args := []string{}
-
-		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			return nil, errMock
-		}
-
-		err := airflowUpgradeCheck(cmd, args)
-		s.ErrorIs(err, errMock)
-	})
-}
-
 func (s *AirflowSuite) TestAirflowBash() {
 	s.Run("success", func() {
 		cmd := newAirflowBashCmd()
@@ -1537,22 +1484,5 @@ func (s *AirflowSuite) TestAirflowObjectExport() {
 
 		err := airflowSettingsExport(cmd, args)
 		s.ErrorIs(err, errMock)
-	})
-}
-
-func (s *AirflowSuite) TestPrepareDefaultAirflowImageTag() {
-	getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string) (string, error) {
-		return "", nil
-	}
-	s.Run("default airflow version", func() {
-		useAstronomerCertified = true
-		resp := prepareDefaultAirflowImageTag("", nil)
-		s.Equal(airflowversions.DefaultAirflowVersion, resp)
-	})
-
-	s.Run("default runtime version", func() {
-		useAstronomerCertified = false
-		resp := prepareDefaultAirflowImageTag("", nil)
-		s.Equal(airflowversions.DefaultRuntimeVersion, resp)
 	})
 }

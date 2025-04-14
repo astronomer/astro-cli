@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lucsky/cuid"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 
@@ -29,10 +28,7 @@ import (
 )
 
 const (
-	AuthFlowCurrent       = "ORG_FIRST"
-	AuthFlowIdentityFirst = "IDENTITY_FIRST"
-
-	authConfigEndpoint = "auth-config"
+	authConfigEndpoint = "private/v1alpha1/cli/auth-config"
 
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
@@ -434,45 +430,38 @@ func Logout(domain string, out io.Writer) {
 }
 
 func FetchDomainAuthConfig(domain string) (Config, error) {
-	var (
-		authConfig  Config
-		addr        string
-		validDomain bool
-	)
-
-	validDomain = context.IsCloudDomain(domain)
-	if !validDomain {
-		return authConfig, errors.New("Error! Invalid domain. You are attempting to login into Astro. " +
+	if !context.IsCloudDomain(domain) {
+		return Config{}, errors.New("Error! Invalid domain. You are attempting to login into Astro. " +
 			"Are you trying to authenticate to Astronomer Software? If so, please change your current context with 'astro context switch'")
 	}
 
-	addr = domainutil.GetURLToEndpoint("https", domain, authConfigEndpoint)
+	addr := domainutil.GetURLToEndpoint("https", domain, authConfigEndpoint)
 
 	ctx := http_context.Background()
 	doOptions := &httputil.DoOptions{
 		Context: ctx,
-		Headers: map[string]string{"x-request-id": "cli-auth-" + cuid.New(), "Content-Type": "application/json; charset=utf-8"},
-		Path:    addr,
-		Method:  http.MethodGet,
+		Headers: map[string]string{
+			"Content-Type":              "application/json",
+			"X-Astro-Client-Identifier": "cli",
+		},
+		Path:   addr,
+		Method: http.MethodGet,
 	}
 	res, err := httpClient.Do(doOptions)
 	if err != nil {
-		return authConfig, err
+		return Config{}, err
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode == http.StatusOK {
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		unMarshalErr := json.Unmarshal(body, &authConfig)
-		if unMarshalErr != nil {
-			return authConfig, fmt.Errorf("cannot decode response: %w", unMarshalErr)
-		}
-		return authConfig, nil
+	if res.StatusCode != http.StatusOK {
+		return Config{}, errors.New("something went wrong! Try again or contact Astronomer Support")
 	}
 
-	return authConfig, errors.New("something went wrong! Try again or contact Astronomer Support")
+	var authConfig Config
+	err = json.NewDecoder(res.Body).Decode(&authConfig)
+	if err != nil {
+		return Config{}, fmt.Errorf("cannot decode response: %w", err)
+	}
+
+	return authConfig, nil
 }

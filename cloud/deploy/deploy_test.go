@@ -6,11 +6,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
-	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
@@ -90,8 +90,12 @@ var (
 		},
 		JSON200: &astroplatformcore.DeploymentOptions{
 			RuntimeReleases: []astroplatformcore.RuntimeRelease{
-				{Version: "4.0.0"},
-				{Version: "5.0.0"},
+				{Version: "12.0.0"},
+				{Version: "4.2.6"},
+				{Version: "4.2.5"},
+				{Version: "3.1-1"},
+				{Version: "3.0-3"},
+				{Version: "3.0-1"},
 			},
 		},
 	}
@@ -101,7 +105,7 @@ var (
 		},
 		JSON200: &astroplatformcore.Deployment{
 			Id:                 deploymentID,
-			RuntimeVersion:     "4.2.5",
+			RuntimeVersion:     "12.0.0",
 			Namespace:          "test-name",
 			WorkspaceId:        ws,
 			WebServerUrl:       "test-url",
@@ -115,7 +119,7 @@ var (
 		},
 		JSON200: &astroplatformcore.Deployment{
 			Id:                 deploymentID,
-			RuntimeVersion:     "4.2.5",
+			RuntimeVersion:     "12.0.0",
 			Namespace:          "test-name",
 			WorkspaceId:        ws,
 			WebServerUrl:       "test-url",
@@ -131,7 +135,7 @@ var (
 		},
 		JSON200: &astroplatformcore.Deployment{
 			Id:                       deploymentID,
-			RuntimeVersion:           "4.2.5",
+			RuntimeVersion:           "12.0.0",
 			Namespace:                "test-name",
 			WorkspaceId:              ws,
 			WebServerUrl:             "test-url",
@@ -172,7 +176,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
-		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -316,7 +320,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
-		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -452,7 +456,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
-		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -530,7 +534,7 @@ func TestImageOnlyDeploySuccess(t *testing.T) {
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
-		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -618,7 +622,7 @@ func TestDagsDeployFailed(t *testing.T) {
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("4.2.5", nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
 		return mockImageHandler
 	}
 
@@ -683,7 +687,7 @@ func TestDeployFailure(t *testing.T) {
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("4.2.5", nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
 		return mockImageHandler
 	}
 
@@ -778,7 +782,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -812,6 +816,11 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 }
 
 func TestDeployNoMonitoringDAGHosted(t *testing.T) {
+	dagsDir := "./testfiles/dags"
+	err := os.MkdirAll(dagsDir, os.ModePerm)
+	assert.NoError(t, err)
+	defer os.RemoveAll(dagsDir)
+
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      deploymentID,
@@ -856,7 +865,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return("", nil)
 		return mockImageHandler
 	}
@@ -901,70 +910,262 @@ func TestBuildImageFailure(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
-	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", "", false, nil)
+	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("4.2.5", nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
 		return mockImageHandler
 	}
 
 	// dockerfile parsing error
 	dockerfile = "Dockerfile.invalid"
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, nil)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
 	// failed to get runtime releases
 	dockerfile = "Dockerfile"
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, mockPlatformCoreClient)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 	mockCoreClient.AssertExpectations(t)
 	mockPlatformCoreClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 }
 
-func TestIsValidUpgrade(t *testing.T) {
-	resp := IsValidUpgrade("4.2.5", "4.2.6")
-	assert.True(t, resp)
+func TestValidRuntimeVersion(t *testing.T) {
+	testCases := []struct {
+		name              string
+		currentVersion    string
+		newVersion        string
+		deploymentOptions []string
+		forceUpgradeToAF3 bool
+		expected          bool
+		expectedError     string
+	}{
+		// Empty current version cases
+		{
+			name:              "empty current version allows any upgrade",
+			currentVersion:    "",
+			newVersion:        "4.2.6",
+			deploymentOptions: []string{"4.2.6"},
+			expected:          true,
+		},
 
-	resp = IsValidUpgrade("4.2.6", "4.2.5")
-	assert.False(t, resp)
+		// AF2 version upgrade cases
+		{
+			name:              "newer AF2 version is valid upgrade",
+			currentVersion:    "4.2.5",
+			newVersion:        "4.2.6",
+			deploymentOptions: []string{"4.2.6"},
+			expected:          true,
+		},
+		{
+			name:              "older AF2 version is invalid upgrade",
+			currentVersion:    "4.2.6",
+			newVersion:        "4.2.5",
+			deploymentOptions: []string{"4.2.5"},
+			expected:          false,
+			expectedError:     "Cannot deploy a downgraded Astro Runtime version",
+		},
 
-	resp = IsValidUpgrade("", "4.2.6")
-	assert.True(t, resp)
+		// AF2 to AF3 upgrade cases
+		{
+			name:              "AF2 >= 8.7.0 to AF3 version with force flag is valid upgrade",
+			currentVersion:    "8.7.0",
+			newVersion:        "3.0-1",
+			deploymentOptions: []string{"3.0-1"},
+			forceUpgradeToAF3: true,
+			expected:          true,
+		},
+		{
+			name:              "AF2 < 8.7.0 to AF3 version with force flag is invalid upgrade",
+			currentVersion:    "4.2.5",
+			newVersion:        "3.0-1",
+			deploymentOptions: []string{"3.0-1"},
+			forceUpgradeToAF3: true,
+			expected:          false,
+			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 8.7.0 or higher",
+		},
+		{
+			name:              "AF2 >= 8.7.0 to AF3 version without force flag is invalid upgrade",
+			currentVersion:    "8.7.0",
+			newVersion:        "3.0-1",
+			deploymentOptions: []string{"3.0-1"},
+			forceUpgradeToAF3: false,
+			expected:          false,
+			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with the --force-upgrade-to-af3 flag",
+		},
+
+		// AF3 version cases
+		{
+			name:              "newer AF3 version is valid upgrade",
+			currentVersion:    "3.0-1",
+			newVersion:        "3.1-1",
+			deploymentOptions: []string{"3.1-1"},
+			expected:          true,
+		},
+		{
+			name:              "older AF3 version is invalid upgrade",
+			currentVersion:    "3.1-1",
+			newVersion:        "3.0-3",
+			deploymentOptions: []string{"3.0-3"},
+			expected:          false,
+			expectedError:     "Cannot deploy a downgraded Astro Runtime version",
+		},
+		{
+			name:              "AF3 to AF2 is invalid upgrade",
+			currentVersion:    "3.0-1",
+			newVersion:        "4.2.6",
+			deploymentOptions: []string{"4.2.6"},
+			expected:          false,
+			expectedError:     "Cannot deploy a downgraded Astro Runtime version",
+		},
+
+		// Deployment options validation cases
+		{
+			name:              "version not in deployment options is invalid",
+			currentVersion:    "4.2.5",
+			newVersion:        "4.2.6",
+			deploymentOptions: []string{"4.2.5", "4.2.4"},
+			expected:          false,
+			expectedError:     "Cannot deploy an unsupported Astro Runtime version",
+		},
+		{
+			name:              "version in deployment options is valid",
+			currentVersion:    "4.2.5",
+			newVersion:        "4.2.6",
+			deploymentOptions: []string{"4.2.6", "4.2.5"},
+			expected:          true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Capture stdout to check error messages
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+			outC := make(chan string)
+			go func() {
+				var buf bytes.Buffer
+				io.Copy(&buf, r)
+				outC <- buf.String()
+			}()
+
+			result := ValidRuntimeVersion(tc.currentVersion, tc.newVersion, tc.deploymentOptions, tc.forceUpgradeToAF3)
+
+			// Restore stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Check result
+			assert.Equal(t, tc.expected, result)
+
+			// Check error message if expected
+			if tc.expectedError != "" {
+				output := <-outC
+				assert.Contains(t, output, tc.expectedError)
+			}
+		})
+	}
 }
 
-func TestIsValidTag(t *testing.T) {
-	resp := IsValidTag([]string{"4.2.5", "4.2.6"}, "4.2.7")
-	assert.False(t, resp)
-
-	resp = IsValidTag([]string{"4.2.5", "4.2.6"}, "4.2.6")
-	assert.True(t, resp)
+// mockTransport implements http.RoundTripper for mocking HTTP responses
+type mockTransport struct {
+	response *http.Response
 }
 
-func TestCheckVersion(t *testing.T) {
-	httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
-	latestRuntimeVersion, _ := airflowversions.GetDefaultImageTag(httpClient, "")
-
-	// version that is older than newest
-	buf := new(bytes.Buffer)
-	CheckVersion("1.0.0", buf)
-	assert.Contains(t, buf.String(), "WARNING! You are currently running Astro Runtime Version")
-
-	// version that is latest
-	CheckVersion(latestRuntimeVersion, buf)
-	assert.Contains(t, buf.String(), "Runtime Version: "+latestRuntimeVersion)
+func (m *mockTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return m.response, nil
 }
 
-func TestCheckVersionBeta(t *testing.T) {
-	// version that newer than latest
-	buf := new(bytes.Buffer)
-	defer testUtil.MockUserInput(t, "y")()
-	CheckVersion("10.0.0", buf)
-	assert.Contains(t, buf.String(), "")
+func TestWarnNonLatestVersion(t *testing.T) {
+	// Create a mock HTTP client
+	mockClient := &httputil.HTTPClient{
+		HTTPClient: &http.Client{
+			Transport: &mockTransport{
+				response: &http.Response{
+					StatusCode: 200,
+					Body: io.NopCloser(strings.NewReader(`{
+						"runtimeVersions": {
+							"5.0.1": {
+								"metadata": {
+									"airflowVersion": "2.2.5",
+									"channel": "stable",
+									"releaseDate": "2024-01-01"
+								},
+								"migrations": {
+									"airflowDatabase": false
+								}
+							},
+							"5.0.2": {
+								"metadata": {
+									"airflowVersion": "2.2.6",
+									"channel": "stable",
+									"releaseDate": "2024-01-02"
+								},
+								"migrations": {
+									"airflowDatabase": false
+								}
+							}
+						}
+					}`)),
+				},
+			},
+		},
+	}
+
+	// Test cases
+	testCases := []struct {
+		name           string
+		version        string
+		expectedOutput string
+	}{
+		{
+			name:           "older version shows warning",
+			version:        "4.2.5",
+			expectedOutput: "WARNING! You are currently running Astro Runtime Version 4.2.5\nConsider upgrading to the latest version, Astro Runtime 5.0.2\n",
+		},
+		{
+			name:           "latest version shows no warning",
+			version:        "5.0.2",
+			expectedOutput: "",
+		},
+		{
+			name:           "newer version shows no warning",
+			version:        "5.0.3",
+			expectedOutput: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Capture stdout
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+			outC := make(chan string)
+			go func() {
+				var buf bytes.Buffer
+				io.Copy(&buf, r)
+				outC <- buf.String()
+			}()
+
+			// Call the function with our mock client
+			WarnIfNonLatestVersion(tc.version, mockClient)
+
+			// Restore stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Check output
+			output := <-outC
+			assert.Equal(t, tc.expectedOutput, output)
+		})
+	}
 }
 
 func TestCheckPyTest(t *testing.T) {

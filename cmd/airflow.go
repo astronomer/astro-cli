@@ -48,12 +48,16 @@ var (
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
+	apiServerLogs          bool
 	triggererLogs          bool
+	dagProcessorLogs       bool
 	noCache                bool
 	schedulerExec          bool
 	postgresExec           bool
 	webserverExec          bool
 	triggererExec          bool
+	apiServerExec          bool
+	dagProcessorExec       bool
 	connections            bool
 	variables              bool
 	pools                  bool
@@ -62,6 +66,9 @@ var (
 	compose                bool
 	versionTest            bool
 	dagTest                bool
+	lintTest               bool
+	lintDeprecations       bool
+	lintConfigFile         string
 	waitTime               time.Duration
 	containerRuntime       runtimes.ContainerRuntime
 	RunExample             = `
@@ -110,13 +117,12 @@ astro dev init --from-template
 
 	pytestDir = "/tests"
 
-	airflowUpgradeCheckCmd        = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
-	errPytestArgs                 = errors.New("you can only pass one pytest file or directory")
-	buildSecrets                  = []string{}
-	errNoCompose                  = errors.New("cannot use '--compose-file' without '--compose' flag")
-	TemplateList                  = airflow.FetchTemplateList
-	defaultWaitTime               = 1 * time.Minute
-	directoryPermissions   uint32 = 0o755
+	errPytestArgs               = errors.New("you can only pass one pytest file or directory")
+	buildSecrets                = []string{}
+	errNoCompose                = errors.New("cannot use '--compose-file' without '--compose' flag")
+	TemplateList                = airflow.FetchTemplateList
+	defaultWaitTime             = 1 * time.Minute
+	directoryPermissions uint32 = 0o755
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
@@ -145,7 +151,6 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 		newAirflowPytestCmd(),
 		newAirflowParseCmd(),
 		newAirflowRestartCmd(astroCoreClient),
-		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
 		newAirflowUpgradeTestCmd(platformCoreClient),
@@ -155,13 +160,12 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 
 func newAirflowInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "init",
-		Short:             "Create a new Astro project in your working directory",
-		Long:              "Create a new Astro project in your working directory. This generates the files you need to start an Airflow environment on your local machine and deploy your project to a Deployment on Astro or Astronomer Software.",
-		Example:           initCloudExample,
-		Args:              cobra.MaximumNArgs(1),
-		PersistentPreRunE: DoNothing,
-		RunE:              airflowInit,
+		Use:     "init",
+		Short:   "Create a new Astro project in your working directory",
+		Long:    "Create a new Astro project in your working directory. This generates the files you need to start an Airflow environment on your local machine and deploy your project to a Deployment on Astro or Astronomer Software.",
+		Example: initCloudExample,
+		Args:    cobra.MaximumNArgs(1),
+		RunE:    airflowInit,
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
@@ -201,9 +205,12 @@ func newAirflowUpgradeTestCmd(platformCoreClient astroplatformcore.CoreClient) *
 			return airflowUpgradeTest(cmd, platformCoreClient)
 		},
 	}
-	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The version of Airflow you want to upgrade to. The default is the latest available version. Tests are run against the equivalent Astro Runtime version. ")
+	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The version of Airflow you want to upgrade to. The default is the latest available version. Tests are run against the equivalent Astro Runtime version.")
 	cmd.Flags().BoolVarP(&versionTest, "version-test", "", false, "Only run version tests. These tests show you how the versions of your dependencies will change after you upgrade.")
 	cmd.Flags().BoolVarP(&dagTest, "dag-test", "d", false, "Only run DAG tests. These tests check whether your DAGs will generate import errors after you upgrade.")
+	cmd.Flags().BoolVarP(&lintTest, "lint-test", "l", false, "Only run ruff lint tests. These tests check whether your DAGs are compatible with Airflow.")
+	cmd.Flags().BoolVarP(&lintDeprecations, "lint-deprecations", "", false, "Include Airflow deprecations in lint tests.")
+	cmd.Flags().StringVarP(&lintConfigFile, "lint-config-file", "", "", "Relative path within project to a custom ruff config file. If not specified, a default config will be used.")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against.")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "n", "", "Name of the upgraded image. Updates the FROM line in your Dockerfile to pull this image for the upgrade.")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Expose a secret to containers. Equivalent to 'docker build --secret'. Example input id=mysecret,src=secrets.txt")
@@ -286,14 +293,16 @@ func newAirflowLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs",
 		Short:   "Display component logs for your local Airflow environment",
-		Long:    "Display scheduler, worker, and webserver logs for your local Airflow environment",
+		Long:    "Display scheduler, worker, api-server, and webserver logs for your local Airflow environment",
 		PreRunE: SetRuntimeIfExists,
 		RunE:    airflowLogs,
 	}
 	cmd.Flags().BoolVarP(&followLogs, "follow", "f", false, "Follow log output")
 	cmd.Flags().BoolVarP(&schedulerLogs, "scheduler", "s", false, "Output scheduler logs")
 	cmd.Flags().BoolVarP(&webserverLogs, "webserver", "w", false, "Output webserver logs")
+	cmd.Flags().BoolVarP(&apiServerLogs, "api-server", "a", false, "Output api-server logs")
 	cmd.Flags().BoolVarP(&triggererLogs, "triggerer", "t", false, "Output triggerer logs")
+	cmd.Flags().BoolVarP(&dagProcessorLogs, "dag-processor", "d", false, "Output dag-processor logs")
 	return cmd
 }
 
@@ -376,23 +385,11 @@ func newAirflowParseCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowUpgradeCheckCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:                "upgrade-check",
-		Short:              "List DAG and config-level changes required to upgrade to Airflow 2.0",
-		Long:               "List DAG and config-level changes required to upgrade to Airflow 2.0",
-		PreRunE:            EnsureRuntime,
-		RunE:               airflowUpgradeCheck,
-		DisableFlagParsing: true,
-	}
-	return cmd
-}
-
 func newAirflowBashCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "bash",
 		Short:   "Exec into a running an Airflow container",
-		Long:    "Use this command to Exec into either the Webserver, Sechduler, Postgres, or Triggerer Container to run bash commands",
+		Long:    "Use this command to exec into a container to run bash commands",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: EnsureRuntime,
 		RunE:    airflowBash,
@@ -401,6 +398,8 @@ func newAirflowBashCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&webserverExec, "webserver", "w", false, "Exec into the webserver container")
 	cmd.Flags().BoolVarP(&postgresExec, "postgres", "p", false, "Exec into the postgres container")
 	cmd.Flags().BoolVarP(&triggererExec, "triggerer", "t", false, "Exec into the triggerer container")
+	cmd.Flags().BoolVarP(&apiServerExec, "api-server", "a", false, "Exec into the api-server container")
+	cmd.Flags().BoolVarP(&dagProcessorExec, "dag-processor", "d", false, "Exec into the dag-processor container")
 	return cmd
 }
 
@@ -487,15 +486,27 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided)
-	defaultImageTag := runtimeVersion
-	if defaultImageTag == "" {
+	imageTag := runtimeVersion
+	if imageTag == "" {
 		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
-		defaultImageTag = prepareDefaultAirflowImageTag(airflowVersion, httpClient)
+		imageTag, err = getDefaultImageTag(httpClient, airflowVersion, true)
+		if err != nil {
+			return fmt.Errorf("error getting default image tag: %w", err)
+		}
 	}
 
-	defaultImageName := airflow.AstroRuntimeImageName
+	var imageName string
 	if useAstronomerCertified {
-		defaultImageName = airflow.AstronomerCertifiedImageName
+		imageName = airflow.AstronomerCertifiedImageName
+	} else {
+		switch airflowversions.AirflowMajorVersionForRuntimeVersion(imageTag) {
+		case "3":
+			imageName = airflow.AstroRuntimeAirflow3ImageName
+		case "2":
+			imageName = airflow.AstroRuntimeAirflow2ImageName
+		default:
+			return errors.New("unsupported Airflow major version for runtime version " + imageTag)
+		}
 	}
 
 	// Ensure the project directory is created if a positional argument is provided.
@@ -536,7 +547,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag, fromTemplate)
+	err = airflow.Init(config.WorkingPath, imageName, imageTag, fromTemplate)
 	if err != nil {
 		return err
 	}
@@ -621,21 +632,15 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 		return errInvalidBothCustomImageandVersion
 	}
 
-	defaultImageName := airflow.AstroRuntimeImageName
-	defaultImageTag := runtimeVersion
 	if customImageName != "" {
 		fmt.Printf("Testing an upgrade to custom Airflow image: %s\n", customImageName)
-	} else {
+	} else if runtimeVersion == "" {
 		// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided
-		if defaultImageTag == "" {
-			httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
-			defaultImageTag = prepareDefaultAirflowImageTag(airflowVersion, httpClient)
-		}
-		if useAstronomerCertified {
-			defaultImageName = airflow.AstronomerCertifiedImageName
-			fmt.Printf("Testing an upgrade to Astronomer Certified Airflow version %s\n\n", defaultImageTag)
-		} else {
-			fmt.Printf("Testing an upgrade to Astro Runtime %s\n", defaultImageTag)
+		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
+		var err error
+		runtimeVersion, err = getDefaultImageTag(httpClient, airflowVersion, true)
+		if err != nil {
+			return fmt.Errorf("error getting default image tag: %w", err)
 		}
 	}
 
@@ -657,7 +662,7 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	err = containerHandler.UpgradeTest(defaultImageTag, deploymentID, defaultImageName, customImageName, buildSecretString, versionTest, dagTest, platformCoreClient)
+	err = containerHandler.UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, lintDeprecations, lintConfigFile, platformCoreClient)
 	if err != nil {
 		return err
 	}
@@ -735,11 +740,17 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	if webserverLogs {
 		containersNames = append(containersNames, []string{airflow.WebserverDockerContainerName}...)
 	}
+	if apiServerLogs {
+		containersNames = append(containersNames, []string{airflow.APIServerDockerContainerName}...)
+	}
 	if schedulerLogs {
 		containersNames = append(containersNames, []string{airflow.SchedulerDockerContainerName}...)
 	}
 	if triggererLogs {
 		containersNames = append(containersNames, []string{airflow.TriggererDockerContainerName}...)
+	}
+	if dagProcessorLogs {
+		containersNames = append(containersNames, []string{airflow.DAGProcessorDockerContainerName}...)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -884,22 +895,6 @@ func airflowParse(cmd *cobra.Command, args []string) error {
 	return containerHandler.Parse(customImageName, "", buildSecretString)
 }
 
-// airflowUpgradeCheck
-func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	// Add airflow command, to simplify astro cli usage
-	args = append(airflowUpgradeCheckCmd, args...)
-
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
-	if err != nil {
-		return err
-	}
-
-	return containerHandler.Run(args, "root")
-}
-
 // Exec into an airflow container
 func airflowBash(cmd *cobra.Command, args []string) error {
 	// figure out what container to exec into
@@ -916,6 +911,12 @@ func airflowBash(cmd *cobra.Command, args []string) error {
 	}
 	if schedulerExec {
 		container = airflow.SchedulerDockerContainerName
+	}
+	if apiServerExec {
+		container = airflow.APIServerDockerContainerName
+	}
+	if dagProcessorExec {
+		container = airflow.DAGProcessorDockerContainerName
 	}
 	// exec into secheduler by default
 	if container == "" {
@@ -963,21 +964,6 @@ func airflowSettingsExport(cmd *cobra.Command, args []string) error {
 	}
 
 	return containerHandler.ExportSettings(settingsFile, envFile, connections, variables, pools, envExport)
-}
-
-func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client) string {
-	defaultImageTag, _ := getDefaultImageTag(httpClient, airflowVersion)
-
-	if defaultImageTag == "" {
-		if useAstronomerCertified {
-			fmt.Println("WARNING! There was a network issue getting the latest Astronomer Certified image. Your Dockerfile may not contain the latest version")
-			defaultImageTag = airflowversions.DefaultAirflowVersion
-		} else {
-			fmt.Println("WARNING! There was a network issue getting the latest Astro Runtime image. Your Dockerfile may not contain the latest version")
-			defaultImageTag = airflowversions.DefaultRuntimeVersion
-		}
-	}
-	return defaultImageTag
 }
 
 func isValidTemplate(templateList []string, template string) bool {

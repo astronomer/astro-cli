@@ -17,7 +17,6 @@ const (
 	PrPreview        = "prprievew"
 
 	localhostDomain = "localhost"
-	astrohubDomain  = "astrohub"
 	cloudDomain     = "cloud"
 	houstonDomain   = "houston"
 
@@ -57,9 +56,7 @@ var (
 		Context:               newCfg("context", ""),
 		Contexts:              newCfg("contexts", ""),
 		DockerCommand:         newCfg("container.binary", ""),
-		LocalAstro:            newCfg("local.astrohub", "http://localhost:8871/v1"),
 		LocalCore:             newCfg("local.core", "http://localhost:8888"),
-		LocalPublicAstro:      newCfg("local.public_astrohub", "http://localhost:8871/graphql"),
 		LocalRegistry:         newCfg("local.registry", "localhost:5555"),
 		LocalHouston:          newCfg("local.houston", ""),
 		LocalPlatform:         newCfg("local.platform", CloudPlatform),
@@ -73,6 +70,7 @@ var (
 		ProjectName:           newCfg("project.name", ""),
 		ProjectWorkspace:      newCfg("project.workspace", ""),
 		WebserverPort:         newCfg("webserver.port", "8080"),
+		APIServerPort:         newCfg("api-server.port", "8080"),
 		AirflowExposePort:     newCfg("airflow.expose_port", "false"),
 		ShowWarnings:          newCfg("show_warnings", "true"),
 		Verbosity:             newCfg("verbosity", "warning"),
@@ -89,6 +87,7 @@ var (
 		MachineCPU:            newCfg("machine.cpu", "2"),
 		MachineMemory:         newCfg("machine.memory", "4096"),
 		ShaAsTag:              newCfg("sha_as_tag", "false"),
+		RuffImage:             newCfg("ruff.image", "ghcr.io/astral-sh/ruff:latest"),
 	}
 
 	// viperHome is the viper object in the users home directory

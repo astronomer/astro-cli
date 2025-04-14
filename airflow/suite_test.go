@@ -17,7 +17,7 @@ type Suite struct {
 	origCmdExec              func(cmd string, stdout, stderr io.Writer, args ...string) error
 	origGetDockerClient      func() (client.APIClient, error)
 	origInitSettings         func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error
-	origCheckWebserverHealth func(url string, timeout time.Duration) error
+	origCheckWebserverHealth func(url string, timeout time.Duration, component string) error
 	origStdout               *os.File
 }
 

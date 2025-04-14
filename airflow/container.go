@@ -5,11 +5,13 @@ import (
 	"crypto/md5" //nolint:gosec
 	"fmt"
 	"html/template"
+	"io"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow/types"
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
@@ -35,7 +37,7 @@ type ContainerHandler interface {
 	ComposeExport(settingsFile, composeFile string) error
 	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString string) (string, error)
 	Parse(customImageName, deployImageName, buildSecretString string) error
-	UpgradeTest(runtimeVersion, deploymentID, newImageName, customImageName, buildSecretString string, versionTest, dagTest bool, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error
+	UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations bool, lintConfigFile string, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -52,10 +54,11 @@ type ImageHandler interface {
 	DoesImageExist(image string) error
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
-	Run(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error
+	RunDAG(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error
 	Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, config types.ImageBuildConfig) (string, error)
 	CreatePipFreeze(altImageName, pipFreezeFile string) error
 	GetImageRepoSHA(registry string) (string, error)
+	RunCommand(args []string, mountDirs map[string]string, stdout, stderr io.Writer) error
 }
 
 type DockerComposeAPI interface {
@@ -109,9 +112,23 @@ func normalizeName(s string) string {
 
 // generateConfig generates the docker-compose config
 func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string) (string, error) {
+	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
+	if !ok {
+		return "", errors.New("runtime version label not found")
+	}
+	var composeYml string
+	switch airflowversions.AirflowMajorVersionForRuntimeVersion(runtimeVersion) {
+	case "2":
+		composeYml = Af2Composeyml
+	case "3":
+		composeYml = Af3Composeyml
+	default:
+		return "", errors.New("unsupported Airflow major version for runtime version " + runtimeVersion)
+	}
+
 	var tmpl *template.Template
 	var err error
-	tmpl, err = template.New("yml").Parse(Composeyml)
+	tmpl, err = template.New("yml").Parse(composeYml)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate config")
 	}
@@ -157,6 +174,7 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		AirflowHome:           airflowHome,
 		AirflowUser:           "astro",
 		AirflowWebserverPort:  config.CFG.WebserverPort.GetString(),
+		AirflowAPIServerPort:  config.CFG.APIServerPort.GetString(),
 		AirflowEnvFile:        envFile,
 		AirflowExposePort:     config.CFG.AirflowExposePort.GetBool(),
 		MountLabel:            "z",

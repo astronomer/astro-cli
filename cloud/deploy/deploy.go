@@ -5,7 +5,6 @@ import (
 	"bytes"
 	httpContext "context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,8 +23,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
-	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/errors"
 )
 
@@ -34,18 +33,14 @@ const (
 	astroDomain            = "astronomer.io"
 	registryUsername       = "cli"
 	runtimeImageLabel      = airflow.RuntimeImageLabel
-	defaultRuntimeVersion  = "4.2.5"
 	dagParseAllowedVersion = "4.1.0"
 
 	composeImageBuildingPromptMsg     = "Building image..."
 	composeSkipImageBuildingPromptMsg = "Skipping building image..."
 	deploymentHeaderMsg               = "Authenticated to %s \n\n"
 
-	warningInvaildImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
-	warningInvalidImageTagMsg  = "WARNING! You are about to push an image using the '%s' runtime tag. This is not supported.\nConsider using one of the following supported tags: %s"
+	warningInvalidImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 
-	message                  = "DAGs uploaded successfully"
-	action                   = "UPLOAD"
 	allTests                 = "all-tests"
 	parseAndPytest           = "parse-and-all-tests"
 	enableDagDeployMsg       = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys"
@@ -112,6 +107,7 @@ type InputDeploy struct {
 	DagsPath          string
 	Description       string
 	BuildSecretString string
+	ForceUpgradeToAF3 bool
 }
 
 const accessYourDeploymentFmt = `
@@ -159,12 +155,12 @@ func shouldIncludeMonitoringDag(deploymentType astroplatformcore.DeploymentType)
 	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
 }
 
-func deployDags(path, dagsPath, dagsUploadURL string, deploymentType astroplatformcore.DeploymentType) (string, error) {
+func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, deploymentType astroplatformcore.DeploymentType) (string, error) {
 	if shouldIncludeMonitoringDag(deploymentType) {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 		// Create monitoring dag file
-		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
+		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.Af2MonitoringDag)
 		if err != nil {
 			return "", err
 		}
@@ -173,7 +169,7 @@ func deployDags(path, dagsPath, dagsUploadURL string, deploymentType astroplatfo
 		defer os.Remove(monitoringDagPath)
 	}
 
-	versionID, err := uploadBundle(path, dagsPath, dagsUploadURL, true)
+	versionID, err := UploadBundle(path, dagsPath, dagsUploadURL, true, currentRuntimeVersion)
 	if err != nil {
 		return "", err
 	}
@@ -265,12 +261,12 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			}
 		}
 		if deployInput.Pytest != "" {
-			version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, platformCoreClient)
+			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInput.ForceUpgradeToAF3, platformCoreClient)
 			if err != nil {
 				return err
 			}
 
-			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
+			err = parseOrPytestDAG(deployInput.Pytest, runtimeVersion, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
 			if err != nil {
 				return err
 			}
@@ -281,7 +277,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, astroplatformcore.DeploymentType(deployInfo.deploymentType))
+		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.currentVersion, astroplatformcore.DeploymentType(deployInfo.deploymentType))
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -345,13 +341,13 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		// Build our image
-		version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, platformCoreClient)
+		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInput.ForceUpgradeToAF3, platformCoreClient)
 		if err != nil {
 			return err
 		}
 
 		if len(dagFiles) > 0 {
-			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
+			err = parseOrPytestDAG(deployInput.Pytest, runtimeVersion, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
 			if err != nil {
 				return err
 			}
@@ -371,7 +367,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
 			if !deployInput.Image {
-				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, astroplatformcore.DeploymentType(deployInfo.deploymentType))
+				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.currentVersion, astroplatformcore.DeploymentType(deployInfo.deploymentType))
 				if err != nil {
 					return err
 				}
@@ -461,9 +457,9 @@ func getDeploymentInfo(
 	return deployInfo, nil
 }
 
-func parseOrPytestDAG(pytest, version, envFile, deployImage, namespace, buildSecretString string) error {
-	dagParseVersionCheck := versions.GreaterThanOrEqualTo(version, dagParseAllowedVersion)
-	if !dagParseVersionCheck {
+func parseOrPytestDAG(pytest, runtimeVersion, envFile, deployImage, namespace, buildSecretString string) error {
+	validDAGParseVersion := airflowversions.CompareRuntimeVersions(runtimeVersion, dagParseAllowedVersion) >= 0
+	if !validDAGParseVersion {
 		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip DAG parse...")
 	}
 
@@ -473,7 +469,7 @@ func parseOrPytestDAG(pytest, version, envFile, deployImage, namespace, buildSec
 	}
 
 	switch {
-	case pytest == parse && dagParseVersionCheck:
+	case pytest == parse && validDAGParseVersion:
 		// parse dags
 		fmt.Println("Testing image...")
 		err := parseDAGs(deployImage, buildSecretString, containerHandler)
@@ -637,7 +633,7 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 	return nil
 }
 
-func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled bool, platformCoreClient astroplatformcore.CoreClient) (version string, err error) {
+func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, forceUpgradeToAF3 bool, platformCoreClient astroplatformcore.CoreClient) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
 
 	if imageName == "" {
@@ -679,14 +675,11 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 	}
 
 	if config.CFG.ShowWarnings.GetBool() && version == "" {
-		fmt.Printf(warningInvaildImageNameMsg, DockerfileImage)
+		fmt.Printf(warningInvalidImageNameMsg, DockerfileImage)
 		fmt.Println("Canceling deploy...")
 		os.Exit(1)
 	}
 
-	if version == "" {
-		version = defaultRuntimeVersion
-	}
 	resp, err := platformCoreClient.GetDeploymentOptionsWithResponse(httpContext.Background(), organizationID, &astroplatformcore.GetDeploymentOptionsParams{})
 	if err != nil {
 		return "", err
@@ -695,30 +688,17 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 	if err != nil {
 		return "", err
 	}
-
-	runtimeReleases := resp.JSON200.RuntimeReleases
-	runtimeVersions := []string{}
-
-	for _, runtimeRelease := range runtimeReleases {
-		runtimeVersions = append(runtimeVersions, runtimeRelease.Version)
+	deploymentOptionsRuntimeVersions := []string{}
+	for _, runtimeRelease := range resp.JSON200.RuntimeReleases {
+		deploymentOptionsRuntimeVersions = append(deploymentOptionsRuntimeVersions, runtimeRelease.Version)
 	}
 
-	isValidRuntimeVersions := ValidTags(runtimeVersions, currentVersion)
-	isUpgradeValid := IsValidUpgrade(currentVersion, version)
-
-	if !isUpgradeValid {
-		fmt.Printf("You pushed a version of Astro Runtime that is incompatible with your Deployment\nModify your Astro Runtime version to %s or higher in your Dockerfile and try again\n", currentVersion)
+	if !ValidRuntimeVersion(currentVersion, version, deploymentOptionsRuntimeVersions, forceUpgradeToAF3) {
 		fmt.Println("Canceling deploy...")
 		os.Exit(1)
 	}
 
-	isTagValid := IsValidTag(isValidRuntimeVersions, version)
-
-	CheckVersion(version, os.Stdout)
-
-	if !isTagValid {
-		fmt.Println(fmt.Sprintf(warningInvalidImageTagMsg, version, isValidRuntimeVersions))
-	}
+	WarnIfNonLatestVersion(version, httputil.NewHTTPClient())
 
 	return version, nil
 }
@@ -758,69 +738,58 @@ func createDeploy(organizationID, deploymentID string, request astroplatformcore
 	return resp.JSON200, err
 }
 
-func IsValidUpgrade(currentVersion, tag string) bool {
-	// To allow old deployments which do not have runtimeVersion tag
+func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVersions []string, forceUpgradeToAF3 bool) bool {
+	// Allow old deployments which do not have runtimeVersion tag
 	if currentVersion == "" {
 		return true
 	}
 
-	tagVersion := util.Coerce(tag)
-	currentTagVersion := util.Coerce(currentVersion)
-
-	if i := tagVersion.Compare(currentTagVersion); i >= 0 {
-		return true
+	// Check that the tag is not a downgrade
+	if airflowversions.CompareRuntimeVersions(tag, currentVersion) < 0 {
+		fmt.Printf("Cannot deploy a downgraded Astro Runtime version. Modify your Astro Runtime version to %s or higher in your Dockerfile\n", currentVersion)
+		return false
 	}
 
-	return false
-}
-
-func IsValidTag(runtimeVersions []string, tag string) bool {
-	tagVersion := util.Coerce(tag)
-	for _, runtimeVersion := range runtimeVersions {
-		supportedVersion := util.Coerce(runtimeVersion)
-		// i = 1 means version greater than
-		if i := supportedVersion.Compare(tagVersion); i == 0 {
-			return true
+	// Check that the tag is supported by the deployment
+	tagInDeploymentOptions := false
+	for _, runtimeVersion := range deploymentOptionsRuntimeVersions {
+		if airflowversions.CompareRuntimeVersions(tag, runtimeVersion) == 0 {
+			tagInDeploymentOptions = true
+			break
 		}
 	}
-	return false
-}
-
-func ValidTags(runtimeVersions []string, currentVersion string) []string {
-	// For old deployments which do not have runtimeVersion tag
-	if currentVersion == "" {
-		return runtimeVersions
+	if !tagInDeploymentOptions {
+		fmt.Println("Cannot deploy an unsupported Astro Runtime version. Modify your Astro Runtime version to a supported version in your Dockerfile")
+		fmt.Printf("Supported versions: %s\n", strings.Join(deploymentOptionsRuntimeVersions, ", "))
+		return false
 	}
 
-	currentTagVersion := util.Coerce(currentVersion)
-	validVersions := []string{}
-
-	for _, runtimeVersion := range runtimeVersions {
-		supportedVersion := util.Coerce(runtimeVersion)
-		// i = 1 means version greater than
-		if i := supportedVersion.Compare(currentTagVersion); i >= 0 {
-			validVersions = append(validVersions, runtimeVersion)
+	// If upgrading from Airflow 2 to Airflow 3, we require at least Runtime 8.7.0 (Airflow 2.6.3) and that the user has forced the upgrade
+	currentVersionAirflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(currentVersion)
+	tagAirflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(tag)
+	if currentVersionAirflowMajorVersion == "2" && tagAirflowMajorVersion == "3" {
+		if airflowversions.CompareRuntimeVersions(currentVersion, "8.7.0") < 0 {
+			fmt.Println("Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 8.7.0 or higher")
+			return false
+		}
+		if !forceUpgradeToAF3 {
+			fmt.Println("Can only upgrade deployment from Airflow 2 to Airflow 3 with the --force-upgrade-to-af3 flag")
+			return false
 		}
 	}
 
-	return validVersions
+	return true
 }
 
-func CheckVersion(version string, out io.Writer) {
-	httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
-	latestRuntimeVersion, _ := airflowversions.GetDefaultImageTag(httpClient, "")
-	switch {
-	case versions.LessThan(version, latestRuntimeVersion):
-		// if current runtime version is not greater than or equal to the latest runtime verion let the user know
-		fmt.Fprintf(out, "WARNING! You are currently running Astro Runtime Version %s\nConsider upgrading to the latest version, Astro Runtime %s\n", version, latestRuntimeVersion)
-	case versions.GreaterThan(version, latestRuntimeVersion):
-		i, _ := input.Confirm("WARNING! The Astro Runtime image in your Dockerfile is classified as \"Beta\" and may not be fit for pipelines in production. Are you sure you want to continue?\n")
+func WarnIfNonLatestVersion(version string, httpClient *httputil.HTTPClient) {
+	client := airflowversions.NewClient(httpClient, false)
+	latestRuntimeVersion, err := airflowversions.GetDefaultImageTag(client, "", false)
+	if err != nil {
+		logger.Debugf("unable to get latest runtime version: %s", err)
+		return
+	}
 
-		if !i {
-			fmt.Fprintf(out, "Canceling deploy...")
-			os.Exit(1)
-		}
-	default:
-		fmt.Fprintf(out, "Runtime Version: %s\n", version)
+	if airflowversions.CompareRuntimeVersions(version, latestRuntimeVersion) <= 0 {
+		fmt.Printf("WARNING! You are currently running Astro Runtime Version %s\nConsider upgrading to the latest version, Astro Runtime %s\n", version, latestRuntimeVersion)
 	}
 }
