@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -46,22 +47,24 @@ import (
 )
 
 const (
-	RuntimeImageLabel              = "io.astronomer.docker.runtime.version"
-	AirflowImageLabel              = "io.astronomer.docker.airflow.version"
-	componentName                  = "airflow"
-	dockerStateUp                  = "running"
-	dockerExitState                = "exited"
-	defaultAirflowVersion          = uint64(0x2) //nolint:mnd
-	triggererAllowedRuntimeVersion = "4.0.0"
-	triggererAllowedAirflowVersion = "2.2.0"
-	pytestDirectory                = "tests"
-	registryUsername               = "cli"
-	unknown                        = "unknown"
-	major                          = "major"
-	patch                          = "patch"
-	minor                          = "minor"
-	partsNum                       = 2
-	ruffFilePermission             = 0o600
+	RuntimeImageLabel                     = "io.astronomer.docker.runtime.version"
+	AirflowImageLabel                     = "io.astronomer.docker.airflow.version"
+	componentName                         = "airflow"
+	dockerStateUp                         = "running"
+	dockerExitState                       = "exited"
+	defaultAirflowVersion                 = uint64(0x2) //nolint:mnd
+	triggererAllowedRuntimeVersion        = "4.0.0"
+	triggererAllowedAirflowVersion        = "2.2.0"
+	pytestDirectory                       = "tests"
+	registryUsername                      = "cli"
+	unknown                               = "unknown"
+	major                                 = "major"
+	patch                                 = "patch"
+	minor                                 = "minor"
+	partsNum                              = 2
+	ruffFilePermission                    = 0o600
+	airflowMajorVersion2           uint64 = 2
+	airflowMajorVersion3           uint64 = 3
 
 	composeCreateErrMsg      = "error creating docker-compose project"
 	composeStatusCheckErrMsg = "error checking docker-compose status"
@@ -69,7 +72,7 @@ const (
 	composePauseErrMsg       = "Error pausing project containers"
 	composeStopErrMsg        = "Error stopping and removing containers"
 
-	composeLinkWebserverMsg = "Airflow Webserver: %s"
+	composeLinkUIMsg        = "Airflow UI: %s"
 	composeLinkPostgresMsg  = "Postgres Database: %s"
 	composeUserPasswordMsg  = "The default Airflow UI credentials are: %s"
 	postgresUserPasswordMsg = "The default Postgres DB credentials are: %s"
@@ -1398,9 +1401,20 @@ func (d *DockerCompose) checkAirflowVersion() (uint64, error) {
 		if version, err := semver.NewVersion(airflowVersion); err == nil {
 			airflowDockerVersion = version.Major()
 		} else {
-			fmt.Printf("unable to parse airflow version, defaulting to major version 2, error: %s", err.Error())
+			fmt.Printf("unable to parse Airflow version, defaulting to major version 2, error: %s", err.Error())
+		}
+	} else {
+		runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
+		if ok {
+			airflowDockerVersion, err = strconv.ParseUint(airflowversions.AirflowMajorVersionForRuntimeVersion(runtimeVersion), 10, 64)
+			if err != nil {
+				fmt.Printf("unable to parse runtime version, defaulting to major version 2")
+			}
+		} else {
+			fmt.Printf("unable to detect Airflow or runtime versions in image labels, defaulting to major version 2")
 		}
 	}
+
 	return airflowDockerVersion, nil
 }
 
@@ -1475,7 +1489,7 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 	return project, nil
 }
 
-func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *composetypes.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
+func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *composetypes.Project, composeService api.Service, airflowMajorVersion uint64, noBrowser bool) error {
 	psInfo, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
 		All: true,
 	})
@@ -1493,24 +1507,35 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 			if strings.Contains(psInfo[i].Name, project.Name) &&
 				(strings.Contains(psInfo[i].Name, WebserverDockerContainerName) ||
 					strings.Contains(psInfo[i].Name, APIServerDockerContainerName)) {
-				err = initSettings(psInfo[i].ID, settingsFile, envConns, airflowDockerVersion, true, true, true)
+				err = initSettings(psInfo[i].ID, settingsFile, envConns, airflowMajorVersion, true, true, true)
 				if err != nil {
 					return err
 				}
 			}
 		}
 	}
-	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
-	webserverURL := "http://localhost:" + parts[len(parts)-1]
+
+	var port string
+	switch airflowMajorVersion {
+	case airflowMajorVersion2:
+		port = config.CFG.WebserverPort.GetString()
+	case airflowMajorVersion3:
+		port = config.CFG.APIServerPort.GetString()
+	}
+	parts := strings.Split(port, ":")
+	uiURL := "http://localhost:" + parts[len(parts)-1]
 	bullet := ansi.Cyan("\u27A4") + " "
-	fmt.Printf(bullet+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
+	fmt.Printf(bullet+composeLinkUIMsg+"\n", ansi.Bold(uiURL))
 	fmt.Printf(bullet+composeLinkPostgresMsg+"\n", ansi.Bold("postgresql://localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
-	fmt.Printf(bullet+composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
+	// The CLI configures Airflow 3 to run without UI credentials, so we don't want to print them out
+	if airflowMajorVersion == airflowMajorVersion2 {
+		fmt.Printf(bullet+composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
+	}
 	fmt.Printf(bullet+postgresUserPasswordMsg+"\n", ansi.Bold("postgres:postgres"))
 	if !(noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {
-		err = openURL(webserverURL)
+		err = openURL(uiURL)
 		if err != nil {
-			fmt.Println("\nUnable to open the webserver URL, please visit the following link: " + webserverURL)
+			fmt.Println("\nUnable to open the Airflow UI, please visit the following link: " + uiURL)
 		}
 	}
 	return nil
