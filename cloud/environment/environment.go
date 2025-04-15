@@ -11,7 +11,7 @@ import (
 var ErrorEntityIDNotSpecified = errors.New("workspace or deployment ID must be specified")
 
 func ListConnections(workspaceID, deploymentID string, coreClient astrocore.CoreClient) (map[string]astrocore.EnvironmentObjectConnection, error) {
-	envObjs, err := listEnvironmentObjects(workspaceID, deploymentID, astrocore.ListEnvironmentObjectsParamsObjectTypeCONNECTION, coreClient)
+	envObjs, err := listEnvironmentObjects(workspaceID, deploymentID, astrocore.CONNECTION, coreClient)
 	if err != nil {
 		return nil, err
 	}
