@@ -286,7 +286,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretS
 	var healthURL, healthComponent string
 	switch airflowMajorVersion {
 	case "3":
-		healthURL = fmt.Sprintf("http://localhost:%s/public/monitor/health", config.CFG.APIServerPort.GetString())
+		healthURL = fmt.Sprintf("http://localhost:%s/api/v2/monitor/health", config.CFG.APIServerPort.GetString())
 		healthComponent = "api-server"
 	case "2":
 		healthURL = fmt.Sprintf("http://localhost:%s/health", config.CFG.WebserverPort.GetString())
@@ -1490,24 +1490,23 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 }
 
 func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *composetypes.Project, composeService api.Service, airflowMajorVersion uint64, noBrowser bool) error {
-	psInfo, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
+	containers, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
 		All: true,
 	})
 	if err != nil {
 		return errors.Wrap(err, composeStatusCheckErrMsg)
 	}
 
-	fileState, err := fileutil.Exists(settingsFile, nil)
+	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
 	}
-
-	if fileState {
-		for i := range psInfo {
-			if strings.Contains(psInfo[i].Name, project.Name) &&
-				(strings.Contains(psInfo[i].Name, WebserverDockerContainerName) ||
-					strings.Contains(psInfo[i].Name, APIServerDockerContainerName)) {
-				err = initSettings(psInfo[i].ID, settingsFile, envConns, airflowMajorVersion, true, true, true)
+	if settingsFileExists {
+		for _, container := range containers { //nolint:gocritic
+			if strings.Contains(container.Name, project.Name) &&
+				(strings.Contains(container.Name, WebserverDockerContainerName) ||
+					strings.Contains(container.Name, APIServerDockerContainerName)) {
+				err = initSettings(container.ID, settingsFile, envConns, airflowMajorVersion, true, true, true)
 				if err != nil {
 					return err
 				}
