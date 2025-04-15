@@ -361,6 +361,7 @@ services:
   AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
   AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://api-server:8080/execution/"
   AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
   AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
