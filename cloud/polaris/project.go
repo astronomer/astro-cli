@@ -2,6 +2,7 @@ package polaris
 
 import (
 	"archive/tar"
+	"compress/gzip"
 	httpContext "context"
 	"errors"
 	"fmt"
@@ -9,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-
-	"compress/gzip"
 
 	astropolariscore "github.com/astronomer/astro-cli/astro-client-polaris-core"
 	"github.com/astronomer/astro-cli/config"
@@ -22,6 +21,8 @@ import (
 
 var (
 	ErrInvalidProjectSelection = errors.New("invalid project selection")
+	// DefaultDirPerm is the default permission for directories
+	DefaultDirPerm os.FileMode = 0o755
 )
 
 func newTableOut() *printutil.Table {
@@ -134,51 +135,53 @@ func selectPolarisProject(projects []astropolariscore.PolarisProject) (astropola
 }
 
 // ExportProject exports a project from CLI to Astro IDE
-func ExportProject(client astropolariscore.PolarisClient, projectID string, workspaceID string, organizationID string, out io.Writer) error {
-	// Ask user if they want to create a new project
-	fmt.Println("Do you want to create a new project? (y/n)")
-	choice := input.Text("\n> ")
-	if choice == "y" || choice == "Y" {
-		// Get project details from user
-		fmt.Println("Enter project name:")
-		name := input.Text("\n> ")
+func ExportProject(client astropolariscore.PolarisClient, projectID, workspaceID, organizationID string, out io.Writer) error {
+	if projectID == "" {
+		// Ask user if they want to create a new project
+		fmt.Println("Do you want to create a new project? (y/n)")
+		choice := input.Text("\n> ")
+		if choice == "y" || choice == "Y" {
+			// Get project details from user
+			fmt.Println("Enter project name:")
+			name := input.Text("\n> ")
 
-		// Create new project
-		ctx, err := context.GetCurrentContext()
-		if err != nil {
-			return err
-		}
+			// Create new project
+			ctx, err := context.GetCurrentContext()
+			if err != nil {
+				return err
+			}
 
-		// Create the project request
-		req := astropolariscore.CreatePolarisProjectRequest{
-			Name: &name,
-		}
+			// Create the project request
+			req := astropolariscore.CreatePolarisProjectRequest{
+				Name: &name,
+			}
 
-		// Create the project
-		resp, err := client.CreatePolarisProjectWithResponse(httpContext.Background(), organizationID, workspaceID, req)
-		if err != nil {
-			return fmt.Errorf("failed to create project: %w", err)
-		}
+			// Create the project
+			resp, err := client.CreatePolarisProjectWithResponse(httpContext.Background(), organizationID, workspaceID, req)
+			if err != nil {
+				return fmt.Errorf("failed to create project: %w", err)
+			}
 
-		if err := astropolariscore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-			return err
-		}
+			if err := astropolariscore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+				return err
+			}
 
-		fmt.Fprintf(out, "Successfully created project '%s' in workspace '%s'\n", name, ctx.Workspace)
+			fmt.Fprintf(out, "Successfully created project '%s' in workspace '%s'\n", name, ctx.Workspace)
 
-		// Get the newly created project ID
-		projectID = resp.JSON200.Id
-	} else {
-		// List existing projects and let user select one
-		projects, err := ListProjects(client)
-		if err != nil {
-			return err
+			// Get the newly created project ID
+			projectID = resp.JSON200.Id
+		} else {
+			// List existing projects and let user select one
+			projects, err := ListProjects(client)
+			if err != nil {
+				return err
+			}
+			selectedProject, err := selectPolarisProject(projects)
+			if err != nil {
+				return err
+			}
+			projectID = selectedProject.Id
 		}
-		selectedProject, err := selectPolarisProject(projects)
-		if err != nil {
-			return err
-		}
-		projectID = selectedProject.Id
 	}
 
 	// Create a temporary directory for the archive
@@ -304,7 +307,7 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 }
 
 // ImportProject imports a project from Astro IDE to the local directory
-func ImportProject(client astropolariscore.PolarisClient, projectID string, sessionID string, organizationID string, workspaceID string, out io.Writer) error {
+func ImportProject(client astropolariscore.PolarisClient, projectID, sessionID, organizationID, workspaceID string, out io.Writer) error {
 	// Validate current directory is empty
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -406,10 +409,10 @@ func extractTarGzArchive(archivePath, targetDir string) error {
 		}
 
 		// Create the target path
-		targetPath := filepath.Join(targetDir, header.Name)
+		targetPath := filepath.Join(targetDir, header.Name) //nolint
 
 		// Create parent directories if needed
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(targetPath), DefaultDirPerm); err != nil {
 			return err
 		}
 
@@ -417,16 +420,16 @@ func extractTarGzArchive(archivePath, targetDir string) error {
 		switch header.Typeflag {
 		case tar.TypeDir:
 			// Create directory
-			if err := os.MkdirAll(targetPath, 0755); err != nil {
+			if err := os.MkdirAll(targetPath, DefaultDirPerm); err != nil {
 				return err
 			}
 		case tar.TypeReg:
 			// Create file
-			file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)) //nolint
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(file, tarReader); err != nil {
+			if _, err := io.Copy(file, tarReader); err != nil { //nolint
 				file.Close()
 				return err
 			}
@@ -438,7 +441,7 @@ func extractTarGzArchive(archivePath, targetDir string) error {
 }
 
 // CreatePolarisProject creates a new Polaris project
-func CreatePolarisProject(client astropolariscore.PolarisClient, organizationID string, workspaceID string, name string, description string, visibility string, out io.Writer) error {
+func CreatePolarisProject(client astropolariscore.PolarisClient, organizationID, workspaceID, name, description, visibility string, out io.Writer) error {
 	// Get context
 	ctx, err := context.GetCurrentContext()
 	if err != nil {

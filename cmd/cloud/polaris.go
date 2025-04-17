@@ -66,9 +66,6 @@ astro polaris project create --workspace-id <workspace-id> --organization-id <or
 	cmd.Flags().StringVarP(&polarisProjectName, "name", "n", "", "Name of the project")
 	cmd.Flags().StringVarP(&polarisDescription, "description", "d", "", "Description of the project")
 	cmd.Flags().StringVar(&polarisVisibility, "visibility", "PRIVATE", "Visibility of the project (PRIVATE or WORKSPACE)")
-
-	cmd.MarkFlagRequired("name")
-
 	return cmd
 }
 
@@ -165,10 +162,12 @@ func createPolarisProject(cmd *cobra.Command, out io.Writer) error {
 		return errors.New("visibility must be either 'PRIVATE' or 'WORKSPACE'")
 	}
 
+	cmd.SilenceUsage = true
 	return polaris.CreatePolarisProject(polarisCoreClient, organizationID, workspaceID, polarisProjectName, polarisDescription, polarisVisibility, out)
 }
 
 func listPolarisProjects(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
 	return polaris.List(polarisCoreClient, out)
 }
 
@@ -185,6 +184,8 @@ func exportPolarisProject(cmd *cobra.Command, out io.Writer) error {
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
 	}
+
+	cmd.SilenceUsage = true
 	return polaris.ExportProject(polarisCoreClient, projectID, workspaceID, organizationID, out)
 }
 
@@ -201,5 +202,7 @@ func importPolarisProject(cmd *cobra.Command, out io.Writer) error {
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
 	}
+
+	cmd.SilenceUsage = true
 	return polaris.ImportProject(polarisCoreClient, projectID, sessionID, organizationID, workspaceID, out)
 }
