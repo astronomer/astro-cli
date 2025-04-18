@@ -112,7 +112,7 @@ func selectPolarisProject(projects []astropolariscore.PolarisProject) (astropola
 		Header:         []string{"#", "PROJECTNAME", "ID"},
 	}
 
-	fmt.Println("\nPlease select the workspace you would like to update:")
+	fmt.Println("\nPlease select the project from the list below:")
 
 	projectMap := map[string]astropolariscore.PolarisProject{}
 	for i := range projects {
