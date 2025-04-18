@@ -798,14 +798,14 @@ func (d *DockerCompose) lintTest(testHomeDirectory string, includeDeprecations b
 		}
 	}
 
-	// Mount the dags directory and the ruff config file
+	// Mount the project and the ruff config file
 	mountDirs := map[string]string{
-		filepath.Join(config.WorkingPath, "dags"): "/app/dags",
-		configFile: "/app/ruff.toml",
+		config.WorkingPath: "/app/project",
+		configFile:         "/app/ruff.toml",
 	}
 
-	// Run ruff with the config file and the dags directory
-	ruffArgs := []string{"check", "--config", "/app/ruff.toml", "/app/dags"}
+	// Run ruff with the config file and the project directory
+	ruffArgs := []string{"check", "--config", "/app/ruff.toml", "/app/project"}
 	var buf bytes.Buffer
 	bufWriter := io.MultiWriter(os.Stdout, &buf)
 	ruffErr := d.ruffImageHandler.RunCommand(ruffArgs, mountDirs, bufWriter, bufWriter)

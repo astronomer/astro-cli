@@ -1407,7 +1407,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 
 		ruffImageHandler := new(mocks.ImageHandler)
-		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/dags"}, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/project"}, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
@@ -1425,7 +1425,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 
 		ruffImageHandler := new(mocks.ImageHandler)
-		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/dags"}, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/project"}, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
@@ -1444,12 +1444,6 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		s.NoError(err)
 		defer os.Remove(dummyConfigFile) // Clean up dummy file
 
-		// Create dummy dags directory inside the temp test directory
-		dummyDagsDir := filepath.Join(cwd, "dags")
-		err = os.Mkdir(dummyDagsDir, 0o777)
-		s.NoError(err)
-		defer os.RemoveAll(dummyDagsDir) // Clean up dummy dags dir
-
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "Dockerfile", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
@@ -1457,10 +1451,10 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		ruffImageHandler := new(mocks.ImageHandler)
 		// Expect RunCommand, specifically check that the provided config file and dags dir are mounted
 		expectedMounts := map[string]string{
-			dummyDagsDir:    "/app/dags",      // Use the dummy dags dir path from cwd
+			cwd:             "/app/project",   // Use the dummy dags dir path from cwd
 			dummyConfigFile: "/app/ruff.toml", // Check this mapping
 		}
-		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/dags"}, expectedMounts, mock.Anything, mock.Anything).Return(nil).Once()
+		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/project"}, expectedMounts, mock.Anything, mock.Anything).Return(nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
@@ -1482,7 +1476,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 
 		ruffImageHandler := new(mocks.ImageHandler)
-		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/dags"}, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
+		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/project"}, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
