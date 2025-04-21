@@ -1407,6 +1407,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 
 		ruffImageHandler := new(mocks.ImageHandler)
+		ruffImageHandler.On("Pull", "", "", "").Return(nil).Once()
 		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/project"}, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
@@ -1425,6 +1426,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 
 		ruffImageHandler := new(mocks.ImageHandler)
+		ruffImageHandler.On("Pull", "", "", "").Return(nil).Once()
 		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/project"}, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
@@ -1454,6 +1456,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 			cwd:             "/app/project",   // Use the dummy dags dir path from cwd
 			dummyConfigFile: "/app/ruff.toml", // Check this mapping
 		}
+		ruffImageHandler.On("Pull", "", "", "").Return(nil).Once()
 		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/project"}, expectedMounts, mock.Anything, mock.Anything).Return(nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
@@ -1476,6 +1479,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
 
 		ruffImageHandler := new(mocks.ImageHandler)
+		ruffImageHandler.On("Pull", "", "", "").Return(nil).Once()
 		ruffImageHandler.On("RunCommand", []string{"check", "--config", "/app/ruff.toml", "/app/project"}, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
