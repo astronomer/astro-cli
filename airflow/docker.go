@@ -804,6 +804,12 @@ func (d *DockerCompose) lintTest(testHomeDirectory string, includeDeprecations b
 		configFile:         "/app/ruff.toml",
 	}
 
+	// Pull the ruff image to get the latest image for the "latest" tag
+	err = d.ruffImageHandler.Pull("", "", "")
+	if err != nil {
+		return false, err
+	}
+
 	// Run ruff with the config file and the project directory
 	ruffArgs := []string{"check", "--config", "/app/ruff.toml", "/app/project"}
 	var buf bytes.Buffer
