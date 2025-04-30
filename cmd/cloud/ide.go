@@ -81,7 +81,7 @@ astro IDE project create --name <project-name>
 # Create a new IDE project with description and visibility
 astro IDE project create --name <project-name> --visibility private --description "My project description"
 
-# Create a new IDE project in specific organisation and workspace
+# Create a new IDE project in specific organization and workspace
 astro IDE project create --workspace-id <workspace-id> --organization-id <organization-id> --name <project-name> --description "My project description" --visibility private
 `,
 	}
@@ -109,7 +109,7 @@ astro ide import
 # Import a project from a specific Astro IDE project
 astro ide import --project-id <project-id>
 
-# Import a project from an Astro IDE project from specific organisation and workspace
+# Import a project from an Astro IDE project from specific organization and workspace
 astro ide import --project-id <project-id> --workspace-id <workspace-id> --organization-id <organization-id>
 `,
 	}
@@ -138,7 +138,7 @@ astro ide export --project-id <project-id>
 # Force export to an Astro IDE project
 astro ide export --project-id <project-id> --force
 
-# Export a project to an Astro IDE project to specific organisation and workspace
+# Export a project to an Astro IDE project to specific organization and workspace
 astro ide export --project-id <project-id> --workspace-id <workspace-id> --organization-id <organization-id>
 `,
 	}
