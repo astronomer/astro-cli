@@ -1,8 +1,0 @@
-package: astropolariscore
-generate:
-  - types
-  - client
-include-tags:
-  - Polaris Session
-  - Polaris Project
-output: ./astro-client-polaris-core/api.gen.go

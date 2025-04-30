@@ -276,6 +276,24 @@ const (
 	CreateHybridDeploymentRequestTypeSTANDARD  CreateHybridDeploymentRequestType = "STANDARD"
 )
 
+// Defines values for CreatePolarisProjectRequestVisibility.
+const (
+	CreatePolarisProjectRequestVisibilityPRIVATE   CreatePolarisProjectRequestVisibility = "PRIVATE"
+	CreatePolarisProjectRequestVisibilityWORKSPACE CreatePolarisProjectRequestVisibility = "WORKSPACE"
+)
+
+// Defines values for CreatePolarisSessionPermission.
+const (
+	CreatePolarisSessionPermissionREADONLY  CreatePolarisSessionPermission = "READ_ONLY"
+	CreatePolarisSessionPermissionREADWRITE CreatePolarisSessionPermission = "READ_WRITE"
+)
+
+// Defines values for CreatePolarisSessionRequestPermission.
+const (
+	CreatePolarisSessionRequestPermissionREADONLY  CreatePolarisSessionRequestPermission = "READ_ONLY"
+	CreatePolarisSessionRequestPermissionREADWRITE CreatePolarisSessionRequestPermission = "READ_WRITE"
+)
+
 // Defines values for CreateStandardDeploymentRequestCloudProvider.
 const (
 	CreateStandardDeploymentRequestCloudProviderAWS   CreateStandardDeploymentRequestCloudProvider = "AWS"
@@ -558,6 +576,18 @@ const (
 	OrganizationSupportPlanTRIALV2             OrganizationSupportPlan = "TRIAL_V2"
 )
 
+// Defines values for PolarisProjectVisibility.
+const (
+	PolarisProjectVisibilityPRIVATE   PolarisProjectVisibility = "PRIVATE"
+	PolarisProjectVisibilityWORKSPACE PolarisProjectVisibility = "WORKSPACE"
+)
+
+// Defines values for PolarisSessionEditActor.
+const (
+	PolarisSessionEditActorAGENT PolarisSessionEditActor = "AGENT"
+	PolarisSessionEditActorUSER  PolarisSessionEditActor = "USER"
+)
+
 // Defines values for RoleScopeType.
 const (
 	RoleScopeTypeDEPLOYMENT   RoleScopeType = "DEPLOYMENT"
@@ -704,6 +734,18 @@ const (
 	BASICPAYGO     UpdateOrganizationSupportPlanRequestSupportPlan = "BASIC_PAYGO"
 	DEVELOPERPAYGO UpdateOrganizationSupportPlanRequestSupportPlan = "DEVELOPER_PAYGO"
 	TEAMPAYGO      UpdateOrganizationSupportPlanRequestSupportPlan = "TEAM_PAYGO"
+)
+
+// Defines values for UpdatePolarisSessionPermission.
+const (
+	UpdatePolarisSessionPermissionREADONLY  UpdatePolarisSessionPermission = "READ_ONLY"
+	UpdatePolarisSessionPermissionREADWRITE UpdatePolarisSessionPermission = "READ_WRITE"
+)
+
+// Defines values for UpdatePolarisSessionRequestPermission.
+const (
+	UpdatePolarisSessionRequestPermissionREADONLY  UpdatePolarisSessionRequestPermission = "READ_ONLY"
+	UpdatePolarisSessionRequestPermissionREADWRITE UpdatePolarisSessionRequestPermission = "READ_WRITE"
 )
 
 // Defines values for UserSignupType.
@@ -913,9 +955,9 @@ const (
 
 // Defines values for GetDeploymentOptionsParamsDeploymentType.
 const (
-	DEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
-	HYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
-	STANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
+	GetDeploymentOptionsParamsDeploymentTypeDEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
+	GetDeploymentOptionsParamsDeploymentTypeHYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
+	GetDeploymentOptionsParamsDeploymentTypeSTANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
 )
 
 // Defines values for GetDeploymentOptionsParamsExecutor.
@@ -1196,6 +1238,38 @@ const (
 	ListWorkspaceApiTokensParamsSortsUpdatedByIdDesc  ListWorkspaceApiTokensParamsSorts = "updatedById:desc"
 )
 
+// Defines values for ListPolarisProjectsParamsSorts.
+const (
+	ListPolarisProjectsParamsSortsCreatedAtAsc    ListPolarisProjectsParamsSorts = "createdAt:asc"
+	ListPolarisProjectsParamsSortsCreatedAtDesc   ListPolarisProjectsParamsSorts = "createdAt:desc"
+	ListPolarisProjectsParamsSortsDescriptionAsc  ListPolarisProjectsParamsSorts = "description:asc"
+	ListPolarisProjectsParamsSortsDescriptionDesc ListPolarisProjectsParamsSorts = "description:desc"
+	ListPolarisProjectsParamsSortsIdAsc           ListPolarisProjectsParamsSorts = "id:asc"
+	ListPolarisProjectsParamsSortsIdDesc          ListPolarisProjectsParamsSorts = "id:desc"
+	ListPolarisProjectsParamsSortsNameAsc         ListPolarisProjectsParamsSorts = "name:asc"
+	ListPolarisProjectsParamsSortsNameDesc        ListPolarisProjectsParamsSorts = "name:desc"
+	ListPolarisProjectsParamsSortsUpdatedAtAsc    ListPolarisProjectsParamsSorts = "updatedAt:asc"
+	ListPolarisProjectsParamsSortsUpdatedAtDesc   ListPolarisProjectsParamsSorts = "updatedAt:desc"
+)
+
+// Defines values for ListPolarisProjectsParamsVisibility.
+const (
+	PRIVATE   ListPolarisProjectsParamsVisibility = "PRIVATE"
+	WORKSPACE ListPolarisProjectsParamsVisibility = "WORKSPACE"
+)
+
+// Defines values for ImportPolarisSessionTarParamsMode.
+const (
+	ImportPolarisSessionTarParamsModeOVERWRITE ImportPolarisSessionTarParamsMode = "OVERWRITE"
+	ImportPolarisSessionTarParamsModeUPSERT    ImportPolarisSessionTarParamsMode = "UPSERT"
+)
+
+// Defines values for ImportPolarisSessionZipParamsMode.
+const (
+	ImportPolarisSessionZipParamsModeOVERWRITE ImportPolarisSessionZipParamsMode = "OVERWRITE"
+	ImportPolarisSessionZipParamsModeUPSERT    ImportPolarisSessionZipParamsMode = "UPSERT"
+)
+
 // Defines values for ListWorkspaceTeamsParamsSorts.
 const (
 	ListWorkspaceTeamsParamsSortsCreatedAtAsc       ListWorkspaceTeamsParamsSorts = "createdAt:asc"
@@ -1212,18 +1286,18 @@ const (
 
 // Defines values for ListWorkspaceUsersParamsSorts.
 const (
-	CreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
-	CreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
-	FullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
-	FullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
-	StatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
-	StatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
-	UpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
-	UpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
-	UsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
-	UsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
-	WorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
-	WorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
+	ListWorkspaceUsersParamsSortsCreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
+	ListWorkspaceUsersParamsSortsCreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
+	ListWorkspaceUsersParamsSortsFullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
+	ListWorkspaceUsersParamsSortsFullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
+	ListWorkspaceUsersParamsSortsStatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
+	ListWorkspaceUsersParamsSortsStatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
+	ListWorkspaceUsersParamsSortsUpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
+	ListWorkspaceUsersParamsSortsUpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
+	ListWorkspaceUsersParamsSortsUsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
+	ListWorkspaceUsersParamsSortsUsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
+	ListWorkspaceUsersParamsSortsWorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
+	ListWorkspaceUsersParamsSortsWorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
 )
 
 // Defines values for ListSelfUserGitAccountsParamsGitProvider.
@@ -2046,6 +2120,33 @@ type CreateOrganizationRequest struct {
 	Name     string                  `json:"name"`
 }
 
+// CreatePolarisProjectRequest defines model for CreatePolarisProjectRequest.
+type CreatePolarisProjectRequest struct {
+	Description *string                                `json:"description,omitempty"`
+	Name        *string                                `json:"name,omitempty"`
+	Visibility  *CreatePolarisProjectRequestVisibility `json:"visibility,omitempty"`
+}
+
+// CreatePolarisProjectRequestVisibility defines model for CreatePolarisProjectRequest.Visibility.
+type CreatePolarisProjectRequestVisibility string
+
+// CreatePolarisSession defines model for CreatePolarisSession.
+type CreatePolarisSession struct {
+	Id         string                         `json:"id"`
+	Permission CreatePolarisSessionPermission `json:"permission"`
+}
+
+// CreatePolarisSessionPermission defines model for CreatePolarisSession.Permission.
+type CreatePolarisSessionPermission string
+
+// CreatePolarisSessionRequest defines model for CreatePolarisSessionRequest.
+type CreatePolarisSessionRequest struct {
+	Permission *CreatePolarisSessionRequestPermission `json:"permission,omitempty"`
+}
+
+// CreatePolarisSessionRequestPermission defines model for CreatePolarisSessionRequest.Permission.
+type CreatePolarisSessionRequestPermission string
+
 // CreateStandardDeploymentRequest defines model for CreateStandardDeploymentRequest.
 type CreateStandardDeploymentRequest struct {
 	// AstroRuntimeVersion Version of the astro runtime to use
@@ -2287,8 +2388,9 @@ type DeployGitProvider string
 
 // DeployPolaris defines model for DeployPolaris.
 type DeployPolaris struct {
-	ProjectId string `json:"projectId"`
-	VersionId string `json:"versionId"`
+	ProjectId   string `json:"projectId"`
+	ProjectName string `json:"projectName"`
+	VersionId   string `json:"versionId"`
 }
 
 // DeployRollbackRequest defines model for DeployRollbackRequest.
@@ -2872,6 +2974,11 @@ type HibernationStatus struct {
 	Reason        *string    `json:"reason,omitempty"`
 }
 
+// ImportPolarisSession defines model for ImportPolarisSession.
+type ImportPolarisSession struct {
+	Edit PolarisSessionEdit `json:"edit"`
+}
+
 // Invite defines model for Invite.
 type Invite struct {
 	ExpiresAt     string              `json:"expiresAt"`
@@ -3056,6 +3163,50 @@ type OrganizationStatus string
 // OrganizationSupportPlan defines model for Organization.SupportPlan.
 type OrganizationSupportPlan string
 
+// PolarisProject defines model for PolarisProject.
+type PolarisProject struct {
+	CreatedAt      time.Time                `json:"createdAt"`
+	CreatedBy      string                   `json:"createdBy"`
+	Description    *string                  `json:"description,omitempty"`
+	Id             string                   `json:"id"`
+	Lock           *PolarisProjectLock      `json:"lock,omitempty"`
+	Name           string                   `json:"name"`
+	OrganizationId string                   `json:"organizationId"`
+	Rules          *string                  `json:"rules,omitempty"`
+	UpdatedAt      time.Time                `json:"updatedAt"`
+	UpdatedBy      string                   `json:"updatedBy"`
+	Visibility     PolarisProjectVisibility `json:"visibility"`
+	WorkspaceId    string                   `json:"workspaceId"`
+}
+
+// PolarisProjectVisibility defines model for PolarisProject.Visibility.
+type PolarisProjectVisibility string
+
+// PolarisProjectLock defines model for PolarisProjectLock.
+type PolarisProjectLock struct {
+	LastEditedAt string              `json:"lastEditedAt"`
+	Subject      BasicSubjectProfile `json:"subject"`
+}
+
+// PolarisProjectsPaginated defines model for PolarisProjectsPaginated.
+type PolarisProjectsPaginated struct {
+	Limit      int              `json:"limit"`
+	Offset     int              `json:"offset"`
+	Projects   []PolarisProject `json:"projects"`
+	TotalCount int              `json:"totalCount"`
+}
+
+// PolarisSessionEdit defines model for PolarisSessionEdit.
+type PolarisSessionEdit struct {
+	Actor    PolarisSessionEditActor `json:"actor"`
+	EditedAt string                  `json:"editedAt"`
+	Id       string                  `json:"id"`
+	Message  string                  `json:"message"`
+}
+
+// PolarisSessionEditActor defines model for PolarisSessionEdit.Actor.
+type PolarisSessionEditActor string
+
 // ProviderInstanceType defines model for ProviderInstanceType.
 type ProviderInstanceType struct {
 	Cpu  int    `json:"cpu"`
@@ -3227,6 +3378,11 @@ type RuntimeRelease struct {
 	ReleaseDate              string `json:"releaseDate"`
 	StellarDatabaseMigration bool   `json:"stellarDatabaseMigration"`
 	Version                  string `json:"version"`
+}
+
+// SavePolarisSessionRequest defines model for SavePolarisSessionRequest.
+type SavePolarisSessionRequest struct {
+	Message string `json:"message"`
 }
 
 // SchedulerMachine defines model for SchedulerMachine.
@@ -3697,6 +3853,23 @@ type UpdateOrganizationSupportPlanRequest struct {
 
 // UpdateOrganizationSupportPlanRequestSupportPlan defines model for UpdateOrganizationSupportPlanRequest.SupportPlan.
 type UpdateOrganizationSupportPlanRequestSupportPlan string
+
+// UpdatePolarisSession defines model for UpdatePolarisSession.
+type UpdatePolarisSession struct {
+	Id         string                         `json:"id"`
+	Permission UpdatePolarisSessionPermission `json:"permission"`
+}
+
+// UpdatePolarisSessionPermission defines model for UpdatePolarisSession.Permission.
+type UpdatePolarisSessionPermission string
+
+// UpdatePolarisSessionRequest defines model for UpdatePolarisSessionRequest.
+type UpdatePolarisSessionRequest struct {
+	Permission UpdatePolarisSessionRequestPermission `json:"permission"`
+}
+
+// UpdatePolarisSessionRequestPermission defines model for UpdatePolarisSessionRequest.Permission.
+type UpdatePolarisSessionRequestPermission string
 
 // UpdateTeamRequest defines model for UpdateTeamRequest.
 type UpdateTeamRequest struct {
@@ -4568,6 +4741,60 @@ type ListWorkspaceDagsParams struct {
 	DeploymentIdIn *[]string `form:"deploymentId__in,omitempty" json:"deploymentId__in,omitempty"`
 }
 
+// ListPolarisProjectsParams defines parameters for ListPolarisProjects.
+type ListPolarisProjectsParams struct {
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Search search string across name and description
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListPolarisProjectsParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+
+	// Visibility filter by visibility of projects
+	Visibility *ListPolarisProjectsParamsVisibility `form:"visibility,omitempty" json:"visibility,omitempty"`
+}
+
+// ListPolarisProjectsParamsSorts defines parameters for ListPolarisProjects.
+type ListPolarisProjectsParamsSorts string
+
+// ListPolarisProjectsParamsVisibility defines parameters for ListPolarisProjects.
+type ListPolarisProjectsParamsVisibility string
+
+// ExportPolarisSessionTarParams defines parameters for ExportPolarisSessionTar.
+type ExportPolarisSessionTarParams struct {
+	// Filename filename
+	Filename *string `form:"filename,omitempty" json:"filename,omitempty"`
+}
+
+// ExportPolarisSessionZipParams defines parameters for ExportPolarisSessionZip.
+type ExportPolarisSessionZipParams struct {
+	// Filename filename
+	Filename *string `form:"filename,omitempty" json:"filename,omitempty"`
+}
+
+// ImportPolarisSessionTarParams defines parameters for ImportPolarisSessionTar.
+type ImportPolarisSessionTarParams struct {
+	// Mode import mode Enums(OVERWRITE,UPSERT)
+	Mode *ImportPolarisSessionTarParamsMode `form:"mode,omitempty" json:"mode,omitempty"`
+}
+
+// ImportPolarisSessionTarParamsMode defines parameters for ImportPolarisSessionTar.
+type ImportPolarisSessionTarParamsMode string
+
+// ImportPolarisSessionZipParams defines parameters for ImportPolarisSessionZip.
+type ImportPolarisSessionZipParams struct {
+	// Mode import mode Enums(OVERWRITE,UPSERT)
+	Mode *ImportPolarisSessionZipParamsMode `form:"mode,omitempty" json:"mode,omitempty"`
+}
+
+// ImportPolarisSessionZipParamsMode defines parameters for ImportPolarisSessionZip.
+type ImportPolarisSessionZipParamsMode string
+
 // ListWorkspaceTeamsParams defines parameters for ListWorkspaceTeams.
 type ListWorkspaceTeamsParams struct {
 	// IncludeMembers includes details about the teams members
@@ -4774,6 +5001,18 @@ type UpdateWorkspaceApiTokenJSONRequestBody = UpdateWorkspaceApiTokenRequest
 
 // TransferDeploymentJSONRequestBody defines body for TransferDeployment for application/json ContentType.
 type TransferDeploymentJSONRequestBody = TransferDeploymentRequest
+
+// CreatePolarisProjectJSONRequestBody defines body for CreatePolarisProject for application/json ContentType.
+type CreatePolarisProjectJSONRequestBody = CreatePolarisProjectRequest
+
+// CreatePolarisSessionJSONRequestBody defines body for CreatePolarisSession for application/json ContentType.
+type CreatePolarisSessionJSONRequestBody = CreatePolarisSessionRequest
+
+// SavePolarisSessionJSONRequestBody defines body for SavePolarisSession for application/json ContentType.
+type SavePolarisSessionJSONRequestBody = SavePolarisSessionRequest
+
+// UpdatePolarisSessionJSONRequestBody defines body for UpdatePolarisSession for application/json ContentType.
+type UpdatePolarisSessionJSONRequestBody = UpdatePolarisSessionRequest
 
 // MutateWorkspaceTeamRoleJSONRequestBody defines body for MutateWorkspaceTeamRole for application/json ContentType.
 type MutateWorkspaceTeamRoleJSONRequestBody = MutateWorkspaceTeamRoleRequest
@@ -5457,6 +5696,41 @@ type ClientInterface interface {
 	TransferDeploymentWithBody(ctx context.Context, organizationId string, workspaceId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	TransferDeployment(ctx context.Context, organizationId string, workspaceId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPolarisProjects request
+	ListPolarisProjects(ctx context.Context, organizationId string, workspaceId string, params *ListPolarisProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreatePolarisProjectWithBody request with any body
+	CreatePolarisProjectWithBody(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreatePolarisProject(ctx context.Context, organizationId string, workspaceId string, body CreatePolarisProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreatePolarisSessionWithBody request with any body
+	CreatePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreatePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportPolarisSessionTar request
+	ExportPolarisSessionTar(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionTarParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportPolarisSessionZip request
+	ExportPolarisSessionZip(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionZipParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportPolarisSessionTarWithBody request with any body
+	ImportPolarisSessionTarWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportPolarisSessionZipWithBody request with any body
+	ImportPolarisSessionZipWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SavePolarisSessionWithBody request with any body
+	SavePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	SavePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SavePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdatePolarisSessionWithBody request with any body
+	UpdatePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdatePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaceTeams request
 	ListWorkspaceTeams(ctx context.Context, organizationId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -7210,6 +7484,162 @@ func (c *Client) TransferDeploymentWithBody(ctx context.Context, organizationId 
 
 func (c *Client) TransferDeployment(ctx context.Context, organizationId string, workspaceId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTransferDeploymentRequest(c.Server, organizationId, workspaceId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListPolarisProjects(ctx context.Context, organizationId string, workspaceId string, params *ListPolarisProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPolarisProjectsRequest(c.Server, organizationId, workspaceId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreatePolarisProjectWithBody(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePolarisProjectRequestWithBody(c.Server, organizationId, workspaceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreatePolarisProject(ctx context.Context, organizationId string, workspaceId string, body CreatePolarisProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePolarisProjectRequest(c.Server, organizationId, workspaceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreatePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePolarisSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreatePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePolarisSessionRequest(c.Server, organizationId, workspaceId, projectId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ExportPolarisSessionTar(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionTarParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportPolarisSessionTarRequest(c.Server, organizationId, workspaceId, projectId, sessionId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ExportPolarisSessionZip(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionZipParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportPolarisSessionZipRequest(c.Server, organizationId, workspaceId, projectId, sessionId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ImportPolarisSessionTarWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportPolarisSessionTarRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ImportPolarisSessionZipWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportPolarisSessionZipRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SavePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSavePolarisSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SavePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SavePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSavePolarisSessionRequest(c.Server, organizationId, workspaceId, projectId, sessionId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdatePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdatePolarisSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdatePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdatePolarisSessionRequest(c.Server, organizationId, workspaceId, projectId, sessionId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -14555,6 +14985,696 @@ func NewTransferDeploymentRequestWithBody(server string, organizationId string, 
 	return req, nil
 }
 
+// NewListPolarisProjectsRequest generates requests for ListPolarisProjects
+func NewListPolarisProjectsRequest(server string, organizationId string, workspaceId string, params *ListPolarisProjectsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Search != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sorts != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Visibility != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "visibility", runtime.ParamLocationQuery, *params.Visibility); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreatePolarisProjectRequest calls the generic CreatePolarisProject builder with application/json body
+func NewCreatePolarisProjectRequest(server string, organizationId string, workspaceId string, body CreatePolarisProjectJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreatePolarisProjectRequestWithBody(server, organizationId, workspaceId, "application/json", bodyReader)
+}
+
+// NewCreatePolarisProjectRequestWithBody generates requests for CreatePolarisProject with any type of body
+func NewCreatePolarisProjectRequestWithBody(server string, organizationId string, workspaceId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewCreatePolarisSessionRequest calls the generic CreatePolarisSession builder with application/json body
+func NewCreatePolarisSessionRequest(server string, organizationId string, workspaceId string, projectId string, body CreatePolarisSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreatePolarisSessionRequestWithBody(server, organizationId, workspaceId, projectId, "application/json", bodyReader)
+}
+
+// NewCreatePolarisSessionRequestWithBody generates requests for CreatePolarisSession with any type of body
+func NewCreatePolarisSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewExportPolarisSessionTarRequest generates requests for ExportPolarisSessionTar
+func NewExportPolarisSessionTarRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionTarParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/export/tar", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Filename != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "filename", runtime.ParamLocationQuery, *params.Filename); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewExportPolarisSessionZipRequest generates requests for ExportPolarisSessionZip
+func NewExportPolarisSessionZipRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionZipParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/export/zip", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Filename != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "filename", runtime.ParamLocationQuery, *params.Filename); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewImportPolarisSessionTarRequestWithBody generates requests for ImportPolarisSessionTar with any type of body
+func NewImportPolarisSessionTarRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionTarParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/import/tar", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Mode != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "mode", runtime.ParamLocationQuery, *params.Mode); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewImportPolarisSessionZipRequestWithBody generates requests for ImportPolarisSessionZip with any type of body
+func NewImportPolarisSessionZipRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionZipParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/import/zip", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Mode != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "mode", runtime.ParamLocationQuery, *params.Mode); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewSavePolarisSessionRequest calls the generic SavePolarisSession builder with application/json body
+func NewSavePolarisSessionRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, body SavePolarisSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSavePolarisSessionRequestWithBody(server, organizationId, workspaceId, projectId, sessionId, "application/json", bodyReader)
+}
+
+// NewSavePolarisSessionRequestWithBody generates requests for SavePolarisSession with any type of body
+func NewSavePolarisSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/save", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdatePolarisSessionRequest calls the generic UpdatePolarisSession builder with application/json body
+func NewUpdatePolarisSessionRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, body UpdatePolarisSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdatePolarisSessionRequestWithBody(server, organizationId, workspaceId, projectId, sessionId, "application/json", bodyReader)
+}
+
+// NewUpdatePolarisSessionRequestWithBody generates requests for UpdatePolarisSession with any type of body
+func NewUpdatePolarisSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/update", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListWorkspaceTeamsRequest generates requests for ListWorkspaceTeams
 func NewListWorkspaceTeamsRequest(server string, organizationId string, workspaceId string, params *ListWorkspaceTeamsParams) (*http.Request, error) {
 	var err error
@@ -15852,6 +16972,41 @@ type ClientWithResponsesInterface interface {
 	TransferDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TransferDeploymentResponse, error)
 
 	TransferDeploymentWithResponse(ctx context.Context, organizationId string, workspaceId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*TransferDeploymentResponse, error)
+
+	// ListPolarisProjectsWithResponse request
+	ListPolarisProjectsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListPolarisProjectsParams, reqEditors ...RequestEditorFn) (*ListPolarisProjectsResponse, error)
+
+	// CreatePolarisProjectWithBodyWithResponse request with any body
+	CreatePolarisProjectWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePolarisProjectResponse, error)
+
+	CreatePolarisProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, body CreatePolarisProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePolarisProjectResponse, error)
+
+	// CreatePolarisSessionWithBodyWithResponse request with any body
+	CreatePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePolarisSessionResponse, error)
+
+	CreatePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePolarisSessionResponse, error)
+
+	// ExportPolarisSessionTarWithResponse request
+	ExportPolarisSessionTarWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionTarParams, reqEditors ...RequestEditorFn) (*ExportPolarisSessionTarResponse, error)
+
+	// ExportPolarisSessionZipWithResponse request
+	ExportPolarisSessionZipWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionZipParams, reqEditors ...RequestEditorFn) (*ExportPolarisSessionZipResponse, error)
+
+	// ImportPolarisSessionTarWithBodyWithResponse request with any body
+	ImportPolarisSessionTarWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportPolarisSessionTarResponse, error)
+
+	// ImportPolarisSessionZipWithBodyWithResponse request with any body
+	ImportPolarisSessionZipWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportPolarisSessionZipResponse, error)
+
+	// SavePolarisSessionWithBodyWithResponse request with any body
+	SavePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SavePolarisSessionResponse, error)
+
+	SavePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SavePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*SavePolarisSessionResponse, error)
+
+	// UpdatePolarisSessionWithBodyWithResponse request with any body
+	UpdatePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePolarisSessionResponse, error)
+
+	UpdatePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePolarisSessionResponse, error)
 
 	// ListWorkspaceTeamsWithResponse request
 	ListWorkspaceTeamsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*ListWorkspaceTeamsResponse, error)
@@ -18638,6 +19793,224 @@ func (r TransferDeploymentResponse) StatusCode() int {
 	return 0
 }
 
+type ListPolarisProjectsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PolarisProjectsPaginated
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListPolarisProjectsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListPolarisProjectsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreatePolarisProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PolarisProject
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreatePolarisProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreatePolarisProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreatePolarisSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *CreatePolarisSession
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreatePolarisSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreatePolarisSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ExportPolarisSessionTarResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportPolarisSessionTarResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportPolarisSessionTarResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ExportPolarisSessionZipResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportPolarisSessionZipResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportPolarisSessionZipResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ImportPolarisSessionTarResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ImportPolarisSession
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportPolarisSessionTarResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportPolarisSessionTarResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ImportPolarisSessionZipResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ImportPolarisSession
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportPolarisSessionZipResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportPolarisSessionZipResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SavePolarisSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r SavePolarisSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SavePolarisSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdatePolarisSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *UpdatePolarisSession
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdatePolarisSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdatePolarisSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListWorkspaceTeamsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20230,6 +21603,119 @@ func (c *ClientWithResponses) TransferDeploymentWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseTransferDeploymentResponse(rsp)
+}
+
+// ListPolarisProjectsWithResponse request returning *ListPolarisProjectsResponse
+func (c *ClientWithResponses) ListPolarisProjectsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListPolarisProjectsParams, reqEditors ...RequestEditorFn) (*ListPolarisProjectsResponse, error) {
+	rsp, err := c.ListPolarisProjects(ctx, organizationId, workspaceId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPolarisProjectsResponse(rsp)
+}
+
+// CreatePolarisProjectWithBodyWithResponse request with arbitrary body returning *CreatePolarisProjectResponse
+func (c *ClientWithResponses) CreatePolarisProjectWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePolarisProjectResponse, error) {
+	rsp, err := c.CreatePolarisProjectWithBody(ctx, organizationId, workspaceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePolarisProjectResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreatePolarisProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, body CreatePolarisProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePolarisProjectResponse, error) {
+	rsp, err := c.CreatePolarisProject(ctx, organizationId, workspaceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePolarisProjectResponse(rsp)
+}
+
+// CreatePolarisSessionWithBodyWithResponse request with arbitrary body returning *CreatePolarisSessionResponse
+func (c *ClientWithResponses) CreatePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePolarisSessionResponse, error) {
+	rsp, err := c.CreatePolarisSessionWithBody(ctx, organizationId, workspaceId, projectId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePolarisSessionResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreatePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePolarisSessionResponse, error) {
+	rsp, err := c.CreatePolarisSession(ctx, organizationId, workspaceId, projectId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePolarisSessionResponse(rsp)
+}
+
+// ExportPolarisSessionTarWithResponse request returning *ExportPolarisSessionTarResponse
+func (c *ClientWithResponses) ExportPolarisSessionTarWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionTarParams, reqEditors ...RequestEditorFn) (*ExportPolarisSessionTarResponse, error) {
+	rsp, err := c.ExportPolarisSessionTar(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportPolarisSessionTarResponse(rsp)
+}
+
+// ExportPolarisSessionZipWithResponse request returning *ExportPolarisSessionZipResponse
+func (c *ClientWithResponses) ExportPolarisSessionZipWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionZipParams, reqEditors ...RequestEditorFn) (*ExportPolarisSessionZipResponse, error) {
+	rsp, err := c.ExportPolarisSessionZip(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportPolarisSessionZipResponse(rsp)
+}
+
+// ImportPolarisSessionTarWithBodyWithResponse request with arbitrary body returning *ImportPolarisSessionTarResponse
+func (c *ClientWithResponses) ImportPolarisSessionTarWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportPolarisSessionTarResponse, error) {
+	rsp, err := c.ImportPolarisSessionTarWithBody(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportPolarisSessionTarResponse(rsp)
+}
+
+// ImportPolarisSessionZipWithBodyWithResponse request with arbitrary body returning *ImportPolarisSessionZipResponse
+func (c *ClientWithResponses) ImportPolarisSessionZipWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportPolarisSessionZipResponse, error) {
+	rsp, err := c.ImportPolarisSessionZipWithBody(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportPolarisSessionZipResponse(rsp)
+}
+
+// SavePolarisSessionWithBodyWithResponse request with arbitrary body returning *SavePolarisSessionResponse
+func (c *ClientWithResponses) SavePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SavePolarisSessionResponse, error) {
+	rsp, err := c.SavePolarisSessionWithBody(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSavePolarisSessionResponse(rsp)
+}
+
+func (c *ClientWithResponses) SavePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SavePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*SavePolarisSessionResponse, error) {
+	rsp, err := c.SavePolarisSession(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSavePolarisSessionResponse(rsp)
+}
+
+// UpdatePolarisSessionWithBodyWithResponse request with arbitrary body returning *UpdatePolarisSessionResponse
+func (c *ClientWithResponses) UpdatePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePolarisSessionResponse, error) {
+	rsp, err := c.UpdatePolarisSessionWithBody(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdatePolarisSessionResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdatePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePolarisSessionResponse, error) {
+	rsp, err := c.UpdatePolarisSession(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdatePolarisSessionResponse(rsp)
 }
 
 // ListWorkspaceTeamsWithResponse request returning *ListWorkspaceTeamsResponse
@@ -26349,6 +27835,374 @@ func ParseTransferDeploymentResponse(rsp *http.Response) (*TransferDeploymentRes
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListPolarisProjectsResponse parses an HTTP response from a ListPolarisProjectsWithResponse call
+func ParseListPolarisProjectsResponse(rsp *http.Response) (*ListPolarisProjectsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListPolarisProjectsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PolarisProjectsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreatePolarisProjectResponse parses an HTTP response from a CreatePolarisProjectWithResponse call
+func ParseCreatePolarisProjectResponse(rsp *http.Response) (*CreatePolarisProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreatePolarisProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PolarisProject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreatePolarisSessionResponse parses an HTTP response from a CreatePolarisSessionWithResponse call
+func ParseCreatePolarisSessionResponse(rsp *http.Response) (*CreatePolarisSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreatePolarisSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreatePolarisSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseExportPolarisSessionTarResponse parses an HTTP response from a ExportPolarisSessionTarWithResponse call
+func ParseExportPolarisSessionTarResponse(rsp *http.Response) (*ExportPolarisSessionTarResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportPolarisSessionTarResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseExportPolarisSessionZipResponse parses an HTTP response from a ExportPolarisSessionZipWithResponse call
+func ParseExportPolarisSessionZipResponse(rsp *http.Response) (*ExportPolarisSessionZipResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportPolarisSessionZipResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseImportPolarisSessionTarResponse parses an HTTP response from a ImportPolarisSessionTarWithResponse call
+func ParseImportPolarisSessionTarResponse(rsp *http.Response) (*ImportPolarisSessionTarResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportPolarisSessionTarResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ImportPolarisSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseImportPolarisSessionZipResponse parses an HTTP response from a ImportPolarisSessionZipWithResponse call
+func ParseImportPolarisSessionZipResponse(rsp *http.Response) (*ImportPolarisSessionZipResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportPolarisSessionZipResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ImportPolarisSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSavePolarisSessionResponse parses an HTTP response from a SavePolarisSessionWithResponse call
+func ParseSavePolarisSessionResponse(rsp *http.Response) (*SavePolarisSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SavePolarisSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdatePolarisSessionResponse parses an HTTP response from a UpdatePolarisSessionWithResponse call
+func ParseUpdatePolarisSessionResponse(rsp *http.Response) (*UpdatePolarisSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdatePolarisSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UpdatePolarisSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

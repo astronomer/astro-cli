@@ -1,4 +1,4 @@
-package polaris
+package ide
 
 import (
 	"archive/tar"
@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 
-	astropolariscore "github.com/astronomer/astro-cli/astro-client-polaris-core"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -34,8 +35,8 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-// List all polaris projects
-func List(client astropolariscore.PolarisClient, out io.Writer) error {
+// List all IDE projects
+func List(client astrocore.CoreClient, out io.Writer) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
@@ -66,26 +67,26 @@ func List(client astropolariscore.PolarisClient, out io.Writer) error {
 	return nil
 }
 
-func ListProjects(client astropolariscore.PolarisClient) ([]astropolariscore.PolarisProject, error) {
+func ListProjects(client astrocore.CoreClient) ([]astrocore.PolarisProject, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return []astropolariscore.PolarisProject{}, err
+		return []astrocore.PolarisProject{}, err
 	}
 
-	sorts := []astropolariscore.ListPolarisProjectsParamsSorts{"name:asc"}
+	sorts := []astrocore.ListPolarisProjectsParamsSorts{"name:asc"}
 	limit := 1000
-	workspaceListParams := &astropolariscore.ListPolarisProjectsParams{
+	workspaceListParams := &astrocore.ListPolarisProjectsParams{
 		Limit: &limit,
 		Sorts: &sorts,
 	}
 
 	resp, err := client.ListPolarisProjectsWithResponse(httpContext.Background(), ctx.Organization, ctx.Workspace, workspaceListParams)
 	if err != nil {
-		return []astropolariscore.PolarisProject{}, err
+		return []astrocore.PolarisProject{}, err
 	}
-	err = astropolariscore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return []astropolariscore.PolarisProject{}, err
+		return []astrocore.PolarisProject{}, err
 	}
 
 	projects := resp.JSON200.Projects
@@ -93,9 +94,9 @@ func ListProjects(client astropolariscore.PolarisClient) ([]astropolariscore.Pol
 	return projects, nil
 }
 
-func selectPolarisProject(projects []astropolariscore.PolarisProject) (astropolariscore.PolarisProject, error) {
+func selectIDEProject(projects []astrocore.PolarisProject) (astrocore.PolarisProject, error) {
 	if len(projects) == 0 {
-		return astropolariscore.PolarisProject{}, nil
+		return astrocore.PolarisProject{}, nil
 	}
 
 	if len(projects) == 1 {
@@ -114,7 +115,7 @@ func selectPolarisProject(projects []astropolariscore.PolarisProject) (astropola
 
 	fmt.Println("\nPlease select the project from the list below:")
 
-	projectMap := map[string]astropolariscore.PolarisProject{}
+	projectMap := map[string]astrocore.PolarisProject{}
 	for i := range projects {
 		index := i + 1
 		table.AddRow([]string{
@@ -129,116 +130,169 @@ func selectPolarisProject(projects []astropolariscore.PolarisProject) (astropola
 	choice := input.Text("\n> ")
 	selected, ok := projectMap[choice]
 	if !ok {
-		return astropolariscore.PolarisProject{}, ErrInvalidProjectSelection
+		return astrocore.PolarisProject{}, ErrInvalidProjectSelection
 	}
 	return selected, nil
 }
 
+// createNewProject creates a new project and returns its ID
+func createNewProject(client astrocore.CoreClient, organizationID, workspaceID string, out io.Writer) (string, error) {
+	fmt.Println("Enter project name:")
+	name := input.Text("\n>")
+
+	req := astrocore.CreatePolarisProjectRequest{
+		Name: &name,
+	}
+
+	resp, err := client.CreatePolarisProjectWithResponse(httpContext.Background(), organizationID, workspaceID, req)
+	if err != nil {
+		return "", fmt.Errorf("failed to create project: %w", err)
+	}
+
+	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		return "", err
+	}
+
+	fmt.Fprintf(out, "Successfully created project '%s' in workspace '%s'\n", name, workspaceID)
+	return resp.JSON200.Id, nil
+}
+
+// createSession creates a new session with the specified permission
+func createSession(client astrocore.CoreClient, organizationID, workspaceID, projectID string, permission astrocore.CreatePolarisSessionRequestPermission) (*astrocore.CreatePolarisSessionResponse, error) {
+	sessionResp, err := client.CreatePolarisSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, astrocore.CreatePolarisSessionJSONRequestBody{
+		Permission: &permission,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := astrocore.NormalizeAPIError(sessionResp.HTTPResponse, sessionResp.Body); err != nil {
+		return nil, err
+	}
+	return sessionResp, nil
+}
+
+// updateSessionPermission updates the session permission to READ_WRITE
+func updateSessionPermission(client astrocore.CoreClient, organizationID, workspaceID, projectID, sessionID string) error {
+	updatePermission := astrocore.UpdatePolarisSessionRequestPermissionREADWRITE
+	updateResp, err := client.UpdatePolarisSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, astrocore.UpdatePolarisSessionJSONRequestBody{
+		Permission: updatePermission,
+	})
+	if err != nil {
+		return err
+	}
+	return astrocore.NormalizeAPIError(updateResp.HTTPResponse, updateResp.Body)
+}
+
 // ExportProject exports a project from CLI to Astro IDE
-func ExportProject(client astropolariscore.PolarisClient, projectID, workspaceID, organizationID string, out io.Writer) error {
-	if projectID == "" {
-		// Ask user if they want to create a new project
+func ExportProject(client astrocore.CoreClient, projectID, organizationID, workspaceID, domain string, force bool, out io.Writer) error {
+	var err error
+
+	// Handle project creation or selection
+	if projectID == "" && !force {
 		fmt.Println("Do you want to create a new project? (y/n)")
 		choice := input.Text("\n> ")
 		if choice == "y" || choice == "Y" {
-			// Get project details from user
-			fmt.Println("Enter project name:")
-			name := input.Text("\n> ")
-
-			// Create new project
-			ctx, err := context.GetCurrentContext()
+			projectID, err = createNewProject(client, organizationID, workspaceID, out)
 			if err != nil {
 				return err
 			}
-
-			// Create the project request
-			req := astropolariscore.CreatePolarisProjectRequest{
-				Name: &name,
-			}
-
-			// Create the project
-			resp, err := client.CreatePolarisProjectWithResponse(httpContext.Background(), organizationID, workspaceID, req)
-			if err != nil {
-				return fmt.Errorf("failed to create project: %w", err)
-			}
-
-			if err := astropolariscore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-				return err
-			}
-
-			fmt.Fprintf(out, "Successfully created project '%s' in workspace '%s'\n", name, ctx.Workspace)
-
-			// Get the newly created project ID
-			projectID = resp.JSON200.Id
-		} else {
-			// List existing projects and let user select one
-			projects, err := ListProjects(client)
-			if err != nil {
-				return err
-			}
-			selectedProject, err := selectPolarisProject(projects)
-			if err != nil {
-				return err
-			}
-			projectID = selectedProject.Id
 		}
 	}
 
-	// Create a temporary directory for the archive
+	// Select from existing projects if needed
+	if projectID == "" {
+		projects, err := ListProjects(client)
+		if err != nil {
+			return err
+		}
+		selectedProject, err := selectIDEProject(projects)
+		if err != nil {
+			return err
+		}
+		projectID = selectedProject.Id
+	}
+
+	// Create temporary directory and archive
 	tempDir, err := os.MkdirTemp("", "astro-import-*")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(tempDir)
 
-	// Create tar.gz archive of current directory
 	archivePath := filepath.Join(tempDir, "project.tar.gz")
 	if err := createTarGzArchive(".", archivePath); err != nil {
 		return err
 	}
 
-	// Create a new session
-	sessionResp, err := client.CreatePolarisSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID)
+	// Create session and handle permissions
+	sessionResp, err := createSession(client, organizationID, workspaceID, projectID, astrocore.CreatePolarisSessionRequestPermissionREADWRITE)
 	if err != nil {
 		return err
 	}
-	if err := astropolariscore.NormalizeAPIError(sessionResp.HTTPResponse, sessionResp.Body); err != nil {
-		return err
-	}
-	session := sessionResp.JSON200
 
-	// Open the archive file
-	archiveFile, err := os.Open(archivePath)
+	if sessionResp.JSON200.Permission == "READ_ONLY" {
+		if !force {
+			return fmt.Errorf("you do not have sufficient permission to export the project. Use --force flag to overwrite the existing project lock")
+		}
+		if err := updateSessionPermission(client, organizationID, workspaceID, projectID, sessionResp.JSON200.Id); err != nil {
+			return err
+		}
+	}
+
+	// Upload the archive
+	file, err := os.Open(archivePath)
 	if err != nil {
 		return err
 	}
-	defer archiveFile.Close()
+	defer file.Close()
 
 	// Import the package
-	mode := astropolariscore.ImportPolarisSessionTarParamsModeOVERWRITE
-	importParams := &astropolariscore.ImportPolarisSessionTarParams{
+	mode := astrocore.ImportPolarisSessionTarParamsModeOVERWRITE
+	importParams := &astrocore.ImportPolarisSessionTarParams{
 		Mode: &mode,
 	}
-	importResp, err := client.ImportPolarisSessionTarWithBodyWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, session.Id, importParams, "application/x-gzip", archiveFile)
+	importResp, err := client.ImportPolarisSessionTarWithBodyWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionResp.JSON200.Id, importParams, "application/x-gzip", file)
 	if err != nil {
 		return err
 	}
-	if err := astropolariscore.NormalizeAPIError(importResp.HTTPResponse, importResp.Body); err != nil {
+	if err := astrocore.NormalizeAPIError(importResp.HTTPResponse, importResp.Body); err != nil {
 		return err
 	}
 
 	// Save the session
-	saveResp, err := client.SavePolarisSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, session.Id, astropolariscore.SavePolarisSessionJSONRequestBody{
+	saveResp, err := client.SavePolarisSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionResp.JSON200.Id, astrocore.SavePolarisSessionJSONRequestBody{
 		Message: "Imported from Astro CLI",
 	})
 	if err != nil {
 		return err
 	}
-	if err := astropolariscore.NormalizeAPIError(saveResp.HTTPResponse, saveResp.Body); err != nil {
+	if err := astrocore.NormalizeAPIError(saveResp.HTTPResponse, saveResp.Body); err != nil {
+		return err
+	}
+
+	// Update session permission back to READ_ONLY
+	updatePermission := astrocore.UpdatePolarisSessionRequestPermissionREADONLY
+	updateResp, err := client.UpdatePolarisSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionResp.JSON200.Id, astrocore.UpdatePolarisSessionJSONRequestBody{
+		Permission: updatePermission,
+	})
+	if err != nil {
+		return err
+	}
+	if err := astrocore.NormalizeAPIError(updateResp.HTTPResponse, updateResp.Body); err != nil {
 		return err
 	}
 
 	fmt.Fprintf(out, "Successfully exported project to %s\n", projectID)
+
+	// Construct the URL
+	url := fmt.Sprintf("https://cloud.%s/%s/astro-ide/%s", domain, workspaceID, projectID)
+
+	// Open the URL in browser
+	cmd := exec.Command("open", url)
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(out, "Failed to open browser: %v\n", err)
+	}
+
 	return nil
 }
 
@@ -307,7 +361,7 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 }
 
 // ImportProject imports a project from Astro IDE to the local directory
-func ImportProject(client astropolariscore.PolarisClient, projectID, sessionID, organizationID, workspaceID string, out io.Writer) error {
+func ImportProject(client astrocore.CoreClient, projectID, organizationID, workspaceID string, out io.Writer) error {
 	// Validate current directory is empty
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -323,24 +377,19 @@ func ImportProject(client astropolariscore.PolarisClient, projectID, sessionID, 
 		if err != nil {
 			return err
 		}
-		selectedProject, err := selectPolarisProject(projects)
+		selectedProject, err := selectIDEProject(projects)
 		if err != nil {
 			return err
 		}
 		projectID = selectedProject.Id
 	}
 
-	// If sessionID is not provided, create a new session
-	if sessionID == "" {
-		sessionResp, err := client.CreatePolarisSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID)
-		if err != nil {
-			return err
-		}
-		if err := astropolariscore.NormalizeAPIError(sessionResp.HTTPResponse, sessionResp.Body); err != nil {
-			return err
-		}
-		sessionID = sessionResp.JSON200.Id
+	// Create a new session with READ_ONLY permission
+	sessionResp, err := createSession(client, organizationID, workspaceID, projectID, astrocore.CreatePolarisSessionRequestPermissionREADONLY)
+	if err != nil {
+		return err
 	}
+	sessionID := sessionResp.JSON200.Id
 
 	// Create a temporary file for the archive
 	tempFile, err := os.CreateTemp("", "astro-export-*.tar.gz")
@@ -351,12 +400,12 @@ func ImportProject(client astropolariscore.PolarisClient, projectID, sessionID, 
 	defer tempFile.Close()
 
 	// Export the project
-	exportParams := &astropolariscore.ExportPolarisSessionTarParams{}
+	exportParams := &astrocore.ExportPolarisSessionTarParams{}
 	exportResp, err := client.ExportPolarisSessionTarWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, exportParams)
 	if err != nil {
 		return err
 	}
-	if err := astropolariscore.NormalizeAPIError(exportResp.HTTPResponse, exportResp.Body); err != nil {
+	if err := astrocore.NormalizeAPIError(exportResp.HTTPResponse, exportResp.Body); err != nil {
 		return err
 	}
 
@@ -440,8 +489,8 @@ func extractTarGzArchive(archivePath, targetDir string) error {
 	return nil
 }
 
-// CreatePolarisProject creates a new Polaris project
-func CreatePolarisProject(client astropolariscore.PolarisClient, organizationID, workspaceID, name, description, visibility string, out io.Writer) error {
+// CreateIDEProject creates a new IDE project
+func CreateIDEProject(client astrocore.CoreClient, organizationID, workspaceID, name, description, visibility string, out io.Writer) error {
 	// Get context
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -449,14 +498,14 @@ func CreatePolarisProject(client astropolariscore.PolarisClient, organizationID,
 	}
 
 	// Create the project request
-	req := astropolariscore.CreatePolarisProjectRequest{
+	req := astrocore.CreatePolarisProjectRequest{
 		Name:        &name,
 		Description: &description,
 	}
 
 	// Set visibility if provided
 	if visibility != "" {
-		vis := astropolariscore.CreatePolarisProjectRequestVisibility(visibility)
+		vis := astrocore.CreatePolarisProjectRequestVisibility(visibility)
 		req.Visibility = &vis
 	}
 
@@ -466,7 +515,7 @@ func CreatePolarisProject(client astropolariscore.PolarisClient, organizationID,
 		return fmt.Errorf("failed to create project: %w", err)
 	}
 
-	if err := astropolariscore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return err
 	}
 

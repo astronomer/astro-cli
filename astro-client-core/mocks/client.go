@@ -1016,6 +1016,154 @@ func (_m *ClientWithResponsesInterface) CreateOrganizationWithResponse(ctx conte
 	return r0, r1
 }
 
+// CreatePolarisProjectWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreatePolarisProjectWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreatePolarisProjectResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreatePolarisProjectWithBodyWithResponse")
+	}
+
+	var r0 *astrocore.CreatePolarisProjectResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.CreatePolarisProjectResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.CreatePolarisProjectResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreatePolarisProjectResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreatePolarisProjectWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreatePolarisProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, body astrocore.CreatePolarisProjectRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreatePolarisProjectResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreatePolarisProjectWithResponse")
+	}
+
+	var r0 *astrocore.CreatePolarisProjectResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.CreatePolarisProjectRequest, ...astrocore.RequestEditorFn) (*astrocore.CreatePolarisProjectResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.CreatePolarisProjectRequest, ...astrocore.RequestEditorFn) *astrocore.CreatePolarisProjectResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreatePolarisProjectResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, astrocore.CreatePolarisProjectRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreatePolarisSessionWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, projectId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreatePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreatePolarisSessionResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, projectId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreatePolarisSessionWithBodyWithResponse")
+	}
+
+	var r0 *astrocore.CreatePolarisSessionResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.CreatePolarisSessionResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, projectId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.CreatePolarisSessionResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, projectId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreatePolarisSessionResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, projectId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreatePolarisSessionWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, projectId, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreatePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, body astrocore.CreatePolarisSessionRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreatePolarisSessionResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, projectId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreatePolarisSessionWithResponse")
+	}
+
+	var r0 *astrocore.CreatePolarisSessionResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrocore.CreatePolarisSessionRequest, ...astrocore.RequestEditorFn) (*astrocore.CreatePolarisSessionResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, projectId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrocore.CreatePolarisSessionRequest, ...astrocore.RequestEditorFn) *astrocore.CreatePolarisSessionResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, projectId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreatePolarisSessionResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astrocore.CreatePolarisSessionRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, projectId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateTeamWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, contentType, body, reqEditors
 func (_m *ClientWithResponsesInterface) CreateTeamWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateTeamResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -2163,6 +2311,80 @@ func (_m *ClientWithResponsesInterface) ExcludeLinkingEnvironmentObjectWithRespo
 	return r0, r1
 }
 
+// ExportPolarisSessionTarWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ExportPolarisSessionTarWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *astrocore.ExportPolarisSessionTarParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ExportPolarisSessionTarResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, projectId, sessionId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExportPolarisSessionTarWithResponse")
+	}
+
+	var r0 *astrocore.ExportPolarisSessionTarResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, *astrocore.ExportPolarisSessionTarParams, ...astrocore.RequestEditorFn) (*astrocore.ExportPolarisSessionTarResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, *astrocore.ExportPolarisSessionTarParams, ...astrocore.RequestEditorFn) *astrocore.ExportPolarisSessionTarResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ExportPolarisSessionTarResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, *astrocore.ExportPolarisSessionTarParams, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ExportPolarisSessionZipWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ExportPolarisSessionZipWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *astrocore.ExportPolarisSessionZipParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ExportPolarisSessionZipResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, projectId, sessionId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExportPolarisSessionZipWithResponse")
+	}
+
+	var r0 *astrocore.ExportPolarisSessionZipResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, *astrocore.ExportPolarisSessionZipParams, ...astrocore.RequestEditorFn) (*astrocore.ExportPolarisSessionZipResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, *astrocore.ExportPolarisSessionZipParams, ...astrocore.RequestEditorFn) *astrocore.ExportPolarisSessionZipResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ExportPolarisSessionZipResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, *astrocore.ExportPolarisSessionZipParams, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetAgentWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, agentId, reqEditors
 func (_m *ClientWithResponsesInterface) GetAgentWithResponse(ctx context.Context, organizationId string, deploymentId string, agentId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetAgentResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -3051,6 +3273,80 @@ func (_m *ClientWithResponsesInterface) GetWorkspaceWithResponse(ctx context.Con
 	return r0, r1
 }
 
+// ImportPolarisSessionTarWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) ImportPolarisSessionTarWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *astrocore.ImportPolarisSessionTarParams, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ImportPolarisSessionTarResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ImportPolarisSessionTarWithBodyWithResponse")
+	}
+
+	var r0 *astrocore.ImportPolarisSessionTarResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, *astrocore.ImportPolarisSessionTarParams, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.ImportPolarisSessionTarResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, *astrocore.ImportPolarisSessionTarParams, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.ImportPolarisSessionTarResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ImportPolarisSessionTarResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, *astrocore.ImportPolarisSessionTarParams, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ImportPolarisSessionZipWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) ImportPolarisSessionZipWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *astrocore.ImportPolarisSessionZipParams, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ImportPolarisSessionZipResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ImportPolarisSessionZipWithBodyWithResponse")
+	}
+
+	var r0 *astrocore.ImportPolarisSessionZipResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, *astrocore.ImportPolarisSessionZipParams, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.ImportPolarisSessionZipResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, *astrocore.ImportPolarisSessionZipParams, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.ImportPolarisSessionZipResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ImportPolarisSessionZipResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, *astrocore.ImportPolarisSessionZipParams, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListAgentsWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, params, reqEditors
 func (_m *ClientWithResponsesInterface) ListAgentsWithResponse(ctx context.Context, organizationId string, deploymentId string, params *astrocore.ListAgentsParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListAgentsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -3636,6 +3932,43 @@ func (_m *ClientWithResponsesInterface) ListOrganizationsWithResponse(ctx contex
 
 	if rf, ok := ret.Get(1).(func(context.Context, *astrocore.ListOrganizationsParams, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListPolarisProjectsWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ListPolarisProjectsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *astrocore.ListPolarisProjectsParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListPolarisProjectsResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPolarisProjectsWithResponse")
+	}
+
+	var r0 *astrocore.ListPolarisProjectsResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, *astrocore.ListPolarisProjectsParams, ...astrocore.RequestEditorFn) (*astrocore.ListPolarisProjectsResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, *astrocore.ListPolarisProjectsParams, ...astrocore.RequestEditorFn) *astrocore.ListPolarisProjectsResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ListPolarisProjectsResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, *astrocore.ListPolarisProjectsParams, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -4642,6 +4975,80 @@ func (_m *ClientWithResponsesInterface) RotateWorkspaceApiTokenWithResponse(ctx 
 	return r0, r1
 }
 
+// SavePolarisSessionWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) SavePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.SavePolarisSessionResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, projectId, sessionId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SavePolarisSessionWithBodyWithResponse")
+	}
+
+	var r0 *astrocore.SavePolarisSessionResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.SavePolarisSessionResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.SavePolarisSessionResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.SavePolarisSessionResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SavePolarisSessionWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors
+func (_m *ClientWithResponsesInterface) SavePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body astrocore.SavePolarisSessionRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.SavePolarisSessionResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, projectId, sessionId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SavePolarisSessionWithResponse")
+	}
+
+	var r0 *astrocore.SavePolarisSessionResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, astrocore.SavePolarisSessionRequest, ...astrocore.RequestEditorFn) (*astrocore.SavePolarisSessionResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, astrocore.SavePolarisSessionRequest, ...astrocore.RequestEditorFn) *astrocore.SavePolarisSessionResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.SavePolarisSessionResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, astrocore.SavePolarisSessionRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // TransferDeploymentWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, deploymentId, contentType, body, reqEditors
 func (_m *ClientWithResponsesInterface) TransferDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, deploymentId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.TransferDeploymentResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -5597,6 +6004,80 @@ func (_m *ClientWithResponsesInterface) UpdateOrganizationWithResponse(ctx conte
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, astrocore.UpdateOrganizationRequest, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, organizationId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdatePolarisSessionWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdatePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdatePolarisSessionResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, projectId, sessionId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePolarisSessionWithBodyWithResponse")
+	}
+
+	var r0 *astrocore.UpdatePolarisSessionResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.UpdatePolarisSessionResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.UpdatePolarisSessionResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdatePolarisSessionResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdatePolarisSessionWithResponse provides a mock function with given fields: ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdatePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body astrocore.UpdatePolarisSessionRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdatePolarisSessionResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, workspaceId, projectId, sessionId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePolarisSessionWithResponse")
+	}
+
+	var r0 *astrocore.UpdatePolarisSessionResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, astrocore.UpdatePolarisSessionRequest, ...astrocore.RequestEditorFn) (*astrocore.UpdatePolarisSessionResponse, error)); ok {
+		return rf(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, astrocore.UpdatePolarisSessionRequest, ...astrocore.RequestEditorFn) *astrocore.UpdatePolarisSessionResponse); ok {
+		r0 = rf(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdatePolarisSessionResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, astrocore.UpdatePolarisSessionRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
