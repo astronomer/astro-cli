@@ -35,7 +35,6 @@ func newIDEProjectCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newIDEListProjectCmd(out),
-		newIDECreateProjectCmd(out),
 		newIDEImportProjectCmd(out),
 		newIDEExportProjectCmd(out),
 	)
@@ -62,34 +61,6 @@ astro IDE project list --workspace-id <workspace-id> --organization-id <organiza
 	}
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "Workspace ID to list projects from")
 	cmd.Flags().StringVarP(&organizationID, "organization-id", "o", "", "Organization ID to list projects from")
-	return cmd
-}
-
-func newIDECreateProjectCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "create",
-		Aliases: []string{"c"},
-		Short:   "Create a new IDE project",
-		Long:    "Create a new IDE project in the current workspace",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return createIDEProject(cmd, out)
-		},
-		Example: `
-# Create a new IDE project
-astro IDE project create --name <project-name>
-
-# Create a new IDE project with description and visibility
-astro IDE project create --name <project-name> --visibility private --description "My project description"
-
-# Create a new IDE project in specific organization and workspace
-astro IDE project create --workspace-id <workspace-id> --organization-id <organization-id> --name <project-name> --description "My project description" --visibility private
-`,
-	}
-	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "Workspace ID for the project")
-	cmd.Flags().StringVarP(&organizationID, "organization-id", "o", "", "Organization ID for the project")
-	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of the project")
-	cmd.Flags().StringVarP(&projectDescription, "description", "d", "", "Description of the project")
-	cmd.Flags().StringVar(&projectVisibility, "visibility", "PRIVATE", "Visibility of the project (PRIVATE or WORKSPACE)")
 	return cmd
 }
 
@@ -147,29 +118,6 @@ astro ide export --project-id <project-id> --workspace-id <workspace-id> --organ
 	cmd.Flags().StringVarP(&organizationID, "organization-id", "o", "", "Organization ID for the project")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force export to overwrite project lock")
 	return cmd
-}
-
-func createIDEProject(cmd *cobra.Command, out io.Writer) error {
-	ctx, err := context.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-
-	orgID, wsID, err := validateWorkspaceAndOrgID(&ctx)
-	if err != nil {
-		return err
-	}
-
-	if projectName == "" {
-		return errors.New("please provide the name of the project using --name flag")
-	}
-	// Validate visibility
-	if projectVisibility != "PRIVATE" && projectVisibility != "WORKSPACE" {
-		return errors.New("visibility must be either 'PRIVATE' or 'WORKSPACE'")
-	}
-
-	cmd.SilenceUsage = true
-	return ide.CreateIDEProject(astroCoreClient, orgID, wsID, projectName, projectDescription, projectVisibility, out)
 }
 
 func listIDEProjects(cmd *cobra.Command, out io.Writer) error {

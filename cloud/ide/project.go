@@ -488,37 +488,3 @@ func extractTarGzArchive(archivePath, targetDir string) error {
 
 	return nil
 }
-
-// CreateIDEProject creates a new IDE project
-func CreateIDEProject(client astrocore.CoreClient, organizationID, workspaceID, name, description, visibility string, out io.Writer) error {
-	// Get context
-	ctx, err := context.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-
-	// Create the project request
-	req := astrocore.CreatePolarisProjectRequest{
-		Name:        &name,
-		Description: &description,
-	}
-
-	// Set visibility if provided
-	if visibility != "" {
-		vis := astrocore.CreatePolarisProjectRequestVisibility(visibility)
-		req.Visibility = &vis
-	}
-
-	// Create the project
-	resp, err := client.CreatePolarisProjectWithResponse(httpContext.Background(), ctx.Organization, ctx.Workspace, req)
-	if err != nil {
-		return fmt.Errorf("failed to create project: %w", err)
-	}
-
-	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
-	}
-
-	fmt.Fprintf(out, "Successfully created project '%s' in workspace '%s'\n", name, ctx.Workspace)
-	return nil
-}
