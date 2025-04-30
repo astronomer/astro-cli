@@ -10,12 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	projectName        string
-	projectDescription string
-	projectVisibility  string
-	ideProjectID       string
-)
+var ideProjectID string
 
 func newIDECommand(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
