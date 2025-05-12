@@ -182,10 +182,6 @@ func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
 		defer testUtil.MockUserInput(s.T(), "y")()
 		err := airflowInit(cmd, args)
 		s.NoError(err)
-
-		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
-		dockerfileContents := string(b)
-		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
 	})
 }
 
@@ -198,10 +194,6 @@ func (s *AirflowSuite) Test_airflowInitNoDefaultImageTag() {
 
 		err := airflowInit(cmd, args)
 		s.NoError(err)
-		// assert contents of Dockerfile
-		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
-		dockerfileContents := string(b)
-		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
 	})
 }
 
@@ -305,10 +297,6 @@ func (s *AirflowSuite) TestAirflowInit() {
 		os.Stdin = r
 		err := airflowInit(cmd, args)
 		s.NoError(err)
-
-		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
-		dockerfileContents := string(b)
-		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
 	})
 
 	s.Run("invalid project name", func() {

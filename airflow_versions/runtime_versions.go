@@ -40,9 +40,9 @@ func isNewFormat(v string) bool {
 	return newFormatRegex.MatchString(v)
 }
 
-// parseNewFormat splits a version string into its constituent parts
+// ParseNewFormat splits a version string into its constituent parts
 // Returns nil if the version string does not have valid format
-func parseNewFormat(v string) *versionParts {
+func ParseNewFormat(v string) *versionParts {
 	matches := newFormatRegex.FindStringSubmatch(v)
 	if matches == nil {
 		return nil
@@ -60,7 +60,7 @@ func parseNewFormat(v string) *versionParts {
 // normalizeVersion converts new format to semver format
 // Returns the original string if it can't be normalized
 func normalizeVersion(v string) string {
-	parts := parseNewFormat(v)
+	parts := ParseNewFormat(v)
 	if parts == nil {
 		// maybe it didn't parse because it's semver, then semver will handle it
 		// maybe it didn't parse because it's neither valid semver nor valid astrover, still semver will handle it
@@ -139,6 +139,18 @@ func RuntimeVersionMajor(version string) string {
 		return ""
 	}
 	return strings.TrimPrefix(semver.Major(v), "v")
+}
+
+// RuntimeVersionMajorMinor returns the major and minor version prefix of the version string
+// For example, RuntimeVersionMajorMinor("3.0-1") == "3.0"
+// If v is an invalid version string, RuntimeVersionMajorMinor returns the empty string
+func RuntimeVersionMajorMinor(version string) string {
+	version = stripVersionPrefix(version)
+	v := "v" + normalizeVersion(version)
+	if !semver.IsValid(v) {
+		return ""
+	}
+	return strings.TrimPrefix(semver.MajorMinor(v), "v")
 }
 
 func AirflowMajorVersionForRuntimeVersion(runtimeVersion string) string {

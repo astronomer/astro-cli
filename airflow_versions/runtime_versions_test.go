@@ -63,6 +63,27 @@ func (s *runtimeVersionsSuite) TestRuntimeVersionMajor() {
 	}
 }
 
+func (s *runtimeVersionsSuite) TestRuntimeVersionMajorMinor() {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"new format", "3.0-7", "3.0"},
+		{"old format", "12.1.1", "12.1"},
+		{"invalid version", "invalid", ""},
+	}
+
+	for _, tt := range tests {
+		s.t.Run(tt.name, func(t *testing.T) {
+			result := RuntimeVersionMajorMinor(tt.input)
+			if result != tt.expected {
+				t.Errorf("RuntimeVersionMajorMinor(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func (s *runtimeVersionsSuite) TestRuntimeVersionAirflowMajorVersion() {
 	tests := []struct {
 		name     string

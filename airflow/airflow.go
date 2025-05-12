@@ -150,6 +150,11 @@ func Init(path, airflowImageName, airflowImageTag, template string) error {
 	var files map[string]string
 	switch airflowversions.AirflowMajorVersionForRuntimeVersion(airflowImageTag) {
 	case "3":
+		// Use the floating tag for the runtime version, so that the latest patch versions are automatically used
+		airflowImageFloatingTag := airflowversions.RuntimeVersionMajorMinor(airflowImageTag)
+		if airflowImageFloatingTag != "" {
+			airflowImageTag = airflowImageFloatingTag
+		}
 		files = map[string]string{
 			".dockerignore":                        Af3Dockerignore,
 			"Dockerfile":                           fmt.Sprintf(Af3Dockerfile, airflowImageName, airflowImageTag),
