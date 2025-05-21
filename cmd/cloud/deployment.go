@@ -733,7 +733,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
-func validateRemoteExecution() (error) {
+func validateRemoteExecution() error {
 	if !airflowversions.IsAirflow3(runtimeVersion) {
 		return errors.New("remote-execution-enabled is only supported for Airflow 3.x")
 	}
