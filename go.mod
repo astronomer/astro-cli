@@ -40,6 +40,7 @@ require (
 	github.com/golangci/golangci-lint v1.62.2
 	github.com/google/go-github/v48 v48.2.0
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/oapi-codegen/oapi-codegen/v2 v2.4.0
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/vektra/mockery/v2 v2.50.0
@@ -123,6 +124,7 @@ require (
 	github.com/denis-tingaikin/go-header v0.5.0 // indirect
 	github.com/docker/cli-docs-tool v0.8.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
+	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/ettle/strcase v0.2.0 // indirect
@@ -275,6 +277,7 @@ require (
 	github.com/sonatard/noctx v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/sourcegraph/go-diff v0.7.0 // indirect
+	github.com/speakeasy-api/openapi-overlay v0.9.0 // indirect
 	github.com/ssgreg/nlreturn/v2 v2.2.1 // indirect
 	github.com/stbenjam/no-sprintf-host-port v0.2.0 // indirect
 	github.com/tdakkota/asciicheck v0.3.0 // indirect
@@ -299,6 +302,7 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
+	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xen0n/gosmopolitan v1.2.2 // indirect
 	github.com/yagipy/maintidx v1.0.0 // indirect
