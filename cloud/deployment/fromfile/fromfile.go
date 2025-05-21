@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -715,7 +716,9 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 	if deploymentFromFile.Deployment.Configuration.Executor == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.executor")
 	}
-	if !isValidExecutor(deploymentFromFile.Deployment.Configuration.Executor) {
+	// check if deployment is using Airflow 3 by validating runtime version
+	isAirflow3 := airflowversions.IsAirflow3(deploymentFromFile.Deployment.Configuration.RunTimeVersion)
+	if !isValidExecutor(deploymentFromFile.Deployment.Configuration.Executor, isAirflow3) {
 		return fmt.Errorf("executor %s %w. It can either be CeleryExecutor or KubernetesExecutor", deploymentFromFile.Deployment.Configuration.Executor, errInvalidValue)
 	}
 	// if alert emails are requested
@@ -996,8 +999,22 @@ func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment) (envV
 }
 
 // isValidExecutor returns true for valid executor values and false if not.
-func isValidExecutor(executor string) bool {
-	return strings.EqualFold(executor, deployment.KubeExecutor) || strings.EqualFold(executor, deployment.CeleryExecutor) || strings.EqualFold(executor, deployment.CELERY) || strings.EqualFold(executor, deployment.KUBERNETES)
+func isValidExecutor(executor string, isAirflow3 bool) bool {
+	validExecutors := []string{ // Airflow 2 executors
+		deployment.KubeExecutor,
+		deployment.CeleryExecutor,
+		deployment.CELERY,
+		deployment.KUBERNETES,
+	}
+	if isAirflow3 {
+		validExecutors = append(validExecutors, deployment.AstroExecutor, deployment.ASTRO)
+	}
+	for _, e := range validExecutors {
+		if strings.EqualFold(executor, e) {
+			return true
+		}
+	}
+	return false
 }
 
 func transformDeploymentType(deploymentType string) astroplatformcore.DeploymentType {
