@@ -51,8 +51,10 @@ const (
 	noWorkspaceMsg      = "no Workspace with id (%s) found"
 	KubeExecutor        = "KubernetesExecutor"
 	CeleryExecutor      = "CeleryExecutor"
+	AstroExecutor       = "AstroExecutor"
 	KUBERNETES          = "KUBERNETES"
 	CELERY              = "CELERY"
+	ASTRO               = "ASTRO"
 	notApplicable       = "N/A"
 	gcpCloud            = "gcp"
 	awsCloud            = "aws"
@@ -235,11 +237,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 
 	configOption, err := GetDeploymentOptions("", deploymentOptionsParams, coreClient)
 	if err != nil {
-		return err
-	}
-
-	// check that runtime version is not for Airflow 3
-	if err := airflowversions.ValidateNoAirflow3Support(runtimeVersion); err != nil {
 		return err
 	}
 
