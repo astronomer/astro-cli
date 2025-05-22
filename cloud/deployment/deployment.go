@@ -355,6 +355,19 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
 			}
+			if strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) || remoteExecutionEnabled {
+				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorASTRO
+			}
+			var remoteExecution *astroplatformcore.RemoteExecutionSpecRequest
+			if remoteExecutionEnabled {
+				remoteExecution = &astroplatformcore.RemoteExecutionSpecRequest{
+					Enabled: true,
+					AllowedIPAddressRanges: allowedIPAddressRanges,
+					TaskLogBucket:         taskLogBucket,
+					TaskLogURLFormat:      taskLogURLFormat,
+				}
+			}
+
 			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
 				AstroRuntimeVersion:  runtimeVersion,
 				CloudProvider:        &requestedCloudProvider,
@@ -373,6 +386,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
+				RemoteExecution:      remoteExecution,
 			}
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
@@ -406,6 +420,18 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
+			if strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) || remoteExecutionEnabled {
+				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorASTRO
+			}
+			var remoteExecution *astroplatformcore.RemoteExecutionSpecRequest
+			if remoteExecutionEnabled {
+				remoteExecution = &astroplatformcore.RemoteExecutionSpecRequest{
+					Enabled: true,
+					AllowedIPAddressRanges: allowedIPAddressRanges,
+					TaskLogBucket:         taskLogBucket,
+					TaskLogURLFormat:      taskLogURLFormat,
+				}
+			}
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
 				AstroRuntimeVersion:  runtimeVersion,
 				Description:          &description,
@@ -423,6 +449,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
+				RemoteExecution:      remoteExecution,
 			}
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
