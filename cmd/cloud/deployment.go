@@ -763,7 +763,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	deployment.CleanOutput = cleanOutput
 
 	// check if executor is valid
-	if !isValidExecutor(executor, airflowversions.IsAirflow3(runtimeVersion)) {
+	if len(executor) > 0 && !isValidExecutor(executor, airflowversions.IsAirflow3(runtimeVersion)) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 	// request is to update from a file
