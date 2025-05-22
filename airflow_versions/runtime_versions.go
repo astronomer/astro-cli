@@ -160,3 +160,7 @@ func ValidateNoAirflow3Support(runtimeVersion string) error {
 	}
 	return nil
 }
+
+func IsAirflow3(runtimeVersion string) bool {
+	return AirflowMajorVersionForRuntimeVersion(runtimeVersion) == "3"
+}

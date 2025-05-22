@@ -3,6 +3,7 @@ package fromfile
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -3969,40 +3970,37 @@ func (s *Suite) TestCheckEnvVars() {
 }
 
 func (s *Suite) TestIsValidExecutor() {
-	s.Run("returns true if executor is Celery", func() {
-		actual := isValidExecutor(deployment.CeleryExecutor)
-		s.True(actual)
+
+	af3OnlyValidExecutors := []string{"astro", "astroexecutor", "ASTRO", deployment.AstroExecutor, deployment.ASTRO}
+	af2ValidExecutors := []string{"celery", "celeryexecutor", "kubernetes", "kubernetesexecutor", "CELERY", "KUBERNETES", deployment.CeleryExecutor, deployment.KubeExecutor, deployment.CELERY, deployment.KUBERNETES}
+	for _, executor := range af2ValidExecutors {
+		s.Run(fmt.Sprintf("returns true if executor is %s isAirflow3=false", executor), func() {
+			actual := isValidExecutor(executor, false)
+			s.True(actual)
+		})
+	}
+	for _, executor := range af3OnlyValidExecutors {
+		s.Run(fmt.Sprintf("returns false if executor is %s isAirflow3=false", executor), func() {
+			actual := isValidExecutor(executor, false)
+			s.False(actual)
+		})
+	}
+	s.Run("returns false if executor is invalid isAirflow3=false", func() {
+		actual := isValidExecutor("invalid-executor", false)
+		s.False(actual)
 	})
-	s.Run("returns true if executor is Kubernetes", func() {
-		actual := isValidExecutor(deployment.KubeExecutor)
-		s.True(actual)
-	})
-	s.Run("returns true if executor is CELERY", func() {
-		actual := isValidExecutor(deployment.CELERY)
-		s.True(actual)
-	})
-	s.Run("returns true if executor is KUBERNETES", func() {
-		actual := isValidExecutor(deployment.KUBERNETES)
-		s.True(actual)
-	})
-	s.Run("returns true if executor is celery", func() {
-		actual := isValidExecutor("celery")
-		s.True(actual)
-	})
-	s.Run("returns true if executor is kubernetes", func() {
-		actual := isValidExecutor("kubernetes")
-		s.True(actual)
-	})
-	s.Run("returns true if executor is celery", func() {
-		actual := isValidExecutor("celeryexecutor")
-		s.True(actual)
-	})
-	s.Run("returns true if executor is kubernetes", func() {
-		actual := isValidExecutor("kubernetesexecutor")
-		s.True(actual)
-	})
-	s.Run("returns false if executor is neither Celery nor Kubernetes", func() {
-		actual := isValidExecutor("test-executor")
+
+	// Airflow 3 introduces AstroExecutor as a valid executor
+	af3ValidExecutors := append(af3OnlyValidExecutors, af2ValidExecutors...)
+	for _, executor := range af3ValidExecutors {
+		s.Run(fmt.Sprintf("returns true if executor is %s isAirflow3=true", executor), func() {
+			actual := isValidExecutor(executor, true)
+			s.True(actual)
+		})
+	}
+
+	s.Run("returns false if executor is invalid isAirflow3=true", func() {
+		actual := isValidExecutor("invalid-executor", true)
 		s.False(actual)
 	})
 }

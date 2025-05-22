@@ -76,6 +76,10 @@ var (
 	logScheduler              bool
 	logWorkers                bool
 	logTriggerer              bool
+	remoteExecution           bool
+	allowedIPAddressRanges    []string
+	taskLogBucket             string
+	taskLogURLFormat          string
 
 	deploymentType                = standard
 	deploymentVariableListExample = `
@@ -392,6 +396,10 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	if err != nil {
 		fmt.Println(err)
 	}
+	cmd.Flags().BoolVarP(&remoteExecution, "remote-execution", "", false, "Enable remote execution for the Deployment")
+	cmd.Flags().StringArrayVarP(&allowedIPAddressRanges, "allowed-ip-address-ranges", "", []string{}, "The allowed IP address ranges for remote execution")
+	cmd.Flags().StringVarP(&taskLogBucket, "task-log-bucket", "", "", "The task log bucket for remote execution")
+	cmd.Flags().StringVarP(&taskLogURLFormat, "task-log-url-format", "", "", "The task log URL format for remote execution")
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the Deployment to create. File can be in either JSON or YAML format.")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
@@ -626,6 +634,12 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo
+	if remoteExecution {
+		if err := validateRemoteExecution(); err != nil {
+			return err
+		}
+	}
+
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -640,8 +654,9 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if executor == "" {
 		executor = deployment.CeleryExecutor
 	}
+
 	// check if executor is valid
-	if !isValidExecutor(executor) {
+	if !isValidExecutor(executor, airflowversions.IsAirflow3(runtimeVersion)) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 
@@ -701,8 +716,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Get latest runtime version
 	if runtimeVersion == "" {
 		airflowVersionClient := airflowversions.NewClient(httpClient, false)
-		// Excludes Airflow 3 until the command supports it
-		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "", true)
+		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "", false)
 		if err != nil {
 			return err
 		}
@@ -716,7 +730,23 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, platformCoreClient, astroCoreClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, remoteExecution, allowedIPAddressRanges, taskLogBucket, taskLogURLFormat, platformCoreClient, astroCoreClient, waitForStatus)
+}
+
+func validateRemoteExecution() error {
+	if !airflowversions.IsAirflow3(runtimeVersion) {
+		return errors.New("remote-execution-enabled is only supported for Airflow 3.x")
+	}
+	if !isRemoteExecutionExecutor(executor) {
+		return errors.New("remote-execution-enabled is only supported for the Astro executor")
+	}
+	if taskLogBucket == "" || taskLogURLFormat == "" {
+		return errors.New("task-log-bucket and task-log-url-format are required when remote-execution-enabled is true")
+	}
+	if len(allowedIPAddressRanges) == 0 {
+		return errors.New("at least one allowed-ip-address-range is required when remote-execution-enabled is true")
+	}
+	return nil
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
@@ -733,7 +763,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	deployment.CleanOutput = cleanOutput
 
 	// check if executor is valid
-	if !isValidExecutor(executor) {
+	if len(executor) > 0 && !isValidExecutor(executor, airflowversions.IsAirflow3(runtimeVersion)) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 	// request is to update from a file
@@ -864,8 +894,35 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, platformCoreClient)
 }
 
-func isValidExecutor(executor string) bool {
-	return strings.EqualFold(executor, deployment.KubeExecutor) || strings.EqualFold(executor, deployment.CeleryExecutor) || executor == "" || strings.EqualFold(executor, deployment.CELERY) || strings.EqualFold(executor, deployment.KUBERNETES)
+func isRemoteExecutionExecutor(executor string) bool {
+	remoteExecutionExecutors := []string{
+		deployment.AstroExecutor,
+		deployment.ASTRO,
+	}
+	for _, e := range remoteExecutionExecutors {
+		if strings.EqualFold(executor, e) {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidExecutor(executor string, isAirflow3 bool) bool {
+	validExecutors := []string{
+		deployment.KubeExecutor,
+		deployment.CeleryExecutor,
+		deployment.CELERY,
+		deployment.KUBERNETES,
+	}
+	if isAirflow3 {
+		validExecutors = append(validExecutors, deployment.AstroExecutor, deployment.ASTRO)
+	}
+	for _, e := range validExecutors {
+		if strings.EqualFold(executor, e) {
+			return true
+		}
+	}
+	return false
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.
