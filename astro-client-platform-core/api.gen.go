@@ -838,7 +838,7 @@ type CreateDedicatedDeploymentRequest struct {
 
 	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
 	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
-	RemoteExecution *RemoteExecutionSpecRequest `json:"remoteExecution,omitempty"`
+	RemoteExecution     *RemoteExecutionSpecRequest   `json:"remoteExecution,omitempty"`
 	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize The size of the scheduler Pod.
@@ -1055,12 +1055,12 @@ type CreateStandardDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
-	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
 
 	// RemoteExecution Whether the Deployment is configured for remote execution.
 	RemoteExecution *RemoteExecutionSpecRequest `json:"remoteExecution,omitempty"`
 
-	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
+	ScalingSpec *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize The size of the scheduler Pod.
 	SchedulerSize CreateStandardDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -1485,18 +1485,18 @@ type DeploymentScalingSpecRequest struct {
 
 // RemoteExecutionSpec defines model for RemoteExecutionSpec.
 type RemoteExecutionSpec struct {
-	Enabled bool `json:"enabled"`
+	Enabled                bool     `json:"enabled"`
 	AllowedIPAddressRanges []string `json:"allowedIPAddressRanges,omitempty"`
-	TaskLogBucket string `json:"taskLogBucket,omitempty"`
-	TaskLogURLFormat string `json:"taskLogURLFormat,omitempty"`
+	TaskLogBucket          string   `json:"taskLogBucket,omitempty"`
+	TaskLogURLFormat       string   `json:"taskLogURLFormat,omitempty"`
 }
 
 // RemoteExecutionSpecRequest defines model for RemoteExecutionSpecRequest.
 type RemoteExecutionSpecRequest struct {
-	Enabled bool `json:"enabled"`
+	Enabled                bool     `json:"enabled"`
 	AllowedIPAddressRanges []string `json:"allowedIPAddressRanges"`
-	TaskLogBucket string `json:"taskLogBucket,omitempty"`
-	TaskLogURLFormat string `json:"taskLogURLFormat,omitempty"`
+	TaskLogBucket          string   `json:"taskLogBucket,omitempty"`
+	TaskLogURLFormat       string   `json:"taskLogURLFormat,omitempty"`
 }
 
 // DeploymentScalingStatus defines model for DeploymentScalingStatus.
