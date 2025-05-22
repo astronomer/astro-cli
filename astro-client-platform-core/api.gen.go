@@ -95,6 +95,7 @@ const (
 const (
 	CreateDedicatedDeploymentRequestExecutorCELERY     CreateDedicatedDeploymentRequestExecutor = "CELERY"
 	CreateDedicatedDeploymentRequestExecutorKUBERNETES CreateDedicatedDeploymentRequestExecutor = "KUBERNETES"
+	CreateDedicatedDeploymentRequestExecutorASTRO      CreateDedicatedDeploymentRequestExecutor = "ASTRO"
 )
 
 // Defines values for CreateDedicatedDeploymentRequestSchedulerSize.
@@ -157,6 +158,7 @@ const (
 const (
 	CreateStandardDeploymentRequestExecutorCELERY     CreateStandardDeploymentRequestExecutor = "CELERY"
 	CreateStandardDeploymentRequestExecutorKUBERNETES CreateStandardDeploymentRequestExecutor = "KUBERNETES"
+	CreateStandardDeploymentRequestExecutorASTRO      CreateStandardDeploymentRequestExecutor = "ASTRO"
 )
 
 // Defines values for CreateStandardDeploymentRequestSchedulerSize.
@@ -836,6 +838,7 @@ type CreateDedicatedDeploymentRequest struct {
 
 	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
 	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+	RemoteExecution *RemoteExecutionSpecRequest `json:"remoteExecution,omitempty"`
 	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize The size of the scheduler Pod.
@@ -1053,6 +1056,10 @@ type CreateStandardDeploymentRequest struct {
 
 	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
 	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+
+	// RemoteExecution Whether the Deployment is configured for remote execution.
+	RemoteExecution *RemoteExecutionSpecRequest `json:"remoteExecution,omitempty"`
+
 	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize The size of the scheduler Pod.
@@ -1474,6 +1481,22 @@ type DeploymentScalingSpec struct {
 // DeploymentScalingSpecRequest defines model for DeploymentScalingSpecRequest.
 type DeploymentScalingSpecRequest struct {
 	HibernationSpec *DeploymentHibernationSpecRequest `json:"hibernationSpec,omitempty"`
+}
+
+// RemoteExecutionSpec defines model for RemoteExecutionSpec.
+type RemoteExecutionSpec struct {
+	Enabled bool `json:"enabled"`
+	AllowedIPAddressRanges []string `json:"allowedIPAddressRanges,omitempty"`
+	TaskLogBucket string `json:"taskLogBucket,omitempty"`
+	TaskLogURLFormat string `json:"taskLogURLFormat,omitempty"`
+}
+
+// RemoteExecutionSpecRequest defines model for RemoteExecutionSpecRequest.
+type RemoteExecutionSpecRequest struct {
+	Enabled bool `json:"enabled"`
+	AllowedIPAddressRanges []string `json:"allowedIPAddressRanges"`
+	TaskLogBucket string `json:"taskLogBucket,omitempty"`
+	TaskLogURLFormat string `json:"taskLogURLFormat,omitempty"`
 }
 
 // DeploymentScalingStatus defines model for DeploymentScalingStatus.
