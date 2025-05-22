@@ -41,18 +41,6 @@ const (
 	USER       BasicSubjectProfileSubjectType = "USER"
 )
 
-// Defines values for CreateApiTokenRequestRole.
-const (
-	CreateApiTokenRequestRoleDEPLOYMENTADMIN          CreateApiTokenRequestRole = "DEPLOYMENT_ADMIN"
-	CreateApiTokenRequestRoleORGANIZATIONBILLINGADMIN CreateApiTokenRequestRole = "ORGANIZATION_BILLING_ADMIN"
-	CreateApiTokenRequestRoleORGANIZATIONMEMBER       CreateApiTokenRequestRole = "ORGANIZATION_MEMBER"
-	CreateApiTokenRequestRoleORGANIZATIONOWNER        CreateApiTokenRequestRole = "ORGANIZATION_OWNER"
-	CreateApiTokenRequestRoleWORKSPACEAUTHOR          CreateApiTokenRequestRole = "WORKSPACE_AUTHOR"
-	CreateApiTokenRequestRoleWORKSPACEMEMBER          CreateApiTokenRequestRole = "WORKSPACE_MEMBER"
-	CreateApiTokenRequestRoleWORKSPACEOPERATOR        CreateApiTokenRequestRole = "WORKSPACE_OPERATOR"
-	CreateApiTokenRequestRoleWORKSPACEOWNER           CreateApiTokenRequestRole = "WORKSPACE_OWNER"
-)
-
 // Defines values for CreateApiTokenRequestType.
 const (
 	DEPLOYMENT   CreateApiTokenRequestType = "DEPLOYMENT"
@@ -62,56 +50,65 @@ const (
 
 // Defines values for CreateTeamRequestOrganizationRole.
 const (
-	CreateTeamRequestOrganizationRoleORGANIZATIONBILLINGADMIN CreateTeamRequestOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
-	CreateTeamRequestOrganizationRoleORGANIZATIONMEMBER       CreateTeamRequestOrganizationRole = "ORGANIZATION_MEMBER"
-	CreateTeamRequestOrganizationRoleORGANIZATIONOWNER        CreateTeamRequestOrganizationRole = "ORGANIZATION_OWNER"
+	CreateTeamRequestOrganizationRoleORGANIZATIONBILLINGADMIN  CreateTeamRequestOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
+	CreateTeamRequestOrganizationRoleORGANIZATIONMEMBER        CreateTeamRequestOrganizationRole = "ORGANIZATION_MEMBER"
+	CreateTeamRequestOrganizationRoleORGANIZATIONOBSERVEADMIN  CreateTeamRequestOrganizationRole = "ORGANIZATION_OBSERVE_ADMIN"
+	CreateTeamRequestOrganizationRoleORGANIZATIONOBSERVEMEMBER CreateTeamRequestOrganizationRole = "ORGANIZATION_OBSERVE_MEMBER"
+	CreateTeamRequestOrganizationRoleORGANIZATIONOWNER         CreateTeamRequestOrganizationRole = "ORGANIZATION_OWNER"
 )
 
 // Defines values for CreateUserInviteRequestRole.
 const (
-	CreateUserInviteRequestRoleORGANIZATIONBILLINGADMIN CreateUserInviteRequestRole = "ORGANIZATION_BILLING_ADMIN"
-	CreateUserInviteRequestRoleORGANIZATIONMEMBER       CreateUserInviteRequestRole = "ORGANIZATION_MEMBER"
-	CreateUserInviteRequestRoleORGANIZATIONOWNER        CreateUserInviteRequestRole = "ORGANIZATION_OWNER"
-)
-
-// Defines values for DeploymentRoleRole.
-const (
-	DEPLOYMENTADMIN DeploymentRoleRole = "DEPLOYMENT_ADMIN"
+	CreateUserInviteRequestRoleORGANIZATIONBILLINGADMIN  CreateUserInviteRequestRole = "ORGANIZATION_BILLING_ADMIN"
+	CreateUserInviteRequestRoleORGANIZATIONMEMBER        CreateUserInviteRequestRole = "ORGANIZATION_MEMBER"
+	CreateUserInviteRequestRoleORGANIZATIONOBSERVEADMIN  CreateUserInviteRequestRole = "ORGANIZATION_OBSERVE_ADMIN"
+	CreateUserInviteRequestRoleORGANIZATIONOBSERVEMEMBER CreateUserInviteRequestRole = "ORGANIZATION_OBSERVE_MEMBER"
+	CreateUserInviteRequestRoleORGANIZATIONOWNER         CreateUserInviteRequestRole = "ORGANIZATION_OWNER"
 )
 
 // Defines values for SubjectRolesOrganizationRole.
 const (
-	SubjectRolesOrganizationRoleORGANIZATIONBILLINGADMIN SubjectRolesOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
-	SubjectRolesOrganizationRoleORGANIZATIONMEMBER       SubjectRolesOrganizationRole = "ORGANIZATION_MEMBER"
-	SubjectRolesOrganizationRoleORGANIZATIONOWNER        SubjectRolesOrganizationRole = "ORGANIZATION_OWNER"
+	SubjectRolesOrganizationRoleORGANIZATIONBILLINGADMIN  SubjectRolesOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
+	SubjectRolesOrganizationRoleORGANIZATIONMEMBER        SubjectRolesOrganizationRole = "ORGANIZATION_MEMBER"
+	SubjectRolesOrganizationRoleORGANIZATIONOBSERVEADMIN  SubjectRolesOrganizationRole = "ORGANIZATION_OBSERVE_ADMIN"
+	SubjectRolesOrganizationRoleORGANIZATIONOBSERVEMEMBER SubjectRolesOrganizationRole = "ORGANIZATION_OBSERVE_MEMBER"
+	SubjectRolesOrganizationRoleORGANIZATIONOWNER         SubjectRolesOrganizationRole = "ORGANIZATION_OWNER"
 )
 
 // Defines values for TeamOrganizationRole.
 const (
-	TeamOrganizationRoleORGANIZATIONBILLINGADMIN TeamOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
-	TeamOrganizationRoleORGANIZATIONMEMBER       TeamOrganizationRole = "ORGANIZATION_MEMBER"
-	TeamOrganizationRoleORGANIZATIONOWNER        TeamOrganizationRole = "ORGANIZATION_OWNER"
+	TeamOrganizationRoleORGANIZATIONBILLINGADMIN  TeamOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
+	TeamOrganizationRoleORGANIZATIONMEMBER        TeamOrganizationRole = "ORGANIZATION_MEMBER"
+	TeamOrganizationRoleORGANIZATIONOBSERVEADMIN  TeamOrganizationRole = "ORGANIZATION_OBSERVE_ADMIN"
+	TeamOrganizationRoleORGANIZATIONOBSERVEMEMBER TeamOrganizationRole = "ORGANIZATION_OBSERVE_MEMBER"
+	TeamOrganizationRoleORGANIZATIONOWNER         TeamOrganizationRole = "ORGANIZATION_OWNER"
 )
 
 // Defines values for UpdateTeamRolesRequestOrganizationRole.
 const (
-	UpdateTeamRolesRequestOrganizationRoleORGANIZATIONBILLINGADMIN UpdateTeamRolesRequestOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
-	UpdateTeamRolesRequestOrganizationRoleORGANIZATIONMEMBER       UpdateTeamRolesRequestOrganizationRole = "ORGANIZATION_MEMBER"
-	UpdateTeamRolesRequestOrganizationRoleORGANIZATIONOWNER        UpdateTeamRolesRequestOrganizationRole = "ORGANIZATION_OWNER"
+	UpdateTeamRolesRequestOrganizationRoleORGANIZATIONBILLINGADMIN  UpdateTeamRolesRequestOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
+	UpdateTeamRolesRequestOrganizationRoleORGANIZATIONMEMBER        UpdateTeamRolesRequestOrganizationRole = "ORGANIZATION_MEMBER"
+	UpdateTeamRolesRequestOrganizationRoleORGANIZATIONOBSERVEADMIN  UpdateTeamRolesRequestOrganizationRole = "ORGANIZATION_OBSERVE_ADMIN"
+	UpdateTeamRolesRequestOrganizationRoleORGANIZATIONOBSERVEMEMBER UpdateTeamRolesRequestOrganizationRole = "ORGANIZATION_OBSERVE_MEMBER"
+	UpdateTeamRolesRequestOrganizationRoleORGANIZATIONOWNER         UpdateTeamRolesRequestOrganizationRole = "ORGANIZATION_OWNER"
 )
 
 // Defines values for UpdateUserRolesRequestOrganizationRole.
 const (
-	UpdateUserRolesRequestOrganizationRoleORGANIZATIONBILLINGADMIN UpdateUserRolesRequestOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
-	UpdateUserRolesRequestOrganizationRoleORGANIZATIONMEMBER       UpdateUserRolesRequestOrganizationRole = "ORGANIZATION_MEMBER"
-	UpdateUserRolesRequestOrganizationRoleORGANIZATIONOWNER        UpdateUserRolesRequestOrganizationRole = "ORGANIZATION_OWNER"
+	UpdateUserRolesRequestOrganizationRoleORGANIZATIONBILLINGADMIN  UpdateUserRolesRequestOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
+	UpdateUserRolesRequestOrganizationRoleORGANIZATIONMEMBER        UpdateUserRolesRequestOrganizationRole = "ORGANIZATION_MEMBER"
+	UpdateUserRolesRequestOrganizationRoleORGANIZATIONOBSERVEADMIN  UpdateUserRolesRequestOrganizationRole = "ORGANIZATION_OBSERVE_ADMIN"
+	UpdateUserRolesRequestOrganizationRoleORGANIZATIONOBSERVEMEMBER UpdateUserRolesRequestOrganizationRole = "ORGANIZATION_OBSERVE_MEMBER"
+	UpdateUserRolesRequestOrganizationRoleORGANIZATIONOWNER         UpdateUserRolesRequestOrganizationRole = "ORGANIZATION_OWNER"
 )
 
 // Defines values for UserOrganizationRole.
 const (
-	UserOrganizationRoleORGANIZATIONBILLINGADMIN UserOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
-	UserOrganizationRoleORGANIZATIONMEMBER       UserOrganizationRole = "ORGANIZATION_MEMBER"
-	UserOrganizationRoleORGANIZATIONOWNER        UserOrganizationRole = "ORGANIZATION_OWNER"
+	ORGANIZATIONBILLINGADMIN  UserOrganizationRole = "ORGANIZATION_BILLING_ADMIN"
+	ORGANIZATIONMEMBER        UserOrganizationRole = "ORGANIZATION_MEMBER"
+	ORGANIZATIONOBSERVEADMIN  UserOrganizationRole = "ORGANIZATION_OBSERVE_ADMIN"
+	ORGANIZATIONOBSERVEMEMBER UserOrganizationRole = "ORGANIZATION_OBSERVE_MEMBER"
+	ORGANIZATIONOWNER         UserOrganizationRole = "ORGANIZATION_OWNER"
 )
 
 // Defines values for UserStatus.
@@ -124,6 +121,7 @@ const (
 
 // Defines values for WorkspaceRoleRole.
 const (
+	WORKSPACEACCESSOR WorkspaceRoleRole = "WORKSPACE_ACCESSOR"
 	WORKSPACEAUTHOR   WorkspaceRoleRole = "WORKSPACE_AUTHOR"
 	WORKSPACEMEMBER   WorkspaceRoleRole = "WORKSPACE_MEMBER"
 	WORKSPACEOPERATOR WorkspaceRoleRole = "WORKSPACE_OPERATOR"
@@ -301,7 +299,7 @@ type CreateApiTokenRequest struct {
 	Name string `json:"name"`
 
 	// Role The role of the API token.
-	Role CreateApiTokenRequestRole `json:"role"`
+	Role string `json:"role"`
 
 	// TokenExpiryPeriodInDays The expiry period of the API token in days. If not specified, the token will never expire.
 	TokenExpiryPeriodInDays *int `json:"tokenExpiryPeriodInDays,omitempty"`
@@ -309,9 +307,6 @@ type CreateApiTokenRequest struct {
 	// Type The scope of the API token.
 	Type CreateApiTokenRequestType `json:"type"`
 }
-
-// CreateApiTokenRequestRole The role of the API token.
-type CreateApiTokenRequestRole string
 
 // CreateApiTokenRequestType The scope of the API token.
 type CreateApiTokenRequestType string
@@ -351,12 +346,9 @@ type DeploymentRole struct {
 	// DeploymentId The Deployment ID.
 	DeploymentId string `json:"deploymentId"`
 
-	// Role The role of the subject in the Deployment.
-	Role DeploymentRoleRole `json:"role"`
+	// Role The name of the role for the subject in the Deployment.
+	Role string `json:"role"`
 }
-
-// DeploymentRoleRole The role of the subject in the Deployment.
-type DeploymentRoleRole string
 
 // Error defines model for Error.
 type Error struct {
@@ -405,6 +397,9 @@ type Team struct {
 	// CreatedAt The time when the Team was created in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
 	CreatedAt time.Time            `json:"createdAt"`
 	CreatedBy *BasicSubjectProfile `json:"createdBy,omitempty"`
+
+	// DeploymentRoles The Team's role in each Deployment it belongs to.
+	DeploymentRoles *[]DeploymentRole `json:"deploymentRoles,omitempty"`
 
 	// Description The Team's description.
 	Description *string `json:"description,omitempty"`
@@ -512,6 +507,9 @@ type UpdateTeamRequest struct {
 
 // UpdateTeamRolesRequest defines model for UpdateTeamRolesRequest.
 type UpdateTeamRolesRequest struct {
+	// DeploymentRoles The user's updated Deployment roles. The Deployments you specify must belong to the Team's Organization.
+	DeploymentRoles *[]DeploymentRole `json:"deploymentRoles,omitempty"`
+
 	// OrganizationRole The Team's Organization roles.
 	OrganizationRole UpdateTeamRolesRequestOrganizationRole `json:"organizationRole"`
 
@@ -524,6 +522,9 @@ type UpdateTeamRolesRequestOrganizationRole string
 
 // UpdateUserRolesRequest defines model for UpdateUserRolesRequest.
 type UpdateUserRolesRequest struct {
+	// DeploymentRoles The user's updated Deployment roles. Requires also specifying an `OrganizationRole`.
+	DeploymentRoles *[]DeploymentRole `json:"deploymentRoles,omitempty"`
+
 	// OrganizationRole The user's updated Organization role.
 	OrganizationRole *UpdateUserRolesRequestOrganizationRole `json:"organizationRole,omitempty"`
 
@@ -541,6 +542,9 @@ type User struct {
 
 	// CreatedAt The time when the user was created in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
 	CreatedAt time.Time `json:"createdAt"`
+
+	// DeploymentRoles The user's Deployment roles.
+	DeploymentRoles *[]DeploymentRole `json:"deploymentRoles,omitempty"`
 
 	// FullName The user's full name.
 	FullName string `json:"fullName"`
@@ -599,6 +603,9 @@ type WorkspaceRoleRole string
 
 // ListTeamsParams defines parameters for ListTeams.
 type ListTeamsParams struct {
+	// Names A list of names for Teams to filter by. The API returns details only for the specified Teams.
+	Names *[]string `form:"names,omitempty" json:"names,omitempty"`
+
 	// Offset Offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
@@ -655,6 +662,9 @@ type ListApiTokensParamsSorts string
 type ListUsersParams struct {
 	// WorkspaceId The ID of the Workspace to filter the list of users for. When specified, the API returns only users belonging to the specified Workspace.
 	WorkspaceId *string `form:"workspaceId,omitempty" json:"workspaceId,omitempty"`
+
+	// DeploymentId The ID of the Deployment to filter the list of users for. When specified, the API returns only users belonging to the specified Deployment.
+	DeploymentId *string `form:"deploymentId,omitempty" json:"deploymentId,omitempty"`
 
 	// Offset Offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
@@ -1327,6 +1337,22 @@ func NewListTeamsRequest(server string, organizationId string, params *ListTeams
 
 	if params != nil {
 		queryValues := queryURL.Query()
+
+		if params.Names != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "names", runtime.ParamLocationQuery, *params.Names); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
 
 		if params.Offset != nil {
 
@@ -2267,6 +2293,22 @@ func NewListUsersRequest(server string, organizationId string, params *ListUsers
 		if params.WorkspaceId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "workspaceId", runtime.ParamLocationQuery, *params.WorkspaceId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.DeploymentId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deploymentId", runtime.ParamLocationQuery, *params.DeploymentId); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err

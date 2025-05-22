@@ -36,17 +36,26 @@ const (
 
 // Defines values for ClusterStatus.
 const (
-	ClusterStatusCREATED      ClusterStatus = "CREATED"
-	ClusterStatusCREATEFAILED ClusterStatus = "CREATE_FAILED"
-	ClusterStatusCREATING     ClusterStatus = "CREATING"
-	ClusterStatusUPDATEFAILED ClusterStatus = "UPDATE_FAILED"
-	ClusterStatusUPDATING     ClusterStatus = "UPDATING"
+	ClusterStatusACCESSDENIED   ClusterStatus = "ACCESS_DENIED"
+	ClusterStatusCREATED        ClusterStatus = "CREATED"
+	ClusterStatusCREATEFAILED   ClusterStatus = "CREATE_FAILED"
+	ClusterStatusCREATING       ClusterStatus = "CREATING"
+	ClusterStatusUPDATEFAILED   ClusterStatus = "UPDATE_FAILED"
+	ClusterStatusUPDATING       ClusterStatus = "UPDATING"
+	ClusterStatusUPGRADEPENDING ClusterStatus = "UPGRADE_PENDING"
 )
 
 // Defines values for ClusterType.
 const (
 	ClusterTypeDEDICATED ClusterType = "DEDICATED"
 	ClusterTypeHYBRID    ClusterType = "HYBRID"
+)
+
+// Defines values for ClusterHealthStatusValue.
+const (
+	HEALTHY   ClusterHealthStatusValue = "HEALTHY"
+	UNHEALTHY ClusterHealthStatusValue = "UNHEALTHY"
+	UNKNOWN   ClusterHealthStatusValue = "UNKNOWN"
 )
 
 // Defines values for ClusterOptionsProvider.
@@ -90,9 +99,10 @@ const (
 
 // Defines values for CreateDedicatedDeploymentRequestSchedulerSize.
 const (
-	CreateDedicatedDeploymentRequestSchedulerSizeLARGE  CreateDedicatedDeploymentRequestSchedulerSize = "LARGE"
-	CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM CreateDedicatedDeploymentRequestSchedulerSize = "MEDIUM"
-	CreateDedicatedDeploymentRequestSchedulerSizeSMALL  CreateDedicatedDeploymentRequestSchedulerSize = "SMALL"
+	CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE CreateDedicatedDeploymentRequestSchedulerSize = "EXTRA_LARGE"
+	CreateDedicatedDeploymentRequestSchedulerSizeLARGE      CreateDedicatedDeploymentRequestSchedulerSize = "LARGE"
+	CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM     CreateDedicatedDeploymentRequestSchedulerSize = "MEDIUM"
+	CreateDedicatedDeploymentRequestSchedulerSizeSMALL      CreateDedicatedDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for CreateDedicatedDeploymentRequestType.
@@ -100,6 +110,14 @@ const (
 	CreateDedicatedDeploymentRequestTypeDEDICATED CreateDedicatedDeploymentRequestType = "DEDICATED"
 	CreateDedicatedDeploymentRequestTypeHYBRID    CreateDedicatedDeploymentRequestType = "HYBRID"
 	CreateDedicatedDeploymentRequestTypeSTANDARD  CreateDedicatedDeploymentRequestType = "STANDARD"
+)
+
+// Defines values for CreateDeployRequestType.
+const (
+	CreateDeployRequestTypeBUNDLE      CreateDeployRequestType = "BUNDLE"
+	CreateDeployRequestTypeDAGONLY     CreateDeployRequestType = "DAG_ONLY"
+	CreateDeployRequestTypeIMAGEANDDAG CreateDeployRequestType = "IMAGE_AND_DAG"
+	CreateDeployRequestTypeIMAGEONLY   CreateDeployRequestType = "IMAGE_ONLY"
 )
 
 // Defines values for CreateGcpClusterRequestCloudProvider.
@@ -143,9 +161,10 @@ const (
 
 // Defines values for CreateStandardDeploymentRequestSchedulerSize.
 const (
-	CreateStandardDeploymentRequestSchedulerSizeLARGE  CreateStandardDeploymentRequestSchedulerSize = "LARGE"
-	CreateStandardDeploymentRequestSchedulerSizeMEDIUM CreateStandardDeploymentRequestSchedulerSize = "MEDIUM"
-	CreateStandardDeploymentRequestSchedulerSizeSMALL  CreateStandardDeploymentRequestSchedulerSize = "SMALL"
+	CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE CreateStandardDeploymentRequestSchedulerSize = "EXTRA_LARGE"
+	CreateStandardDeploymentRequestSchedulerSizeLARGE      CreateStandardDeploymentRequestSchedulerSize = "LARGE"
+	CreateStandardDeploymentRequestSchedulerSizeMEDIUM     CreateStandardDeploymentRequestSchedulerSize = "MEDIUM"
+	CreateStandardDeploymentRequestSchedulerSizeSMALL      CreateStandardDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for CreateStandardDeploymentRequestType.
@@ -153,6 +172,27 @@ const (
 	CreateStandardDeploymentRequestTypeDEDICATED CreateStandardDeploymentRequestType = "DEDICATED"
 	CreateStandardDeploymentRequestTypeHYBRID    CreateStandardDeploymentRequestType = "HYBRID"
 	CreateStandardDeploymentRequestTypeSTANDARD  CreateStandardDeploymentRequestType = "STANDARD"
+)
+
+// Defines values for DeployStatus.
+const (
+	DEPLOYED    DeployStatus = "DEPLOYED"
+	FAILED      DeployStatus = "FAILED"
+	INITIALIZED DeployStatus = "INITIALIZED"
+)
+
+// Defines values for DeployType.
+const (
+	DeployTypeDAGONLY     DeployType = "DAG_ONLY"
+	DeployTypeIMAGEANDDAG DeployType = "IMAGE_AND_DAG"
+	DeployTypeIMAGEONLY   DeployType = "IMAGE_ONLY"
+)
+
+// Defines values for DeploymentCloudProvider.
+const (
+	DeploymentCloudProviderAWS   DeploymentCloudProvider = "AWS"
+	DeploymentCloudProviderAZURE DeploymentCloudProvider = "AZURE"
+	DeploymentCloudProviderGCP   DeploymentCloudProvider = "GCP"
 )
 
 // Defines values for DeploymentExecutor.
@@ -163,9 +203,10 @@ const (
 
 // Defines values for DeploymentSchedulerSize.
 const (
-	DeploymentSchedulerSizeLARGE  DeploymentSchedulerSize = "LARGE"
-	DeploymentSchedulerSizeMEDIUM DeploymentSchedulerSize = "MEDIUM"
-	DeploymentSchedulerSizeSMALL  DeploymentSchedulerSize = "SMALL"
+	DeploymentSchedulerSizeEXTRALARGE DeploymentSchedulerSize = "EXTRA_LARGE"
+	DeploymentSchedulerSizeLARGE      DeploymentSchedulerSize = "LARGE"
+	DeploymentSchedulerSizeMEDIUM     DeploymentSchedulerSize = "MEDIUM"
+	DeploymentSchedulerSizeSMALL      DeploymentSchedulerSize = "SMALL"
 )
 
 // Defines values for DeploymentStatus.
@@ -183,6 +224,12 @@ const (
 	DeploymentTypeDEDICATED DeploymentType = "DEDICATED"
 	DeploymentTypeHYBRID    DeploymentType = "HYBRID"
 	DeploymentTypeSTANDARD  DeploymentType = "STANDARD"
+)
+
+// Defines values for DeploymentHibernationStatusNextEventType.
+const (
+	HIBERNATE DeploymentHibernationStatusNextEventType = "HIBERNATE"
+	WAKE      DeploymentHibernationStatusNextEventType = "WAKE"
 )
 
 // Defines values for ManagedDomainStatus.
@@ -215,25 +262,45 @@ const (
 
 // Defines values for OrganizationStatus.
 const (
-	ACTIVE    OrganizationStatus = "ACTIVE"
-	INACTIVE  OrganizationStatus = "INACTIVE"
-	SUSPENDED OrganizationStatus = "SUSPENDED"
+	OrganizationStatusACTIVE    OrganizationStatus = "ACTIVE"
+	OrganizationStatusINACTIVE  OrganizationStatus = "INACTIVE"
+	OrganizationStatusSUSPENDED OrganizationStatus = "SUSPENDED"
 )
 
 // Defines values for OrganizationSupportPlan.
 const (
 	OrganizationSupportPlanBASIC            OrganizationSupportPlan = "BASIC"
+	OrganizationSupportPlanBASICPAYGO       OrganizationSupportPlan = "BASIC_PAYGO"
+	OrganizationSupportPlanBUSINESS         OrganizationSupportPlan = "BUSINESS"
 	OrganizationSupportPlanBUSINESSCRITICAL OrganizationSupportPlan = "BUSINESS_CRITICAL"
+	OrganizationSupportPlanBUSINESSV2       OrganizationSupportPlan = "BUSINESS_V2"
+	OrganizationSupportPlanDEVELOPER        OrganizationSupportPlan = "DEVELOPER"
+	OrganizationSupportPlanDEVELOPERPAYGO   OrganizationSupportPlan = "DEVELOPER_PAYGO"
+	OrganizationSupportPlanENTERPRISE       OrganizationSupportPlan = "ENTERPRISE"
+	OrganizationSupportPlanENTERPRISEV2     OrganizationSupportPlan = "ENTERPRISE_V2"
+	OrganizationSupportPlanINACTIVE         OrganizationSupportPlan = "INACTIVE"
+	OrganizationSupportPlanINTERNAL         OrganizationSupportPlan = "INTERNAL"
+	OrganizationSupportPlanPOV              OrganizationSupportPlan = "POV"
 	OrganizationSupportPlanPREMIUM          OrganizationSupportPlan = "PREMIUM"
 	OrganizationSupportPlanSTANDARD         OrganizationSupportPlan = "STANDARD"
+	OrganizationSupportPlanTEAM             OrganizationSupportPlan = "TEAM"
+	OrganizationSupportPlanTEAMPAYGO        OrganizationSupportPlan = "TEAM_PAYGO"
+	OrganizationSupportPlanTEAMV2           OrganizationSupportPlan = "TEAM_V2"
 	OrganizationSupportPlanTRIAL            OrganizationSupportPlan = "TRIAL"
+	OrganizationSupportPlanTRIALV2          OrganizationSupportPlan = "TRIAL_V2"
+)
+
+// Defines values for OrganizationProductPlanAstronomerProduct.
+const (
+	ASTROOBSERVE OrganizationProductPlanAstronomerProduct = "ASTRO OBSERVE"
 )
 
 // Defines values for SchedulerMachineName.
 const (
-	SchedulerMachineNameLARGE  SchedulerMachineName = "LARGE"
-	SchedulerMachineNameMEDIUM SchedulerMachineName = "MEDIUM"
-	SchedulerMachineNameSMALL  SchedulerMachineName = "SMALL"
+	SchedulerMachineNameEXTRALARGE SchedulerMachineName = "EXTRA_LARGE"
+	SchedulerMachineNameLARGE      SchedulerMachineName = "LARGE"
+	SchedulerMachineNameMEDIUM     SchedulerMachineName = "MEDIUM"
+	SchedulerMachineNameSMALL      SchedulerMachineName = "SMALL"
 )
 
 // Defines values for UpdateDedicatedClusterRequestClusterType.
@@ -249,9 +316,10 @@ const (
 
 // Defines values for UpdateDedicatedDeploymentRequestSchedulerSize.
 const (
-	UpdateDedicatedDeploymentRequestSchedulerSizeLARGE  UpdateDedicatedDeploymentRequestSchedulerSize = "LARGE"
-	UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM UpdateDedicatedDeploymentRequestSchedulerSize = "MEDIUM"
-	UpdateDedicatedDeploymentRequestSchedulerSizeSMALL  UpdateDedicatedDeploymentRequestSchedulerSize = "SMALL"
+	UpdateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE UpdateDedicatedDeploymentRequestSchedulerSize = "EXTRA_LARGE"
+	UpdateDedicatedDeploymentRequestSchedulerSizeLARGE      UpdateDedicatedDeploymentRequestSchedulerSize = "LARGE"
+	UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM     UpdateDedicatedDeploymentRequestSchedulerSize = "MEDIUM"
+	UpdateDedicatedDeploymentRequestSchedulerSizeSMALL      UpdateDedicatedDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for UpdateDedicatedDeploymentRequestType.
@@ -287,9 +355,10 @@ const (
 
 // Defines values for UpdateStandardDeploymentRequestSchedulerSize.
 const (
-	UpdateStandardDeploymentRequestSchedulerSizeLARGE  UpdateStandardDeploymentRequestSchedulerSize = "LARGE"
-	UpdateStandardDeploymentRequestSchedulerSizeMEDIUM UpdateStandardDeploymentRequestSchedulerSize = "MEDIUM"
-	UpdateStandardDeploymentRequestSchedulerSizeSMALL  UpdateStandardDeploymentRequestSchedulerSize = "SMALL"
+	UpdateStandardDeploymentRequestSchedulerSizeEXTRALARGE UpdateStandardDeploymentRequestSchedulerSize = "EXTRA_LARGE"
+	UpdateStandardDeploymentRequestSchedulerSizeLARGE      UpdateStandardDeploymentRequestSchedulerSize = "LARGE"
+	UpdateStandardDeploymentRequestSchedulerSizeMEDIUM     UpdateStandardDeploymentRequestSchedulerSize = "MEDIUM"
+	UpdateStandardDeploymentRequestSchedulerSizeSMALL      UpdateStandardDeploymentRequestSchedulerSize = "SMALL"
 )
 
 // Defines values for UpdateStandardDeploymentRequestType.
@@ -301,20 +370,24 @@ const (
 
 // Defines values for WorkerMachineName.
 const (
-	WorkerMachineNameA10 WorkerMachineName = "A10"
-	WorkerMachineNameA20 WorkerMachineName = "A20"
-	WorkerMachineNameA40 WorkerMachineName = "A40"
-	WorkerMachineNameA5  WorkerMachineName = "A5"
-	WorkerMachineNameA60 WorkerMachineName = "A60"
+	WorkerMachineNameA10  WorkerMachineName = "A10"
+	WorkerMachineNameA120 WorkerMachineName = "A120"
+	WorkerMachineNameA160 WorkerMachineName = "A160"
+	WorkerMachineNameA20  WorkerMachineName = "A20"
+	WorkerMachineNameA40  WorkerMachineName = "A40"
+	WorkerMachineNameA5   WorkerMachineName = "A5"
+	WorkerMachineNameA60  WorkerMachineName = "A60"
 )
 
 // Defines values for WorkerQueueRequestAstroMachine.
 const (
-	WorkerQueueRequestAstroMachineA10 WorkerQueueRequestAstroMachine = "A10"
-	WorkerQueueRequestAstroMachineA20 WorkerQueueRequestAstroMachine = "A20"
-	WorkerQueueRequestAstroMachineA40 WorkerQueueRequestAstroMachine = "A40"
-	WorkerQueueRequestAstroMachineA5  WorkerQueueRequestAstroMachine = "A5"
-	WorkerQueueRequestAstroMachineA60 WorkerQueueRequestAstroMachine = "A60"
+	WorkerQueueRequestAstroMachineA10  WorkerQueueRequestAstroMachine = "A10"
+	WorkerQueueRequestAstroMachineA120 WorkerQueueRequestAstroMachine = "A120"
+	WorkerQueueRequestAstroMachineA160 WorkerQueueRequestAstroMachine = "A160"
+	WorkerQueueRequestAstroMachineA20  WorkerQueueRequestAstroMachine = "A20"
+	WorkerQueueRequestAstroMachineA40  WorkerQueueRequestAstroMachine = "A40"
+	WorkerQueueRequestAstroMachineA5   WorkerQueueRequestAstroMachine = "A5"
+	WorkerQueueRequestAstroMachineA60  WorkerQueueRequestAstroMachine = "A60"
 )
 
 // Defines values for ListOrganizationsParamsSupportPlan.
@@ -351,8 +424,8 @@ const (
 
 // Defines values for GetClusterOptionsParamsType.
 const (
-	DEDICATED GetClusterOptionsParamsType = "DEDICATED"
-	HYBRID    GetClusterOptionsParamsType = "HYBRID"
+	GetClusterOptionsParamsTypeDEDICATED GetClusterOptionsParamsType = "DEDICATED"
+	GetClusterOptionsParamsTypeHYBRID    GetClusterOptionsParamsType = "HYBRID"
 )
 
 // Defines values for ListClustersParamsProvider.
@@ -387,9 +460,9 @@ const (
 
 // Defines values for GetDeploymentOptionsParamsCloudProvider.
 const (
-	GetDeploymentOptionsParamsCloudProviderAWS   GetDeploymentOptionsParamsCloudProvider = "AWS"
-	GetDeploymentOptionsParamsCloudProviderAZURE GetDeploymentOptionsParamsCloudProvider = "AZURE"
-	GetDeploymentOptionsParamsCloudProviderGCP   GetDeploymentOptionsParamsCloudProvider = "GCP"
+	AWS   GetDeploymentOptionsParamsCloudProvider = "AWS"
+	AZURE GetDeploymentOptionsParamsCloudProvider = "AZURE"
+	GCP   GetDeploymentOptionsParamsCloudProvider = "GCP"
 )
 
 // Defines values for ListDeploymentsParamsSorts.
@@ -436,6 +509,24 @@ type BasicSubjectProfile struct {
 // BasicSubjectProfileSubjectType The subject type.
 type BasicSubjectProfileSubjectType string
 
+// Bundle defines model for Bundle.
+type Bundle struct {
+	// BundleType The type of bundle.
+	BundleType string `json:"bundleType"`
+
+	// CurrentVersion The current bundle version.
+	CurrentVersion *string `json:"currentVersion,omitempty"`
+
+	// DeployId The ID of the deploy that included the bundle.
+	DeployId string `json:"deployId"`
+
+	// DesiredVersion The desired version of the bundle.
+	DesiredVersion *string `json:"desiredVersion,omitempty"`
+
+	// MountPath The path where the Astro mounts the bundle on the Airflow component pods.
+	MountPath string `json:"mountPath"`
+}
+
 // Cluster defines model for Cluster.
 type Cluster struct {
 	// CloudProvider The name of the cluster's cloud provider.
@@ -445,7 +536,8 @@ type Cluster struct {
 	CreatedAt time.Time `json:"createdAt"`
 
 	// DbInstanceType The type of database instance that is used for the cluster.
-	DbInstanceType string `json:"dbInstanceType"`
+	DbInstanceType string               `json:"dbInstanceType"`
+	HealthStatus   *ClusterHealthStatus `json:"healthStatus,omitempty"`
 
 	// Id The cluster's ID.
 	Id string `json:"id"`
@@ -509,6 +601,31 @@ type ClusterStatus string
 // ClusterType The type of the cluster.
 type ClusterType string
 
+// ClusterHealthStatus defines model for ClusterHealthStatus.
+type ClusterHealthStatus struct {
+	// Details List of details supporting health assessment.
+	Details *[]ClusterHealthStatusDetail `json:"details,omitempty"`
+
+	// Value Overall health state (HEALTHY or UNHEALTHY).
+	Value ClusterHealthStatusValue `json:"value"`
+}
+
+// ClusterHealthStatusValue Overall health state (HEALTHY or UNHEALTHY).
+type ClusterHealthStatusValue string
+
+// ClusterHealthStatusDetail defines model for ClusterHealthStatusDetail.
+type ClusterHealthStatusDetail struct {
+	// Code The health status for a specific component.
+	Code      string  `json:"code"`
+	Component *string `json:"component,omitempty"`
+
+	// Description A description of the component that was assessed.
+	Description string `json:"description"`
+
+	// Severity The weight this component is given in overall cluster health assessment.
+	Severity string `json:"severity"`
+}
+
 // ClusterK8sTag defines model for ClusterK8sTag.
 type ClusterK8sTag struct {
 	// Key The tag's key.
@@ -522,6 +639,9 @@ type ClusterK8sTag struct {
 type ClusterMetadata struct {
 	// ExternalIPs External IPs of the cluster.
 	ExternalIPs *[]string `json:"externalIPs,omitempty"`
+
+	// KubeDnsIp The IP address of the kube-dns service.
+	KubeDnsIp *string `json:"kubeDnsIp,omitempty"`
 
 	// OidcIssuerUrl OIDC issuer URL for the cluster
 	OidcIssuerUrl *string `json:"oidcIssuerUrl,omitempty"`
@@ -678,14 +798,20 @@ type CreateDedicatedDeploymentRequest struct {
 	// ClusterId The ID of the cluster where the Deployment will be created.
 	ClusterId string `json:"clusterId"`
 
+	// ContactEmails A list of contact emails for the Deployment.
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
+
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
 
-	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi`. This value must always be twice the value of `DefaultTaskPodCpu`.
+	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `DefaultTaskPodCpu`.
 	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
 
 	// Description The Deployment's description.
 	Description *string `json:"description,omitempty"`
+
+	// EnvironmentVariables List of environment variables to add to the Deployment.
+	EnvironmentVariables *[]DeploymentEnvironmentVariableRequest `json:"environmentVariables,omitempty"`
 
 	// Executor The Deployment's executor type.
 	Executor CreateDedicatedDeploymentRequestExecutor `json:"executor"`
@@ -696,6 +822,9 @@ type CreateDedicatedDeploymentRequest struct {
 	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
 
+	// IsDevelopmentMode If true, deployment will be able to use development-only features, such as hibernation, but will not have guaranteed uptime SLAs
+	IsDevelopmentMode *bool `json:"isDevelopmentMode,omitempty"`
+
 	// IsHighAvailability Whether the Deployment is configured for high availability. If `true`, multiple scheduler pods will be online.
 	IsHighAvailability bool `json:"isHighAvailability"`
 
@@ -705,10 +834,11 @@ type CreateDedicatedDeploymentRequest struct {
 	// ResourceQuotaCpu The CPU quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current CPU usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in number of CPU cores.
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
-	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
+	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
-	// SchedulerSize The size of the scheduler pod.
+	// SchedulerSize The size of the scheduler Pod.
 	SchedulerSize CreateDedicatedDeploymentRequestSchedulerSize `json:"schedulerSize"`
 
 	// Type The type of the Deployment.
@@ -717,18 +847,39 @@ type CreateDedicatedDeploymentRequest struct {
 	// WorkerQueues The list of worker queues configured for the Deployment. Applies only when `Executor` is `CELERY`. At least 1 worker queue is needed. All Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]WorkerQueueRequest `json:"workerQueues,omitempty"`
 
-	// WorkspaceId The ID of the workspace to which the Deployment belongs.
+	// WorkloadIdentity The Deployment's workload identity.
+	WorkloadIdentity *string `json:"workloadIdentity,omitempty"`
+
+	// WorkspaceId The ID of the Workspace to which the Deployment belongs.
 	WorkspaceId string `json:"workspaceId"`
 }
 
 // CreateDedicatedDeploymentRequestExecutor The Deployment's executor type.
 type CreateDedicatedDeploymentRequestExecutor string
 
-// CreateDedicatedDeploymentRequestSchedulerSize The size of the scheduler pod.
+// CreateDedicatedDeploymentRequestSchedulerSize The size of the scheduler Pod.
 type CreateDedicatedDeploymentRequestSchedulerSize string
 
 // CreateDedicatedDeploymentRequestType The type of the Deployment.
 type CreateDedicatedDeploymentRequestType string
+
+// CreateDeployRequest defines model for CreateDeployRequest.
+type CreateDeployRequest struct {
+	// BundleMountPath The path where Astro mounts the bundle on the Airflow component pods. Required if deploy type is BUNDLE.
+	BundleMountPath *string `json:"bundleMountPath,omitempty"`
+
+	// BundleType The type of bundle deployed. Required if deploy type is BUNDLE.
+	BundleType *string `json:"bundleType,omitempty"`
+
+	// Description The deploy's description.
+	Description *string `json:"description,omitempty"`
+
+	// Type The type of deploy.
+	Type CreateDeployRequestType `json:"type"`
+}
+
+// CreateDeployRequestType The type of deploy.
+type CreateDeployRequestType string
 
 // CreateDeploymentRequest defines model for CreateDeploymentRequest.
 type CreateDeploymentRequest struct {
@@ -791,8 +942,14 @@ type CreateHybridDeploymentRequest struct {
 	// ClusterId The ID of the cluster where the Deployment will be created.
 	ClusterId string `json:"clusterId"`
 
+	// ContactEmails A list of contact emails for the Deployment.
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
+
 	// Description The Deployment's description.
 	Description *string `json:"description,omitempty"`
+
+	// EnvironmentVariables List of environment variables to add to the Deployment.
+	EnvironmentVariables *[]DeploymentEnvironmentVariableRequest `json:"environmentVariables,omitempty"`
 
 	// Executor The Deployment's executor type.
 	Executor CreateHybridDeploymentRequestExecutor `json:"executor"`
@@ -816,7 +973,10 @@ type CreateHybridDeploymentRequest struct {
 	// WorkerQueues The list of worker queues configured for the Deployment. Applies only when `Executor` is `CELERY`. At least 1 worker queue is needed. All Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]HybridWorkerQueueRequest `json:"workerQueues,omitempty"`
 
-	// WorkspaceId The ID of the workspace to which the Deployment belongs.
+	// WorkloadIdentity The Deployment's workload identity.
+	WorkloadIdentity *string `json:"workloadIdentity,omitempty"`
+
+	// WorkspaceId The ID of the Workspace to which the Deployment belongs.
 	WorkspaceId string `json:"workspaceId"`
 }
 
@@ -852,14 +1012,20 @@ type CreateStandardDeploymentRequest struct {
 	// ClusterId The ID of the cluster to which the Deployment will be created in. Optional if cloud provider and region is specified.
 	ClusterId *string `json:"clusterId,omitempty"`
 
+	// ContactEmails A list of contact emails for the Deployment.
+	ContactEmails *[]string `json:"contactEmails,omitempty"`
+
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
 
-	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi`. This value must always be twice the value of `DefaultTaskPodCpu`.
+	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `DefaultTaskPodCpu`.
 	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
 
 	// Description The Deployment's description.
 	Description *string `json:"description,omitempty"`
+
+	// EnvironmentVariables List of environment variables to add to the Deployment.
+	EnvironmentVariables *[]DeploymentEnvironmentVariableRequest `json:"environmentVariables,omitempty"`
 
 	// Executor The Deployment's executor type.
 	Executor CreateStandardDeploymentRequestExecutor `json:"executor"`
@@ -869,6 +1035,9 @@ type CreateStandardDeploymentRequest struct {
 
 	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
+
+	// IsDevelopmentMode If true, deployment will be able to use development-only features, such as hibernation, but will not have guaranteed uptime SLAs
+	IsDevelopmentMode *bool `json:"isDevelopmentMode,omitempty"`
 
 	// IsHighAvailability Whether the Deployment is configured for high availability. If `true`, multiple scheduler pods will be online.
 	IsHighAvailability bool `json:"isHighAvailability"`
@@ -882,10 +1051,11 @@ type CreateStandardDeploymentRequest struct {
 	// ResourceQuotaCpu The CPU quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current CPU usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in number of CPU cores.
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
-	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
+	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
-	// SchedulerSize The size of the scheduler pod.
+	// SchedulerSize The size of the scheduler Pod.
 	SchedulerSize CreateStandardDeploymentRequestSchedulerSize `json:"schedulerSize"`
 
 	// Type The type of the Deployment.
@@ -894,7 +1064,10 @@ type CreateStandardDeploymentRequest struct {
 	// WorkerQueues The list of worker queues configured for the Deployment. Applies only when `Executor` is `CELERY`. At least 1 worker queue is needed. All Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]WorkerQueueRequest `json:"workerQueues,omitempty"`
 
-	// WorkspaceId The ID of the workspace to which the Deployment belongs.
+	// WorkloadIdentity The Deployment's workload identity.
+	WorkloadIdentity *string `json:"workloadIdentity,omitempty"`
+
+	// WorkspaceId The ID of the Workspace to which the Deployment belongs.
 	WorkspaceId string `json:"workspaceId"`
 }
 
@@ -904,7 +1077,7 @@ type CreateStandardDeploymentRequestCloudProvider string
 // CreateStandardDeploymentRequestExecutor The Deployment's executor type.
 type CreateStandardDeploymentRequestExecutor string
 
-// CreateStandardDeploymentRequestSchedulerSize The size of the scheduler pod.
+// CreateStandardDeploymentRequestSchedulerSize The size of the scheduler Pod.
 type CreateStandardDeploymentRequestSchedulerSize string
 
 // CreateStandardDeploymentRequestType The type of the Deployment.
@@ -922,6 +1095,76 @@ type CreateWorkspaceRequest struct {
 	Name string `json:"name"`
 }
 
+// Deploy defines model for Deploy.
+type Deploy struct {
+	// AirflowVersion The deploy's Airflow version.
+	AirflowVersion *string `json:"airflowVersion,omitempty"`
+
+	// AstroRuntimeVersion The deploy's Astro Runtime version.
+	AstroRuntimeVersion *string `json:"astroRuntimeVersion,omitempty"`
+
+	// BundleMountPath The path where Astro mounts the bundle on the Airflow component pods.
+	BundleMountPath *string `json:"bundleMountPath,omitempty"`
+
+	// BundleUploadUrl The URL where the deploy uploads the bundle. Appears only if DAG deploys are enabled on the Deployment and deploy type is BUNDLE.
+	BundleUploadUrl *string `json:"bundleUploadUrl,omitempty"`
+
+	// Bundles The bundles included in a specific Deployment.
+	Bundles *[]Bundle `json:"bundles,omitempty"`
+
+	// CreatedAt The time when the deploy was created in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
+	CreatedAt        time.Time            `json:"createdAt"`
+	CreatedBySubject *BasicSubjectProfile `json:"createdBySubject,omitempty"`
+
+	// DagTarballVersion The deploy's DAG tarball version, also known as the Bundle Version in the Astro UI.
+	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
+
+	// DagsUploadUrl The deploy's upload URL to upload DAG bundles. Appears only if dag deploys are enabled on the Deployment.
+	DagsUploadUrl *string `json:"dagsUploadUrl,omitempty"`
+
+	// DeploymentId The Deployment's ID.
+	DeploymentId string `json:"deploymentId"`
+
+	// Description The deploy's description.
+	Description *string `json:"description,omitempty"`
+
+	// Id The deploy's ID.
+	Id string `json:"id"`
+
+	// ImageRepository The URL of the deploy's image repository.
+	ImageRepository string `json:"imageRepository"`
+
+	// ImageTag The deploy's image tag. Appears only if specified in the most recent deploy.
+	ImageTag string `json:"imageTag"`
+
+	// IsDagDeployEnabled Whether the deploy was triggered on a Deployment with DAG deploys enabled.
+	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
+
+	// RollbackFromId The ID of the deploy that you completed a rollback on. Appears only if a rollback has been performed.
+	RollbackFromId *string `json:"rollbackFromId,omitempty"`
+
+	// Status The status of the deploy.
+	Status DeployStatus `json:"status"`
+
+	// Type The type of deploy.
+	Type DeployType `json:"type"`
+
+	// UpdatedAt The time when the deploy was last updated in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
+	UpdatedAt        *time.Time           `json:"updatedAt,omitempty"`
+	UpdatedBySubject *BasicSubjectProfile `json:"updatedBySubject,omitempty"`
+}
+
+// DeployStatus The status of the deploy.
+type DeployStatus string
+
+// DeployType The type of deploy.
+type DeployType string
+
+// DeployRollbackRequest defines model for DeployRollbackRequest.
+type DeployRollbackRequest struct {
+	Description *string `json:"description,omitempty"`
+}
+
 // Deployment defines model for Deployment.
 type Deployment struct {
 	// AirflowVersion The Deployment's Airflow version.
@@ -931,7 +1174,7 @@ type Deployment struct {
 	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
 
 	// CloudProvider The cloud provider of the cluster. Only for Standard Deployment.
-	CloudProvider *string `json:"cloudProvider,omitempty"`
+	CloudProvider *DeploymentCloudProvider `json:"cloudProvider,omitempty"`
 
 	// ClusterId The ID of the cluster where the Deployment is hosted.
 	ClusterId *string `json:"clusterId,omitempty"`
@@ -946,7 +1189,7 @@ type Deployment struct {
 	CreatedAt time.Time           `json:"createdAt"`
 	CreatedBy BasicSubjectProfile `json:"createdBy"`
 
-	// DagTarballVersion The Deployment's current DAG tarball version, also known as the Bundle Version in the Cloud UI. If no deploys are currently processing, this value should be the same as DesiredDagTarballVersion.
+	// DagTarballVersion The Deployment's current DAG tarball version, also known as the Bundle Version in the Astro UI. If no deploys are currently processing, this value should be the same as DesiredDagTarballVersion.
 	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
 
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
@@ -988,6 +1231,9 @@ type Deployment struct {
 	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
 
+	// IsDevelopmentMode If true, deployment will be able to use development-only features, such as hibernation, but will not have guaranteed uptime SLAs
+	IsDevelopmentMode *bool `json:"isDevelopmentMode,omitempty"`
+
 	// IsHighAvailability Whether the Deployment has high availability (HA) enabled. If `true`, multiple scheduler Pods will run at once.
 	IsHighAvailability *bool `json:"isHighAvailability,omitempty"`
 
@@ -1013,7 +1259,9 @@ type Deployment struct {
 	ResourceQuotaMemory *string `json:"resourceQuotaMemory,omitempty"`
 
 	// RuntimeVersion Deprecated: runtimeVersion has been replaced with astroRuntimeVersion
-	RuntimeVersion string `json:"runtimeVersion"`
+	RuntimeVersion string                   `json:"runtimeVersion"`
+	ScalingSpec    *DeploymentScalingSpec   `json:"scalingSpec,omitempty"`
+	ScalingStatus  *DeploymentScalingStatus `json:"scalingStatus,omitempty"`
 
 	// SchedulerAu The number of Astronomer units (AU) for the Deployment's scheduler. Applies only to Deployments hosted on Hybrid clusters.
 	SchedulerAu *int `json:"schedulerAu,omitempty"`
@@ -1077,6 +1325,9 @@ type Deployment struct {
 	WorkspaceName *string `json:"workspaceName,omitempty"`
 }
 
+// DeploymentCloudProvider The cloud provider of the cluster. Only for Standard Deployment.
+type DeploymentCloudProvider string
+
 // DeploymentExecutor The Deployment's executor type.
 type DeploymentExecutor string
 
@@ -1116,6 +1367,76 @@ type DeploymentEnvironmentVariableRequest struct {
 	Value *string `json:"value,omitempty"`
 }
 
+// DeploymentHibernationOverride defines model for DeploymentHibernationOverride.
+type DeploymentHibernationOverride struct {
+	// IsActive Whether the override is currently active or not
+	IsActive *bool `json:"isActive,omitempty"`
+
+	// IsHibernating Whether to go into hibernation or not via the override rule
+	IsHibernating *bool `json:"isHibernating,omitempty"`
+
+	// OverrideUntil Timestamp till the override on the hibernation schedule is in effect
+	OverrideUntil *time.Time `json:"overrideUntil,omitempty"`
+}
+
+// DeploymentHibernationOverrideRequest defines model for DeploymentHibernationOverrideRequest.
+type DeploymentHibernationOverrideRequest struct {
+	// IsHibernating Whether to go into hibernation or not via the override rule
+	IsHibernating *bool `json:"isHibernating,omitempty"`
+
+	// OverrideUntil Timestamp till the override on the hibernation schedule is in effect
+	OverrideUntil *string `json:"overrideUntil,omitempty"`
+}
+
+// DeploymentHibernationSchedule defines model for DeploymentHibernationSchedule.
+type DeploymentHibernationSchedule struct {
+	// Description A brief description of the schedule
+	Description *string `json:"description,omitempty"`
+
+	// HibernateAtCron A 5-part cron expression defining the times at which the deployment should hibernate
+	HibernateAtCron string `json:"hibernateAtCron"`
+
+	// IsEnabled Toggle this schedule on or off. If set to false, this schedule will have no effect on hibernation.
+	IsEnabled bool `json:"isEnabled"`
+
+	// WakeAtCron A 5-part cron expression definingh the times at which the deployment should wake from hibernation
+	WakeAtCron string `json:"wakeAtCron"`
+}
+
+// DeploymentHibernationSpec defines model for DeploymentHibernationSpec.
+type DeploymentHibernationSpec struct {
+	Override *DeploymentHibernationOverride `json:"override,omitempty"`
+
+	// Schedules The list of schedules for deployment hibernation
+	Schedules *[]DeploymentHibernationSchedule `json:"schedules,omitempty"`
+}
+
+// DeploymentHibernationSpecRequest defines model for DeploymentHibernationSpecRequest.
+type DeploymentHibernationSpecRequest struct {
+	Override *DeploymentHibernationOverrideRequest `json:"override,omitempty"`
+
+	// Schedules The list of schedules for deployment hibernation
+	Schedules *[]DeploymentHibernationSchedule `json:"schedules,omitempty"`
+}
+
+// DeploymentHibernationStatus defines model for DeploymentHibernationStatus.
+type DeploymentHibernationStatus struct {
+	// IsHibernating If the deployment is currently in hibernating state or not
+	IsHibernating bool `json:"isHibernating"`
+
+	// NextEventAt Timestamp of the next scheduled hibernation event for the deployment
+	NextEventAt *string `json:"nextEventAt,omitempty"`
+
+	// NextEventType The type of the next scheduled event for the deployment. Either HIBERNATE or WAKE
+	NextEventType *DeploymentHibernationStatusNextEventType `json:"nextEventType,omitempty"`
+
+	// Reason Reason for the current hibernation state of the deployment
+	Reason *string `json:"reason,omitempty"`
+}
+
+// DeploymentHibernationStatusNextEventType The type of the next scheduled event for the deployment. Either HIBERNATE or WAKE
+type DeploymentHibernationStatusNextEventType string
+
 // DeploymentInstanceSpecRequest defines model for DeploymentInstanceSpecRequest.
 type DeploymentInstanceSpecRequest struct {
 	// Au The number of Astro unit allocated to the Deployment pod. Minimum `5`, Maximum `24`.
@@ -1145,6 +1466,21 @@ type DeploymentOptions struct {
 	WorkloadIdentityOptions *[]WorkloadIdentityOption `json:"workloadIdentityOptions,omitempty"`
 }
 
+// DeploymentScalingSpec defines model for DeploymentScalingSpec.
+type DeploymentScalingSpec struct {
+	HibernationSpec *DeploymentHibernationSpec `json:"hibernationSpec,omitempty"`
+}
+
+// DeploymentScalingSpecRequest defines model for DeploymentScalingSpecRequest.
+type DeploymentScalingSpecRequest struct {
+	HibernationSpec *DeploymentHibernationSpecRequest `json:"hibernationSpec,omitempty"`
+}
+
+// DeploymentScalingStatus defines model for DeploymentScalingStatus.
+type DeploymentScalingStatus struct {
+	HibernationStatus *DeploymentHibernationStatus `json:"hibernationStatus,omitempty"`
+}
+
 // DeploymentsPaginated defines model for DeploymentsPaginated.
 type DeploymentsPaginated struct {
 	// Deployments A list of Deployments in the current page.
@@ -1160,11 +1496,35 @@ type DeploymentsPaginated struct {
 	TotalCount int `json:"totalCount"`
 }
 
+// DeploysPaginated defines model for DeploysPaginated.
+type DeploysPaginated struct {
+	// Deploys A list of deploys in the current page.
+	Deploys []Deploy `json:"deploys"`
+
+	// Limit The maximum number of deploys in one page.
+	Limit int `json:"limit"`
+
+	// Offset The offset of the current page of deploys.
+	Offset int `json:"offset"`
+
+	// TotalCount The total number of deploys.
+	TotalCount int `json:"totalCount"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	Message    string `json:"message"`
 	RequestId  string `json:"requestId"`
 	StatusCode int    `json:"statusCode"`
+}
+
+// FinalizeDeployRequest defines model for FinalizeDeployRequest.
+type FinalizeDeployRequest struct {
+	// BundleTarballVersion The deploy's bundle tarball version. Required if DAG deploy is enabled on the Deployment and deploy type is BUNDLE.
+	BundleTarballVersion *string `json:"bundleTarballVersion,omitempty"`
+
+	// DagTarballVersion The deploy's DAG tarball version, also known as the Bundle Version in the Astro UI. Required if DAG deploys are enabled on the Deployment, and deploy type is either IMAGE_AND_DAG or DAG_ONLY.
+	DagTarballVersion *string `json:"dagTarballVersion,omitempty"`
 }
 
 // HybridWorkerQueueRequest defines model for HybridWorkerQueueRequest.
@@ -1294,7 +1654,8 @@ type Organization struct {
 	PaymentMethod *OrganizationPaymentMethod `json:"paymentMethod,omitempty"`
 
 	// Product The Organization's product type.
-	Product *OrganizationProduct `json:"product,omitempty"`
+	Product      *OrganizationProduct       `json:"product,omitempty"`
+	ProductPlans *[]OrganizationProductPlan `json:"productPlans,omitempty"`
 
 	// Status The Organization's status.
 	Status *OrganizationStatus `json:"status,omitempty"`
@@ -1322,6 +1683,17 @@ type OrganizationStatus string
 // OrganizationSupportPlan The Organization's support plan.
 type OrganizationSupportPlan string
 
+// OrganizationProductPlan defines model for OrganizationProductPlan.
+type OrganizationProductPlan struct {
+	AstronomerProduct OrganizationProductPlanAstronomerProduct `json:"astronomerProduct"`
+	OrganizationId    string                                   `json:"organizationId"`
+	ProductPlanId     string                                   `json:"productPlanId"`
+	ProductPlanName   string                                   `json:"productPlanName"`
+}
+
+// OrganizationProductPlanAstronomerProduct defines model for OrganizationProductPlan.AstronomerProduct.
+type OrganizationProductPlanAstronomerProduct string
+
 // OrganizationsPaginated defines model for OrganizationsPaginated.
 type OrganizationsPaginated struct {
 	// Limit The maximum number of Organizations in the page.
@@ -1335,6 +1707,15 @@ type OrganizationsPaginated struct {
 
 	// TotalCount The total number of Organizations.
 	TotalCount int `json:"totalCount"`
+}
+
+// OverrideDeploymentHibernationBody defines model for OverrideDeploymentHibernationBody.
+type OverrideDeploymentHibernationBody struct {
+	// IsHibernating The type of override to perform. Set this value to 'true' to have the Deployment hibernate regardless of its hibernation schedule. Set the value to 'false' to have the Deployment wake up regardless of its hibernation schedule. Use 'OverrideUntil' to define the length of the override.
+	IsHibernating bool `json:"isHibernating"`
+
+	// OverrideUntil The end of the override time in UTC, formatted as 'YYYY-MM-DDTHH:MM:SSZ'. If this value isn't specified, the override persists until you end it through the Astro UI or another API call.
+	OverrideUntil *time.Time `json:"overrideUntil,omitempty"`
 }
 
 // ProviderInstanceType defines model for ProviderInstanceType.
@@ -1465,7 +1846,7 @@ type UpdateDedicatedDeploymentRequest struct {
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
 
-	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi`. This value must always be twice the value of `DefaultTaskPodCpu`.
+	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `DefaultTaskPodCpu`.
 	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
 
 	// Description The Deployment's description.
@@ -1483,6 +1864,9 @@ type UpdateDedicatedDeploymentRequest struct {
 	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
 
+	// IsDevelopmentMode Whether the Deployment is for development only. If `false`, the Deployment can be considered production for the purposes of support case priority, but development-only features such as hibernation will not be available. You can't update this value to `true` for existing non-development Deployments.
+	IsDevelopmentMode *bool `json:"isDevelopmentMode,omitempty"`
+
 	// IsHighAvailability Whether the Deployment is configured for high availability. If `true`, multiple scheduler pods will be online.
 	IsHighAvailability bool `json:"isHighAvailability"`
 
@@ -1492,10 +1876,11 @@ type UpdateDedicatedDeploymentRequest struct {
 	// ResourceQuotaCpu The CPU quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current CPU usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in number of CPU cores.
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
-	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
+	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
-	// SchedulerSize The size of the scheduler pod.
+	// SchedulerSize The size of the scheduler Pod.
 	SchedulerSize UpdateDedicatedDeploymentRequestSchedulerSize `json:"schedulerSize"`
 
 	// Type The type of the Deployment.
@@ -1514,11 +1899,17 @@ type UpdateDedicatedDeploymentRequest struct {
 // UpdateDedicatedDeploymentRequestExecutor The executor Deployment's executor.
 type UpdateDedicatedDeploymentRequestExecutor string
 
-// UpdateDedicatedDeploymentRequestSchedulerSize The size of the scheduler pod.
+// UpdateDedicatedDeploymentRequestSchedulerSize The size of the scheduler Pod.
 type UpdateDedicatedDeploymentRequestSchedulerSize string
 
 // UpdateDedicatedDeploymentRequestType The type of the Deployment.
 type UpdateDedicatedDeploymentRequestType string
+
+// UpdateDeployRequest defines model for UpdateDeployRequest.
+type UpdateDeployRequest struct {
+	// Description The deploy's description.
+	Description *string `json:"description,omitempty"`
+}
 
 // UpdateDeploymentRequest defines model for UpdateDeploymentRequest.
 type UpdateDeploymentRequest struct {
@@ -1621,7 +2012,7 @@ type UpdateStandardDeploymentRequest struct {
 	// DefaultTaskPodCpu The default CPU resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in number of CPU cores.
 	DefaultTaskPodCpu string `json:"defaultTaskPodCpu"`
 
-	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi`. This value must always be twice the value of `DefaultTaskPodCpu`.
+	// DefaultTaskPodMemory The default memory resource usage for a worker Pod when running the Kubernetes executor or KubernetesPodOperator. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `DefaultTaskPodCpu`.
 	DefaultTaskPodMemory string `json:"defaultTaskPodMemory"`
 
 	// Description The Deployment's description.
@@ -1639,6 +2030,9 @@ type UpdateStandardDeploymentRequest struct {
 	// IsDagDeployEnabled Whether the Deployment has DAG deploys enabled.
 	IsDagDeployEnabled bool `json:"isDagDeployEnabled"`
 
+	// IsDevelopmentMode Whether the Deployment is for development only. If `false`, the Deployment can be considered production for the purposes of support case priority, but development-only features such as hibernation will not be available. You can't update this value to `true` for existing non-development Deployments.
+	IsDevelopmentMode *bool `json:"isDevelopmentMode,omitempty"`
+
 	// IsHighAvailability Whether the Deployment is configured for high availability. If `true`, multiple scheduler pods will be online.
 	IsHighAvailability bool `json:"isHighAvailability"`
 
@@ -1648,10 +2042,11 @@ type UpdateStandardDeploymentRequest struct {
 	// ResourceQuotaCpu The CPU quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current CPU usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in number of CPU cores.
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
-	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi`. This value must always be twice the value of `ResourceQuotaCpu`.
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
+	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
+	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
-	// SchedulerSize The size of the scheduler pod.
+	// SchedulerSize The size of the scheduler Pod.
 	SchedulerSize UpdateStandardDeploymentRequestSchedulerSize `json:"schedulerSize"`
 
 	// Type The type of the Deployment.
@@ -1670,7 +2065,7 @@ type UpdateStandardDeploymentRequest struct {
 // UpdateStandardDeploymentRequestExecutor The executor Deployment's executor.
 type UpdateStandardDeploymentRequestExecutor string
 
-// UpdateStandardDeploymentRequestSchedulerSize The size of the scheduler pod.
+// UpdateStandardDeploymentRequestSchedulerSize The size of the scheduler Pod.
 type UpdateStandardDeploymentRequestSchedulerSize string
 
 // UpdateStandardDeploymentRequestType The type of the Deployment.
@@ -1853,6 +2248,15 @@ type GetOrganizationParams struct {
 	IsLookUpOnly *bool `form:"isLookUpOnly,omitempty" json:"isLookUpOnly,omitempty"`
 }
 
+// GetOrganizationAuditLogsParams defines parameters for GetOrganizationAuditLogs.
+type GetOrganizationAuditLogsParams struct {
+	// StartDate The start date of the logs.
+	StartDate *time.Time `form:"startDate,omitempty" json:"startDate,omitempty"`
+
+	// EndDate The end date of the logs.
+	EndDate *time.Time `form:"endDate,omitempty" json:"endDate,omitempty"`
+}
+
 // GetClusterOptionsParams defines parameters for GetClusterOptions.
 type GetClusterOptionsParams struct {
 	// Provider The cluster's cloud provider.
@@ -1870,6 +2274,9 @@ type GetClusterOptionsParamsType string
 
 // ListClustersParams defines parameters for ListClusters.
 type ListClustersParams struct {
+	// Names A list of names for Clusters to filter by. The API returns details only for the specified Clusters.
+	Names *[]string `form:"names,omitempty" json:"names,omitempty"`
+
 	// Provider The cloud provider to list clusters for. Clusters from other providers will be filtered out of the results.
 	Provider *ListClustersParamsProvider `form:"provider,omitempty" json:"provider,omitempty"`
 
@@ -1918,6 +2325,9 @@ type ListDeploymentsParams struct {
 	// DeploymentIds A list of IDs for Deployments to show. The API returns details only for the specified Deployments.
 	DeploymentIds *[]string `form:"deploymentIds,omitempty" json:"deploymentIds,omitempty"`
 
+	// Names A list of names for Deployments to filter by. The API returns details only for the specified Deployments.
+	Names *[]string `form:"names,omitempty" json:"names,omitempty"`
+
 	// WorkspaceIds A list of IDs for Workspaces to filter on. The API returns details for all Deployments belonging only to the specified Workspaces.
 	WorkspaceIds *[]string `form:"workspaceIds,omitempty" json:"workspaceIds,omitempty"`
 
@@ -1934,10 +2344,22 @@ type ListDeploymentsParams struct {
 // ListDeploymentsParamsSorts defines parameters for ListDeployments.
 type ListDeploymentsParamsSorts string
 
+// ListDeploysParams defines parameters for ListDeploys.
+type ListDeploysParams struct {
+	// Offset The number of results to skip before returning values.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit The maximum number of results to return.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListWorkspacesParams defines parameters for ListWorkspaces.
 type ListWorkspacesParams struct {
 	// WorkspaceIds A list of IDs for specific Workspaces to list. The API will list information only for Workspaces which have been specified in this list.
 	WorkspaceIds *[]string `form:"workspaceIds,omitempty" json:"workspaceIds,omitempty"`
+
+	// Names A list of names for specific Workspaces to filter by. The API will list information only for Workspaces which have been specified in this list.
+	Names *[]string `form:"names,omitempty" json:"names,omitempty"`
 
 	// Offset The number of results to skip before returning values.
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
@@ -1966,6 +2388,21 @@ type CreateDeploymentJSONRequestBody = CreateDeploymentRequest
 
 // UpdateDeploymentJSONRequestBody defines body for UpdateDeployment for application/json ContentType.
 type UpdateDeploymentJSONRequestBody = UpdateDeploymentRequest
+
+// CreateDeployJSONRequestBody defines body for CreateDeploy for application/json ContentType.
+type CreateDeployJSONRequestBody = CreateDeployRequest
+
+// UpdateDeployJSONRequestBody defines body for UpdateDeploy for application/json ContentType.
+type UpdateDeployJSONRequestBody = UpdateDeployRequest
+
+// FinalizeDeployJSONRequestBody defines body for FinalizeDeploy for application/json ContentType.
+type FinalizeDeployJSONRequestBody = FinalizeDeployRequest
+
+// DeployRollbackJSONRequestBody defines body for DeployRollback for application/json ContentType.
+type DeployRollbackJSONRequestBody = DeployRollbackRequest
+
+// UpdateDeploymentHibernationOverrideJSONRequestBody defines body for UpdateDeploymentHibernationOverride for application/json ContentType.
+type UpdateDeploymentHibernationOverrideJSONRequestBody = OverrideDeploymentHibernationBody
 
 // CreateWorkspaceJSONRequestBody defines body for CreateWorkspace for application/json ContentType.
 type CreateWorkspaceJSONRequestBody = CreateWorkspaceRequest
@@ -2383,6 +2820,9 @@ type ClientInterface interface {
 
 	UpdateOrganization(ctx context.Context, organizationId string, body UpdateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetOrganizationAuditLogs request
+	GetOrganizationAuditLogs(ctx context.Context, organizationId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetClusterOptions request
 	GetClusterOptions(ctx context.Context, organizationId string, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -2426,6 +2866,40 @@ type ClientInterface interface {
 	UpdateDeploymentWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateDeployment(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDeploys request
+	ListDeploys(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateDeployWithBody request with any body
+	CreateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateDeploy(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDeploy request
+	GetDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateDeployWithBody request with any body
+	UpdateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FinalizeDeployWithBody request with any body
+	FinalizeDeployWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	FinalizeDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, body FinalizeDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeployRollbackWithBody request with any body
+	DeployRollbackWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DeployRollback(ctx context.Context, organizationId string, deploymentId string, deployId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteDeploymentHibernationOverride request
+	DeleteDeploymentHibernationOverride(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateDeploymentHibernationOverrideWithBody request with any body
+	UpdateDeploymentHibernationOverrideWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateDeploymentHibernationOverride(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentHibernationOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaces request
 	ListWorkspaces(ctx context.Context, organizationId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2485,6 +2959,18 @@ func (c *Client) UpdateOrganizationWithBody(ctx context.Context, organizationId 
 
 func (c *Client) UpdateOrganization(ctx context.Context, organizationId string, body UpdateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateOrganizationRequest(c.Server, organizationId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetOrganizationAuditLogs(ctx context.Context, organizationId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetOrganizationAuditLogsRequest(c.Server, organizationId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -2677,6 +3163,162 @@ func (c *Client) UpdateDeploymentWithBody(ctx context.Context, organizationId st
 
 func (c *Client) UpdateDeployment(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateDeploymentRequest(c.Server, organizationId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDeploys(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDeploysRequest(c.Server, organizationId, deploymentId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeployRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateDeploy(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeployRequest(c.Server, organizationId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeployRequest(c.Server, organizationId, deploymentId, deployId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeployRequestWithBody(c.Server, organizationId, deploymentId, deployId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeployRequest(c.Server, organizationId, deploymentId, deployId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) FinalizeDeployWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFinalizeDeployRequestWithBody(c.Server, organizationId, deploymentId, deployId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) FinalizeDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, body FinalizeDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFinalizeDeployRequest(c.Server, organizationId, deploymentId, deployId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeployRollbackWithBody(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeployRollbackRequestWithBody(c.Server, organizationId, deploymentId, deployId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeployRollback(ctx context.Context, organizationId string, deploymentId string, deployId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeployRollbackRequest(c.Server, organizationId, deploymentId, deployId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteDeploymentHibernationOverride(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteDeploymentHibernationOverrideRequest(c.Server, organizationId, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeploymentHibernationOverrideWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeploymentHibernationOverrideRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeploymentHibernationOverride(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentHibernationOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeploymentHibernationOverrideRequest(c.Server, organizationId, deploymentId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2987,6 +3629,78 @@ func NewUpdateOrganizationRequestWithBody(server string, organizationId string, 
 	return req, nil
 }
 
+// NewGetOrganizationAuditLogsRequest generates requests for GetOrganizationAuditLogs
+func NewGetOrganizationAuditLogsRequest(server string, organizationId string, params *GetOrganizationAuditLogsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/audit-logs", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.StartDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "startDate", runtime.ParamLocationQuery, *params.StartDate); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.EndDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "endDate", runtime.ParamLocationQuery, *params.EndDate); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetClusterOptionsRequest generates requests for GetClusterOptions
 func NewGetClusterOptionsRequest(server string, organizationId string, params *GetClusterOptionsParams) (*http.Request, error) {
 	var err error
@@ -3083,6 +3797,22 @@ func NewListClustersRequest(server string, organizationId string, params *ListCl
 
 	if params != nil {
 		queryValues := queryURL.Query()
+
+		if params.Names != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "names", runtime.ParamLocationQuery, *params.Names); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
 
 		if params.Provider != nil {
 
@@ -3491,6 +4221,22 @@ func NewListDeploymentsRequest(server string, organizationId string, params *Lis
 
 		}
 
+		if params.Names != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "names", runtime.ParamLocationQuery, *params.Names); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		if params.WorkspaceIds != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "workspaceIds", runtime.ParamLocationQuery, *params.WorkspaceIds); err != nil {
@@ -3749,6 +4495,465 @@ func NewUpdateDeploymentRequestWithBody(server string, organizationId string, de
 	return req, nil
 }
 
+// NewListDeploysRequest generates requests for ListDeploys
+func NewListDeploysRequest(server string, organizationId string, deploymentId string, params *ListDeploysParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateDeployRequest calls the generic CreateDeploy builder with application/json body
+func NewCreateDeployRequest(server string, organizationId string, deploymentId string, body CreateDeployJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateDeployRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
+}
+
+// NewCreateDeployRequestWithBody generates requests for CreateDeploy with any type of body
+func NewCreateDeployRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetDeployRequest generates requests for GetDeploy
+func NewGetDeployRequest(server string, organizationId string, deploymentId string, deployId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deployId", runtime.ParamLocationPath, deployId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateDeployRequest calls the generic UpdateDeploy builder with application/json body
+func NewUpdateDeployRequest(server string, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateDeployRequestWithBody(server, organizationId, deploymentId, deployId, "application/json", bodyReader)
+}
+
+// NewUpdateDeployRequestWithBody generates requests for UpdateDeploy with any type of body
+func NewUpdateDeployRequestWithBody(server string, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deployId", runtime.ParamLocationPath, deployId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewFinalizeDeployRequest calls the generic FinalizeDeploy builder with application/json body
+func NewFinalizeDeployRequest(server string, organizationId string, deploymentId string, deployId string, body FinalizeDeployJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewFinalizeDeployRequestWithBody(server, organizationId, deploymentId, deployId, "application/json", bodyReader)
+}
+
+// NewFinalizeDeployRequestWithBody generates requests for FinalizeDeploy with any type of body
+func NewFinalizeDeployRequestWithBody(server string, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deployId", runtime.ParamLocationPath, deployId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s/finalize", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeployRollbackRequest calls the generic DeployRollback builder with application/json body
+func NewDeployRollbackRequest(server string, organizationId string, deploymentId string, deployId string, body DeployRollbackJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeployRollbackRequestWithBody(server, organizationId, deploymentId, deployId, "application/json", bodyReader)
+}
+
+// NewDeployRollbackRequestWithBody generates requests for DeployRollback with any type of body
+func NewDeployRollbackRequestWithBody(server string, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "deployId", runtime.ParamLocationPath, deployId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s/rollback", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteDeploymentHibernationOverrideRequest generates requests for DeleteDeploymentHibernationOverride
+func NewDeleteDeploymentHibernationOverrideRequest(server string, organizationId string, deploymentId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/hibernation-override", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateDeploymentHibernationOverrideRequest calls the generic UpdateDeploymentHibernationOverride builder with application/json body
+func NewUpdateDeploymentHibernationOverrideRequest(server string, organizationId string, deploymentId string, body UpdateDeploymentHibernationOverrideJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateDeploymentHibernationOverrideRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
+}
+
+// NewUpdateDeploymentHibernationOverrideRequestWithBody generates requests for UpdateDeploymentHibernationOverride with any type of body
+func NewUpdateDeploymentHibernationOverrideRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/hibernation-override", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListWorkspacesRequest generates requests for ListWorkspaces
 func NewListWorkspacesRequest(server string, organizationId string, params *ListWorkspacesParams) (*http.Request, error) {
 	var err error
@@ -3781,6 +4986,22 @@ func NewListWorkspacesRequest(server string, organizationId string, params *List
 		if params.WorkspaceIds != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "workspaceIds", runtime.ParamLocationQuery, *params.WorkspaceIds); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Names != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "names", runtime.ParamLocationQuery, *params.Names); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -4090,6 +5311,9 @@ type ClientWithResponsesInterface interface {
 
 	UpdateOrganizationWithResponse(ctx context.Context, organizationId string, body UpdateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateOrganizationResponse, error)
 
+	// GetOrganizationAuditLogsWithResponse request
+	GetOrganizationAuditLogsWithResponse(ctx context.Context, organizationId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*GetOrganizationAuditLogsResponse, error)
+
 	// GetClusterOptionsWithResponse request
 	GetClusterOptionsWithResponse(ctx context.Context, organizationId string, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*GetClusterOptionsResponse, error)
 
@@ -4133,6 +5357,40 @@ type ClientWithResponsesInterface interface {
 	UpdateDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error)
 
 	UpdateDeploymentWithResponse(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error)
+
+	// ListDeploysWithResponse request
+	ListDeploysWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*ListDeploysResponse, error)
+
+	// CreateDeployWithBodyWithResponse request with any body
+	CreateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error)
+
+	CreateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error)
+
+	// GetDeployWithResponse request
+	GetDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, reqEditors ...RequestEditorFn) (*GetDeployResponse, error)
+
+	// UpdateDeployWithBodyWithResponse request with any body
+	UpdateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeployResponse, error)
+
+	UpdateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeployResponse, error)
+
+	// FinalizeDeployWithBodyWithResponse request with any body
+	FinalizeDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FinalizeDeployResponse, error)
+
+	FinalizeDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body FinalizeDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*FinalizeDeployResponse, error)
+
+	// DeployRollbackWithBodyWithResponse request with any body
+	DeployRollbackWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error)
+
+	DeployRollbackWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error)
+
+	// DeleteDeploymentHibernationOverrideWithResponse request
+	DeleteDeploymentHibernationOverrideWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentHibernationOverrideResponse, error)
+
+	// UpdateDeploymentHibernationOverrideWithBodyWithResponse request with any body
+	UpdateDeploymentHibernationOverrideWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentHibernationOverrideResponse, error)
+
+	UpdateDeploymentHibernationOverrideWithResponse(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentHibernationOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentHibernationOverrideResponse, error)
 
 	// ListWorkspacesWithResponse request
 	ListWorkspacesWithResponse(ctx context.Context, organizationId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*ListWorkspacesResponse, error)
@@ -4228,6 +5486,27 @@ func (r UpdateOrganizationResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UpdateOrganizationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetOrganizationAuditLogsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r GetOrganizationAuditLogsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetOrganizationAuditLogsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -4554,6 +5833,214 @@ func (r UpdateDeploymentResponse) StatusCode() int {
 	return 0
 }
 
+type ListDeploysResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploysPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDeploysResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDeploysResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type FinalizeDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r FinalizeDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FinalizeDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeployRollbackResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeployRollbackResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeployRollbackResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteDeploymentHibernationOverrideResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON4XX      *Error
+	JSON5XX      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteDeploymentHibernationOverrideResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteDeploymentHibernationOverrideResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateDeploymentHibernationOverrideResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentHibernationOverride
+	JSON4XX      *Error
+	JSON5XX      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateDeploymentHibernationOverrideResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateDeploymentHibernationOverrideResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListWorkspacesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4722,6 +6209,15 @@ func (c *ClientWithResponses) UpdateOrganizationWithResponse(ctx context.Context
 	return ParseUpdateOrganizationResponse(rsp)
 }
 
+// GetOrganizationAuditLogsWithResponse request returning *GetOrganizationAuditLogsResponse
+func (c *ClientWithResponses) GetOrganizationAuditLogsWithResponse(ctx context.Context, organizationId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*GetOrganizationAuditLogsResponse, error) {
+	rsp, err := c.GetOrganizationAuditLogs(ctx, organizationId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetOrganizationAuditLogsResponse(rsp)
+}
+
 // GetClusterOptionsWithResponse request returning *GetClusterOptionsResponse
 func (c *ClientWithResponses) GetClusterOptionsWithResponse(ctx context.Context, organizationId string, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*GetClusterOptionsResponse, error) {
 	rsp, err := c.GetClusterOptions(ctx, organizationId, params, reqEditors...)
@@ -4860,6 +6356,118 @@ func (c *ClientWithResponses) UpdateDeploymentWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseUpdateDeploymentResponse(rsp)
+}
+
+// ListDeploysWithResponse request returning *ListDeploysResponse
+func (c *ClientWithResponses) ListDeploysWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*ListDeploysResponse, error) {
+	rsp, err := c.ListDeploys(ctx, organizationId, deploymentId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDeploysResponse(rsp)
+}
+
+// CreateDeployWithBodyWithResponse request with arbitrary body returning *CreateDeployResponse
+func (c *ClientWithResponses) CreateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error) {
+	rsp, err := c.CreateDeployWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDeployResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error) {
+	rsp, err := c.CreateDeploy(ctx, organizationId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDeployResponse(rsp)
+}
+
+// GetDeployWithResponse request returning *GetDeployResponse
+func (c *ClientWithResponses) GetDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, reqEditors ...RequestEditorFn) (*GetDeployResponse, error) {
+	rsp, err := c.GetDeploy(ctx, organizationId, deploymentId, deployId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeployResponse(rsp)
+}
+
+// UpdateDeployWithBodyWithResponse request with arbitrary body returning *UpdateDeployResponse
+func (c *ClientWithResponses) UpdateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeployResponse, error) {
+	rsp, err := c.UpdateDeployWithBody(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeployResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body UpdateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeployResponse, error) {
+	rsp, err := c.UpdateDeploy(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeployResponse(rsp)
+}
+
+// FinalizeDeployWithBodyWithResponse request with arbitrary body returning *FinalizeDeployResponse
+func (c *ClientWithResponses) FinalizeDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FinalizeDeployResponse, error) {
+	rsp, err := c.FinalizeDeployWithBody(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFinalizeDeployResponse(rsp)
+}
+
+func (c *ClientWithResponses) FinalizeDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body FinalizeDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*FinalizeDeployResponse, error) {
+	rsp, err := c.FinalizeDeploy(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFinalizeDeployResponse(rsp)
+}
+
+// DeployRollbackWithBodyWithResponse request with arbitrary body returning *DeployRollbackResponse
+func (c *ClientWithResponses) DeployRollbackWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error) {
+	rsp, err := c.DeployRollbackWithBody(ctx, organizationId, deploymentId, deployId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeployRollbackResponse(rsp)
+}
+
+func (c *ClientWithResponses) DeployRollbackWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, body DeployRollbackJSONRequestBody, reqEditors ...RequestEditorFn) (*DeployRollbackResponse, error) {
+	rsp, err := c.DeployRollback(ctx, organizationId, deploymentId, deployId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeployRollbackResponse(rsp)
+}
+
+// DeleteDeploymentHibernationOverrideWithResponse request returning *DeleteDeploymentHibernationOverrideResponse
+func (c *ClientWithResponses) DeleteDeploymentHibernationOverrideWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*DeleteDeploymentHibernationOverrideResponse, error) {
+	rsp, err := c.DeleteDeploymentHibernationOverride(ctx, organizationId, deploymentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteDeploymentHibernationOverrideResponse(rsp)
+}
+
+// UpdateDeploymentHibernationOverrideWithBodyWithResponse request with arbitrary body returning *UpdateDeploymentHibernationOverrideResponse
+func (c *ClientWithResponses) UpdateDeploymentHibernationOverrideWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentHibernationOverrideResponse, error) {
+	rsp, err := c.UpdateDeploymentHibernationOverrideWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeploymentHibernationOverrideResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateDeploymentHibernationOverrideWithResponse(ctx context.Context, organizationId string, deploymentId string, body UpdateDeploymentHibernationOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentHibernationOverrideResponse, error) {
+	rsp, err := c.UpdateDeploymentHibernationOverride(ctx, organizationId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeploymentHibernationOverrideResponse(rsp)
 }
 
 // ListWorkspacesWithResponse request returning *ListWorkspacesResponse
@@ -5094,6 +6702,22 @@ func ParseUpdateOrganizationResponse(rsp *http.Response) (*UpdateOrganizationRes
 		}
 		response.JSON500 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseGetOrganizationAuditLogsResponse parses an HTTP response from a GetOrganizationAuditLogsWithResponse call
+func ParseGetOrganizationAuditLogsResponse(rsp *http.Response) (*GetOrganizationAuditLogsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetOrganizationAuditLogsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
 	}
 
 	return response, nil
@@ -5797,6 +7421,438 @@ func ParseUpdateDeploymentResponse(rsp *http.Response) (*UpdateDeploymentRespons
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDeploysResponse parses an HTTP response from a ListDeploysWithResponse call
+func ParseListDeploysResponse(rsp *http.Response) (*ListDeploysResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDeploysResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploysPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateDeployResponse parses an HTTP response from a CreateDeployWithResponse call
+func ParseCreateDeployResponse(rsp *http.Response) (*CreateDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDeployResponse parses an HTTP response from a GetDeployWithResponse call
+func ParseGetDeployResponse(rsp *http.Response) (*GetDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateDeployResponse parses an HTTP response from a UpdateDeployWithResponse call
+func ParseUpdateDeployResponse(rsp *http.Response) (*UpdateDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseFinalizeDeployResponse parses an HTTP response from a FinalizeDeployWithResponse call
+func ParseFinalizeDeployResponse(rsp *http.Response) (*FinalizeDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FinalizeDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeployRollbackResponse parses an HTTP response from a DeployRollbackWithResponse call
+func ParseDeployRollbackResponse(rsp *http.Response) (*DeployRollbackResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeployRollbackResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteDeploymentHibernationOverrideResponse parses an HTTP response from a DeleteDeploymentHibernationOverrideWithResponse call
+func ParseDeleteDeploymentHibernationOverrideResponse(rsp *http.Response) (*DeleteDeploymentHibernationOverrideResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteDeploymentHibernationOverrideResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 5:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON5XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateDeploymentHibernationOverrideResponse parses an HTTP response from a UpdateDeploymentHibernationOverrideWithResponse call
+func ParseUpdateDeploymentHibernationOverrideResponse(rsp *http.Response) (*UpdateDeploymentHibernationOverrideResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateDeploymentHibernationOverrideResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentHibernationOverride
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 5:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON5XX = &dest
 
 	}
 
