@@ -1418,15 +1418,15 @@ func TestIsValidExecutor(t *testing.T) {
 	// Airflow 3 introduces AstroExecutor as a valid executor
 	af3ValidExecutors := append(af3OnlyValidExecutors, af2ValidExecutors...)
 	for _, executor := range af3ValidExecutors {
-		t.Run(fmt.Sprintf("returns true if executor is %s isAirflow3=true", executor), func() {
+		t.Run(fmt.Sprintf("returns true if executor is %s isAirflow3=true", executor), func(t *testing.T) {
 			actual := isValidExecutor(executor, true)
-			t.True(actual)
+			assert.True(t, actual)
 		})
 	}
 
-	t.Run("returns false if executor is invalid isAirflow3=true", func() {
+	t.Run("returns false if executor is invalid isAirflow3=true", func(t *testing.T) {
 		actual := isValidExecutor("invalid-executor", true)
-		t.False(actual)
+		assert.False(t, actual)
 	})
 }
 func TestIsValidCloudProvider(t *testing.T) {

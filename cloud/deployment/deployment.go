@@ -1777,7 +1777,8 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 			coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 			dagDeploy = enable
 		}
-		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, platformCoreClient, coreClient, false)
+
+		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, false, []string{}, "", "", platformCoreClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
