@@ -794,6 +794,43 @@ func (_m *ClientWithResponsesInterface) GetDeploymentWithResponse(ctx context.Co
 	return r0, r1
 }
 
+// GetOrganizationAuditLogsWithResponse provides a mock function with given fields: ctx, organizationId, params, reqEditors
+func (_m *ClientWithResponsesInterface) GetOrganizationAuditLogsWithResponse(ctx context.Context, organizationId string, params *astroplatformcore.GetOrganizationAuditLogsParams, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.GetOrganizationAuditLogsResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOrganizationAuditLogsWithResponse")
+	}
+
+	var r0 *astroplatformcore.GetOrganizationAuditLogsResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *astroplatformcore.GetOrganizationAuditLogsParams, ...astroplatformcore.RequestEditorFn) (*astroplatformcore.GetOrganizationAuditLogsResponse, error)); ok {
+		return rf(ctx, organizationId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *astroplatformcore.GetOrganizationAuditLogsParams, ...astroplatformcore.RequestEditorFn) *astroplatformcore.GetOrganizationAuditLogsResponse); ok {
+		r0 = rf(ctx, organizationId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astroplatformcore.GetOrganizationAuditLogsResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *astroplatformcore.GetOrganizationAuditLogsParams, ...astroplatformcore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetOrganizationWithResponse provides a mock function with given fields: ctx, organizationId, params, reqEditors
 func (_m *ClientWithResponsesInterface) GetOrganizationWithResponse(ctx context.Context, organizationId string, params *astroplatformcore.GetOrganizationParams, reqEditors ...astroplatformcore.RequestEditorFn) (*astroplatformcore.GetOrganizationResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
