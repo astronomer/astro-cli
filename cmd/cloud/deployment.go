@@ -730,7 +730,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, platformCoreClient, astroCoreClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, remoteExecution, allowedIPAddressRanges, taskLogBucket, taskLogURLFormat, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
 func validateRemoteExecution() error {
@@ -898,6 +898,11 @@ func isRemoteExecutionExecutor(executor string) bool {
 	remoteExecutionExecutors := []string{
 		deployment.AstroExecutor,
 		deployment.ASTRO,
+	}
+	for _, e := range remoteExecutionExecutors {
+		if strings.EqualFold(executor, e) {
+			return true
+		}
 	}
 	return false
 }
