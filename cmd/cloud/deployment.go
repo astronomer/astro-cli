@@ -76,7 +76,7 @@ var (
 	logScheduler              bool
 	logWorkers                bool
 	logTriggerer              bool
-	remoteExecutionEnabled    bool
+	remoteExecution    bool
 	allowedIPAddressRanges    []string
 	taskLogBucket             string
 	taskLogURLFormat          string
@@ -396,7 +396,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	if err != nil {
 		fmt.Println(err)
 	}
-	cmd.Flags().BoolVarP(&remoteExecutionEnabled, "remote-execution-enabled", "", false, "Enable remote execution for the Deployment")
+	cmd.Flags().BoolVarP(&remoteExecution, "remote-execution", "", false, "Enable remote execution for the Deployment")
 	cmd.Flags().StringArrayVarP(&allowedIPAddressRanges, "allowed-ip-address-ranges", "", []string{}, "The allowed IP address ranges for remote execution")
 	cmd.Flags().StringVarP(&taskLogBucket, "task-log-bucket", "", "", "The task log bucket for remote execution")
 	cmd.Flags().StringVarP(&taskLogURLFormat, "task-log-url-format", "", "", "The task log URL format for remote execution")
@@ -634,7 +634,7 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo
-	if remoteExecutionEnabled {
+	if remoteExecution {
 		if err := validateRemoteExecution(); err != nil {
 			return err
 		}
