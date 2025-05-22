@@ -166,6 +166,8 @@ func newAirflowInitCmd() *cobra.Command {
 		Example: initCloudExample,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    airflowInit,
+		// Override the root PersistentPreRunE to prevent looking up for container runtime.
+		PersistentPreRunE: SetupLogging,
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
