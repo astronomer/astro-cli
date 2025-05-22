@@ -361,10 +361,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			var remoteExecution *astroplatformcore.RemoteExecutionSpecRequest
 			if remoteExecutionEnabled {
 				remoteExecution = &astroplatformcore.RemoteExecutionSpecRequest{
-					Enabled: true,
+					Enabled:                true,
 					AllowedIPAddressRanges: allowedIPAddressRanges,
-					TaskLogBucket:         taskLogBucket,
-					TaskLogURLFormat:      taskLogURLFormat,
+					TaskLogBucket:          taskLogBucket,
+					TaskLogURLFormat:       taskLogURLFormat,
 				}
 			}
 
@@ -426,10 +426,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			var remoteExecution *astroplatformcore.RemoteExecutionSpecRequest
 			if remoteExecutionEnabled {
 				remoteExecution = &astroplatformcore.RemoteExecutionSpecRequest{
-					Enabled: true,
+					Enabled:                true,
 					AllowedIPAddressRanges: allowedIPAddressRanges,
-					TaskLogBucket:         taskLogBucket,
-					TaskLogURLFormat:      taskLogURLFormat,
+					TaskLogBucket:          taskLogBucket,
+					TaskLogURLFormat:       taskLogURLFormat,
 				}
 			}
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
