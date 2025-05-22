@@ -329,7 +329,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 
 		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
 		dockerfileContents := string(b)
-		s.True(strings.Contains(dockerfileContents, "astrocrpublic.azurecr.io/runtime:"))
+		s.True(strings.Contains(dockerfileContents, "astrocrpublic.azurecr.io/runtime:") || strings.Contains(dockerfileContents, "quay.io/astronomer/astro-runtime:"))
 	})
 
 	s.Run("invalid project name", func() {
