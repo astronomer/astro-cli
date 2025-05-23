@@ -25,7 +25,7 @@ func (s *Suite) TestRegistryLogin() {
 			cli:      mockClient,
 		}
 
-		err := handler.Login("", "")
+		err := handler.Login("testuser", "testtoken")
 		s.NoError(err)
 		mockClient.AssertExpectations(s.T())
 	})
