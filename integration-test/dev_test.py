@@ -9,7 +9,7 @@ import yaml
 from datetime import datetime
 
 ASTRO = os.path.abspath("../astro")
-AIRFLOW_COMPONENT = ["postgres", "api-server", "scheduler", "triggerer"]
+AIRFLOW_COMPONENT = ["postgres", "api-server", "scheduler", "triggerer", "dag-processor"]
 VAR_KEY = "foo"
 VAR_VALUE = "bar"
 
