@@ -9,7 +9,13 @@ import yaml
 from datetime import datetime
 
 ASTRO = os.path.abspath("../astro")
-AIRFLOW_COMPONENT = ["postgres", "api-server", "scheduler", "triggerer", "dag-processor"]
+AIRFLOW_COMPONENT = [
+    "postgres",
+    "api-server",
+    "scheduler",
+    "triggerer",
+    "dag-processor",
+]
 VAR_KEY = "foo"
 VAR_VALUE = "bar"
 
@@ -38,7 +44,10 @@ def docker_client():
         text=True,
     )
 
-def poll_for_condition(check_method, timeout_seconds=30, poll_interval_seconds=1, *args, **kwargs):
+
+def poll_for_condition(
+    check_method, timeout_seconds=30, poll_interval_seconds=1, *args, **kwargs
+):
     """
     Polls a given check_method until it returns True or a timeout is reached.
 
@@ -56,6 +65,7 @@ def poll_for_condition(check_method, timeout_seconds=30, poll_interval_seconds=1
         time.sleep(poll_interval_seconds)
     return False
 
+
 def check_astro_containers_stopped(client, components):
     """
     Checks if all Astro-related dev containers are stopped.
@@ -66,10 +76,12 @@ def check_astro_containers_stopped(client, components):
     """
     running_containers = client.containers.list()
     astro_dev_containers = [
-        c for c in running_containers
+        c
+        for c in running_containers
         if "astro-dev" in c.name or any(comp in c.name for comp in components)
     ]
     return not astro_dev_containers
+
 
 def check_astro_containers_running(client, components):
     """
@@ -80,13 +92,16 @@ def check_astro_containers_running(client, components):
     :return: True if all specified components have at least one running container, False otherwise.
     """
     container_statuses = get_container_status(components, client)
-    if not container_statuses: # In case get_container_status returns empty due to no containers found
+    if (
+        not container_statuses
+    ):  # In case get_container_status returns empty due to no containers found
         return False
 
     for component in components:
         # Check if any container for this component is running
         component_running = any(
-            name for name, status in container_statuses.items() 
+            name
+            for name, status in container_statuses.items()
             if component in name and status == "running"
         )
         if not component_running:
@@ -98,9 +113,12 @@ def check_astro_containers_running(client, components):
             # If found but not running
             for name, status in container_statuses.items():
                 if component in name and status != "running":
-                    print(f"Component {component} container {name} is {status}, not 'running'.")
+                    print(
+                        f"Component {component} container {name} is {status}, not 'running'."
+                    )
                     return False
     return True
+
 
 def get_container_status(components, client):
     running_containers = client.containers.list()
@@ -176,10 +194,12 @@ def test_dev_start(docker_client):
     all_running = poll_for_condition(
         check_method=check_astro_containers_running,
         client=docker_client,
-        components=AIRFLOW_COMPONENT
+        components=AIRFLOW_COMPONENT,
     )
 
-    assert all_running, f"Timeout reached: Not all Airflow component containers were running within the expected time."
+    assert (
+        all_running
+    ), f"Timeout reached: Not all Airflow component containers were running within the expected time."
 
 
 def test_dev_ps():
@@ -336,12 +356,14 @@ def test_dev_kill(docker_client):
     )
 
     assert result.returncode == 0
-    
+
     # Validate airflow containers are stopped by polling
     condition_met = poll_for_condition(
         check_method=check_astro_containers_stopped,
         client=docker_client,
-        components=AIRFLOW_COMPONENT
+        components=AIRFLOW_COMPONENT,
     )
-    
-    assert condition_met, f"Timeout reached: Not all Airflow component containers were stopped within the expected time."
+
+    assert (
+        condition_met
+    ), f"Timeout reached: Not all Airflow component containers were stopped within the expected time."
