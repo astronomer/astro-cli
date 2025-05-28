@@ -789,7 +789,7 @@ func WarnIfNonLatestVersion(version string, httpClient *httputil.HTTPClient) {
 		return
 	}
 
-	if airflowversions.CompareRuntimeVersions(version, latestRuntimeVersion) <= 0 {
+	if airflowversions.CompareRuntimeVersions(version, latestRuntimeVersion) < 0 {
 		fmt.Printf("WARNING! You are currently running Astro Runtime Version %s\nConsider upgrading to the latest version, Astro Runtime %s\n", version, latestRuntimeVersion)
 	}
 }

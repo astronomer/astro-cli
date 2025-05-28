@@ -1118,54 +1118,47 @@ func TestWarnNonLatestVersion(t *testing.T) {
 		},
 	}
 
-	// Test cases
-	testCases := []struct {
-		name           string
-		version        string
-		expectedOutput string
-	}{
-		{
-			name:           "older version shows warning",
-			version:        "4.2.5",
-			expectedOutput: "WARNING! You are currently running Astro Runtime Version 4.2.5\nConsider upgrading to the latest version, Astro Runtime 5.0.2\n",
-		},
-		{
-			name:           "latest version shows no warning",
-			version:        "5.0.2",
-			expectedOutput: "",
-		},
-		{
-			name:           "newer version shows no warning",
-			version:        "5.0.3",
-			expectedOutput: "",
-		},
-	}
+	t.Run("older version shows warning", func(t *testing.T) {
+		orgStdout := os.Stdout
+		defer func() { os.Stdout = orgStdout }()
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Capture stdout
-			oldStdout := os.Stdout
-			r, w, _ := os.Pipe()
-			os.Stdout = w
-			outC := make(chan string)
-			go func() {
-				var buf bytes.Buffer
-				io.Copy(&buf, r)
-				outC <- buf.String()
-			}()
+		r, w, _ := os.Pipe()
+		os.Stdout = w
 
-			// Call the function with our mock client
-			WarnIfNonLatestVersion(tc.version, mockClient)
+		WarnIfNonLatestVersion("4.2.5", mockClient)
 
-			// Restore stdout
-			w.Close()
-			os.Stdout = oldStdout
+		w.Close()
+		out, _ := io.ReadAll(r)
+		assert.Equal(t, "WARNING! You are currently running Astro Runtime Version 4.2.5\nConsider upgrading to the latest version, Astro Runtime 5.0.2\n", string(out))
+	})
 
-			// Check output
-			output := <-outC
-			assert.Equal(t, tc.expectedOutput, output)
-		})
-	}
+	t.Run("latest version shows no warning", func(t *testing.T) {
+		orgStdout := os.Stdout
+		defer func() { os.Stdout = orgStdout }()
+
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		WarnIfNonLatestVersion("5.0.2", mockClient)
+
+		w.Close()
+		out, _ := io.ReadAll(r)
+		assert.Equal(t, "", string(out))
+	})
+
+	t.Run("newer version shows no warning", func(t *testing.T) {
+		orgStdout := os.Stdout
+		defer func() { os.Stdout = orgStdout }()
+
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		WarnIfNonLatestVersion("5.0.3", mockClient)
+
+		w.Close()
+		out, _ := io.ReadAll(r)
+		assert.Equal(t, "", string(out))
+	})
 }
 
 func TestCheckPyTest(t *testing.T) {
