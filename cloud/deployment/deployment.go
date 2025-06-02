@@ -51,8 +51,10 @@ const (
 	noWorkspaceMsg      = "no Workspace with id (%s) found"
 	KubeExecutor        = "KubernetesExecutor"
 	CeleryExecutor      = "CeleryExecutor"
+	AstroExecutor       = "AstroExecutor"
 	KUBERNETES          = "KUBERNETES"
 	CELERY              = "CELERY"
+	ASTRO               = "ASTRO"
 	notApplicable       = "N/A"
 	gcpCloud            = "gcp"
 	awsCloud            = "aws"
@@ -218,7 +220,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logWebserver, logSch
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIPAddressRanges []string, taskLogBucket, taskLogURLFormat string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
 
@@ -235,11 +237,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 
 	configOption, err := GetDeploymentOptions("", deploymentOptionsParams, coreClient)
 	if err != nil {
-		return err
-	}
-
-	// check that runtime version is not for Airflow 3
-	if err := airflowversions.ValidateNoAirflow3Support(runtimeVersion); err != nil {
 		return err
 	}
 
@@ -358,6 +355,19 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
 			}
+			if strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) || remoteExecutionEnabled {
+				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorASTRO
+			}
+			var remoteExecution *astroplatformcore.RemoteExecutionSpecRequest
+			if remoteExecutionEnabled {
+				remoteExecution = &astroplatformcore.RemoteExecutionSpecRequest{
+					Enabled:                true,
+					AllowedIPAddressRanges: allowedIPAddressRanges,
+					TaskLogBucket:          taskLogBucket,
+					TaskLogURLFormat:       taskLogURLFormat,
+				}
+			}
+
 			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
 				AstroRuntimeVersion:  runtimeVersion,
 				CloudProvider:        &requestedCloudProvider,
@@ -376,6 +386,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
+				RemoteExecution:      remoteExecution,
 			}
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
@@ -409,6 +420,18 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
+			if strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) || remoteExecutionEnabled {
+				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorASTRO
+			}
+			var remoteExecution *astroplatformcore.RemoteExecutionSpecRequest
+			if remoteExecutionEnabled {
+				remoteExecution = &astroplatformcore.RemoteExecutionSpecRequest{
+					Enabled:                true,
+					AllowedIPAddressRanges: allowedIPAddressRanges,
+					TaskLogBucket:          taskLogBucket,
+					TaskLogURLFormat:       taskLogURLFormat,
+				}
+			}
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
 				AstroRuntimeVersion:  runtimeVersion,
 				Description:          &description,
@@ -426,6 +449,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
+				RemoteExecution:      remoteExecution,
 			}
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
@@ -1753,7 +1777,8 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 			coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
 			dagDeploy = enable
 		}
-		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, platformCoreClient, coreClient, false)
+
+		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, false, []string{}, "", "", platformCoreClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
