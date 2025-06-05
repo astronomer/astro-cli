@@ -42,7 +42,7 @@ var (
 
 const (
 	airflowConnectionList = "airflow connections list -o yaml"
-	ariflowPoolsList      = "airflow pools list -o yaml"
+	airflowPoolsList      = "airflow pools list -o yaml"
 	airflowConnExport     = "airflow connections export tmp.connections --file-format env"
 	airflowVarExport      = "airflow variables export tmp.var"
 	catVarFile            = "cat tmp.var"
@@ -605,7 +605,7 @@ func ExportVariables(id string) error {
 			for j := range settings.Airflow.Variables {
 				if settings.Airflow.Variables[j].VariableName == k {
 					fmt.Println("Updating Pool: " + k)
-					// Remove variable if it already exits
+					// Remove variable if it already exists
 					settings.Airflow.Variables = append(settings.Airflow.Variables[:j], settings.Airflow.Variables[j+1:]...)
 					break
 				}
@@ -633,7 +633,7 @@ func ExportVariables(id string) error {
 
 func ExportPools(id string) error {
 	// Setup airflow command to export pools
-	airflowCommand := ariflowPoolsList
+	airflowCommand := airflowPoolsList
 	out, err := execAirflowCommand(id, airflowCommand)
 	if err != nil {
 		return fmt.Errorf("error listing pools: %w", err)
