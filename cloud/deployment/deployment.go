@@ -220,7 +220,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logWebserver, logSch
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIPAddressRanges []string, taskLogBucket, taskLogURLFormat string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, allowedIPAddressRanges []string, taskLogBucket, taskLogURLFormat string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
 
@@ -355,17 +355,8 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
 			}
-			if strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) || remoteExecutionEnabled {
+			if strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) {
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorASTRO
-			}
-			var remoteExecution *astroplatformcore.RemoteExecutionSpecRequest
-			if remoteExecutionEnabled {
-				remoteExecution = &astroplatformcore.RemoteExecutionSpecRequest{
-					Enabled:                true,
-					AllowedIPAddressRanges: allowedIPAddressRanges,
-					TaskLogBucket:          taskLogBucket,
-					TaskLogURLFormat:       taskLogURLFormat,
-				}
 			}
 
 			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
@@ -386,7 +377,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
-				RemoteExecution:      remoteExecution,
 			}
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
@@ -420,17 +410,8 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorKUBERNETES
 			}
-			if strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) || remoteExecutionEnabled {
+			if strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) {
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorASTRO
-			}
-			var remoteExecution *astroplatformcore.RemoteExecutionSpecRequest
-			if remoteExecutionEnabled {
-				remoteExecution = &astroplatformcore.RemoteExecutionSpecRequest{
-					Enabled:                true,
-					AllowedIPAddressRanges: allowedIPAddressRanges,
-					TaskLogBucket:          taskLogBucket,
-					TaskLogURLFormat:       taskLogURLFormat,
-				}
 			}
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
 				AstroRuntimeVersion:  runtimeVersion,
@@ -449,7 +430,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ResourceQuotaCpu:     resourceQuotaCpu,
 				ResourceQuotaMemory:  resourceQuotaMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
-				RemoteExecution:      remoteExecution,
 			}
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 				dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue

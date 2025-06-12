@@ -76,7 +76,6 @@ var (
 	logScheduler              bool
 	logWorkers                bool
 	logTriggerer              bool
-	remoteExecution           bool
 	allowedIPAddressRanges    []string
 	taskLogBucket             string
 	taskLogURLFormat          string
@@ -396,7 +395,6 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	if err != nil {
 		fmt.Println(err)
 	}
-	cmd.Flags().BoolVarP(&remoteExecution, "remote-execution", "", false, "Enable remote execution for the Deployment")
 	cmd.Flags().StringArrayVarP(&allowedIPAddressRanges, "allowed-ip-address-ranges", "", []string{}, "The allowed IP address ranges for remote execution")
 	cmd.Flags().StringVarP(&taskLogBucket, "task-log-bucket", "", "", "The task log bucket for remote execution")
 	cmd.Flags().StringVarP(&taskLogURLFormat, "task-log-url-format", "", "", "The task log URL format for remote execution")
@@ -634,11 +632,6 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo
-	if remoteExecution {
-		if err := validateRemoteExecution(); err != nil {
-			return err
-		}
-	}
 
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
@@ -730,23 +723,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, remoteExecution, allowedIPAddressRanges, taskLogBucket, taskLogURLFormat, platformCoreClient, astroCoreClient, waitForStatus)
-}
-
-func validateRemoteExecution() error {
-	if !airflowversions.IsAirflow3(runtimeVersion) {
-		return errors.New("remote-execution-enabled is only supported for Airflow 3.x")
-	}
-	if !isRemoteExecutionExecutor(executor) {
-		return errors.New("remote-execution-enabled is only supported for the Astro executor")
-	}
-	if taskLogBucket == "" || taskLogURLFormat == "" {
-		return errors.New("task-log-bucket and task-log-url-format are required when remote-execution-enabled is true")
-	}
-	if len(allowedIPAddressRanges) == 0 {
-		return errors.New("at least one allowed-ip-address-range is required when remote-execution-enabled is true")
-	}
-	return nil
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, allowedIPAddressRanges, taskLogBucket, taskLogURLFormat, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
@@ -892,19 +869,6 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 	}
 
 	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, platformCoreClient)
-}
-
-func isRemoteExecutionExecutor(executor string) bool {
-	remoteExecutionExecutors := []string{
-		deployment.AstroExecutor,
-		deployment.ASTRO,
-	}
-	for _, e := range remoteExecutionExecutors {
-		if strings.EqualFold(executor, e) {
-			return true
-		}
-	}
-	return false
 }
 
 func isValidExecutor(executor string, isAirflow3 bool) bool {

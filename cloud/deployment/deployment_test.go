@@ -470,7 +470,7 @@ func (s *Suite) TestGetDeployment() {
 			name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement,
 			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
-			remoteExecutionEnabled bool, allowedIPAddressRanges []string, taskLogBucket string, taskLogURLFormat string,
+			allowedIPAddressRanges []string, taskLogBucket string, taskLogURLFormat string,
 			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
 			return errMock
@@ -502,7 +502,7 @@ func (s *Suite) TestGetDeployment() {
 		createDeployment = func(
 			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
-			remoteExecutionEnabled bool, allowedIPAddressRanges []string, taskLogBucket, taskLogURLFormat string,
+			allowedIPAddressRanges []string, taskLogBucket, taskLogURLFormat string,
 			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
 			return nil
@@ -538,7 +538,7 @@ func (s *Suite) TestGetDeployment() {
 			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement,
 			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string,
 			deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int,
-			remoteExecutionEnabled bool, allowedIPAddressRanges []string, taskLogBucket, taskLogURLFormat string,
+			allowedIPAddressRanges []string, taskLogBucket, taskLogURLFormat string,
 			platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool,
 		) error {
 			return nil
