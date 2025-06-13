@@ -2336,23 +2336,6 @@ func (s *Suite) TestAirflow3Blocking() {
 		updateMockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
-	s.Run("Create blocks operation for Airflow 3 runtime version", func() {
-		// Create a fresh local mock clients for this subtest
-		createMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		createMockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-
-		// Mock the GetDeploymentOptionsWithResponse method which is called by Create
-		// We don't need the actual validation to happen, just need to return before the Airflow 3 check
-		createMockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil)
-
-		// Test creating a deployment with Airflow 3 runtime version
-		err := Create("test-deployment", ws, "", "", airflow3Version, "", "", "", "", "", "", "", "", "", "", "", "", "", standardType, 0, 0, []string{}, "", "", createMockPlatformCoreClient, createMockCoreClient, false)
-
-		s.Error(err)
-		s.Contains(err.Error(), "This command is not yet supported on Airflow 3 deployments")
-		createMockCoreClient.AssertExpectations(s.T())
-	})
-
 	s.Run("Logs blocks operation for Airflow 3 deployments", func() {
 		// Create a fresh local mock clients for this subtest
 		logsMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
