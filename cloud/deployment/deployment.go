@@ -378,7 +378,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ResourceQuotaMemory:  resourceQuotaMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
 			}
-			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
+			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) || strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) {
 				standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
 			}
 			switch schedulerSize {
@@ -503,6 +503,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			},
 			Type: astroplatformcore.CreateHybridDeploymentRequestTypeHYBRID,
 		}
+		// TODO when we add remote execution we'll need to omit worker queues if remote execution is enabled
 		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 			hybridDeploymentRequest.WorkerQueues = &defautWorkerQueue
 		} else {
@@ -1758,7 +1759,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 			dagDeploy = enable
 		}
 
-		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, false, []string{}, "", "", platformCoreClient, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, []string{}, "", "", platformCoreClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
