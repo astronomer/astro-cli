@@ -93,9 +93,9 @@ const (
 
 // Defines values for CreateDedicatedDeploymentRequestExecutor.
 const (
+	CreateDedicatedDeploymentRequestExecutorASTRO      CreateDedicatedDeploymentRequestExecutor = "ASTRO"
 	CreateDedicatedDeploymentRequestExecutorCELERY     CreateDedicatedDeploymentRequestExecutor = "CELERY"
 	CreateDedicatedDeploymentRequestExecutorKUBERNETES CreateDedicatedDeploymentRequestExecutor = "KUBERNETES"
-	CreateDedicatedDeploymentRequestExecutorASTRO      CreateDedicatedDeploymentRequestExecutor = "ASTRO"
 )
 
 // Defines values for CreateDedicatedDeploymentRequestSchedulerSize.
@@ -156,9 +156,9 @@ const (
 
 // Defines values for CreateStandardDeploymentRequestExecutor.
 const (
+	CreateStandardDeploymentRequestExecutorASTRO      CreateStandardDeploymentRequestExecutor = "ASTRO"
 	CreateStandardDeploymentRequestExecutorCELERY     CreateStandardDeploymentRequestExecutor = "CELERY"
 	CreateStandardDeploymentRequestExecutorKUBERNETES CreateStandardDeploymentRequestExecutor = "KUBERNETES"
-	CreateStandardDeploymentRequestExecutorASTRO      CreateStandardDeploymentRequestExecutor = "ASTRO"
 )
 
 // Defines values for CreateStandardDeploymentRequestSchedulerSize.
@@ -199,6 +199,7 @@ const (
 
 // Defines values for DeploymentExecutor.
 const (
+	DeploymentExecutorASTRO      DeploymentExecutor = "ASTRO"
 	DeploymentExecutorCELERY     DeploymentExecutor = "CELERY"
 	DeploymentExecutorKUBERNETES DeploymentExecutor = "KUBERNETES"
 )
@@ -312,6 +313,7 @@ const (
 
 // Defines values for UpdateDedicatedDeploymentRequestExecutor.
 const (
+	UpdateDedicatedDeploymentRequestExecutorASTRO      UpdateDedicatedDeploymentRequestExecutor = "ASTRO"
 	UpdateDedicatedDeploymentRequestExecutorCELERY     UpdateDedicatedDeploymentRequestExecutor = "CELERY"
 	UpdateDedicatedDeploymentRequestExecutorKUBERNETES UpdateDedicatedDeploymentRequestExecutor = "KUBERNETES"
 )
@@ -351,6 +353,7 @@ const (
 
 // Defines values for UpdateStandardDeploymentRequestExecutor.
 const (
+	UpdateStandardDeploymentRequestExecutorASTRO      UpdateStandardDeploymentRequestExecutor = "ASTRO"
 	UpdateStandardDeploymentRequestExecutorCELERY     UpdateStandardDeploymentRequestExecutor = "CELERY"
 	UpdateStandardDeploymentRequestExecutorKUBERNETES UpdateStandardDeploymentRequestExecutor = "KUBERNETES"
 )
@@ -401,6 +404,21 @@ const (
 	ListOrganizationsParamsSupportPlanTRIAL            ListOrganizationsParamsSupportPlan = "TRIAL"
 )
 
+// Defines values for ListOrganizationsParamsProductPlan.
+const (
+	ListOrganizationsParamsProductPlanBASIC            ListOrganizationsParamsProductPlan = "BASIC"
+	ListOrganizationsParamsProductPlanBUSINESSCRITICAL ListOrganizationsParamsProductPlan = "BUSINESS_CRITICAL"
+	ListOrganizationsParamsProductPlanPREMIUM          ListOrganizationsParamsProductPlan = "PREMIUM"
+	ListOrganizationsParamsProductPlanSTANDARD         ListOrganizationsParamsProductPlan = "STANDARD"
+	ListOrganizationsParamsProductPlanTRIAL            ListOrganizationsParamsProductPlan = "TRIAL"
+)
+
+// Defines values for ListOrganizationsParamsAstronomerProduct.
+const (
+	ListOrganizationsParamsAstronomerProductASTRO   ListOrganizationsParamsAstronomerProduct = "ASTRO"
+	ListOrganizationsParamsAstronomerProductOBSERVE ListOrganizationsParamsAstronomerProduct = "OBSERVE"
+)
+
 // Defines values for ListOrganizationsParamsProduct.
 const (
 	ListOrganizationsParamsProductHOSTED ListOrganizationsParamsProduct = "HOSTED"
@@ -449,15 +467,16 @@ const (
 
 // Defines values for GetDeploymentOptionsParamsDeploymentType.
 const (
-	GetDeploymentOptionsParamsDeploymentTypeDEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
-	GetDeploymentOptionsParamsDeploymentTypeHYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
-	GetDeploymentOptionsParamsDeploymentTypeSTANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
+	DEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
+	HYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
+	STANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
 )
 
 // Defines values for GetDeploymentOptionsParamsExecutor.
 const (
-	GetDeploymentOptionsParamsExecutorCELERY     GetDeploymentOptionsParamsExecutor = "CELERY"
-	GetDeploymentOptionsParamsExecutorKUBERNETES GetDeploymentOptionsParamsExecutor = "KUBERNETES"
+	ASTRO      GetDeploymentOptionsParamsExecutor = "ASTRO"
+	CELERY     GetDeploymentOptionsParamsExecutor = "CELERY"
+	KUBERNETES GetDeploymentOptionsParamsExecutor = "KUBERNETES"
 )
 
 // Defines values for GetDeploymentOptionsParamsCloudProvider.
@@ -838,7 +857,6 @@ type CreateDedicatedDeploymentRequest struct {
 
 	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
 	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
-	RemoteExecution     *RemoteExecutionSpecRequest   `json:"remoteExecution,omitempty"`
 	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize The size of the scheduler Pod.
@@ -847,7 +865,7 @@ type CreateDedicatedDeploymentRequest struct {
 	// Type The type of the Deployment.
 	Type CreateDedicatedDeploymentRequestType `json:"type"`
 
-	// WorkerQueues The list of worker queues configured for the Deployment. Applies only when `Executor` is `CELERY`. At least 1 worker queue is needed. All Deployments need at least 1 worker queue called `default`.
+	// WorkerQueues The list of worker queues configured for the Deployment. Applies only when `Executor` is `CELERY` or `ASTRO`. All such Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]WorkerQueueRequest `json:"workerQueues,omitempty"`
 
 	// WorkloadIdentity The Deployment's workload identity.
@@ -1055,12 +1073,8 @@ type CreateStandardDeploymentRequest struct {
 	ResourceQuotaCpu string `json:"resourceQuotaCpu"`
 
 	// ResourceQuotaMemory The memory quota for worker Pods when running the Kubernetes executor or KubernetesPodOperator. If current memory usage across all workers exceeds the quota, no new worker Pods can be scheduled. Units are in `Gi` and must be explicitly included. This value must always be twice the value of `ResourceQuotaCpu`.
-	ResourceQuotaMemory string `json:"resourceQuotaMemory"`
-
-	// RemoteExecution Whether the Deployment is configured for remote execution.
-	RemoteExecution *RemoteExecutionSpecRequest `json:"remoteExecution,omitempty"`
-
-	ScalingSpec *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
+	ResourceQuotaMemory string                        `json:"resourceQuotaMemory"`
+	ScalingSpec         *DeploymentScalingSpecRequest `json:"scalingSpec,omitempty"`
 
 	// SchedulerSize The size of the scheduler Pod.
 	SchedulerSize CreateStandardDeploymentRequestSchedulerSize `json:"schedulerSize"`
@@ -1483,22 +1497,6 @@ type DeploymentScalingSpecRequest struct {
 	HibernationSpec *DeploymentHibernationSpecRequest `json:"hibernationSpec,omitempty"`
 }
 
-// RemoteExecutionSpec defines model for RemoteExecutionSpec.
-type RemoteExecutionSpec struct {
-	Enabled                bool     `json:"enabled"`
-	AllowedIPAddressRanges []string `json:"allowedIPAddressRanges,omitempty"`
-	TaskLogBucket          string   `json:"taskLogBucket,omitempty"`
-	TaskLogURLFormat       string   `json:"taskLogURLFormat,omitempty"`
-}
-
-// RemoteExecutionSpecRequest defines model for RemoteExecutionSpecRequest.
-type RemoteExecutionSpecRequest struct {
-	Enabled                bool     `json:"enabled"`
-	AllowedIPAddressRanges []string `json:"allowedIPAddressRanges"`
-	TaskLogBucket          string   `json:"taskLogBucket,omitempty"`
-	TaskLogURLFormat       string   `json:"taskLogURLFormat,omitempty"`
-}
-
 // DeploymentScalingStatus defines model for DeploymentScalingStatus.
 type DeploymentScalingStatus struct {
 	HibernationStatus *DeploymentHibernationStatus `json:"hibernationStatus,omitempty"`
@@ -1909,7 +1907,7 @@ type UpdateDedicatedDeploymentRequest struct {
 	// Type The type of the Deployment.
 	Type UpdateDedicatedDeploymentRequestType `json:"type"`
 
-	// WorkerQueues A list of the Deployment's worker queues. Applies only when `Executor` is `CELERY`. All Deployments need at least 1 worker queue called `default`.
+	// WorkerQueues A list of the Deployment's worker queues. Applies only when `Executor` is `CELERY` or `ASTRO`. All such Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]WorkerQueueRequest `json:"workerQueues,omitempty"`
 
 	// WorkloadIdentity The Deployment's workload identity.
@@ -2075,7 +2073,7 @@ type UpdateStandardDeploymentRequest struct {
 	// Type The type of the Deployment.
 	Type UpdateStandardDeploymentRequestType `json:"type"`
 
-	// WorkerQueues A list of the Deployment's worker queues. Applies only when `Executor` is `CELERY`. All Deployments need at least 1 worker queue called `default`.
+	// WorkerQueues A list of the Deployment's worker queues. Applies only when `Executor` is `CELERY` or `ASTRO`. All such Deployments need at least 1 worker queue called `default`.
 	WorkerQueues *[]WorkerQueueRequest `json:"workerQueues,omitempty"`
 
 	// WorkloadIdentity The Deployment's workload identity.
@@ -2243,6 +2241,12 @@ type ListOrganizationsParams struct {
 	// SupportPlan Filters the Organization list by support plan.
 	SupportPlan *ListOrganizationsParamsSupportPlan `form:"supportPlan,omitempty" json:"supportPlan,omitempty"`
 
+	// ProductPlan Filters the Organization list by product plan.
+	ProductPlan *ListOrganizationsParamsProductPlan `form:"productPlan,omitempty" json:"productPlan,omitempty"`
+
+	// AstronomerProduct filter by astronomer product, should be one of ASTRO or OBSERVE
+	AstronomerProduct *ListOrganizationsParamsAstronomerProduct `form:"astronomerProduct,omitempty" json:"astronomerProduct,omitempty"`
+
 	// Product Filters the Organization list by product.
 	Product *ListOrganizationsParamsProduct `form:"product,omitempty" json:"product,omitempty"`
 
@@ -2258,6 +2262,12 @@ type ListOrganizationsParams struct {
 
 // ListOrganizationsParamsSupportPlan defines parameters for ListOrganizations.
 type ListOrganizationsParamsSupportPlan string
+
+// ListOrganizationsParamsProductPlan defines parameters for ListOrganizations.
+type ListOrganizationsParamsProductPlan string
+
+// ListOrganizationsParamsAstronomerProduct defines parameters for ListOrganizations.
+type ListOrganizationsParamsAstronomerProduct string
 
 // ListOrganizationsParamsProduct defines parameters for ListOrganizations.
 type ListOrganizationsParamsProduct string
@@ -3461,6 +3471,38 @@ func NewListOrganizationsRequest(server string, params *ListOrganizationsParams)
 		if params.SupportPlan != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "supportPlan", runtime.ParamLocationQuery, *params.SupportPlan); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProductPlan != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "productPlan", runtime.ParamLocationQuery, *params.ProductPlan); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.AstronomerProduct != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "astronomerProduct", runtime.ParamLocationQuery, *params.AstronomerProduct); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
