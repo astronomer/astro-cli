@@ -76,9 +76,6 @@ var (
 	logScheduler              bool
 	logWorkers                bool
 	logTriggerer              bool
-	allowedIPAddressRanges    []string
-	taskLogBucket             string
-	taskLogURLFormat          string
 
 	deploymentType                = standard
 	deploymentVariableListExample = `
@@ -395,9 +392,6 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	if err != nil {
 		fmt.Println(err)
 	}
-	cmd.Flags().StringArrayVarP(&allowedIPAddressRanges, "allowed-ip-address-ranges", "", []string{}, "The allowed IP address ranges for remote execution")
-	cmd.Flags().StringVarP(&taskLogBucket, "task-log-bucket", "", "", "The task log bucket for remote execution")
-	cmd.Flags().StringVarP(&taskLogURLFormat, "task-log-url-format", "", "", "The task log URL format for remote execution")
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the Deployment to create. File can be in either JSON or YAML format.")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
@@ -723,7 +717,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, allowedIPAddressRanges, taskLogBucket, taskLogURLFormat, platformCoreClient, astroCoreClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
