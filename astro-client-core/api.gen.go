@@ -774,6 +774,23 @@ const (
 	ListOrganizationsParamsSupportPlanTRIAL            ListOrganizationsParamsSupportPlan = "TRIAL"
 )
 
+// Defines values for ListOrganizationsParamsProductPlan.
+const (
+	ListOrganizationsParamsProductPlanBASIC            ListOrganizationsParamsProductPlan = "BASIC"
+	ListOrganizationsParamsProductPlanBUSINESSCRITICAL ListOrganizationsParamsProductPlan = "BUSINESS_CRITICAL"
+	ListOrganizationsParamsProductPlanINTERNAL         ListOrganizationsParamsProductPlan = "INTERNAL"
+	ListOrganizationsParamsProductPlanPOV              ListOrganizationsParamsProductPlan = "POV"
+	ListOrganizationsParamsProductPlanPREMIUM          ListOrganizationsParamsProductPlan = "PREMIUM"
+	ListOrganizationsParamsProductPlanSTANDARD         ListOrganizationsParamsProductPlan = "STANDARD"
+	ListOrganizationsParamsProductPlanTRIAL            ListOrganizationsParamsProductPlan = "TRIAL"
+)
+
+// Defines values for ListOrganizationsParamsAstronomerProduct.
+const (
+	ASTRO   ListOrganizationsParamsAstronomerProduct = "ASTRO"
+	OBSERVE ListOrganizationsParamsAstronomerProduct = "OBSERVE"
+)
+
 // Defines values for ListOrganizationsParamsProduct.
 const (
 	ListOrganizationsParamsProductHOSTED ListOrganizationsParamsProduct = "HOSTED"
@@ -918,9 +935,9 @@ const (
 
 // Defines values for GetDeploymentOptionsParamsDeploymentType.
 const (
-	DEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
-	HYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
-	STANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
+	GetDeploymentOptionsParamsDeploymentTypeDEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
+	GetDeploymentOptionsParamsDeploymentTypeHYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
+	GetDeploymentOptionsParamsDeploymentTypeSTANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
 )
 
 // Defines values for GetDeploymentOptionsParamsExecutor.
@@ -1246,6 +1263,11 @@ const (
 	ListSelfUserRepositoryBranchesParamsGitProviderGITHUB ListSelfUserRepositoryBranchesParamsGitProvider = "GITHUB"
 )
 
+// Defines values for CreateSelfUserRepositoryBranchParamsGitProvider.
+const (
+	CreateSelfUserRepositoryBranchParamsGitProviderGITHUB CreateSelfUserRepositoryBranchParamsGitProvider = "GITHUB"
+)
+
 // Defines values for GetSelfUserRepositoryBranchParamsGitProvider.
 const (
 	GetSelfUserRepositoryBranchParamsGitProviderGITHUB GetSelfUserRepositoryBranchParamsGitProvider = "GITHUB"
@@ -1258,7 +1280,7 @@ const (
 
 // Defines values for GetSelfUserGitAppInstallationParamsGitProvider.
 const (
-	GITHUB GetSelfUserGitAppInstallationParamsGitProvider = "GITHUB"
+	GetSelfUserGitAppInstallationParamsGitProviderGITHUB GetSelfUserGitAppInstallationParamsGitProvider = "GITHUB"
 )
 
 // AddTeamMembersRequest defines model for AddTeamMembersRequest.
@@ -1985,6 +2007,12 @@ type CreateGcpClusterRequest struct {
 
 // CreateGcpClusterRequestType defines model for CreateGcpClusterRequest.Type.
 type CreateGcpClusterRequestType string
+
+// CreateGitRepositoryBranchRequest defines model for CreateGitRepositoryBranchRequest.
+type CreateGitRepositoryBranchRequest struct {
+	Branch     string `json:"branch"`
+	FromBranch string `json:"fromBranch"`
+}
 
 // CreateHybridDeploymentRequest defines model for CreateHybridDeploymentRequest.
 type CreateHybridDeploymentRequest struct {
@@ -2787,8 +2815,9 @@ type EnvironmentObjectMetricsExportExporterType string
 
 // EnvironmentObjectMetricsExportLogEntry defines model for EnvironmentObjectMetricsExportLogEntry.
 type EnvironmentObjectMetricsExportLogEntry struct {
-	Raw       string `json:"raw"`
-	Timestamp string `json:"timestamp"`
+	Raw        string  `json:"raw"`
+	Resolution *string `json:"resolution,omitempty"`
+	Timestamp  string  `json:"timestamp"`
 }
 
 // EnvironmentObjectMetricsExportOverrides defines model for EnvironmentObjectMetricsExportOverrides.
@@ -4013,6 +4042,12 @@ type ListOrganizationsParams struct {
 	// SupportPlan filter by support plan, should be one of INTERNAL, POV, TRIAL, BASIC, STANDARD, PREMIUM, BUSINESS_CRITICAL, or null for all orgs
 	SupportPlan *ListOrganizationsParamsSupportPlan `form:"supportPlan,omitempty" json:"supportPlan,omitempty"`
 
+	// ProductPlan filter by product plan, should be one of INTERNAL, POV, TRIAL, BASIC, STANDARD, PREMIUM, BUSINESS_CRITICAL, or null for all orgs
+	ProductPlan *ListOrganizationsParamsProductPlan `form:"productPlan,omitempty" json:"productPlan,omitempty"`
+
+	// AstronomerProduct filter by astronomer product, should be one of ASTRO or OBSERVE
+	AstronomerProduct *ListOrganizationsParamsAstronomerProduct `form:"astronomerProduct,omitempty" json:"astronomerProduct,omitempty"`
+
 	// Product filter by product, null for all orgs
 	Product *ListOrganizationsParamsProduct `form:"product,omitempty" json:"product,omitempty"`
 
@@ -4028,6 +4063,12 @@ type ListOrganizationsParamsTrialStatus string
 
 // ListOrganizationsParamsSupportPlan defines parameters for ListOrganizations.
 type ListOrganizationsParamsSupportPlan string
+
+// ListOrganizationsParamsProductPlan defines parameters for ListOrganizations.
+type ListOrganizationsParamsProductPlan string
+
+// ListOrganizationsParamsAstronomerProduct defines parameters for ListOrganizations.
+type ListOrganizationsParamsAstronomerProduct string
 
 // ListOrganizationsParamsProduct defines parameters for ListOrganizations.
 type ListOrganizationsParamsProduct string
@@ -4743,6 +4784,9 @@ type ListSelfUserRepositoryBranchesParams struct {
 // ListSelfUserRepositoryBranchesParamsGitProvider defines parameters for ListSelfUserRepositoryBranches.
 type ListSelfUserRepositoryBranchesParamsGitProvider string
 
+// CreateSelfUserRepositoryBranchParamsGitProvider defines parameters for CreateSelfUserRepositoryBranch.
+type CreateSelfUserRepositoryBranchParamsGitProvider string
+
 // GetSelfUserRepositoryBranchParamsGitProvider defines parameters for GetSelfUserRepositoryBranch.
 type GetSelfUserRepositoryBranchParamsGitProvider string
 
@@ -4886,6 +4930,9 @@ type MutateWorkspaceTeamRoleJSONRequestBody = MutateWorkspaceTeamRoleRequest
 
 // MutateWorkspaceUserRoleJSONRequestBody defines body for MutateWorkspaceUserRole for application/json ContentType.
 type MutateWorkspaceUserRoleJSONRequestBody = MutateWorkspaceUserRoleRequest
+
+// CreateSelfUserRepositoryBranchJSONRequestBody defines body for CreateSelfUserRepositoryBranch for application/json ContentType.
+type CreateSelfUserRepositoryBranchJSONRequestBody = CreateGitRepositoryBranchRequest
 
 // UpdateSelfUserInviteJSONRequestBody defines body for UpdateSelfUserInvite for application/json ContentType.
 type UpdateSelfUserInviteJSONRequestBody = UpdateInviteRequest
@@ -5603,6 +5650,11 @@ type ClientInterface interface {
 
 	// ListSelfUserRepositoryBranches request
 	ListSelfUserRepositoryBranches(ctx context.Context, gitProvider ListSelfUserRepositoryBranchesParamsGitProvider, gitAccount string, gitRepository string, params *ListSelfUserRepositoryBranchesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSelfUserRepositoryBranchWithBody request with any body
+	CreateSelfUserRepositoryBranchWithBody(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateSelfUserRepositoryBranch(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, body CreateSelfUserRepositoryBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSelfUserRepositoryBranch request
 	GetSelfUserRepositoryBranch(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -7503,6 +7555,30 @@ func (c *Client) ListSelfUserRepositoryBranches(ctx context.Context, gitProvider
 	return c.Client.Do(req)
 }
 
+func (c *Client) CreateSelfUserRepositoryBranchWithBody(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSelfUserRepositoryBranchRequestWithBody(c.Server, gitProvider, gitAccount, gitRepository, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateSelfUserRepositoryBranch(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, body CreateSelfUserRepositoryBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSelfUserRepositoryBranchRequest(c.Server, gitProvider, gitAccount, gitRepository, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetSelfUserRepositoryBranch(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSelfUserRepositoryBranchRequest(c.Server, gitProvider, gitAccount, gitRepository, gitBranch)
 	if err != nil {
@@ -7772,6 +7848,38 @@ func NewListOrganizationsRequest(server string, params *ListOrganizationsParams)
 		if params.SupportPlan != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "supportPlan", runtime.ParamLocationQuery, *params.SupportPlan); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProductPlan != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "productPlan", runtime.ParamLocationQuery, *params.ProductPlan); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.AstronomerProduct != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "astronomerProduct", runtime.ParamLocationQuery, *params.AstronomerProduct); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -15752,6 +15860,67 @@ func NewListSelfUserRepositoryBranchesRequest(server string, gitProvider ListSel
 	return req, nil
 }
 
+// NewCreateSelfUserRepositoryBranchRequest calls the generic CreateSelfUserRepositoryBranch builder with application/json body
+func NewCreateSelfUserRepositoryBranchRequest(server string, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, body CreateSelfUserRepositoryBranchJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSelfUserRepositoryBranchRequestWithBody(server, gitProvider, gitAccount, gitRepository, "application/json", bodyReader)
+}
+
+// NewCreateSelfUserRepositoryBranchRequestWithBody generates requests for CreateSelfUserRepositoryBranch with any type of body
+func NewCreateSelfUserRepositoryBranchRequestWithBody(server string, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "gitProvider", runtime.ParamLocationPath, gitProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "gitAccount", runtime.ParamLocationPath, gitAccount)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "gitRepository", runtime.ParamLocationPath, gitRepository)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/users/self/git-providers/%s/accounts/%s/repositories/%s/branches", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetSelfUserRepositoryBranchRequest generates requests for GetSelfUserRepositoryBranch
 func NewGetSelfUserRepositoryBranchRequest(server string, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string) (*http.Request, error) {
 	var err error
@@ -16423,6 +16592,11 @@ type ClientWithResponsesInterface interface {
 
 	// ListSelfUserRepositoryBranchesWithResponse request
 	ListSelfUserRepositoryBranchesWithResponse(ctx context.Context, gitProvider ListSelfUserRepositoryBranchesParamsGitProvider, gitAccount string, gitRepository string, params *ListSelfUserRepositoryBranchesParams, reqEditors ...RequestEditorFn) (*ListSelfUserRepositoryBranchesResponse, error)
+
+	// CreateSelfUserRepositoryBranchWithBodyWithResponse request with any body
+	CreateSelfUserRepositoryBranchWithBodyWithResponse(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSelfUserRepositoryBranchResponse, error)
+
+	CreateSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, body CreateSelfUserRepositoryBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSelfUserRepositoryBranchResponse, error)
 
 	// GetSelfUserRepositoryBranchWithResponse request
 	GetSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*GetSelfUserRepositoryBranchResponse, error)
@@ -19498,6 +19672,33 @@ func (r ListSelfUserRepositoryBranchesResponse) StatusCode() int {
 	return 0
 }
 
+type CreateSelfUserRepositoryBranchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *RepositoryBranch
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON405      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSelfUserRepositoryBranchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSelfUserRepositoryBranchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetSelfUserRepositoryBranchResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20974,6 +21175,23 @@ func (c *ClientWithResponses) ListSelfUserRepositoryBranchesWithResponse(ctx con
 		return nil, err
 	}
 	return ParseListSelfUserRepositoryBranchesResponse(rsp)
+}
+
+// CreateSelfUserRepositoryBranchWithBodyWithResponse request with arbitrary body returning *CreateSelfUserRepositoryBranchResponse
+func (c *ClientWithResponses) CreateSelfUserRepositoryBranchWithBodyWithResponse(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSelfUserRepositoryBranchResponse, error) {
+	rsp, err := c.CreateSelfUserRepositoryBranchWithBody(ctx, gitProvider, gitAccount, gitRepository, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSelfUserRepositoryBranchResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, body CreateSelfUserRepositoryBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSelfUserRepositoryBranchResponse, error) {
+	rsp, err := c.CreateSelfUserRepositoryBranch(ctx, gitProvider, gitAccount, gitRepository, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSelfUserRepositoryBranchResponse(rsp)
 }
 
 // GetSelfUserRepositoryBranchWithResponse request returning *GetSelfUserRepositoryBranchResponse
@@ -27700,6 +27918,67 @@ func ParseListSelfUserRepositoryBranchesResponse(rsp *http.Response) (*ListSelfU
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateSelfUserRepositoryBranchResponse parses an HTTP response from a CreateSelfUserRepositoryBranchWithResponse call
+func ParseCreateSelfUserRepositoryBranchResponse(rsp *http.Response) (*CreateSelfUserRepositoryBranchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSelfUserRepositoryBranchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RepositoryBranch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
