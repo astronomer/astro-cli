@@ -32,8 +32,31 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &astroplatformcore.Deployment{
-			Id:             "test-id-1",
-			RuntimeVersion: "3.0-1",
+			Id:                     "test-id-1",
+			RuntimeVersion:         "3.0-1",
+			Namespace:              "test-name",
+			WorkspaceId:            "workspace-id",
+			WebServerUrl:           "test-url",
+			IsDagDeployEnabled:     false,
+			Description:            &description,
+			Name:                   "test-deployment-label",
+			Status:                 "HEALTHY",
+			Type:                   &standardType,
+			ClusterId:              &csID,
+			ClusterName:            &testCluster,
+			Executor:               &executorCelery,
+			IsHighAvailability:     &highAvailabilityTest,
+			IsDevelopmentMode:      &developmentModeTest,
+			ResourceQuotaCpu:       &resourceQuotaCPU,
+			ResourceQuotaMemory:    &ResourceQuotaMemory,
+			SchedulerSize:          &schedulerTestSize,
+			Region:                 &region,
+			WorkspaceName:          &workspaceName,
+			CloudProvider:          (*astroplatformcore.DeploymentCloudProvider)(&cloudProvider),
+			DefaultTaskPodCpu:      &defaultTaskPodCPU,
+			DefaultTaskPodMemory:   &defaultTaskPodMemory,
+			WebServerAirflowApiUrl: "airflow-url",
+			WorkerQueues:           &[]astroplatformcore.WorkerQueue{},
 		},
 	}
 )
@@ -80,15 +103,6 @@ func TestConnectionList(t *testing.T) {
 		assert.Error(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
-	t.Run("operations are blocked for Airflow 3 deployments", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"connection", "list", "-d", "test-id-1"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
 }
 
 func TestConnectionCreate(t *testing.T) {
@@ -120,15 +134,6 @@ func TestConnectionCreate(t *testing.T) {
 		cmdArgs := []string{"connection", "create"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-	t.Run("operations are blocked for Airflow 3 deployments", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"connection", "create", "-d", "test-id-1", "--conn-id", "conn-id", "--conn-type", "conn-type"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 	t.Run("successful airflow variable create", func(t *testing.T) {
@@ -176,16 +181,6 @@ func TestConnectionUpdate(t *testing.T) {
 		cmdArgs := []string{"connection", "update"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
-	t.Run("operations are blocked for Airflow 3 deployments", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"connection", "update", "-d", "test-id-1", "--conn-id", "conn-id"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
@@ -308,15 +303,6 @@ func TestVariableList(t *testing.T) {
 		assert.Error(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
-	t.Run("operations are blocked for Airflow 3 deployments", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"airflow-variable", "list", "-d", "test-id-1"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
 }
 
 func TestVariableUpdate(t *testing.T) {
@@ -353,16 +339,6 @@ func TestVariableUpdate(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
-	t.Run("operations are blocked for Airflow 3 deployments", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"airflow-variable", "update", "-d", "test-id-1", "--key", "KEY"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
 	t.Run("successful airflow variable update", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
@@ -376,7 +352,7 @@ func TestVariableUpdate(t *testing.T) {
 	})
 }
 
-func TestVaraibleCreate(t *testing.T) {
+func TestVariableCreate(t *testing.T) {
 	expectedHelp := "Create Airflow variables for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
@@ -406,16 +382,6 @@ func TestVaraibleCreate(t *testing.T) {
 		cmdArgs := []string{"airflow-variable", "create"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
-	t.Run("operations are blocked for Airflow 3 deployments", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"airflow-variable", "create", "-d", "test-id-1", "--key", "KEY", "--value", "VAR"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
@@ -538,15 +504,6 @@ func TestPoolList(t *testing.T) {
 		assert.Error(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
-	t.Run("operations are blocked for Airflow 3 deployments", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"pool", "list", "-d", "test-id-1"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
 }
 
 func TestPoolUpdate(t *testing.T) {
@@ -584,16 +541,6 @@ func TestPoolUpdate(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
-	t.Run("operations are blocked for Airflow 3 deployments", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"pool", "update", "-d", "test-id-1", "--name", "name"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
 	t.Run("successful pool update", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
@@ -601,6 +548,18 @@ func TestPoolUpdate(t *testing.T) {
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 		mockClient.On("UpdatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
 		cmdArgs := []string{"pool", "update", "-d", "test-id-1", "--name", "name"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("successful pool update for AF3 with --include-deferred flag", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
+		mockClient.On("UpdatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
+		cmdArgs := []string{"pool", "update", "-d", "test-id-1", "--name", "name", "--include-deferred", "enable"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -640,16 +599,6 @@ func TestPoolCreate(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
-	t.Run("operations are blocked for Airflow 3 deployments", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"pool", "create", "-d", "test-id-1", "--name", "name"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
 	t.Run("successful pool create", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
@@ -657,6 +606,18 @@ func TestPoolCreate(t *testing.T) {
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 		mockClient.On("CreatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
 		cmdArgs := []string{"pool", "create", "-d", "test-id-1", "--name", "name"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("successful pool create for AF3 with --include-deferred flag", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
+		mockClient.On("CreatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
+		cmdArgs := []string{"pool", "create", "-d", "test-id-1", "--name", "name", "--include-deferred", "enable"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
