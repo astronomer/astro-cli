@@ -3146,7 +3146,7 @@ func (s *Suite) TestCheckRequiredFields() {
 		input.Deployment.Configuration.Executor = "test-executor"
 		err = checkRequiredFields(&input, "")
 		s.ErrorIs(err, errInvalidValue)
-		s.ErrorContains(err, "is not valid. It can either be CeleryExecutor, KubernetesExecutor, or AstroExecutor")
+		s.ErrorContains(err, "is not valid. It can be CeleryExecutor, KubernetesExecutor, or AstroExecutor")
 	})
 	s.Run("returns an error if alert email is invalid", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
