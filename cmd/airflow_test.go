@@ -203,7 +203,7 @@ func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
 		s.NoError(err)
 		dockerfileContents := string(b)
 		// Check for the exact image name we expect
-		s.Contains(dockerfileContents, "FROM astrocrpublic.azurecr.io/runtime:")
+		s.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:")
 	})
 }
 
@@ -222,7 +222,7 @@ func (s *AirflowSuite) Test_airflowInitNoDefaultImageTag() {
 		s.NoError(err)
 		dockerfileContents := string(b)
 		// Check for the exact image name we expect
-		s.Contains(dockerfileContents, "FROM astrocrpublic.azurecr.io/runtime:")
+		s.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:")
 	})
 }
 
