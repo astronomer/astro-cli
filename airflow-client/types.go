@@ -22,9 +22,10 @@ type Variable struct {
 
 // Pool represents the structure of an Airflow pool
 type Pool struct {
-	Description string `json:"description"`
-	Name        string `json:"name"`
-	Slots       int    `json:"slots"`
+	Description     string `json:"description"`
+	Name            string `json:"name"`
+	Slots           int    `json:"slots"`
+	IncludeDeferred bool   `json:"include_deferred"`
 }
 
 type Response struct {

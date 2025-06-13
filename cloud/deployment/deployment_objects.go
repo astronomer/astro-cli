@@ -214,7 +214,7 @@ func PoolList(airflowURL string, airflowAPIClient airflowclient.Client, out io.W
 	conTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "SLOTS"},
+		Header:         []string{"NAME", "SLOTS", "INCLUDE DEFERRED"},
 	}
 
 	// get pools
@@ -222,23 +222,23 @@ func PoolList(airflowURL string, airflowAPIClient airflowclient.Client, out io.W
 	if err != nil {
 		return err
 	}
-	// Print Connections
+	// Print pools
 	for i := range poolsResp.Pools {
 		pool := poolsResp.Pools[i]
-		conTab.AddRow([]string{pool.Name, fmt.Sprint(pool.Slots)}, false)
+		conTab.AddRow([]string{pool.Name, fmt.Sprint(pool.Slots), fmt.Sprint(pool.IncludeDeferred)}, false)
 	}
 
 	return conTab.Print(out)
 }
 
-func PoolCreate(airflowURL, name, description string, slots int, airflowAPIClient airflowclient.Client, out io.Writer) error {
+func PoolCreate(airflowURL, name, description string, slots int, includeDeferred bool, airflowAPIClient airflowclient.Client, out io.Writer) error {
 	pool := airflowclient.Pool{
-		Name:        name,
-		Slots:       slots,
-		Description: description,
+		Name:            name,
+		Slots:           slots,
+		Description:     description,
+		IncludeDeferred: includeDeferred,
 	}
 
-	// create connections
 	fmt.Printf("Creating pool %s\n", pool.Name)
 	err := airflowAPIClient.CreatePool(airflowURL, pool)
 	if err != nil {
@@ -247,14 +247,14 @@ func PoolCreate(airflowURL, name, description string, slots int, airflowAPIClien
 	return nil
 }
 
-func PoolUpdate(airflowURL, name, description string, slots int, airflowAPIClient airflowclient.Client, out io.Writer) error {
+func PoolUpdate(airflowURL, name, description string, slots int, includeDeferred bool, airflowAPIClient airflowclient.Client, out io.Writer) error {
 	pool := airflowclient.Pool{
-		Name:        name,
-		Slots:       slots,
-		Description: description,
+		Name:            name,
+		Slots:           slots,
+		Description:     description,
+		IncludeDeferred: includeDeferred,
 	}
 
-	// update connection
 	fmt.Printf("updating pool %s\n", pool.Name)
 	err := airflowAPIClient.UpdatePool(airflowURL, pool)
 	if err != nil {

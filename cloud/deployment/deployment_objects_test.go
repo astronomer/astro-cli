@@ -338,13 +338,15 @@ func (s *Suite) TestPoolCreate() {
 		poolName := "test_pool"
 		poolSlots := 5
 		poolDescription := "Test pool for unit testing"
+		poolIncludeDeferred := true
 		mockClient.On("CreatePool", testAirflowURL, airflowclient.Pool{
-			Name:        poolName,
-			Slots:       poolSlots,
-			Description: poolDescription,
+			Name:            poolName,
+			Slots:           poolSlots,
+			Description:     poolDescription,
+			IncludeDeferred: poolIncludeDeferred,
 		}).Return(nil).Once()
 
-		err := PoolCreate(testAirflowURL, poolName, poolDescription, poolSlots, mockClient, out)
+		err := PoolCreate(testAirflowURL, poolName, poolDescription, poolSlots, poolIncludeDeferred, mockClient, out)
 		s.NoError(err)
 	})
 
@@ -354,13 +356,15 @@ func (s *Suite) TestPoolCreate() {
 		poolName := "test_pool"
 		poolSlots := 5
 		poolDescription := "Test pool for unit testing"
+		poolIncludeDeferred := true
 		mockClient.On("CreatePool", testAirflowURL, airflowclient.Pool{
-			Name:        poolName,
-			Slots:       poolSlots,
-			Description: poolDescription,
+			Name:            poolName,
+			Slots:           poolSlots,
+			Description:     poolDescription,
+			IncludeDeferred: poolIncludeDeferred,
 		}).Return(errTest).Once()
 
-		err := PoolCreate(testAirflowURL, poolName, poolDescription, poolSlots, mockClient, out)
+		err := PoolCreate(testAirflowURL, poolName, poolDescription, poolSlots, poolIncludeDeferred, mockClient, out)
 		s.Error(err)
 		s.Equal("error", err.Error())
 	})
@@ -373,13 +377,15 @@ func (s *Suite) TestPoolUpdate() {
 		poolName := "test_pool"
 		poolSlots := 5
 		poolDescription := "Test pool for unit testing"
+		poolIncludeDeferred := true
 		mockClient.On("UpdatePool", testAirflowURL, airflowclient.Pool{
-			Name:        poolName,
-			Slots:       poolSlots,
-			Description: poolDescription,
+			Name:            poolName,
+			Slots:           poolSlots,
+			Description:     poolDescription,
+			IncludeDeferred: poolIncludeDeferred,
 		}).Return(nil).Once()
 
-		err := PoolUpdate(testAirflowURL, poolName, poolDescription, poolSlots, mockClient, out)
+		err := PoolUpdate(testAirflowURL, poolName, poolDescription, poolSlots, poolIncludeDeferred, mockClient, out)
 		s.NoError(err)
 	})
 
@@ -389,13 +395,15 @@ func (s *Suite) TestPoolUpdate() {
 		poolName := "test_pool"
 		poolSlots := 5
 		poolDescription := "Test pool for unit testing"
+		poolIncludeDeferred := true
 		mockClient.On("UpdatePool", testAirflowURL, airflowclient.Pool{
-			Name:        poolName,
-			Slots:       poolSlots,
-			Description: poolDescription,
+			Name:            poolName,
+			Slots:           poolSlots,
+			Description:     poolDescription,
+			IncludeDeferred: poolIncludeDeferred,
 		}).Return(errTest).Once()
 
-		err := PoolUpdate(testAirflowURL, poolName, poolDescription, poolSlots, mockClient, out)
+		err := PoolUpdate(testAirflowURL, poolName, poolDescription, poolSlots, poolIncludeDeferred, mockClient, out)
 		s.Error(err)
 		s.Equal("error", err.Error())
 	})

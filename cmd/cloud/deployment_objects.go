@@ -29,10 +29,11 @@ var (
 	varValue           string
 	key                string
 	slots              int
+	includeDeferred    string
 )
 
 const (
-	webserverURLField        = "metadata.webserver_url"
+	webserverURLField        = "metadata.airflow_api_url"
 	warningConnectionCopyCMD = "WARNING! The password and extra field are not copied over. You will need to manually add these values"
 	warningVariableCopyCMD   = "WARNING! Secret values are not copied over. You will need to manually add these values"
 )
@@ -279,6 +280,7 @@ func newDeploymentPoolCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&name, "name", "", "", "The Airflow pool value. Required")
 	cmd.Flags().IntVarP(&slots, "slots", "s", 0, "The Airflow pool key. Required")
 	cmd.Flags().StringVarP(&description, "description", "", "", "The Airflow pool description")
+	cmd.Flags().StringVarP(&includeDeferred, "include-deferred", "", "", "If set to 'enable', deferred tasks are considered when calculating open pool slots. Default is 'disable'. Possible values are disable/enable.")
 
 	return cmd
 }
@@ -299,6 +301,7 @@ func newDeploymentPoolUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&name, "name", "", "", "The pool value.  Required.")
 	cmd.Flags().IntVarP(&slots, "slots", "s", 0, "The pool slots.")
 	cmd.Flags().StringVarP(&description, "description", "", "", "The pool description.")
+	cmd.Flags().StringVarP(&includeDeferred, "include-deferred", "", "", "If set to 'enable', deferred tasks are considered when calculating open pool slots. Required for Airflow 3+ deployments. Possible values disable/enable.")
 
 	return cmd
 }
@@ -338,10 +341,6 @@ func deploymentConnectionList(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
-		return err
-	}
-
 	airflowURL, err := getAirflowURL(&requestedDeployment)
 	if err != nil {
 		return err
@@ -362,10 +361,6 @@ func deploymentConnectionCreate(cmd *cobra.Command, out io.Writer) error {
 	// get or select the deployment
 	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
 	if err != nil {
-		return err
-	}
-
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
 		return err
 	}
 
@@ -398,10 +393,6 @@ func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
 	// get or select the deployment
 	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
 	if err != nil {
-		return err
-	}
-
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
 		return err
 	}
 
@@ -484,10 +475,6 @@ func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
-		return err
-	}
-
 	airflowURL, err := getAirflowURL(&requestedDeployment)
 	if err != nil {
 		return err
@@ -508,10 +495,6 @@ func deploymentAirflowVariableCreate(cmd *cobra.Command, out io.Writer) error {
 	// get or select the deployment
 	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
 	if err != nil {
-		return err
-	}
-
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
 		return err
 	}
 
@@ -544,10 +527,6 @@ func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error { 
 	// get or select the deployment
 	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
 	if err != nil {
-		return err
-	}
-
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
 		return err
 	}
 
@@ -630,10 +609,6 @@ func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
-		return err
-	}
-
 	airflowURL, err := getAirflowURL(&requestedDeployment)
 	if err != nil {
 		return err
@@ -657,10 +632,6 @@ func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error { //nolint
 		return err
 	}
 
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
-		return err
-	}
-
 	airflowURL, err := getAirflowURL(&requestedDeployment)
 	if err != nil {
 		return err
@@ -671,7 +642,18 @@ func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error { //nolint
 		return errors.New("a pool name is needed to create a pool. Please use the '--name' flag to specify a name")
 	}
 
-	return deployment.PoolCreate(airflowURL, name, description, slots, airflowAPIClient, out)
+	// check includeDeferred
+	var includeDeferredValue bool
+	switch includeDeferred {
+	case enable:
+		includeDeferredValue = true
+	case disable, "":
+		includeDeferredValue = false
+	default:
+		return errors.New("Invalid --include-deferred value")
+	}
+
+	return deployment.PoolCreate(airflowURL, name, description, slots, includeDeferredValue, airflowAPIClient, out)
 }
 
 func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error { //nolint
@@ -689,21 +671,31 @@ func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error { //nolint
 		return err
 	}
 
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
-		return err
-	}
-
 	airflowURL, err := getAirflowURL(&requestedDeployment)
 	if err != nil {
 		return err
 	}
 
-	// check key
+	// check name
 	if name == "" {
 		return errors.New("a pool name is needed to update a pool. Please use the '--name' flag to specify a name")
 	}
 
-	return deployment.PoolUpdate(airflowURL, name, description, slots, airflowAPIClient, out)
+	// check includeDeferred
+	if airflowversions.AirflowMajorVersionForRuntimeVersion(requestedDeployment.RuntimeVersion) >= "3" && includeDeferred == "" {
+		return errors.New("an include deferred value is needed to update a pool. Please use the '--include-deferred' flag to specify a value")
+	}
+	var includeDeferredValue bool
+	switch includeDeferred {
+	case enable:
+		includeDeferredValue = true
+	case disable, "":
+		includeDeferredValue = false
+	default:
+		return errors.New("Invalid --include-deferred value")
+	}
+
+	return deployment.PoolUpdate(airflowURL, name, description, slots, includeDeferredValue, airflowAPIClient, out)
 }
 
 //nolint:dupl
