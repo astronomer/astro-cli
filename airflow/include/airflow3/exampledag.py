@@ -72,9 +72,7 @@ def example_astronauts():
                 {"craft": "Tiangong", "name": "Ye Guangfu"},
             ]
 
-        ti.xcom_push(
-            key="number_of_people_in_space", value=number_of_people_in_space
-        )
+        ti.xcom_push(key="number_of_people_in_space", value=number_of_people_in_space)
         return list_of_people_in_space
 
     @task
