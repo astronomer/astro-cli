@@ -643,7 +643,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 
 	// check if executor is valid
-	if !isValidExecutor(executor, airflowversions.IsAirflow3(runtimeVersion)) {
+	if !isValidExecutor(executor, runtimeVersion) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 
@@ -734,7 +734,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	deployment.CleanOutput = cleanOutput
 
 	// check if executor is valid
-	if len(executor) > 0 && !isValidExecutor(executor, airflowversions.IsAirflow3(runtimeVersion)) {
+	if !isValidExecutor(executor, runtimeVersion) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 	// request is to update from a file
@@ -865,14 +865,14 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, platformCoreClient)
 }
 
-func isValidExecutor(executor string, isAirflow3 bool) bool {
-	validExecutors := []string{
+func isValidExecutor(executor string, runtimeVersion string) bool {
+		validExecutors := []string{
 		deployment.KubeExecutor,
 		deployment.CeleryExecutor,
 		deployment.CELERY,
 		deployment.KUBERNETES,
 	}
-	if isAirflow3 {
+	if airflowversions.IsAirflow3(runtimeVersion) {
 		validExecutors = append(validExecutors, deployment.AstroExecutor, deployment.ASTRO)
 	}
 	for _, e := range validExecutors {
