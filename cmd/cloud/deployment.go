@@ -719,7 +719,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
-func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
+func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit,gocyclo
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -733,7 +733,9 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	deployment.CleanOutput = cleanOutput
 
 	// check if executor is valid
-	if len(executor) > 0 && !isValidExecutor(executor, runtimeVersion) {
+	// note and empty string for executor will be defaulted to whatever
+	// the current executor on the deployment is
+	if executor != "" && !isValidExecutor(executor, runtimeVersion) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 	// request is to update from a file

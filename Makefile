@@ -26,3 +26,6 @@ mock:
 
 codecov:
 	@eval $$(curl -s https://codecov.io/bash)
+
+fmt:
+	gofumpt -w .

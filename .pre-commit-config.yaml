@@ -3,11 +3,11 @@ exclude: '(vendor|.vscode)'  # regex
 repos:
   - repo: local
     hooks:
-      - id: go-fmt
-        name: go fmt
+      - id: gofumpt
+        name: gofumpt
         types: [go]
         language: system
-        entry: 'gofmt -w -s'
+        entry: 'make fmt'
   - repo: https://github.com/psf/black
     rev: 24.10.0
     hooks:
