@@ -1395,7 +1395,6 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 }
 
 func TestIsValidExecutor(t *testing.T) {
-
 	af3OnlyValidExecutors := []string{"astro", "astroexecutor", "ASTRO", deployment.AstroExecutor, deployment.ASTRO}
 	af2ValidExecutors := []string{"celery", "celeryexecutor", "kubernetes", "kubernetesexecutor", "CELERY", "KUBERNETES", deployment.CeleryExecutor, deployment.KubeExecutor, deployment.CELERY, deployment.KUBERNETES}
 	for _, executor := range af2ValidExecutors {
@@ -1416,7 +1415,7 @@ func TestIsValidExecutor(t *testing.T) {
 	})
 
 	// Airflow 3 introduces AstroExecutor as a valid executor
-	af3ValidExecutors := append(af3OnlyValidExecutors, af2ValidExecutors...)
+	af3ValidExecutors := append(af3OnlyValidExecutors, af2ValidExecutors...) //nolint:gocritic
 	for _, executor := range af3ValidExecutors {
 		t.Run(fmt.Sprintf("returns true if executor is %s isAirflow3=true", executor), func(t *testing.T) {
 			actual := isValidExecutor(executor, "3.0-1")
@@ -1429,6 +1428,7 @@ func TestIsValidExecutor(t *testing.T) {
 		assert.False(t, actual)
 	})
 }
+
 func TestIsValidCloudProvider(t *testing.T) {
 	t.Run("returns true if cloudProvider is gcp", func(t *testing.T) {
 		actual := isValidCloudProvider("gcp")

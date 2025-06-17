@@ -247,7 +247,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 					return errNoUseWorkerQueues
 				}
-				err = workerqueue.IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, defaultOptions, &astroMachine)
+				err = workerqueue.IsHostedWorkerQueueInputValid(requestedWorkerQueue, defaultOptions, &astroMachine)
 				if err != nil {
 					return err
 				}
@@ -268,7 +268,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				}
 				// set default values if none were specified
 				requestedHybridWorkerQueue := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, workerQueue, defaultOptions)
-				err = workerqueue.IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue, defaultOptions)
+				err = workerqueue.IsWorkerQueueInputValid(requestedHybridWorkerQueue, defaultOptions)
 				if err != nil {
 					return err
 				}

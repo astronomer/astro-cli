@@ -991,21 +991,23 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			case "":
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
+
+			// confirm with user if the executor is changing
+			if *currentDeployment.Executor != astroplatformcore.DeploymentExecutor(standardDeploymentRequest.Executor) {
+				confirmWithUser = true
+			}
+
 			switch standardDeploymentRequest.Executor {
-			case astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY:
-				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES {
-					confirmWithUser = true
-				}
+			case astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY, astroplatformcore.UpdateStandardDeploymentRequestExecutorASTRO:
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES && workerQueuesRequest == nil {
 					standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
 				} else {
 					standardDeploymentRequest.WorkerQueues = &workerQueuesRequest
 				}
 			case astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES:
-				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
-					confirmWithUser = true
-				}
+				//no-op
 			}
+
 			err := updateDeploymentRequest.FromUpdateStandardDeploymentRequest(standardDeploymentRequest)
 			if err != nil {
 				return err
@@ -1056,7 +1058,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
 			switch dedicatedDeploymentRequest.Executor {
-			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY:
+			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY, astroplatformcore.UpdateDedicatedDeploymentRequestExecutorASTRO:
 				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES {
 					confirmWithUser = true
 				}
@@ -1759,7 +1761,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 			dagDeploy = enable
 		}
 
-		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, []string{}, "", "", platformCoreClient, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, platformCoreClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}

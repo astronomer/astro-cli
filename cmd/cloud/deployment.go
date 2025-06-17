@@ -626,7 +626,6 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo
-
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -865,8 +864,8 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, platformCoreClient)
 }
 
-func isValidExecutor(executor string, runtimeVersion string) bool {
-		validExecutors := []string{
+func isValidExecutor(executor, runtimeVersion string) bool {
+	validExecutors := []string{
 		deployment.KubeExecutor,
 		deployment.CeleryExecutor,
 		deployment.CELERY,

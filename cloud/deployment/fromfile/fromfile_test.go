@@ -3970,7 +3970,6 @@ func (s *Suite) TestCheckEnvVars() {
 }
 
 func (s *Suite) TestIsValidExecutor() {
-
 	af3OnlyValidExecutors := []string{"astro", "astroexecutor", "ASTRO", deployment.AstroExecutor, deployment.ASTRO}
 	af2ValidExecutors := []string{"celery", "celeryexecutor", "kubernetes", "kubernetesexecutor", "CELERY", "KUBERNETES", deployment.CeleryExecutor, deployment.KubeExecutor, deployment.CELERY, deployment.KUBERNETES}
 	for _, executor := range af2ValidExecutors {
@@ -3991,7 +3990,7 @@ func (s *Suite) TestIsValidExecutor() {
 	})
 
 	// Airflow 3 introduces AstroExecutor as a valid executor
-	af3ValidExecutors := append(af3OnlyValidExecutors, af2ValidExecutors...)
+	af3ValidExecutors := append(af3OnlyValidExecutors, af2ValidExecutors...) //nolint:gocritic
 	for _, executor := range af3ValidExecutors {
 		s.Run(fmt.Sprintf("returns true if executor is %s isAirflow3=true", executor), func() {
 			actual := isValidExecutor(executor, true)
