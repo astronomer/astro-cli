@@ -1005,7 +1005,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 					standardDeploymentRequest.WorkerQueues = &workerQueuesRequest
 				}
 			case astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES:
-				//no-op
+				// no-op
 			}
 
 			err := updateDeploymentRequest.FromUpdateStandardDeploymentRequest(standardDeploymentRequest)
