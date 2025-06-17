@@ -734,7 +734,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 
 	// check if executor is valid
 	if len(executor) > 0 && !isValidExecutor(executor, runtimeVersion) {
-			return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
+		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 	// request is to update from a file
 	if inputFile != "" {
