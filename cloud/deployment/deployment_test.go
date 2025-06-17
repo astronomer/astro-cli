@@ -997,7 +997,6 @@ func (s *Suite) TestCreate() {
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
-
 	s.Run("success with Celery Executor and different schedulers", func() {
 		// Set up mock responses and expectations
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(4)
