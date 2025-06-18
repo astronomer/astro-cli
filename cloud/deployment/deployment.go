@@ -503,7 +503,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			},
 			Type: astroplatformcore.CreateHybridDeploymentRequestTypeHYBRID,
 		}
-		// TODO when we add remote execution we'll need to omit worker queues if remote execution is enabled
+		// TODO (https://github.com/astronomer/astro-cli/issues/1853) when we add remote execution we'll need to omit worker queues if remote execution is enabled
 		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 			hybridDeploymentRequest.WorkerQueues = &defautWorkerQueue
 		} else {
