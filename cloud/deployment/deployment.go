@@ -503,7 +503,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			},
 			Type: astroplatformcore.CreateHybridDeploymentRequestTypeHYBRID,
 		}
-		// TODO (https://github.com/astronomer/astro-cli/issues/1853) when we add remote execution we'll need to omit worker queues if remote execution is enabled
+		// TODO when we add remote execution we'll need to omit worker queues if remote execution is enabled
 		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
 			hybridDeploymentRequest.WorkerQueues = &defautWorkerQueue
 		} else {
@@ -997,22 +997,11 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				confirmWithUser = true
 			}
 
-			switch standardDeploymentRequest.Executor {
-			case astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY:
-				standardDeploymentRequest.WorkerQueues = fillWorkerQueues(
-					astroplatformcore.DeploymentExecutor(standardDeploymentRequest.Executor),
-					standardDeploymentRequest.WorkerQueues,
-					&defaultWorkerQueue,
-				)
-			case astroplatformcore.UpdateStandardDeploymentRequestExecutorASTRO:
-				standardDeploymentRequest.WorkerQueues = fillWorkerQueues(
-					astroplatformcore.DeploymentExecutor(standardDeploymentRequest.Executor),
-					standardDeploymentRequest.WorkerQueues,
-					&defaultWorkerQueue,
-				)
-			case astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES:
-				standardDeploymentRequest.WorkerQueues = nil
-			}
+			standardDeploymentRequest.WorkerQueues = updateWorkerQueuesForExecutor(
+				astroplatformcore.DeploymentExecutor(standardDeploymentRequest.Executor),
+				standardDeploymentRequest.WorkerQueues,
+				&defaultWorkerQueue,
+			)
 
 			err := updateDeploymentRequest.FromUpdateStandardDeploymentRequest(standardDeploymentRequest)
 			if err != nil {
@@ -1067,12 +1056,17 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			if *currentDeployment.Executor != astroplatformcore.DeploymentExecutor(dedicatedDeploymentRequest.Executor) {
 				confirmWithUser = true
 			}
+			dedicatedDeploymentRequest.WorkerQueues = updateWorkerQueuesForExecutor(
+				astroplatformcore.DeploymentExecutor(dedicatedDeploymentRequest.Executor),
+				&workerQueuesRequest,
+				&defaultWorkerQueue,
+			)
 			if dedicatedDeploymentRequest.Executor == astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES {
 				// For KUBERNETES executor, WorkerQueues should be nil
 				dedicatedDeploymentRequest.WorkerQueues = nil
 			} else {
-				dedicatedDeploymentRequest.WorkerQueues = fillWorkerQueues(
-					astroplatformcore.DeploymentExecutor(dedicatedDeploymentRequest.Executor),
+				dedicatedDeploymentRequest.WorkerQueues = updateWorkerQueuesForExecutor(
+					*currentDeployment.Executor,
 					&workerQueuesRequest,
 					&defaultWorkerQueue,
 				)
@@ -1236,11 +1230,21 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	return nil
 }
 
-func fillWorkerQueues(executor astroplatformcore.DeploymentExecutor, workerQueuesRequest, defautWorkerQueue *[]astroplatformcore.WorkerQueueRequest) *[]astroplatformcore.WorkerQueueRequest {
-	if executor == astroplatformcore.DeploymentExecutorKUBERNETES && workerQueuesRequest == nil {
-		return defautWorkerQueue
-	} else {
-		return workerQueuesRequest
+func updateWorkerQueuesForExecutor(newExecutor astroplatformcore.DeploymentExecutor, workerQueuesRequest, defautWorkerQueue *[]astroplatformcore.WorkerQueueRequest) *[]astroplatformcore.WorkerQueueRequest {
+	// this function is called when executor is changing.
+	switch newExecutor {
+	case astroplatformcore.DeploymentExecutorKUBERNETES:
+		return nil
+	case astroplatformcore.DeploymentExecutorCELERY:
+		fallthrough
+	case astroplatformcore.DeploymentExecutorASTRO:
+		fallthrough
+	default:
+		if workerQueuesRequest == nil {
+			return defautWorkerQueue
+		} else {
+			return workerQueuesRequest
+		}
 	}
 }
 
