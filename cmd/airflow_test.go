@@ -12,7 +12,6 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
-	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	coreMocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/astronomer/astro-cli/config"
@@ -42,11 +41,6 @@ func (s *AirflowSuite) SetupTest() {
 	}
 	s.tempDir = dir
 	config.WorkingPath = s.tempDir
-
-	// Mock getDefaultImageTag to return a known image tag
-	getDefaultImageTag = func(client *airflowversions.Client, airflowVersion string, excludeAirflow3 bool) (string, error) {
-		return "4.2.4", nil
-	}
 }
 
 func (s *AirflowSuite) SetupSubTest() {
@@ -57,25 +51,16 @@ func (s *AirflowSuite) SetupSubTest() {
 	}
 	s.tempDir = dir
 	config.WorkingPath = s.tempDir
-
-	// Mock getDefaultImageTag to return a known image tag
-	getDefaultImageTag = func(client *airflowversions.Client, airflowVersion string, excludeAirflow3 bool) (string, error) {
-		return "4.2.4", nil
-	}
 }
 
 func (s *AirflowSuite) TearDownTest() {
 	// Clean up init files after test
 	s.cleanUpInitFiles()
-	// Restore original getDefaultImageTag
-	getDefaultImageTag = airflowversions.GetDefaultImageTag
 }
 
 func (s *AirflowSuite) TearDownSubTest() {
 	// Clean up init files after test
 	s.cleanUpInitFiles()
-	// Restore original getDefaultImageTag
-	getDefaultImageTag = airflowversions.GetDefaultImageTag
 }
 
 var (
@@ -203,7 +188,7 @@ func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
 		s.NoError(err)
 		dockerfileContents := string(b)
 		// Check for the exact image name we expect
-		s.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:")
+		s.Contains(dockerfileContents, "FROM astrocrpublic.azurecr.io/runtime:")
 	})
 }
 
@@ -222,7 +207,7 @@ func (s *AirflowSuite) Test_airflowInitNoDefaultImageTag() {
 		s.NoError(err)
 		dockerfileContents := string(b)
 		// Check for the exact image name we expect
-		s.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:")
+		s.Contains(dockerfileContents, "FROM astrocrpublic.azurecr.io/runtime:")
 	})
 }
 
@@ -329,7 +314,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 
 		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
 		dockerfileContents := string(b)
-		s.True(strings.Contains(dockerfileContents, "astrocrpublic.azurecr.io/runtime:") || strings.Contains(dockerfileContents, "quay.io/astronomer/astro-runtime:"))
+		s.True(strings.Contains(dockerfileContents, "astrocrpublic.azurecr.io/runtime:"))
 	})
 
 	s.Run("invalid project name", func() {
