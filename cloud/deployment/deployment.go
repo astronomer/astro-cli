@@ -1061,16 +1061,6 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				&workerQueuesRequest,
 				&defaultWorkerQueue,
 			)
-			if dedicatedDeploymentRequest.Executor == astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES {
-				// For KUBERNETES executor, WorkerQueues should be nil
-				dedicatedDeploymentRequest.WorkerQueues = nil
-			} else {
-				dedicatedDeploymentRequest.WorkerQueues = updateWorkerQueuesForExecutor(
-					*currentDeployment.Executor,
-					&workerQueuesRequest,
-					&defaultWorkerQueue,
-				)
-			}
 			err := updateDeploymentRequest.FromUpdateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
 			if err != nil {
 				return err
