@@ -764,7 +764,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astroplatformcore.WorkerQueueRequest, hybridQueueList []astroplatformcore.HybridWorkerQueueRequest, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, force bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error { //nolint
+func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astroplatformcore.WorkerQueueRequest, hybridQueueList []astroplatformcore.HybridWorkerQueueRequest, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, force bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error {
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, coreClient)
@@ -869,17 +869,17 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		var workerQueuesRequest []astroplatformcore.WorkerQueueRequest
 		if currentDeployment.WorkerQueues != nil {
 			workerQueues := *currentDeployment.WorkerQueues
-			for i := range workerQueues {
-				var workerQueueRequest astroplatformcore.WorkerQueueRequest
-				workerQueueRequest.AstroMachine = astroplatformcore.WorkerQueueRequestAstroMachine(*workerQueues[i].AstroMachine)
-				workerQueueRequest.Id = &workerQueues[i].Id
-				workerQueueRequest.IsDefault = workerQueues[i].IsDefault
-				workerQueueRequest.MaxWorkerCount = workerQueues[i].MaxWorkerCount
-				workerQueueRequest.MinWorkerCount = workerQueues[i].MinWorkerCount
-				workerQueueRequest.Name = workerQueues[i].Name
-				workerQueueRequest.WorkerConcurrency = workerQueues[i].WorkerConcurrency
-				workerQueuesRequest = append(workerQueuesRequest, workerQueueRequest)
-			}
+			workerQueuesRequest = ConvertWorkerQueues(workerQueues, func(q astroplatformcore.WorkerQueue) astroplatformcore.WorkerQueueRequest {
+				return astroplatformcore.WorkerQueueRequest{
+					AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(*q.AstroMachine),
+					Id:                &q.Id,
+					IsDefault:         q.IsDefault,
+					MaxWorkerCount:    q.MaxWorkerCount,
+					MinWorkerCount:    q.MinWorkerCount,
+					Name:              q.Name,
+					WorkerConcurrency: q.WorkerConcurrency,
+				}
+			})
 		}
 
 		var workerConcurrency int
@@ -1001,17 +1001,17 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			case astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY:
 				standardDeploymentRequest.WorkerQueues = fillWorkerQueues(
 					astroplatformcore.DeploymentExecutor(standardDeploymentRequest.Executor),
-					*standardDeploymentRequest.WorkerQueues,
-					defaultWorkerQueue,
+					standardDeploymentRequest.WorkerQueues,
+					&defaultWorkerQueue,
 				)
 			case astroplatformcore.UpdateStandardDeploymentRequestExecutorASTRO:
 				standardDeploymentRequest.WorkerQueues = fillWorkerQueues(
 					astroplatformcore.DeploymentExecutor(standardDeploymentRequest.Executor),
-					*standardDeploymentRequest.WorkerQueues,
-					defaultWorkerQueue,
+					standardDeploymentRequest.WorkerQueues,
+					&defaultWorkerQueue,
 				)
 			case astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES:
-				// no-op
+				standardDeploymentRequest.WorkerQueues = nil
 			}
 
 			err := updateDeploymentRequest.FromUpdateStandardDeploymentRequest(standardDeploymentRequest)
@@ -1067,13 +1067,15 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			if *currentDeployment.Executor != astroplatformcore.DeploymentExecutor(dedicatedDeploymentRequest.Executor) {
 				confirmWithUser = true
 			}
-			switch dedicatedDeploymentRequest.Executor {
-			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY:
-				dedicatedDeploymentRequest.WorkerQueues = fillWorkerQueues(astroplatformcore.DeploymentExecutor(dedicatedDeploymentRequest.Executor), workerQueuesRequest, defaultWorkerQueue)
-			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorASTRO:
-				dedicatedDeploymentRequest.WorkerQueues = fillWorkerQueues(astroplatformcore.DeploymentExecutor(dedicatedDeploymentRequest.Executor), workerQueuesRequest, defaultWorkerQueue)
-			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES:
-				// no-op
+			if dedicatedDeploymentRequest.Executor == astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES {
+				// For KUBERNETES executor, WorkerQueues should be nil
+				dedicatedDeploymentRequest.WorkerQueues = nil
+			} else {
+				dedicatedDeploymentRequest.WorkerQueues = fillWorkerQueues(
+					astroplatformcore.DeploymentExecutor(dedicatedDeploymentRequest.Executor),
+					&workerQueuesRequest,
+					&defaultWorkerQueue,
+				)
 			}
 			err := updateDeploymentRequest.FromUpdateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
 			if err != nil {
@@ -1085,17 +1087,17 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		var workerQueuesRequest []astroplatformcore.HybridWorkerQueueRequest
 		if currentDeployment.WorkerQueues != nil {
 			workerQueues := *currentDeployment.WorkerQueues
-			for i := range workerQueues {
-				var workerQueueRequest astroplatformcore.HybridWorkerQueueRequest
-				workerQueueRequest.Id = &workerQueues[i].Id
-				workerQueueRequest.IsDefault = workerQueues[i].IsDefault
-				workerQueueRequest.MaxWorkerCount = workerQueues[i].MaxWorkerCount
-				workerQueueRequest.MinWorkerCount = workerQueues[i].MinWorkerCount
-				workerQueueRequest.Name = workerQueues[i].Name
-				workerQueueRequest.WorkerConcurrency = workerQueues[i].WorkerConcurrency
-				workerQueueRequest.NodePoolId = *workerQueues[i].NodePoolId
-				workerQueuesRequest = append(workerQueuesRequest, workerQueueRequest)
-			}
+			workerQueuesRequest = ConvertWorkerQueues(workerQueues, func(q astroplatformcore.WorkerQueue) astroplatformcore.HybridWorkerQueueRequest {
+				return astroplatformcore.HybridWorkerQueueRequest{
+					Id:                &q.Id,
+					IsDefault:         q.IsDefault,
+					MaxWorkerCount:    q.MaxWorkerCount,
+					MinWorkerCount:    q.MinWorkerCount,
+					Name:              q.Name,
+					WorkerConcurrency: q.WorkerConcurrency,
+					NodePoolId:        *q.NodePoolId,
+				}
+			})
 		}
 
 		if len(hybridQueueList) > 0 {
@@ -1156,6 +1158,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			confirmWithUser = true
 		}
 		if hybridDeploymentRequest.Executor == astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES {
+			// For KUBERNETES executor, WorkerQueues should be nil
+			hybridDeploymentRequest.WorkerQueues = nil
 			if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
 				confirmWithUser = true
 				hybridDeploymentRequest.TaskPodNodePoolId = &nodePoolID
@@ -1232,11 +1236,11 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	return nil
 }
 
-func fillWorkerQueues(executor astroplatformcore.DeploymentExecutor, workerQueuesRequest, defautWorkerQueue []astroplatformcore.WorkerQueueRequest) *[]astroplatformcore.WorkerQueueRequest {
+func fillWorkerQueues(executor astroplatformcore.DeploymentExecutor, workerQueuesRequest, defautWorkerQueue *[]astroplatformcore.WorkerQueueRequest) *[]astroplatformcore.WorkerQueueRequest {
 	if executor == astroplatformcore.DeploymentExecutorKUBERNETES && workerQueuesRequest == nil {
-		return &defautWorkerQueue
+		return defautWorkerQueue
 	} else {
-		return &workerQueuesRequest
+		return workerQueuesRequest
 	}
 }
 
@@ -1853,4 +1857,31 @@ func GetCoreCloudProvider(cloudProvider string) astrocore.GetDeploymentOptionsPa
 
 func isDevelopmentDeployment(deployment astroplatformcore.Deployment) bool { //nolint:gocritic
 	return deployment.IsDevelopmentMode != nil && *deployment.IsDevelopmentMode
+}
+
+// ConvertWorkerQueues is a generic function to convert a slice of WorkerQueue to a slice of T (WorkerQueueRequest or HybridWorkerQueueRequest)
+func ConvertWorkerQueues[T any](workerQueues []astroplatformcore.WorkerQueue, convertFn func(astroplatformcore.WorkerQueue) T) []T {
+	result := make([]T, 0, len(workerQueues))
+	for i := range workerQueues {
+		result = append(result, convertFn(workerQueues[i]))
+	}
+	return result
+}
+
+func IsValidExecutor(executor, runtimeVersion string) bool {
+	validExecutors := []string{
+		KubeExecutor,
+		CeleryExecutor,
+		CELERY,
+		KUBERNETES,
+	}
+	if airflowversions.IsAirflow3(runtimeVersion) {
+		validExecutors = append(validExecutors, AstroExecutor, ASTRO)
+	}
+	for _, e := range validExecutors {
+		if strings.EqualFold(executor, e) {
+			return true
+		}
+	}
+	return false
 }

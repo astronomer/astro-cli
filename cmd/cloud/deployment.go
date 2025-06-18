@@ -642,7 +642,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 
 	// check if executor is valid
-	if !isValidExecutor(executor, runtimeVersion) {
+	if !deployment.IsValidExecutor(executor, runtimeVersion) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 
@@ -719,7 +719,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
-func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit,gocyclo
+func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -733,9 +733,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	deployment.CleanOutput = cleanOutput
 
 	// check if executor is valid
-	// note and empty string for executor will be defaulted to whatever
-	// the current executor on the deployment is
-	if executor != "" && !isValidExecutor(executor, runtimeVersion) {
+	if executor != "" && !deployment.IsValidExecutor(executor, runtimeVersion) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 	// request is to update from a file
@@ -864,24 +862,6 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 	}
 
 	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, platformCoreClient)
-}
-
-func isValidExecutor(executor, runtimeVersion string) bool {
-	validExecutors := []string{
-		deployment.KubeExecutor,
-		deployment.CeleryExecutor,
-		deployment.CELERY,
-		deployment.KUBERNETES,
-	}
-	if airflowversions.IsAirflow3(runtimeVersion) {
-		validExecutors = append(validExecutors, deployment.AstroExecutor, deployment.ASTRO)
-	}
-	for _, e := range validExecutors {
-		if strings.EqualFold(executor, e) {
-			return true
-		}
-	}
-	return false
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.

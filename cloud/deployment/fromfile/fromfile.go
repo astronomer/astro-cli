@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -716,11 +715,6 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 	if deploymentFromFile.Deployment.Configuration.Executor == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.executor")
 	}
-	// check if deployment is using Airflow 3 by validating runtime version
-	isAirflow3 := airflowversions.IsAirflow3(deploymentFromFile.Deployment.Configuration.RunTimeVersion)
-	if !isValidExecutor(deploymentFromFile.Deployment.Configuration.Executor, isAirflow3) {
-		return fmt.Errorf("executor %s %w. It can be CeleryExecutor, KubernetesExecutor, or AstroExecutor", deploymentFromFile.Deployment.Configuration.Executor, errInvalidValue)
-	}
 	// if alert emails are requested
 	if hasAlertEmails(deploymentFromFile) {
 		err := checkAlertEmails(deploymentFromFile)
@@ -755,6 +749,9 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 			missingField := "default queue is missing under deployment.worker_queues"
 			return fmt.Errorf("%w: %s", errRequiredField, missingField)
 		}
+	}
+	if !deployment.IsValidExecutor(deploymentFromFile.Deployment.Configuration.Executor, deploymentFromFile.Deployment.Configuration.RunTimeVersion) {
+		return fmt.Errorf("%s is not valid. It can be CeleryExecutor, KubernetesExecutor, or AstroExecutor: %w", deploymentFromFile.Deployment.Configuration.Executor, errInvalidValue)
 	}
 	return nil
 }
@@ -996,25 +993,6 @@ func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment) (envV
 		envVars = append(envVars, envVar)
 	}
 	return envVars
-}
-
-// isValidExecutor returns true for valid executor values and false if not.
-func isValidExecutor(executor string, isAirflow3 bool) bool {
-	validExecutors := []string{ // Airflow 2 executors
-		deployment.KubeExecutor,
-		deployment.CeleryExecutor,
-		deployment.CELERY,
-		deployment.KUBERNETES,
-	}
-	if isAirflow3 {
-		validExecutors = append(validExecutors, deployment.AstroExecutor, deployment.ASTRO)
-	}
-	for _, e := range validExecutors {
-		if strings.EqualFold(executor, e) {
-			return true
-		}
-	}
-	return false
 }
 
 func transformDeploymentType(deploymentType string) astroplatformcore.DeploymentType {

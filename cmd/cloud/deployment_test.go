@@ -1399,18 +1399,18 @@ func TestIsValidExecutor(t *testing.T) {
 	af2ValidExecutors := []string{"celery", "celeryexecutor", "kubernetes", "kubernetesexecutor", "CELERY", "KUBERNETES", deployment.CeleryExecutor, deployment.KubeExecutor, deployment.CELERY, deployment.KUBERNETES}
 	for _, executor := range af2ValidExecutors {
 		t.Run(fmt.Sprintf("returns true if executor is %s isAirflow3=false", executor), func(t *testing.T) {
-			actual := isValidExecutor(executor, "13.0.0")
+			actual := deployment.IsValidExecutor(executor, "13.0.0")
 			assert.True(t, actual)
 		})
 	}
 	for _, executor := range af3OnlyValidExecutors {
 		t.Run(fmt.Sprintf("returns false if executor is %s isAirflow3=false", executor), func(t *testing.T) {
-			actual := isValidExecutor(executor, "13.0.0")
+			actual := deployment.IsValidExecutor(executor, "13.0.0")
 			assert.False(t, actual)
 		})
 	}
 	t.Run("returns false if executor is invalid isAirflow3=false", func(t *testing.T) {
-		actual := isValidExecutor("invalid-executor", "13.0.0")
+		actual := deployment.IsValidExecutor("invalid-executor", "13.0.0")
 		assert.False(t, actual)
 	})
 
@@ -1418,13 +1418,13 @@ func TestIsValidExecutor(t *testing.T) {
 	af3ValidExecutors := append(af3OnlyValidExecutors, af2ValidExecutors...) //nolint:gocritic
 	for _, executor := range af3ValidExecutors {
 		t.Run(fmt.Sprintf("returns true if executor is %s isAirflow3=true", executor), func(t *testing.T) {
-			actual := isValidExecutor(executor, "3.0-1")
+			actual := deployment.IsValidExecutor(executor, "3.0-1")
 			assert.True(t, actual)
 		})
 	}
 
 	t.Run("returns false if executor is invalid isAirflow3=true", func(t *testing.T) {
-		actual := isValidExecutor("invalid-executor", "3.0-1")
+		actual := deployment.IsValidExecutor("invalid-executor", "3.0-1")
 		assert.False(t, actual)
 	})
 }
