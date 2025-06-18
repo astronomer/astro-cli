@@ -888,7 +888,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				workerConcurrency = int(configOption.WorkerMachines[i].Concurrency.Default)
 			}
 		}
-		defautWorkerQueue := []astroplatformcore.WorkerQueueRequest{{
+		defaultWorkerQueue := []astroplatformcore.WorkerQueueRequest{{
 			AstroMachine:      astroplatformcore.WorkerQueueRequestAstroMachine(configOption.DefaultValues.WorkerMachineName),
 			IsDefault:         true,
 			MaxWorkerCount:    int(configOption.WorkerQueues.MaxWorkers.Default),
@@ -998,12 +998,18 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			}
 
 			switch standardDeploymentRequest.Executor {
-			case astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY, astroplatformcore.UpdateStandardDeploymentRequestExecutorASTRO:
-				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES && workerQueuesRequest == nil {
-					standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
-				} else {
-					standardDeploymentRequest.WorkerQueues = &workerQueuesRequest
-				}
+			case astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY:
+				standardDeploymentRequest.WorkerQueues = fillWorkerQueues(
+					astroplatformcore.DeploymentExecutor(standardDeploymentRequest.Executor),
+					*standardDeploymentRequest.WorkerQueues,
+					defaultWorkerQueue,
+				)
+			case astroplatformcore.UpdateStandardDeploymentRequestExecutorASTRO:
+				standardDeploymentRequest.WorkerQueues = fillWorkerQueues(
+					astroplatformcore.DeploymentExecutor(standardDeploymentRequest.Executor),
+					*standardDeploymentRequest.WorkerQueues,
+					defaultWorkerQueue,
+				)
 			case astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES:
 				// no-op
 			}
@@ -1057,21 +1063,17 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize(*currentDeployment.SchedulerSize)
 			}
+			// confirm with user if the executor is changing
+			if *currentDeployment.Executor != astroplatformcore.DeploymentExecutor(dedicatedDeploymentRequest.Executor) {
+				confirmWithUser = true
+			}
 			switch dedicatedDeploymentRequest.Executor {
-			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY, astroplatformcore.UpdateDedicatedDeploymentRequestExecutorASTRO:
-				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES {
-					confirmWithUser = true
-				}
-				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorKUBERNETES && workerQueuesRequest == nil {
-					dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
-				} else {
-					dedicatedDeploymentRequest.WorkerQueues = &workerQueuesRequest
-				}
+			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY:
+				dedicatedDeploymentRequest.WorkerQueues = fillWorkerQueues(astroplatformcore.DeploymentExecutor(dedicatedDeploymentRequest.Executor), workerQueuesRequest, defaultWorkerQueue)
+			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorASTRO:
+				dedicatedDeploymentRequest.WorkerQueues = fillWorkerQueues(astroplatformcore.DeploymentExecutor(dedicatedDeploymentRequest.Executor), workerQueuesRequest, defaultWorkerQueue)
 			case astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES:
-				if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
-					confirmWithUser = true
-					dedicatedDeploymentRequest.WorkerQueues = nil
-				}
+				// no-op
 			}
 			err := updateDeploymentRequest.FromUpdateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
 			if err != nil {
@@ -1149,6 +1151,10 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			return err
 		}
 		nodePoolID := getDefaultNodePoolID(cluster.NodePools)
+		// confirm with user if the executor is changing
+		if *currentDeployment.Executor != astroplatformcore.DeploymentExecutor(hybridDeploymentRequest.Executor) {
+			confirmWithUser = true
+		}
 		if hybridDeploymentRequest.Executor == astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES {
 			if *currentDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
 				confirmWithUser = true
@@ -1224,6 +1230,14 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		tabDeployment.Print(os.Stdout)
 	}
 	return nil
+}
+
+func fillWorkerQueues(executor astroplatformcore.DeploymentExecutor, workerQueuesRequest, defautWorkerQueue []astroplatformcore.WorkerQueueRequest) *[]astroplatformcore.WorkerQueueRequest {
+	if executor == astroplatformcore.DeploymentExecutorKUBERNETES && workerQueuesRequest == nil {
+		return &defautWorkerQueue
+	} else {
+		return &workerQueuesRequest
+	}
 }
 
 func Delete(deploymentID, ws, deploymentName string, forceDelete bool, platformCoreClient astroplatformcore.CoreClient) error {

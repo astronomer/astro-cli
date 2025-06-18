@@ -1239,10 +1239,6 @@ func (s *Suite) TestCreate() {
 		defer testUtil.MockUserInput(s.T(), "test-name")()
 		defer testUtil.MockUserInput(s.T(), "y")()
 
-		// setup wait for test
-		sleepTime = 1
-		tickNum = 2
-
 		// Call the Create function with Dedicated Deployment and wait for status
 		err := Create("test-name", ws, "test-desc", csID, "3.0-1", dagDeploy, AstroExecutor, "", "", "", "", "", "", "", "", "", "", "", astroplatformcore.DeploymentTypeDEDICATED, 0, 0, mockPlatformCoreClient, mockCoreClient, true)
 		s.NoError(err)
