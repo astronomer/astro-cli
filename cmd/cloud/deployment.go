@@ -656,10 +656,10 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		return errors.New("Invalid --type value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --cicd-enforcment value")
+		return errors.New("Invalid --cicd-enforcement value")
 	}
 	if deploymentCreateEnforceCD && cicdEnforcement == disable {
-		return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
+		return errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
 	}
 	if organization.IsOrgHosted() && clusterID != "" && (deploymentType == standard || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared) {
 		return errors.New("flag --cluster-id cannot be used to create a standard deployment. If you want to create a dedicated deployment, use --type dedicated along with --cluster-id")
@@ -756,20 +756,12 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		return errors.New("Invalid --development-mode value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --cicd-enforcment value")
+		return errors.New("Invalid --cicd-enforcement value")
 	}
 	if cmd.Flags().Changed("enforce-cicd") {
-		if deploymentUpdateEnforceCD && cicdEnforcement == disable {
-			return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
-		}
-		if !deploymentUpdateEnforceCD && cicdEnforcement == enable {
-			return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
-		}
-		if deploymentUpdateEnforceCD {
-			cicdEnforcement = enable
-		}
-		if !deploymentUpdateEnforceCD {
-			cicdEnforcement = disable
+		shouldReturn, err1 := validateCICD()
+		if shouldReturn {
+			return err1
 		}
 	}
 
@@ -779,6 +771,22 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	}
 
 	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
+}
+
+func validateCICD() (bool, error) {
+	if deploymentUpdateEnforceCD && cicdEnforcement == disable {
+		return true, errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
+	}
+	if !deploymentUpdateEnforceCD && cicdEnforcement == enable {
+		return true, errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
+	}
+	if deploymentUpdateEnforceCD {
+		cicdEnforcement = enable
+	}
+	if !deploymentUpdateEnforceCD {
+		cicdEnforcement = disable
+	}
+	return false, nil
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {

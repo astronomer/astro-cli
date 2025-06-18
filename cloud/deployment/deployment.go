@@ -764,7 +764,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astroplatformcore.WorkerQueueRequest, hybridQueueList []astroplatformcore.HybridWorkerQueueRequest, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, force bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error {
+func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astroplatformcore.WorkerQueueRequest, hybridQueueList []astroplatformcore.HybridWorkerQueueRequest, newEnvironmentVariables []astroplatformcore.DeploymentEnvironmentVariableRequest, force bool, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) error { //nolint
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, coreClient)
@@ -1226,9 +1226,13 @@ func updateWorkerQueuesForExecutor(newExecutor astroplatformcore.DeploymentExecu
 	case astroplatformcore.DeploymentExecutorKUBERNETES:
 		return nil
 	case astroplatformcore.DeploymentExecutorCELERY:
-		fallthrough
+		// placeholder for celery specific logic
+		// https://github.com/astronomer/astro-cli/pull/1854#discussion_r2153379104
+		fallthrough //nolint:gocritic
 	case astroplatformcore.DeploymentExecutorASTRO:
-		fallthrough
+		// placeholder for astro specific logic
+		// https://github.com/astronomer/astro-cli/pull/1854#discussion_r2153379104
+		fallthrough //nolint:gocritic
 	default:
 		if workerQueuesRequest == nil {
 			return defautWorkerQueue
