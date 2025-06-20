@@ -759,8 +759,8 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		return errors.New("Invalid --cicd-enforcement value")
 	}
 	if cmd.Flags().Changed("enforce-cicd") {
-		shouldReturn, err1 := validateCICD()
-		if shouldReturn {
+		err1 := validateCICD()
+		if err1 != nil {
 			return err1
 		}
 	}
