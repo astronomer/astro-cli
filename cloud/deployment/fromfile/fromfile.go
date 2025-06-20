@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
