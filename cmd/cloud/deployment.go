@@ -385,7 +385,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the Deployment")
-	cmd.Flags().StringVarP(&executor, "executor", "e", "CeleryExecutor", "The executor to use for the Deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
+	cmd.Flags().StringVarP(&executor, "executor", "e", "CeleryExecutor", "The executor to use for the Deployment. Possible values can be CeleryExecutor, KubernetesExecutor, or Astro Executor.")
 	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable")
 	cmd.Flags().BoolVarP(&deploymentCreateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. This flag has been deprecated for the --cicd-enforcement flag.")
 	err := cmd.Flags().MarkDeprecated("enforce-cicd", "use --cicd-enforcement instead")
@@ -433,7 +433,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&label, "name", "n", "", "Update the Deployment's name. If the new name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "Workspace the Deployment is located in")
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
+	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the deployment. Possible values can be CeleryExecutor, KubernetesExecutor or Astro Executor.")
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the deployment to update. File can be in either JSON or YAML format.")
 	cmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "Force update: Don't prompt a user before Deployment update")
 	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable.")
@@ -638,11 +638,17 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 
 	// set default executor if none was specified
 	if executor == "" {
-		executor = deployment.CeleryExecutor
+		if airflowversions.IsAirflow3(runtimeVersion) {
+			executor = deployment.AstroExecutor
+		} else {
+			executor = deployment.CeleryExecutor
+		}
 	}
+
 	// check if executor is valid
-	if !isValidExecutor(executor) {
-		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
+	fmt.Println(deploymentType)
+	if !deployment.IsValidExecutor(executor, runtimeVersion, deploymentType) {
+		return fmt.Errorf("%s is %w for runtime version %s deployment type %s", executor, errInvalidExecutor, runtimeVersion, deploymentType)
 	}
 
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
@@ -655,10 +661,10 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		return errors.New("Invalid --type value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --cicd-enforcment value")
+		return errors.New("Invalid --cicd-enforcement value")
 	}
 	if deploymentCreateEnforceCD && cicdEnforcement == disable {
-		return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
+		return errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
 	}
 	if organization.IsOrgHosted() && clusterID != "" && (deploymentType == standard || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared) {
 		return errors.New("flag --cluster-id cannot be used to create a standard deployment. If you want to create a dedicated deployment, use --type dedicated along with --cluster-id")
@@ -701,8 +707,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Get latest runtime version
 	if runtimeVersion == "" {
 		airflowVersionClient := airflowversions.NewClient(httpClient, false)
-		// Excludes Airflow 3 until the command supports it
-		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "", true)
+		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "", false)
 		if err != nil {
 			return err
 		}
@@ -733,7 +738,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	deployment.CleanOutput = cleanOutput
 
 	// check if executor is valid
-	if !isValidExecutor(executor) {
+	if executor != "" && !deployment.IsValidExecutor(executor, runtimeVersion, deploymentType) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 	// request is to update from a file
@@ -756,20 +761,12 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		return errors.New("Invalid --development-mode value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --cicd-enforcment value")
+		return errors.New("Invalid --cicd-enforcement value")
 	}
 	if cmd.Flags().Changed("enforce-cicd") {
-		if deploymentUpdateEnforceCD && cicdEnforcement == disable {
-			return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
-		}
-		if !deploymentUpdateEnforceCD && cicdEnforcement == enable {
-			return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
-		}
-		if deploymentUpdateEnforceCD {
-			cicdEnforcement = enable
-		}
-		if !deploymentUpdateEnforceCD {
-			cicdEnforcement = disable
+		err1 := validateCICD()
+		if err1 != nil {
+			return err1
 		}
 	}
 
@@ -779,6 +776,22 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	}
 
 	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
+}
+
+func validateCICD() error {
+	if deploymentUpdateEnforceCD && cicdEnforcement == disable {
+		return errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
+	}
+	if !deploymentUpdateEnforceCD && cicdEnforcement == enable {
+		return errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
+	}
+	if deploymentUpdateEnforceCD {
+		cicdEnforcement = enable
+	}
+	if !deploymentUpdateEnforceCD {
+		cicdEnforcement = disable
+	}
+	return nil
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
@@ -862,10 +875,6 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 	}
 
 	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, platformCoreClient)
-}
-
-func isValidExecutor(executor string) bool {
-	return strings.EqualFold(executor, deployment.KubeExecutor) || strings.EqualFold(executor, deployment.CeleryExecutor) || executor == "" || strings.EqualFold(executor, deployment.CELERY) || strings.EqualFold(executor, deployment.KUBERNETES)
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.
