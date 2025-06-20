@@ -1226,25 +1226,27 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	return nil
 }
 
-func updateWorkerQueuesForExecutor(newExecutor astroplatformcore.DeploymentExecutor, workerQueuesRequest, defautWorkerQueue *[]astroplatformcore.WorkerQueueRequest) *[]astroplatformcore.WorkerQueueRequest {
+func updateWorkerQueuesForExecutor(newExecutor astroplatformcore.DeploymentExecutor, workerQueuesRequest, defaultWorkerQueue *[]astroplatformcore.WorkerQueueRequest) *[]astroplatformcore.WorkerQueueRequest {
+	var workerQueuesRequestOrDefault *[]astroplatformcore.WorkerQueueRequest
+	if workerQueuesRequest == nil {
+		workerQueuesRequestOrDefault = workerQueuesRequest
+	} else {
+		workerQueuesRequestOrDefault = defaultWorkerQueue
+	}
 	// this function is called when executor is changing.
 	switch newExecutor {
 	case astroplatformcore.DeploymentExecutorKUBERNETES:
 		return nil
-	// case astroplatformcore.DeploymentExecutorCELERY:
-	// 	// placeholder for celery specific logic
-	// 	// https://github.com/astronomer/astro-cli/pull/1854#discussion_r2153379104
-	// 	fallthrough //nolint:gocritic
-	// case astroplatformcore.DeploymentExecutorASTRO:
-	// 	// placeholder for astro specific logic
-	// 	// https://github.com/astronomer/astro-cli/pull/1854#discussion_r2153379104
-	// 	fallthrough //nolint:gocritic
+	case astroplatformcore.DeploymentExecutorCELERY:
+		// placeholder for celery specific logic
+		// https://github.com/astronomer/astro-cli/pull/1854#discussion_r2153379104
+		return workerQueuesRequestOrDefault
+	case astroplatformcore.DeploymentExecutorASTRO:
+		// placeholder for astro specific logic
+		// https://github.com/astronomer/astro-cli/pull/1854#discussion_r2153379104
+		return workerQueuesRequestOrDefault
 	default:
-		if workerQueuesRequest == nil {
-			return defautWorkerQueue
-		} else {
-			return workerQueuesRequest
-		}
+		return nil
 	}
 }
 

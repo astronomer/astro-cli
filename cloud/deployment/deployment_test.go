@@ -1411,7 +1411,6 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
-
 }
 
 func (s *Suite) TestSelectCluster() {
