@@ -717,8 +717,7 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.executor")
 	}
 	// check if deployment is using Airflow 3 by validating runtime version
-	isAirflow3 := airflowversions.IsAirflow3(deploymentFromFile.Deployment.Configuration.RunTimeVersion)
-	if !deployment.IsValidExecutor(deploymentFromFile.Deployment.Configuration.Executor, isAirflow3) {
+	if !deployment.IsValidExecutor(deploymentFromFile.Deployment.Configuration.Executor, deploymentFromFile.Deployment.Configuration.RunTimeVersion) {
 		return fmt.Errorf("executor %s %w. It can be CeleryExecutor, KubernetesExecutor, or AstroExecutor", deploymentFromFile.Deployment.Configuration.Executor, errInvalidValue)
 	}
 	// if alert emails are requested
