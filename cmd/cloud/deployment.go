@@ -638,12 +638,17 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 
 	// set default executor if none was specified
 	if executor == "" {
-		executor = deployment.CeleryExecutor
+		if airflowversions.IsAirflow3(runtimeVersion) {
+			executor = deployment.AstroExecutor
+		} else {
+			executor = deployment.CeleryExecutor
+		}
 	}
 
 	// check if executor is valid
-	if !deployment.IsValidExecutor(executor, runtimeVersion) {
-		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
+	fmt.Println(deploymentType)
+	if !deployment.IsValidExecutor(executor, runtimeVersion, deploymentType) {
+		return fmt.Errorf("%s is %w for runtime version %s deployment type %s", executor, errInvalidExecutor, runtimeVersion, deploymentType)
 	}
 
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
@@ -733,7 +738,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	deployment.CleanOutput = cleanOutput
 
 	// check if executor is valid
-	if executor != "" && !deployment.IsValidExecutor(executor, runtimeVersion) {
+	if executor != "" && !deployment.IsValidExecutor(executor, runtimeVersion, deploymentType) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 	// request is to update from a file

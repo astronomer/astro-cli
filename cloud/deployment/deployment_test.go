@@ -1411,6 +1411,7 @@ func (s *Suite) TestCreate() {
 		mockCoreClient.AssertExpectations(s.T())
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
+
 }
 
 func (s *Suite) TestSelectCluster() {
@@ -1534,6 +1535,7 @@ func (s *Suite) TestUpdate() { //nolint
 		},
 	}
 	deploymentResponse.JSON200.Executor = &executorCelery
+
 	mockUpdateDeploymentResponse := astroplatformcore.UpdateDeploymentResponse{
 		JSON200: &astroplatformcore.Deployment{
 			Id:            "test-id",
@@ -1929,6 +1931,40 @@ func (s *Suite) TestUpdate() { //nolint
 
 		// Call the Update function with a non-empty workload ID
 		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "small", "enable", "", "disable", "", "", "", "", mockWorkloadIdentity, 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, true, mockCoreClient, mockPlatformCoreClient)
+		s.NoError(err)
+	})
+	s.Run("update deployment to change executor to/from ASTRO executor", func() {
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(4)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(4)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(4)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(4)
+
+		// Set type to standard for ASTRO executor support
+		deploymentResponse.JSON200.Type = &standardType
+
+		// CELERY -> ASTRO
+		deploymentResponse.JSON200.Executor = &executorCelery
+		defer testUtil.MockUserInput(s.T(), "y")()
+		err := Update("test-id-1", "", ws, "", "", "", AstroExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		s.NoError(err)
+
+		// ASTRO -> CELERY
+		astroExecutor := astroplatformcore.DeploymentExecutorASTRO
+		deploymentResponse.JSON200.Executor = &astroExecutor
+		defer testUtil.MockUserInput(s.T(), "y")()
+		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		s.NoError(err)
+
+		// ASTRO -> KUBERNETES
+		deploymentResponse.JSON200.Executor = &astroExecutor
+		defer testUtil.MockUserInput(s.T(), "y")()
+		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
+		s.NoError(err)
+
+		// KUBERNETES -> ASTRO
+		deploymentResponse.JSON200.Executor = &executorKubernetes
+		defer testUtil.MockUserInput(s.T(), "y")()
+		err = Update("test-id-1", "", ws, "", "", "", AstroExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, mockCoreClient, mockPlatformCoreClient)
 		s.NoError(err)
 	})
 }
