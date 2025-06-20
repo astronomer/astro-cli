@@ -396,7 +396,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			if highAvailability == enable { //nolint: goconst
 				standardDeploymentRequest.IsHighAvailability = true
 			}
-			fmt.Printf("request: %#v", standardDeploymentRequest)
 			err := createDeploymentRequest.FromCreateStandardDeploymentRequest(standardDeploymentRequest)
 			if err != nil {
 				return err
@@ -447,7 +446,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			case "":
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
 			}
-			fmt.Printf("request: %#v", dedicatedDeploymentRequest)
 			err := createDeploymentRequest.FromCreateDedicatedDeploymentRequest(dedicatedDeploymentRequest)
 			if err != nil {
 				return err
@@ -511,7 +509,6 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		} else {
 			hybridDeploymentRequest.TaskPodNodePoolId = &nodePoolID
 		}
-		fmt.Printf("request: %#v", hybridDeploymentRequest)
 		err = createDeploymentRequest.FromCreateHybridDeploymentRequest(hybridDeploymentRequest)
 		if err != nil {
 			return err
