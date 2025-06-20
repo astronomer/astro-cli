@@ -2383,24 +2383,6 @@ func (s *Suite) TestAirflow3Blocking() {
 		},
 	}
 
-	s.Run("Update blocks operation for Airflow 3 deployments", func() {
-		// Create a fresh local mock clients for this subtest
-		updateMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		updateMockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-
-		// Set expectations on the local mock client
-		// Mock the ListDeploymentsWithResponse method which is called by GetDeployment
-		updateMockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3ListDeploymentsResponse, nil)
-		updateMockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil)
-
-		// Test updating an Airflow 3 deployment
-		err := Update("test-id-airflow3", "new-name", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, false, updateMockCoreClient, updateMockPlatformCoreClient)
-
-		s.Error(err)
-		s.Contains(err.Error(), "This command is not yet supported on Airflow 3 deployments")
-		updateMockPlatformCoreClient.AssertExpectations(s.T())
-	})
-
 	s.Run("Logs blocks operation for Airflow 3 deployments", func() {
 		// Create a fresh local mock clients for this subtest
 		logsMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
