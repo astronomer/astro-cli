@@ -773,12 +773,12 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
 }
 
-func validateCICD() (bool, error) {
+func validateCICD() error {
 	if deploymentUpdateEnforceCD && cicdEnforcement == disable {
-		return true, errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
+		return errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
 	}
 	if !deploymentUpdateEnforceCD && cicdEnforcement == enable {
-		return true, errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
+		return errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
 	}
 	if deploymentUpdateEnforceCD {
 		cicdEnforcement = enable
@@ -786,7 +786,7 @@ func validateCICD() (bool, error) {
 	if !deploymentUpdateEnforceCD {
 		cicdEnforcement = disable
 	}
-	return false, nil
+	return nil
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
