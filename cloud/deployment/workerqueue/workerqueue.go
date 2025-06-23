@@ -174,14 +174,14 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		queueToCreateOrUpdateHybrid = SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdateHybrid, defaultOptions)
 	}
 	switch *requestedDeployment.Executor {
-	case astroplatformcore.DeploymentExecutorCELERY:
+	case astroplatformcore.DeploymentExecutorCELERY, astroplatformcore.DeploymentExecutorASTRO:
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-			err = IsHostedCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &workerMachine)
+			err = IsHostedWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &workerMachine)
 			if err != nil {
 				return err
 			}
 		} else {
-			err = IsCeleryWorkerQueueInputValid(queueToCreateOrUpdateHybrid, defaultOptions)
+			err = IsWorkerQueueInputValid(queueToCreateOrUpdateHybrid, defaultOptions)
 			if err != nil {
 				return err
 			}
@@ -286,11 +286,11 @@ func SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency int, wor
 	return workerQueueToCreate
 }
 
-// IsCeleryWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions.
+// IsWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions.
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
 // ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue astroplatformcore.HybridWorkerQueueRequest, defaultOptions astroplatformcore.WorkerQueueOptions) error {
+func IsWorkerQueueInputValid(requestedHybridWorkerQueue astroplatformcore.HybridWorkerQueueRequest, defaultOptions astroplatformcore.WorkerQueueOptions) error {
 	var errorMessage string
 	if !(requestedHybridWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
 		!(requestedHybridWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
@@ -310,11 +310,11 @@ func IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue astroplatformcore.
 	return nil
 }
 
-// IsHostedCeleryWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions and machineOptions.
+// IsHostedWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions and machineOptions.
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
 // ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue astroplatformcore.WorkerQueueRequest, defaultOptions astroplatformcore.WorkerQueueOptions, machineOptions *astroplatformcore.WorkerMachine) error {
+func IsHostedWorkerQueueInputValid(requestedWorkerQueue astroplatformcore.WorkerQueueRequest, defaultOptions astroplatformcore.WorkerQueueOptions, machineOptions *astroplatformcore.WorkerMachine) error {
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
 		!(requestedWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {

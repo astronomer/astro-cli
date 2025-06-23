@@ -980,19 +980,19 @@ func (s *Suite) TestIsCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 0
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 275
-		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.NoError(err)
 	})
 	s.Run("returns an error when min worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 35
-		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: min worker count must be between 0 and 20")
 	})
 	s.Run("returns an error when max worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 19
-		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: max worker count must be between 20 and 200")
 	})
@@ -1000,7 +1000,7 @@ func (s *Suite) TestIsCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 350
-		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: worker concurrency must be between 175 and 275")
 	})
@@ -1045,19 +1045,19 @@ func (s *Suite) TestIsHostedCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 0
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 10
-		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.NoError(err)
 	})
 	s.Run("returns an error when min worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 35
-		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: min worker count must be between 0 and 20")
 	})
 	s.Run("returns an error when max worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 19
-		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: max worker count must be between 20 and 200")
 	})
@@ -1065,7 +1065,7 @@ func (s *Suite) TestIsHostedCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 20
-		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: worker concurrency must be between 1 and 15")
 	})

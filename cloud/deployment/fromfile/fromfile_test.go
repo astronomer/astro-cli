@@ -3145,7 +3145,7 @@ func (s *Suite) TestCheckRequiredFields() {
 		input.Deployment.Configuration.Executor = "test-executor"
 		err = checkRequiredFields(&input, "")
 		s.ErrorIs(err, errInvalidValue)
-		s.ErrorContains(err, "is not valid. It can either be CeleryExecutor or KubernetesExecutor")
+		s.ErrorContains(err, "is not valid. It can be CeleryExecutor, KubernetesExecutor, or AstroExecutor")
 	})
 	s.Run("returns an error if alert email is invalid", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
@@ -3965,44 +3965,5 @@ func (s *Suite) TestCheckEnvVars() {
 		input.Deployment.EnvVars = list
 		err = checkEnvVars(&input, "update")
 		s.NoError(err)
-	})
-}
-
-func (s *Suite) TestIsValidExecutor() {
-	s.Run("returns true if executor is Celery", func() {
-		actual := isValidExecutor(deployment.CeleryExecutor)
-		s.True(actual)
-	})
-	s.Run("returns true if executor is Kubernetes", func() {
-		actual := isValidExecutor(deployment.KubeExecutor)
-		s.True(actual)
-	})
-	s.Run("returns true if executor is CELERY", func() {
-		actual := isValidExecutor(deployment.CELERY)
-		s.True(actual)
-	})
-	s.Run("returns true if executor is KUBERNETES", func() {
-		actual := isValidExecutor(deployment.KUBERNETES)
-		s.True(actual)
-	})
-	s.Run("returns true if executor is celery", func() {
-		actual := isValidExecutor("celery")
-		s.True(actual)
-	})
-	s.Run("returns true if executor is kubernetes", func() {
-		actual := isValidExecutor("kubernetes")
-		s.True(actual)
-	})
-	s.Run("returns true if executor is celery", func() {
-		actual := isValidExecutor("celeryexecutor")
-		s.True(actual)
-	})
-	s.Run("returns true if executor is kubernetes", func() {
-		actual := isValidExecutor("kubernetesexecutor")
-		s.True(actual)
-	})
-	s.Run("returns false if executor is neither Celery nor Kubernetes", func() {
-		actual := isValidExecutor("test-executor")
-		s.False(actual)
 	})
 }

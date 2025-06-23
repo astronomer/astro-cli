@@ -246,7 +246,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 					return errNoUseWorkerQueues
 				}
-				err = workerqueue.IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, defaultOptions, &astroMachine)
+				err = workerqueue.IsHostedWorkerQueueInputValid(requestedWorkerQueue, defaultOptions, &astroMachine)
 				if err != nil {
 					return err
 				}
@@ -267,7 +267,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				}
 				// set default values if none were specified
 				requestedHybridWorkerQueue := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, workerQueue, defaultOptions)
-				err = workerqueue.IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue, defaultOptions)
+				err = workerqueue.IsWorkerQueueInputValid(requestedHybridWorkerQueue, defaultOptions)
 				if err != nil {
 					return err
 				}
@@ -715,8 +715,9 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 	if deploymentFromFile.Deployment.Configuration.Executor == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.executor")
 	}
-	if !isValidExecutor(deploymentFromFile.Deployment.Configuration.Executor) {
-		return fmt.Errorf("executor %s %w. It can either be CeleryExecutor or KubernetesExecutor", deploymentFromFile.Deployment.Configuration.Executor, errInvalidValue)
+	// check if deployment is using Airflow 3 by validating runtime version
+	if !deployment.IsValidExecutor(deploymentFromFile.Deployment.Configuration.Executor, deploymentFromFile.Deployment.Configuration.RunTimeVersion, deploymentFromFile.Deployment.Configuration.DeploymentType) {
+		return fmt.Errorf("executor %s %w. It can be CeleryExecutor, KubernetesExecutor, or AstroExecutor", deploymentFromFile.Deployment.Configuration.Executor, errInvalidValue)
 	}
 	// if alert emails are requested
 	if hasAlertEmails(deploymentFromFile) {
@@ -993,11 +994,6 @@ func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment) (envV
 		envVars = append(envVars, envVar)
 	}
 	return envVars
-}
-
-// isValidExecutor returns true for valid executor values and false if not.
-func isValidExecutor(executor string) bool {
-	return strings.EqualFold(executor, deployment.KubeExecutor) || strings.EqualFold(executor, deployment.CeleryExecutor) || strings.EqualFold(executor, deployment.CELERY) || strings.EqualFold(executor, deployment.KUBERNETES)
 }
 
 func transformDeploymentType(deploymentType string) astroplatformcore.DeploymentType {

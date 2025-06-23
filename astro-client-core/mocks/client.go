@@ -1016,6 +1016,80 @@ func (_m *ClientWithResponsesInterface) CreateOrganizationWithResponse(ctx conte
 	return r0, r1
 }
 
+// CreateSelfUserRepositoryBranchWithBodyWithResponse provides a mock function with given fields: ctx, gitProvider, gitAccount, gitRepository, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateSelfUserRepositoryBranchWithBodyWithResponse(ctx context.Context, gitProvider astrocore.CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateSelfUserRepositoryBranchResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, gitProvider, gitAccount, gitRepository, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateSelfUserRepositoryBranchWithBodyWithResponse")
+	}
+
+	var r0 *astrocore.CreateSelfUserRepositoryBranchResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.CreateSelfUserRepositoryBranchParamsGitProvider, string, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.CreateSelfUserRepositoryBranchResponse, error)); ok {
+		return rf(ctx, gitProvider, gitAccount, gitRepository, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.CreateSelfUserRepositoryBranchParamsGitProvider, string, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.CreateSelfUserRepositoryBranchResponse); ok {
+		r0 = rf(ctx, gitProvider, gitAccount, gitRepository, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateSelfUserRepositoryBranchResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, astrocore.CreateSelfUserRepositoryBranchParamsGitProvider, string, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, gitProvider, gitAccount, gitRepository, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreateSelfUserRepositoryBranchWithResponse provides a mock function with given fields: ctx, gitProvider, gitAccount, gitRepository, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider astrocore.CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, body astrocore.CreateGitRepositoryBranchRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateSelfUserRepositoryBranchResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, gitProvider, gitAccount, gitRepository, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateSelfUserRepositoryBranchWithResponse")
+	}
+
+	var r0 *astrocore.CreateSelfUserRepositoryBranchResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.CreateSelfUserRepositoryBranchParamsGitProvider, string, string, astrocore.CreateGitRepositoryBranchRequest, ...astrocore.RequestEditorFn) (*astrocore.CreateSelfUserRepositoryBranchResponse, error)); ok {
+		return rf(ctx, gitProvider, gitAccount, gitRepository, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, astrocore.CreateSelfUserRepositoryBranchParamsGitProvider, string, string, astrocore.CreateGitRepositoryBranchRequest, ...astrocore.RequestEditorFn) *astrocore.CreateSelfUserRepositoryBranchResponse); ok {
+		r0 = rf(ctx, gitProvider, gitAccount, gitRepository, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateSelfUserRepositoryBranchResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, astrocore.CreateSelfUserRepositoryBranchParamsGitProvider, string, string, astrocore.CreateGitRepositoryBranchRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, gitProvider, gitAccount, gitRepository, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateTeamWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, contentType, body, reqEditors
 func (_m *ClientWithResponsesInterface) CreateTeamWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateTeamResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
