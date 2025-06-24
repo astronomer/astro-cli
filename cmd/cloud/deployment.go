@@ -646,7 +646,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 
 	// check if executor is valid
-	fmt.Println(deploymentType)
 	if !deployment.IsValidExecutor(executor, runtimeVersion, deploymentType) {
 		return fmt.Errorf("%s is %w for runtime version %s deployment type %s", executor, errInvalidExecutor, runtimeVersion, deploymentType)
 	}
