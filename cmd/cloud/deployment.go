@@ -73,6 +73,7 @@ var (
 	removeOverride            bool
 	forceOverride             bool
 	logWebserver              bool
+	logApiserver              bool
 	logScheduler              bool
 	logWorkers                bool
 	logTriggerer              bool
@@ -364,6 +365,7 @@ func newDeploymentLogsCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&logCount, "log-count", "c", logCount, "Number of logs to show")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to show logs of")
 	cmd.Flags().BoolVar(&logWebserver, "webserver", false, "Show logs from the webserver")
+	cmd.Flags().BoolVar(&logApiserver, "apiserver", false, "Show logs from the api server")
 	cmd.Flags().BoolVar(&logScheduler, "scheduler", false, "Show logs from the scheduler")
 	cmd.Flags().BoolVar(&logWorkers, "workers", false, "Show logs from the workers")
 	cmd.Flags().BoolVar(&logTriggerer, "triggerer", false, "Show logs from the triggerer")
@@ -621,8 +623,9 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid Workspace")
 	}
+	logServer := logWebserver || logApiserver
 
-	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logWebserver, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroCoreClient)
+	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logServer, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroCoreClient)
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo

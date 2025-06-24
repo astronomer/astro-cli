@@ -137,7 +137,7 @@ func List(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcor
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Logs(deploymentID, ws, deploymentName, keyword string, logWebserver, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs bool, logCount int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
+func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs bool, logCount int, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 	var logLevel string
 	var i int
 	// log level
@@ -168,18 +168,22 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logWebserver, logSch
 	}
 
 	// Check if deployment is using Airflow 3
-	if err := airflowversions.ValidateNoAirflow3Support(deployment.RuntimeVersion); err != nil {
-		return err
-	}
 
 	deploymentID = deployment.Id
 	timeRange := 86400
 	offset := 0
 
+	var serverComponent astrocore.GetDeploymentLogsParamsSources
+	if airflowversions.IsAirflow3(deployment.RuntimeVersion) {
+		serverComponent = astrocore.GetDeploymentLogsParamsSourcesApiserver
+	} else {
+		serverComponent = astrocore.GetDeploymentLogsParamsSourcesWebserver
+	}
+
 	// get log source
 	var componentSources []astrocore.GetDeploymentLogsParamsSources
-	if logWebserver {
-		componentSources = append(componentSources, "webserver")
+	if logServer {
+		componentSources = append(componentSources, serverComponent)
 	}
 	if logScheduler {
 		componentSources = append(componentSources, "scheduler")
@@ -191,7 +195,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logWebserver, logSch
 		componentSources = append(componentSources, "worker")
 	}
 	if len(componentSources) == 0 {
-		componentSources = append(componentSources, "webserver", "scheduler", "triggerer", "worker")
+		componentSources = append(componentSources, serverComponent, "scheduler", "triggerer", "worker")
 	}
 
 	getDeploymentLogsParams := astrocore.GetDeploymentLogsParams{
