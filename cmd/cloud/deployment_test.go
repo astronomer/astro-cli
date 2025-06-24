@@ -154,6 +154,37 @@ var (
 			WorkerQueues:           &[]astroplatformcore.WorkerQueue{},
 		},
 	}
+	hostedDedicatedDeploymentResponse = astroplatformcore.GetDeploymentResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.Deployment{
+			Id:                     "test-id-1",
+			RuntimeVersion:         "3.0-1",
+			Namespace:              "test-name",
+			WorkspaceId:            "workspace-id",
+			WebServerUrl:           "test-url",
+			IsDagDeployEnabled:     false,
+			Description:            &description,
+			Name:                   "test-deployment-label",
+			Status:                 "HEALTHY",
+			Type:                   &dedicatedType,
+			ClusterId:              &csID,
+			ClusterName:            &testCluster,
+			Executor:               &executorCelery,
+			IsHighAvailability:     &highAvailabilityTest,
+			IsDevelopmentMode:      &developmentModeTest,
+			SchedulerSize:          &schedulerTestSize,
+			Region:                 &region,
+			WorkspaceName:          &workspaceName,
+			CloudProvider:          (*astroplatformcore.DeploymentCloudProvider)(&cloudProvider),
+			WebServerAirflowApiUrl: "airflow-url",
+			WorkerQueues:           &[]astroplatformcore.WorkerQueue{},
+			RemoteExecution: &astroplatformcore.DeploymentRemoteExecution{
+				Enabled: true,
+			},
+		},
+	}
 	mockListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -163,6 +194,7 @@ var (
 		},
 	}
 	standardType               = astroplatformcore.DeploymentTypeSTANDARD
+	dedicatedType              = astroplatformcore.DeploymentTypeDEDICATED
 	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
 	testRegion                 = "region"
 	testProvider               = "provider"
@@ -723,7 +755,7 @@ deployment:
 		astroCoreClient = mockCoreClient
 		platformCoreClient = mockPlatformCoreClient
 		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated",
+			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--remote-execution-enabled", "--allowed-ip-address-ranges", "0.0.0.0/0",
 		}
 
 		// Mock user input for deployment name and wait for status
@@ -1088,6 +1120,46 @@ deployment:
 		platformCoreClient = mockPlatformCoreClient
 		cmdArgs := []string{
 			"update", "test-id-1", "--name", "test-name", "--workload-identity", workloadIdentity,
+		}
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("updates a hosted dedicated deployment with remote execution config", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+
+		taskLogBucket := "test-bucket"
+		taskLogURLPattern := "test-url-pattern"
+		allowedIPAddressRanges := []string{"1.2.3.4/32"}
+		mockUpdateDeploymentResponse.JSON200.RemoteExecution = &astroplatformcore.DeploymentRemoteExecution{
+			Enabled:                true,
+			AllowedIpAddressRanges: allowedIPAddressRanges,
+			TaskLogBucket:          &taskLogBucket,
+			TaskLogUrlPattern:      &taskLogURLPattern,
+		}
+
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(i astroplatformcore.UpdateDeploymentRequest) bool {
+			input, _ := i.AsUpdateDedicatedDeploymentRequest()
+			return input.RemoteExecution != nil && input.RemoteExecution.Enabled &&
+				input.RemoteExecution.AllowedIpAddressRanges != nil && (*input.RemoteExecution.AllowedIpAddressRanges)[0] == allowedIPAddressRanges[0] &&
+				input.RemoteExecution.TaskLogBucket != nil && *input.RemoteExecution.TaskLogBucket == taskLogBucket &&
+				input.RemoteExecution.TaskLogUrlPattern != nil && *input.RemoteExecution.TaskLogUrlPattern == taskLogURLPattern
+		})).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDedicatedDeploymentResponse, nil).Times(1)
+
+		astroCoreClient = mockCoreClient
+		platformCoreClient = mockPlatformCoreClient
+		cmdArgs := []string{
+			"update", "test-id-1", "--name", "test-name", "--allowed-ip-address-ranges", "1.2.3.4/32", "--task-log-bucket", taskLogBucket, "--task-log-url-pattern", taskLogURLPattern,
 		}
 
 		_, err = execDeploymentCmd(cmdArgs...)
