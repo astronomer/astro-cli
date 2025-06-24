@@ -372,10 +372,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				IsDevelopmentMode:    &developmentModeValue,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.CreateStandardDeploymentRequestTypeSTANDARD,
-				DefaultTaskPodCpu:    defaultTaskPodCpu,
-				DefaultTaskPodMemory: defaultTaskPodMemory,
-				ResourceQuotaCpu:     resourceQuotaCpu,
-				ResourceQuotaMemory:  resourceQuotaMemory,
+				DefaultTaskPodCpu:    &defaultTaskPodCpu,
+				DefaultTaskPodMemory: &defaultTaskPodMemory,
+				ResourceQuotaCpu:     &resourceQuotaCpu,
+				ResourceQuotaMemory:  &resourceQuotaMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
 			}
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) || strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) {
@@ -425,10 +425,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				ClusterId:            clusterID,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.CreateDedicatedDeploymentRequestTypeDEDICATED,
-				DefaultTaskPodCpu:    defaultTaskPodCpu,
-				DefaultTaskPodMemory: defaultTaskPodMemory,
-				ResourceQuotaCpu:     resourceQuotaCpu,
-				ResourceQuotaMemory:  resourceQuotaMemory,
+				DefaultTaskPodCpu:    &defaultTaskPodCpu,
+				DefaultTaskPodMemory: &defaultTaskPodMemory,
+				ResourceQuotaCpu:     &resourceQuotaCpu,
+				ResourceQuotaMemory:  &resourceQuotaMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
 			}
 			if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) || strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) {
@@ -971,11 +971,11 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				IsDevelopmentMode:    &developmentModeValue,
 				WorkspaceId:          currentDeployment.WorkspaceId,
 				Type:                 astroplatformcore.UpdateStandardDeploymentRequestTypeSTANDARD,
-				ResourceQuotaCpu:     resourceQuotaCpu,
-				ResourceQuotaMemory:  resourceQuotaMemory,
+				ResourceQuotaCpu:     &resourceQuotaCpu,
+				ResourceQuotaMemory:  &resourceQuotaMemory,
 				EnvironmentVariables: deploymentEnvironmentVariablesRequest,
-				DefaultTaskPodCpu:    defaultTaskPodCpu,
-				DefaultTaskPodMemory: defaultTaskPodMemory,
+				DefaultTaskPodCpu:    &defaultTaskPodCpu,
+				DefaultTaskPodMemory: &defaultTaskPodMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
 			}
 			switch schedulerSize {
@@ -1035,10 +1035,10 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				IsDevelopmentMode:    &developmentModeValue,
 				WorkspaceId:          currentDeployment.WorkspaceId,
 				Type:                 astroplatformcore.UpdateDedicatedDeploymentRequestTypeDEDICATED,
-				DefaultTaskPodCpu:    defaultTaskPodCpu,
-				DefaultTaskPodMemory: defaultTaskPodMemory,
-				ResourceQuotaCpu:     resourceQuotaCpu,
-				ResourceQuotaMemory:  resourceQuotaMemory,
+				DefaultTaskPodCpu:    &defaultTaskPodCpu,
+				DefaultTaskPodMemory: &defaultTaskPodMemory,
+				ResourceQuotaCpu:     &resourceQuotaCpu,
+				ResourceQuotaMemory:  &resourceQuotaMemory,
 				EnvironmentVariables: deploymentEnvironmentVariablesRequest,
 				WorkerQueues:         &workerQueuesRequest,
 				WorkloadIdentity:     deplWorkloadIdentity,
@@ -1382,6 +1382,10 @@ func IsDeploymentDedicated(deploymentType astroplatformcore.DeploymentType) bool
 
 func IsDeploymentHybrid(deploymentType astroplatformcore.DeploymentType) bool {
 	return deploymentType == astroplatformcore.DeploymentTypeHYBRID
+}
+
+func IsRemoteExecutionEnabled(deployment *astroplatformcore.Deployment) bool {
+	return deployment.RemoteExecution != nil && deployment.RemoteExecution.Enabled
 }
 
 // CoreUpdateDeploymentHibernationOverride updates a deployment hibernation override with the core API

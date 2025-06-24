@@ -234,9 +234,21 @@ const (
 	CreateEnvironmentObjectLinkRequestScopeDEPLOYMENT CreateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
 )
 
+// Defines values for CreateEnvironmentObjectMetricsExportOverridesRequestAuthType.
+const (
+	CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeAUTHTOKEN CreateEnvironmentObjectMetricsExportOverridesRequestAuthType = "AUTH_TOKEN"
+	CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeBASIC     CreateEnvironmentObjectMetricsExportOverridesRequestAuthType = "BASIC"
+)
+
 // Defines values for CreateEnvironmentObjectMetricsExportOverridesRequestExporterType.
 const (
 	CreateEnvironmentObjectMetricsExportOverridesRequestExporterTypePROMETHEUS CreateEnvironmentObjectMetricsExportOverridesRequestExporterType = "PROMETHEUS"
+)
+
+// Defines values for CreateEnvironmentObjectMetricsExportRequestAuthType.
+const (
+	CreateEnvironmentObjectMetricsExportRequestAuthTypeAUTHTOKEN CreateEnvironmentObjectMetricsExportRequestAuthType = "AUTH_TOKEN"
+	CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC     CreateEnvironmentObjectMetricsExportRequestAuthType = "BASIC"
 )
 
 // Defines values for CreateEnvironmentObjectMetricsExportRequestExporterType.
@@ -475,9 +487,21 @@ const (
 	EnvironmentObjectLinkScopeDEPLOYMENT EnvironmentObjectLinkScope = "DEPLOYMENT"
 )
 
+// Defines values for EnvironmentObjectMetricsExportAuthType.
+const (
+	EnvironmentObjectMetricsExportAuthTypeAUTHTOKEN EnvironmentObjectMetricsExportAuthType = "AUTH_TOKEN"
+	EnvironmentObjectMetricsExportAuthTypeBASIC     EnvironmentObjectMetricsExportAuthType = "BASIC"
+)
+
 // Defines values for EnvironmentObjectMetricsExportExporterType.
 const (
 	EnvironmentObjectMetricsExportExporterTypePROMETHEUS EnvironmentObjectMetricsExportExporterType = "PROMETHEUS"
+)
+
+// Defines values for EnvironmentObjectMetricsExportOverridesAuthType.
+const (
+	EnvironmentObjectMetricsExportOverridesAuthTypeAUTHTOKEN EnvironmentObjectMetricsExportOverridesAuthType = "AUTH_TOKEN"
+	EnvironmentObjectMetricsExportOverridesAuthTypeBASIC     EnvironmentObjectMetricsExportOverridesAuthType = "BASIC"
 )
 
 // Defines values for EnvironmentObjectMetricsExportOverridesExporterType.
@@ -530,9 +554,9 @@ const (
 
 // Defines values for OrganizationStatus.
 const (
-	OrganizationStatusACTIVE    OrganizationStatus = "ACTIVE"
-	OrganizationStatusINACTIVE  OrganizationStatus = "INACTIVE"
-	OrganizationStatusSUSPENDED OrganizationStatus = "SUSPENDED"
+	ACTIVE    OrganizationStatus = "ACTIVE"
+	INACTIVE  OrganizationStatus = "INACTIVE"
+	SUSPENDED OrganizationStatus = "SUSPENDED"
 )
 
 // Defines values for OrganizationSupportPlan.
@@ -653,9 +677,21 @@ const (
 	UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT UpdateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
 )
 
+// Defines values for UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType.
+const (
+	UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeAUTHTOKEN UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType = "AUTH_TOKEN"
+	UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeBASIC     UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType = "BASIC"
+)
+
 // Defines values for UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType.
 const (
 	UpdateEnvironmentObjectMetricsExportOverridesRequestExporterTypePROMETHEUS UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType = "PROMETHEUS"
+)
+
+// Defines values for UpdateEnvironmentObjectMetricsExportRequestAuthType.
+const (
+	UpdateEnvironmentObjectMetricsExportRequestAuthTypeAUTHTOKEN UpdateEnvironmentObjectMetricsExportRequestAuthType = "AUTH_TOKEN"
+	UpdateEnvironmentObjectMetricsExportRequestAuthTypeBASIC     UpdateEnvironmentObjectMetricsExportRequestAuthType = "BASIC"
 )
 
 // Defines values for UpdateEnvironmentObjectMetricsExportRequestExporterType.
@@ -711,6 +747,13 @@ const (
 	TEAMPAYGO      UpdateOrganizationSupportPlanRequestSupportPlan = "TEAM_PAYGO"
 )
 
+// Defines values for UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider.
+const (
+	UpdateWorkspaceAstroIdeDeploymentsRequestCloudProviderAWS   UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider = "AWS"
+	UpdateWorkspaceAstroIdeDeploymentsRequestCloudProviderAZURE UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider = "AZURE"
+	UpdateWorkspaceAstroIdeDeploymentsRequestCloudProviderGCP   UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider = "GCP"
+)
+
 // Defines values for UserSignupType.
 const (
 	UserSignupTypeRegular UserSignupType = "Regular"
@@ -726,6 +769,13 @@ const (
 	WorkerMachineNameA40  WorkerMachineName = "A40"
 	WorkerMachineNameA5   WorkerMachineName = "A5"
 	WorkerMachineNameA60  WorkerMachineName = "A60"
+)
+
+// Defines values for WorkspaceAstroIdeDeploymentsCloudProvider.
+const (
+	WorkspaceAstroIdeDeploymentsCloudProviderAWS   WorkspaceAstroIdeDeploymentsCloudProvider = "AWS"
+	WorkspaceAstroIdeDeploymentsCloudProviderAZURE WorkspaceAstroIdeDeploymentsCloudProvider = "AZURE"
+	WorkspaceAstroIdeDeploymentsCloudProviderGCP   WorkspaceAstroIdeDeploymentsCloudProvider = "GCP"
 )
 
 // Defines values for AgentActionBodyAction.
@@ -935,9 +985,9 @@ const (
 
 // Defines values for GetDeploymentOptionsParamsDeploymentType.
 const (
-	GetDeploymentOptionsParamsDeploymentTypeDEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
-	GetDeploymentOptionsParamsDeploymentTypeHYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
-	GetDeploymentOptionsParamsDeploymentTypeSTANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
+	DEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
+	HYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
+	STANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
 )
 
 // Defines values for GetDeploymentOptionsParamsExecutor.
@@ -1425,6 +1475,7 @@ type Cluster struct {
 	ProviderAccount        string                      `json:"providerAccount"`
 	RdsSnapshotIdentifier  *string                     `json:"rdsSnapshotIdentifier,omitempty"`
 	Region                 string                      `json:"region"`
+	SecondaryPodRanges     *[]SecondaryPodRange        `json:"secondaryPodRanges,omitempty"`
 	ServicePeeringRange    string                      `json:"servicePeeringRange"`
 	ServiceSubnetRange     string                      `json:"serviceSubnetRange"`
 	Status                 ClusterStatus               `json:"status"`
@@ -1488,6 +1539,7 @@ type ClusterDetailed struct {
 	ProviderAccount            string                      `json:"providerAccount"`
 	RdsSnapshotIdentifier      *string                     `json:"rdsSnapshotIdentifier,omitempty"`
 	Region                     string                      `json:"region"`
+	SecondaryPodRanges         *[]SecondaryPodRange        `json:"secondaryPodRanges,omitempty"`
 	ServicePeeringRange        string                      `json:"servicePeeringRange"`
 	ServiceSubnetRange         string                      `json:"serviceSubnetRange"`
 	Status                     ClusterDetailedStatus       `json:"status"`
@@ -1515,6 +1567,16 @@ type ClusterDetailedStatus string
 // ClusterDetailedType defines model for ClusterDetailed.Type.
 type ClusterDetailedType string
 
+// ClusterHealthDetailMute defines model for ClusterHealthDetailMute.
+type ClusterHealthDetailMute struct {
+	ClusterId string               `json:"clusterId"`
+	Code      string               `json:"code"`
+	Component string               `json:"component"`
+	CreatedBy *BasicSubjectProfile `json:"createdBy,omitempty"`
+	Expires   string               `json:"expires"`
+	Note      string               `json:"note"`
+}
+
 // ClusterHealthStatus defines model for ClusterHealthStatus.
 type ClusterHealthStatus struct {
 	Details  *[]ClusterHealthStatusDetail `json:"details,omitempty"`
@@ -1530,11 +1592,12 @@ type ClusterHealthStatusValue string
 
 // ClusterHealthStatusDetail defines model for ClusterHealthStatusDetail.
 type ClusterHealthStatusDetail struct {
-	Code        string  `json:"code"`
-	Component   *string `json:"component,omitempty"`
-	Description string  `json:"description"`
-	Muted       bool    `json:"muted"`
-	Severity    string  `json:"severity"`
+	Code                 string                     `json:"code"`
+	Component            *string                    `json:"component,omitempty"`
+	Description          string                     `json:"description"`
+	Muted                bool                       `json:"muted"`
+	RecentlyExpiredMutes *[]ClusterHealthDetailMute `json:"recentlyExpiredMutes,omitempty"`
+	Severity             string                     `json:"severity"`
 }
 
 // ClusterMetadata defines model for ClusterMetadata.
@@ -1931,6 +1994,7 @@ type CreateEnvironmentObjectLinkRequestScope string
 
 // CreateEnvironmentObjectMetricsExportOverridesRequest defines model for CreateEnvironmentObjectMetricsExportOverridesRequest.
 type CreateEnvironmentObjectMetricsExportOverridesRequest struct {
+	AuthType     *CreateEnvironmentObjectMetricsExportOverridesRequestAuthType     `json:"authType,omitempty"`
 	BasicToken   *string                                                           `json:"basicToken,omitempty"`
 	Endpoint     *string                                                           `json:"endpoint,omitempty"`
 	ExporterType *CreateEnvironmentObjectMetricsExportOverridesRequestExporterType `json:"exporterType,omitempty"`
@@ -1940,11 +2004,15 @@ type CreateEnvironmentObjectMetricsExportOverridesRequest struct {
 	Username     *string                                                           `json:"username,omitempty"`
 }
 
+// CreateEnvironmentObjectMetricsExportOverridesRequestAuthType defines model for CreateEnvironmentObjectMetricsExportOverridesRequest.AuthType.
+type CreateEnvironmentObjectMetricsExportOverridesRequestAuthType string
+
 // CreateEnvironmentObjectMetricsExportOverridesRequestExporterType defines model for CreateEnvironmentObjectMetricsExportOverridesRequest.ExporterType.
 type CreateEnvironmentObjectMetricsExportOverridesRequestExporterType string
 
 // CreateEnvironmentObjectMetricsExportRequest defines model for CreateEnvironmentObjectMetricsExportRequest.
 type CreateEnvironmentObjectMetricsExportRequest struct {
+	AuthType     *CreateEnvironmentObjectMetricsExportRequestAuthType    `json:"authType,omitempty"`
 	BasicToken   *string                                                 `json:"basicToken,omitempty"`
 	Endpoint     string                                                  `json:"endpoint"`
 	ExporterType CreateEnvironmentObjectMetricsExportRequestExporterType `json:"exporterType"`
@@ -1953,6 +2021,9 @@ type CreateEnvironmentObjectMetricsExportRequest struct {
 	Password     *string                                                 `json:"password,omitempty"`
 	Username     *string                                                 `json:"username,omitempty"`
 }
+
+// CreateEnvironmentObjectMetricsExportRequestAuthType defines model for CreateEnvironmentObjectMetricsExportRequest.AuthType.
+type CreateEnvironmentObjectMetricsExportRequestAuthType string
 
 // CreateEnvironmentObjectMetricsExportRequestExporterType defines model for CreateEnvironmentObjectMetricsExportRequest.ExporterType.
 type CreateEnvironmentObjectMetricsExportRequestExporterType string
@@ -2239,7 +2310,6 @@ type DeactivateOrganization struct {
 	ClusterCount           *int  `json:"clusterCount,omitempty"`
 	DeploymentCount        *int  `json:"deploymentCount,omitempty"`
 	HasComputeDependencies *bool `json:"hasComputeDependencies,omitempty"`
-	ProjectCount           *int  `json:"projectCount,omitempty"`
 }
 
 // DeactivateOrganizationRequest defines model for DeactivateOrganizationRequest.
@@ -2801,6 +2871,7 @@ type EnvironmentObjectLinkScope string
 
 // EnvironmentObjectMetricsExport defines model for EnvironmentObjectMetricsExport.
 type EnvironmentObjectMetricsExport struct {
+	AuthType     *EnvironmentObjectMetricsExportAuthType    `json:"authType,omitempty"`
 	BasicToken   *string                                    `json:"basicToken,omitempty"`
 	Endpoint     string                                     `json:"endpoint"`
 	ExporterType EnvironmentObjectMetricsExportExporterType `json:"exporterType"`
@@ -2809,6 +2880,9 @@ type EnvironmentObjectMetricsExport struct {
 	Password     *string                                    `json:"password,omitempty"`
 	Username     *string                                    `json:"username,omitempty"`
 }
+
+// EnvironmentObjectMetricsExportAuthType defines model for EnvironmentObjectMetricsExport.AuthType.
+type EnvironmentObjectMetricsExportAuthType string
 
 // EnvironmentObjectMetricsExportExporterType defines model for EnvironmentObjectMetricsExport.ExporterType.
 type EnvironmentObjectMetricsExportExporterType string
@@ -2822,6 +2896,7 @@ type EnvironmentObjectMetricsExportLogEntry struct {
 
 // EnvironmentObjectMetricsExportOverrides defines model for EnvironmentObjectMetricsExportOverrides.
 type EnvironmentObjectMetricsExportOverrides struct {
+	AuthType     *EnvironmentObjectMetricsExportOverridesAuthType     `json:"authType,omitempty"`
 	BasicToken   *string                                              `json:"basicToken,omitempty"`
 	Endpoint     *string                                              `json:"endpoint,omitempty"`
 	ExporterType *EnvironmentObjectMetricsExportOverridesExporterType `json:"exporterType,omitempty"`
@@ -2830,6 +2905,9 @@ type EnvironmentObjectMetricsExportOverrides struct {
 	Password     *string                                              `json:"password,omitempty"`
 	Username     *string                                              `json:"username,omitempty"`
 }
+
+// EnvironmentObjectMetricsExportOverridesAuthType defines model for EnvironmentObjectMetricsExportOverrides.AuthType.
+type EnvironmentObjectMetricsExportOverridesAuthType string
 
 // EnvironmentObjectMetricsExportOverridesExporterType defines model for EnvironmentObjectMetricsExportOverrides.ExporterType.
 type EnvironmentObjectMetricsExportOverridesExporterType string
@@ -3066,6 +3144,7 @@ type NodePool struct {
 
 // Organization defines model for Organization.
 type Organization struct {
+	AllowEnhancedSupportAccess  bool                       `json:"allowEnhancedSupportAccess"`
 	AuthServiceId               string                     `json:"authServiceId"`
 	AzurePlanId                 *string                    `json:"azurePlanId,omitempty"`
 	AzureSubscriptionId         *string                    `json:"azureSubscriptionId,omitempty"`
@@ -3323,6 +3402,12 @@ type Scope struct {
 	Type     string `json:"type"`
 }
 
+// SecondaryPodRange defines model for SecondaryPodRange.
+type SecondaryPodRange struct {
+	Name     *string `json:"name,omitempty"`
+	PodRange *string `json:"podRange,omitempty"`
+}
+
 // Self defines model for Self.
 type Self struct {
 	AvatarUrl           string          `json:"avatarUrl"`
@@ -3361,6 +3446,7 @@ type SharedCluster struct {
 	Name                string                     `json:"name"`
 	PodSubnetRange      string                     `json:"podSubnetRange"`
 	Region              string                     `json:"region"`
+	SecondaryPodRanges  *[]SecondaryPodRange       `json:"secondaryPodRanges,omitempty"`
 	ServicePeeringRange string                     `json:"servicePeeringRange"`
 	ServiceSubnetRange  string                     `json:"serviceSubnetRange"`
 	Status              SharedClusterStatus        `json:"status"`
@@ -3577,6 +3663,7 @@ type UpdateEnvironmentObjectLinkRequestScope string
 
 // UpdateEnvironmentObjectMetricsExportOverridesRequest defines model for UpdateEnvironmentObjectMetricsExportOverridesRequest.
 type UpdateEnvironmentObjectMetricsExportOverridesRequest struct {
+	AuthType     *UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType     `json:"authType,omitempty"`
 	BasicToken   *string                                                           `json:"basicToken,omitempty"`
 	Endpoint     *string                                                           `json:"endpoint,omitempty"`
 	ExporterType *UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType `json:"exporterType,omitempty"`
@@ -3586,11 +3673,15 @@ type UpdateEnvironmentObjectMetricsExportOverridesRequest struct {
 	Username     *string                                                           `json:"username,omitempty"`
 }
 
+// UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType defines model for UpdateEnvironmentObjectMetricsExportOverridesRequest.AuthType.
+type UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType string
+
 // UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType defines model for UpdateEnvironmentObjectMetricsExportOverridesRequest.ExporterType.
 type UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType string
 
 // UpdateEnvironmentObjectMetricsExportRequest defines model for UpdateEnvironmentObjectMetricsExportRequest.
 type UpdateEnvironmentObjectMetricsExportRequest struct {
+	AuthType     *UpdateEnvironmentObjectMetricsExportRequestAuthType     `json:"authType,omitempty"`
 	BasicToken   *string                                                  `json:"basicToken,omitempty"`
 	Endpoint     *string                                                  `json:"endpoint,omitempty"`
 	ExporterType *UpdateEnvironmentObjectMetricsExportRequestExporterType `json:"exporterType,omitempty"`
@@ -3599,6 +3690,9 @@ type UpdateEnvironmentObjectMetricsExportRequest struct {
 	Password     *string                                                  `json:"password,omitempty"`
 	Username     *string                                                  `json:"username,omitempty"`
 }
+
+// UpdateEnvironmentObjectMetricsExportRequestAuthType defines model for UpdateEnvironmentObjectMetricsExportRequest.AuthType.
+type UpdateEnvironmentObjectMetricsExportRequestAuthType string
 
 // UpdateEnvironmentObjectMetricsExportRequestExporterType defines model for UpdateEnvironmentObjectMetricsExportRequest.ExporterType.
 type UpdateEnvironmentObjectMetricsExportRequestExporterType string
@@ -3762,6 +3856,7 @@ type UpdateOrganizationApiTokenRolesRequest struct {
 
 // UpdateOrganizationRequest defines model for UpdateOrganizationRequest.
 type UpdateOrganizationRequest struct {
+	AllowEnhancedSupportAccess *bool  `json:"allowEnhancedSupportAccess,omitempty"`
 	BillingEmail               string `json:"billingEmail"`
 	EnvironmentSecretsShowable *bool  `json:"environmentSecretsShowable,omitempty"`
 	IsScimEnabled              bool   `json:"isScimEnabled"`
@@ -3795,11 +3890,29 @@ type UpdateWorkspaceApiTokenRolesRequest struct {
 	Workspace  *string                          `json:"workspace,omitempty"`
 }
 
+// UpdateWorkspaceAstroIdeDeploymentsRequest defines model for UpdateWorkspaceAstroIdeDeploymentsRequest.
+type UpdateWorkspaceAstroIdeDeploymentsRequest struct {
+	AutoStart     *bool                                                   `json:"autoStart,omitempty"`
+	CloudProvider *UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider `json:"cloudProvider,omitempty"`
+	ClusterId     *string                                                 `json:"clusterId,omitempty"`
+	Region        *string                                                 `json:"region,omitempty"`
+	TimeoutMins   *int                                                    `json:"timeoutMins,omitempty"`
+}
+
+// UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider defines model for UpdateWorkspaceAstroIdeDeploymentsRequest.CloudProvider.
+type UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider string
+
+// UpdateWorkspaceAstroIdeRequest defines model for UpdateWorkspaceAstroIdeRequest.
+type UpdateWorkspaceAstroIdeRequest struct {
+	Deployments UpdateWorkspaceAstroIdeDeploymentsRequest `json:"deployments"`
+}
+
 // UpdateWorkspaceRequest defines model for UpdateWorkspaceRequest.
 type UpdateWorkspaceRequest struct {
-	ApiKeyOnlyDeploymentsDefault bool    `json:"apiKeyOnlyDeploymentsDefault"`
-	Description                  *string `json:"description,omitempty"`
-	Name                         string  `json:"name"`
+	ApiKeyOnlyDeploymentsDefault bool                            `json:"apiKeyOnlyDeploymentsDefault"`
+	AstroIde                     *UpdateWorkspaceAstroIdeRequest `json:"astroIde,omitempty"`
+	Description                  *string                         `json:"description,omitempty"`
+	Name                         string                          `json:"name"`
 }
 
 // User defines model for User.
@@ -3944,6 +4057,7 @@ type WorkloadIdentityOption struct {
 // Workspace defines model for Workspace.
 type Workspace struct {
 	ApiKeyOnlyDeploymentsDefault bool                 `json:"apiKeyOnlyDeploymentsDefault"`
+	AstroIde                     WorkspaceAstroIde    `json:"astroIde"`
 	CreatedAt                    time.Time            `json:"createdAt"`
 	CreatedBy                    *BasicSubjectProfile `json:"createdBy,omitempty"`
 	DeploymentCount              *int                 `json:"deploymentCount,omitempty"`
@@ -3961,6 +4075,23 @@ type Workspace struct {
 	UpdatedBy             *BasicSubjectProfile `json:"updatedBy,omitempty"`
 	UserCount             *int                 `json:"userCount,omitempty"`
 }
+
+// WorkspaceAstroIde defines model for WorkspaceAstroIde.
+type WorkspaceAstroIde struct {
+	Deployments WorkspaceAstroIdeDeployments `json:"deployments"`
+}
+
+// WorkspaceAstroIdeDeployments defines model for WorkspaceAstroIdeDeployments.
+type WorkspaceAstroIdeDeployments struct {
+	AutoStart     bool                                       `json:"autoStart"`
+	CloudProvider *WorkspaceAstroIdeDeploymentsCloudProvider `json:"cloudProvider,omitempty"`
+	ClusterId     *string                                    `json:"clusterId,omitempty"`
+	Region        *string                                    `json:"region,omitempty"`
+	TimeoutMins   *int                                       `json:"timeoutMins,omitempty"`
+}
+
+// WorkspaceAstroIdeDeploymentsCloudProvider defines model for WorkspaceAstroIdeDeployments.CloudProvider.
+type WorkspaceAstroIdeDeploymentsCloudProvider string
 
 // WorkspaceDag defines model for WorkspaceDag.
 type WorkspaceDag struct {
