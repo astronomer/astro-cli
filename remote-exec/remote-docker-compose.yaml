@@ -1,0 +1,33 @@
+x-common-env-vars: &common-env-vars
+  AIRFLOW__CORE__LOAD_EXAMPLES: "True"
+  ASTRO_AGENT_CLIENT_DISALLOW_DEFAULT_XCOM_BACKEND: "False"
+  ASTRO_AGENT_CLIENT_DISALLOW_DEFAULT_SECRET_BACKEND: "False"
+  ASTRO_AGENT_CLIENT_LOG_LEVEL: "DEBUG"
+  ASTRO_AGENT_CLIENT_API_SERVER: "${ASTRO_REMOTE_API_URL}"
+  ASTRO_AGENT_CLIENT_API_TOKEN: "${AGENT_TOKEN}"
+
+services:
+  dag-processor:
+    image: ${REMOTE_EXEC_IMAGE}
+    command: ["dag_processor"]
+    environment:
+      <<: *common-env-vars
+      ASTRO_AGENT_CLIENT_AGENT_ID: "${DP_ID}"
+    restart: always
+  worker:
+    image: ${REMOTE_EXEC_IMAGE}
+    environment:
+      <<: *common-env-vars
+      AIRFLOW__OPENLINEAGE__DISABLED: "true"
+      ASTRO_AGENT_CLIENT_SYNC_SLOTS: "10"
+      ASTRO_AGENT_CLIENT_AGENT_ID: "${WORKER_ID}"
+    restart: always
+  triggerer:
+    image: ${REMOTE_EXEC_IMAGE}
+    command: ["triggerer"]
+    environment:
+      <<: *common-env-vars
+      AIRFLOW__OPENLINEAGE__DISABLED: "true"
+      ASTRO_AGENT_CLIENT_TRIGGERER__ASYNC_SLOTS: "1000"
+      ASTRO_AGENT_CLIENT_AGENT_ID: "${TRIGGERER_ID}"
+    restart: always

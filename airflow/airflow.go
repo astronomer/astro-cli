@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -198,5 +199,9 @@ func repositoryName(name string) string {
 
 // imageName creates an airflow image name
 func ImageName(name, tag string) string {
+	// If name already looks like a full image (has a slash and a colon), use as-is
+	if strings.Contains(name, "/") && strings.Contains(name, ":") {
+		return name
+	}
 	return fmt.Sprintf("%s:%s", repositoryName(name), tag)
 }

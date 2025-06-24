@@ -1,0 +1,33 @@
+x-common-env-vars: &common-env-vars
+  AIRFLOW__CORE__LOAD_EXAMPLES: "True"
+  ASTRO_AGENT_CLIENT_DISALLOW_DEFAULT_XCOM_BACKEND: "False"
+  ASTRO_AGENT_CLIENT_DISALLOW_DEFAULT_SECRET_BACKEND: "False"
+  ASTRO_AGENT_CLIENT_LOG_LEVEL: "DEBUG"
+  ASTRO_AGENT_CLIENT_API_SERVER: "http://localhost:8080"
+  ASTRO_AGENT_CLIENT_API_TOKEN: "test-token"
+
+services:
+  dag-processor:
+    image: test/airflow:latest
+    command: ["dag_processor"]
+    environment:
+      <<: *common-env-vars
+      ASTRO_AGENT_CLIENT_AGENT_ID: "dag-processor-b5e4f3a6-90ab-4fd0-b5cd-444f8910471e"
+    restart: always
+  worker:
+    image: test/airflow:latest
+    environment:
+      <<: *common-env-vars
+      AIRFLOW__OPENLINEAGE__DISABLED: "true"
+      ASTRO_AGENT_CLIENT_SYNC_SLOTS: "10"
+      ASTRO_AGENT_CLIENT_AGENT_ID: "worker-91f2f012-3851-45aa-a28b-7f3721c27e66"
+    restart: always
+  triggerer:
+    image: test/airflow:latest
+    command: ["triggerer"]
+    environment:
+      <<: *common-env-vars
+      AIRFLOW__OPENLINEAGE__DISABLED: "true"
+      ASTRO_AGENT_CLIENT_TRIGGERER__ASYNC_SLOTS: "1000"
+      ASTRO_AGENT_CLIENT_AGENT_ID: "triggerer-6c59f9bc-26e9-4b1f-ae26-068321663b5c"
+    restart: always
