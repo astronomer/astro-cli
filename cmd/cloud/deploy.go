@@ -13,21 +13,21 @@ import (
 )
 
 var (
-	forceDeploy       bool
-	forcePrompt       bool
-	saveDeployConfig  bool
-	pytest            bool
-	parse             bool
-	dags              bool
-	waitForDeploy     bool
-	image             bool
-	dagsPath          string
-	pytestFile        string
-	envFile           string
-	imageName         string
-	deploymentName    string
-	deployDescription string
-	deployExample     = `
+	forceDeploy          bool
+	forcePrompt          bool
+	saveDeployConfig     bool
+	pytest               bool
+	parse                bool
+	dags                 bool
+	waitForDeploy        bool
+	image                bool
+	dagsPath             string
+	pytestFile           string
+	envFile              string
+	imageName            string
+	deployDeploymentName string
+	deployDescription    string
+	deployExample        = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
 
   $ astro deploy <deployment ID>
@@ -68,7 +68,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
 	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have DAG Deploy enabled your DAGs will not be affected.")
 	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
+	cmd.Flags().StringVarP(&deployDeploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
@@ -146,7 +146,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		Pytest:            pytestFile,
 		EnvFile:           envFile,
 		ImageName:         imageName,
-		DeploymentName:    deploymentName,
+		DeploymentName:    deployDeploymentName,
 		Prompt:            forcePrompt,
 		Dags:              dags,
 		Image:             image,

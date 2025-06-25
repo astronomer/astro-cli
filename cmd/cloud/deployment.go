@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -14,8 +15,10 @@ import (
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	remoteexec "github.com/astronomer/astro-cli/remote-exec"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -31,6 +34,7 @@ var (
 	label                     string
 	runtimeVersion            string
 	deploymentID              string
+	deploymentName            string
 	logsKeyword               string
 	forceDelete               bool
 	description               string
@@ -100,6 +104,8 @@ var (
 	errFlag                 = errors.New("--deployment-file can not be used with other arguments")
 	errInvalidExecutor      = errors.New("not a valid executor")
 	errInvalidCloudProvider = errors.New("not a valid cloud provider. It can only be gcp, azure or aws")
+	agentToken              string
+	remoteAPIURL            string
 )
 
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
@@ -127,6 +133,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentTokenRootCmd(out),
 		newDeploymentHibernateCmd(),
 		newDeploymentWakeUpCmd(),
+		newDeploymentRemoteExecCmd(),
 	)
 	return cmd
 }
@@ -591,6 +598,32 @@ func newDeploymentWakeUpCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&removeOverride, "remove-override", "r", false, "Remove any existing override and resume the regular hibernation schedule.")
 	cmd.Flags().BoolVarP(&forceOverride, "force", "f", false, "Force wake up. The CLI will not prompt to confirm before waking up the Deployment.")
 	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
+	return cmd
+}
+
+func newDeploymentRemoteExecCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "remote-exec",
+		Aliases: []string{"re"},
+		Short:   "Run remote execution agents locally",
+		Long:    "Run remote execution agents locally (worker, dag-processor, triggerer).",
+	}
+	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
+	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment ID for remote execution")
+	cmd.PersistentFlags().StringVar(&deploymentName, "deployment-name", "", "deployment name for remote execution")
+	cmd.PersistentFlags().StringVar(&agentToken, "agent-token", "", "agent token for remote execution")
+	cmd.PersistentFlags().StringVar(&remoteAPIURL, "remote-api-url", "", "remote API URL for remote execution (optional)")
+	cmd.MarkPersistentFlagRequired("agent-token")
+	cmd.AddCommand(
+		newRemoteExecInitCmd(),
+		newRemoteExecStartCmd(astroCoreClient),
+		newRemoteExecRunCmd(),
+		newRemoteExecPSCmd(),
+		newRemoteExecStopCmd(),
+		newRemoteExecKillCmd(),
+		newRemoteExecRestartCmd(astroCoreClient),
+		newRemoteExecBashCmd(),
+	)
 	return cmd
 }
 
@@ -1408,4 +1441,339 @@ func getOverrideUntil(until, forDuration string) (*time.Time, error) {
 		return &overrideUntil, nil
 	}
 	return nil, nil
+}
+
+// getDeploymentWithRemoteExecution gets deployment information including remote execution details
+func getDeploymentWithRemoteExecution(ws, deploymentID, deploymentName string) (*astrocore.Deployment, error) {
+	// First get the platform deployment to get the deployment ID
+	platformDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	if err != nil {
+		return nil, err
+	}
+
+	// Now get the core deployment with remote execution information
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := astroCoreClient.GetDeploymentWithResponse(context.Background(), c.Organization, platformDeployment.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.JSON200, nil
+}
+
+func newRemoteExecInitCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Initialize remote execution environment",
+		Long:  "Initialize the remote execution environment with required configuration.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws, err := coalesceWorkspace()
+			if err != nil {
+				return errors.Wrap(err, "failed to find a valid workspace")
+			}
+			currentDeployment, err := getDeploymentWithRemoteExecution(ws, deploymentID, deploymentName)
+			if err != nil {
+				return err
+			}
+			imageName := fmt.Sprintf("%s/airflow:latest", currentDeployment.ReleaseName)
+			remoteAPIURL := ""
+			if currentDeployment.RemoteExecution != nil {
+				remoteAPIURL = currentDeployment.RemoteExecution.RemoteApiUrl
+			}
+			if remoteAPIURL == "" {
+				return fmt.Errorf("remote API URL is required but could not be determined from deployment. Please provide it using --remote-api-url flag")
+			}
+			config := remoteexec.Config{
+				AgentToken:     agentToken,
+				RemoteAPIURL:   remoteAPIURL,
+				DeploymentName: deploymentName,
+				ImageName:      imageName,
+			}
+			re, err := remoteexec.Init(config)
+			if err != nil {
+				return err
+			}
+			fmt.Println("Remote execution environment initialized successfully")
+			fmt.Printf("Compose file: %s\n", re.GetComposeFilePath())
+			return nil
+		},
+	}
+	return cmd
+}
+
+func newRemoteExecStartCmd(coreClient interface{}) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "start",
+		Short: "Start remote execution agents",
+		Long:  "Start the remote execution agents (worker, dag-processor, triggerer).",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws, err := coalesceWorkspace()
+			if err != nil {
+				return errors.Wrap(err, "failed to find a valid workspace")
+			}
+			currentDeployment, err := getDeploymentWithRemoteExecution(ws, deploymentID, deploymentName)
+			if err != nil {
+				return err
+			}
+			imageName := fmt.Sprintf("%s/airflow:latest", currentDeployment.ReleaseName)
+			remoteAPIURL := ""
+			if currentDeployment.RemoteExecution != nil {
+				remoteAPIURL = currentDeployment.RemoteExecution.RemoteApiUrl
+			}
+			if remoteAPIURL == "" {
+				return fmt.Errorf("remote API URL is required but could not be determined from deployment. Please provide it using --remote-api-url flag")
+			}
+			config := remoteexec.Config{
+				AgentToken:     agentToken,
+				RemoteAPIURL:   remoteAPIURL,
+				DeploymentName: deploymentName,
+				ImageName:      imageName,
+			}
+			re, err := remoteexec.Init(config)
+			if err != nil {
+				return err
+			}
+			return re.Start("", "", false, 60)
+		},
+	}
+	return cmd
+}
+
+func newRemoteExecStopCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "stop",
+		Short: "Stop remote execution agents",
+		Long:  "Stop the remote execution agents and clean up containers.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws, err := coalesceWorkspace()
+			if err != nil {
+				return errors.Wrap(err, "failed to find a valid workspace")
+			}
+			currentDeployment, err := getDeploymentWithRemoteExecution(ws, deploymentID, deploymentName)
+			if err != nil {
+				return err
+			}
+			imageName := fmt.Sprintf("%s/airflow:latest", currentDeployment.ReleaseName)
+			remoteAPIURL := ""
+			if currentDeployment.RemoteExecution != nil {
+				remoteAPIURL = currentDeployment.RemoteExecution.RemoteApiUrl
+			}
+			if remoteAPIURL == "" {
+				return fmt.Errorf("remote API URL is required but could not be determined from deployment. Please provide it using --remote-api-url flag")
+			}
+			config := remoteexec.Config{
+				AgentToken:     agentToken,
+				RemoteAPIURL:   remoteAPIURL,
+				DeploymentName: deploymentName,
+				ImageName:      imageName,
+			}
+			re, err := remoteexec.Init(config)
+			if err != nil {
+				return err
+			}
+			return re.Stop(false)
+		},
+	}
+	return cmd
+}
+
+func newRemoteExecPSCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "ps",
+		Short: "Show status of remote execution agents",
+		Long:  "Display the current status of all remote execution agent containers.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws, err := coalesceWorkspace()
+			if err != nil {
+				return errors.Wrap(err, "failed to find a valid workspace")
+			}
+			currentDeployment, err := getDeploymentWithRemoteExecution(ws, deploymentID, deploymentName)
+			if err != nil {
+				return err
+			}
+			imageName := fmt.Sprintf("%s/airflow:latest", currentDeployment.ReleaseName)
+			remoteAPIURL := ""
+			if currentDeployment.RemoteExecution != nil {
+				remoteAPIURL = currentDeployment.RemoteExecution.RemoteApiUrl
+			}
+			if remoteAPIURL == "" {
+				return fmt.Errorf("remote API URL is required but could not be determined from deployment. Please provide it using --remote-api-url flag")
+			}
+			config := remoteexec.Config{
+				AgentToken:     agentToken,
+				RemoteAPIURL:   remoteAPIURL,
+				DeploymentName: deploymentName,
+				ImageName:      imageName,
+			}
+			re, err := remoteexec.Init(config)
+			if err != nil {
+				return err
+			}
+			return re.PS()
+		},
+	}
+	return cmd
+}
+
+func newRemoteExecRunCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "run",
+		Short: "Run a command in a remote execution agent",
+		Long:  "Execute a command inside one of the remote execution agent containers.",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws, err := coalesceWorkspace()
+			if err != nil {
+				return errors.Wrap(err, "failed to find a valid workspace")
+			}
+			currentDeployment, err := getDeploymentWithRemoteExecution(ws, deploymentID, deploymentName)
+			if err != nil {
+				return err
+			}
+			imageName := fmt.Sprintf("%s/airflow:latest", currentDeployment.ReleaseName)
+			remoteAPIURL := ""
+			if currentDeployment.RemoteExecution != nil {
+				remoteAPIURL = currentDeployment.RemoteExecution.RemoteApiUrl
+			}
+			if remoteAPIURL == "" {
+				return fmt.Errorf("remote API URL is required but could not be determined from deployment. Please provide it using --remote-api-url flag")
+			}
+			config := remoteexec.Config{
+				AgentToken:     agentToken,
+				RemoteAPIURL:   remoteAPIURL,
+				DeploymentName: deploymentName,
+				ImageName:      imageName,
+			}
+			re, err := remoteexec.Init(config)
+			if err != nil {
+				return err
+			}
+			return re.Run("", args, "")
+		},
+	}
+	return cmd
+}
+
+func newRemoteExecRestartCmd(coreClient interface{}) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "restart",
+		Short: "Restart remote execution agents",
+		Long:  "Restart all remote execution agent containers.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws, err := coalesceWorkspace()
+			if err != nil {
+				return errors.Wrap(err, "failed to find a valid workspace")
+			}
+			currentDeployment, err := getDeploymentWithRemoteExecution(ws, deploymentID, deploymentName)
+			if err != nil {
+				return err
+			}
+			imageName := fmt.Sprintf("%s/airflow:latest", currentDeployment.ReleaseName)
+			remoteAPIURL := ""
+			if currentDeployment.RemoteExecution != nil {
+				remoteAPIURL = currentDeployment.RemoteExecution.RemoteApiUrl
+			}
+			if remoteAPIURL == "" {
+				return fmt.Errorf("remote API URL is required but could not be determined from deployment. Please provide it using --remote-api-url flag")
+			}
+			config := remoteexec.Config{
+				AgentToken:     agentToken,
+				RemoteAPIURL:   remoteAPIURL,
+				DeploymentName: deploymentName,
+				ImageName:      imageName,
+			}
+			re, err := remoteexec.Init(config)
+			if err != nil {
+				return err
+			}
+			return re.Restart()
+		},
+	}
+	return cmd
+}
+
+func newRemoteExecBashCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "bash",
+		Short: "Open a bash shell in a remote execution agent",
+		Long:  "Open an interactive bash shell inside a remote execution agent container.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws, err := coalesceWorkspace()
+			if err != nil {
+				return errors.Wrap(err, "failed to find a valid workspace")
+			}
+			currentDeployment, err := getDeploymentWithRemoteExecution(ws, deploymentID, deploymentName)
+			if err != nil {
+				return err
+			}
+			imageName := fmt.Sprintf("%s/airflow:latest", currentDeployment.ReleaseName)
+			remoteAPIURL := ""
+			if currentDeployment.RemoteExecution != nil {
+				remoteAPIURL = currentDeployment.RemoteExecution.RemoteApiUrl
+			}
+			if remoteAPIURL == "" {
+				return fmt.Errorf("remote API URL is required but could not be determined from deployment. Please provide it using --remote-api-url flag")
+			}
+			config := remoteexec.Config{
+				AgentToken:     agentToken,
+				RemoteAPIURL:   remoteAPIURL,
+				DeploymentName: deploymentName,
+				ImageName:      imageName,
+			}
+			re, err := remoteexec.Init(config)
+			if err != nil {
+				return err
+			}
+			return re.Bash("")
+		},
+	}
+	return cmd
+}
+
+func newRemoteExecKillCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "kill",
+		Short: "Force kill remote execution agents",
+		Long:  "Force kill all remote execution agent containers.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws, err := coalesceWorkspace()
+			if err != nil {
+				return errors.Wrap(err, "failed to find a valid workspace")
+			}
+			currentDeployment, err := getDeploymentWithRemoteExecution(ws, deploymentID, deploymentName)
+			if err != nil {
+				return err
+			}
+			imageName := fmt.Sprintf("%s/airflow:latest", currentDeployment.ReleaseName)
+			remoteAPIURL := ""
+			if currentDeployment.RemoteExecution != nil {
+				remoteAPIURL = currentDeployment.RemoteExecution.RemoteApiUrl
+			}
+			if remoteAPIURL == "" {
+				return fmt.Errorf("remote API URL is required but could not be determined from deployment. Please provide it using --remote-api-url flag")
+			}
+			config := remoteexec.Config{
+				AgentToken:     agentToken,
+				RemoteAPIURL:   remoteAPIURL,
+				DeploymentName: deploymentName,
+				ImageName:      imageName,
+			}
+			re, err := remoteexec.Init(config)
+			if err != nil {
+				return err
+			}
+			// Stop with force (equivalent to kill)
+			return re.Stop(true)
+		},
+	}
+	return cmd
 }
