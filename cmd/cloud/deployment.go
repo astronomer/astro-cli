@@ -1452,6 +1452,6 @@ func getOverrideUntil(until, forDuration string) (*time.Time, error) {
 }
 
 func fromCsv(s string) *[]string {
-	ss := strings.Split(s, ",")
+	ss := strings.Split(strings.TrimSpace(s), ",")
 	return &ss
 }

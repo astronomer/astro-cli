@@ -633,14 +633,17 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 					deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU = *existingDeployment.DefaultTaskPodCpu
 				}
 				dedicatedDeploymentRequest.DefaultTaskPodCpu = &deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU
+
 				if deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory == "" {
 					deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory = *existingDeployment.DefaultTaskPodMemory
 				}
 				dedicatedDeploymentRequest.DefaultTaskPodMemory = &deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory
+
 				if deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU == "" {
 					deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU = *existingDeployment.ResourceQuotaCpu
 				}
 				dedicatedDeploymentRequest.ResourceQuotaCpu = &deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU
+
 				if deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory == "" {
 					deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory = *existingDeployment.ResourceQuotaMemory
 				}
