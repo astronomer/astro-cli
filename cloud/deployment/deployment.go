@@ -167,8 +167,6 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 		return err
 	}
 
-	// Check if deployment is using Airflow 3
-
 	deploymentID = deployment.Id
 	timeRange := 86400
 	offset := 0
