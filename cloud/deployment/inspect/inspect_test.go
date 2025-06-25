@@ -24,11 +24,13 @@ import (
 var (
 	mockPlatformCoreClient     = new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	executorKubernetes         = astroplatformcore.DeploymentExecutorKUBERNETES
+	executorAstro              = astroplatformcore.DeploymentExecutorASTRO
 	errGetDeployment           = errors.New("test get deployment error")
 	errMarshal                 = errors.New("test error")
 	workloadIdentity           = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
 	deploymentID               = "test-deployment-id"
 	standardType               = astroplatformcore.DeploymentTypeSTANDARD
+	dedicatedType              = astroplatformcore.DeploymentTypeDEDICATED
 	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
 	region                     = "us-central1"
 	astroMachine               = "a5"
@@ -199,6 +201,38 @@ var (
 				Override:  &hibernationOverride,
 				Schedules: &hibernationSchedules,
 			},
+		},
+	}
+	taskLogBucket             = "task-log-bucket"
+	taskLogURLPattern         = "task-log-url-pattern"
+	sourceDeploymentDedicated = astroplatformcore.Deployment{
+		Id:                     deploymentID,
+		Name:                   "test-deployment-label",
+		Description:            &description,
+		WorkspaceName:          &workspaceName,
+		WorkspaceId:            "test-ws-id",
+		Namespace:              "great-release-name",
+		ClusterId:              &clusterID,
+		ClusterName:            &ClusterName,
+		ContactEmails:          &contactEmails,
+		Type:                   &dedicatedType,
+		Executor:               &executorAstro,
+		RuntimeVersion:         "3.0-1",
+		AirflowVersion:         "3.0.0",
+		SchedulerAu:            &schedulerAU,
+		SchedulerReplicas:      schedulerReplicas,
+		WebServerAirflowApiUrl: "some-url/api/v1",
+		EnvironmentVariables:   &deploymentEnvironmentVariable,
+		UpdatedAt:              time.Now(),
+		Status:                 "UNHEALTHY",
+		IsDagDeployEnabled:     false,
+		SchedulerSize:          &schedulerTestSize,
+		WorkloadIdentity:       &workloadIdentity,
+		RemoteExecution: &astroplatformcore.DeploymentRemoteExecution{
+			Enabled:                true,
+			AllowedIpAddressRanges: []string{"0.0.0.0/0"},
+			TaskLogBucket:          &taskLogBucket,
+			TaskLogUrlPattern:      &taskLogURLPattern,
 		},
 	}
 
@@ -548,6 +582,35 @@ func TestGetDeploymentConfig(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
 		sourceDeployment.Type = &hybridType
+	})
+
+	t.Run("returns deployment config for the requested dedicated deployment with remote execution", func(t *testing.T) {
+		var actualDeploymentConfig deploymentConfig
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		expectedDeploymentConfig := deploymentConfig{
+			Name:             sourceDeploymentDedicated.Name,
+			Description:      *sourceDeploymentDedicated.Description,
+			WorkspaceName:    *sourceDeploymentDedicated.WorkspaceName,
+			RunTimeVersion:   sourceDeploymentDedicated.RuntimeVersion,
+			SchedulerAU:      *sourceDeploymentDedicated.SchedulerAu,
+			SchedulerCount:   sourceDeploymentDedicated.SchedulerReplicas,
+			DagDeployEnabled: &sourceDeploymentDedicated.IsDagDeployEnabled,
+			SchedulerSize:    string(*sourceDeploymentDedicated.SchedulerSize),
+			Executor:         string(*sourceDeploymentDedicated.Executor),
+			DeploymentType:   string(*sourceDeploymentDedicated.Type),
+			ClusterName:      *sourceDeploymentDedicated.ClusterName,
+			RemoteExecution: &RemoteExecution{
+				Enabled:                sourceDeploymentDedicated.RemoteExecution.Enabled,
+				AllowedIPAddressRanges: &sourceDeploymentDedicated.RemoteExecution.AllowedIpAddressRanges,
+				TaskLogBucket:          sourceDeploymentDedicated.RemoteExecution.TaskLogBucket,
+				TaskLogURLPattern:      sourceDeploymentDedicated.RemoteExecution.TaskLogUrlPattern,
+			},
+		}
+		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeploymentDedicated, mockPlatformCoreClient, false)
+		assert.NoError(t, err)
+		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
 	})
 }
 
