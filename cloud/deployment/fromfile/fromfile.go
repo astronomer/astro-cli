@@ -409,6 +409,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				remoteExecution = &astroplatformcore.DeploymentRemoteExecutionRequest{
 					Enabled:                true,
 					AllowedIpAddressRanges: deploymentFromFile.Deployment.Configuration.RemoteExecution.AllowedIPAddressRanges,
+					TaskLogBucket:          deploymentFromFile.Deployment.Configuration.RemoteExecution.TaskLogBucket,
+					TaskLogUrlPattern:      deploymentFromFile.Deployment.Configuration.RemoteExecution.TaskLogURLPattern,
 				}
 			}
 

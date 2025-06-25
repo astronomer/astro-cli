@@ -421,6 +421,8 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVarP(&developmentMode, "development-mode", "m", "disable", "Set to 'enable' to enable development-only features such as hibernation. When enabled, the Deployment will not have guaranteed uptime SLAs.'")
 		cmd.Flags().BoolVarP(&flagRemoteExecutionEnabled, "remote-execution-enabled", "", false, "Enables Remote Execution for the Deployment.")
 		cmd.Flags().StringVarP(&flagAllowedIPAddressRanges, "allowed-ip-address-ranges", "", "", "A comma-separated list of allowed IP address ranges for the Deployment. By default, there's no IP restriction. Example: 203.0.113.0/24,198.51.100.42/32")
+		cmd.Flags().StringVarP(&flagTaskLogBucket, "task-log-bucket", "", "", "The bucket to use for storing task logs. Example: s3://my-bucket/airflow-logs")
+		cmd.Flags().StringVarP(&flagTaskLogURLPattern, "task-log-url-pattern", "", "", "The URL pattern to use for accessing task logs. Example: dag_id={{ ti.dag_id }}/run_id={{ ti.run_id }}/task_id={{ ti.task_id }}/{% if ti.map_index >= 0 %}map_index={{ ti.map_index }}/{% endif %}attempt={{ try_number|default(ti.try_number) }}/{{ ti.id }}.log")
 	} else {
 		cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", 0, "The Deployment's scheduler resources in AUs")
 		cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", 0, "The number of scheduler replicas for the Deployment")
@@ -686,6 +688,18 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		}
 		allowedIPAddressRanges = fromCsv(flagAllowedIPAddressRanges)
 	}
+	if cmd.Flags().Changed("task-log-bucket") {
+		if !flagRemoteExecutionEnabled {
+			return errors.New("flag --task-log-bucket cannot be used when remote execution is disabled")
+		}
+		taskLogBucket = &flagTaskLogBucket
+	}
+	if cmd.Flags().Changed("task-log-url-pattern") {
+		if !flagRemoteExecutionEnabled {
+			return errors.New("flag --task-log-url-pattern cannot be used when remote execution is disabled")
+		}
+		taskLogURLPattern = &flagTaskLogURLPattern
+	}
 	if deploymentCreateEnforceCD {
 		cicdEnforcement = enable
 	}
@@ -738,7 +752,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, platformCoreClient, astroCoreClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit

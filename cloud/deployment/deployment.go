@@ -220,7 +220,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logWebserver, logSch
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
 
@@ -418,6 +418,8 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				remoteExecution = &astroplatformcore.DeploymentRemoteExecutionRequest{
 					Enabled:                true,
 					AllowedIpAddressRanges: allowedIpAddressRanges,
+					TaskLogBucket:          taskLogBucket,
+					TaskLogUrlPattern:      taskLogURLPattern,
 				}
 			}
 			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
@@ -1828,7 +1830,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 			dagDeploy = enable
 		}
 
-		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, false, nil, platformCoreClient, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, false, nil, nil, nil, platformCoreClient, coreClient, false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}

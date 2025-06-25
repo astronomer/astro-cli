@@ -755,7 +755,7 @@ deployment:
 		astroCoreClient = mockCoreClient
 		platformCoreClient = mockPlatformCoreClient
 		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--remote-execution-enabled", "--allowed-ip-address-ranges", "0.0.0.0/0",
+			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--remote-execution-enabled", "--allowed-ip-address-ranges", "0.0.0.0/0", "--task-log-bucket", "test-bucket", "--task-log-url-pattern", "test-url-pattern",
 		}
 
 		// Mock user input for deployment name and wait for status
