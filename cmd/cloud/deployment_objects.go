@@ -428,10 +428,6 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find the source Deployment")
 	}
 
-	if err := airflowversions.ValidateNoAirflow3Support(fromDeployment.RuntimeVersion); err != nil {
-		return err
-	}
-
 	fromAirflowURL, err := getAirflowURL(&fromDeployment)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the source Deployment Airflow webserver URL")
@@ -444,10 +440,6 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	toDeployment, err := deployment.GetDeployment(ws, toDeploymentID, toDeploymentName, false, nil, platformCoreClient, astroCoreClient)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the target Deployment")
-	}
-
-	if err := airflowversions.ValidateNoAirflow3Support(toDeployment.RuntimeVersion); err != nil {
-		return err
 	}
 
 	toAirflowURL, err := getAirflowURL(&toDeployment)
@@ -562,10 +554,6 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find the source Deployment")
 	}
 
-	if err := airflowversions.ValidateNoAirflow3Support(fromDeployment.RuntimeVersion); err != nil {
-		return err
-	}
-
 	fromAirflowURL, err := getAirflowURL(&fromDeployment)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the source deployments airflow webserver URL")
@@ -578,10 +566,6 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	toDeployment, err := deployment.GetDeployment(ws, toDeploymentID, toDeploymentName, false, nil, platformCoreClient, astroCoreClient)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the target Deployment")
-	}
-
-	if err := airflowversions.ValidateNoAirflow3Support(toDeployment.RuntimeVersion); err != nil {
-		return err
 	}
 
 	toAirflowURL, err := getAirflowURL(&toDeployment)
@@ -717,10 +701,6 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 		return errors.Wrap(err, "failed to find the source Deployment")
 	}
 
-	if err := airflowversions.ValidateNoAirflow3Support(fromDeployment.RuntimeVersion); err != nil {
-		return err
-	}
-
 	fromAirflowURL, err := getAirflowURL(&fromDeployment)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the source deployments airflow webserver URL")
@@ -733,10 +713,6 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	toDeployment, err := deployment.GetDeployment(ws, toDeploymentID, toDeploymentName, false, nil, platformCoreClient, astroCoreClient)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the target Deployment")
-	}
-
-	if err := airflowversions.ValidateNoAirflow3Support(toDeployment.RuntimeVersion); err != nil {
-		return err
 	}
 
 	toAirflowURL, err := getAirflowURL(&toDeployment)
