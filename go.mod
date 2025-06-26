@@ -2,8 +2,6 @@ module github.com/astronomer/astro-cli
 
 go 1.23.0
 
-// toolchain go1.24.1
-
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/semver/v3 v3.3.1

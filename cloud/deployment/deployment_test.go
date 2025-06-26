@@ -836,6 +836,11 @@ func (s *Suite) TestLogs() {
 					Timestamp: 2,
 					Source:    astrocore.DeploymentLogEntrySourceWorker,
 				},
+				{
+					Raw:       "test log line 5",
+					Timestamp: 1,
+					Source:    astrocore.DeploymentLogEntrySourceApiserver,
+				},
 			},
 			SearchId: "search-id",
 		},
@@ -918,6 +923,22 @@ func (s *Suite) TestLogs() {
 
 		mockPlatformCoreClient.AssertExpectations(s.T())
 		mockCoreClient.AssertExpectations(s.T())
+	})
+	// Add after the "multiple components" subtest
+	s.Run("airflow 3 deployment fetches apiserver logs", func() {
+		// Mock Airflow 3 deployment
+		airflow3Deployment := deploymentResponse
+		if airflow3Deployment.JSON200 != nil {
+			airflow3Deployment.JSON200.RuntimeVersion = "3.0-1"
+		}
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3Deployment, nil).Once()
+
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(&astrocore.GetDeploymentLogsResponse{JSON200: &astrocore.DeploymentLog{Results: []astrocore.DeploymentLogEntry{{Raw: "apiserver log", Timestamp: 1, Source: astrocore.DeploymentLogEntrySourceApiserver}}}, HTTPResponse: &http.Response{StatusCode: 200}}, nil).Once()
+
+		err := Logs("test-id-1", ws, "", "", true, false, false, false, false, false, false, 1, mockPlatformCoreClient, mockCoreClient)
+		s.NoError(err)
 	})
 }
 
@@ -2394,61 +2415,5 @@ func (s *Suite) TestDeleteDeploymentHibernationOverride() {
 		err := DeleteDeploymentHibernationOverride("", ws, "", false, mockPlatformCoreClient)
 		s.NoError(err)
 		mockPlatformCoreClient.AssertExpectations(s.T())
-	})
-}
-
-func (s *Suite) TestAirflow3Blocking() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	// Set up a deployment with Airflow 3 runtime version
-	airflow3Version := "3.0-1"
-
-	// Create a local copy of the deployment response with Airflow 3
-	airflow3DeploymentResponse := astroplatformcore.GetDeploymentResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astroplatformcore.Deployment{
-			Id:             "test-id-airflow3",
-			Name:           "test-airflow3",
-			RuntimeVersion: airflow3Version,
-			WorkspaceId:    ws,
-		},
-	}
-
-	// Mock list deployments response with Airflow 3 deployment
-	airflow3ListDeploymentsResponse := astroplatformcore.ListDeploymentsResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astroplatformcore.DeploymentsPaginated{
-			Deployments: []astroplatformcore.Deployment{
-				{
-					Id:             "test-id-airflow3",
-					Name:           "test-airflow3",
-					RuntimeVersion: airflow3Version,
-					WorkspaceId:    ws,
-				},
-			},
-		},
-	}
-
-	s.Run("Logs blocks operation for Airflow 3 deployments", func() {
-		// Create a fresh local mock clients for this subtest
-		logsMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		logsMockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-
-		// Set expectations on the local mock client
-		// Mock the ListDeploymentsWithResponse method which is called by GetDeployment
-		logsMockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3ListDeploymentsResponse, nil)
-		logsMockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil)
-
-		// Test viewing logs for an Airflow 3 deployment
-		// logWebserver, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs
-		err := Logs("test-id-airflow3", ws, "", "", true, true, true, true, false, false, false, 10, logsMockPlatformCoreClient, logsMockCoreClient)
-
-		s.Error(err)
-		s.Contains(err.Error(), "This command is not yet supported on Airflow 3 deployments")
-		logsMockPlatformCoreClient.AssertExpectations(s.T())
 	})
 }
