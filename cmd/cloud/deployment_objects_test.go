@@ -232,31 +232,6 @@ func TestConnectionCopy(t *testing.T) {
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
-	t.Run("operations are blocked for Airflow 3 deployments when source is Airflow 3", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"connection", "copy", "--source-id", "test-id-1", "--target-id", "test-id-2"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
-	t.Run("operations are blocked for Airflow 3 deployments when target is Airflow 3", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		// For target Airflow 3 deployment, we'll just mock the minimum needed
-		// We don't need cluster response since ValidateNoAirflow3Support should fail first
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"connection", "copy", "--source-id", "test-id-1", "--target-id", "test-id-1"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
 	t.Run("successful connection copy", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient.On("GetConnections", mock.Anything).Return(mockResp, nil).Twice()
@@ -430,31 +405,6 @@ func TestVariableCopy(t *testing.T) {
 		cmdArgs := []string{"airflow-variable", "copy", "--source-id", "test-id-1", "--target-id", "test-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
-	t.Run("operations are blocked for Airflow 3 deployments when source is Airflow 3", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"airflow-variable", "copy", "--source-id", "test-id-1", "--target-id", "test-id-2"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
-	t.Run("operations are blocked for Airflow 3 deployments when target is Airflow 3", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		// For target Airflow 3 deployment, we'll just mock the minimum needed
-		// We don't need cluster response since ValidateNoAirflow3Support should fail first
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"airflow-variable", "copy", "--source-id", "test-id-1", "--target-id", "test-id-1"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
@@ -655,31 +605,6 @@ func TestPoolCopy(t *testing.T) {
 		cmdArgs := []string{"pool", "copy", "--source-id", "test-id-1", "--target-id", "test-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
-	t.Run("operations are blocked for Airflow 3 deployments when source is Airflow 3", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"pool", "copy", "--source-id", "test-id-1", "--target-id", "test-id-2"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
-	t.Run("operations are blocked for Airflow 3 deployments when target is Airflow 3", func(t *testing.T) {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		// For target Airflow 3 deployment, we'll just mock the minimum needed
-		// We don't need cluster response since ValidateNoAirflow3Support should fail first
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-		cmdArgs := []string{"pool", "copy", "--source-id", "test-id-1", "--target-id", "test-id-1"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "This command is not yet supported on Airflow 3 deployments")
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
