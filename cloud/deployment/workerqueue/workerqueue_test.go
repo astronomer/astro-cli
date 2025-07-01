@@ -1337,7 +1337,6 @@ func (s *Suite) TestUpdateQueueList() {
 		},
 	}
 	for _, exec := range []astroplatformcore.DeploymentExecutor{deploymentCelery, deploymentAstro} {
-		exec := exec // capture range variable
 		s.Run(fmt.Sprintf("updates min, max, concurrency and node pool when queue exists (%s)", exec), func() {
 			updatedQ := astroplatformcore.WorkerQueueRequest{
 				Id:                &id2,
