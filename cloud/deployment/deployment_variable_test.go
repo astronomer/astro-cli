@@ -407,27 +407,25 @@ func TestAirflow3BlockingVariables(t *testing.T) {
 		},
 	}
 
-	t.Run("VariableList blocks operation for Airflow 3 deployments", func(t *testing.T) {
+	t.Run("VariableList does not block operation for Airflow 3 deployments", func(t *testing.T) {
 		// Set expectations on the mock client
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3ListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
 
 		buf := new(bytes.Buffer)
 		err := VariableList("test-id-airflow3", "", ws, "", "", false, mockPlatformCoreClient, buf)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "This command is not yet supported on Airflow 3 deployments")
+		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
-	t.Run("VariableModify blocks operation for Airflow 3 deployments", func(t *testing.T) {
+	t.Run("VariableModify does not block operation for Airflow 3 deployments", func(t *testing.T) {
 		// Set expectations on the mock client
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3ListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
 
 		buf := new(bytes.Buffer)
 		err := VariableModify("test-id-airflow3", "test-key", "test-value", ws, "", "", []string{}, false, false, false, mockCoreClient, mockPlatformCoreClient, buf)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "This command is not yet supported on Airflow 3 deployments")
+		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 }
