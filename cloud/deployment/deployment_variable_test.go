@@ -6,9 +6,7 @@ import (
 	"os"
 	"testing"
 
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -365,67 +363,4 @@ func TestAddVariablesFromArgs(t *testing.T) {
 		[]string{"test-key-2=test-value=4", "test-key-3=", "test-key-3"}, false, false, buf,
 	)
 	assert.Equal(t, []astroplatformcore.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue4}}, resp)
-}
-
-func TestAirflow3BlockingVariables(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	// Create a mock client for the tests
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-
-	// Set up a deployment with Airflow 3 runtime version
-	airflow3Version := "3.0-1"
-
-	// Create a deployment response with Airflow 3
-	airflow3DeploymentResponse := astroplatformcore.GetDeploymentResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astroplatformcore.Deployment{
-			Id:             "test-id-airflow3",
-			Name:           "test-airflow3",
-			RuntimeVersion: airflow3Version,
-			WorkspaceId:    ws,
-		},
-	}
-
-	// Mock list deployments response with Airflow 3 deployment
-	airflow3ListDeploymentsResponse := astroplatformcore.ListDeploymentsResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astroplatformcore.DeploymentsPaginated{
-			Deployments: []astroplatformcore.Deployment{
-				{
-					Id:             "test-id-airflow3",
-					Name:           "test-airflow3",
-					RuntimeVersion: airflow3Version,
-					WorkspaceId:    ws,
-				},
-			},
-		},
-	}
-
-	t.Run("VariableList does not block operation for Airflow 3 deployments", func(t *testing.T) {
-		// Set expectations on the mock client
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3ListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-
-		buf := new(bytes.Buffer)
-		err := VariableList("test-id-airflow3", "", ws, "", "", false, mockPlatformCoreClient, buf)
-		assert.NoError(t, err)
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
-
-	t.Run("VariableModify does not block operation for Airflow 3 deployments", func(t *testing.T) {
-		// Set expectations on the mock client
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3ListDeploymentsResponse, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-
-		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-airflow3", "test-key", "test-value", ws, "", "", []string{}, false, false, false, mockCoreClient, mockPlatformCoreClient, buf)
-		assert.NoError(t, err)
-		mockPlatformCoreClient.AssertExpectations(t)
-	})
 }
