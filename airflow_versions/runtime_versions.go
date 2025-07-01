@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/pkg/errors"
 	"golang.org/x/mod/semver"
 )
 
