@@ -1317,6 +1317,7 @@ func (s *Suite) TestUpdateQueueList() {
 	id3 := "q-3"
 	id4 := "q-4"
 	deploymentCelery := astroplatformcore.DeploymentExecutorCELERY
+	deploymentAstro := astroplatformcore.DeploymentExecutorASTRO
 	existingQs := []astroplatformcore.WorkerQueueRequest{
 		{
 			Id:                &id1,
@@ -1335,62 +1336,65 @@ func (s *Suite) TestUpdateQueueList() {
 			WorkerConcurrency: 18,
 		},
 	}
-	s.Run("updates min, max, concurrency and node pool when queue exists", func() {
-		updatedQ := astroplatformcore.WorkerQueueRequest{
-			Id:                &id2,
-			Name:              "test-q-1",
-			IsDefault:         false,
-			MaxWorkerCount:    16,
-			MinWorkerCount:    3,
-			WorkerConcurrency: 20,
-		}
-		updatedQueueList := updateQueueList(existingQs, updatedQ, &deploymentCelery, 3, 16, 20)
-		s.Equal(updatedQ, updatedQueueList[1])
-	})
-	s.Run("does not update id or isDefault when queue exists", func() {
-		updatedQRequest := astroplatformcore.WorkerQueueRequest{
-			Id:                &id3,
-			Name:              "test-q-1",
-			IsDefault:         true,
-			MaxWorkerCount:    16,
-			MinWorkerCount:    3,
-			WorkerConcurrency: 20,
-		}
-		updatedQ := astroplatformcore.WorkerQueueRequest{
-			Id:                &id2,
-			Name:              "test-q-1",
-			IsDefault:         false,
-			MaxWorkerCount:    16,
-			MinWorkerCount:    3,
-			WorkerConcurrency: 20,
-		}
-		updatedQueueList := updateQueueList(existingQs, updatedQRequest, &deploymentCelery, 3, 16, 20)
-		s.Equal(updatedQ, updatedQueueList[1])
-	})
-	s.Run("does not change any queues if queue to update does not exist", func() {
-		updatedQRequest := astroplatformcore.WorkerQueueRequest{
-			Id:                &id4,
-			Name:              "test-q-does-not-exist",
-			IsDefault:         true,
-			MaxWorkerCount:    16,
-			MinWorkerCount:    3,
-			WorkerConcurrency: 20,
-		}
-		updatedQueueList := updateQueueList(existingQs, updatedQRequest, &deploymentCelery, 0, 0, 0)
-		s.Equal(existingQs, updatedQueueList)
-	})
-	s.Run("does not change any queues if user did not request min, max, concurrency", func() {
-		updatedQRequest := astroplatformcore.WorkerQueueRequest{
-			Id:                &id2,
-			Name:              "test-q-1",
-			IsDefault:         false,
-			MaxWorkerCount:    15,
-			MinWorkerCount:    5,
-			WorkerConcurrency: 18,
-		}
-		updatedQueueList := updateQueueList(existingQs, updatedQRequest, &deploymentCelery, -1, 0, 0)
-		s.Equal(existingQs, updatedQueueList)
-	})
+	for _, exec := range []astroplatformcore.DeploymentExecutor{deploymentCelery, deploymentAstro} {
+		exec := exec // capture range variable
+		s.Run(fmt.Sprintf("updates min, max, concurrency and node pool when queue exists (%s)", exec), func() {
+			updatedQ := astroplatformcore.WorkerQueueRequest{
+				Id:                &id2,
+				Name:              "test-q-1",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+			}
+			updatedQueueList := updateQueueList(existingQs, updatedQ, &exec, 3, 16, 20)
+			s.Equal(updatedQ, updatedQueueList[1])
+		})
+		s.Run(fmt.Sprintf("does not update id or isDefault when queue exists (%s)", exec), func() {
+			updatedQRequest := astroplatformcore.WorkerQueueRequest{
+				Id:                &id3,
+				Name:              "test-q-1",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+			}
+			updatedQ := astroplatformcore.WorkerQueueRequest{
+				Id:                &id2,
+				Name:              "test-q-1",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+			}
+			updatedQueueList := updateQueueList(existingQs, updatedQRequest, &exec, 3, 16, 20)
+			s.Equal(updatedQ, updatedQueueList[1])
+		})
+		s.Run(fmt.Sprintf("does not change any queues if queue to update does not exist (%s)", exec), func() {
+			updatedQRequest := astroplatformcore.WorkerQueueRequest{
+				Id:                &id4,
+				Name:              "test-q-does-not-exist",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+			}
+			updatedQueueList := updateQueueList(existingQs, updatedQRequest, &exec, 0, 0, 0)
+			s.Equal(existingQs, updatedQueueList)
+		})
+		s.Run(fmt.Sprintf("does not change any queues if user did not request min, max, concurrency (%s)", exec), func() {
+			updatedQRequest := astroplatformcore.WorkerQueueRequest{
+				Id:                &id2,
+				Name:              "test-q-1",
+				IsDefault:         false,
+				MaxWorkerCount:    15,
+				MinWorkerCount:    5,
+				WorkerConcurrency: 18,
+			}
+			updatedQueueList := updateQueueList(existingQs, updatedQRequest, &exec, -1, 0, 0)
+			s.Equal(existingQs, updatedQueueList)
+		})
+	}
 }
 
 func (s *Suite) TestGetQueueName() {
