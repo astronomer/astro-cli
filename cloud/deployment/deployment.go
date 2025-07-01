@@ -1271,7 +1271,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 
 func updateWorkerQueuesForExecutor(newExecutor astroplatformcore.DeploymentExecutor, workerQueuesRequest, defaultWorkerQueue *[]astroplatformcore.WorkerQueueRequest) *[]astroplatformcore.WorkerQueueRequest {
 	var workerQueuesRequestOrDefault *[]astroplatformcore.WorkerQueueRequest
-	if workerQueuesRequest == nil {
+	if workerQueuesRequest != nil {
 		workerQueuesRequestOrDefault = workerQueuesRequest
 	} else {
 		workerQueuesRequestOrDefault = defaultWorkerQueue
