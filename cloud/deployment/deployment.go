@@ -1865,10 +1865,10 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 	}
 	switch ctx.Domain {
 	case domainutil.LocalDomain:
-		deploymentURL = ctx.Domain + ":5000/" + workspaceID + "/deployments/" + deploymentID + "/overview"
+		deploymentURL = ctx.Domain + ":5000/" + workspaceID + "/deployments/" + deploymentID
 	default:
 		_, domain := domainutil.GetPRSubDomain(ctx.Domain)
-		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID + "/overview"
+		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID
 	}
 	return deploymentURL, nil
 }
