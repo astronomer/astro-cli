@@ -2201,42 +2201,42 @@ func (s *Suite) TestGetDeploymentURL() {
 
 	s.Run("returns deploymentURL for dev environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudDevPlatform)
-		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns deploymentURL for stage environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudStagePlatform)
-		expectedURL := "cloud.astronomer-stage.io/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "cloud.astronomer-stage.io/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns deploymentURL for perf environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudPerfPlatform)
-		expectedURL := "cloud.astronomer-perf.io/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "cloud.astronomer-perf.io/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns deploymentURL for cloud (prod) environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		expectedURL := "cloud.astronomer.io/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "cloud.astronomer.io/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns deploymentURL for pr preview environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudPrPreview)
-		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns deploymentURL for local environment", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		expectedURL := "localhost:5000/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "localhost:5000/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)

@@ -772,7 +772,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         status: UNHEALTHY
         created_at: 2022-11-17T13:25:55.275697-08:00
         updated_at: 2022-11-17T13:25:55.275697-08:00
-        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
         webserver_url: some-url
         hibernation_override:
             is_hibernating: true
@@ -965,7 +965,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         status: UNHEALTHY
         created_at: 2023-02-01T12:00:00Z
         updated_at: 2023-02-01T12:00:00Z
-        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
         webserver_url: some-url
         airflow_api_url: some-url/api/v1
         hibernation_override:
@@ -1065,7 +1065,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
             "webserver_url": "some-url",
             "airflow_api_url": "some-url/api/v1"
 			"hibernation_override": {
