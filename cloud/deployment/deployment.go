@@ -997,6 +997,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				DefaultTaskPodCpu:    &defaultTaskPodCpu,
 				DefaultTaskPodMemory: &defaultTaskPodMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
+				WorkerQueues:         &workerQueuesRequest,
 			}
 			switch schedulerSize {
 			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):
