@@ -997,6 +997,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 				DefaultTaskPodCpu:    &defaultTaskPodCpu,
 				DefaultTaskPodMemory: &defaultTaskPodMemory,
 				WorkloadIdentity:     deplWorkloadIdentity,
+				WorkerQueues:         &workerQueuesRequest,
 			}
 			switch schedulerSize {
 			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL)):
@@ -1271,7 +1272,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 
 func updateWorkerQueuesForExecutor(newExecutor astroplatformcore.DeploymentExecutor, workerQueuesRequest, defaultWorkerQueue *[]astroplatformcore.WorkerQueueRequest) *[]astroplatformcore.WorkerQueueRequest {
 	var workerQueuesRequestOrDefault *[]astroplatformcore.WorkerQueueRequest
-	if workerQueuesRequest == nil {
+	if workerQueuesRequest != nil {
 		workerQueuesRequestOrDefault = workerQueuesRequest
 	} else {
 		workerQueuesRequestOrDefault = defaultWorkerQueue
@@ -1864,10 +1865,10 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 	}
 	switch ctx.Domain {
 	case domainutil.LocalDomain:
-		deploymentURL = ctx.Domain + ":5000/" + workspaceID + "/deployments/" + deploymentID + "/overview"
+		deploymentURL = ctx.Domain + ":5000/" + workspaceID + "/deployments/" + deploymentID
 	default:
 		_, domain := domainutil.GetPRSubDomain(ctx.Domain)
-		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID + "/overview"
+		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID
 	}
 	return deploymentURL, nil
 }

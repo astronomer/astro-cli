@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -31,11 +30,6 @@ func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string,
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, nil)
 	if err != nil {
-		return err
-	}
-
-	// Check if deployment is using Airflow 3
-	if err := airflowversions.ValidateNoAirflow3Support(currentDeployment.RuntimeVersion); err != nil {
 		return err
 	}
 
@@ -99,11 +93,6 @@ func VariableModify(
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, coreClient)
 	if err != nil {
-		return err
-	}
-
-	// Check if deployment is using Airflow 3
-	if err := airflowversions.ValidateNoAirflow3Support(currentDeployment.RuntimeVersion); err != nil {
 		return err
 	}
 

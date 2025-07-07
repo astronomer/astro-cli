@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/pkg/errors"
 	"golang.org/x/mod/semver"
 )
 
@@ -150,15 +149,6 @@ func AirflowMajorVersionForRuntimeVersion(runtimeVersion string) string {
 		return ""
 	}
 	return RuntimeVersionMajor(runtimeVersion)
-}
-
-// ValidateNoAirflow3Support checks if the runtime version is for Airflow 3
-// and returns an error if it is since Airflow 3 is not yet supported for the command
-func ValidateNoAirflow3Support(runtimeVersion string) error {
-	if AirflowMajorVersionForRuntimeVersion(runtimeVersion) == "3" {
-		return errors.New("This command is not yet supported on Airflow 3 deployments")
-	}
-	return nil
 }
 
 func IsAirflow3(runtimeVersion string) bool {

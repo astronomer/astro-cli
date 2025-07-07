@@ -11,7 +11,6 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
 
-	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -65,11 +64,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	if requestedDeployment.Id == "" {
 		fmt.Printf("%s %s\n", deployment.NoDeploymentInWSMsg, ansi.Bold(ws))
 		return nil
-	}
-
-	// Check if deployment is using Airflow 3
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
-		return err
 	}
 
 	getDeploymentOptions := astroplatformcore.GetDeploymentOptionsParams{
@@ -515,11 +509,6 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 		return nil
 	}
 
-	// Check if deployment is using Airflow 3
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
-		return err
-	}
-
 	// prompt for queue name if one was not provided
 	if name == "" {
 		name, err = selectQueue(requestedDeployment.WorkerQueues, out)
@@ -652,7 +641,7 @@ func selectQueue(queueListIndex *[]astroplatformcore.WorkerQueue, out io.Writer)
 }
 
 // updateQueueList is used to merge existingQueues with the queueToUpdate. Based on the executor for the deployment, it
-// sets the resources for CeleryExecutor and removes all resources for KubernetesExecutor as they get calculated based
+// sets the resources for CeleryExecutor and AstroExecutor and removes all resources for KubernetesExecutor as they get calculated based
 // on the worker type.
 //
 //nolint:dupl
@@ -664,7 +653,8 @@ func updateQueueList(existingQueues []astroplatformcore.WorkerQueueRequest, queu
 
 		queue.Id = existingQueues[i].Id               // we need IDs to update existing queues
 		queue.IsDefault = existingQueues[i].IsDefault // users can not change this
-		if *executor == astroplatformcore.DeploymentExecutorCELERY {
+		switch *executor {
+		case astroplatformcore.DeploymentExecutorCELERY, astroplatformcore.DeploymentExecutorASTRO:
 			if wQueueMin != -1 {
 				queue.MinWorkerCount = queueToUpdate.MinWorkerCount
 			}
@@ -674,7 +664,7 @@ func updateQueueList(existingQueues []astroplatformcore.WorkerQueueRequest, queu
 			if wQueueConcurrency != 0 {
 				queue.WorkerConcurrency = queueToUpdate.WorkerConcurrency
 			}
-		} else if *executor == astroplatformcore.DeploymentExecutorKUBERNETES {
+		case astroplatformcore.DeploymentExecutorKUBERNETES:
 			// KubernetesExecutor calculates resources automatically based on the worker type
 			queue.WorkerConcurrency = 0
 			queue.MinWorkerCount = 0

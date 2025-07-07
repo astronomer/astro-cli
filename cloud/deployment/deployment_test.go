@@ -1740,6 +1740,88 @@ func (s *Suite) TestUpdate() { //nolint
 		s.NoError(err)
 	})
 
+	s.Run("successfully update worker queues with standard type", func() {
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(i astroplatformcore.UpdateDeploymentRequest) bool {
+			input, _ := i.AsUpdateStandardDeploymentRequest()
+			return input.WorkerQueues != nil && len(*input.WorkerQueues) == 1 && (*input.WorkerQueues)[0].Name == "worker-name"
+		})).Return(&mockUpdateDeploymentResponse, nil).Times(2)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
+
+		// change type to standard
+		deploymentResponse.JSON200.Type = &standardType
+		deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{
+			{
+				AstroMachine:      &astroMachine,
+				Id:                "queue-id",
+				IsDefault:         true,
+				MaxWorkerCount:    10,
+				MinWorkerCount:    1,
+				Name:              "worker-name",
+				WorkerConcurrency: 20,
+				NodePoolId:        &nodeID,
+			},
+		}
+
+		// mock os.Stdin
+		// Mock user input for deployment name
+		defer testUtil.MockUserInput(s.T(), "1")()
+
+		// success with standard type with name
+		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockCoreClient, mockPlatformCoreClient)
+		s.NoError(err)
+
+		// mock os.Stdin
+		// Mock user input for deployment name
+		defer testUtil.MockUserInput(s.T(), "1")()
+
+		// success with standard type
+		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "enable", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, nil, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockCoreClient, mockPlatformCoreClient)
+		s.NoError(err)
+	})
+
+	s.Run("successfully update worker queues", func() {
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(i astroplatformcore.UpdateDeploymentRequest) bool {
+			input, _ := i.AsUpdateDedicatedDeploymentRequest()
+			return input.WorkerQueues != nil && len(*input.WorkerQueues) == 1 && (*input.WorkerQueues)[0].Name == "worker-name"
+		})).Return(&mockUpdateDeploymentResponse, nil).Times(2)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
+
+		// change type to dedicated
+		deploymentResponse.JSON200.Type = &dedicatedType
+		deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{
+			{
+				AstroMachine:      &astroMachine,
+				Id:                "queue-id",
+				IsDefault:         true,
+				MaxWorkerCount:    10,
+				MinWorkerCount:    1,
+				Name:              "worker-name",
+				WorkerConcurrency: 20,
+				NodePoolId:        &nodeID,
+			},
+		}
+
+		// mock os.Stdin
+		// Mock user input for deployment name
+		defer testUtil.MockUserInput(s.T(), "1")()
+
+		// success with dedicated type with name
+		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockCoreClient, mockPlatformCoreClient)
+		s.NoError(err)
+
+		// mock os.Stdin
+		// Mock user input for deployment name
+		defer testUtil.MockUserInput(s.T(), "1")()
+
+		// success with dedicated type
+		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "disable", "enable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, nil, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockCoreClient, mockPlatformCoreClient)
+		s.NoError(err)
+	})
+
 	s.Run("failed to validate resources", func() {
 		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, errMock).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
@@ -2119,42 +2201,42 @@ func (s *Suite) TestGetDeploymentURL() {
 
 	s.Run("returns deploymentURL for dev environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudDevPlatform)
-		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns deploymentURL for stage environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudStagePlatform)
-		expectedURL := "cloud.astronomer-stage.io/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "cloud.astronomer-stage.io/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns deploymentURL for perf environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudPerfPlatform)
-		expectedURL := "cloud.astronomer-perf.io/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "cloud.astronomer-perf.io/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns deploymentURL for cloud (prod) environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		expectedURL := "cloud.astronomer.io/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "cloud.astronomer.io/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns deploymentURL for pr preview environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudPrPreview)
-		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)
 	})
 	s.Run("returns deploymentURL for local environment", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		expectedURL := "localhost:5000/workspace-id/deployments/deployment-id/overview"
+		expectedURL := "localhost:5000/workspace-id/deployments/deployment-id"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		s.NoError(err)
 		s.Equal(expectedURL, actualURL)
