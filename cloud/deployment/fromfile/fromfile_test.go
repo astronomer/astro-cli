@@ -1496,6 +1496,109 @@ deployment:
 		s.Contains(out.String(), "\"is_development_mode\": true")
 		mockCoreClient.AssertExpectations(s.T())
 	})
+	s.Run("reads the json file and creates a hosted standard deployment with astro executor", func() {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		filePath = "./deployment.yaml"
+		data = `{
+    "deployment": {
+        "environment_variables": [
+            {
+                "is_secret": false,
+                "key": "foo",
+                "updated_at": "NOW",
+                "value": "bar"
+            },
+            {
+                "is_secret": true,
+                "key": "bar",
+                "updated_at": "NOW+1",
+                "value": "baz"
+            }
+        ],
+        "configuration": {
+            "name": "test-deployment-label",
+            "description": "description",
+            "runtime_version": "3.0-1",
+            "dag_deploy_enabled": true,
+            "executor": "AstroExecutor",
+            "scheduler_au": 5,
+            "scheduler_count": 3,
+			"scheduler_size": "large",
+            "workspace_name": "test-workspace",
+			"deployment_type": "STANDARD",
+			"region": "test-region",
+			"cloud_provider": "aws",
+			"is_development_mode": true,
+			"workload_identity": "test-workload-identity"
+        },
+        "worker_queues": [
+            {
+                "name": "default",
+                "is_default": true,
+                "max_worker_count": 130,
+                "min_worker_count": 12,
+                "worker_concurrency": 10,
+                "worker_type": "a5"
+            },
+            {
+                "name": "test-queue-1",
+                "is_default": false,
+                "max_worker_count": 175,
+                "min_worker_count": 8,
+                "worker_concurrency": 10,
+                "worker_type": "a5"
+            }
+        ],
+        "metadata": {
+            "deployment_id": "test-deployment-id",
+            "workspace_id": "test-ws-id",
+            "release_name": "great-release-name",
+            "airflow_version": "2.4.0",
+            "status": "UNHEALTHY",
+            "created_at": "2022-11-17T12:26:45.362983-08:00",
+            "updated_at": "2022-11-17T12:26:45.362983-08:00",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
+            "webserver_url": "some-url"
+        },
+        "alert_emails": [
+            "test1@test.com",
+            "test2@test.com"
+        ]
+    }
+}`
+		mockCoreDeploymentResponse[0].ClusterId = nil
+		mockCoreDeploymentCreateResponse[0].ClusterId = nil
+		deploymentResponse.JSON200.ClusterId = nil
+		standardType := astroplatformcore.DeploymentTypeSTANDARD
+		deploymentResponse.JSON200.Type = &standardType
+		deploymentResponse.JSON200.Executor = &executorAstro
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.CreateDeploymentRequest) bool {
+				request, err := input.AsCreateStandardDeploymentRequest()
+				s.NoError(err)
+				return request.WorkloadIdentity != nil && *request.WorkloadIdentity == "test-workload-identity" &&
+					request.Type == astroplatformcore.CreateStandardDeploymentRequestTypeSTANDARD && request.Executor == astroplatformcore.CreateStandardDeploymentRequestExecutorASTRO
+			},
+		)).Return(&mockCreateDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		s.NoError(err)
+		s.Contains(out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
+		s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
+		s.Contains(out.String(), "\"is_development_mode\": true")
+		s.Contains(out.String(), "\"executor\": \"ASTRO\"")
+		mockCoreClient.AssertExpectations(s.T())
+	})
 	s.Run("returns an error if listing workspace fails", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
