@@ -644,10 +644,10 @@ func TestGetPrintableDeployment(t *testing.T) {
 func TestGetAdditionalNullableFields(t *testing.T) {
 	sourceDeployment.Type = &hybridType
 	sourceDeployment.TaskPodNodePoolId = nil
-	for _, exec := range []*astroplatformcore.DeploymentExecutor{&executorCelery, &executorAstro} {
-		t.Run(fmt.Sprintf("returns alert emails, queues and variables for the requested deployment with %s Executor", string(*exec)), func(t *testing.T) {
+	for _, exec := range []astroplatformcore.DeploymentExecutor{executorCelery, executorAstro} {
+		t.Run(fmt.Sprintf("returns alert emails, queues and variables for the requested deployment with %s Executor", string(exec)), func(t *testing.T) {
 			var expectedAdditional, actualAdditional orderedPieces
-			sourceDeployment.Executor = exec
+			sourceDeployment.Executor = &exec
 			qList := []map[string]interface{}{
 				{
 					"name":               "default",
