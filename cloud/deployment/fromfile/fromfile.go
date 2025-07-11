@@ -323,6 +323,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorCELERY
 			case deployment.KubeExecutor, deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
+			case deployment.AstroExecutor, deployment.ASTRO:
+				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorASTRO
 			}
 
 			var schedulerSize astroplatformcore.CreateStandardDeploymentRequestSchedulerSize
@@ -511,6 +513,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
 			case strings.ToUpper(deployment.KubeExecutor), deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
+			case strings.ToUpper(deployment.AstroExecutor), deployment.ASTRO:
+				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorASTRO
 			}
 
 			var schedulerSize astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize
