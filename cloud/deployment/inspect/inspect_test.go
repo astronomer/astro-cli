@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -643,39 +644,42 @@ func TestGetPrintableDeployment(t *testing.T) {
 func TestGetAdditionalNullableFields(t *testing.T) {
 	sourceDeployment.Type = &hybridType
 	sourceDeployment.TaskPodNodePoolId = nil
-	t.Run("returns alert emails, queues and variables for the requested deployment with CeleryExecutor", func(t *testing.T) {
-		var expectedAdditional, actualAdditional orderedPieces
-		qList := []map[string]interface{}{
-			{
-				"name":               "default",
-				"max_worker_count":   130,
-				"min_worker_count":   12,
-				"worker_concurrency": 110,
-				"worker_type":        "test-instance-type",
-			},
-			{
-				"name":               "test-queue-1",
-				"max_worker_count":   175,
-				"min_worker_count":   8,
-				"worker_concurrency": 150,
-				"worker_type":        "test-instance-type-1",
-			},
-		}
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		rawExpected := map[string]interface{}{
-			"alert_emails":          sourceDeployment.ContactEmails,
-			"worker_queues":         qList,
-			"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
-			"hibernation_schedules": getHibernationSchedulesMap(*sourceDeployment.ScalingSpec.HibernationSpec.Schedules),
-		}
-		rawAdditional := getAdditionalNullableFields(&sourceDeployment, nodePools)
-		err := decodeToStruct(rawAdditional, &actualAdditional)
-		assert.NoError(t, err)
-		err = decodeToStruct(rawExpected, &expectedAdditional)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedAdditional, actualAdditional)
-	})
-	t.Run("returns alert emails, queues and variables for the requested deployment with KubernetesExecutor", func(t *testing.T) {
+	for _, exec := range []astroplatformcore.DeploymentExecutor{executorCelery, executorAstro} {
+		t.Run(fmt.Sprintf("returns alert emails, queues and variables for the requested deployment with %s Executor", string(exec)), func(t *testing.T) {
+			var expectedAdditional, actualAdditional orderedPieces
+			sourceDeployment.Executor = &exec
+			qList := []map[string]interface{}{
+				{
+					"name":               "default",
+					"max_worker_count":   130,
+					"min_worker_count":   12,
+					"worker_concurrency": 110,
+					"worker_type":        "test-instance-type",
+				},
+				{
+					"name":               "test-queue-1",
+					"max_worker_count":   175,
+					"min_worker_count":   8,
+					"worker_concurrency": 150,
+					"worker_type":        "test-instance-type-1",
+				},
+			}
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			rawExpected := map[string]interface{}{
+				"alert_emails":          sourceDeployment.ContactEmails,
+				"worker_queues":         qList,
+				"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
+				"hibernation_schedules": getHibernationSchedulesMap(*sourceDeployment.ScalingSpec.HibernationSpec.Schedules),
+			}
+			rawAdditional := getAdditionalNullableFields(&sourceDeployment, nodePools)
+			err := decodeToStruct(rawAdditional, &actualAdditional)
+			assert.NoError(t, err)
+			err = decodeToStruct(rawExpected, &expectedAdditional)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedAdditional, actualAdditional)
+		})
+	}
+	t.Run("returns alert emails, queues and variables for the requested deployment with KUBERNETES Executor", func(t *testing.T) {
 		var expectedAdditional, actualAdditional orderedPieces
 		sourceDeployment.Executor = &executorKubernetes
 		qList := []map[string]interface{}{

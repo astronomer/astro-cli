@@ -353,7 +353,7 @@ func getQMap(coreDeploymentPointer *astroplatformcore.Deployment, sourceNodePool
 	var resources map[string]interface{}
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))
 	for _, queue := range sourceDeploymentQs { //nolint
-		if *coreDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
+		if *coreDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY || *coreDeployment.Executor == astroplatformcore.DeploymentExecutorASTRO {
 			resources = map[string]interface{}{
 				"max_worker_count":   queue.MaxWorkerCount,
 				"min_worker_count":   queue.MinWorkerCount,
