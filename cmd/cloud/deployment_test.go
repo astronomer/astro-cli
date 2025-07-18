@@ -592,6 +592,11 @@ func TestDeploymentCreate(t *testing.T) {
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
 	})
+	t.Run("returns an error if remote-execution-enabled flag is set but org is not hosted", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--remote-execution-enabled"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "unknown flag: --remote-execution-enabled")
+	})
 	t.Run("creates a deployment from file", func(t *testing.T) {
 		filePath := "./test-deployment.yaml"
 		data := `
@@ -740,6 +745,16 @@ deployment:
 		}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "ibm is not a valid cloud provider. It can only be gcp")
+	})
+	t.Run("returns an error if remote execution is enabled but deployment type is not dedicated", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--remote-execution-enabled"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "flag --remote-execution-enabled can only be used when creating a dedicated deployment")
 	})
 	t.Run("creates a hosted dedicated deployment", func(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
