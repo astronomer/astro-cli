@@ -685,9 +685,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if organization.IsOrgHosted() && clusterID != "" && (deploymentType == standard || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared) {
 		return errors.New("flag --cluster-id cannot be used to create a standard deployment. If you want to create a dedicated deployment, use --type dedicated along with --cluster-id")
 	}
-	if flagRemoteExecutionEnabled && deploymentType != dedicated && deploymentType != fromfile.HostedDedicated {
-		return errors.New("flag --remote-execution-enabled can only be used when creating a dedicated deployment")
-	}
 	if cmd.Flags().Changed("allowed-ip-address-ranges") {
 		if !flagRemoteExecutionEnabled {
 			return errors.New("flag --allowed-ip-address-ranges cannot be used when remote execution is disabled")
