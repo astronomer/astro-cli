@@ -653,6 +653,15 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// clean output
 	deployment.CleanOutput = cleanOutput
 
+	// Get latest runtime version
+	if runtimeVersion == "" {
+		airflowVersionClient := airflowversions.NewClient(httpClient, false)
+		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "", false)
+		if err != nil {
+			return err
+		}
+	}
+
 	// set default executor if none was specified
 	if executor == "" {
 		if airflowversions.IsAirflow3(runtimeVersion) {
@@ -741,14 +750,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		}
 	}
 
-	// Get latest runtime version
-	if runtimeVersion == "" {
-		airflowVersionClient := airflowversions.NewClient(httpClient, false)
-		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "", false)
-		if err != nil {
-			return err
-		}
-	}
 	// validate cloudProvider
 	if cloudProvider != "" {
 		if !isValidCloudProvider(astrocore.SharedClusterCloudProvider(cloudProvider)) {
