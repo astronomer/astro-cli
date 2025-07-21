@@ -382,7 +382,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				WorkloadIdentity:     deplWorkloadIdentity,
 				RemoteExecution:      remoteExecution,
 			}
-			if standardDeploymentRequest.RemoteExecution == nil || !standardDeploymentRequest.RemoteExecution.Enabled {
+			if !remoteExecutionEnabled {
 				if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) || strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) {
 					standardDeploymentRequest.WorkerQueues = &defautWorkerQueue
 				}
@@ -397,7 +397,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE)):
 				standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
-				if standardDeploymentRequest.RemoteExecution != nil && standardDeploymentRequest.RemoteExecution.Enabled {
+				if remoteExecutionEnabled {
 					standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeSMALL
 				} else {
 					standardDeploymentRequest.SchedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
@@ -442,7 +442,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 				WorkloadIdentity:     deplWorkloadIdentity,
 				RemoteExecution:      remoteExecution,
 			}
-			if dedicatedDeploymentRequest.RemoteExecution == nil || !dedicatedDeploymentRequest.RemoteExecution.Enabled {
+			if !remoteExecutionEnabled {
 				if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) || strings.EqualFold(executor, AstroExecutor) || strings.EqualFold(executor, ASTRO) {
 					dedicatedDeploymentRequest.WorkerQueues = &defautWorkerQueue
 				}
@@ -457,7 +457,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 			case strings.ToLower(string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE)):
 				dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			case "":
-				if dedicatedDeploymentRequest.RemoteExecution != nil && dedicatedDeploymentRequest.RemoteExecution.Enabled {
+				if remoteExecutionEnabled {
 					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
 				} else {
 					dedicatedDeploymentRequest.SchedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize(configOption.DefaultValues.SchedulerSize)
