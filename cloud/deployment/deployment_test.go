@@ -2499,3 +2499,153 @@ func (s *Suite) TestDeleteDeploymentHibernationOverride() {
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 }
+
+func (s *Suite) TestCreateDefaultTaskPodCPU() {
+	s.Run("creates default task pod CPU if set", func() {
+		cpu := CreateDefaultTaskPodCPU("1CPU", false, nil)
+		s.Equal("1CPU", *cpu)
+	})
+
+	s.Run("defaults to nil if Remote Execution is enabled", func() {
+		cpu := CreateDefaultTaskPodCPU("", true, nil)
+		s.Nil(cpu)
+	})
+
+	s.Run("defaults to config option if Remote Execution is disabled", func() {
+		cpu := CreateDefaultTaskPodCPU("", false, &astrocore.DeploymentOptions{ResourceQuotas: astrocore.ResourceQuotaOptions{DefaultPodSize: astrocore.DefaultPodSizeOption{Cpu: astrocore.ResourceRange{Default: "0.5CPU"}}}})
+		s.Equal("0.5CPU", *cpu)
+	})
+}
+
+func (s *Suite) TestCreateDefaultTaskPodMemory() {
+	s.Run("creates default task pod memory if set", func() {
+		memory := CreateDefaultTaskPodMemory("1Gi", false, nil)
+		s.Equal("1Gi", *memory)
+	})
+
+	s.Run("defaults to nil if Remote Execution is enabled", func() {
+		memory := CreateDefaultTaskPodMemory("", true, nil)
+		s.Nil(memory)
+	})
+
+	s.Run("defaults to config option if Remote Execution is disabled", func() {
+		memory := CreateDefaultTaskPodMemory("", false, &astrocore.DeploymentOptions{ResourceQuotas: astrocore.ResourceQuotaOptions{DefaultPodSize: astrocore.DefaultPodSizeOption{Memory: astrocore.ResourceRange{Default: "2Gi"}}}})
+		s.Equal("2Gi", *memory)
+	})
+}
+
+func (s *Suite) TestCreateResourceQuotaCPU() {
+	s.Run("creates CPU if set", func() {
+		cpu := CreateResourceQuotaCPU("1CPU", false, nil)
+		s.Equal("1CPU", *cpu)
+	})
+
+	s.Run("defaults to nil if Remote Execution is enabled", func() {
+		cpu := CreateResourceQuotaCPU("", true, nil)
+		s.Nil(cpu)
+	})
+
+	s.Run("defaults to config option if Remote Execution is disabled", func() {
+		cpu := CreateResourceQuotaCPU("", false, &astrocore.DeploymentOptions{ResourceQuotas: astrocore.ResourceQuotaOptions{ResourceQuota: astrocore.ResourceOption{Cpu: astrocore.ResourceRange{Default: "0.5CPU"}}}})
+		s.Equal("0.5CPU", *cpu)
+	})
+}
+
+func (s *Suite) TestCreateResourceQuotaMemory() {
+	s.Run("creates memory if set", func() {
+		memory := CreateResourceQuotaMemory("1Gi", false, nil)
+		s.Equal("1Gi", *memory)
+	})
+
+	s.Run("defaults to nil if Remote Execution is enabled", func() {
+		memory := CreateResourceQuotaMemory("", true, nil)
+		s.Nil(memory)
+	})
+
+	s.Run("defaults to config option if Remote Execution is disabled", func() {
+		memory := CreateResourceQuotaMemory("", false, &astrocore.DeploymentOptions{ResourceQuotas: astrocore.ResourceQuotaOptions{ResourceQuota: astrocore.ResourceOption{Memory: astrocore.ResourceRange{Default: "2Gi"}}}})
+		s.Equal("2Gi", *memory)
+	})
+}
+
+func (s *Suite) TestUpdateDefaultTaskPodCPU() {
+	s.Run("updates CPU if set", func() {
+		cpu := UpdateDefaultTaskPodCPU("2CPU", nil, nil)
+		s.Equal("2CPU", *cpu)
+	})
+
+	s.Run("keeps existing CPU if set", func() {
+		existingDefaultTaskPodCPU := "1CPU"
+		cpu := UpdateDefaultTaskPodCPU("1CPU", &astroplatformcore.Deployment{DefaultTaskPodCpu: &existingDefaultTaskPodCPU}, nil)
+		s.Equal("1CPU", *cpu)
+	})
+
+	s.Run("defaults to nil if Remote Execution is enabled", func() {
+		cpu := UpdateDefaultTaskPodCPU("", &astroplatformcore.Deployment{RemoteExecution: &astroplatformcore.DeploymentRemoteExecution{Enabled: true}}, nil)
+		s.Nil(cpu)
+	})
+
+	s.Run("defaults to config option if Remote Execution is disabled", func() {
+		cpu := UpdateDefaultTaskPodCPU("", &astroplatformcore.Deployment{}, &astrocore.DeploymentOptions{ResourceQuotas: astrocore.ResourceQuotaOptions{DefaultPodSize: astrocore.DefaultPodSizeOption{Cpu: astrocore.ResourceRange{Default: "0.5CPU"}}}})
+		s.Equal("0.5CPU", *cpu)
+	})
+
+	s.Run("returns nil if CPU is not set, Remote Execution is disabled and config is not available", func() {
+		cpu := UpdateDefaultTaskPodCPU("", &astroplatformcore.Deployment{}, nil)
+		s.Nil(cpu)
+	})
+}
+
+func (s *Suite) TestUpdateDefaultTaskPodMemory() {
+	s.Run("updates memory if set", func() {
+		memory := UpdateDefaultTaskPodMemory("2Gi", nil, nil)
+		s.Equal("2Gi", *memory)
+	})
+
+	s.Run("keeps existing memory if set", func() {
+		existingDefaultTaskPodMemory := "1Gi"
+		memory := UpdateDefaultTaskPodMemory("1Gi", &astroplatformcore.Deployment{DefaultTaskPodMemory: &existingDefaultTaskPodMemory}, nil)
+		s.Equal("1Gi", *memory)
+	})
+
+	s.Run("defaults to nil if Remote Execution is enabled", func() {
+		memory := UpdateDefaultTaskPodMemory("", &astroplatformcore.Deployment{RemoteExecution: &astroplatformcore.DeploymentRemoteExecution{Enabled: true}}, nil)
+		s.Nil(memory)
+	})
+
+	s.Run("defaults to config option if Remote Execution is disabled", func() {
+		memory := UpdateDefaultTaskPodMemory("", &astroplatformcore.Deployment{}, &astrocore.DeploymentOptions{ResourceQuotas: astrocore.ResourceQuotaOptions{DefaultPodSize: astrocore.DefaultPodSizeOption{Memory: astrocore.ResourceRange{Default: "2Gi"}}}})
+		s.Equal("2Gi", *memory)
+	})
+
+	s.Run("returns nil if memory is not set, Remote Execution is disabled and config is not available", func() {
+		memory := UpdateDefaultTaskPodMemory("", &astroplatformcore.Deployment{}, nil)
+		s.Nil(memory)
+	})
+}
+
+func (s *Suite) TestUpdateResourceQuotaCPU() {
+	s.Run("updates CPU if set", func() {
+		cpu := UpdateResourceQuotaCPU("2CPU", nil)
+		s.Equal("2CPU", *cpu)
+	})
+
+	s.Run("keeps existing CPU", func() {
+		existingResourceQuotaCPU := "1CPU"
+		cpu := UpdateResourceQuotaCPU("1CPU", &astroplatformcore.Deployment{ResourceQuotaCpu: &existingResourceQuotaCPU})
+		s.Equal("1CPU", *cpu)
+	})
+}
+
+func (s *Suite) TestUpdateResourceQuotaMemory() {
+	s.Run("updates memory if set", func() {
+		memory := UpdateResourceQuotaMemory("2Gi", nil)
+		s.Equal("2Gi", *memory)
+	})
+
+	s.Run("keeps existing memory", func() {
+		existingResourceQuotaMemory := "1Gi"
+		memory := UpdateResourceQuotaMemory("1Gi", &astroplatformcore.Deployment{ResourceQuotaMemory: &existingResourceQuotaMemory})
+		s.Equal("1Gi", *memory)
+	})
+}
