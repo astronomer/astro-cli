@@ -736,8 +736,8 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	// default is to display all logs
 	containersNames := make([]string, 0)
 
-	if !schedulerLogs && !webserverLogs && !triggererLogs {
-		containersNames = append(containersNames, []string{airflow.WebserverDockerContainerName, airflow.SchedulerDockerContainerName, airflow.TriggererDockerContainerName}...)
+	if !schedulerLogs && !webserverLogs && !triggererLogs && !apiServerLogs && !dagProcessorLogs {
+		containersNames = append(containersNames, []string{airflow.WebserverDockerContainerName, airflow.SchedulerDockerContainerName, airflow.TriggererDockerContainerName, airflow.APIServerDockerContainerName, airflow.DAGProcessorDockerContainerName}...)
 	}
 	if webserverLogs {
 		containersNames = append(containersNames, []string{airflow.WebserverDockerContainerName}...)
