@@ -746,16 +746,6 @@ deployment:
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "ibm is not a valid cloud provider. It can only be gcp")
 	})
-	t.Run("returns an error if remote execution is enabled but deployment type is not dedicated", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--remote-execution-enabled"}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "flag --remote-execution-enabled can only be used when creating a dedicated deployment")
-	})
 	t.Run("creates a hosted dedicated deployment", func(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
