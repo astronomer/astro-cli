@@ -833,7 +833,7 @@ func (s *AirflowSuite) TestAirflowLogs() {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Logs", true, "webserver", "scheduler", "triggerer").Return(nil).Once()
+			mockContainerHandler.On("Logs", true, "webserver", "scheduler", "triggerer", "api-server", "dag-processor").Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
