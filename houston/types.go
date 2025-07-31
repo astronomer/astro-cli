@@ -119,6 +119,7 @@ type Deployment struct {
 	CreatedAt             time.Time           `json:"createdAt"`
 	UpdatedAt             time.Time           `json:"updatedAt"`
 	DagDeployment         DagDeploymentConfig `json:"dagDeployment"`
+	ClusterId             string              `json:"clusterId"`
 }
 
 type DagDeploymentConfig struct {

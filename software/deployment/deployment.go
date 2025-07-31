@@ -463,7 +463,7 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 	}
 
 	if desiredRuntimeVersion == "" {
-		selectedVersion, err := getRuntimeVersionSelection(deployment.RuntimeVersion, deployment.RuntimeAirflowVersion, client, out)
+		selectedVersion, err := getRuntimeVersionSelection(deployment.RuntimeVersion, deployment.RuntimeAirflowVersion, deployment.ClusterId, client, out)
 		if err != nil {
 			return err
 		}
@@ -536,7 +536,10 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 		return errDeploymentAlreadyOnRuntime
 	}
 
-	runtimeReleases, err := houston.Call(client.GetRuntimeReleases)(deployment.AirflowVersion)
+	vars := make(map[string]interface{})
+	vars["airflowVersion"] = deployment.AirflowVersion
+	vars["clusterId"] = deployment.ClusterId
+	runtimeReleases, err := houston.Call(client.GetRuntimeReleases)(vars)
 	if err != nil {
 		return err
 	}
@@ -556,7 +559,7 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 	}
 	desiredRuntimeVersion := latestRuntimeRelease.String()
 
-	vars := map[string]interface{}{"deploymentUuid": deploymentID, "desiredRuntimeVersion": desiredRuntimeVersion}
+	vars = map[string]interface{}{"deploymentUuid": deploymentID, "desiredRuntimeVersion": desiredRuntimeVersion}
 	resp, err := houston.Call(client.UpdateDeploymentRuntime)(vars)
 	if err != nil {
 		return err
@@ -644,7 +647,7 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 	return filteredVersions[i-1], nil
 }
 
-func getRuntimeVersionSelection(runtimeVersion, airflowVersion string, client houston.ClientInterface, out io.Writer) (string, error) {
+func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterId string, client houston.ClientInterface, out io.Writer) (string, error) {
 	currentRuntimeVersion, err := semver.NewVersion(runtimeVersion)
 	if err != nil {
 		return "", err
@@ -655,7 +658,9 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion string, client ho
 	}
 
 	// prepare list of AC airflow versions
-	runtimeVersions, err := houston.Call(client.GetRuntimeReleases)("")
+	vars := make(map[string]interface{})
+	vars["clusterId"] = clusterId
+	runtimeVersions, err := houston.Call(client.GetRuntimeReleases)(vars)
 	if err != nil {
 		return "", err
 	}

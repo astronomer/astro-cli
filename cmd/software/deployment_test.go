@@ -1028,7 +1028,50 @@ func (s *Suite) TestDeploymentRuntimeMigrateCommand() {
 	api := new(mocks.ClientInterface)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("UpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
-	api.On("GetRuntimeReleases", mockDeploymentResponse.AirflowVersion).Return(mockRuntimeReleaseResp, nil)
+	vars := make(map[string]interface{})
+	vars["airflowVersion"] = mockDeploymentResponse.AirflowVersion
+	vars["clusterId"] = ""
+	api.On("GetRuntimeReleases", vars).Return(mockRuntimeReleaseResp, nil)
+
+	houstonClient = api
+	output, err := execDeploymentCmd(
+		"runtime",
+		"migrate",
+		"--deployment-id="+mockDeploymentResponse.ID,
+	)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
+	api.AssertExpectations(s.T())
+}
+
+func (s *Suite) TestDeploymentRuntimeMigrateCommandFor1_0_0() {
+	appConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			AstroRuntimeEnabled: true,
+		},
+	}
+
+	expectedOut := `The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to Astronomer.`
+
+	mockDeploymentResponse := *mockDeployment
+	mockDeploymentResponse.AirflowVersion = "2.2.4"
+	mockDeploymentResponse.DesiredAirflowVersion = "2.2.4"
+	mockDeploymentResponse.ClusterId = "ckn4phn1k0104v5xtrer5lpli"
+
+	mockUpdateRequest := map[string]interface{}{
+		"deploymentUuid":        mockDeploymentResponse.ID,
+		"desiredRuntimeVersion": "4.2.4",
+	}
+
+	mockRuntimeReleaseResp := houston.RuntimeReleases{houston.RuntimeRelease{AirflowVersion: "2.2.4", Version: "4.2.4"}}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
+	api.On("UpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
+	vars := make(map[string]interface{})
+	vars["airflowVersion"] = mockDeploymentResponse.AirflowVersion
+	vars["clusterId"] = mockDeploymentResponse.ClusterId
+	api.On("GetRuntimeReleases", vars).Return(mockRuntimeReleaseResp, nil)
 
 	houstonClient = api
 	output, err := execDeploymentCmd(

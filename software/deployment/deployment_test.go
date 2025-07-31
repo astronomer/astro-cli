@@ -1323,7 +1323,9 @@ To cancel, run:
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": mockDeployment.DesiredRuntimeVersion}
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
+		vars := make(map[string]interface{})
+		vars["clusterId"] = ""
+		api.On("GetRuntimeReleases", vars).Return(mockRuntimeReleases, nil)
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
 
 		// mock os.Stdin for when prompted by getAirflowVersionSelection()
@@ -1431,10 +1433,43 @@ func (s *Suite) TestRuntimeMigrate() {
 
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.3", AirflowVersion: "2.2.3"}, houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
+		vars := make(map[string]interface{})
+		vars["airflowVersion"] = mockDeployment.AirflowVersion
+		vars["clusterId"] = ""
+		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.3", AirflowVersion: "2.2.3"}, houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
 		mockMigrateRuntimeResp := *mockDeployment
 		mockMigrateRuntimeResp.RuntimeVersion = "4.2.4"
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(&mockMigrateRuntimeResp, nil)
+		buf := new(bytes.Buffer)
+		err := RuntimeMigrate(mockDeployment.ID, api, buf)
+		s.NoError(err)
+		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
+ test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.4     
+
+The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to Astronomer.
+To cancel, run: 
+ $ astro deployment runtime migrate --cancel
+
+`
+
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
+	})
+
+	s.Run("migrate runtime success for 1.0.0", func() {
+		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": "4.2.4"}
+
+		mockDeploymentResp := *mockDeployment
+		mockDeploymentResp.ClusterId = "test-cluster-id"
+		api := new(mocks.ClientInterface)
+		api.On("GetDeployment", mockDeployment.ID).Return(&mockDeploymentResp, nil)
+		vars := make(map[string]interface{})
+		vars["airflowVersion"] = mockDeployment.AirflowVersion
+		vars["clusterId"] = "test-cluster-id"
+		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.3", AirflowVersion: "2.2.3"}, houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
+		mockMigrateRuntimeUpdateResp := *mockDeployment
+		mockMigrateRuntimeUpdateResp.RuntimeVersion = "4.2.4"
+		api.On("UpdateDeploymentRuntime", expectedVars).Return(&mockMigrateRuntimeUpdateResp, nil)
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
 		s.NoError(err)
@@ -1479,7 +1514,10 @@ To cancel, run:
 		mockError := errors.New("get runtime releases error")
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{}, mockError)
+		vars := make(map[string]interface{})
+		vars["airflowVersion"] = mockDeployment.AirflowVersion
+		vars["clusterId"] = ""
+		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, mockError)
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
@@ -1490,7 +1528,10 @@ To cancel, run:
 	s.Run("invalid airflow version to migrate to runtime", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{}, nil)
+		vars := make(map[string]interface{})
+		vars["airflowVersion"] = mockDeployment.AirflowVersion
+		vars["clusterId"] = ""
+		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
@@ -1503,7 +1544,10 @@ To cancel, run:
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": "4.2.4"}
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
+		vars := make(map[string]interface{})
+		vars["airflowVersion"] = mockDeployment.AirflowVersion
+		vars["clusterId"] = ""
+		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(nil, mockError)
 
 		buf := new(bytes.Buffer)

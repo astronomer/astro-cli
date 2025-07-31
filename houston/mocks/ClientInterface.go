@@ -786,9 +786,9 @@ func (_m *ClientInterface) GetPlatformVersion(_a0 interface{}) (string, error) {
 	return r0, r1
 }
 
-// GetRuntimeReleases provides a mock function with given fields: airflowVersion
-func (_m *ClientInterface) GetRuntimeReleases(airflowVersion string) (houston.RuntimeReleases, error) {
-	ret := _m.Called(airflowVersion)
+// GetRuntimeReleases provides a mock function with given fields: vars
+func (_m *ClientInterface) GetRuntimeReleases(vars map[string]interface{}) (houston.RuntimeReleases, error) {
+	ret := _m.Called(vars)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRuntimeReleases")
@@ -796,19 +796,19 @@ func (_m *ClientInterface) GetRuntimeReleases(airflowVersion string) (houston.Ru
 
 	var r0 houston.RuntimeReleases
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (houston.RuntimeReleases, error)); ok {
-		return rf(airflowVersion)
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) (houston.RuntimeReleases, error)); ok {
+		return rf(vars)
 	}
-	if rf, ok := ret.Get(0).(func(string) houston.RuntimeReleases); ok {
-		r0 = rf(airflowVersion)
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) houston.RuntimeReleases); ok {
+		r0 = rf(vars)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(houston.RuntimeReleases)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(airflowVersion)
+	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
+		r1 = rf(vars)
 	} else {
 		r1 = ret.Error(1)
 	}
