@@ -1056,7 +1056,7 @@ func (s *Suite) TestDeploymentRuntimeMigrateCommandFor1_0_0() {
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = "2.2.4"
 	mockDeploymentResponse.DesiredAirflowVersion = "2.2.4"
-	mockDeploymentResponse.ClusterId = "ckn4phn1k0104v5xtrer5lpli"
+	mockDeploymentResponse.ClusterID = "ckn4phn1k0104v5xtrer5lpli"
 
 	mockUpdateRequest := map[string]interface{}{
 		"deploymentUuid":        mockDeploymentResponse.ID,
@@ -1070,7 +1070,7 @@ func (s *Suite) TestDeploymentRuntimeMigrateCommandFor1_0_0() {
 	api.On("UpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
 	vars := make(map[string]interface{})
 	vars["airflowVersion"] = mockDeploymentResponse.AirflowVersion
-	vars["clusterId"] = mockDeploymentResponse.ClusterId
+	vars["clusterId"] = mockDeploymentResponse.ClusterID
 	api.On("GetRuntimeReleases", vars).Return(mockRuntimeReleaseResp, nil)
 
 	houstonClient = api

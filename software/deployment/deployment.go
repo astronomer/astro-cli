@@ -463,7 +463,7 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 	}
 
 	if desiredRuntimeVersion == "" {
-		selectedVersion, err := getRuntimeVersionSelection(deployment.RuntimeVersion, deployment.RuntimeAirflowVersion, deployment.ClusterId, client, out)
+		selectedVersion, err := getRuntimeVersionSelection(deployment.RuntimeVersion, deployment.RuntimeAirflowVersion, deployment.ClusterID, client, out)
 		if err != nil {
 			return err
 		}
@@ -538,7 +538,7 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 
 	vars := make(map[string]interface{})
 	vars["airflowVersion"] = deployment.AirflowVersion
-	vars["clusterId"] = deployment.ClusterId
+	vars["clusterId"] = deployment.ClusterID
 	runtimeReleases, err := houston.Call(client.GetRuntimeReleases)(vars)
 	if err != nil {
 		return err
@@ -647,7 +647,7 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 	return filteredVersions[i-1], nil
 }
 
-func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterId string, client houston.ClientInterface, out io.Writer) (string, error) {
+func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string, client houston.ClientInterface, out io.Writer) (string, error) {
 	currentRuntimeVersion, err := semver.NewVersion(runtimeVersion)
 	if err != nil {
 		return "", err
@@ -659,7 +659,7 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterId string
 
 	// prepare list of AC airflow versions
 	vars := make(map[string]interface{})
-	vars["clusterId"] = clusterId
+	vars["clusterId"] = clusterID
 	runtimeVersions, err := houston.Call(client.GetRuntimeReleases)(vars)
 	if err != nil {
 		return "", err

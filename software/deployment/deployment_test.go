@@ -1460,7 +1460,7 @@ To cancel, run:
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": "4.2.4"}
 
 		mockDeploymentResp := *mockDeployment
-		mockDeploymentResp.ClusterId = "test-cluster-id"
+		mockDeploymentResp.ClusterID = "test-cluster-id"
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(&mockDeploymentResp, nil)
 		vars := make(map[string]interface{})
