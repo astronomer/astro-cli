@@ -237,7 +237,7 @@ var (
 				}
 			}`,
 		},
-        {
+		{
 			version: "1.0.0",
 			query: `
 			query GetDeployment(
