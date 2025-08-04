@@ -55,22 +55,23 @@ var (
 	knowHosts               string
 	runtimeVersion          string
 	desiredRuntimeVersion   string
+	clusterID               string
 	deploymentCreateExample = `
 # Create new deployment with Celery executor (default: celery without params).
-$ astro deployment create --label=new-deployment-name --executor=celery
+$ astro deployment create --label=new-deployment-name --executor=celery --cluster-id=123(mandatory for Software release 1.0.0 and above)
 
 # Create new deployment with Local executor.
-$ astro deployment create --label=new-deployment-name-local --executor=local
+$ astro deployment create --label=new-deployment-name-local --executor=local --cluster-id=123(mandatory for Software release 1.0.0 and above)
 
 # Create new deployment with Kubernetes executor.
-$ astro deployment create --label=new-deployment-name-k8s --executor=k8s --airflow-version=2.4.1
+$ astro deployment create --label=new-deployment-name-k8s --executor=k8s --airflow-version=2.4.1 --cluster-id=123(mandatory for Software release 1.0.0 and above)
 
 # Create new deployment with Astronomer Runtime.
-$ astro deployment create --label=my-new-deployment --executor=k8s --runtime-version=6.0.1
+$ astro deployment create --label=my-new-deployment --executor=k8s --runtime-version=6.0.1 --cluster-id=123(mandatory for Software release 1.0.0 and above)
 `
 	createExampleDagDeployment = `
 # Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
-$ astro deployment create --label=my-new-deployment --executor=k8s --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=test:/test
+$ astro deployment create --label=my-new-deployment --executor=k8s --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=test:/test --cluster-id=123(mandatory for Software release 1.0.0 and above)
 `
 	deploymentAirflowUpgradeExample = `
   $ astro deployment airflow upgrade --deployment-id=<deployment-id> --desired-airflow-version=<desired-airflow-version>
@@ -167,6 +168,15 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired Airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
+	houstonVersion, err := houstonClient.GetPlatformVersion(nil)
+	if err != nil {
+		fmt.Println("Unable to get Houston version: ", err.Error())
+		return cmd
+	}
+	if houstonVersion >= "1.0.0" {
+		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Set cluster ID to create deployment in (mandatory for Software release 1.0.0 and above)")
+		_ = cmd.MarkFlagRequired("cluster-id")
+	}
 	_ = cmd.MarkFlagRequired("label")
 	return cmd
 }
@@ -420,6 +430,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		KnownHosts:        knowHosts,
 		GitSyncInterval:   gitSyncInterval,
 		TriggererReplicas: createTriggererReplicas,
+		ClusterID:         clusterID,
 	}
 	return deployment.Create(req, houstonClient, out)
 }

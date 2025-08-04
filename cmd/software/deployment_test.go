@@ -83,6 +83,7 @@ func (s *Suite) TestDeploymentCreateCommandNfsMountDisabled() {
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -112,6 +113,7 @@ func (s *Suite) TestDeploymentCreateCommandTriggererDisabled() {
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -143,6 +145,7 @@ func (s *Suite) TestDeploymentCreateCommandTriggererEnabled() {
 	}
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -174,6 +177,7 @@ func (s *Suite) TestDeploymentCreateCommandNfsMountEnabled() {
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(2)
 
 	myTests := []struct {
@@ -206,6 +210,7 @@ func (s *Suite) TestDeploymentCreateCommandGitSyncEnabled() {
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(5)
 
 	myTests := []struct {
@@ -241,6 +246,7 @@ func (s *Suite) TestDeploymentCreateCommandDagOnlyDeployEnabled() {
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(5)
 
 	myTests := []struct {
@@ -270,6 +276,7 @@ func (s *Suite) TestDeploymentCreateCommandGitSyncDisabled() {
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -279,6 +286,35 @@ func (s *Suite) TestDeploymentCreateCommandGitSyncDisabled() {
 	}{
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "", expectedError: "unknown flag: --dag-deployment-type"},
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		houstonClient = api
+		output, err := execDeploymentCmd(tt.cmdArgs...)
+		if tt.expectedError != "" {
+			s.EqualError(err, tt.expectedError)
+		} else {
+			s.NoError(err)
+		}
+		s.Contains(output, tt.expectedOutput)
+	}
+}
+
+func (s *Suite) TestDeploymentCreateCommandGitSyncDisabledAndVersionIs1_0_0AndClusterIDIsNotSet() {
+	appConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{GitSyncEnabled: false},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("GetPlatformVersion", nil).Return("1.0.0", nil)
+	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "", expectedError: "required flag(s) \"cluster-id\" not set"},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -302,6 +338,7 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 		}
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}
@@ -323,6 +360,7 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 		}
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1", "--force"}
@@ -345,6 +383,7 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1"}
 		houstonClient = api
@@ -379,6 +418,7 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1"}
 		houstonClient = api
@@ -413,6 +453,7 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 		dagDeployment := &houston.DagDeploymentConfig{
 			Type: houston.ImageDeploymentType,
@@ -438,6 +479,7 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		getDeploymentError := errors.New("Test error")
 		api.On("GetDeployment", mock.Anything).Return(nil, getDeploymentError).Once()
 		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}
@@ -456,6 +498,7 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		dagDeployment := &houston.DagDeploymentConfig{
 			Type: houston.DagOnlyDeploymentType,
 		}
@@ -480,6 +523,7 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		dagDeployment := &houston.DagDeploymentConfig{
 			Type: houston.ImageDeploymentType,
 		}
@@ -520,6 +564,7 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		dagDeployment := &houston.DagDeploymentConfig{
 			Type: houston.ImageDeploymentType,
 		}
@@ -560,6 +605,7 @@ func (s *Suite) TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy() {
 		}
 		api := new(mocks.ClientInterface)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		dagDeployment := &houston.DagDeploymentConfig{
 			Type: houston.DagOnlyDeploymentType,
 		}
@@ -600,6 +646,7 @@ func (s *Suite) TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(appConfig, nil)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		dagDeployment := &houston.DagDeploymentConfig{
 			Type: houston.DagOnlyDeploymentType,
 		}
@@ -643,6 +690,7 @@ func (s *Suite) TestDeploymentUpdateCommand() {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Times(8)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	dagDeployment := &houston.DagDeploymentConfig{
 		Type: houston.ImageDeploymentType,
 	}
@@ -687,6 +735,7 @@ func (s *Suite) TestDeploymentUpdateTriggererEnabledCommand() {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Twice()
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	dagDeployment := &houston.DagDeploymentConfig{
 		Type: houston.ImageDeploymentType,
 	}
@@ -726,6 +775,7 @@ func (s *Suite) TestDeploymentUpdateCommandGitSyncDisabled() {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	dagDeployment := &houston.DagDeploymentConfig{
 		Type: houston.ImageDeploymentType,
 	}
@@ -763,7 +813,7 @@ func (s *Suite) TestDeploymentUpdateCommandDagOnlyDeployEnabled() {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	myTests := []struct {
 		cmdArgs        []string
 		expectedOutput string
@@ -800,7 +850,7 @@ func (s *Suite) TestDeploymentAirflowUpgradeCommand() {
 	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("UpdateDeploymentAirflow", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd(
 		"airflow",
@@ -831,7 +881,7 @@ func (s *Suite) TestDeploymentAirflowUpgradeCancelCommand() {
 	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("UpdateDeploymentAirflow", expectedUpdateRequest).Return(&mockDeploymentUpdated, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd(
 		"airflow",
@@ -849,7 +899,7 @@ func (s *Suite) TestDeploymentDelete() {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: false}).Return(mockDeployment, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd("delete", mockDeployment.ID)
 	s.NoError(err)
@@ -863,7 +913,7 @@ func (s *Suite) TestDeploymentList() {
 
 	api := new(mocks.ClientInterface)
 	api.On("ListPaginatedDeployments", expectedRequest).Return([]houston.Deployment{*mockDeployment}, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd("list", "--all")
 	s.NoError(err)
@@ -881,7 +931,7 @@ func (s *Suite) TestDeploymentDeleteHardResponseNo() {
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	// mock os.Stdin
 	input := []byte("n")
 	r, w, err := os.Pipe()
@@ -911,7 +961,7 @@ func (s *Suite) TestDeploymentDeleteHardResponseYes() {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: true}).Return(mockDeployment, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	// mock os.Stdin
 	input := []byte("y")
 	r, w, err := os.Pipe()
@@ -954,7 +1004,7 @@ func (s *Suite) TestDeploymentRuntimeUpgradeCommand() {
 	api := new(mocks.ClientInterface)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("UpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd(
 		"runtime",
@@ -992,7 +1042,7 @@ func (s *Suite) TestDeploymentRuntimeUpgradeCancelCommand() {
 	api := new(mocks.ClientInterface)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("CancelUpdateDeploymentRuntime", expectedUpdateRequest).Return(&mockDeploymentUpdated, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd(
 		"runtime",
@@ -1032,7 +1082,7 @@ func (s *Suite) TestDeploymentRuntimeMigrateCommand() {
 	vars["airflowVersion"] = mockDeploymentResponse.AirflowVersion
 	vars["clusterId"] = ""
 	api.On("GetRuntimeReleases", vars).Return(mockRuntimeReleaseResp, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd(
 		"runtime",
@@ -1072,7 +1122,7 @@ func (s *Suite) TestDeploymentRuntimeMigrateCommandFor1_0_0() {
 	vars["airflowVersion"] = mockDeploymentResponse.AirflowVersion
 	vars["clusterId"] = mockDeploymentResponse.ClusterID
 	api.On("GetRuntimeReleases", vars).Return(mockRuntimeReleaseResp, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd(
 		"runtime",
@@ -1106,7 +1156,7 @@ func (s *Suite) TestDeploymentRuntimeMigrateCancelCommand() {
 	api := new(mocks.ClientInterface)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("CancelUpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd(
 		"runtime",

@@ -223,7 +223,8 @@ func (s *Suite) TestCreate() {
 	dagDeploymentType := houston.ImageDeploymentType
 	nfsLocation := ""
 	triggerReplicas := 0
-	req := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas}
+	clusterID := "testClusterID"
+	req := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID}
 
 	s.Run("create success", func() {
 		api := new(mocks.ClientInterface)
@@ -262,7 +263,7 @@ func (s *Suite) TestCreate() {
 
 		triggerReplicas = -1
 		buf := new(bytes.Buffer)
-		req = &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas}
+		req = &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID}
 		err := Create(req, api, buf)
 		s.NoError(err)
 		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
@@ -315,7 +316,7 @@ func (s *Suite) TestCreate() {
 
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
-			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, "", runtimeVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas}
+			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, "", runtimeVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas, clusterID}
 			err := Create(createReq, api, buf)
 			if tt.expectedError != "" {
 				s.EqualError(err, tt.expectedError)
@@ -367,7 +368,7 @@ func (s *Suite) TestCreate() {
 
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(&appConfig, nil)
-		api.On("GetAvailableNamespaces", nil).Return(mockNamespaces, nil)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockNamespaces, nil)
 
 		buf := new(bytes.Buffer)
 
@@ -396,7 +397,7 @@ func (s *Suite) TestCreate() {
 
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(&appConfig, nil)
-		api.On("GetAvailableNamespaces", nil).Return([]houston.Namespace{}, errMock)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return([]houston.Namespace{}, errMock)
 
 		buf := new(bytes.Buffer)
 		err := Create(req, api, buf)
@@ -1039,7 +1040,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 
 	s.Run("get available namespaces", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAvailableNamespaces", nil).Return(mockAvailableNamespaces, nil)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockAvailableNamespaces, nil)
 
 		buf := new(bytes.Buffer)
 
@@ -1055,7 +1056,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		name, err := getDeploymentSelectionNamespaces(api, buf)
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
 		s.NoError(err)
 		expected := `#     AVAILABLE KUBERNETES NAMESPACES     
 1     test1                               
@@ -1068,10 +1069,10 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 
 	s.Run("no namespace", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAvailableNamespaces", nil).Return([]houston.Namespace{}, nil)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return([]houston.Namespace{}, nil)
 
 		buf := new(bytes.Buffer)
-		name, err := getDeploymentSelectionNamespaces(api, buf)
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
 		expected := ``
 		s.Equal(expected, name)
 		s.EqualError(err, "no kubernetes namespaces are available")
@@ -1080,7 +1081,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 
 	s.Run("parse error", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAvailableNamespaces", nil).Return(mockAvailableNamespaces, nil)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockAvailableNamespaces, nil)
 
 		buf := new(bytes.Buffer)
 
@@ -1096,7 +1097,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		name, err := getDeploymentSelectionNamespaces(api, buf)
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
 		s.Equal("", name)
 		s.EqualError(err, "cannot parse test to int")
 		api.AssertExpectations(s.T())
@@ -1104,10 +1105,10 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 
 	s.Run("api error", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAvailableNamespaces", nil).Return(nil, errMock)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
-		name, err := getDeploymentSelectionNamespaces(api, buf)
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
 		s.Equal("", name)
 		s.EqualError(err, errMock.Error())
 	})
