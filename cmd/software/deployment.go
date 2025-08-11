@@ -145,7 +145,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 			localHoustonVersion = version
 		}
 	}
-	
+
 	example := deploymentCreateExample
 	if localHoustonVersion >= "1.0.0" {
 		example = deploymentCreateExampleSoftwareV1
