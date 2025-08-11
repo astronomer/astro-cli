@@ -668,9 +668,9 @@ func (_m *ClientInterface) GetAuthConfig(ctx *config.Context) (*houston.AuthConf
 	return r0, r1
 }
 
-// GetAvailableNamespaces provides a mock function with given fields: _a0
-func (_m *ClientInterface) GetAvailableNamespaces(_a0 interface{}) ([]houston.Namespace, error) {
-	ret := _m.Called(_a0)
+// GetAvailableNamespaces provides a mock function with given fields: vars
+func (_m *ClientInterface) GetAvailableNamespaces(vars map[string]interface{}) ([]houston.Namespace, error) {
+	ret := _m.Called(vars)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAvailableNamespaces")
@@ -678,19 +678,19 @@ func (_m *ClientInterface) GetAvailableNamespaces(_a0 interface{}) ([]houston.Na
 
 	var r0 []houston.Namespace
 	var r1 error
-	if rf, ok := ret.Get(0).(func(interface{}) ([]houston.Namespace, error)); ok {
-		return rf(_a0)
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) ([]houston.Namespace, error)); ok {
+		return rf(vars)
 	}
-	if rf, ok := ret.Get(0).(func(interface{}) []houston.Namespace); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) []houston.Namespace); ok {
+		r0 = rf(vars)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]houston.Namespace)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(_a0)
+	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
+		r1 = rf(vars)
 	} else {
 		r1 = ret.Error(1)
 	}

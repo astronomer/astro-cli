@@ -153,7 +153,7 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 	vars := map[string]interface{}{"label": req.Label, "workspaceId": req.WS, "executor": req.Executor, "cloudRole": req.CloudRole}
 
 	if CheckPreCreateNamespaceDeployment(client) {
-		namespace, err := getDeploymentSelectionNamespaces(client, out)
+		namespace, err := getDeploymentSelectionNamespaces(client, out, req.ClusterID)
 		if err != nil {
 			return err
 		}
@@ -245,7 +245,7 @@ func Delete(id string, hardDelete bool, client houston.ClientInterface, out io.W
 }
 
 // list all available namespaces
-func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Writer) (string, error) {
+func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Writer, clusterID string) (string, error) {
 	tab := &printutil.Table{
 		Padding:        []int{30},
 		DynamicPadding: true,
@@ -255,7 +255,7 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 	logger.Debug("checking namespaces available for platform")
 	tab.GetUserInput = true
 
-	names, err := houston.Call(client.GetAvailableNamespaces)(nil)
+	names, err := houston.Call(client.GetAvailableNamespaces)(map[string]interface{}{"clusterID": clusterID})
 	if err != nil {
 		return "", err
 	}

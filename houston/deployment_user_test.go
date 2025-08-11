@@ -109,6 +109,7 @@ func (s *Suite) TestAddDeploymentUser() {
 				Header:     make(http.Header),
 			}
 		})
+
 		api := NewClient(client)
 
 		_, err := api.AddDeploymentUser(UpdateDeploymentUserRequest{})

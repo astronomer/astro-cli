@@ -82,6 +82,7 @@ func (s *Suite) TestDeploymentLogsWebServerRemoteLogs() {
 			api := new(mocks.ClientInterface)
 			// Have to use mock.Anything because since is computed in the function by using time.Now()
 			api.On("ListDeploymentLogs", mock.Anything).Return(mockLogs, nil)
+			api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 
 			houstonClient = api
 			output, err := execDeploymentCmd("logs", test.component, mockDeployment.ID)
@@ -93,6 +94,7 @@ func (s *Suite) TestDeploymentLogsWebServerRemoteLogs() {
 		s.Run(fmt.Sprintf("list %s logs error", test.component), func() {
 			api := new(mocks.ClientInterface)
 			api.On("ListDeploymentLogs", mock.Anything).Return(nil, errMock)
+			api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 
 			houstonClient = api
 			_, err := execDeploymentCmd("logs", test.component, mockDeployment.ID)
