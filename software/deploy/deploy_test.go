@@ -153,7 +153,9 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithTagWarning() {
 	mockedDeploymentConfig := &houston.DeploymentConfig{
 		AirflowImages: mockAirflowImageList,
 	}
-	s.houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
@@ -176,8 +178,10 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithImageRepoWarning() {
 	mockedDeploymentConfig := &houston.DeploymentConfig{
 		AirflowImages: mockAirflowImageList,
 	}
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
-	s.houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
 	s.NoError(err)
@@ -215,7 +219,9 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 		AirflowImages: mockAirflowImageList,
 	}
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
-	s.houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 	s.houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:test-test", AirflowVersion: "1.10.12", RuntimeVersion: ""}).Return(nil, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description, "")
@@ -274,7 +280,9 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistryAndCustomImageName
 		AirflowImages: mockAirflowImageList,
 	}
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
-	s.houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 	s.houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:latest", AirflowVersion: "1.10.12", RuntimeVersion: "12.2.0"}).Return(nil, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description, customImageName)
@@ -293,7 +301,9 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 		AirflowImages: mockAirflowImageList,
 	}
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(nil, errMockHouston).Once()
-	s.houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 	// houston GetDeploymentConfig call failure
 	err = buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
 	s.Error(err, errMockHouston)
@@ -425,7 +435,9 @@ func (s *Suite) TestAirflowSuccess() {
 	s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Once()
 	s.houstonMock.On("GetDeployment", mock.Anything).Return(&houston.Deployment{}, nil).Once()
-	s.houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(mockRuntimeReleases, nil)
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, false, "")
 	s.NoError(err)
@@ -458,7 +470,9 @@ func (s *Suite) TestAirflowSuccessForImageOnly() {
 	}
 
 	s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-	s.houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(mockRuntimeReleases, nil)
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, "")
 	s.NoError(err)
@@ -492,7 +506,9 @@ func (s *Suite) TestAirflowSuccessForImageName() {
 	}
 
 	s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-	s.houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(mockRuntimeReleases, nil)
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, customImageName)
 	s.NoError(err)

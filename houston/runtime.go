@@ -1,19 +1,15 @@
 package houston
 
 var GetRuntimeReleases = `
-	query runtimeReleases($airflowVersion: String) {
-		runtimeReleases(airflowVersion: $airflowVersion) {
+	query runtimeReleases($airflowVersion: String, $clusterId: Uuid) {
+		runtimeReleases(airflowVersion: $airflowVersion, clusterId: $clusterId) {
 			version
 			airflowVersion
 			airflowDatabaseMigrations
 		}
 	}`
 
-func (h ClientImplementation) GetRuntimeReleases(airflowVersion string) (RuntimeReleases, error) {
-	vars := make(map[string]interface{})
-	if airflowVersion != "" {
-		vars["airflowVersion"] = airflowVersion
-	}
+func (h ClientImplementation) GetRuntimeReleases(vars map[string]interface{}) (RuntimeReleases, error) {
 	dReq := Request{
 		Query:     GetRuntimeReleases,
 		Variables: vars,

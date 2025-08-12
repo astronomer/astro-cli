@@ -153,7 +153,7 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 	vars := map[string]interface{}{"label": req.Label, "workspaceId": req.WS, "executor": req.Executor, "cloudRole": req.CloudRole}
 
 	if CheckPreCreateNamespaceDeployment(client) {
-		namespace, err := getDeploymentSelectionNamespaces(client, out)
+		namespace, err := getDeploymentSelectionNamespaces(client, out, req.ClusterID)
 		if err != nil {
 			return err
 		}
@@ -245,7 +245,7 @@ func Delete(id string, hardDelete bool, client houston.ClientInterface, out io.W
 }
 
 // list all available namespaces
-func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Writer) (string, error) {
+func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Writer, clusterID string) (string, error) {
 	tab := &printutil.Table{
 		Padding:        []int{30},
 		DynamicPadding: true,
@@ -255,7 +255,7 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 	logger.Debug("checking namespaces available for platform")
 	tab.GetUserInput = true
 
-	names, err := houston.Call(client.GetAvailableNamespaces)(nil)
+	names, err := houston.Call(client.GetAvailableNamespaces)(map[string]interface{}{"clusterID": clusterID})
 	if err != nil {
 		return "", err
 	}
@@ -463,7 +463,7 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 	}
 
 	if desiredRuntimeVersion == "" {
-		selectedVersion, err := getRuntimeVersionSelection(deployment.RuntimeVersion, deployment.RuntimeAirflowVersion, client, out)
+		selectedVersion, err := getRuntimeVersionSelection(deployment.RuntimeVersion, deployment.RuntimeAirflowVersion, deployment.ClusterID, client, out)
 		if err != nil {
 			return err
 		}
@@ -536,7 +536,10 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 		return errDeploymentAlreadyOnRuntime
 	}
 
-	runtimeReleases, err := houston.Call(client.GetRuntimeReleases)(deployment.AirflowVersion)
+	vars := make(map[string]interface{})
+	vars["airflowVersion"] = deployment.AirflowVersion
+	vars["clusterId"] = deployment.ClusterID
+	runtimeReleases, err := houston.Call(client.GetRuntimeReleases)(vars)
 	if err != nil {
 		return err
 	}
@@ -556,7 +559,7 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 	}
 	desiredRuntimeVersion := latestRuntimeRelease.String()
 
-	vars := map[string]interface{}{"deploymentUuid": deploymentID, "desiredRuntimeVersion": desiredRuntimeVersion}
+	vars = map[string]interface{}{"deploymentUuid": deploymentID, "desiredRuntimeVersion": desiredRuntimeVersion}
 	resp, err := houston.Call(client.UpdateDeploymentRuntime)(vars)
 	if err != nil {
 		return err
@@ -644,7 +647,7 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 	return filteredVersions[i-1], nil
 }
 
-func getRuntimeVersionSelection(runtimeVersion, airflowVersion string, client houston.ClientInterface, out io.Writer) (string, error) {
+func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string, client houston.ClientInterface, out io.Writer) (string, error) {
 	currentRuntimeVersion, err := semver.NewVersion(runtimeVersion)
 	if err != nil {
 		return "", err
@@ -655,7 +658,9 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion string, client ho
 	}
 
 	// prepare list of AC airflow versions
-	runtimeVersions, err := houston.Call(client.GetRuntimeReleases)("")
+	vars := make(map[string]interface{})
+	vars["clusterId"] = clusterID
+	runtimeVersions, err := houston.Call(client.GetRuntimeReleases)(vars)
 	if err != nil {
 		return "", err
 	}

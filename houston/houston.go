@@ -76,10 +76,10 @@ type ClientInterface interface {
 	ListWorkspaceServiceAccounts(workspaceID string) ([]ServiceAccount, error)
 	// app
 	GetAppConfig(interface{}) (*AppConfig, error)
-	GetAvailableNamespaces(interface{}) ([]Namespace, error)
+	GetAvailableNamespaces(vars map[string]interface{}) ([]Namespace, error)
 	GetPlatformVersion(interface{}) (string, error)
 	// runtime
-	GetRuntimeReleases(airflowVersion string) (RuntimeReleases, error)
+	GetRuntimeReleases(vars map[string]interface{}) (RuntimeReleases, error)
 	// teams
 	GetTeam(teamID string) (*Team, error)
 	GetTeamUsers(teamID string) ([]User, error)

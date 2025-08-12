@@ -18,4 +18,5 @@ type CreateDeploymentRequest struct {
 	KnownHosts        string
 	GitSyncInterval   int
 	TriggererReplicas int
+	ClusterID         string
 }

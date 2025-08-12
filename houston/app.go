@@ -68,12 +68,26 @@ var (
 		},
 	}
 
-	AvailableNamespacesGetRequest = `
-	query availableNamespaces {
-		availableNamespaces{
-			name
-		}
-	}`
+	AvailableNamespacesGetRequest = queryList{
+		{
+			version: "0.25.0",
+			query: `
+			query availableNamespaces {
+				availableNamespaces {
+					name
+				}
+			}`,
+		},
+		{
+			version: "1.0.0",
+			query: `
+			query availableNamespaces($clusterId: Uuid!) {
+				availableNamespaces(clusterId: $clusterId) {
+					name
+				}
+			}`,
+		},
+	}
 
 	HoustonVersionQuery = `
 	query AppConfig {
@@ -117,9 +131,14 @@ func (h ClientImplementation) GetAppConfig(_ interface{}) (*AppConfig, error) {
 }
 
 // GetAvailableNamespace - get namespaces to create deployments
-func (h ClientImplementation) GetAvailableNamespaces(_ interface{}) ([]Namespace, error) {
+func (h ClientImplementation) GetAvailableNamespaces(vars map[string]interface{}) ([]Namespace, error) {
+	reqVars := map[string]interface{}{}
+	if vars["clusterID"] != "" && vars["clusterID"] != nil {
+		reqVars["clusterId"] = vars["clusterID"]
+	}
 	req := Request{
-		Query: AvailableNamespacesGetRequest,
+		Query:     AvailableNamespacesGetRequest.GreatestLowerBound(version),
+		Variables: reqVars,
 	}
 
 	r, err := req.DoWithClient(h.client)

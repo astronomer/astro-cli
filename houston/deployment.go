@@ -237,6 +237,37 @@ var (
 				}
 			}`,
 		},
+		{
+			version: "1.0.0",
+			query: `
+			query GetDeployment(
+				$workspaceId: Uuid!
+				$releaseName: String
+			){
+				workspaceDeployments(
+					workspaceUuid: $workspaceId
+					releaseName: $releaseName
+				){
+					id
+					type
+					label
+					releaseName
+					workspace {
+						id
+					}
+					deployInfo {
+						nextCli
+						current
+					}
+					version
+					airflowVersion
+					runtimeVersion
+					clusterId
+					createdAt
+					updatedAt
+				}
+			}`,
+		},
 	}
 
 	PaginatedDeploymentsGetRequest = queryList{
@@ -389,6 +420,33 @@ var (
 					dagDeployment {
 						type
 					}
+				}
+			}`,
+		},
+		{
+			version: "1.0.0",
+			query: `
+			query GetDeployment(
+				$id: String!
+			){
+				deployment(
+					where: {id: $id}
+				){
+					id
+					airflowVersion
+					desiredAirflowVersion
+					runtimeVersion
+					desiredRuntimeVersion
+					runtimeAirflowVersion
+					releaseName
+					urls {
+						type
+						url
+					}
+					dagDeployment {
+						type
+					}
+					clusterId
 				}
 			}`,
 		},

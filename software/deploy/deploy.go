@@ -137,8 +137,10 @@ func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, d
 	if err != nil {
 		return err
 	}
+	vars := make(map[string]interface{})
+	vars["clusterId"] = deploymentInfo.ClusterID
 	// ignoring the error as user can be connected to platform where runtime is not enabled
-	runtimeReleases, _ := houston.Call(houstonClient.GetRuntimeReleases)("")
+	runtimeReleases, _ := houston.Call(houstonClient.GetRuntimeReleases)(vars)
 	var validTags string
 	if config.CFG.ShowWarnings.GetBool() && deploymentInfo.DesiredAirflowVersion != "" && !deploymentConfig.IsValidTag(tag) {
 		validTags = strings.Join(deploymentConfig.GetValidTags(tag), ", ")
