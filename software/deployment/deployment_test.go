@@ -508,6 +508,7 @@ func (s *Suite) TestDelete() {
 }
 
 func (s *Suite) TestList() {
+	clusterID := "testClusterID"
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockDeployments := []houston.Deployment{
 		{
@@ -534,7 +535,7 @@ func (s *Suite) TestList() {
 		api.On("ListDeployments", expectedRequest).Return(mockDeployments, nil)
 
 		buf := new(bytes.Buffer)
-		err := List(mockDeployments[0].Workspace.ID, false, api, buf)
+		err := List(mockDeployments[0].Workspace.ID, false, api, buf, clusterID)
 		s.NoError(err)
 		expected := ` NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 TAG     IMAGE VERSION                  
  test     burning-terrestrial-5940     v1.1.0     ckbv801t300qh0760pck7ea0c     ?       Astronomer-Certified-1.1.0     
@@ -548,7 +549,7 @@ func (s *Suite) TestList() {
 		api.On("ListDeployments", expectedRequest).Return([]houston.Deployment{}, errMock)
 
 		buf := new(bytes.Buffer)
-		err := List(mockDeployments[0].Workspace.ID, false, api, buf)
+		err := List(mockDeployments[0].Workspace.ID, false, api, buf, clusterID)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -556,13 +557,14 @@ func (s *Suite) TestList() {
 	s.Run("list namespace all enabled", func() {
 		expectedRequest := houston.PaginatedDeploymentsRequest{
 			Take: -1,
+			ClusterID: clusterID,
 		}
 
 		api := new(mocks.ClientInterface)
 		api.On("ListPaginatedDeployments", expectedRequest).Return(mockDeployments, nil)
 
 		buf := new(bytes.Buffer)
-		err := List(mockDeployments[0].Workspace.ID, true, api, buf)
+		err := List(mockDeployments[0].Workspace.ID, true, api, buf, clusterID)
 		s.NoError(err)
 		expected := ` NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 TAG     IMAGE VERSION                  
  test     burning-terrestrial-5940     v1.1.0     ckbv801t300qh0760pck7ea0c     ?       Astronomer-Certified-1.1.0     

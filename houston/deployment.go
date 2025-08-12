@@ -11,7 +11,8 @@ type ListDeploymentsRequest struct {
 }
 
 type PaginatedDeploymentsRequest struct {
-	Take int `json:"take"`
+	Take      int    `json:"take"`
+	ClusterID string `json:"clusterId"`
 }
 
 // ListDeploymentLogsRequest - filters to list logs from a deployment
@@ -295,6 +296,37 @@ var (
 					version
 					airflowVersion
 					runtimeVersion
+					createdAt
+					updatedAt
+				}
+			}`,
+		},
+		{
+			version: "1.0.0",
+			query: `
+			query paginatedDeployments( $take: Int, $name: String, $cursor: Uuid, $pageNumber: Int, $clusterId: Uuid) {
+				paginatedDeployments(
+					take: $take
+					name: $name
+					cursor: $cursor
+					pageNumber: $pageNumber
+					clusterId: $clusterId
+				) {
+					id
+					type
+					label
+					releaseName
+					workspace {
+						id
+					}
+					deployInfo {
+						nextCli
+						current
+					}
+					version
+					airflowVersion
+					runtimeVersion
+					clusterId
 					createdAt
 					updatedAt
 				}
@@ -625,6 +657,9 @@ func (h ClientImplementation) ListDeployments(filters ListDeploymentsRequest) ([
 func (h ClientImplementation) ListPaginatedDeployments(filters PaginatedDeploymentsRequest) ([]Deployment, error) {
 	variables := map[string]interface{}{}
 	variables["take"] = filters.Take
+	if filters.ClusterID != "" {
+		variables["clusterId"] = filters.ClusterID
+	}
 	reqQuery := PaginatedDeploymentsGetRequest.GreatestLowerBound(version)
 	req := Request{
 		Query: reqQuery,

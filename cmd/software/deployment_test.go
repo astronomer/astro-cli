@@ -921,6 +921,22 @@ func (s *Suite) TestDeploymentList() {
 	api.AssertExpectations(s.T())
 }
 
+func (s *Suite) TestDeploymentListWithClusterID() {
+	expectedRequest := houston.PaginatedDeploymentsRequest{
+		Take: -1,
+		ClusterID: "testClusterID",
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("ListPaginatedDeployments", expectedRequest).Return([]houston.Deployment{*mockDeployment}, nil)
+	api.On("GetPlatformVersion", nil).Return("1.0.0", nil)
+	houstonClient = api
+	output, err := execDeploymentCmd("list", "--all", "--cluster-id=testClusterID")
+	s.NoError(err)
+	s.Contains(output, mockDeployment.ID)
+	api.AssertExpectations(s.T())
+}
+
 func (s *Suite) TestDeploymentDeleteHardResponseNo() {
 	appConfig = &houston.AppConfig{
 		HardDeleteDeployment: true,
