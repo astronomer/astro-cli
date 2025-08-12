@@ -72,20 +72,20 @@ var (
 		{
 			version: "0.25.0",
 			query: `
-	query availableNamespaces {
-		availableNamespaces {
-			name
-		}
-	}`,
+			query availableNamespaces {
+				availableNamespaces {
+					name
+				}
+			}`,
 		},
 		{
 			version: "1.0.0",
 			query: `
-	query availableNamespaces($clusterId: Uuid!) {
-		availableNamespaces(clusterId: $clusterId) {
-			name
-		}
-	}`,
+			query availableNamespaces($clusterId: Uuid!) {
+				availableNamespaces(clusterId: $clusterId) {
+					name
+				}
+			}`,
 		},
 	}
 
