@@ -230,6 +230,13 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentListCmd(out io.Writer) *cobra.Command {
+	// Try to get Houston version, but use global variable if client is not available
+	localHoustonVersion := houstonVersion
+	if houstonClient != nil {
+		if version, err := houstonClient.GetPlatformVersion(nil); err == nil {
+			localHoustonVersion = version
+		}
+	}
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -240,6 +247,9 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show Deployments across all Workspaces")
+	if localHoustonVersion >= "1.0.0" {
+		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Show Deployments from the specified cluster")
+	}
 	return cmd
 }
 
@@ -494,7 +504,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.List(ws, allDeployments, houstonClient, out)
+	return deployment.List(ws, allDeployments, houstonClient, out, clusterID)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, out io.Writer) error {
