@@ -923,7 +923,7 @@ func (s *Suite) TestDeploymentList() {
 
 func (s *Suite) TestDeploymentListWithClusterID() {
 	expectedRequest := houston.PaginatedDeploymentsRequest{
-		Take: -1,
+		Take:      -1,
 		ClusterID: "testClusterID",
 	}
 

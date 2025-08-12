@@ -556,7 +556,7 @@ func (s *Suite) TestList() {
 
 	s.Run("list namespace all enabled", func() {
 		expectedRequest := houston.PaginatedDeploymentsRequest{
-			Take: -1,
+			Take:      -1,
 			ClusterID: clusterID,
 		}
 

@@ -295,7 +295,7 @@ func getDeploymentNamespaceName() (string, error) {
 func getDeploymentsFromHouston(ws string, all bool, client houston.ClientInterface, clusterID string) ([]houston.Deployment, error) {
 	if all {
 		return houston.Call(client.ListPaginatedDeployments)(houston.PaginatedDeploymentsRequest{
-			Take: -1,
+			Take:      -1,
 			ClusterID: clusterID,
 		})
 	}
