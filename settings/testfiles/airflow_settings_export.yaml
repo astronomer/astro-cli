@@ -1,23 +1,23 @@
 airflow:
-  connections:
-  - conn_id: local_postgres
-    conn_type: postgres
-    conn_host: example.db.example.com
-    conn_schema: schema
-    conn_login: username
-    conn_password: password
-    conn_port: 5432
-    conn_uri: ""
-    conn_extra: {}
-  pools:
-  - pool_name: pool_name
-    pool_slot: 3
-    pool_description: pool_desc
-  - pool_name: default_pool
-    pool_slot: 128
-    pool_description: Default pool
-  variables:
-  - variable_name: email_list
-    variable_value: test@test.com
-  - variable_name: myvar
-    variable_value: myval
+    connections:
+        - conn_id: local_postgres
+          conn_type: postgres
+          conn_host: example.db.example.com
+          conn_schema: schema
+          conn_login: username
+          conn_password: password
+          conn_port: 5432
+          conn_uri: ""
+          conn_extra: {}
+    pools:
+        - pool_name: pool_name
+          pool_slot: 3
+          pool_description: pool_desc
+        - pool_name: default_pool
+          pool_slot: 128
+          pool_description: Default pool
+    variables:
+        - variable_name: email_list
+          variable_value: test@test.com
+        - variable_name: myvar
+          variable_value: myval
