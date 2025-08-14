@@ -1507,7 +1507,7 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
 	}
-	if settingsFileExists {
+	if settingsFileExists || len(envConns) > 0 {
 		for _, container := range containers { //nolint:gocritic
 			if strings.Contains(container.Name, project.Name) &&
 				(strings.Contains(container.Name, WebserverDockerContainerName) ||

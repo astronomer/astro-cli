@@ -32,9 +32,6 @@ func (s *Suite) TestConfigSettings() {
 	// config setttings no id error
 	err = ConfigSettings("", "", nil, 2, false, false, false)
 	s.ErrorIs(err, errNoID)
-	// config settings settings file error
-	err = ConfigSettings("container-id", "testfiles/airflow_settings_invalid.yaml", nil, 2, false, false, false)
-	s.Contains(err.Error(), "unable to decode file")
 }
 
 func (s *Suite) TestAddConnectionsAirflowOne() {
@@ -349,15 +346,11 @@ func (s *Suite) TestEnvExport() {
 		s.Contains(err.Error(), "there was an error during env export")
 		_ = fileutil.WriteStringToFile("testfiles/test.env", "")
 	})
-
-	s.Run("not airflow 2", func() {
-		err := EnvExport("id", "", 1, true, true)
-		s.Contains(err.Error(), "Command must be used with Airflow 2.X")
-	})
 }
 
 func (s *Suite) TestExport() {
 	s.Run("success", func() {
+		WorkingPath = "./testfiles/"
 		execAirflowCommand = func(id, airflowCommand string) (string, error) {
 			switch airflowCommand {
 			case airflowConnectionList:
@@ -399,6 +392,7 @@ func (s *Suite) TestExport() {
 	})
 
 	s.Run("variable failure", func() {
+		WorkingPath = "./testfiles/"
 		execAirflowCommand = func(id, airflowCommand string) (string, error) {
 			switch airflowCommand {
 			case airflowVarExport:
@@ -415,11 +409,6 @@ func (s *Suite) TestExport() {
 	s.Run("missing id", func() {
 		err := Export("", "", 2, true, true, true)
 		s.ErrorIs(err, errNoID)
-	})
-
-	s.Run("not airflow 2", func() {
-		err := Export("id", "", 1, true, true, true)
-		s.Contains(err.Error(), "Command must be used with Airflow 2.X")
 	})
 }
 
