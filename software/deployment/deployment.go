@@ -152,6 +152,10 @@ func addTriggererReplicasArg(vars map[string]interface{}, client houston.ClientI
 func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io.Writer) error {
 	vars := map[string]interface{}{"label": req.Label, "workspaceId": req.WS, "executor": req.Executor, "cloudRole": req.CloudRole}
 
+	if req.ClusterID != "" {
+		vars["clusterId"] = req.ClusterID
+	}
+
 	if CheckPreCreateNamespaceDeployment(client) {
 		namespace, err := getDeploymentSelectionNamespaces(client, out, req.ClusterID)
 		if err != nil {

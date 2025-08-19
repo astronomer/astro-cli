@@ -226,7 +226,22 @@ func (s *Suite) TestCreate() {
 	clusterID := "testClusterID"
 	req := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID}
 
-	s.Run("create success", func() {
+	s.Run("create success. Cluster is not passed in the payload", func() {
+		req.ClusterID = ""
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+		// Have to use mock anything for now as vars is too big
+		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+
+		buf := new(bytes.Buffer)
+		err := Create(req, api, buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		api.AssertExpectations(s.T())
+		req.ClusterID = clusterID
+	})
+
+	s.Run("create success. Cluster is passed in the payload", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		// Have to use mock anything for now as vars is too big

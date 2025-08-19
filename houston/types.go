@@ -21,6 +21,7 @@ type ResponseData struct {
 	AddWorkspaceUser               *Workspace                  `json:"workspaceAddUser,omitempty"`
 	RemoveWorkspaceUser            *Workspace                  `json:"workspaceRemoveUser,omitempty"`
 	CreateDeployment               *Deployment                 `json:"createDeployment,omitempty"`
+	UpsertDeployment               *Deployment                 `json:"upsertDeployment,omitempty"`
 	CreateToken                    *AuthUser                   `json:"createToken,omitempty"`
 	CreateWorkspaceServiceAccount  *WorkspaceServiceAccount    `json:"createWorkspaceServiceAccount,omitempty"`
 	CreateDeploymentServiceAccount *DeploymentServiceAccount   `json:"createDeploymentServiceAccount,omitempty"`

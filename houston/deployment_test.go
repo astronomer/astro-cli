@@ -54,6 +54,47 @@ func (s *Suite) TestCreateDeployment() {
 		s.Equal(deployment, mockDeployment.Data.CreateDeployment)
 	})
 
+	s.Run("success for upsert deployment", func() {
+		localMockDeployment := &Response{
+			Data: ResponseData{
+				UpsertDeployment: &Deployment{
+					ID:                    "deployment-test-id",
+					Type:                  "airflow",
+					Label:                 "test deployment",
+					ReleaseName:           "prehistoric-gravity-930",
+					Version:               "2.2.0",
+					AirflowVersion:        "2.2.0",
+					DesiredAirflowVersion: "2.2.0",
+					DeploymentInfo:        DeploymentInfo{},
+					Workspace: Workspace{
+						ID: "test-workspace-id",
+					},
+					Urls: []DeploymentURL{
+						{Type: "airflow", URL: "http://airflow.com"},
+						{Type: "flower", URL: "http://flower.com"},
+					},
+					CreatedAt: time.Time{},
+					UpdatedAt: time.Time{},
+				},
+			},
+		}
+		localJsonResponse, err := json.Marshal(localMockDeployment)
+		s.NoError(err)
+
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(localJsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		deployment, err := api.CreateDeployment(map[string]interface{}{})
+		s.NoError(err)
+		s.Equal(deployment, localMockDeployment.Data.UpsertDeployment)
+	})
+
 	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
@@ -231,6 +272,47 @@ func (s *Suite) TestUpdateDeployment() {
 		deployment, err := api.UpdateDeployment(map[string]interface{}{})
 		s.NoError(err)
 		s.Equal(deployment, mockDeployment.Data.UpdateDeployment)
+	})
+
+	s.Run("success for upsert deployment", func() {
+		localMockDeployment := &Response{
+			Data: ResponseData{
+				UpsertDeployment: &Deployment{
+					ID:                    "deployment-test-id",
+					Type:                  "airflow",
+					Label:                 "test deployment",
+					ReleaseName:           "prehistoric-gravity-930",
+					Version:               "2.2.0",
+					AirflowVersion:        "2.2.0",
+					DesiredAirflowVersion: "2.2.0",
+					DeploymentInfo:        DeploymentInfo{},
+					Workspace: Workspace{
+						ID: "test-workspace-id",
+					},
+					Urls: []DeploymentURL{
+						{Type: "airflow", URL: "http://airflow.com"},
+						{Type: "flower", URL: "http://flower.com"},
+					},
+					CreatedAt: time.Time{},
+					UpdatedAt: time.Time{},
+				},
+			},
+		}
+		localJsonResponse, err := json.Marshal(localMockDeployment)
+		s.NoError(err)
+
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(localJsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		deployment, err := api.UpdateDeployment(map[string]interface{}{})
+		s.NoError(err)
+		s.Equal(deployment, localMockDeployment.Data.UpsertDeployment)
 	})
 
 	s.Run("error", func() {
