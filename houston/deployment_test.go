@@ -78,13 +78,13 @@ func (s *Suite) TestCreateDeployment() {
 				},
 			},
 		}
-		localJsonResponse, err := json.Marshal(localMockDeployment)
+		localJSONResponse, err := json.Marshal(localMockDeployment)
 		s.NoError(err)
 
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(localJsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(localJSONResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -298,13 +298,13 @@ func (s *Suite) TestUpdateDeployment() {
 				},
 			},
 		}
-		localJsonResponse, err := json.Marshal(localMockDeployment)
+		localJSONResponse, err := json.Marshal(localMockDeployment)
 		s.NoError(err)
 
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(localJsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(localJSONResponse)),
 				Header:     make(http.Header),
 			}
 		})
