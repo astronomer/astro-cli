@@ -176,6 +176,51 @@ var (
 				}
 			}`,
 		},
+		{
+			version: "1.0.0",
+			query: `
+			mutation upsertDeployment(
+				$label: String,
+			    $workspaceId: Uuid,
+			    $clusterId: Uuid,
+			    $releaseName: String,
+				$executor: ExecutorType,
+				$runtimeVersion: String,
+			    $namespace: String,
+				$cloudRole: String,
+				$dagDeployment: DagDeployment,
+				$triggererReplicas: Int,
+			  ) {
+			    upsertDeployment(
+			      workspaceUuid: $workspaceId,
+			      clusterId: $clusterId,
+			      label: $label,
+			      releaseName: $releaseName,
+			      namespace: $namespace,
+			      runtimeVersion: $runtimeVersion,
+			      executor: $executor,
+			      triggerer: {
+						replicas: $triggererReplicas
+					}
+			      dagDeployment: $dagDeployment,
+			      cloudRole: $cloudRole,
+			    ) {
+			        id
+					type
+					label
+					releaseName
+					version
+					airflowVersion
+					runtimeVersion
+					urls {
+						type
+						url
+					}
+					createdAt
+					updatedAt
+			      }
+			    }`,
+		},
 	}
 
 	DeploymentsGetRequest = queryList{
@@ -407,6 +452,45 @@ var (
 				}
 			}`,
 		},
+		{
+			version: "1.0.0",
+			query: `
+			mutation upsertDeployment(
+			    $deploymentId: Uuid!,
+				$label: String,
+			    $description: String,
+				$executor: ExecutorType,
+				$cloudRole: String,
+				$dagDeployment: DagDeployment,
+				$triggererReplicas: Int,
+			  ) {
+			    upsertDeployment(
+			      deploymentUuid: $deploymentId,
+			      label: $label,
+			      description: $description,
+			      executor: $executor,
+			      triggerer: {
+						replicas: $triggererReplicas
+					}
+			      dagDeployment: $dagDeployment,
+			      cloudRole: $cloudRole,
+			    ) {
+			        id
+					type
+					label
+					releaseName
+					version
+					airflowVersion
+					runtimeVersion
+					urls {
+						type
+						url
+					}
+					createdAt
+					updatedAt
+			      }
+			    }`,
+		},
 	}
 
 	DeploymentGetRequest = queryList{
@@ -608,7 +692,9 @@ func (h ClientImplementation) CreateDeployment(vars map[string]interface{}) (*De
 	if err != nil {
 		return nil, handleAPIErr(err)
 	}
-
+	if r.Data.UpsertDeployment != nil {
+		return r.Data.UpsertDeployment, nil
+	}
 	return r.Data.CreateDeployment, nil
 }
 
@@ -677,6 +763,14 @@ func (h ClientImplementation) ListPaginatedDeployments(filters PaginatedDeployme
 // UpdateDeployment - update a deployment
 func (h ClientImplementation) UpdateDeployment(variables map[string]interface{}) (*Deployment, error) {
 	reqQuery := DeploymentUpdateRequest.GreatestLowerBound(version)
+	if variables["payload"] != nil {
+		if variables["payload"].(map[string]string)["label"] != "" {
+			variables["label"] = variables["payload"].(map[string]string)["label"]
+		}
+		if variables["payload"].(map[string]string)["description"] != "" {
+			variables["description"] = variables["payload"].(map[string]string)["description"]
+		}
+	}
 	req := Request{
 		Query:     reqQuery,
 		Variables: variables,
@@ -687,6 +781,9 @@ func (h ClientImplementation) UpdateDeployment(variables map[string]interface{})
 		return nil, handleAPIErr(err)
 	}
 
+	if r.Data.UpsertDeployment != nil {
+		return r.Data.UpsertDeployment, nil
+	}
 	return r.Data.UpdateDeployment, nil
 }
 
