@@ -66,6 +66,25 @@ var (
 				}
 			}`,
 		},
+		{
+			version: "1.0.0",
+			query: `
+			query AppConfig($clusterId: Uuid) {
+				appConfig(clusterId: $clusterId) {
+					version
+					baseDomain
+					byoUpdateRegistryHost
+					smtpConfigured
+					manualReleaseNames
+					configureDagDeployment
+					nfsMountDagDeployment
+					manualNamespaceNames
+					hardDeleteDeployment
+					triggererEnabled
+					featureFlags
+				}
+			}`,
+		},
 	}
 
 	AvailableNamespacesGetRequest = queryList{
@@ -98,18 +117,17 @@ var (
 )
 
 // GetAppConfig - get application configuration
-func (h ClientImplementation) GetAppConfig(_ interface{}) (*AppConfig, error) {
-	// If application config has already been requested, we do not want to request it again
-	// since this is a CLI program that gets executed and exits at the end of execution, we don't want to send multiple
-	// times the same call to get the app config, since it probably won't change in a few milliseconds.
-	// We would like to retry on ErrGetHomeString error in case context has been set correctly now.
-	if appConfig != nil || (appConfigErr != nil && !errors.Is(appConfigErr, config.ErrGetHomeString)) {
-		return appConfig, appConfigErr
+func (h ClientImplementation) GetAppConfig(clusterID string) (*AppConfig, error) {
+	// Even if application config has already been requested, we want to request it again
+	// Because we want to get the app config for the clusterID if it is provided
+	vars := map[string]interface{}{}
+	if clusterID != "" {
+		vars["clusterId"] = clusterID
 	}
-
 	reqQuery := AppConfigRequest.GreatestLowerBound(version)
 	req := Request{
-		Query: reqQuery,
+		Query:     reqQuery,
+		Variables: vars,
 	}
 
 	var r *Response
