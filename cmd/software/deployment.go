@@ -413,6 +413,10 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
+	if clusterID != "" {
+		appConfig, _ = houston.Call(houstonClient.GetAppConfig)(clusterID)
+	}
+
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -473,7 +477,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		TriggererReplicas: createTriggererReplicas,
 		ClusterID:         clusterID,
 	}
-	return deployment.Create(req, houstonClient, out)
+	return deployment.Create(req, houstonClient, out, appConfig)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -520,6 +524,14 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	cmd.SilenceUsage = true
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
+	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(args[0])
+	if err != nil {
+		return fmt.Errorf("failed to get deployment info: %w", err)
+	}
+	appConfig, err = houston.Call(houstonClient.GetAppConfig)(deploymentInfo.ClusterID)
+	if err != nil {
+		return fmt.Errorf("failed to get app config: %w", err)
+	}
 	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
@@ -528,11 +540,6 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 
 	// new dag deployment type or current dag deployment type is dag_deploy, confirm from user
 	if !skipPrompt {
-		deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(args[0])
-		if err != nil {
-			return fmt.Errorf("failed to get deployment info: %w", err)
-		}
-
 		// non dag_deploy to dag_deploy
 		if deploymentInfo.DagDeployment.Type != houston.DagOnlyDeploymentType && dagDeploymentType == houston.DagOnlyDeploymentType {
 			y, _ := input.Confirm(UpdateDeploymentTypeToDagDeployPromptMsg)
@@ -554,14 +561,13 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 
 	// we should validate only in case when this feature has been enabled
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
-		err := validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, true)
+		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, true)
 		if err != nil {
 			return err
 		}
 	}
 
 	var executorType string
-	var err error
 	if executorUpdate != "" {
 		executorType, err = validateExecutorArg(executorUpdate)
 		if err != nil {
@@ -569,7 +575,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		}
 	}
 
-	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, out)
+	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, out, appConfig)
 }
 
 func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {

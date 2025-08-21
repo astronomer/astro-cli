@@ -98,6 +98,19 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 		return deploymentID, fmt.Errorf("failed to get deployment info: %w", err)
 	}
 
+	appConfig, err := houston.Call(houstonClient.GetAppConfig)(deploymentInfo.ClusterID)
+	if err != nil {
+		return deploymentID, fmt.Errorf("failed to get app config: %w", err)
+	}
+
+	if appConfig != nil && appConfig.Flags.BYORegistryEnabled {
+		byoRegistryEnabled = true
+		byoRegistryDomain = appConfig.BYORegistryDomain
+		if byoRegistryDomain == "" {
+			return deploymentID, ErrBYORegistryDomainNotSet
+		}
+	}
+
 	// isImageOnlyDeploy is not valid for image-based deployments since image-based deployments inherently mean that the image itself contains dags.
 	// If we deploy only the image, the deployment will not have any dags for image-based deployments.
 	// Even on astro, image-based deployments are not allowed to be deployed with --image flag.
@@ -400,12 +413,7 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 	return fmt.Sprintf("https://deployments.%s/%s/dags/upload", c.Domain, deploymentInfo.ReleaseName)
 }
 
-func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
-	// Throw error if the feature is disabled at Houston level
-	if !isDagOnlyDeploymentEnabled(appConfig) {
-		return ErrDagOnlyDeployDisabledInConfig
-	}
-
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 	deploymentID, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
 	if err != nil {
 		return err
@@ -419,6 +427,14 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info: %w", err)
+	}
+	appConfig, err := houston.Call(houstonClient.GetAppConfig)(deploymentInfo.ClusterID)
+	if err != nil {
+		return fmt.Errorf("failed to get app config: %w", err)
+	}
+	// Throw error if the feature is disabled at Houston level
+	if !isDagOnlyDeploymentEnabled(appConfig) {
+		return ErrDagOnlyDeployDisabledInConfig
 	}
 	if !isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
 		return ErrDagOnlyDeployNotEnabledForDeployment
