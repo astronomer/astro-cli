@@ -65,9 +65,9 @@ const (
 )
 
 var (
-	sleepTime        = 180
-	tickNum          = 10
-	timeoutNum       = 180
+	SleepTime        = 180
+	TickNum          = 10
+	TimeoutNum       = 180
 	listLimit        = 1000
 	dagDeployEnabled bool
 )
@@ -536,9 +536,8 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	if err != nil {
 		return err
 	}
-
 	if waitForStatus {
-		err = HealthPoll(d.Id, workspaceID, sleepTime, tickNum, timeoutNum, platformCoreClient)
+		err = HealthPoll(d.Id, workspaceID, SleepTime, TickNum, TimeoutNum, platformCoreClient)
 		if err != nil {
 			errOutput := createOutput(workspaceID, &d)
 			if errOutput != nil {
