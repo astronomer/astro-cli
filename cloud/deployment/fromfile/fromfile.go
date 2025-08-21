@@ -177,7 +177,6 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 	}
 	// Get deployment created or updated
 	existingDeployment, err = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name, astroPlatformCore)
-	fmt.Println("DEBUG: After deploymentFromName/existingDeployment")
 	if err != nil {
 		return err
 	}
