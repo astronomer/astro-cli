@@ -745,7 +745,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 			return errFlag
 		}
 		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, waitForStatus)
-
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
