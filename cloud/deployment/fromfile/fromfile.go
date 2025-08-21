@@ -12,6 +12,7 @@ import (
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
@@ -51,7 +52,7 @@ const (
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
 // inputFile can be in yaml or json format
 // It returns an error if any required information is missing or incorrectly specified.
-func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer) error { //nolint
+func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer, waitForStatus bool) error { //nolint
 	var (
 		err                                           error
 		errHelp, clusterID, workspaceID, outputFormat string
@@ -126,7 +127,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		}
 		// this deployment does not exist so create it
 		// transform formattedDeployment to DeploymentCreateInput
-		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, createAction, &astroplatformcore.Deployment{}, nodePools, dagDeploy, envVars, coreClient, astroPlatformCore)
+		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, createAction, &astroplatformcore.Deployment{}, nodePools, dagDeploy, envVars, coreClient, astroPlatformCore, waitForStatus)
 		if err != nil {
 			return err
 		}
@@ -169,13 +170,14 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 			return fmt.Errorf("%w \n failed to %s alert emails", err, action)
 		}
 		// transform formattedDeployment to DeploymentUpdateInput
-		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, dagDeploy, envVars, coreClient, astroPlatformCore)
+		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, dagDeploy, envVars, coreClient, astroPlatformCore, waitForStatus)
 		if err != nil {
 			return err
 		}
 	}
 	// Get deployment created or updated
 	existingDeployment, err = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name, astroPlatformCore)
+	fmt.Println("DEBUG: After deploymentFromName/existingDeployment")
 	if err != nil {
 		return err
 	}
@@ -194,7 +196,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 // It returns an error if node pool id could not be found for the worker type.
 //
 //nolint:dupl
-func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool, dagDeploy bool, envVars []astroplatformcore.DeploymentEnvironmentVariableRequest, coreClient astrocore.CoreClient, astroPlatformCore astroplatformcore.CoreClient) error { //nolint
+func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool, dagDeploy bool, envVars []astroplatformcore.DeploymentEnvironmentVariableRequest, coreClient astrocore.CoreClient, astroPlatformCore astroplatformcore.CoreClient, waitForStatus bool) error { //nolint
 	var (
 		defaultOptions          astroplatformcore.WorkerQueueOptions
 		configOptions           astroplatformcore.DeploymentOptions
@@ -486,7 +488,26 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 		}
 
-		_, err := deployment.CoreCreateDeployment("", createDeploymentRequest, astroPlatformCore)
+		d, err := deployment.CoreCreateDeployment("", createDeploymentRequest, astroPlatformCore)
+		if err != nil {
+			return err
+		}
+		deploymentID := d.Id
+
+		if waitForStatus {
+			err = deployment.HealthPoll(
+				deploymentID,
+				workspaceID,
+				deployment.SleepTime,
+				deployment.TickNum,
+				deployment.TimeoutNum,
+				astroPlatformCore,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
 		if err != nil {
 			return err
 		}
