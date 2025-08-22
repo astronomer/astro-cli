@@ -231,6 +231,7 @@ func newAirflowUpgradeTestCmd(platformCoreClient astroplatformcore.CoreClient) *
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "Use an Astronomer Certified image instead of Astro Runtime. Use the airflow-version flag to specify your AC version.")
 	}
 
+
 	_, err = context.GetCurrentContext()
 	if err != nil && !avoidACFlag { // Case when user is not logged in to any platform
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "Use an Astronomer Certified image instead of Astro Runtime. Use the airflow-version flag to specify your AC version.")
