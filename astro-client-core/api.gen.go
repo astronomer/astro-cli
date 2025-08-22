@@ -44,6 +44,23 @@ const (
 	ApiTokenRoleEntityTypeWORKSPACE    ApiTokenRoleEntityType = "WORKSPACE"
 )
 
+// Defines values for AstroIdeProjectVisibility.
+const (
+	AstroIdeProjectVisibilityPRIVATE   AstroIdeProjectVisibility = "PRIVATE"
+	AstroIdeProjectVisibilityWORKSPACE AstroIdeProjectVisibility = "WORKSPACE"
+)
+
+// Defines values for AstroIdeProjectRemoteGitProvider.
+const (
+	AstroIdeProjectRemoteGitProviderGITHUB AstroIdeProjectRemoteGitProvider = "GITHUB"
+)
+
+// Defines values for AstroIdeSessionEditActor.
+const (
+	AstroIdeSessionEditActorAGENT AstroIdeSessionEditActor = "AGENT"
+	AstroIdeSessionEditActorUSER  AstroIdeSessionEditActor = "USER"
+)
+
 // Defines values for BasicSubjectProfileSubjectType.
 const (
 	BasicSubjectProfileSubjectTypeSERVICEKEY BasicSubjectProfileSubjectType = "SERVICEKEY"
@@ -164,6 +181,29 @@ const (
 // Defines values for ClusterRouteTargetType.
 const (
 	ClusterRouteTargetTypeAWSPCX ClusterRouteTargetType = "AWS_PCX"
+)
+
+// Defines values for CreateAstroIdeProjectRemoteRequestGitProvider.
+const (
+	CreateAstroIdeProjectRemoteRequestGitProviderGITHUB CreateAstroIdeProjectRemoteRequestGitProvider = "GITHUB"
+)
+
+// Defines values for CreateAstroIdeProjectRequestVisibility.
+const (
+	CreateAstroIdeProjectRequestVisibilityPRIVATE   CreateAstroIdeProjectRequestVisibility = "PRIVATE"
+	CreateAstroIdeProjectRequestVisibilityWORKSPACE CreateAstroIdeProjectRequestVisibility = "WORKSPACE"
+)
+
+// Defines values for CreateAstroIdeSessionPermission.
+const (
+	CreateAstroIdeSessionPermissionREADONLY  CreateAstroIdeSessionPermission = "READ_ONLY"
+	CreateAstroIdeSessionPermissionREADWRITE CreateAstroIdeSessionPermission = "READ_WRITE"
+)
+
+// Defines values for CreateAstroIdeSessionRequestPermission.
+const (
+	CreateAstroIdeSessionRequestPermissionREADONLY  CreateAstroIdeSessionRequestPermission = "READ_ONLY"
+	CreateAstroIdeSessionRequestPermissionREADWRITE CreateAstroIdeSessionRequestPermission = "READ_WRITE"
 )
 
 // Defines values for CreateAwsClusterRequestType.
@@ -696,6 +736,18 @@ const (
 const (
 	DAG   TriggerGitDeployRequestDeployType = "DAG"
 	IMAGE TriggerGitDeployRequestDeployType = "IMAGE"
+)
+
+// Defines values for UpdateAstroIdeSessionPermission.
+const (
+	UpdateAstroIdeSessionPermissionREADONLY  UpdateAstroIdeSessionPermission = "READ_ONLY"
+	UpdateAstroIdeSessionPermissionREADWRITE UpdateAstroIdeSessionPermission = "READ_WRITE"
+)
+
+// Defines values for UpdateAstroIdeSessionRequestPermission.
+const (
+	UpdateAstroIdeSessionRequestPermissionREADONLY  UpdateAstroIdeSessionRequestPermission = "READ_ONLY"
+	UpdateAstroIdeSessionRequestPermissionREADWRITE UpdateAstroIdeSessionRequestPermission = "READ_WRITE"
 )
 
 // Defines values for UpdateEnvironmentObjectLinkRequestScope.
@@ -1331,6 +1383,38 @@ const (
 	ListWorkspaceApiTokensParamsSortsUpdatedByIdDesc  ListWorkspaceApiTokensParamsSorts = "updatedById:desc"
 )
 
+// Defines values for ListAstroIdeProjectsParamsSorts.
+const (
+	ListAstroIdeProjectsParamsSortsCreatedAtAsc    ListAstroIdeProjectsParamsSorts = "createdAt:asc"
+	ListAstroIdeProjectsParamsSortsCreatedAtDesc   ListAstroIdeProjectsParamsSorts = "createdAt:desc"
+	ListAstroIdeProjectsParamsSortsDescriptionAsc  ListAstroIdeProjectsParamsSorts = "description:asc"
+	ListAstroIdeProjectsParamsSortsDescriptionDesc ListAstroIdeProjectsParamsSorts = "description:desc"
+	ListAstroIdeProjectsParamsSortsIdAsc           ListAstroIdeProjectsParamsSorts = "id:asc"
+	ListAstroIdeProjectsParamsSortsIdDesc          ListAstroIdeProjectsParamsSorts = "id:desc"
+	ListAstroIdeProjectsParamsSortsNameAsc         ListAstroIdeProjectsParamsSorts = "name:asc"
+	ListAstroIdeProjectsParamsSortsNameDesc        ListAstroIdeProjectsParamsSorts = "name:desc"
+	ListAstroIdeProjectsParamsSortsUpdatedAtAsc    ListAstroIdeProjectsParamsSorts = "updatedAt:asc"
+	ListAstroIdeProjectsParamsSortsUpdatedAtDesc   ListAstroIdeProjectsParamsSorts = "updatedAt:desc"
+)
+
+// Defines values for ListAstroIdeProjectsParamsVisibility.
+const (
+	ListAstroIdeProjectsParamsVisibilityPRIVATE   ListAstroIdeProjectsParamsVisibility = "PRIVATE"
+	ListAstroIdeProjectsParamsVisibilityWORKSPACE ListAstroIdeProjectsParamsVisibility = "WORKSPACE"
+)
+
+// Defines values for ImportAstroIdeSessionTarParamsMode.
+const (
+	ImportAstroIdeSessionTarParamsModeOVERWRITE ImportAstroIdeSessionTarParamsMode = "OVERWRITE"
+	ImportAstroIdeSessionTarParamsModeUPSERT    ImportAstroIdeSessionTarParamsMode = "UPSERT"
+)
+
+// Defines values for ImportAstroIdeSessionZipParamsMode.
+const (
+	ImportAstroIdeSessionZipParamsModeOVERWRITE ImportAstroIdeSessionZipParamsMode = "OVERWRITE"
+	ImportAstroIdeSessionZipParamsModeUPSERT    ImportAstroIdeSessionZipParamsMode = "UPSERT"
+)
+
 // Defines values for ListWorkspaceTeamsParamsSorts.
 const (
 	ListWorkspaceTeamsParamsSortsCreatedAtAsc       ListWorkspaceTeamsParamsSorts = "createdAt:asc"
@@ -1347,18 +1431,18 @@ const (
 
 // Defines values for ListWorkspaceUsersParamsSorts.
 const (
-	CreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
-	CreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
-	FullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
-	FullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
-	StatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
-	StatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
-	UpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
-	UpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
-	UsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
-	UsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
-	WorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
-	WorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
+	ListWorkspaceUsersParamsSortsCreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
+	ListWorkspaceUsersParamsSortsCreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
+	ListWorkspaceUsersParamsSortsFullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
+	ListWorkspaceUsersParamsSortsFullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
+	ListWorkspaceUsersParamsSortsStatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
+	ListWorkspaceUsersParamsSortsStatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
+	ListWorkspaceUsersParamsSortsUpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
+	ListWorkspaceUsersParamsSortsUpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
+	ListWorkspaceUsersParamsSortsUsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
+	ListWorkspaceUsersParamsSortsUsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
+	ListWorkspaceUsersParamsSortsWorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
+	ListWorkspaceUsersParamsSortsWorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
 )
 
 // Defines values for ListSelfUserGitAccountsParamsGitProvider.
@@ -1488,6 +1572,90 @@ type ApiTokenRoleEntityType string
 type ApiTokenWorkspaceRoleRequest struct {
 	EntityId string `json:"entityId"`
 	Role     string `json:"role"`
+}
+
+// AstroIdeProject defines model for AstroIdeProject.
+type AstroIdeProject struct {
+	CreatedAt      time.Time                 `json:"createdAt"`
+	CreatedBy      *BasicSubjectProfile      `json:"createdBy,omitempty"`
+	Description    *string                   `json:"description,omitempty"`
+	Id             string                    `json:"id"`
+	Lock           *AstroIdeProjectLock      `json:"lock,omitempty"`
+	Name           string                    `json:"name"`
+	OrganizationId string                    `json:"organizationId"`
+	Remote         *AstroIdeProjectRemote    `json:"remote,omitempty"`
+	Rules          *string                   `json:"rules,omitempty"`
+	UpdatedAt      time.Time                 `json:"updatedAt"`
+	UpdatedBy      *BasicSubjectProfile      `json:"updatedBy,omitempty"`
+	Visibility     AstroIdeProjectVisibility `json:"visibility"`
+	WorkspaceId    string                    `json:"workspaceId"`
+}
+
+// AstroIdeProjectVisibility defines model for AstroIdeProject.Visibility.
+type AstroIdeProjectVisibility string
+
+// AstroIdeProjectLock defines model for AstroIdeProjectLock.
+type AstroIdeProjectLock struct {
+	LastEditedAt string              `json:"lastEditedAt"`
+	Subject      BasicSubjectProfile `json:"subject"`
+}
+
+// AstroIdeProjectRemote defines model for AstroIdeProjectRemote.
+type AstroIdeProjectRemote struct {
+	GitAccount    string                           `json:"gitAccount"`
+	GitBranch     *string                          `json:"gitBranch,omitempty"`
+	GitPath       *string                          `json:"gitPath,omitempty"`
+	GitProvider   AstroIdeProjectRemoteGitProvider `json:"gitProvider"`
+	GitRepository string                           `json:"gitRepository"`
+}
+
+// AstroIdeProjectRemoteGitProvider defines model for AstroIdeProjectRemote.GitProvider.
+type AstroIdeProjectRemoteGitProvider string
+
+// AstroIdeProjectVersion defines model for AstroIdeProjectVersion.
+type AstroIdeProjectVersion struct {
+	Id      string                         `json:"id"`
+	Message string                         `json:"message"`
+	SavedAt string                         `json:"savedAt"`
+	SavedBy *AstroIdeProjectVersionSavedBy `json:"savedBy,omitempty"`
+}
+
+// AstroIdeProjectVersionSavedBy defines model for AstroIdeProjectVersionSavedBy.
+type AstroIdeProjectVersionSavedBy struct {
+	RemoteCommitAuthor *AstroIdeProjectVersionSavedByRemoteCommitAuthor `json:"remoteCommitAuthor,omitempty"`
+	Subject            *BasicSubjectProfile                             `json:"subject,omitempty"`
+}
+
+// AstroIdeProjectVersionSavedByRemoteCommitAuthor defines model for AstroIdeProjectVersionSavedByRemoteCommitAuthor.
+type AstroIdeProjectVersionSavedByRemoteCommitAuthor struct {
+	Name string `json:"name"`
+}
+
+// AstroIdeProjectsPaginated defines model for AstroIdeProjectsPaginated.
+type AstroIdeProjectsPaginated struct {
+	Limit      int               `json:"limit"`
+	Offset     int               `json:"offset"`
+	Projects   []AstroIdeProject `json:"projects"`
+	TotalCount int               `json:"totalCount"`
+}
+
+// AstroIdeSessionEdit defines model for AstroIdeSessionEdit.
+type AstroIdeSessionEdit struct {
+	Actor    AstroIdeSessionEditActor  `json:"actor"`
+	Deploy   AstroIdeSessionEditDeploy `json:"deploy"`
+	EditedAt string                    `json:"editedAt"`
+	Id       string                    `json:"id"`
+	Message  string                    `json:"message"`
+}
+
+// AstroIdeSessionEditActor defines model for AstroIdeSessionEdit.Actor.
+type AstroIdeSessionEditActor string
+
+// AstroIdeSessionEditDeploy defines model for AstroIdeSessionEditDeploy.
+type AstroIdeSessionEditDeploy struct {
+	Applicable bool    `json:"applicable"`
+	DeployId   *string `json:"deployId,omitempty"`
+	Error      *string `json:"error,omitempty"`
 }
 
 // BasicSubjectProfile defines model for BasicSubjectProfile.
@@ -1813,6 +1981,53 @@ type ConnectionAuthTypeParameter struct {
 	IsRequired       bool    `json:"isRequired"`
 	IsSecret         bool    `json:"isSecret"`
 }
+
+// CreateAstroIdeProjectRemoteRequest defines model for CreateAstroIdeProjectRemoteRequest.
+type CreateAstroIdeProjectRemoteRequest struct {
+	GitAccount    string                                        `json:"gitAccount"`
+	GitBranch     *string                                       `json:"gitBranch,omitempty"`
+	GitPath       *string                                       `json:"gitPath,omitempty"`
+	GitProvider   CreateAstroIdeProjectRemoteRequestGitProvider `json:"gitProvider"`
+	GitRepository string                                        `json:"gitRepository"`
+}
+
+// CreateAstroIdeProjectRemoteRequestGitProvider defines model for CreateAstroIdeProjectRemoteRequest.GitProvider.
+type CreateAstroIdeProjectRemoteRequestGitProvider string
+
+// CreateAstroIdeProjectRequest defines model for CreateAstroIdeProjectRequest.
+type CreateAstroIdeProjectRequest struct {
+	Description   *string                                 `json:"description,omitempty"`
+	Name          *string                                 `json:"name,omitempty"`
+	PromptForName *string                                 `json:"promptForName,omitempty"`
+	Remote        *CreateAstroIdeProjectRemoteRequest     `json:"remote,omitempty"`
+	Template      *string                                 `json:"template,omitempty"`
+	Visibility    *CreateAstroIdeProjectRequestVisibility `json:"visibility,omitempty"`
+}
+
+// CreateAstroIdeProjectRequestVisibility defines model for CreateAstroIdeProjectRequest.Visibility.
+type CreateAstroIdeProjectRequestVisibility string
+
+// CreateAstroIdeSession defines model for CreateAstroIdeSession.
+type CreateAstroIdeSession struct {
+	DeploymentError *string                         `json:"deploymentError,omitempty"`
+	DeploymentId    *string                         `json:"deploymentId,omitempty"`
+	Id              string                          `json:"id"`
+	Permission      CreateAstroIdeSessionPermission `json:"permission"`
+	RemoteBranch    *string                         `json:"remoteBranch,omitempty"`
+}
+
+// CreateAstroIdeSessionPermission defines model for CreateAstroIdeSession.Permission.
+type CreateAstroIdeSessionPermission string
+
+// CreateAstroIdeSessionRequest defines model for CreateAstroIdeSessionRequest.
+type CreateAstroIdeSessionRequest struct {
+	AutoDeploy   *bool                                   `json:"autoDeploy,omitempty"`
+	Permission   *CreateAstroIdeSessionRequestPermission `json:"permission,omitempty"`
+	RemoteBranch *string                                 `json:"remoteBranch,omitempty"`
+}
+
+// CreateAstroIdeSessionRequestPermission defines model for CreateAstroIdeSessionRequest.Permission.
+type CreateAstroIdeSessionRequestPermission string
 
 // CreateAwsClusterRequest defines model for CreateAwsClusterRequest.
 type CreateAwsClusterRequest struct {
@@ -3087,6 +3302,11 @@ type HibernationStatus struct {
 	Reason        *string    `json:"reason,omitempty"`
 }
 
+// ImportAstroIdeSession defines model for ImportAstroIdeSession.
+type ImportAstroIdeSession struct {
+	Edit AstroIdeSessionEdit `json:"edit"`
+}
+
 // Invite defines model for Invite.
 type Invite struct {
 	ExpiresAt     string              `json:"expiresAt"`
@@ -3480,6 +3700,17 @@ type RuntimeRelease struct {
 	Version                  string `json:"version"`
 }
 
+// SaveAstroIdeSession defines model for SaveAstroIdeSession.
+type SaveAstroIdeSession struct {
+	Version AstroIdeProjectVersion `json:"version"`
+}
+
+// SaveAstroIdeSessionRequest defines model for SaveAstroIdeSessionRequest.
+type SaveAstroIdeSessionRequest struct {
+	Message         string  `json:"message"`
+	NewRemoteBranch *string `json:"newRemoteBranch,omitempty"`
+}
+
 // SchedulerMachine defines model for SchedulerMachine.
 type SchedulerMachine struct {
 	// Name The name of this machine.
@@ -3653,6 +3884,23 @@ type TriggerGitDeployRequest struct {
 
 // TriggerGitDeployRequestDeployType The type of deploy to trigger. If omitted then the deploy type will be inferred
 type TriggerGitDeployRequestDeployType string
+
+// UpdateAstroIdeSession defines model for UpdateAstroIdeSession.
+type UpdateAstroIdeSession struct {
+	Id         string                          `json:"id"`
+	Permission UpdateAstroIdeSessionPermission `json:"permission"`
+}
+
+// UpdateAstroIdeSessionPermission defines model for UpdateAstroIdeSession.Permission.
+type UpdateAstroIdeSessionPermission string
+
+// UpdateAstroIdeSessionRequest defines model for UpdateAstroIdeSessionRequest.
+type UpdateAstroIdeSessionRequest struct {
+	Permission UpdateAstroIdeSessionRequestPermission `json:"permission"`
+}
+
+// UpdateAstroIdeSessionRequestPermission defines model for UpdateAstroIdeSessionRequest.Permission.
+type UpdateAstroIdeSessionRequestPermission string
 
 // UpdateAwsClusterRequest defines model for UpdateAwsClusterRequest.
 type UpdateAwsClusterRequest struct {
@@ -4908,6 +5156,63 @@ type ListWorkspaceApiTokensParamsTokenTypes string
 // ListWorkspaceApiTokensParamsSorts defines parameters for ListWorkspaceApiTokens.
 type ListWorkspaceApiTokensParamsSorts string
 
+// ListAstroIdeProjectsParams defines parameters for ListAstroIdeProjects.
+type ListAstroIdeProjectsParams struct {
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Search search string across name and description
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListAstroIdeProjectsParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+
+	// Visibility filter by visibility of projects
+	Visibility *ListAstroIdeProjectsParamsVisibility `form:"visibility,omitempty" json:"visibility,omitempty"`
+
+	// IncludeSubjectInfo include subject info
+	IncludeSubjectInfo *bool `form:"includeSubjectInfo,omitempty" json:"includeSubjectInfo,omitempty"`
+}
+
+// ListAstroIdeProjectsParamsSorts defines parameters for ListAstroIdeProjects.
+type ListAstroIdeProjectsParamsSorts string
+
+// ListAstroIdeProjectsParamsVisibility defines parameters for ListAstroIdeProjects.
+type ListAstroIdeProjectsParamsVisibility string
+
+// ExportAstroIdeSessionTarParams defines parameters for ExportAstroIdeSessionTar.
+type ExportAstroIdeSessionTarParams struct {
+	// Filename filename
+	Filename *string `form:"filename,omitempty" json:"filename,omitempty"`
+}
+
+// ExportAstroIdeSessionZipParams defines parameters for ExportAstroIdeSessionZip.
+type ExportAstroIdeSessionZipParams struct {
+	// Filename filename
+	Filename *string `form:"filename,omitempty" json:"filename,omitempty"`
+}
+
+// ImportAstroIdeSessionTarParams defines parameters for ImportAstroIdeSessionTar.
+type ImportAstroIdeSessionTarParams struct {
+	// Mode import mode Enums(OVERWRITE,UPSERT)
+	Mode *ImportAstroIdeSessionTarParamsMode `form:"mode,omitempty" json:"mode,omitempty"`
+}
+
+// ImportAstroIdeSessionTarParamsMode defines parameters for ImportAstroIdeSessionTar.
+type ImportAstroIdeSessionTarParamsMode string
+
+// ImportAstroIdeSessionZipParams defines parameters for ImportAstroIdeSessionZip.
+type ImportAstroIdeSessionZipParams struct {
+	// Mode import mode Enums(OVERWRITE,UPSERT)
+	Mode *ImportAstroIdeSessionZipParamsMode `form:"mode,omitempty" json:"mode,omitempty"`
+}
+
+// ImportAstroIdeSessionZipParamsMode defines parameters for ImportAstroIdeSessionZip.
+type ImportAstroIdeSessionZipParamsMode string
+
 // ListWorkspaceDagsParams defines parameters for ListWorkspaceDags.
 type ListWorkspaceDagsParams struct {
 	// PageSize page size, default of 20
@@ -5174,6 +5479,18 @@ type CreateWorkspaceApiTokenJSONRequestBody = CreateWorkspaceApiTokenRequest
 
 // UpdateWorkspaceApiTokenJSONRequestBody defines body for UpdateWorkspaceApiToken for application/json ContentType.
 type UpdateWorkspaceApiTokenJSONRequestBody = UpdateWorkspaceApiTokenRequest
+
+// CreateAstroIdeProjectJSONRequestBody defines body for CreateAstroIdeProject for application/json ContentType.
+type CreateAstroIdeProjectJSONRequestBody = CreateAstroIdeProjectRequest
+
+// CreateAstroIdeSessionJSONRequestBody defines body for CreateAstroIdeSession for application/json ContentType.
+type CreateAstroIdeSessionJSONRequestBody = CreateAstroIdeSessionRequest
+
+// SaveAstroIdeSessionJSONRequestBody defines body for SaveAstroIdeSession for application/json ContentType.
+type SaveAstroIdeSessionJSONRequestBody = SaveAstroIdeSessionRequest
+
+// UpdateAstroIdeSessionJSONRequestBody defines body for UpdateAstroIdeSession for application/json ContentType.
+type UpdateAstroIdeSessionJSONRequestBody = UpdateAstroIdeSessionRequest
 
 // TransferDeploymentJSONRequestBody defines body for TransferDeployment for application/json ContentType.
 type TransferDeploymentJSONRequestBody = TransferDeploymentRequest
@@ -5858,6 +6175,44 @@ type ClientInterface interface {
 
 	// RotateWorkspaceApiToken request
 	RotateWorkspaceApiToken(ctx context.Context, organizationId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAstroIdeProjects request
+	ListAstroIdeProjects(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAstroIdeProjectWithBody request with any body
+	CreateAstroIdeProjectWithBody(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateAstroIdeProject(ctx context.Context, organizationId string, workspaceId string, body CreateAstroIdeProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAstroIdeProject request
+	GetAstroIdeProject(ctx context.Context, organizationId string, workspaceId string, projectId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAstroIdeSessionWithBody request with any body
+	CreateAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportAstroIdeSessionTar request
+	ExportAstroIdeSessionTar(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionTarParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportAstroIdeSessionZip request
+	ExportAstroIdeSessionZip(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionZipParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportAstroIdeSessionTarWithBody request with any body
+	ImportAstroIdeSessionTarWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportAstroIdeSessionZipWithBody request with any body
+	ImportAstroIdeSessionZipWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SaveAstroIdeSessionWithBody request with any body
+	SaveAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	SaveAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SaveAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAstroIdeSessionWithBody request with any body
+	UpdateAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaceDagFilters request
 	ListWorkspaceDagFilters(ctx context.Context, organizationId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -7606,6 +7961,174 @@ func (c *Client) UpdateWorkspaceApiToken(ctx context.Context, organizationId str
 
 func (c *Client) RotateWorkspaceApiToken(ctx context.Context, organizationId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRotateWorkspaceApiTokenRequest(c.Server, organizationId, workspaceId, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListAstroIdeProjects(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAstroIdeProjectsRequest(c.Server, organizationId, workspaceId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAstroIdeProjectWithBody(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAstroIdeProjectRequestWithBody(c.Server, organizationId, workspaceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAstroIdeProject(ctx context.Context, organizationId string, workspaceId string, body CreateAstroIdeProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAstroIdeProjectRequest(c.Server, organizationId, workspaceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetAstroIdeProject(ctx context.Context, organizationId string, workspaceId string, projectId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAstroIdeProjectRequest(c.Server, organizationId, workspaceId, projectId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAstroIdeSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAstroIdeSessionRequest(c.Server, organizationId, workspaceId, projectId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ExportAstroIdeSessionTar(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionTarParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportAstroIdeSessionTarRequest(c.Server, organizationId, workspaceId, projectId, sessionId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ExportAstroIdeSessionZip(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionZipParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportAstroIdeSessionZipRequest(c.Server, organizationId, workspaceId, projectId, sessionId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ImportAstroIdeSessionTarWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportAstroIdeSessionTarRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ImportAstroIdeSessionZipWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportAstroIdeSessionZipRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SaveAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSaveAstroIdeSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SaveAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SaveAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSaveAstroIdeSessionRequest(c.Server, organizationId, workspaceId, projectId, sessionId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAstroIdeSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAstroIdeSessionRequest(c.Server, organizationId, workspaceId, projectId, sessionId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -15020,6 +15543,760 @@ func NewRotateWorkspaceApiTokenRequest(server string, organizationId string, wor
 	return req, nil
 }
 
+// NewListAstroIdeProjectsRequest generates requests for ListAstroIdeProjects
+func NewListAstroIdeProjectsRequest(server string, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Search != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sorts != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Visibility != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "visibility", runtime.ParamLocationQuery, *params.Visibility); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeSubjectInfo != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeSubjectInfo", runtime.ParamLocationQuery, *params.IncludeSubjectInfo); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateAstroIdeProjectRequest calls the generic CreateAstroIdeProject builder with application/json body
+func NewCreateAstroIdeProjectRequest(server string, organizationId string, workspaceId string, body CreateAstroIdeProjectJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAstroIdeProjectRequestWithBody(server, organizationId, workspaceId, "application/json", bodyReader)
+}
+
+// NewCreateAstroIdeProjectRequestWithBody generates requests for CreateAstroIdeProject with any type of body
+func NewCreateAstroIdeProjectRequestWithBody(server string, organizationId string, workspaceId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetAstroIdeProjectRequest generates requests for GetAstroIdeProject
+func NewGetAstroIdeProjectRequest(server string, organizationId string, workspaceId string, projectId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateAstroIdeSessionRequest calls the generic CreateAstroIdeSession builder with application/json body
+func NewCreateAstroIdeSessionRequest(server string, organizationId string, workspaceId string, projectId string, body CreateAstroIdeSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAstroIdeSessionRequestWithBody(server, organizationId, workspaceId, projectId, "application/json", bodyReader)
+}
+
+// NewCreateAstroIdeSessionRequestWithBody generates requests for CreateAstroIdeSession with any type of body
+func NewCreateAstroIdeSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewExportAstroIdeSessionTarRequest generates requests for ExportAstroIdeSessionTar
+func NewExportAstroIdeSessionTarRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionTarParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/export/tar", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Filename != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "filename", runtime.ParamLocationQuery, *params.Filename); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewExportAstroIdeSessionZipRequest generates requests for ExportAstroIdeSessionZip
+func NewExportAstroIdeSessionZipRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionZipParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/export/zip", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Filename != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "filename", runtime.ParamLocationQuery, *params.Filename); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewImportAstroIdeSessionTarRequestWithBody generates requests for ImportAstroIdeSessionTar with any type of body
+func NewImportAstroIdeSessionTarRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionTarParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/import/tar", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Mode != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "mode", runtime.ParamLocationQuery, *params.Mode); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewImportAstroIdeSessionZipRequestWithBody generates requests for ImportAstroIdeSessionZip with any type of body
+func NewImportAstroIdeSessionZipRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionZipParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/import/zip", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Mode != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "mode", runtime.ParamLocationQuery, *params.Mode); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewSaveAstroIdeSessionRequest calls the generic SaveAstroIdeSession builder with application/json body
+func NewSaveAstroIdeSessionRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, body SaveAstroIdeSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSaveAstroIdeSessionRequestWithBody(server, organizationId, workspaceId, projectId, sessionId, "application/json", bodyReader)
+}
+
+// NewSaveAstroIdeSessionRequestWithBody generates requests for SaveAstroIdeSession with any type of body
+func NewSaveAstroIdeSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/save", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdateAstroIdeSessionRequest calls the generic UpdateAstroIdeSession builder with application/json body
+func NewUpdateAstroIdeSessionRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAstroIdeSessionRequestWithBody(server, organizationId, workspaceId, projectId, sessionId, "application/json", bodyReader)
+}
+
+// NewUpdateAstroIdeSessionRequestWithBody generates requests for UpdateAstroIdeSession with any type of body
+func NewUpdateAstroIdeSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/update", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListWorkspaceDagFiltersRequest generates requests for ListWorkspaceDagFilters
 func NewListWorkspaceDagFiltersRequest(server string, organizationId string, workspaceId string) (*http.Request, error) {
 	var err error
@@ -16848,6 +18125,44 @@ type ClientWithResponsesInterface interface {
 
 	// RotateWorkspaceApiTokenWithResponse request
 	RotateWorkspaceApiTokenWithResponse(ctx context.Context, organizationId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateWorkspaceApiTokenResponse, error)
+
+	// ListAstroIdeProjectsWithResponse request
+	ListAstroIdeProjectsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*ListAstroIdeProjectsResponse, error)
+
+	// CreateAstroIdeProjectWithBodyWithResponse request with any body
+	CreateAstroIdeProjectWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAstroIdeProjectResponse, error)
+
+	CreateAstroIdeProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, body CreateAstroIdeProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAstroIdeProjectResponse, error)
+
+	// GetAstroIdeProjectWithResponse request
+	GetAstroIdeProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, reqEditors ...RequestEditorFn) (*GetAstroIdeProjectResponse, error)
+
+	// CreateAstroIdeSessionWithBodyWithResponse request with any body
+	CreateAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAstroIdeSessionResponse, error)
+
+	CreateAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAstroIdeSessionResponse, error)
+
+	// ExportAstroIdeSessionTarWithResponse request
+	ExportAstroIdeSessionTarWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionTarParams, reqEditors ...RequestEditorFn) (*ExportAstroIdeSessionTarResponse, error)
+
+	// ExportAstroIdeSessionZipWithResponse request
+	ExportAstroIdeSessionZipWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionZipParams, reqEditors ...RequestEditorFn) (*ExportAstroIdeSessionZipResponse, error)
+
+	// ImportAstroIdeSessionTarWithBodyWithResponse request with any body
+	ImportAstroIdeSessionTarWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportAstroIdeSessionTarResponse, error)
+
+	// ImportAstroIdeSessionZipWithBodyWithResponse request with any body
+	ImportAstroIdeSessionZipWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportAstroIdeSessionZipResponse, error)
+
+	// SaveAstroIdeSessionWithBodyWithResponse request with any body
+	SaveAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SaveAstroIdeSessionResponse, error)
+
+	SaveAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SaveAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*SaveAstroIdeSessionResponse, error)
+
+	// UpdateAstroIdeSessionWithBodyWithResponse request with any body
+	UpdateAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAstroIdeSessionResponse, error)
+
+	UpdateAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAstroIdeSessionResponse, error)
 
 	// ListWorkspaceDagFiltersWithResponse request
 	ListWorkspaceDagFiltersWithResponse(ctx context.Context, organizationId string, workspaceId string, reqEditors ...RequestEditorFn) (*ListWorkspaceDagFiltersResponse, error)
@@ -19629,6 +20944,250 @@ func (r RotateWorkspaceApiTokenResponse) StatusCode() int {
 	return 0
 }
 
+type ListAstroIdeProjectsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AstroIdeProjectsPaginated
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAstroIdeProjectsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAstroIdeProjectsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateAstroIdeProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AstroIdeProject
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAstroIdeProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAstroIdeProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetAstroIdeProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AstroIdeProject
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAstroIdeProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAstroIdeProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateAstroIdeSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *CreateAstroIdeSession
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAstroIdeSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAstroIdeSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ExportAstroIdeSessionTarResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportAstroIdeSessionTarResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportAstroIdeSessionTarResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ExportAstroIdeSessionZipResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportAstroIdeSessionZipResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportAstroIdeSessionZipResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ImportAstroIdeSessionTarResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ImportAstroIdeSession
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportAstroIdeSessionTarResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportAstroIdeSessionTarResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ImportAstroIdeSessionZipResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ImportAstroIdeSession
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportAstroIdeSessionZipResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportAstroIdeSessionZipResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SaveAstroIdeSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SaveAstroIdeSession
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r SaveAstroIdeSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SaveAstroIdeSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateAstroIdeSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *UpdateAstroIdeSession
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAstroIdeSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAstroIdeSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListWorkspaceDagFiltersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -21335,6 +22894,128 @@ func (c *ClientWithResponses) RotateWorkspaceApiTokenWithResponse(ctx context.Co
 		return nil, err
 	}
 	return ParseRotateWorkspaceApiTokenResponse(rsp)
+}
+
+// ListAstroIdeProjectsWithResponse request returning *ListAstroIdeProjectsResponse
+func (c *ClientWithResponses) ListAstroIdeProjectsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*ListAstroIdeProjectsResponse, error) {
+	rsp, err := c.ListAstroIdeProjects(ctx, organizationId, workspaceId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAstroIdeProjectsResponse(rsp)
+}
+
+// CreateAstroIdeProjectWithBodyWithResponse request with arbitrary body returning *CreateAstroIdeProjectResponse
+func (c *ClientWithResponses) CreateAstroIdeProjectWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAstroIdeProjectResponse, error) {
+	rsp, err := c.CreateAstroIdeProjectWithBody(ctx, organizationId, workspaceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAstroIdeProjectResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateAstroIdeProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, body CreateAstroIdeProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAstroIdeProjectResponse, error) {
+	rsp, err := c.CreateAstroIdeProject(ctx, organizationId, workspaceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAstroIdeProjectResponse(rsp)
+}
+
+// GetAstroIdeProjectWithResponse request returning *GetAstroIdeProjectResponse
+func (c *ClientWithResponses) GetAstroIdeProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, reqEditors ...RequestEditorFn) (*GetAstroIdeProjectResponse, error) {
+	rsp, err := c.GetAstroIdeProject(ctx, organizationId, workspaceId, projectId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAstroIdeProjectResponse(rsp)
+}
+
+// CreateAstroIdeSessionWithBodyWithResponse request with arbitrary body returning *CreateAstroIdeSessionResponse
+func (c *ClientWithResponses) CreateAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAstroIdeSessionResponse, error) {
+	rsp, err := c.CreateAstroIdeSessionWithBody(ctx, organizationId, workspaceId, projectId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAstroIdeSessionResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAstroIdeSessionResponse, error) {
+	rsp, err := c.CreateAstroIdeSession(ctx, organizationId, workspaceId, projectId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAstroIdeSessionResponse(rsp)
+}
+
+// ExportAstroIdeSessionTarWithResponse request returning *ExportAstroIdeSessionTarResponse
+func (c *ClientWithResponses) ExportAstroIdeSessionTarWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionTarParams, reqEditors ...RequestEditorFn) (*ExportAstroIdeSessionTarResponse, error) {
+	rsp, err := c.ExportAstroIdeSessionTar(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportAstroIdeSessionTarResponse(rsp)
+}
+
+// ExportAstroIdeSessionZipWithResponse request returning *ExportAstroIdeSessionZipResponse
+func (c *ClientWithResponses) ExportAstroIdeSessionZipWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionZipParams, reqEditors ...RequestEditorFn) (*ExportAstroIdeSessionZipResponse, error) {
+	rsp, err := c.ExportAstroIdeSessionZip(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportAstroIdeSessionZipResponse(rsp)
+}
+
+// ImportAstroIdeSessionTarWithBodyWithResponse request with arbitrary body returning *ImportAstroIdeSessionTarResponse
+func (c *ClientWithResponses) ImportAstroIdeSessionTarWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportAstroIdeSessionTarResponse, error) {
+	rsp, err := c.ImportAstroIdeSessionTarWithBody(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportAstroIdeSessionTarResponse(rsp)
+}
+
+// ImportAstroIdeSessionZipWithBodyWithResponse request with arbitrary body returning *ImportAstroIdeSessionZipResponse
+func (c *ClientWithResponses) ImportAstroIdeSessionZipWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportAstroIdeSessionZipResponse, error) {
+	rsp, err := c.ImportAstroIdeSessionZipWithBody(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportAstroIdeSessionZipResponse(rsp)
+}
+
+// SaveAstroIdeSessionWithBodyWithResponse request with arbitrary body returning *SaveAstroIdeSessionResponse
+func (c *ClientWithResponses) SaveAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SaveAstroIdeSessionResponse, error) {
+	rsp, err := c.SaveAstroIdeSessionWithBody(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSaveAstroIdeSessionResponse(rsp)
+}
+
+func (c *ClientWithResponses) SaveAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SaveAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*SaveAstroIdeSessionResponse, error) {
+	rsp, err := c.SaveAstroIdeSession(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSaveAstroIdeSessionResponse(rsp)
+}
+
+// UpdateAstroIdeSessionWithBodyWithResponse request with arbitrary body returning *UpdateAstroIdeSessionResponse
+func (c *ClientWithResponses) UpdateAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAstroIdeSessionResponse, error) {
+	rsp, err := c.UpdateAstroIdeSessionWithBody(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAstroIdeSessionResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAstroIdeSessionResponse, error) {
+	rsp, err := c.UpdateAstroIdeSession(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAstroIdeSessionResponse(rsp)
 }
 
 // ListWorkspaceDagFiltersWithResponse request returning *ListWorkspaceDagFiltersResponse
@@ -27475,6 +29156,428 @@ func ParseRotateWorkspaceApiTokenResponse(rsp *http.Response) (*RotateWorkspaceA
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAstroIdeProjectsResponse parses an HTTP response from a ListAstroIdeProjectsWithResponse call
+func ParseListAstroIdeProjectsResponse(rsp *http.Response) (*ListAstroIdeProjectsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAstroIdeProjectsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AstroIdeProjectsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAstroIdeProjectResponse parses an HTTP response from a CreateAstroIdeProjectWithResponse call
+func ParseCreateAstroIdeProjectResponse(rsp *http.Response) (*CreateAstroIdeProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAstroIdeProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AstroIdeProject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAstroIdeProjectResponse parses an HTTP response from a GetAstroIdeProjectWithResponse call
+func ParseGetAstroIdeProjectResponse(rsp *http.Response) (*GetAstroIdeProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAstroIdeProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AstroIdeProject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAstroIdeSessionResponse parses an HTTP response from a CreateAstroIdeSessionWithResponse call
+func ParseCreateAstroIdeSessionResponse(rsp *http.Response) (*CreateAstroIdeSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAstroIdeSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreateAstroIdeSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseExportAstroIdeSessionTarResponse parses an HTTP response from a ExportAstroIdeSessionTarWithResponse call
+func ParseExportAstroIdeSessionTarResponse(rsp *http.Response) (*ExportAstroIdeSessionTarResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportAstroIdeSessionTarResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseExportAstroIdeSessionZipResponse parses an HTTP response from a ExportAstroIdeSessionZipWithResponse call
+func ParseExportAstroIdeSessionZipResponse(rsp *http.Response) (*ExportAstroIdeSessionZipResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportAstroIdeSessionZipResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseImportAstroIdeSessionTarResponse parses an HTTP response from a ImportAstroIdeSessionTarWithResponse call
+func ParseImportAstroIdeSessionTarResponse(rsp *http.Response) (*ImportAstroIdeSessionTarResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportAstroIdeSessionTarResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ImportAstroIdeSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseImportAstroIdeSessionZipResponse parses an HTTP response from a ImportAstroIdeSessionZipWithResponse call
+func ParseImportAstroIdeSessionZipResponse(rsp *http.Response) (*ImportAstroIdeSessionZipResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportAstroIdeSessionZipResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ImportAstroIdeSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSaveAstroIdeSessionResponse parses an HTTP response from a SaveAstroIdeSessionWithResponse call
+func ParseSaveAstroIdeSessionResponse(rsp *http.Response) (*SaveAstroIdeSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SaveAstroIdeSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SaveAstroIdeSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAstroIdeSessionResponse parses an HTTP response from a UpdateAstroIdeSessionWithResponse call
+func ParseUpdateAstroIdeSessionResponse(rsp *http.Response) (*UpdateAstroIdeSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAstroIdeSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UpdateAstroIdeSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
