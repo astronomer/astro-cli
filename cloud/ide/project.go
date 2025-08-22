@@ -100,9 +100,9 @@ func selectIDEProject(projects []astrocore.AstroIdeProject) (astrocore.AstroIdeP
 	}
 
 	if len(projects) == 1 {
-		fmt.Println("Only one Workspace was found. Using the following Workspace by default: \n" +
-			fmt.Sprintf("\n Workspace Name: %s", ansi.Bold(projects[0].Name)) +
-			fmt.Sprintf("\n Workspace ID: %s\n", ansi.Bold(projects[0].Id)))
+		fmt.Println("Only one Project was found. Using the following Project by default: \n" +
+			fmt.Sprintf("\n Project Name: %s", ansi.Bold(projects[0].Name)) +
+			fmt.Sprintf("\n Project ID: %s\n", ansi.Bold(projects[0].Id)))
 
 		return projects[0], nil
 	}
@@ -183,7 +183,7 @@ func getProject(client astrocore.CoreClient, organizationID, workspaceID, projec
 	return projectResp, nil
 }
 
-// updateSessionPermission updates the session permission to READ_WRITE
+// updateSessionPermission updates the session permission
 func updateSessionPermission(client astrocore.CoreClient, organizationID, workspaceID, projectID, sessionID string, permission astrocore.UpdateAstroIdeSessionRequestPermission) error {
 	updateResp, err := client.UpdateAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, astrocore.UpdateAstroIdeSessionJSONRequestBody{
 		Permission: permission,
@@ -192,6 +192,55 @@ func updateSessionPermission(client astrocore.CoreClient, organizationID, worksp
 		return err
 	}
 	return astrocore.NormalizeAPIError(updateResp.HTTPResponse, updateResp.Body)
+}
+
+// uploadAndImportArchive handles archive upload and import logic
+func importArchiveToIde(client astrocore.CoreClient, organizationID, workspaceID, projectID, sessionID, archivePath string) error {
+	// Upload the archive
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Import the package
+	mode := astrocore.ImportAstroIdeSessionTarParamsModeOVERWRITE
+	importParams := &astrocore.ImportAstroIdeSessionTarParams{
+		Mode: &mode,
+	}
+	importResp, err := client.ImportAstroIdeSessionTarWithBodyWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, importParams, "application/x-gzip", file)
+	if err != nil {
+		return err
+	}
+	return astrocore.NormalizeAPIError(importResp.HTTPResponse, importResp.Body)
+}
+
+// saveSessionAndCleanup handles session saving and cleanup
+func saveSessionAndCleanup(client astrocore.CoreClient, organizationID, workspaceID, projectID, sessionID string) error {
+	// Save the session
+	saveResp, err := client.SaveAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, astrocore.SaveAstroIdeSessionJSONRequestBody{
+		Message: "Imported from Astro CLI",
+	})
+	if err != nil {
+		return err
+	}
+	if err := astrocore.NormalizeAPIError(saveResp.HTTPResponse, saveResp.Body); err != nil {
+		return err
+	}
+
+	return updateSessionPermission(client, organizationID, workspaceID, projectID, sessionID, astrocore.UpdateAstroIdeSessionRequestPermissionREADONLY)
+}
+
+// openProjectInBrowser opens the project URL in the default browser
+func openProjectInBrowser(domain, workspaceID, projectID string, out io.Writer) {
+	// Construct the URL
+	url := fmt.Sprintf("https://cloud.%s/%s/astro-ide/%s", domain, workspaceID, projectID)
+
+	// Open the URL in browser
+	cmd := exec.Command("open", url)
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(out, "Failed to open browser: %v\n", err)
+	}
 }
 
 // ExportProject exports a project from CLI to Astro IDE
@@ -263,54 +312,20 @@ func ExportProject(client astrocore.CoreClient, projectID, organizationID, works
 		}
 	}
 
-	// Upload the archive
-	file, err := os.Open(archivePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Import the package
-	mode := astrocore.ImportAstroIdeSessionTarParamsModeOVERWRITE
-	importParams := &astrocore.ImportAstroIdeSessionTarParams{
-		Mode: &mode,
-	}
-	importResp, err := client.ImportAstroIdeSessionTarWithBodyWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionResp.JSON200.Id, importParams, "application/x-gzip", file)
-	if err != nil {
-		return err
-	}
-	if err := astrocore.NormalizeAPIError(importResp.HTTPResponse, importResp.Body); err != nil {
+	// Upload and import archive
+	if err := importArchiveToIde(client, organizationID, workspaceID, projectID, sessionResp.JSON200.Id, archivePath); err != nil {
 		return err
 	}
 
-	// Save the session
-	saveResp, err := client.SaveAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionResp.JSON200.Id, astrocore.SaveAstroIdeSessionJSONRequestBody{
-		Message: "Imported from Astro CLI",
-	})
-	if err != nil {
-		return err
-	}
-	if err := astrocore.NormalizeAPIError(saveResp.HTTPResponse, saveResp.Body); err != nil {
-		return err
-	}
-
-	// Update session permission back to READ_ONLY
-
-	err = updateSessionPermission(client, organizationID, workspaceID, projectID, sessionResp.JSON200.Id, astrocore.UpdateAstroIdeSessionRequestPermissionREADONLY)
-	if err != nil {
+	// Save session and cleanup
+	if err := saveSessionAndCleanup(client, organizationID, workspaceID, projectID, sessionResp.JSON200.Id); err != nil {
 		return err
 	}
 
 	fmt.Fprintf(out, "Successfully exported project to %s\n", projectID)
 
-	// Construct the URL
-	url := fmt.Sprintf("https://cloud.%s/%s/astro-ide/%s", domain, workspaceID, projectID)
-
-	// Open the URL in browser
-	cmd := exec.Command("open", url)
-	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(out, "Failed to open browser: %v\n", err)
-	}
+	// Open project in browser
+	openProjectInBrowser(domain, workspaceID, projectID, out)
 
 	return nil
 }
