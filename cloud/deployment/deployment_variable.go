@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -31,11 +30,6 @@ func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string,
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, nil)
 	if err != nil {
-		return err
-	}
-
-	// Check if deployment is using Airflow 3
-	if err := airflowversions.ValidateNoAirflow3Support(currentDeployment.RuntimeVersion); err != nil {
 		return err
 	}
 
@@ -102,11 +96,6 @@ func VariableModify(
 		return err
 	}
 
-	// Check if deployment is using Airflow 3
-	if err := airflowversions.ValidateNoAirflow3Support(currentDeployment.RuntimeVersion); err != nil {
-		return err
-	}
-
 	// build query input
 	oldEnvironmentVariables := []astroplatformcore.DeploymentEnvironmentVariable{}
 	if currentDeployment.EnvironmentVariables != nil {
@@ -149,7 +138,7 @@ func VariableModify(
 	}
 
 	// update deployment
-	err = Update(currentDeployment.Id, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, newEnvironmentVariables, false, coreClient, platformCoreClient)
+	err = Update(currentDeployment.Id, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, newEnvironmentVariables, nil, nil, nil, false, coreClient, platformCoreClient)
 	if err != nil {
 		return err
 	}

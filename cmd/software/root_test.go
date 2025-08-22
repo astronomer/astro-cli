@@ -40,7 +40,7 @@ func (s *AddCmdSuite) TestAddCmds() {
 		},
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
+	houstonMock.On("GetAppConfig", "").Return(appConfig, nil)
 	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
@@ -52,7 +52,7 @@ func (s *AddCmdSuite) TestAddCmds() {
 
 func (s *AddCmdSuite) TestAppConfigFailure() {
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig", nil).Return(nil, errMock)
+	houstonMock.On("GetAppConfig", "").Return(nil, errMock)
 	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
@@ -71,7 +71,7 @@ func (s *AddCmdSuite) TestPlatformVersionFailure() {
 		},
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
+	houstonMock.On("GetAppConfig", "").Return(appConfig, nil)
 	houstonMock.On("GetPlatformVersion", nil).Return("", errMock)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)

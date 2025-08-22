@@ -154,6 +154,37 @@ var (
 			WorkerQueues:           &[]astroplatformcore.WorkerQueue{},
 		},
 	}
+	hostedDedicatedDeploymentResponse = astroplatformcore.GetDeploymentResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.Deployment{
+			Id:                     "test-id-1",
+			RuntimeVersion:         "3.0-1",
+			Namespace:              "test-name",
+			WorkspaceId:            "workspace-id",
+			WebServerUrl:           "test-url",
+			IsDagDeployEnabled:     false,
+			Description:            &description,
+			Name:                   "test-deployment-label",
+			Status:                 "HEALTHY",
+			Type:                   &dedicatedType,
+			ClusterId:              &csID,
+			ClusterName:            &testCluster,
+			Executor:               &executorCelery,
+			IsHighAvailability:     &highAvailabilityTest,
+			IsDevelopmentMode:      &developmentModeTest,
+			SchedulerSize:          &schedulerTestSize,
+			Region:                 &region,
+			WorkspaceName:          &workspaceName,
+			CloudProvider:          (*astroplatformcore.DeploymentCloudProvider)(&cloudProvider),
+			WebServerAirflowApiUrl: "airflow-url",
+			WorkerQueues:           &[]astroplatformcore.WorkerQueue{},
+			RemoteExecution: &astroplatformcore.DeploymentRemoteExecution{
+				Enabled: true,
+			},
+		},
+	}
 	mockListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -163,6 +194,7 @@ var (
 		},
 	}
 	standardType               = astroplatformcore.DeploymentTypeSTANDARD
+	dedicatedType              = astroplatformcore.DeploymentTypeDEDICATED
 	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
 	testRegion                 = "region"
 	testProvider               = "provider"
@@ -560,6 +592,11 @@ func TestDeploymentCreate(t *testing.T) {
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
 	})
+	t.Run("returns an error if remote-execution-enabled flag is set but org is not hosted", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--remote-execution-enabled"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "unknown flag: --remote-execution-enabled")
+	})
 	t.Run("creates a deployment from file", func(t *testing.T) {
 		filePath := "./test-deployment.yaml"
 		data := `
@@ -606,7 +643,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -723,7 +760,7 @@ deployment:
 		astroCoreClient = mockCoreClient
 		platformCoreClient = mockPlatformCoreClient
 		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated",
+			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--remote-execution-enabled", "--allowed-ip-address-ranges", "0.0.0.0/0", "--task-log-bucket", "test-bucket", "--task-log-url-pattern", "test-url-pattern",
 		}
 
 		// Mock user input for deployment name and wait for status
@@ -945,7 +982,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1088,6 +1125,46 @@ deployment:
 		platformCoreClient = mockPlatformCoreClient
 		cmdArgs := []string{
 			"update", "test-id-1", "--name", "test-name", "--workload-identity", workloadIdentity,
+		}
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("updates a hosted dedicated deployment with remote execution config", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+
+		taskLogBucket := "test-bucket"
+		taskLogURLPattern := "test-url-pattern"
+		allowedIPAddressRanges := []string{"1.2.3.4/32"}
+		mockUpdateDeploymentResponse.JSON200.RemoteExecution = &astroplatformcore.DeploymentRemoteExecution{
+			Enabled:                true,
+			AllowedIpAddressRanges: allowedIPAddressRanges,
+			TaskLogBucket:          &taskLogBucket,
+			TaskLogUrlPattern:      &taskLogURLPattern,
+		}
+
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(i astroplatformcore.UpdateDeploymentRequest) bool {
+			input, _ := i.AsUpdateDedicatedDeploymentRequest()
+			return input.RemoteExecution != nil && input.RemoteExecution.Enabled &&
+				input.RemoteExecution.AllowedIpAddressRanges != nil && (*input.RemoteExecution.AllowedIpAddressRanges)[0] == allowedIPAddressRanges[0] &&
+				input.RemoteExecution.TaskLogBucket != nil && *input.RemoteExecution.TaskLogBucket == taskLogBucket &&
+				input.RemoteExecution.TaskLogUrlPattern != nil && *input.RemoteExecution.TaskLogUrlPattern == taskLogURLPattern
+		})).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDedicatedDeploymentResponse, nil).Times(1)
+
+		astroCoreClient = mockCoreClient
+		platformCoreClient = mockPlatformCoreClient
+		cmdArgs := []string{
+			"update", "test-id-1", "--name", "test-name", "--allowed-ip-address-ranges", "1.2.3.4/32", "--task-log-bucket", taskLogBucket, "--task-log-url-pattern", taskLogURLPattern,
 		}
 
 		_, err = execDeploymentCmd(cmdArgs...)
@@ -1395,44 +1472,44 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 }
 
 func TestIsValidExecutor(t *testing.T) {
-	t.Run("returns true for Kubernetes Executor", func(t *testing.T) {
-		actual := isValidExecutor(deployment.KubeExecutor)
-		assert.True(t, actual)
+	af3OnlyValidExecutors := []string{"astro", "astroexecutor", "ASTRO", deployment.AstroExecutor, deployment.ASTRO}
+	af2ValidExecutors := []string{"celery", "celeryexecutor", "kubernetes", "kubernetesexecutor", "CELERY", "KUBERNETES", deployment.CeleryExecutor, deployment.KubeExecutor, deployment.CELERY, deployment.KUBERNETES}
+	for _, executor := range af2ValidExecutors {
+		t.Run(fmt.Sprintf("returns true if executor is %s isAirflow3=false", executor), func(t *testing.T) {
+			actual := deployment.IsValidExecutor(executor, "13.0.0", "standard")
+			assert.True(t, actual)
+		})
+	}
+	for _, executor := range af3OnlyValidExecutors {
+		t.Run(fmt.Sprintf("returns false if executor is %s isAirflow3=false", executor), func(t *testing.T) {
+			actual := deployment.IsValidExecutor(executor, "13.0.0", "standard")
+			assert.False(t, actual)
+		})
+	}
+	t.Run("returns false if executor is invalid isAirflow3=false", func(t *testing.T) {
+		actual := deployment.IsValidExecutor("invalid-executor", "13.0.0", "standard")
+		assert.False(t, actual)
 	})
-	t.Run("returns true for Celery Executor", func(t *testing.T) {
-		actual := isValidExecutor(deployment.CeleryExecutor)
-		assert.True(t, actual)
-	})
-	t.Run("returns true if executor is CELERY", func(t *testing.T) {
-		actual := isValidExecutor(deployment.CELERY)
-		assert.True(t, actual)
-	})
-	t.Run("returns true if executor is KUBERNETES", func(t *testing.T) {
-		actual := isValidExecutor(deployment.KUBERNETES)
-		assert.True(t, actual)
-	})
-	t.Run("returns true if executor is celery", func(t *testing.T) {
-		actual := isValidExecutor("celery")
-		assert.True(t, actual)
-	})
-	t.Run("returns true if executor is kubernetes", func(t *testing.T) {
-		actual := isValidExecutor("kubernetes")
-		assert.True(t, actual)
-	})
-	t.Run("returns true if executor is celery", func(t *testing.T) {
-		actual := isValidExecutor("celeryexecutor")
-		assert.True(t, actual)
-	})
-	t.Run("returns true if executor is kubernetes", func(t *testing.T) {
-		actual := isValidExecutor("kubernetesexecutor")
-		assert.True(t, actual)
-	})
-	t.Run("returns true when no Executor is requested", func(t *testing.T) {
-		actual := isValidExecutor("")
-		assert.True(t, actual)
-	})
-	t.Run("returns false for any invalid executor", func(t *testing.T) {
-		actual := isValidExecutor("KubeExecutor")
+
+	// Airflow 3 introduces AstroExecutor as a valid executor
+	af3ValidExecutors := append(af3OnlyValidExecutors, af2ValidExecutors...) //nolint:gocritic
+	for _, executor := range af3ValidExecutors {
+		t.Run(fmt.Sprintf("returns true if executor is %s isAirflow3=true", executor), func(t *testing.T) {
+			actual := deployment.IsValidExecutor(executor, "3.0-1", "standard")
+			assert.True(t, actual)
+		})
+	}
+
+	// astro exec not allowed on hybrid
+	for _, executor := range af3OnlyValidExecutors {
+		t.Run(fmt.Sprintf("returns false if executor is %s isAirflow3=true for hybrid", executor), func(t *testing.T) {
+			actual := deployment.IsValidExecutor(executor, "3.0-1", "hybrid")
+			assert.False(t, actual)
+		})
+	}
+
+	t.Run("returns false if executor is invalid isAirflow3=true", func(t *testing.T) {
+		actual := deployment.IsValidExecutor("invalid-executor", "3.0-1", "standard")
 		assert.False(t, actual)
 	})
 }

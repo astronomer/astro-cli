@@ -183,9 +183,12 @@ func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
 		err := airflowInit(cmd, args)
 		s.NoError(err)
 
-		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
+		// Read and verify Dockerfile contents
+		b, err := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
+		s.NoError(err)
 		dockerfileContents := string(b)
-		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+		// Check for the exact image name we expect
+		s.Contains(dockerfileContents, "FROM astrocrpublic.azurecr.io/runtime:")
 	})
 }
 
@@ -198,10 +201,13 @@ func (s *AirflowSuite) Test_airflowInitNoDefaultImageTag() {
 
 		err := airflowInit(cmd, args)
 		s.NoError(err)
-		// assert contents of Dockerfile
-		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
+
+		// Read and verify Dockerfile contents
+		b, err := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
+		s.NoError(err)
 		dockerfileContents := string(b)
-		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+		// Check for the exact image name we expect
+		s.Contains(dockerfileContents, "FROM astrocrpublic.azurecr.io/runtime:")
 	})
 }
 
@@ -308,7 +314,7 @@ func (s *AirflowSuite) TestAirflowInit() {
 
 		b, _ := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile"))
 		dockerfileContents := string(b)
-		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+		s.True(strings.Contains(dockerfileContents, "astrocrpublic.azurecr.io/runtime:"))
 	})
 
 	s.Run("invalid project name", func() {
@@ -518,28 +524,6 @@ func (s *AirflowSuite) TestAirflowStart() {
 		err := airflowStart(cmd, args, nil)
 		s.NoError(err)
 		mockContainerHandler.AssertExpectations(s.T())
-	})
-
-	s.Run("success with deployment id flag set but environment objects disabled", func() {
-		cmd := newAirflowStartCmd(nil)
-		deploymentID = "test-deployment-id"
-		cmd.Flag("deployment-id").Value.Set(deploymentID)
-		args := []string{"test-env-file"}
-		config.CFG.DisableEnvObjects.SetHomeString("true")
-		defer config.CFG.DisableEnvObjects.SetHomeString("false")
-
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-
-		mockContainerHandler := new(mocks.ContainerHandler)
-		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", false, false, defaultWaitTime, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
-			return mockContainerHandler, nil
-		}
-
-		err := airflowStart(cmd, args, mockCoreClient)
-		s.NoError(err)
-		mockContainerHandler.AssertExpectations(s.T())
-		mockCoreClient.AssertExpectations(s.T())
 	})
 
 	s.Run("success with deployment id flag set", func() {
@@ -827,7 +811,7 @@ func (s *AirflowSuite) TestAirflowLogs() {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Logs", true, "webserver", "scheduler", "triggerer").Return(nil).Once()
+			mockContainerHandler.On("Logs", true, "webserver", "scheduler", "triggerer", "api-server", "dag-processor").Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 

@@ -11,7 +11,6 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
 
-	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -65,11 +64,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	if requestedDeployment.Id == "" {
 		fmt.Printf("%s %s\n", deployment.NoDeploymentInWSMsg, ansi.Bold(ws))
 		return nil
-	}
-
-	// Check if deployment is using Airflow 3
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
-		return err
 	}
 
 	getDeploymentOptions := astroplatformcore.GetDeploymentOptionsParams{
@@ -174,14 +168,14 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		queueToCreateOrUpdateHybrid = SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdateHybrid, defaultOptions)
 	}
 	switch *requestedDeployment.Executor {
-	case astroplatformcore.DeploymentExecutorCELERY:
+	case astroplatformcore.DeploymentExecutorCELERY, astroplatformcore.DeploymentExecutorASTRO:
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-			err = IsHostedCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &workerMachine)
+			err = IsHostedWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &workerMachine)
 			if err != nil {
 				return err
 			}
 		} else {
-			err = IsCeleryWorkerQueueInputValid(queueToCreateOrUpdateHybrid, defaultOptions)
+			err = IsWorkerQueueInputValid(queueToCreateOrUpdateHybrid, defaultOptions)
 			if err != nil {
 				return err
 			}
@@ -238,7 +232,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 	}
 	// update the deployment with the new list of worker queues
-	err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToCreate, hybridListToCreate, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
+	err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToCreate, hybridListToCreate, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, coreClient, platformCoreClient)
 	if err != nil {
 		return err
 	}
@@ -286,11 +280,11 @@ func SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency int, wor
 	return workerQueueToCreate
 }
 
-// IsCeleryWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions.
+// IsWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions.
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
 // ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue astroplatformcore.HybridWorkerQueueRequest, defaultOptions astroplatformcore.WorkerQueueOptions) error {
+func IsWorkerQueueInputValid(requestedHybridWorkerQueue astroplatformcore.HybridWorkerQueueRequest, defaultOptions astroplatformcore.WorkerQueueOptions) error {
 	var errorMessage string
 	if !(requestedHybridWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
 		!(requestedHybridWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
@@ -310,11 +304,11 @@ func IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue astroplatformcore.
 	return nil
 }
 
-// IsHostedCeleryWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions and machineOptions.
+// IsHostedWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions and machineOptions.
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
 // ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue astroplatformcore.WorkerQueueRequest, defaultOptions astroplatformcore.WorkerQueueOptions, machineOptions *astroplatformcore.WorkerMachine) error {
+func IsHostedWorkerQueueInputValid(requestedWorkerQueue astroplatformcore.WorkerQueueRequest, defaultOptions astroplatformcore.WorkerQueueOptions, machineOptions *astroplatformcore.WorkerMachine) error {
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
 		!(requestedWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
@@ -515,11 +509,6 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 		return nil
 	}
 
-	// Check if deployment is using Airflow 3
-	if err := airflowversions.ValidateNoAirflow3Support(requestedDeployment.RuntimeVersion); err != nil {
-		return err
-	}
-
 	// prompt for queue name if one was not provided
 	if name == "" {
 		name, err = selectQueue(requestedDeployment.WorkerQueues, out)
@@ -570,7 +559,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 				}
 			}
 			// update the deployment with the new list
-			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
+			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, coreClient, platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -592,7 +581,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 				}
 			}
 			// update the deployment with the new list
-			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, true, coreClient, platformCoreClient)
+			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, coreClient, platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -652,7 +641,7 @@ func selectQueue(queueListIndex *[]astroplatformcore.WorkerQueue, out io.Writer)
 }
 
 // updateQueueList is used to merge existingQueues with the queueToUpdate. Based on the executor for the deployment, it
-// sets the resources for CeleryExecutor and removes all resources for KubernetesExecutor as they get calculated based
+// sets the resources for CeleryExecutor and AstroExecutor and removes all resources for KubernetesExecutor as they get calculated based
 // on the worker type.
 //
 //nolint:dupl
@@ -664,7 +653,8 @@ func updateQueueList(existingQueues []astroplatformcore.WorkerQueueRequest, queu
 
 		queue.Id = existingQueues[i].Id               // we need IDs to update existing queues
 		queue.IsDefault = existingQueues[i].IsDefault // users can not change this
-		if *executor == astroplatformcore.DeploymentExecutorCELERY {
+		switch *executor {
+		case astroplatformcore.DeploymentExecutorCELERY, astroplatformcore.DeploymentExecutorASTRO:
 			if wQueueMin != -1 {
 				queue.MinWorkerCount = queueToUpdate.MinWorkerCount
 			}
@@ -674,7 +664,7 @@ func updateQueueList(existingQueues []astroplatformcore.WorkerQueueRequest, queu
 			if wQueueConcurrency != 0 {
 				queue.WorkerConcurrency = queueToUpdate.WorkerConcurrency
 			}
-		} else if *executor == astroplatformcore.DeploymentExecutorKUBERNETES {
+		case astroplatformcore.DeploymentExecutorKUBERNETES:
 			// KubernetesExecutor calculates resources automatically based on the worker type
 			queue.WorkerConcurrency = 0
 			queue.MinWorkerCount = 0
