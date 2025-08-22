@@ -64,7 +64,7 @@ func ConfigSettings(id, settingsFile string, envConns map[string]astrocore.Envir
 	}
 	err := InitSettings(settingsFile)
 	if err != nil {
-		return err
+		logger.Debugf("Unable to initialize settings file: %s", err)
 	}
 	if pools {
 		if err := AddPools(id, version); err != nil {
@@ -97,13 +97,11 @@ func InitSettings(settingsFile string) error {
 
 	// Read in project config
 	readErr := viperSettings.ReadInConfig()
-
 	if readErr != nil {
-		fmt.Printf(configReadErrorMsg, readErr)
+		return errors.Wrap(readErr, "unable to read config file")
 	}
 
 	err := viperSettings.Unmarshal(&settings)
-	// Try and use old settings file if error
 	if err != nil {
 		return errors.Wrap(err, "unable to decode file")
 	}

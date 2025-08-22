@@ -432,6 +432,10 @@ func (d *DockerImage) getRegistryToAuth(imageName string) (string, error) {
 }
 
 func (d *DockerImage) Pull(remoteImage, username, token string) error {
+	if remoteImage == "" {
+		remoteImage = d.imageName
+	}
+
 	// Pulling image to registry
 	fmt.Println(pullingImagePrompt)
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()

@@ -91,7 +91,7 @@ func (s *Suite) TestGetConnections() {
 	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			s.Equal("GET", req.Method)
-			s.Equal("https://test-airflow-url/api/v1/connections", req.URL.String())
+			s.Equal("https://test-airflow-url/connections", req.URL.String())
 			s.Equal("token", req.Header.Get("authorization"))
 
 			return &http.Response{
@@ -147,7 +147,7 @@ func (s *Suite) TestUpdateConnection() {
 	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			s.Equal("PATCH", req.Method)
-			expectedURL := fmt.Sprintf("https://test-airflow-url/api/v1/connections/%s", mockConn.ConnID)
+			expectedURL := fmt.Sprintf("https://test-airflow-url/connections/%s", mockConn.ConnID)
 			s.Equal(expectedURL, req.URL.String())
 			s.Equal("token", req.Header.Get("authorization"))
 
@@ -225,7 +225,7 @@ func (s *Suite) TestCreateConnection() {
 	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			s.Equal("POST", req.Method)
-			expectedURL := "https://test-airflow-url/api/v1/connections"
+			expectedURL := "https://test-airflow-url/connections"
 			s.Equal(expectedURL, req.URL.String())
 			s.Equal("token", req.Header.Get("authorization"))
 
@@ -295,7 +295,7 @@ func (s *Suite) TestCreateConnection() {
 
 func (s *Suite) TestCreateVariable() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	expectedURL := "https://test-airflow-url/api/v1/variables"
+	expectedURL := "https://test-airflow-url/variables"
 
 	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
@@ -357,7 +357,7 @@ func (s *Suite) TestCreateVariable() {
 
 func (s *Suite) TestGetVariables() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	expectedURL := "https://test-airflow-url/api/v1/variables"
+	expectedURL := "https://test-airflow-url/variables"
 
 	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
@@ -399,7 +399,7 @@ func (s *Suite) TestGetVariables() {
 
 func (s *Suite) TestUpdateVariable() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	expectedURL := "https://test-airflow-url/api/v1/variables/test-key"
+	expectedURL := "https://test-airflow-url/variables/test-key"
 
 	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
@@ -486,7 +486,7 @@ func (s *Suite) TestCreatePool() {
 	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			s.Equal("POST", req.Method)
-			expectedURL := "https://test-airflow-url/api/v1/pools"
+			expectedURL := "https://test-airflow-url/pools"
 			s.Equal(expectedURL, req.URL.String())
 			s.Equal("token", req.Header.Get("authorization"))
 
@@ -564,7 +564,7 @@ func (s *Suite) TestUpdatePool() {
 	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			s.Equal("PATCH", req.Method)
-			expectedURL := fmt.Sprintf("https://test-airflow-url/api/v1/pools/%s", mockPool.Name)
+			expectedURL := fmt.Sprintf("https://test-airflow-url/pools/%s", mockPool.Name)
 			s.Equal(expectedURL, req.URL.String())
 			s.Equal("token", req.Header.Get("authorization"))
 
@@ -640,7 +640,7 @@ func (s *Suite) TestGetPools() {
 	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			s.Equal("GET", req.Method)
-			expectedURL := "https://test-airflow-url/api/v1/pools"
+			expectedURL := "https://test-airflow-url/pools"
 			s.Equal(expectedURL, req.URL.String())
 			s.Equal("token", req.Header.Get("authorization"))
 

@@ -153,7 +153,9 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithTagWarning() {
 	mockedDeploymentConfig := &houston.DeploymentConfig{
 		AirflowImages: mockAirflowImageList,
 	}
-	s.houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
@@ -176,8 +178,10 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithImageRepoWarning() {
 	mockedDeploymentConfig := &houston.DeploymentConfig{
 		AirflowImages: mockAirflowImageList,
 	}
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
-	s.houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
 	s.NoError(err)
@@ -215,7 +219,9 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 		AirflowImages: mockAirflowImageList,
 	}
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
-	s.houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 	s.houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:test-test", AirflowVersion: "1.10.12", RuntimeVersion: ""}).Return(nil, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description, "")
@@ -274,7 +280,9 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistryAndCustomImageName
 		AirflowImages: mockAirflowImageList,
 	}
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
-	s.houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 	s.houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:latest", AirflowVersion: "1.10.12", RuntimeVersion: "12.2.0"}).Return(nil, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description, customImageName)
@@ -293,7 +301,9 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 		AirflowImages: mockAirflowImageList,
 	}
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(nil, errMockHouston).Once()
-	s.houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	vars := make(map[string]interface{})
+	vars["clusterId"] = ""
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 	// houston GetDeploymentConfig call failure
 	err = buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
 	s.Error(err, errMockHouston)
@@ -397,7 +407,8 @@ func (s *Suite) TestAirflowFailure() {
 	s.Equal(err.Error(), "failed to get deployment info: "+errMockHouston.Error())
 
 	// buildPushDockerImage failure case
-	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{}, nil)
+	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{ClusterID: "test-cluster-id"}, nil)
+	s.houstonMock.On("GetAppConfig", "test-cluster-id").Return(&houston.AppConfig{}, nil)
 	dockerfile = "Dockerfile.invalid"
 	_, err = Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, false, "")
 	dockerfile = "Dockerfile"
@@ -424,8 +435,11 @@ func (s *Suite) TestAirflowSuccess() {
 	s.houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
 	s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Once()
-	s.houstonMock.On("GetDeployment", mock.Anything).Return(&houston.Deployment{}, nil).Once()
-	s.houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
+	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{ClusterID: "test-cluster-id"}, nil).Once()
+	s.houstonMock.On("GetAppConfig", "test-cluster-id").Return(&houston.AppConfig{}, nil).Once()
+	vars := make(map[string]interface{})
+	vars["clusterId"] = "test-cluster-id"
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(mockRuntimeReleases, nil)
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, false, "")
 	s.NoError(err)
@@ -455,10 +469,15 @@ func (s *Suite) TestAirflowSuccessForImageOnly() {
 	}
 	deployment := &houston.Deployment{
 		DagDeployment: *dagDeployment,
+		ClusterID:     "test-cluster-id",
+		ID:            "test-deployment-id",
 	}
 
-	s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-	s.houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
+	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(deployment, nil).Once()
+	s.houstonMock.On("GetAppConfig", "test-cluster-id").Return(&houston.AppConfig{}, nil).Once()
+	vars := make(map[string]interface{})
+	vars["clusterId"] = "test-cluster-id"
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(mockRuntimeReleases, nil)
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, "")
 	s.NoError(err)
@@ -489,10 +508,15 @@ func (s *Suite) TestAirflowSuccessForImageName() {
 	}
 	deployment := &houston.Deployment{
 		DagDeployment: *dagDeployment,
+		ClusterID:     "test-cluster-id",
+		ID:            "test-deployment-id",
 	}
 
-	s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-	s.houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
+	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(deployment, nil).Once()
+	s.houstonMock.On("GetAppConfig", "test-cluster-id").Return(&houston.AppConfig{}, nil).Once()
+	vars := make(map[string]interface{})
+	vars["clusterId"] = "test-cluster-id"
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(mockRuntimeReleases, nil)
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, customImageName)
 	s.NoError(err)
@@ -513,9 +537,12 @@ func (s *Suite) TestAirflowFailForImageNameWhenImageHasNoRuntimeLabel() {
 	}
 	deployment := &houston.Deployment{
 		DagDeployment: *dagDeployment,
+		ClusterID:     "test-cluster-id",
+		ID:            "test-deployment-id",
 	}
 
-	s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(deployment, nil).Once()
+	s.houstonMock.On("GetAppConfig", "test-cluster-id").Return(&houston.AppConfig{}, nil).Once()
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, customImageName)
 	s.Error(err, ErrNoRuntimeLabelOnCustomImage)
@@ -535,9 +562,12 @@ func (s *Suite) TestAirflowFailureForImageOnly() {
 	}
 	deployment := &houston.Deployment{
 		DagDeployment: *dagDeployment,
+		ClusterID:     "test-cluster-id",
+		ID:            "test-deployment-id",
 	}
 
-	s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(deployment, nil).Once()
+	s.houstonMock.On("GetAppConfig", "test-cluster-id").Return(&houston.AppConfig{}, nil).Once()
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", "", false, false, false, description, true, "")
 	s.Error(err, ErrDeploymentTypeIncorrectForImageOnly)
@@ -549,14 +579,23 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 	wsID := "test-workspace-id"
 
 	s.Run("When config flag is set to false", func() {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
 		featureFlags := &houston.FeatureFlags{
 			DagOnlyDeployment: false,
 		}
+
 		appConfig := &houston.AppConfig{
 			Flags: *featureFlags,
 		}
-
-		err := DagsOnlyDeploy(s.houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
+		deployment := &houston.Deployment{
+			ClusterID: "test-cluster-id",
+			ID:        deploymentID,
+		}
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
+		s.houstonMock.On("GetAppConfig", deployment.ClusterID).Return(appConfig, nil).Once()
+		err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		s.ErrorIs(err, ErrDagOnlyDeployDisabledInConfig)
 	})
 
@@ -564,14 +603,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, errDeploymentNotFound
 		}
-		featureFlags := &houston.FeatureFlags{
-			DagOnlyDeployment: true,
-		}
-		appConfig := &houston.AppConfig{
-			Flags: *featureFlags,
-		}
-
-		err := DagsOnlyDeploy(s.houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
+		err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		s.ErrorIs(err, errDeploymentNotFound)
 	})
 
@@ -579,15 +611,8 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
-		featureFlags := &houston.FeatureFlags{
-			DagOnlyDeployment: true,
-		}
-		appConfig := &houston.AppConfig{
-			Flags: *featureFlags,
-		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
-
-		err := DagsOnlyDeploy(s.houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
+		s.houstonMock.On("GetDeployment", deploymentID).Return(nil, errMockHouston).Once()
+		err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		s.ErrorContains(err, "failed to get deployment info: some houston error")
 	})
 
@@ -606,9 +631,12 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}
 		deployment := &houston.Deployment{
 			DagDeployment: *dagDeployment,
+			ClusterID:     "test-cluster-id",
+			ID:            deploymentID,
 		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-		err := DagsOnlyDeploy(s.houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
+		s.houstonMock.On("GetAppConfig", deployment.ClusterID).Return(appConfig, nil).Once()
+		err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		s.ErrorIs(err, ErrDagOnlyDeployNotEnabledForDeployment)
 	})
 
@@ -627,11 +655,13 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}
 		deployment := &houston.Deployment{
 			DagDeployment: *dagDeployment,
+			ClusterID:     "test-cluster-id",
 		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
 		config.ResetCurrentContext()
 
-		err := DagsOnlyDeploy(s.houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
+		s.houstonMock.On("GetAppConfig", deployment.ClusterID).Return(appConfig, nil).Once()
+		err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		s.EqualError(err, "could not get current context! Error: no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 		context.Switch("localhost")
 	})
@@ -652,9 +682,11 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		deployment := &houston.Deployment{
 			ReleaseName:   "",
 			DagDeployment: *dagDeployment,
+			ClusterID:     "test-cluster-id",
 		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
-		err := DagsOnlyDeploy(s.houstonMock, appConfig, wsID, deploymentID, config.WorkingPath, nil, false, description)
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
+		s.houstonMock.On("GetAppConfig", deployment.ClusterID).Return(appConfig, nil).Once()
+		err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description)
 		s.ErrorIs(err, errInvalidDeploymentID)
 	})
 
@@ -674,8 +706,9 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		deployment := &houston.Deployment{
 			ReleaseName:   "testReleaseName",
 			DagDeployment: *dagDeployment,
+			ClusterID:     "test-cluster-id",
 		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -695,7 +728,8 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		s.NoError(err)
 		defer os.RemoveAll("dags")
 
-		err = DagsOnlyDeploy(s.houstonMock, appConfig, wsID, deploymentID, ".", nil, false, description)
+		s.houstonMock.On("GetAppConfig", deployment.ClusterID).Return(appConfig, nil).Once()
+		err = DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, ".", nil, false, description)
 		s.EqualError(err, ErrEmptyDagFolderUserCancelledOperation.Error())
 
 		// assert that no tar or gz file exists
@@ -719,8 +753,9 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		deployment := &houston.Deployment{
 			ReleaseName:   "testReleaseName",
 			DagDeployment: *dagDeployment,
+			ClusterID:     "test-cluster-id",
 		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -755,7 +790,8 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}))
 		defer server.Close()
 
-		err = DagsOnlyDeploy(s.houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, false, description)
+		s.houstonMock.On("GetAppConfig", deployment.ClusterID).Return(appConfig, nil).Once()
+		err = DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, ".", &server.URL, false, description)
 		s.NoError(err)
 
 		// Validate that dags.tar file was created
@@ -787,8 +823,9 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		deployment := &houston.Deployment{
 			ReleaseName:   "testReleaseName",
 			DagDeployment: *dagDeployment,
+			ClusterID:     "test-cluster-id",
 		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -803,7 +840,8 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		os.Stdin = r
 		defer testUtil.MockUserInput(s.T(), "y")()
 
-		err = DagsOnlyDeploy(s.houstonMock, appConfig, wsID, deploymentID, "./dags", nil, false, description)
+		s.houstonMock.On("GetAppConfig", deployment.ClusterID).Return(appConfig, nil).Once()
+		err = DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, "./dags", nil, false, description)
 		s.EqualError(err, "open dags/dags.tar: no such file or directory")
 
 		// assert that no tar or gz file exists
@@ -830,7 +868,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 			ReleaseName:   "testReleaseName",
 			DagDeployment: *dagDeployment,
 		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
 
 		// create the non-empty dags folder
 		err := os.Mkdir("dags", os.ModePerm)
@@ -847,7 +885,8 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 			return gzipMockError
 		}
 
-		err = DagsOnlyDeploy(s.houstonMock, appConfig, deploymentID, wsID, ".", nil, false, description)
+		s.houstonMock.On("GetAppConfig", deployment.ClusterID).Return(appConfig, nil).Once()
+		err = DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, ".", nil, false, description)
 		s.ErrorIs(err, gzipMockError)
 
 		// Validate that dags.tar file was created
@@ -880,8 +919,9 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		deployment := &houston.Deployment{
 			ReleaseName:   "testReleaseName",
 			DagDeployment: *dagDeployment,
+			ClusterID:     "test-cluster-id",
 		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
 
 		// create the non-empty dags folder
 		err := os.Mkdir("dags", os.ModePerm)
@@ -906,7 +946,8 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}))
 		defer server.Close()
 
-		err = DagsOnlyDeploy(s.houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, false, description)
+		s.houstonMock.On("GetAppConfig", deployment.ClusterID).Return(appConfig, nil).Once()
+		err = DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, ".", &server.URL, false, description)
 		s.NoError(err)
 
 		// Validate that dags.tar file was created
@@ -938,8 +979,9 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		deployment := &houston.Deployment{
 			ReleaseName:   "testReleaseName",
 			DagDeployment: *dagDeployment,
+			ClusterID:     "test-cluster-id",
 		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
 
 		// create the non-empty dags folder
 		err := os.Mkdir("dags", os.ModePerm)
@@ -964,7 +1006,8 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}))
 		defer server.Close()
 
-		err = DagsOnlyDeploy(s.houstonMock, appConfig, wsID, deploymentID, ".", &server.URL, true, description)
+		s.houstonMock.On("GetAppConfig", deployment.ClusterID).Return(appConfig, nil).Once()
+		err = DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, ".", &server.URL, true, description)
 		s.NoError(err)
 
 		// assert that no tar or gz file exists
@@ -1001,7 +1044,7 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
+		s.houstonMock.On("GetDeployment", deploymentID).Return(nil, errMockHouston).Once()
 
 		returnedDeploymentID, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName)
 		s.ErrorContains(err, "failed to get deployment info: some houston error")
@@ -1015,7 +1058,7 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		deployment := &houston.Deployment{
 			ReleaseName: releaseName,
 		}
-		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
 		s.houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(nil, errMockHouston).Once()
 		returnedDeploymentID, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName)
 		s.ErrorContains(err, "some houston error")

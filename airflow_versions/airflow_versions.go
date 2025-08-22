@@ -70,8 +70,12 @@ func getAstroRuntimeTag(runtimeVersions, runtimeVersionsV3 map[string]RuntimeVer
 
 	logger.Debugf("Available runtime versions: %v", availableVersions)
 
-	if airflowVersion != "" && len(availableVersions) == 0 {
-		return "", ErrNoTagAvailable{airflowVersion: airflowVersion}
+	if len(availableVersions) == 0 {
+		if airflowVersion != "" {
+			return "", ErrNoTagAvailable{airflowVersion: airflowVersion}
+		} else {
+			return "", fmt.Errorf("no runtime versions found")
+		}
 	}
 
 	latestVersion := availableVersions[0]

@@ -32,8 +32,9 @@ Successfully added team cl0evnxfl0120dxxu1s4nbnk7 to deployment cknz133ra49758zr
 `
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
 	api.On("AddDeploymentTeam", houston.AddDeploymentTeamRequest{DeploymentID: mockDeployment.ID, TeamID: mockDeploymentTeamRole.Team.ID, Role: mockDeploymentTeamRole.Role}).Return(mockDeploymentTeamRole, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 
 	output, err := execDeploymentCmd(
@@ -56,8 +57,9 @@ func (s *Suite) TestDeploymentTeamRm() {
 `
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
 	api.On("RemoveDeploymentTeam", houston.RemoveDeploymentTeamRequest{DeploymentID: mockDeployment.ID, TeamID: mockDeploymentTeamRole.Team.ID}).Return(mockDeploymentTeamRole, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 
 	output, err := execDeploymentCmd(
@@ -75,8 +77,9 @@ func (s *Suite) TestDeploymentTeamUpdateCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
 	api.On("UpdateDeploymentTeamRole", houston.UpdateDeploymentTeamRequest{DeploymentID: mockDeployment.ID, TeamID: mockDeploymentTeamRole.Team.ID, Role: mockDeploymentTeamRole.Role}).Return(mockDeploymentTeamRole, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 
 	_, err := execDeploymentCmd(

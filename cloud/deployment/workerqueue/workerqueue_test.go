@@ -47,7 +47,7 @@ var (
 		},
 		JSON200: &astroplatformcore.Deployment{
 			Id:                  "test-deployment-id",
-			RuntimeVersion:      "4.2.5",
+			RuntimeVersion:      "3.0-4",
 			Namespace:           "test-deployment-label",
 			WorkspaceId:         "workspace-id",
 			WebServerUrl:        "test-url",
@@ -108,7 +108,7 @@ var (
 			Type:           &standardType,
 			Region:         &testRegion,
 			CloudProvider:  &testProvider,
-			RuntimeVersion: "4.2.5",
+			RuntimeVersion: "3.0-4",
 		},
 		{
 			Id:             "test-id-2",
@@ -116,7 +116,7 @@ var (
 			Status:         "HEALTHY",
 			Type:           &hybridType,
 			ClusterName:    &testCluster,
-			RuntimeVersion: "4.2.5",
+			RuntimeVersion: "3.0-4",
 		},
 	}
 	cloudProvider                = astroplatformcore.DeploymentCloudProviderAWS
@@ -980,19 +980,19 @@ func (s *Suite) TestIsCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 0
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 275
-		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.NoError(err)
 	})
 	s.Run("returns an error when min worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 35
-		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: min worker count must be between 0 and 20")
 	})
 	s.Run("returns an error when max worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 19
-		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: max worker count must be between 20 and 200")
 	})
@@ -1000,7 +1000,7 @@ func (s *Suite) TestIsCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 350
-		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: worker concurrency must be between 175 and 275")
 	})
@@ -1045,19 +1045,19 @@ func (s *Suite) TestIsHostedCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 0
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 10
-		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.NoError(err)
 	})
 	s.Run("returns an error when min worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 35
-		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: min worker count must be between 0 and 20")
 	})
 	s.Run("returns an error when max worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 19
-		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: max worker count must be between 20 and 200")
 	})
@@ -1065,7 +1065,7 @@ func (s *Suite) TestIsHostedCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 20
-		err := IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: worker concurrency must be between 1 and 15")
 	})
@@ -1317,6 +1317,7 @@ func (s *Suite) TestUpdateQueueList() {
 	id3 := "q-3"
 	id4 := "q-4"
 	deploymentCelery := astroplatformcore.DeploymentExecutorCELERY
+	deploymentAstro := astroplatformcore.DeploymentExecutorASTRO
 	existingQs := []astroplatformcore.WorkerQueueRequest{
 		{
 			Id:                &id1,
@@ -1335,62 +1336,64 @@ func (s *Suite) TestUpdateQueueList() {
 			WorkerConcurrency: 18,
 		},
 	}
-	s.Run("updates min, max, concurrency and node pool when queue exists", func() {
-		updatedQ := astroplatformcore.WorkerQueueRequest{
-			Id:                &id2,
-			Name:              "test-q-1",
-			IsDefault:         false,
-			MaxWorkerCount:    16,
-			MinWorkerCount:    3,
-			WorkerConcurrency: 20,
-		}
-		updatedQueueList := updateQueueList(existingQs, updatedQ, &deploymentCelery, 3, 16, 20)
-		s.Equal(updatedQ, updatedQueueList[1])
-	})
-	s.Run("does not update id or isDefault when queue exists", func() {
-		updatedQRequest := astroplatformcore.WorkerQueueRequest{
-			Id:                &id3,
-			Name:              "test-q-1",
-			IsDefault:         true,
-			MaxWorkerCount:    16,
-			MinWorkerCount:    3,
-			WorkerConcurrency: 20,
-		}
-		updatedQ := astroplatformcore.WorkerQueueRequest{
-			Id:                &id2,
-			Name:              "test-q-1",
-			IsDefault:         false,
-			MaxWorkerCount:    16,
-			MinWorkerCount:    3,
-			WorkerConcurrency: 20,
-		}
-		updatedQueueList := updateQueueList(existingQs, updatedQRequest, &deploymentCelery, 3, 16, 20)
-		s.Equal(updatedQ, updatedQueueList[1])
-	})
-	s.Run("does not change any queues if queue to update does not exist", func() {
-		updatedQRequest := astroplatformcore.WorkerQueueRequest{
-			Id:                &id4,
-			Name:              "test-q-does-not-exist",
-			IsDefault:         true,
-			MaxWorkerCount:    16,
-			MinWorkerCount:    3,
-			WorkerConcurrency: 20,
-		}
-		updatedQueueList := updateQueueList(existingQs, updatedQRequest, &deploymentCelery, 0, 0, 0)
-		s.Equal(existingQs, updatedQueueList)
-	})
-	s.Run("does not change any queues if user did not request min, max, concurrency", func() {
-		updatedQRequest := astroplatformcore.WorkerQueueRequest{
-			Id:                &id2,
-			Name:              "test-q-1",
-			IsDefault:         false,
-			MaxWorkerCount:    15,
-			MinWorkerCount:    5,
-			WorkerConcurrency: 18,
-		}
-		updatedQueueList := updateQueueList(existingQs, updatedQRequest, &deploymentCelery, -1, 0, 0)
-		s.Equal(existingQs, updatedQueueList)
-	})
+	for _, exec := range []astroplatformcore.DeploymentExecutor{deploymentCelery, deploymentAstro} {
+		s.Run(fmt.Sprintf("updates min, max, concurrency and node pool when queue exists (%s)", exec), func() {
+			updatedQ := astroplatformcore.WorkerQueueRequest{
+				Id:                &id2,
+				Name:              "test-q-1",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+			}
+			updatedQueueList := updateQueueList(existingQs, updatedQ, &exec, 3, 16, 20)
+			s.Equal(updatedQ, updatedQueueList[1])
+		})
+		s.Run(fmt.Sprintf("does not update id or isDefault when queue exists (%s)", exec), func() {
+			updatedQRequest := astroplatformcore.WorkerQueueRequest{
+				Id:                &id3,
+				Name:              "test-q-1",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+			}
+			updatedQ := astroplatformcore.WorkerQueueRequest{
+				Id:                &id2,
+				Name:              "test-q-1",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+			}
+			updatedQueueList := updateQueueList(existingQs, updatedQRequest, &exec, 3, 16, 20)
+			s.Equal(updatedQ, updatedQueueList[1])
+		})
+		s.Run(fmt.Sprintf("does not change any queues if queue to update does not exist (%s)", exec), func() {
+			updatedQRequest := astroplatformcore.WorkerQueueRequest{
+				Id:                &id4,
+				Name:              "test-q-does-not-exist",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+			}
+			updatedQueueList := updateQueueList(existingQs, updatedQRequest, &exec, 0, 0, 0)
+			s.Equal(existingQs, updatedQueueList)
+		})
+		s.Run(fmt.Sprintf("does not change any queues if user did not request min, max, concurrency (%s)", exec), func() {
+			updatedQRequest := astroplatformcore.WorkerQueueRequest{
+				Id:                &id2,
+				Name:              "test-q-1",
+				IsDefault:         false,
+				MaxWorkerCount:    15,
+				MinWorkerCount:    5,
+				WorkerConcurrency: 18,
+			}
+			updatedQueueList := updateQueueList(existingQs, updatedQRequest, &exec, -1, 0, 0)
+			s.Equal(existingQs, updatedQueueList)
+		})
+	}
 }
 
 func (s *Suite) TestGetQueueName() {
@@ -1506,75 +1509,5 @@ func (s *Suite) TestSanitizeExistingQueues() {
 		}
 		actualQs = sanitizeExistingQueues(existingQs, deployment.KubeExecutor)
 		s.Equal(expectedQs, actualQs)
-	})
-}
-
-func (s *Suite) TestAirflow3Blocking() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	out := new(bytes.Buffer)
-
-	// Create local mock client for platform core (we'll use the existing mockCoreClient for the core client)
-	localMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-
-	// Setup a mock response with Airflow 3 runtime version
-	airflow3Version := "3.0-1"
-
-	// Create a local copy of the deployment list response
-	airflow3Deployment := astroplatformcore.ListDeploymentsResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astroplatformcore.DeploymentsPaginated{
-			Deployments: []astroplatformcore.Deployment{
-				{
-					Id:             "test-deployment-id",
-					Name:           "test-deployment-label",
-					Status:         "HEALTHY",
-					Type:           &standardType,
-					Region:         &testRegion,
-					CloudProvider:  &testProvider,
-					RuntimeVersion: airflow3Version,
-				},
-			},
-		},
-	}
-
-	// Create a local copy of the deployment response
-	airflow3DeploymentResponse := astroplatformcore.GetDeploymentResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astroplatformcore.Deployment{
-			Id:             "test-deployment-id",
-			Name:           "test-deployment-label",
-			RuntimeVersion: airflow3Version,
-		},
-	}
-
-	s.Run("CreateOrUpdate blocks operation for Airflow 3 deployments", func() {
-		// Set expectations on the local mock client
-		localMockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3Deployment, nil).Times(1)
-		localMockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-queue", createAction, "", 0, 0, 0, false, localMockPlatformCoreClient, mockCoreClient, out)
-
-		s.Error(err)
-		s.Contains(err.Error(), "This command is not yet supported on Airflow 3 deployments")
-		localMockPlatformCoreClient.AssertExpectations(s.T())
-	})
-
-	s.Run("Delete blocks operation for Airflow 3 deployments", func() {
-		// Create a fresh local mock client for this subtest
-		localMockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-
-		// Set expectations on the fresh local mock client
-		localMockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3Deployment, nil).Times(1)
-		localMockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
-
-		err := Delete("test-ws-id", "test-deployment-id", "", "test-queue", true, localMockPlatformCoreClient, mockCoreClient, out)
-
-		s.Error(err)
-		s.Contains(err.Error(), "This command is not yet supported on Airflow 3 deployments")
-		localMockPlatformCoreClient.AssertExpectations(s.T())
 	})
 }

@@ -798,14 +798,20 @@ func (d *DockerCompose) lintTest(testHomeDirectory string, includeDeprecations b
 		}
 	}
 
-	// Mount the dags directory and the ruff config file
+	// Mount the project and the ruff config file
 	mountDirs := map[string]string{
-		filepath.Join(config.WorkingPath, "dags"): "/app/dags",
-		configFile: "/app/ruff.toml",
+		config.WorkingPath: "/app/project",
+		configFile:         "/app/ruff.toml",
 	}
 
-	// Run ruff with the config file and the dags directory
-	ruffArgs := []string{"check", "--config", "/app/ruff.toml", "/app/dags"}
+	// Pull the ruff image to get the latest image for the "latest" tag
+	err = d.ruffImageHandler.Pull("", "", "")
+	if err != nil {
+		return false, err
+	}
+
+	// Run ruff with the config file and the project directory
+	ruffArgs := []string{"check", "--config", "/app/ruff.toml", "/app/project"}
 	var buf bytes.Buffer
 	bufWriter := io.MultiWriter(os.Stdout, &buf)
 	ruffErr := d.ruffImageHandler.RunCommand(ruffArgs, mountDirs, bufWriter, bufWriter)
@@ -1501,7 +1507,7 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
 	}
-	if settingsFileExists {
+	if settingsFileExists || len(envConns) > 0 {
 		for _, container := range containers { //nolint:gocritic
 			if strings.Contains(container.Name, project.Name) &&
 				(strings.Contains(container.Name, WebserverDockerContainerName) ||

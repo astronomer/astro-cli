@@ -20,9 +20,9 @@ func (s *Suite) TestDeploymentUserAddCommand() {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
 	api.On("AddDeploymentUser", expectedAddUserRequest).Return(mockDeploymentUserRole, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd(
 		"user",
@@ -43,10 +43,10 @@ func (s *Suite) TestDeploymentUserDeleteCommand() {
 `
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
 	api.On("DeleteDeploymentUser", houston.DeleteDeploymentUserRequest{DeploymentID: mockDeploymentUserRole.Deployment.ID, Email: mockDeploymentUserRole.User.Username}).
 		Return(mockDeploymentUserRole, nil)
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd(
 		"user",
@@ -70,7 +70,7 @@ func (s *Suite) TestDeploymentUserList() {
 	}
 	api := new(mocks.ClientInterface)
 	api.On("ListDeploymentUsers", houston.ListDeploymentUsersRequest{UserID: "test-user-id", Email: "test-email", FullName: "test-name", DeploymentID: "test-id"}).Return(mockUser, nil).Once()
-
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
 	output, err := execDeploymentCmd("user", "list", "--deployment-id", "test-id", "-u", "test-user-id", "-e", "test-email", "-n", "test-name")
 	s.NoError(err)
@@ -93,8 +93,9 @@ func (s *Suite) TestDeploymentUserUpdateCommand() {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
 	api.On("UpdateDeploymentUser", expectedUpdateUserRequest).Return(&mockResponseUserRole, nil)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 
 	houstonClient = api
 	output, err := execDeploymentCmd(
