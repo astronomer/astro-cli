@@ -238,6 +238,7 @@ const (
 const (
 	CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeAUTHTOKEN CreateEnvironmentObjectMetricsExportOverridesRequestAuthType = "AUTH_TOKEN"
 	CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeBASIC     CreateEnvironmentObjectMetricsExportOverridesRequestAuthType = "BASIC"
+	CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeSIGV4     CreateEnvironmentObjectMetricsExportOverridesRequestAuthType = "SIGV4"
 )
 
 // Defines values for CreateEnvironmentObjectMetricsExportOverridesRequestExporterType.
@@ -249,6 +250,7 @@ const (
 const (
 	CreateEnvironmentObjectMetricsExportRequestAuthTypeAUTHTOKEN CreateEnvironmentObjectMetricsExportRequestAuthType = "AUTH_TOKEN"
 	CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC     CreateEnvironmentObjectMetricsExportRequestAuthType = "BASIC"
+	CreateEnvironmentObjectMetricsExportRequestAuthTypeSIGV4     CreateEnvironmentObjectMetricsExportRequestAuthType = "SIGV4"
 )
 
 // Defines values for CreateEnvironmentObjectMetricsExportRequestExporterType.
@@ -491,6 +493,7 @@ const (
 const (
 	EnvironmentObjectMetricsExportAuthTypeAUTHTOKEN EnvironmentObjectMetricsExportAuthType = "AUTH_TOKEN"
 	EnvironmentObjectMetricsExportAuthTypeBASIC     EnvironmentObjectMetricsExportAuthType = "BASIC"
+	EnvironmentObjectMetricsExportAuthTypeSIGV4     EnvironmentObjectMetricsExportAuthType = "SIGV4"
 )
 
 // Defines values for EnvironmentObjectMetricsExportExporterType.
@@ -502,6 +505,7 @@ const (
 const (
 	EnvironmentObjectMetricsExportOverridesAuthTypeAUTHTOKEN EnvironmentObjectMetricsExportOverridesAuthType = "AUTH_TOKEN"
 	EnvironmentObjectMetricsExportOverridesAuthTypeBASIC     EnvironmentObjectMetricsExportOverridesAuthType = "BASIC"
+	EnvironmentObjectMetricsExportOverridesAuthTypeSIGV4     EnvironmentObjectMetricsExportOverridesAuthType = "SIGV4"
 )
 
 // Defines values for EnvironmentObjectMetricsExportOverridesExporterType.
@@ -585,6 +589,28 @@ const (
 const (
 	OrganizationProductPlanAstronomerProductASTRO   OrganizationProductPlanAstronomerProduct = "ASTRO"
 	OrganizationProductPlanAstronomerProductOBSERVE OrganizationProductPlanAstronomerProduct = "OBSERVE"
+)
+
+// Defines values for OrganizationProductPlanProductPlanName.
+const (
+	OrganizationProductPlanProductPlanNameBASIC            OrganizationProductPlanProductPlanName = "BASIC"
+	OrganizationProductPlanProductPlanNameBASICPAYGO       OrganizationProductPlanProductPlanName = "BASIC_PAYGO"
+	OrganizationProductPlanProductPlanNameBUSINESS         OrganizationProductPlanProductPlanName = "BUSINESS"
+	OrganizationProductPlanProductPlanNameBUSINESSCRITICAL OrganizationProductPlanProductPlanName = "BUSINESS_CRITICAL"
+	OrganizationProductPlanProductPlanNameBUSINESSV2       OrganizationProductPlanProductPlanName = "BUSINESS_V2"
+	OrganizationProductPlanProductPlanNameDEVELOPERPAYGO   OrganizationProductPlanProductPlanName = "DEVELOPER_PAYGO"
+	OrganizationProductPlanProductPlanNameENTERPRISE       OrganizationProductPlanProductPlanName = "ENTERPRISE"
+	OrganizationProductPlanProductPlanNameENTERPRISEV2     OrganizationProductPlanProductPlanName = "ENTERPRISE_V2"
+	OrganizationProductPlanProductPlanNameINACTIVE         OrganizationProductPlanProductPlanName = "INACTIVE"
+	OrganizationProductPlanProductPlanNameINTERNAL         OrganizationProductPlanProductPlanName = "INTERNAL"
+	OrganizationProductPlanProductPlanNamePOV              OrganizationProductPlanProductPlanName = "POV"
+	OrganizationProductPlanProductPlanNamePREMIUM          OrganizationProductPlanProductPlanName = "PREMIUM"
+	OrganizationProductPlanProductPlanNameSTANDARD         OrganizationProductPlanProductPlanName = "STANDARD"
+	OrganizationProductPlanProductPlanNameTEAM             OrganizationProductPlanProductPlanName = "TEAM"
+	OrganizationProductPlanProductPlanNameTEAMPAYGO        OrganizationProductPlanProductPlanName = "TEAM_PAYGO"
+	OrganizationProductPlanProductPlanNameTEAMV2           OrganizationProductPlanProductPlanName = "TEAM_V2"
+	OrganizationProductPlanProductPlanNameTRIAL            OrganizationProductPlanProductPlanName = "TRIAL"
+	OrganizationProductPlanProductPlanNameTRIALV2          OrganizationProductPlanProductPlanName = "TRIAL_V2"
 )
 
 // Defines values for RoleScopeType.
@@ -681,6 +707,7 @@ const (
 const (
 	UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeAUTHTOKEN UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType = "AUTH_TOKEN"
 	UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeBASIC     UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType = "BASIC"
+	UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeSIGV4     UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType = "SIGV4"
 )
 
 // Defines values for UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType.
@@ -692,6 +719,7 @@ const (
 const (
 	UpdateEnvironmentObjectMetricsExportRequestAuthTypeAUTHTOKEN UpdateEnvironmentObjectMetricsExportRequestAuthType = "AUTH_TOKEN"
 	UpdateEnvironmentObjectMetricsExportRequestAuthTypeBASIC     UpdateEnvironmentObjectMetricsExportRequestAuthType = "BASIC"
+	UpdateEnvironmentObjectMetricsExportRequestAuthTypeSIGV4     UpdateEnvironmentObjectMetricsExportRequestAuthType = "SIGV4"
 )
 
 // Defines values for UpdateEnvironmentObjectMetricsExportRequestExporterType.
@@ -742,9 +770,9 @@ const (
 
 // Defines values for UpdateOrganizationSupportPlanRequestSupportPlan.
 const (
-	BASICPAYGO     UpdateOrganizationSupportPlanRequestSupportPlan = "BASIC_PAYGO"
-	DEVELOPERPAYGO UpdateOrganizationSupportPlanRequestSupportPlan = "DEVELOPER_PAYGO"
-	TEAMPAYGO      UpdateOrganizationSupportPlanRequestSupportPlan = "TEAM_PAYGO"
+	UpdateOrganizationSupportPlanRequestSupportPlanBASICPAYGO     UpdateOrganizationSupportPlanRequestSupportPlan = "BASIC_PAYGO"
+	UpdateOrganizationSupportPlanRequestSupportPlanDEVELOPERPAYGO UpdateOrganizationSupportPlanRequestSupportPlan = "DEVELOPER_PAYGO"
+	UpdateOrganizationSupportPlanRequestSupportPlanTEAMPAYGO      UpdateOrganizationSupportPlanRequestSupportPlan = "TEAM_PAYGO"
 )
 
 // Defines values for UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider.
@@ -816,23 +844,45 @@ const (
 // Defines values for ListOrganizationsParamsSupportPlan.
 const (
 	ListOrganizationsParamsSupportPlanBASIC            ListOrganizationsParamsSupportPlan = "BASIC"
+	ListOrganizationsParamsSupportPlanBASICPAYGO       ListOrganizationsParamsSupportPlan = "BASIC_PAYGO"
+	ListOrganizationsParamsSupportPlanBUSINESS         ListOrganizationsParamsSupportPlan = "BUSINESS"
 	ListOrganizationsParamsSupportPlanBUSINESSCRITICAL ListOrganizationsParamsSupportPlan = "BUSINESS_CRITICAL"
+	ListOrganizationsParamsSupportPlanBUSINESSV2       ListOrganizationsParamsSupportPlan = "BUSINESS_V2"
+	ListOrganizationsParamsSupportPlanDEVELOPERPAYGO   ListOrganizationsParamsSupportPlan = "DEVELOPER_PAYGO"
+	ListOrganizationsParamsSupportPlanENTERPRISE       ListOrganizationsParamsSupportPlan = "ENTERPRISE"
+	ListOrganizationsParamsSupportPlanENTERPRISEV2     ListOrganizationsParamsSupportPlan = "ENTERPRISE_V2"
+	ListOrganizationsParamsSupportPlanINACTIVE         ListOrganizationsParamsSupportPlan = "INACTIVE"
 	ListOrganizationsParamsSupportPlanINTERNAL         ListOrganizationsParamsSupportPlan = "INTERNAL"
 	ListOrganizationsParamsSupportPlanPOV              ListOrganizationsParamsSupportPlan = "POV"
 	ListOrganizationsParamsSupportPlanPREMIUM          ListOrganizationsParamsSupportPlan = "PREMIUM"
 	ListOrganizationsParamsSupportPlanSTANDARD         ListOrganizationsParamsSupportPlan = "STANDARD"
+	ListOrganizationsParamsSupportPlanTEAM             ListOrganizationsParamsSupportPlan = "TEAM"
+	ListOrganizationsParamsSupportPlanTEAMPAYGO        ListOrganizationsParamsSupportPlan = "TEAM_PAYGO"
+	ListOrganizationsParamsSupportPlanTEAMV2           ListOrganizationsParamsSupportPlan = "TEAM_V2"
 	ListOrganizationsParamsSupportPlanTRIAL            ListOrganizationsParamsSupportPlan = "TRIAL"
+	ListOrganizationsParamsSupportPlanTRIALV2          ListOrganizationsParamsSupportPlan = "TRIAL_V2"
 )
 
 // Defines values for ListOrganizationsParamsProductPlan.
 const (
 	ListOrganizationsParamsProductPlanBASIC            ListOrganizationsParamsProductPlan = "BASIC"
+	ListOrganizationsParamsProductPlanBASICPAYGO       ListOrganizationsParamsProductPlan = "BASIC_PAYGO"
+	ListOrganizationsParamsProductPlanBUSINESS         ListOrganizationsParamsProductPlan = "BUSINESS"
 	ListOrganizationsParamsProductPlanBUSINESSCRITICAL ListOrganizationsParamsProductPlan = "BUSINESS_CRITICAL"
+	ListOrganizationsParamsProductPlanBUSINESSV2       ListOrganizationsParamsProductPlan = "BUSINESS_V2"
+	ListOrganizationsParamsProductPlanDEVELOPERPAYGO   ListOrganizationsParamsProductPlan = "DEVELOPER_PAYGO"
+	ListOrganizationsParamsProductPlanENTERPRISE       ListOrganizationsParamsProductPlan = "ENTERPRISE"
+	ListOrganizationsParamsProductPlanENTERPRISEV2     ListOrganizationsParamsProductPlan = "ENTERPRISE_V2"
+	ListOrganizationsParamsProductPlanINACTIVE         ListOrganizationsParamsProductPlan = "INACTIVE"
 	ListOrganizationsParamsProductPlanINTERNAL         ListOrganizationsParamsProductPlan = "INTERNAL"
 	ListOrganizationsParamsProductPlanPOV              ListOrganizationsParamsProductPlan = "POV"
 	ListOrganizationsParamsProductPlanPREMIUM          ListOrganizationsParamsProductPlan = "PREMIUM"
 	ListOrganizationsParamsProductPlanSTANDARD         ListOrganizationsParamsProductPlan = "STANDARD"
+	ListOrganizationsParamsProductPlanTEAM             ListOrganizationsParamsProductPlan = "TEAM"
+	ListOrganizationsParamsProductPlanTEAMPAYGO        ListOrganizationsParamsProductPlan = "TEAM_PAYGO"
+	ListOrganizationsParamsProductPlanTEAMV2           ListOrganizationsParamsProductPlan = "TEAM_V2"
 	ListOrganizationsParamsProductPlanTRIAL            ListOrganizationsParamsProductPlan = "TRIAL"
+	ListOrganizationsParamsProductPlanTRIALV2          ListOrganizationsParamsProductPlan = "TRIAL_V2"
 )
 
 // Defines values for ListOrganizationsParamsAstronomerProduct.
@@ -985,9 +1035,9 @@ const (
 
 // Defines values for GetDeploymentOptionsParamsDeploymentType.
 const (
-	DEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
-	HYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
-	STANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
+	GetDeploymentOptionsParamsDeploymentTypeDEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
+	GetDeploymentOptionsParamsDeploymentTypeHYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
+	GetDeploymentOptionsParamsDeploymentTypeSTANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
 )
 
 // Defines values for GetDeploymentOptionsParamsExecutor.
@@ -999,9 +1049,16 @@ const (
 
 // Defines values for GetDeploymentOptionsParamsCloudProvider.
 const (
-	AWS   GetDeploymentOptionsParamsCloudProvider = "AWS"
-	AZURE GetDeploymentOptionsParamsCloudProvider = "AZURE"
-	GCP   GetDeploymentOptionsParamsCloudProvider = "GCP"
+	GetDeploymentOptionsParamsCloudProviderAWS   GetDeploymentOptionsParamsCloudProvider = "AWS"
+	GetDeploymentOptionsParamsCloudProviderAZURE GetDeploymentOptionsParamsCloudProvider = "AZURE"
+	GetDeploymentOptionsParamsCloudProviderGCP   GetDeploymentOptionsParamsCloudProvider = "GCP"
+)
+
+// Defines values for ListDeploymentsParamsClusterCloudProvider.
+const (
+	ListDeploymentsParamsClusterCloudProviderAWS   ListDeploymentsParamsClusterCloudProvider = "AWS"
+	ListDeploymentsParamsClusterCloudProviderAZURE ListDeploymentsParamsClusterCloudProvider = "AZURE"
+	ListDeploymentsParamsClusterCloudProviderGCP   ListDeploymentsParamsClusterCloudProvider = "GCP"
 )
 
 // Defines values for ListDeploymentsParamsSorts.
@@ -1145,6 +1202,12 @@ const (
 	METRICSEXPORT   ListEnvironmentObjectsParamsObjectType = "METRICS_EXPORT"
 )
 
+// Defines values for ListEnvironmentObjectsParamsSourceScope.
+const (
+	ListEnvironmentObjectsParamsSourceScopeDEPLOYMENT ListEnvironmentObjectsParamsSourceScope = "DEPLOYMENT"
+	ListEnvironmentObjectsParamsSourceScopeWORKSPACE  ListEnvironmentObjectsParamsSourceScope = "WORKSPACE"
+)
+
 // Defines values for ListRoleTemplatesParamsScopeTypes.
 const (
 	ListRoleTemplatesParamsScopeTypesDEPLOYMENT   ListRoleTemplatesParamsScopeTypes = "DEPLOYMENT"
@@ -1242,8 +1305,8 @@ const (
 
 // Defines values for ListWorkspaceApiTokensParamsTokenTypes.
 const (
-	ListWorkspaceApiTokensParamsTokenTypesORGANIZATION ListWorkspaceApiTokensParamsTokenTypes = "ORGANIZATION"
-	ListWorkspaceApiTokensParamsTokenTypesWORKSPACE    ListWorkspaceApiTokensParamsTokenTypes = "WORKSPACE"
+	ORGANIZATION ListWorkspaceApiTokensParamsTokenTypes = "ORGANIZATION"
+	WORKSPACE    ListWorkspaceApiTokensParamsTokenTypes = "WORKSPACE"
 )
 
 // Defines values for ListWorkspaceApiTokensParamsSorts.
@@ -1451,43 +1514,45 @@ type Bundle struct {
 
 // Cluster defines model for Cluster.
 type Cluster struct {
-	AppliedHarmonyVersion  *string                     `json:"appliedHarmonyVersion,omitempty"`
-	AppliedTemplateVersion string                      `json:"appliedTemplateVersion"`
-	BlockInternetAccess    *bool                       `json:"blockInternetAccess,omitempty"`
-	CloudProvider          ClusterCloudProvider        `json:"cloudProvider"`
-	Cohort                 *ClusterCohort              `json:"cohort,omitempty"`
-	CreatedAt              time.Time                   `json:"createdAt"`
-	DbInstanceType         string                      `json:"dbInstanceType"`
-	DbInstanceVersion      string                      `json:"dbInstanceVersion"`
-	DeletedAt              *string                     `json:"deletedAt,omitempty"`
-	HarmonyVersion         string                      `json:"harmonyVersion"`
-	HealthStatus           *ClusterHealthStatus        `json:"healthStatus,omitempty"`
-	Id                     string                      `json:"id"`
-	IsCordoned             *bool                       `json:"isCordoned,omitempty"`
-	IsDryRun               bool                        `json:"isDryRun"`
-	IsLimited              bool                        `json:"isLimited"`
-	K8sTags                []ClusterTag                `json:"k8sTags"`
-	Metadata               ClusterMetadata             `json:"metadata"`
-	Name                   string                      `json:"name"`
-	NodePools              []NodePool                  `json:"nodePools"`
-	OrganizationId         string                      `json:"organizationId"`
-	PodSubnetRange         string                      `json:"podSubnetRange"`
-	ProviderAccount        string                      `json:"providerAccount"`
-	RdsSnapshotIdentifier  *string                     `json:"rdsSnapshotIdentifier,omitempty"`
-	Region                 string                      `json:"region"`
-	SecondaryPodRanges     *[]SecondaryPodRange        `json:"secondaryPodRanges,omitempty"`
-	ServicePeeringRange    string                      `json:"servicePeeringRange"`
-	ServiceSubnetRange     string                      `json:"serviceSubnetRange"`
-	Status                 ClusterStatus               `json:"status"`
-	TemplateUrl            string                      `json:"templateUrl"`
-	TemplateVersion        string                      `json:"templateVersion"`
-	TemporalRunId          string                      `json:"temporalRunId"`
-	TenantId               string                      `json:"tenantId"`
-	TgwNetworkConnections  *[]ClusterNetworkConnection `json:"tgwNetworkConnections,omitempty"`
-	Type                   ClusterType                 `json:"type"`
-	UpdatedAt              time.Time                   `json:"updatedAt"`
-	VpcSubnetRange         string                      `json:"vpcSubnetRange"`
-	Workspaces             []string                    `json:"workspaces"`
+	AppliedHarmonyVersion             *string                     `json:"appliedHarmonyVersion,omitempty"`
+	AppliedTemplateVersion            string                      `json:"appliedTemplateVersion"`
+	AuroraReplicationSourceIdentifier *string                     `json:"auroraReplicationSourceIdentifier,omitempty"`
+	BlockInternetAccess               *bool                       `json:"blockInternetAccess,omitempty"`
+	CloudProvider                     ClusterCloudProvider        `json:"cloudProvider"`
+	Cohort                            *ClusterCohort              `json:"cohort,omitempty"`
+	CreatedAt                         time.Time                   `json:"createdAt"`
+	DbInstanceType                    string                      `json:"dbInstanceType"`
+	DbInstanceVersion                 string                      `json:"dbInstanceVersion"`
+	DeletedAt                         *string                     `json:"deletedAt,omitempty"`
+	DrRegion                          *string                     `json:"drRegion,omitempty"`
+	HarmonyVersion                    string                      `json:"harmonyVersion"`
+	HealthStatus                      *ClusterHealthStatus        `json:"healthStatus,omitempty"`
+	Id                                string                      `json:"id"`
+	IsCordoned                        *bool                       `json:"isCordoned,omitempty"`
+	IsDryRun                          bool                        `json:"isDryRun"`
+	IsLimited                         bool                        `json:"isLimited"`
+	K8sTags                           []ClusterTag                `json:"k8sTags"`
+	Metadata                          ClusterMetadata             `json:"metadata"`
+	Name                              string                      `json:"name"`
+	NodePools                         []NodePool                  `json:"nodePools"`
+	OrganizationId                    string                      `json:"organizationId"`
+	PodSubnetRange                    string                      `json:"podSubnetRange"`
+	ProviderAccount                   string                      `json:"providerAccount"`
+	RdsSnapshotIdentifier             *string                     `json:"rdsSnapshotIdentifier,omitempty"`
+	Region                            string                      `json:"region"`
+	SecondaryPodRanges                *[]SecondaryPodRange        `json:"secondaryPodRanges,omitempty"`
+	ServicePeeringRange               string                      `json:"servicePeeringRange"`
+	ServiceSubnetRange                string                      `json:"serviceSubnetRange"`
+	Status                            ClusterStatus               `json:"status"`
+	TemplateUrl                       string                      `json:"templateUrl"`
+	TemplateVersion                   string                      `json:"templateVersion"`
+	TemporalRunId                     string                      `json:"temporalRunId"`
+	TenantId                          string                      `json:"tenantId"`
+	TgwNetworkConnections             *[]ClusterNetworkConnection `json:"tgwNetworkConnections,omitempty"`
+	Type                              ClusterType                 `json:"type"`
+	UpdatedAt                         time.Time                   `json:"updatedAt"`
+	VpcSubnetRange                    string                      `json:"vpcSubnetRange"`
+	Workspaces                        []string                    `json:"workspaces"`
 }
 
 // ClusterCloudProvider defines model for Cluster.CloudProvider.
@@ -1504,29 +1569,32 @@ type ClusterType string
 
 // ClusterDetailed defines model for ClusterDetailed.
 type ClusterDetailed struct {
-	AppliedHarmonyVersion          *string                      `json:"appliedHarmonyVersion,omitempty"`
-	AppliedTemplateVersion         string                       `json:"appliedTemplateVersion"`
-	BlockInternetAccess            *bool                        `json:"blockInternetAccess,omitempty"`
-	CloudProvider                  ClusterDetailedCloudProvider `json:"cloudProvider"`
-	Cohort                         *ClusterDetailedCohort       `json:"cohort,omitempty"`
-	CreatedAt                      time.Time                    `json:"createdAt"`
-	CreatedBy                      BasicSubjectProfile          `json:"createdBy"`
-	DbInstanceType                 string                       `json:"dbInstanceType"`
-	DbInstanceVersion              string                       `json:"dbInstanceVersion"`
-	DeletedAt                      *string                      `json:"deletedAt,omitempty"`
-	DisableHarmonyVersionUpgrades  bool                         `json:"disableHarmonyVersionUpgrades"`
-	DisableTemplateVersionUpgrades bool                         `json:"disableTemplateVersionUpgrades"`
-	HarmonyVersion                 string                       `json:"harmonyVersion"`
-	HealthStatus                   *ClusterHealthStatus         `json:"healthStatus,omitempty"`
-	Id                             string                       `json:"id"`
-	IsCordoned                     *bool                        `json:"isCordoned,omitempty"`
-	IsDryRun                       bool                         `json:"isDryRun"`
-	IsLimited                      bool                         `json:"isLimited"`
-	K8sTags                        []ClusterTag                 `json:"k8sTags"`
-	Metadata                       ClusterMetadata              `json:"metadata"`
-	Name                           string                       `json:"name"`
-	NodePools                      []NodePool                   `json:"nodePools"`
-	NoteCount                      int                          `json:"noteCount"`
+	AppliedHarmonyVersion             *string                      `json:"appliedHarmonyVersion,omitempty"`
+	AppliedTemplateVersion            string                       `json:"appliedTemplateVersion"`
+	AuroraReplicationSourceIdentifier *string                      `json:"auroraReplicationSourceIdentifier,omitempty"`
+	AzureDbReviveDropped              *bool                        `json:"azureDbReviveDropped,omitempty"`
+	BlockInternetAccess               *bool                        `json:"blockInternetAccess,omitempty"`
+	CloudProvider                     ClusterDetailedCloudProvider `json:"cloudProvider"`
+	Cohort                            *ClusterDetailedCohort       `json:"cohort,omitempty"`
+	CreatedAt                         time.Time                    `json:"createdAt"`
+	CreatedBy                         BasicSubjectProfile          `json:"createdBy"`
+	DbInstanceType                    string                       `json:"dbInstanceType"`
+	DbInstanceVersion                 string                       `json:"dbInstanceVersion"`
+	DeletedAt                         *string                      `json:"deletedAt,omitempty"`
+	DisableHarmonyVersionUpgrades     bool                         `json:"disableHarmonyVersionUpgrades"`
+	DisableTemplateVersionUpgrades    bool                         `json:"disableTemplateVersionUpgrades"`
+	DrRegion                          *string                      `json:"drRegion,omitempty"`
+	HarmonyVersion                    string                       `json:"harmonyVersion"`
+	HealthStatus                      *ClusterHealthStatus         `json:"healthStatus,omitempty"`
+	Id                                string                       `json:"id"`
+	IsCordoned                        *bool                        `json:"isCordoned,omitempty"`
+	IsDryRun                          bool                         `json:"isDryRun"`
+	IsLimited                         bool                         `json:"isLimited"`
+	K8sTags                           []ClusterTag                 `json:"k8sTags"`
+	Metadata                          ClusterMetadata              `json:"metadata"`
+	Name                              string                       `json:"name"`
+	NodePools                         []NodePool                   `json:"nodePools"`
+	NoteCount                         int                          `json:"noteCount"`
 
 	// OrgShortName Deprecated: orgShortName has been replaced with organizationShortName
 	OrgShortName               *string                     `json:"orgShortName,omitempty"`
@@ -1967,7 +2035,11 @@ type CreateEnvironmentObjectConnectionOverridesRequest struct {
 	Password *string                 `json:"password,omitempty"`
 	Port     *int                    `json:"port,omitempty"`
 	Schema   *string                 `json:"schema,omitempty"`
-	Type     *string                 `json:"type,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Type           *string `json:"type,omitempty"`
 }
 
 // CreateEnvironmentObjectConnectionRequest defines model for CreateEnvironmentObjectConnectionRequest.
@@ -2001,7 +2073,11 @@ type CreateEnvironmentObjectMetricsExportOverridesRequest struct {
 	Headers      *map[string]string                                                `json:"headers,omitempty"`
 	Labels       *map[string]string                                                `json:"labels,omitempty"`
 	Password     *string                                                           `json:"password,omitempty"`
-	Username     *string                                                           `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
 
 // CreateEnvironmentObjectMetricsExportOverridesRequestAuthType defines model for CreateEnvironmentObjectMetricsExportOverridesRequest.AuthType.
@@ -2019,7 +2095,11 @@ type CreateEnvironmentObjectMetricsExportRequest struct {
 	Headers      *map[string]string                                      `json:"headers,omitempty"`
 	Labels       *map[string]string                                      `json:"labels,omitempty"`
 	Password     *string                                                 `json:"password,omitempty"`
-	Username     *string                                                 `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
 
 // CreateEnvironmentObjectMetricsExportRequestAuthType defines model for CreateEnvironmentObjectMetricsExportRequest.AuthType.
@@ -2451,6 +2531,7 @@ type Deployment struct {
 	BlockInternetAccess            *bool                            `json:"blockInternetAccess,omitempty"`
 	Bundles                        *[]Bundle                        `json:"bundles,omitempty"`
 	ClusterCloudProvider           *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
+	ClusterCloudProviderAccount    *string                          `json:"clusterCloudProviderAccount,omitempty"`
 	ClusterId                      string                           `json:"clusterId"`
 	ClusterName                    *string                          `json:"clusterName,omitempty"`
 	ClusterRegion                  *string                          `json:"clusterRegion,omitempty"`
@@ -2878,7 +2959,11 @@ type EnvironmentObjectMetricsExport struct {
 	Headers      *map[string]string                         `json:"headers,omitempty"`
 	Labels       *map[string]string                         `json:"labels,omitempty"`
 	Password     *string                                    `json:"password,omitempty"`
-	Username     *string                                    `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
 
 // EnvironmentObjectMetricsExportAuthType defines model for EnvironmentObjectMetricsExport.AuthType.
@@ -2903,7 +2988,11 @@ type EnvironmentObjectMetricsExportOverrides struct {
 	Headers      *map[string]string                                   `json:"headers,omitempty"`
 	Labels       *map[string]string                                   `json:"labels,omitempty"`
 	Password     *string                                              `json:"password,omitempty"`
-	Username     *string                                              `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
 
 // EnvironmentObjectMetricsExportOverridesAuthType defines model for EnvironmentObjectMetricsExportOverrides.AuthType.
@@ -3167,19 +3256,21 @@ type Organization struct {
 	NoteCount                   int                        `json:"noteCount"`
 	PaymentMethod               *OrganizationPaymentMethod `json:"paymentMethod,omitempty"`
 	Product                     *OrganizationProduct       `json:"product,omitempty"`
-	ProductPlans                *[]OrganizationProductPlan `json:"productPlans,omitempty"`
+	ProductPlans                []OrganizationProductPlan  `json:"productPlans"`
 	SalesforceId                *string                    `json:"salesforceId,omitempty"`
 	ShortName                   string                     `json:"shortName"`
 	Status                      *OrganizationStatus        `json:"status,omitempty"`
 	StripeId                    *string                    `json:"stripeId,omitempty"`
 	StripePaymentMethodId       *string                    `json:"stripePaymentMethodId,omitempty"`
-	SupportPlan                 OrganizationSupportPlan    `json:"supportPlan"`
-	TerminateAt                 *time.Time                 `json:"terminateAt,omitempty"`
-	TrialExpiresAt              *time.Time                 `json:"trialExpiresAt,omitempty"`
-	UpdatedAt                   time.Time                  `json:"updatedAt"`
-	UpdatedBy                   *string                    `json:"updatedBy,omitempty"`
-	UpdatedBySubject            *BasicSubjectProfile       `json:"updatedBySubject,omitempty"`
-	UsesCustomMetronomePlan     *bool                      `json:"usesCustomMetronomePlan,omitempty"`
+
+	// SupportPlan Deprecated: use ProductPlans instead
+	SupportPlan             *OrganizationSupportPlan `json:"supportPlan,omitempty"`
+	TerminateAt             *time.Time               `json:"terminateAt,omitempty"`
+	TrialExpiresAt          *time.Time               `json:"trialExpiresAt,omitempty"`
+	UpdatedAt               time.Time                `json:"updatedAt"`
+	UpdatedBy               *string                  `json:"updatedBy,omitempty"`
+	UpdatedBySubject        *BasicSubjectProfile     `json:"updatedBySubject,omitempty"`
+	UsesCustomMetronomePlan *bool                    `json:"usesCustomMetronomePlan,omitempty"`
 }
 
 // OrganizationPaymentMethod defines model for Organization.PaymentMethod.
@@ -3191,7 +3282,7 @@ type OrganizationProduct string
 // OrganizationStatus defines model for Organization.Status.
 type OrganizationStatus string
 
-// OrganizationSupportPlan defines model for Organization.SupportPlan.
+// OrganizationSupportPlan Deprecated: use ProductPlans instead
 type OrganizationSupportPlan string
 
 // OrganizationProductPlan defines model for OrganizationProductPlan.
@@ -3199,11 +3290,14 @@ type OrganizationProductPlan struct {
 	AstronomerProduct OrganizationProductPlanAstronomerProduct `json:"astronomerProduct"`
 	OrganizationId    string                                   `json:"organizationId"`
 	ProductPlanId     string                                   `json:"productPlanId"`
-	ProductPlanName   string                                   `json:"productPlanName"`
+	ProductPlanName   OrganizationProductPlanProductPlanName   `json:"productPlanName"`
 }
 
 // OrganizationProductPlanAstronomerProduct defines model for OrganizationProductPlan.AstronomerProduct.
 type OrganizationProductPlanAstronomerProduct string
+
+// OrganizationProductPlanProductPlanName defines model for OrganizationProductPlan.ProductPlanName.
+type OrganizationProductPlanProductPlanName string
 
 // ProviderInstanceType defines model for ProviderInstanceType.
 type ProviderInstanceType struct {
@@ -3438,6 +3532,7 @@ type SharedCluster struct {
 	CreatedAt           time.Time                  `json:"createdAt"`
 	DbInstanceType      string                     `json:"dbInstanceType"`
 	DbInstanceVersion   string                     `json:"dbInstanceVersion"`
+	DrRegion            *string                    `json:"drRegion,omitempty"`
 	HealthStatus        *ClusterHealthStatus       `json:"healthStatus,omitempty"`
 	Id                  string                     `json:"id"`
 	IsCordoned          *bool                      `json:"isCordoned,omitempty"`
@@ -3636,7 +3731,11 @@ type UpdateEnvironmentObjectConnectionOverridesRequest struct {
 	Password *string                 `json:"password,omitempty"`
 	Port     *int                    `json:"port,omitempty"`
 	Schema   *string                 `json:"schema,omitempty"`
-	Type     *string                 `json:"type,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Type           *string `json:"type,omitempty"`
 }
 
 // UpdateEnvironmentObjectConnectionRequest defines model for UpdateEnvironmentObjectConnectionRequest.
@@ -3670,7 +3769,11 @@ type UpdateEnvironmentObjectMetricsExportOverridesRequest struct {
 	Headers      *map[string]string                                                `json:"headers,omitempty"`
 	Labels       *map[string]string                                                `json:"labels,omitempty"`
 	Password     *string                                                           `json:"password,omitempty"`
-	Username     *string                                                           `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
 
 // UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType defines model for UpdateEnvironmentObjectMetricsExportOverridesRequest.AuthType.
@@ -3688,7 +3791,11 @@ type UpdateEnvironmentObjectMetricsExportRequest struct {
 	Headers      *map[string]string                                       `json:"headers,omitempty"`
 	Labels       *map[string]string                                       `json:"labels,omitempty"`
 	Password     *string                                                  `json:"password,omitempty"`
-	Username     *string                                                  `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
 
 // UpdateEnvironmentObjectMetricsExportRequestAuthType defines model for UpdateEnvironmentObjectMetricsExportRequest.AuthType.
@@ -4112,7 +4219,7 @@ type WorkspaceDagRun struct {
 	DataIntervalEnd   *time.Time `json:"dataIntervalEnd"`
 	DataIntervalStart *time.Time `json:"dataIntervalStart"`
 	EndDate           *time.Time `json:"endDate"`
-	LogicalDate       time.Time  `json:"logicalDate"`
+	LogicalDate       *time.Time `json:"logicalDate"`
 	RunId             string     `json:"runId"`
 	RunType           string     `json:"runType"`
 	StartDate         *time.Time `json:"startDate"`
@@ -4170,10 +4277,10 @@ type ListOrganizationsParams struct {
 	// TrialStatus filter by trial status, null for all orgs
 	TrialStatus *ListOrganizationsParamsTrialStatus `form:"trialStatus,omitempty" json:"trialStatus,omitempty"`
 
-	// SupportPlan filter by support plan, should be one of INTERNAL, POV, TRIAL, BASIC, STANDARD, PREMIUM, BUSINESS_CRITICAL, or null for all orgs
+	// SupportPlan filter by support plan, should be one of INACTIVE, INTERNAL, POV, TRIAL, BASIC, BASIC_PAYGO, TEAM_PAYGO, STANDARD, PREMIUM, BUSINESS_CRITICAL, BUSINESS, TEAM, ENTERPRISE, DEVELOPER_PAYGO, TEAM_V2, BUSINESS_V2, ENTERPRISE_V2, TRIAL_V2, or null for all orgs
 	SupportPlan *ListOrganizationsParamsSupportPlan `form:"supportPlan,omitempty" json:"supportPlan,omitempty"`
 
-	// ProductPlan filter by product plan, should be one of INTERNAL, POV, TRIAL, BASIC, STANDARD, PREMIUM, BUSINESS_CRITICAL, or null for all orgs
+	// ProductPlan filter by product plan, should be one of INACTIVE, INTERNAL, POV, TRIAL, BASIC, BASIC_PAYGO, TEAM_PAYGO, STANDARD, PREMIUM, BUSINESS_CRITICAL, BUSINESS, TEAM, ENTERPRISE, DEVELOPER_PAYGO, TEAM_V2, BUSINESS_V2, ENTERPRISE_V2, TRIAL_V2, or null for all orgs
 	ProductPlan *ListOrganizationsParamsProductPlan `form:"productPlan,omitempty" json:"productPlan,omitempty"`
 
 	// AstronomerProduct filter by astronomer product, should be one of ASTRO or OBSERVE
@@ -4371,6 +4478,9 @@ type ListDeploymentsParams struct {
 	// WorkspaceIds IDs that define the workspaces where deployments belong to
 	WorkspaceIds *[]string `form:"workspaceIds,omitempty" json:"workspaceIds,omitempty"`
 
+	// ClusterCloudProvider cloud provider to filter deployments on
+	ClusterCloudProvider *ListDeploymentsParamsClusterCloudProvider `form:"clusterCloudProvider,omitempty" json:"clusterCloudProvider,omitempty"`
+
 	// Names deployment names to filter on
 	Names *[]string `form:"names,omitempty" json:"names,omitempty"`
 
@@ -4386,6 +4496,9 @@ type ListDeploymentsParams struct {
 	// Search string to search for when listing deployments
 	Search *string `form:"search,omitempty" json:"search,omitempty"`
 }
+
+// ListDeploymentsParamsClusterCloudProvider defines parameters for ListDeployments.
+type ListDeploymentsParamsClusterCloudProvider string
 
 // ListDeploymentsParamsSorts defines parameters for ListDeployments.
 type ListDeploymentsParamsSorts string
@@ -4601,6 +4714,12 @@ type ListEnvironmentObjectsParams struct {
 
 	// ResolveLinked resolve linked objects
 	ResolveLinked *bool `form:"resolveLinked,omitempty" json:"resolveLinked,omitempty"`
+
+	// SourceScope source scope
+	SourceScope *ListEnvironmentObjectsParamsSourceScope `form:"sourceScope,omitempty" json:"sourceScope,omitempty"`
+
+	// SourceScopeEntityId source scope entity ID
+	SourceScopeEntityId *string `form:"sourceScopeEntityId,omitempty" json:"sourceScopeEntityId,omitempty"`
 }
 
 // ListEnvironmentObjectsParamsSorts defines parameters for ListEnvironmentObjects.
@@ -4608,6 +4727,9 @@ type ListEnvironmentObjectsParamsSorts string
 
 // ListEnvironmentObjectsParamsObjectType defines parameters for ListEnvironmentObjects.
 type ListEnvironmentObjectsParamsObjectType string
+
+// ListEnvironmentObjectsParamsSourceScope defines parameters for ListEnvironmentObjects.
+type ListEnvironmentObjectsParamsSourceScope string
 
 // ListEnvironmentObjectMetricsExportsLogsParams defines parameters for ListEnvironmentObjectMetricsExportsLogs.
 type ListEnvironmentObjectMetricsExportsLogsParams struct {
@@ -9757,7 +9879,6 @@ func NewListDeploymentEnvironmentObjectMetricsExportsLogsRequest(server string, 
 					queryValues.Add(k, v2)
 				}
 			}
-
 		}
 
 		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sourceScopeEntityId", runtime.ParamLocationQuery, params.SourceScopeEntityId); err != nil {
@@ -9770,7 +9891,6 @@ func NewListDeploymentEnvironmentObjectMetricsExportsLogsRequest(server string, 
 					queryValues.Add(k, v2)
 				}
 			}
-
 		}
 
 		queryURL.RawQuery = queryValues.Encode()
@@ -9832,6 +9952,22 @@ func NewListDeploymentsRequest(server string, organizationId string, params *Lis
 		if params.WorkspaceIds != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "workspaceIds", runtime.ParamLocationQuery, *params.WorkspaceIds); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ClusterCloudProvider != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "clusterCloudProvider", runtime.ParamLocationQuery, *params.ClusterCloudProvider); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -12359,6 +12495,38 @@ func NewListEnvironmentObjectsRequest(server string, organizationId string, para
 		if params.ResolveLinked != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "resolveLinked", runtime.ParamLocationQuery, *params.ResolveLinked); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SourceScope != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sourceScope", runtime.ParamLocationQuery, *params.SourceScope); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SourceScopeEntityId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sourceScopeEntityId", runtime.ParamLocationQuery, *params.SourceScopeEntityId); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
