@@ -70,13 +70,13 @@ func newIDEImportProjectCmd(out io.Writer) *cobra.Command {
 		},
 		Example: `
 # Import a project from Astro IDE
-astro ide import
+astro ide project import
 
 # Import a project from a specific Astro IDE project
-astro ide import --project-id <project-id>
+astro ide project import --project-id <project-id>
 
 # Import a project from an Astro IDE project from specific organization and workspace
-astro ide import --project-id <project-id> --workspace-id <workspace-id> --organization-id <organization-id>
+astro ide project import --project-id <project-id> --workspace-id <workspace-id> --organization-id <organization-id>
 `,
 	}
 	cmd.Flags().StringVarP(&ideProjectID, "project-id", "p", "", "Project ID to import")
@@ -99,13 +99,13 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
 astro ide export
 
 # Export a project to a specific Astro IDE project
-astro ide export --project-id <project-id>
+astro ide project export --project-id <project-id>
 
 # Force export to an Astro IDE project
-astro ide export --project-id <project-id> --force
+astro ide project export --project-id <project-id> --force
 
 # Export a project to an Astro IDE project to specific organization and workspace
-astro ide export --project-id <project-id> --workspace-id <workspace-id> --organization-id <organization-id>
+astro ide project export --project-id <project-id> --workspace-id <workspace-id> --organization-id <organization-id>
 `,
 	}
 	cmd.Flags().StringVarP(&ideProjectID, "project-id", "p", "", "Project ID to export")

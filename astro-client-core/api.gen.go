@@ -31,6 +31,7 @@ const (
 
 // Defines values for ApiTokenType.
 const (
+	ApiTokenTypeAGENT        ApiTokenType = "AGENT"
 	ApiTokenTypeDEPLOYMENT   ApiTokenType = "DEPLOYMENT"
 	ApiTokenTypeORGANIZATION ApiTokenType = "ORGANIZATION"
 	ApiTokenTypeWORKSPACE    ApiTokenType = "WORKSPACE"
@@ -41,6 +42,23 @@ const (
 	ApiTokenRoleEntityTypeDEPLOYMENT   ApiTokenRoleEntityType = "DEPLOYMENT"
 	ApiTokenRoleEntityTypeORGANIZATION ApiTokenRoleEntityType = "ORGANIZATION"
 	ApiTokenRoleEntityTypeWORKSPACE    ApiTokenRoleEntityType = "WORKSPACE"
+)
+
+// Defines values for AstroIdeProjectVisibility.
+const (
+	AstroIdeProjectVisibilityPRIVATE   AstroIdeProjectVisibility = "PRIVATE"
+	AstroIdeProjectVisibilityWORKSPACE AstroIdeProjectVisibility = "WORKSPACE"
+)
+
+// Defines values for AstroIdeProjectRemoteGitProvider.
+const (
+	AstroIdeProjectRemoteGitProviderGITHUB AstroIdeProjectRemoteGitProvider = "GITHUB"
+)
+
+// Defines values for AstroIdeSessionEditActor.
+const (
+	AstroIdeSessionEditActorAGENT AstroIdeSessionEditActor = "AGENT"
+	AstroIdeSessionEditActorUSER  AstroIdeSessionEditActor = "USER"
 )
 
 // Defines values for BasicSubjectProfileSubjectType.
@@ -165,6 +183,29 @@ const (
 	ClusterRouteTargetTypeAWSPCX ClusterRouteTargetType = "AWS_PCX"
 )
 
+// Defines values for CreateAstroIdeProjectRemoteRequestGitProvider.
+const (
+	CreateAstroIdeProjectRemoteRequestGitProviderGITHUB CreateAstroIdeProjectRemoteRequestGitProvider = "GITHUB"
+)
+
+// Defines values for CreateAstroIdeProjectRequestVisibility.
+const (
+	CreateAstroIdeProjectRequestVisibilityPRIVATE   CreateAstroIdeProjectRequestVisibility = "PRIVATE"
+	CreateAstroIdeProjectRequestVisibilityWORKSPACE CreateAstroIdeProjectRequestVisibility = "WORKSPACE"
+)
+
+// Defines values for CreateAstroIdeSessionPermission.
+const (
+	CreateAstroIdeSessionPermissionREADONLY  CreateAstroIdeSessionPermission = "READ_ONLY"
+	CreateAstroIdeSessionPermissionREADWRITE CreateAstroIdeSessionPermission = "READ_WRITE"
+)
+
+// Defines values for CreateAstroIdeSessionRequestPermission.
+const (
+	CreateAstroIdeSessionRequestPermissionREADONLY  CreateAstroIdeSessionRequestPermission = "READ_ONLY"
+	CreateAstroIdeSessionRequestPermissionREADWRITE CreateAstroIdeSessionRequestPermission = "READ_WRITE"
+)
+
 // Defines values for CreateAwsClusterRequestType.
 const (
 	CreateAwsClusterRequestTypeBRINGYOUROWNCLOUD CreateAwsClusterRequestType = "BRING_YOUR_OWN_CLOUD"
@@ -233,9 +274,23 @@ const (
 	CreateEnvironmentObjectLinkRequestScopeDEPLOYMENT CreateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
 )
 
+// Defines values for CreateEnvironmentObjectMetricsExportOverridesRequestAuthType.
+const (
+	CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeAUTHTOKEN CreateEnvironmentObjectMetricsExportOverridesRequestAuthType = "AUTH_TOKEN"
+	CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeBASIC     CreateEnvironmentObjectMetricsExportOverridesRequestAuthType = "BASIC"
+	CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeSIGV4     CreateEnvironmentObjectMetricsExportOverridesRequestAuthType = "SIGV4"
+)
+
 // Defines values for CreateEnvironmentObjectMetricsExportOverridesRequestExporterType.
 const (
 	CreateEnvironmentObjectMetricsExportOverridesRequestExporterTypePROMETHEUS CreateEnvironmentObjectMetricsExportOverridesRequestExporterType = "PROMETHEUS"
+)
+
+// Defines values for CreateEnvironmentObjectMetricsExportRequestAuthType.
+const (
+	CreateEnvironmentObjectMetricsExportRequestAuthTypeAUTHTOKEN CreateEnvironmentObjectMetricsExportRequestAuthType = "AUTH_TOKEN"
+	CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC     CreateEnvironmentObjectMetricsExportRequestAuthType = "BASIC"
+	CreateEnvironmentObjectMetricsExportRequestAuthTypeSIGV4     CreateEnvironmentObjectMetricsExportRequestAuthType = "SIGV4"
 )
 
 // Defines values for CreateEnvironmentObjectMetricsExportRequestExporterType.
@@ -274,24 +329,6 @@ const (
 	CreateHybridDeploymentRequestTypeDEDICATED CreateHybridDeploymentRequestType = "DEDICATED"
 	CreateHybridDeploymentRequestTypeHYBRID    CreateHybridDeploymentRequestType = "HYBRID"
 	CreateHybridDeploymentRequestTypeSTANDARD  CreateHybridDeploymentRequestType = "STANDARD"
-)
-
-// Defines values for CreatePolarisProjectRequestVisibility.
-const (
-	CreatePolarisProjectRequestVisibilityPRIVATE   CreatePolarisProjectRequestVisibility = "PRIVATE"
-	CreatePolarisProjectRequestVisibilityWORKSPACE CreatePolarisProjectRequestVisibility = "WORKSPACE"
-)
-
-// Defines values for CreatePolarisSessionPermission.
-const (
-	CreatePolarisSessionPermissionREADONLY  CreatePolarisSessionPermission = "READ_ONLY"
-	CreatePolarisSessionPermissionREADWRITE CreatePolarisSessionPermission = "READ_WRITE"
-)
-
-// Defines values for CreatePolarisSessionRequestPermission.
-const (
-	CreatePolarisSessionRequestPermissionREADONLY  CreatePolarisSessionRequestPermission = "READ_ONLY"
-	CreatePolarisSessionRequestPermissionREADWRITE CreatePolarisSessionRequestPermission = "READ_WRITE"
 )
 
 // Defines values for CreateStandardDeploymentRequestCloudProvider.
@@ -437,25 +474,24 @@ const (
 
 // Defines values for EntitlementRequiredPlan.
 const (
-	EntitlementRequiredPlanAZUREMANAGEDPREVIEW EntitlementRequiredPlan = "AZURE_MANAGED_PREVIEW"
-	EntitlementRequiredPlanBASIC               EntitlementRequiredPlan = "BASIC"
-	EntitlementRequiredPlanBASICPAYGO          EntitlementRequiredPlan = "BASIC_PAYGO"
-	EntitlementRequiredPlanBUSINESS            EntitlementRequiredPlan = "BUSINESS"
-	EntitlementRequiredPlanBUSINESSCRITICAL    EntitlementRequiredPlan = "BUSINESS_CRITICAL"
-	EntitlementRequiredPlanBUSINESSV2          EntitlementRequiredPlan = "BUSINESS_V2"
-	EntitlementRequiredPlanDEVELOPERPAYGO      EntitlementRequiredPlan = "DEVELOPER_PAYGO"
-	EntitlementRequiredPlanENTERPRISE          EntitlementRequiredPlan = "ENTERPRISE"
-	EntitlementRequiredPlanENTERPRISEV2        EntitlementRequiredPlan = "ENTERPRISE_V2"
-	EntitlementRequiredPlanINACTIVE            EntitlementRequiredPlan = "INACTIVE"
-	EntitlementRequiredPlanINTERNAL            EntitlementRequiredPlan = "INTERNAL"
-	EntitlementRequiredPlanPOV                 EntitlementRequiredPlan = "POV"
-	EntitlementRequiredPlanPREMIUM             EntitlementRequiredPlan = "PREMIUM"
-	EntitlementRequiredPlanSTANDARD            EntitlementRequiredPlan = "STANDARD"
-	EntitlementRequiredPlanTEAM                EntitlementRequiredPlan = "TEAM"
-	EntitlementRequiredPlanTEAMPAYGO           EntitlementRequiredPlan = "TEAM_PAYGO"
-	EntitlementRequiredPlanTEAMV2              EntitlementRequiredPlan = "TEAM_V2"
-	EntitlementRequiredPlanTRIAL               EntitlementRequiredPlan = "TRIAL"
-	EntitlementRequiredPlanTRIALV2             EntitlementRequiredPlan = "TRIAL_V2"
+	EntitlementRequiredPlanBASIC            EntitlementRequiredPlan = "BASIC"
+	EntitlementRequiredPlanBASICPAYGO       EntitlementRequiredPlan = "BASIC_PAYGO"
+	EntitlementRequiredPlanBUSINESS         EntitlementRequiredPlan = "BUSINESS"
+	EntitlementRequiredPlanBUSINESSCRITICAL EntitlementRequiredPlan = "BUSINESS_CRITICAL"
+	EntitlementRequiredPlanBUSINESSV2       EntitlementRequiredPlan = "BUSINESS_V2"
+	EntitlementRequiredPlanDEVELOPERPAYGO   EntitlementRequiredPlan = "DEVELOPER_PAYGO"
+	EntitlementRequiredPlanENTERPRISE       EntitlementRequiredPlan = "ENTERPRISE"
+	EntitlementRequiredPlanENTERPRISEV2     EntitlementRequiredPlan = "ENTERPRISE_V2"
+	EntitlementRequiredPlanINACTIVE         EntitlementRequiredPlan = "INACTIVE"
+	EntitlementRequiredPlanINTERNAL         EntitlementRequiredPlan = "INTERNAL"
+	EntitlementRequiredPlanPOV              EntitlementRequiredPlan = "POV"
+	EntitlementRequiredPlanPREMIUM          EntitlementRequiredPlan = "PREMIUM"
+	EntitlementRequiredPlanSTANDARD         EntitlementRequiredPlan = "STANDARD"
+	EntitlementRequiredPlanTEAM             EntitlementRequiredPlan = "TEAM"
+	EntitlementRequiredPlanTEAMPAYGO        EntitlementRequiredPlan = "TEAM_PAYGO"
+	EntitlementRequiredPlanTEAMV2           EntitlementRequiredPlan = "TEAM_V2"
+	EntitlementRequiredPlanTRIAL            EntitlementRequiredPlan = "TRIAL"
+	EntitlementRequiredPlanTRIALV2          EntitlementRequiredPlan = "TRIAL_V2"
 )
 
 // Defines values for EntitlementType.
@@ -493,9 +529,23 @@ const (
 	EnvironmentObjectLinkScopeDEPLOYMENT EnvironmentObjectLinkScope = "DEPLOYMENT"
 )
 
+// Defines values for EnvironmentObjectMetricsExportAuthType.
+const (
+	EnvironmentObjectMetricsExportAuthTypeAUTHTOKEN EnvironmentObjectMetricsExportAuthType = "AUTH_TOKEN"
+	EnvironmentObjectMetricsExportAuthTypeBASIC     EnvironmentObjectMetricsExportAuthType = "BASIC"
+	EnvironmentObjectMetricsExportAuthTypeSIGV4     EnvironmentObjectMetricsExportAuthType = "SIGV4"
+)
+
 // Defines values for EnvironmentObjectMetricsExportExporterType.
 const (
 	EnvironmentObjectMetricsExportExporterTypePROMETHEUS EnvironmentObjectMetricsExportExporterType = "PROMETHEUS"
+)
+
+// Defines values for EnvironmentObjectMetricsExportOverridesAuthType.
+const (
+	EnvironmentObjectMetricsExportOverridesAuthTypeAUTHTOKEN EnvironmentObjectMetricsExportOverridesAuthType = "AUTH_TOKEN"
+	EnvironmentObjectMetricsExportOverridesAuthTypeBASIC     EnvironmentObjectMetricsExportOverridesAuthType = "BASIC"
+	EnvironmentObjectMetricsExportOverridesAuthTypeSIGV4     EnvironmentObjectMetricsExportOverridesAuthType = "SIGV4"
 )
 
 // Defines values for EnvironmentObjectMetricsExportOverridesExporterType.
@@ -555,37 +605,52 @@ const (
 
 // Defines values for OrganizationSupportPlan.
 const (
-	OrganizationSupportPlanAZUREMANAGEDPREVIEW OrganizationSupportPlan = "AZURE_MANAGED_PREVIEW"
-	OrganizationSupportPlanBASIC               OrganizationSupportPlan = "BASIC"
-	OrganizationSupportPlanBASICPAYGO          OrganizationSupportPlan = "BASIC_PAYGO"
-	OrganizationSupportPlanBUSINESS            OrganizationSupportPlan = "BUSINESS"
-	OrganizationSupportPlanBUSINESSCRITICAL    OrganizationSupportPlan = "BUSINESS_CRITICAL"
-	OrganizationSupportPlanBUSINESSV2          OrganizationSupportPlan = "BUSINESS_V2"
-	OrganizationSupportPlanDEVELOPERPAYGO      OrganizationSupportPlan = "DEVELOPER_PAYGO"
-	OrganizationSupportPlanENTERPRISE          OrganizationSupportPlan = "ENTERPRISE"
-	OrganizationSupportPlanENTERPRISEV2        OrganizationSupportPlan = "ENTERPRISE_V2"
-	OrganizationSupportPlanINACTIVE            OrganizationSupportPlan = "INACTIVE"
-	OrganizationSupportPlanINTERNAL            OrganizationSupportPlan = "INTERNAL"
-	OrganizationSupportPlanPOV                 OrganizationSupportPlan = "POV"
-	OrganizationSupportPlanPREMIUM             OrganizationSupportPlan = "PREMIUM"
-	OrganizationSupportPlanSTANDARD            OrganizationSupportPlan = "STANDARD"
-	OrganizationSupportPlanTEAM                OrganizationSupportPlan = "TEAM"
-	OrganizationSupportPlanTEAMPAYGO           OrganizationSupportPlan = "TEAM_PAYGO"
-	OrganizationSupportPlanTEAMV2              OrganizationSupportPlan = "TEAM_V2"
-	OrganizationSupportPlanTRIAL               OrganizationSupportPlan = "TRIAL"
-	OrganizationSupportPlanTRIALV2             OrganizationSupportPlan = "TRIAL_V2"
+	OrganizationSupportPlanBASIC            OrganizationSupportPlan = "BASIC"
+	OrganizationSupportPlanBASICPAYGO       OrganizationSupportPlan = "BASIC_PAYGO"
+	OrganizationSupportPlanBUSINESS         OrganizationSupportPlan = "BUSINESS"
+	OrganizationSupportPlanBUSINESSCRITICAL OrganizationSupportPlan = "BUSINESS_CRITICAL"
+	OrganizationSupportPlanBUSINESSV2       OrganizationSupportPlan = "BUSINESS_V2"
+	OrganizationSupportPlanDEVELOPERPAYGO   OrganizationSupportPlan = "DEVELOPER_PAYGO"
+	OrganizationSupportPlanENTERPRISE       OrganizationSupportPlan = "ENTERPRISE"
+	OrganizationSupportPlanENTERPRISEV2     OrganizationSupportPlan = "ENTERPRISE_V2"
+	OrganizationSupportPlanINACTIVE         OrganizationSupportPlan = "INACTIVE"
+	OrganizationSupportPlanINTERNAL         OrganizationSupportPlan = "INTERNAL"
+	OrganizationSupportPlanPOV              OrganizationSupportPlan = "POV"
+	OrganizationSupportPlanPREMIUM          OrganizationSupportPlan = "PREMIUM"
+	OrganizationSupportPlanSTANDARD         OrganizationSupportPlan = "STANDARD"
+	OrganizationSupportPlanTEAM             OrganizationSupportPlan = "TEAM"
+	OrganizationSupportPlanTEAMPAYGO        OrganizationSupportPlan = "TEAM_PAYGO"
+	OrganizationSupportPlanTEAMV2           OrganizationSupportPlan = "TEAM_V2"
+	OrganizationSupportPlanTRIAL            OrganizationSupportPlan = "TRIAL"
+	OrganizationSupportPlanTRIALV2          OrganizationSupportPlan = "TRIAL_V2"
 )
 
-// Defines values for PolarisProjectVisibility.
+// Defines values for OrganizationProductPlanAstronomerProduct.
 const (
-	PolarisProjectVisibilityPRIVATE   PolarisProjectVisibility = "PRIVATE"
-	PolarisProjectVisibilityWORKSPACE PolarisProjectVisibility = "WORKSPACE"
+	OrganizationProductPlanAstronomerProductASTRO   OrganizationProductPlanAstronomerProduct = "ASTRO"
+	OrganizationProductPlanAstronomerProductOBSERVE OrganizationProductPlanAstronomerProduct = "OBSERVE"
 )
 
-// Defines values for PolarisSessionEditActor.
+// Defines values for OrganizationProductPlanProductPlanName.
 const (
-	PolarisSessionEditActorAGENT PolarisSessionEditActor = "AGENT"
-	PolarisSessionEditActorUSER  PolarisSessionEditActor = "USER"
+	OrganizationProductPlanProductPlanNameBASIC            OrganizationProductPlanProductPlanName = "BASIC"
+	OrganizationProductPlanProductPlanNameBASICPAYGO       OrganizationProductPlanProductPlanName = "BASIC_PAYGO"
+	OrganizationProductPlanProductPlanNameBUSINESS         OrganizationProductPlanProductPlanName = "BUSINESS"
+	OrganizationProductPlanProductPlanNameBUSINESSCRITICAL OrganizationProductPlanProductPlanName = "BUSINESS_CRITICAL"
+	OrganizationProductPlanProductPlanNameBUSINESSV2       OrganizationProductPlanProductPlanName = "BUSINESS_V2"
+	OrganizationProductPlanProductPlanNameDEVELOPERPAYGO   OrganizationProductPlanProductPlanName = "DEVELOPER_PAYGO"
+	OrganizationProductPlanProductPlanNameENTERPRISE       OrganizationProductPlanProductPlanName = "ENTERPRISE"
+	OrganizationProductPlanProductPlanNameENTERPRISEV2     OrganizationProductPlanProductPlanName = "ENTERPRISE_V2"
+	OrganizationProductPlanProductPlanNameINACTIVE         OrganizationProductPlanProductPlanName = "INACTIVE"
+	OrganizationProductPlanProductPlanNameINTERNAL         OrganizationProductPlanProductPlanName = "INTERNAL"
+	OrganizationProductPlanProductPlanNamePOV              OrganizationProductPlanProductPlanName = "POV"
+	OrganizationProductPlanProductPlanNamePREMIUM          OrganizationProductPlanProductPlanName = "PREMIUM"
+	OrganizationProductPlanProductPlanNameSTANDARD         OrganizationProductPlanProductPlanName = "STANDARD"
+	OrganizationProductPlanProductPlanNameTEAM             OrganizationProductPlanProductPlanName = "TEAM"
+	OrganizationProductPlanProductPlanNameTEAMPAYGO        OrganizationProductPlanProductPlanName = "TEAM_PAYGO"
+	OrganizationProductPlanProductPlanNameTEAMV2           OrganizationProductPlanProductPlanName = "TEAM_V2"
+	OrganizationProductPlanProductPlanNameTRIAL            OrganizationProductPlanProductPlanName = "TRIAL"
+	OrganizationProductPlanProductPlanNameTRIALV2          OrganizationProductPlanProductPlanName = "TRIAL_V2"
 )
 
 // Defines values for RoleScopeType.
@@ -673,14 +738,40 @@ const (
 	IMAGE TriggerGitDeployRequestDeployType = "IMAGE"
 )
 
+// Defines values for UpdateAstroIdeSessionPermission.
+const (
+	UpdateAstroIdeSessionPermissionREADONLY  UpdateAstroIdeSessionPermission = "READ_ONLY"
+	UpdateAstroIdeSessionPermissionREADWRITE UpdateAstroIdeSessionPermission = "READ_WRITE"
+)
+
+// Defines values for UpdateAstroIdeSessionRequestPermission.
+const (
+	UpdateAstroIdeSessionRequestPermissionREADONLY  UpdateAstroIdeSessionRequestPermission = "READ_ONLY"
+	UpdateAstroIdeSessionRequestPermissionREADWRITE UpdateAstroIdeSessionRequestPermission = "READ_WRITE"
+)
+
 // Defines values for UpdateEnvironmentObjectLinkRequestScope.
 const (
 	UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT UpdateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
 )
 
+// Defines values for UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType.
+const (
+	UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeAUTHTOKEN UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType = "AUTH_TOKEN"
+	UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeBASIC     UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType = "BASIC"
+	UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeSIGV4     UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType = "SIGV4"
+)
+
 // Defines values for UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType.
 const (
 	UpdateEnvironmentObjectMetricsExportOverridesRequestExporterTypePROMETHEUS UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType = "PROMETHEUS"
+)
+
+// Defines values for UpdateEnvironmentObjectMetricsExportRequestAuthType.
+const (
+	UpdateEnvironmentObjectMetricsExportRequestAuthTypeAUTHTOKEN UpdateEnvironmentObjectMetricsExportRequestAuthType = "AUTH_TOKEN"
+	UpdateEnvironmentObjectMetricsExportRequestAuthTypeBASIC     UpdateEnvironmentObjectMetricsExportRequestAuthType = "BASIC"
+	UpdateEnvironmentObjectMetricsExportRequestAuthTypeSIGV4     UpdateEnvironmentObjectMetricsExportRequestAuthType = "SIGV4"
 )
 
 // Defines values for UpdateEnvironmentObjectMetricsExportRequestExporterType.
@@ -731,21 +822,16 @@ const (
 
 // Defines values for UpdateOrganizationSupportPlanRequestSupportPlan.
 const (
-	BASICPAYGO     UpdateOrganizationSupportPlanRequestSupportPlan = "BASIC_PAYGO"
-	DEVELOPERPAYGO UpdateOrganizationSupportPlanRequestSupportPlan = "DEVELOPER_PAYGO"
-	TEAMPAYGO      UpdateOrganizationSupportPlanRequestSupportPlan = "TEAM_PAYGO"
+	UpdateOrganizationSupportPlanRequestSupportPlanBASICPAYGO     UpdateOrganizationSupportPlanRequestSupportPlan = "BASIC_PAYGO"
+	UpdateOrganizationSupportPlanRequestSupportPlanDEVELOPERPAYGO UpdateOrganizationSupportPlanRequestSupportPlan = "DEVELOPER_PAYGO"
+	UpdateOrganizationSupportPlanRequestSupportPlanTEAMPAYGO      UpdateOrganizationSupportPlanRequestSupportPlan = "TEAM_PAYGO"
 )
 
-// Defines values for UpdatePolarisSessionPermission.
+// Defines values for UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider.
 const (
-	UpdatePolarisSessionPermissionREADONLY  UpdatePolarisSessionPermission = "READ_ONLY"
-	UpdatePolarisSessionPermissionREADWRITE UpdatePolarisSessionPermission = "READ_WRITE"
-)
-
-// Defines values for UpdatePolarisSessionRequestPermission.
-const (
-	UpdatePolarisSessionRequestPermissionREADONLY  UpdatePolarisSessionRequestPermission = "READ_ONLY"
-	UpdatePolarisSessionRequestPermissionREADWRITE UpdatePolarisSessionRequestPermission = "READ_WRITE"
+	UpdateWorkspaceAstroIdeDeploymentsRequestCloudProviderAWS   UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider = "AWS"
+	UpdateWorkspaceAstroIdeDeploymentsRequestCloudProviderAZURE UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider = "AZURE"
+	UpdateWorkspaceAstroIdeDeploymentsRequestCloudProviderGCP   UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider = "GCP"
 )
 
 // Defines values for UserSignupType.
@@ -763,6 +849,13 @@ const (
 	WorkerMachineNameA40  WorkerMachineName = "A40"
 	WorkerMachineNameA5   WorkerMachineName = "A5"
 	WorkerMachineNameA60  WorkerMachineName = "A60"
+)
+
+// Defines values for WorkspaceAstroIdeDeploymentsCloudProvider.
+const (
+	WorkspaceAstroIdeDeploymentsCloudProviderAWS   WorkspaceAstroIdeDeploymentsCloudProvider = "AWS"
+	WorkspaceAstroIdeDeploymentsCloudProviderAZURE WorkspaceAstroIdeDeploymentsCloudProvider = "AZURE"
+	WorkspaceAstroIdeDeploymentsCloudProviderGCP   WorkspaceAstroIdeDeploymentsCloudProvider = "GCP"
 )
 
 // Defines values for AgentActionBodyAction.
@@ -803,12 +896,51 @@ const (
 // Defines values for ListOrganizationsParamsSupportPlan.
 const (
 	ListOrganizationsParamsSupportPlanBASIC            ListOrganizationsParamsSupportPlan = "BASIC"
+	ListOrganizationsParamsSupportPlanBASICPAYGO       ListOrganizationsParamsSupportPlan = "BASIC_PAYGO"
+	ListOrganizationsParamsSupportPlanBUSINESS         ListOrganizationsParamsSupportPlan = "BUSINESS"
 	ListOrganizationsParamsSupportPlanBUSINESSCRITICAL ListOrganizationsParamsSupportPlan = "BUSINESS_CRITICAL"
+	ListOrganizationsParamsSupportPlanBUSINESSV2       ListOrganizationsParamsSupportPlan = "BUSINESS_V2"
+	ListOrganizationsParamsSupportPlanDEVELOPERPAYGO   ListOrganizationsParamsSupportPlan = "DEVELOPER_PAYGO"
+	ListOrganizationsParamsSupportPlanENTERPRISE       ListOrganizationsParamsSupportPlan = "ENTERPRISE"
+	ListOrganizationsParamsSupportPlanENTERPRISEV2     ListOrganizationsParamsSupportPlan = "ENTERPRISE_V2"
+	ListOrganizationsParamsSupportPlanINACTIVE         ListOrganizationsParamsSupportPlan = "INACTIVE"
 	ListOrganizationsParamsSupportPlanINTERNAL         ListOrganizationsParamsSupportPlan = "INTERNAL"
 	ListOrganizationsParamsSupportPlanPOV              ListOrganizationsParamsSupportPlan = "POV"
 	ListOrganizationsParamsSupportPlanPREMIUM          ListOrganizationsParamsSupportPlan = "PREMIUM"
 	ListOrganizationsParamsSupportPlanSTANDARD         ListOrganizationsParamsSupportPlan = "STANDARD"
+	ListOrganizationsParamsSupportPlanTEAM             ListOrganizationsParamsSupportPlan = "TEAM"
+	ListOrganizationsParamsSupportPlanTEAMPAYGO        ListOrganizationsParamsSupportPlan = "TEAM_PAYGO"
+	ListOrganizationsParamsSupportPlanTEAMV2           ListOrganizationsParamsSupportPlan = "TEAM_V2"
 	ListOrganizationsParamsSupportPlanTRIAL            ListOrganizationsParamsSupportPlan = "TRIAL"
+	ListOrganizationsParamsSupportPlanTRIALV2          ListOrganizationsParamsSupportPlan = "TRIAL_V2"
+)
+
+// Defines values for ListOrganizationsParamsProductPlan.
+const (
+	ListOrganizationsParamsProductPlanBASIC            ListOrganizationsParamsProductPlan = "BASIC"
+	ListOrganizationsParamsProductPlanBASICPAYGO       ListOrganizationsParamsProductPlan = "BASIC_PAYGO"
+	ListOrganizationsParamsProductPlanBUSINESS         ListOrganizationsParamsProductPlan = "BUSINESS"
+	ListOrganizationsParamsProductPlanBUSINESSCRITICAL ListOrganizationsParamsProductPlan = "BUSINESS_CRITICAL"
+	ListOrganizationsParamsProductPlanBUSINESSV2       ListOrganizationsParamsProductPlan = "BUSINESS_V2"
+	ListOrganizationsParamsProductPlanDEVELOPERPAYGO   ListOrganizationsParamsProductPlan = "DEVELOPER_PAYGO"
+	ListOrganizationsParamsProductPlanENTERPRISE       ListOrganizationsParamsProductPlan = "ENTERPRISE"
+	ListOrganizationsParamsProductPlanENTERPRISEV2     ListOrganizationsParamsProductPlan = "ENTERPRISE_V2"
+	ListOrganizationsParamsProductPlanINACTIVE         ListOrganizationsParamsProductPlan = "INACTIVE"
+	ListOrganizationsParamsProductPlanINTERNAL         ListOrganizationsParamsProductPlan = "INTERNAL"
+	ListOrganizationsParamsProductPlanPOV              ListOrganizationsParamsProductPlan = "POV"
+	ListOrganizationsParamsProductPlanPREMIUM          ListOrganizationsParamsProductPlan = "PREMIUM"
+	ListOrganizationsParamsProductPlanSTANDARD         ListOrganizationsParamsProductPlan = "STANDARD"
+	ListOrganizationsParamsProductPlanTEAM             ListOrganizationsParamsProductPlan = "TEAM"
+	ListOrganizationsParamsProductPlanTEAMPAYGO        ListOrganizationsParamsProductPlan = "TEAM_PAYGO"
+	ListOrganizationsParamsProductPlanTEAMV2           ListOrganizationsParamsProductPlan = "TEAM_V2"
+	ListOrganizationsParamsProductPlanTRIAL            ListOrganizationsParamsProductPlan = "TRIAL"
+	ListOrganizationsParamsProductPlanTRIALV2          ListOrganizationsParamsProductPlan = "TRIAL_V2"
+)
+
+// Defines values for ListOrganizationsParamsAstronomerProduct.
+const (
+	ASTRO   ListOrganizationsParamsAstronomerProduct = "ASTRO"
+	OBSERVE ListOrganizationsParamsAstronomerProduct = "OBSERVE"
 )
 
 // Defines values for ListOrganizationsParamsProduct.
@@ -955,23 +1087,30 @@ const (
 
 // Defines values for GetDeploymentOptionsParamsDeploymentType.
 const (
-	GetDeploymentOptionsParamsDeploymentTypeDEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
-	GetDeploymentOptionsParamsDeploymentTypeHYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
-	GetDeploymentOptionsParamsDeploymentTypeSTANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
+	DEDICATED GetDeploymentOptionsParamsDeploymentType = "DEDICATED"
+	HYBRID    GetDeploymentOptionsParamsDeploymentType = "HYBRID"
+	STANDARD  GetDeploymentOptionsParamsDeploymentType = "STANDARD"
 )
 
 // Defines values for GetDeploymentOptionsParamsExecutor.
 const (
-	ASTRO      GetDeploymentOptionsParamsExecutor = "ASTRO"
-	CELERY     GetDeploymentOptionsParamsExecutor = "CELERY"
-	KUBERNETES GetDeploymentOptionsParamsExecutor = "KUBERNETES"
+	GetDeploymentOptionsParamsExecutorASTRO      GetDeploymentOptionsParamsExecutor = "ASTRO"
+	GetDeploymentOptionsParamsExecutorCELERY     GetDeploymentOptionsParamsExecutor = "CELERY"
+	GetDeploymentOptionsParamsExecutorKUBERNETES GetDeploymentOptionsParamsExecutor = "KUBERNETES"
 )
 
 // Defines values for GetDeploymentOptionsParamsCloudProvider.
 const (
-	AWS   GetDeploymentOptionsParamsCloudProvider = "AWS"
-	AZURE GetDeploymentOptionsParamsCloudProvider = "AZURE"
-	GCP   GetDeploymentOptionsParamsCloudProvider = "GCP"
+	GetDeploymentOptionsParamsCloudProviderAWS   GetDeploymentOptionsParamsCloudProvider = "AWS"
+	GetDeploymentOptionsParamsCloudProviderAZURE GetDeploymentOptionsParamsCloudProvider = "AZURE"
+	GetDeploymentOptionsParamsCloudProviderGCP   GetDeploymentOptionsParamsCloudProvider = "GCP"
+)
+
+// Defines values for ListDeploymentsParamsClusterCloudProvider.
+const (
+	ListDeploymentsParamsClusterCloudProviderAWS   ListDeploymentsParamsClusterCloudProvider = "AWS"
+	ListDeploymentsParamsClusterCloudProviderAZURE ListDeploymentsParamsClusterCloudProvider = "AZURE"
+	ListDeploymentsParamsClusterCloudProviderGCP   ListDeploymentsParamsClusterCloudProvider = "GCP"
 )
 
 // Defines values for ListDeploymentsParamsSorts.
@@ -1115,6 +1254,12 @@ const (
 	METRICSEXPORT   ListEnvironmentObjectsParamsObjectType = "METRICS_EXPORT"
 )
 
+// Defines values for ListEnvironmentObjectsParamsSourceScope.
+const (
+	ListEnvironmentObjectsParamsSourceScopeDEPLOYMENT ListEnvironmentObjectsParamsSourceScope = "DEPLOYMENT"
+	ListEnvironmentObjectsParamsSourceScopeWORKSPACE  ListEnvironmentObjectsParamsSourceScope = "WORKSPACE"
+)
+
 // Defines values for ListRoleTemplatesParamsScopeTypes.
 const (
 	ListRoleTemplatesParamsScopeTypesDEPLOYMENT   ListRoleTemplatesParamsScopeTypes = "DEPLOYMENT"
@@ -1238,36 +1383,36 @@ const (
 	ListWorkspaceApiTokensParamsSortsUpdatedByIdDesc  ListWorkspaceApiTokensParamsSorts = "updatedById:desc"
 )
 
-// Defines values for ListPolarisProjectsParamsSorts.
+// Defines values for ListAstroIdeProjectsParamsSorts.
 const (
-	ListPolarisProjectsParamsSortsCreatedAtAsc    ListPolarisProjectsParamsSorts = "createdAt:asc"
-	ListPolarisProjectsParamsSortsCreatedAtDesc   ListPolarisProjectsParamsSorts = "createdAt:desc"
-	ListPolarisProjectsParamsSortsDescriptionAsc  ListPolarisProjectsParamsSorts = "description:asc"
-	ListPolarisProjectsParamsSortsDescriptionDesc ListPolarisProjectsParamsSorts = "description:desc"
-	ListPolarisProjectsParamsSortsIdAsc           ListPolarisProjectsParamsSorts = "id:asc"
-	ListPolarisProjectsParamsSortsIdDesc          ListPolarisProjectsParamsSorts = "id:desc"
-	ListPolarisProjectsParamsSortsNameAsc         ListPolarisProjectsParamsSorts = "name:asc"
-	ListPolarisProjectsParamsSortsNameDesc        ListPolarisProjectsParamsSorts = "name:desc"
-	ListPolarisProjectsParamsSortsUpdatedAtAsc    ListPolarisProjectsParamsSorts = "updatedAt:asc"
-	ListPolarisProjectsParamsSortsUpdatedAtDesc   ListPolarisProjectsParamsSorts = "updatedAt:desc"
+	ListAstroIdeProjectsParamsSortsCreatedAtAsc    ListAstroIdeProjectsParamsSorts = "createdAt:asc"
+	ListAstroIdeProjectsParamsSortsCreatedAtDesc   ListAstroIdeProjectsParamsSorts = "createdAt:desc"
+	ListAstroIdeProjectsParamsSortsDescriptionAsc  ListAstroIdeProjectsParamsSorts = "description:asc"
+	ListAstroIdeProjectsParamsSortsDescriptionDesc ListAstroIdeProjectsParamsSorts = "description:desc"
+	ListAstroIdeProjectsParamsSortsIdAsc           ListAstroIdeProjectsParamsSorts = "id:asc"
+	ListAstroIdeProjectsParamsSortsIdDesc          ListAstroIdeProjectsParamsSorts = "id:desc"
+	ListAstroIdeProjectsParamsSortsNameAsc         ListAstroIdeProjectsParamsSorts = "name:asc"
+	ListAstroIdeProjectsParamsSortsNameDesc        ListAstroIdeProjectsParamsSorts = "name:desc"
+	ListAstroIdeProjectsParamsSortsUpdatedAtAsc    ListAstroIdeProjectsParamsSorts = "updatedAt:asc"
+	ListAstroIdeProjectsParamsSortsUpdatedAtDesc   ListAstroIdeProjectsParamsSorts = "updatedAt:desc"
 )
 
-// Defines values for ListPolarisProjectsParamsVisibility.
+// Defines values for ListAstroIdeProjectsParamsVisibility.
 const (
-	PRIVATE   ListPolarisProjectsParamsVisibility = "PRIVATE"
-	WORKSPACE ListPolarisProjectsParamsVisibility = "WORKSPACE"
+	ListAstroIdeProjectsParamsVisibilityPRIVATE   ListAstroIdeProjectsParamsVisibility = "PRIVATE"
+	ListAstroIdeProjectsParamsVisibilityWORKSPACE ListAstroIdeProjectsParamsVisibility = "WORKSPACE"
 )
 
-// Defines values for ImportPolarisSessionTarParamsMode.
+// Defines values for ImportAstroIdeSessionTarParamsMode.
 const (
-	ImportPolarisSessionTarParamsModeOVERWRITE ImportPolarisSessionTarParamsMode = "OVERWRITE"
-	ImportPolarisSessionTarParamsModeUPSERT    ImportPolarisSessionTarParamsMode = "UPSERT"
+	ImportAstroIdeSessionTarParamsModeOVERWRITE ImportAstroIdeSessionTarParamsMode = "OVERWRITE"
+	ImportAstroIdeSessionTarParamsModeUPSERT    ImportAstroIdeSessionTarParamsMode = "UPSERT"
 )
 
-// Defines values for ImportPolarisSessionZipParamsMode.
+// Defines values for ImportAstroIdeSessionZipParamsMode.
 const (
-	ImportPolarisSessionZipParamsModeOVERWRITE ImportPolarisSessionZipParamsMode = "OVERWRITE"
-	ImportPolarisSessionZipParamsModeUPSERT    ImportPolarisSessionZipParamsMode = "UPSERT"
+	ImportAstroIdeSessionZipParamsModeOVERWRITE ImportAstroIdeSessionZipParamsMode = "OVERWRITE"
+	ImportAstroIdeSessionZipParamsModeUPSERT    ImportAstroIdeSessionZipParamsMode = "UPSERT"
 )
 
 // Defines values for ListWorkspaceTeamsParamsSorts.
@@ -1308,6 +1453,16 @@ const (
 // Defines values for ListSelfUserRepositoriesParamsGitProvider.
 const (
 	ListSelfUserRepositoriesParamsGitProviderGITHUB ListSelfUserRepositoriesParamsGitProvider = "GITHUB"
+)
+
+// Defines values for ListSelfUserRepositoryBranchesParamsGitProvider.
+const (
+	ListSelfUserRepositoryBranchesParamsGitProviderGITHUB ListSelfUserRepositoryBranchesParamsGitProvider = "GITHUB"
+)
+
+// Defines values for CreateSelfUserRepositoryBranchParamsGitProvider.
+const (
+	CreateSelfUserRepositoryBranchParamsGitProviderGITHUB CreateSelfUserRepositoryBranchParamsGitProvider = "GITHUB"
 )
 
 // Defines values for GetSelfUserRepositoryBranchParamsGitProvider.
@@ -1419,6 +1574,90 @@ type ApiTokenWorkspaceRoleRequest struct {
 	Role     string `json:"role"`
 }
 
+// AstroIdeProject defines model for AstroIdeProject.
+type AstroIdeProject struct {
+	CreatedAt      time.Time                 `json:"createdAt"`
+	CreatedBy      *BasicSubjectProfile      `json:"createdBy,omitempty"`
+	Description    *string                   `json:"description,omitempty"`
+	Id             string                    `json:"id"`
+	Lock           *AstroIdeProjectLock      `json:"lock,omitempty"`
+	Name           string                    `json:"name"`
+	OrganizationId string                    `json:"organizationId"`
+	Remote         *AstroIdeProjectRemote    `json:"remote,omitempty"`
+	Rules          *string                   `json:"rules,omitempty"`
+	UpdatedAt      time.Time                 `json:"updatedAt"`
+	UpdatedBy      *BasicSubjectProfile      `json:"updatedBy,omitempty"`
+	Visibility     AstroIdeProjectVisibility `json:"visibility"`
+	WorkspaceId    string                    `json:"workspaceId"`
+}
+
+// AstroIdeProjectVisibility defines model for AstroIdeProject.Visibility.
+type AstroIdeProjectVisibility string
+
+// AstroIdeProjectLock defines model for AstroIdeProjectLock.
+type AstroIdeProjectLock struct {
+	LastEditedAt string              `json:"lastEditedAt"`
+	Subject      BasicSubjectProfile `json:"subject"`
+}
+
+// AstroIdeProjectRemote defines model for AstroIdeProjectRemote.
+type AstroIdeProjectRemote struct {
+	GitAccount    string                           `json:"gitAccount"`
+	GitBranch     *string                          `json:"gitBranch,omitempty"`
+	GitPath       *string                          `json:"gitPath,omitempty"`
+	GitProvider   AstroIdeProjectRemoteGitProvider `json:"gitProvider"`
+	GitRepository string                           `json:"gitRepository"`
+}
+
+// AstroIdeProjectRemoteGitProvider defines model for AstroIdeProjectRemote.GitProvider.
+type AstroIdeProjectRemoteGitProvider string
+
+// AstroIdeProjectVersion defines model for AstroIdeProjectVersion.
+type AstroIdeProjectVersion struct {
+	Id      string                         `json:"id"`
+	Message string                         `json:"message"`
+	SavedAt string                         `json:"savedAt"`
+	SavedBy *AstroIdeProjectVersionSavedBy `json:"savedBy,omitempty"`
+}
+
+// AstroIdeProjectVersionSavedBy defines model for AstroIdeProjectVersionSavedBy.
+type AstroIdeProjectVersionSavedBy struct {
+	RemoteCommitAuthor *AstroIdeProjectVersionSavedByRemoteCommitAuthor `json:"remoteCommitAuthor,omitempty"`
+	Subject            *BasicSubjectProfile                             `json:"subject,omitempty"`
+}
+
+// AstroIdeProjectVersionSavedByRemoteCommitAuthor defines model for AstroIdeProjectVersionSavedByRemoteCommitAuthor.
+type AstroIdeProjectVersionSavedByRemoteCommitAuthor struct {
+	Name string `json:"name"`
+}
+
+// AstroIdeProjectsPaginated defines model for AstroIdeProjectsPaginated.
+type AstroIdeProjectsPaginated struct {
+	Limit      int               `json:"limit"`
+	Offset     int               `json:"offset"`
+	Projects   []AstroIdeProject `json:"projects"`
+	TotalCount int               `json:"totalCount"`
+}
+
+// AstroIdeSessionEdit defines model for AstroIdeSessionEdit.
+type AstroIdeSessionEdit struct {
+	Actor    AstroIdeSessionEditActor  `json:"actor"`
+	Deploy   AstroIdeSessionEditDeploy `json:"deploy"`
+	EditedAt string                    `json:"editedAt"`
+	Id       string                    `json:"id"`
+	Message  string                    `json:"message"`
+}
+
+// AstroIdeSessionEditActor defines model for AstroIdeSessionEdit.Actor.
+type AstroIdeSessionEditActor string
+
+// AstroIdeSessionEditDeploy defines model for AstroIdeSessionEditDeploy.
+type AstroIdeSessionEditDeploy struct {
+	Applicable bool    `json:"applicable"`
+	DeployId   *string `json:"deployId,omitempty"`
+	Error      *string `json:"error,omitempty"`
+}
+
 // BasicSubjectProfile defines model for BasicSubjectProfile.
 type BasicSubjectProfile struct {
 	ApiTokenName *string                         `json:"apiTokenName,omitempty"`
@@ -1443,42 +1682,45 @@ type Bundle struct {
 
 // Cluster defines model for Cluster.
 type Cluster struct {
-	AppliedHarmonyVersion  *string                     `json:"appliedHarmonyVersion,omitempty"`
-	AppliedTemplateVersion string                      `json:"appliedTemplateVersion"`
-	BlockInternetAccess    *bool                       `json:"blockInternetAccess,omitempty"`
-	CloudProvider          ClusterCloudProvider        `json:"cloudProvider"`
-	Cohort                 *ClusterCohort              `json:"cohort,omitempty"`
-	CreatedAt              time.Time                   `json:"createdAt"`
-	DbInstanceType         string                      `json:"dbInstanceType"`
-	DbInstanceVersion      string                      `json:"dbInstanceVersion"`
-	DeletedAt              *string                     `json:"deletedAt,omitempty"`
-	HarmonyVersion         string                      `json:"harmonyVersion"`
-	HealthStatus           *ClusterHealthStatus        `json:"healthStatus,omitempty"`
-	Id                     string                      `json:"id"`
-	IsCordoned             *bool                       `json:"isCordoned,omitempty"`
-	IsDryRun               bool                        `json:"isDryRun"`
-	IsLimited              bool                        `json:"isLimited"`
-	K8sTags                []ClusterTag                `json:"k8sTags"`
-	Metadata               ClusterMetadata             `json:"metadata"`
-	Name                   string                      `json:"name"`
-	NodePools              []NodePool                  `json:"nodePools"`
-	OrganizationId         string                      `json:"organizationId"`
-	PodSubnetRange         string                      `json:"podSubnetRange"`
-	ProviderAccount        string                      `json:"providerAccount"`
-	RdsSnapshotIdentifier  *string                     `json:"rdsSnapshotIdentifier,omitempty"`
-	Region                 string                      `json:"region"`
-	ServicePeeringRange    string                      `json:"servicePeeringRange"`
-	ServiceSubnetRange     string                      `json:"serviceSubnetRange"`
-	Status                 ClusterStatus               `json:"status"`
-	TemplateUrl            string                      `json:"templateUrl"`
-	TemplateVersion        string                      `json:"templateVersion"`
-	TemporalRunId          string                      `json:"temporalRunId"`
-	TenantId               string                      `json:"tenantId"`
-	TgwNetworkConnections  *[]ClusterNetworkConnection `json:"tgwNetworkConnections,omitempty"`
-	Type                   ClusterType                 `json:"type"`
-	UpdatedAt              time.Time                   `json:"updatedAt"`
-	VpcSubnetRange         string                      `json:"vpcSubnetRange"`
-	Workspaces             []string                    `json:"workspaces"`
+	AppliedHarmonyVersion             *string                     `json:"appliedHarmonyVersion,omitempty"`
+	AppliedTemplateVersion            string                      `json:"appliedTemplateVersion"`
+	AuroraReplicationSourceIdentifier *string                     `json:"auroraReplicationSourceIdentifier,omitempty"`
+	BlockInternetAccess               *bool                       `json:"blockInternetAccess,omitempty"`
+	CloudProvider                     ClusterCloudProvider        `json:"cloudProvider"`
+	Cohort                            *ClusterCohort              `json:"cohort,omitempty"`
+	CreatedAt                         time.Time                   `json:"createdAt"`
+	DbInstanceType                    string                      `json:"dbInstanceType"`
+	DbInstanceVersion                 string                      `json:"dbInstanceVersion"`
+	DeletedAt                         *string                     `json:"deletedAt,omitempty"`
+	DrRegion                          *string                     `json:"drRegion,omitempty"`
+	HarmonyVersion                    string                      `json:"harmonyVersion"`
+	HealthStatus                      *ClusterHealthStatus        `json:"healthStatus,omitempty"`
+	Id                                string                      `json:"id"`
+	IsCordoned                        *bool                       `json:"isCordoned,omitempty"`
+	IsDryRun                          bool                        `json:"isDryRun"`
+	IsLimited                         bool                        `json:"isLimited"`
+	K8sTags                           []ClusterTag                `json:"k8sTags"`
+	Metadata                          ClusterMetadata             `json:"metadata"`
+	Name                              string                      `json:"name"`
+	NodePools                         []NodePool                  `json:"nodePools"`
+	OrganizationId                    string                      `json:"organizationId"`
+	PodSubnetRange                    string                      `json:"podSubnetRange"`
+	ProviderAccount                   string                      `json:"providerAccount"`
+	RdsSnapshotIdentifier             *string                     `json:"rdsSnapshotIdentifier,omitempty"`
+	Region                            string                      `json:"region"`
+	SecondaryPodRanges                *[]SecondaryPodRange        `json:"secondaryPodRanges,omitempty"`
+	ServicePeeringRange               string                      `json:"servicePeeringRange"`
+	ServiceSubnetRange                string                      `json:"serviceSubnetRange"`
+	Status                            ClusterStatus               `json:"status"`
+	TemplateUrl                       string                      `json:"templateUrl"`
+	TemplateVersion                   string                      `json:"templateVersion"`
+	TemporalRunId                     string                      `json:"temporalRunId"`
+	TenantId                          string                      `json:"tenantId"`
+	TgwNetworkConnections             *[]ClusterNetworkConnection `json:"tgwNetworkConnections,omitempty"`
+	Type                              ClusterType                 `json:"type"`
+	UpdatedAt                         time.Time                   `json:"updatedAt"`
+	VpcSubnetRange                    string                      `json:"vpcSubnetRange"`
+	Workspaces                        []string                    `json:"workspaces"`
 }
 
 // ClusterCloudProvider defines model for Cluster.CloudProvider.
@@ -1495,29 +1737,32 @@ type ClusterType string
 
 // ClusterDetailed defines model for ClusterDetailed.
 type ClusterDetailed struct {
-	AppliedHarmonyVersion          *string                      `json:"appliedHarmonyVersion,omitempty"`
-	AppliedTemplateVersion         string                       `json:"appliedTemplateVersion"`
-	BlockInternetAccess            *bool                        `json:"blockInternetAccess,omitempty"`
-	CloudProvider                  ClusterDetailedCloudProvider `json:"cloudProvider"`
-	Cohort                         *ClusterDetailedCohort       `json:"cohort,omitempty"`
-	CreatedAt                      time.Time                    `json:"createdAt"`
-	CreatedBy                      BasicSubjectProfile          `json:"createdBy"`
-	DbInstanceType                 string                       `json:"dbInstanceType"`
-	DbInstanceVersion              string                       `json:"dbInstanceVersion"`
-	DeletedAt                      *string                      `json:"deletedAt,omitempty"`
-	DisableHarmonyVersionUpgrades  bool                         `json:"disableHarmonyVersionUpgrades"`
-	DisableTemplateVersionUpgrades bool                         `json:"disableTemplateVersionUpgrades"`
-	HarmonyVersion                 string                       `json:"harmonyVersion"`
-	HealthStatus                   *ClusterHealthStatus         `json:"healthStatus,omitempty"`
-	Id                             string                       `json:"id"`
-	IsCordoned                     *bool                        `json:"isCordoned,omitempty"`
-	IsDryRun                       bool                         `json:"isDryRun"`
-	IsLimited                      bool                         `json:"isLimited"`
-	K8sTags                        []ClusterTag                 `json:"k8sTags"`
-	Metadata                       ClusterMetadata              `json:"metadata"`
-	Name                           string                       `json:"name"`
-	NodePools                      []NodePool                   `json:"nodePools"`
-	NoteCount                      int                          `json:"noteCount"`
+	AppliedHarmonyVersion             *string                      `json:"appliedHarmonyVersion,omitempty"`
+	AppliedTemplateVersion            string                       `json:"appliedTemplateVersion"`
+	AuroraReplicationSourceIdentifier *string                      `json:"auroraReplicationSourceIdentifier,omitempty"`
+	AzureDbReviveDropped              *bool                        `json:"azureDbReviveDropped,omitempty"`
+	BlockInternetAccess               *bool                        `json:"blockInternetAccess,omitempty"`
+	CloudProvider                     ClusterDetailedCloudProvider `json:"cloudProvider"`
+	Cohort                            *ClusterDetailedCohort       `json:"cohort,omitempty"`
+	CreatedAt                         time.Time                    `json:"createdAt"`
+	CreatedBy                         BasicSubjectProfile          `json:"createdBy"`
+	DbInstanceType                    string                       `json:"dbInstanceType"`
+	DbInstanceVersion                 string                       `json:"dbInstanceVersion"`
+	DeletedAt                         *string                      `json:"deletedAt,omitempty"`
+	DisableHarmonyVersionUpgrades     bool                         `json:"disableHarmonyVersionUpgrades"`
+	DisableTemplateVersionUpgrades    bool                         `json:"disableTemplateVersionUpgrades"`
+	DrRegion                          *string                      `json:"drRegion,omitempty"`
+	HarmonyVersion                    string                       `json:"harmonyVersion"`
+	HealthStatus                      *ClusterHealthStatus         `json:"healthStatus,omitempty"`
+	Id                                string                       `json:"id"`
+	IsCordoned                        *bool                        `json:"isCordoned,omitempty"`
+	IsDryRun                          bool                         `json:"isDryRun"`
+	IsLimited                         bool                         `json:"isLimited"`
+	K8sTags                           []ClusterTag                 `json:"k8sTags"`
+	Metadata                          ClusterMetadata              `json:"metadata"`
+	Name                              string                       `json:"name"`
+	NodePools                         []NodePool                   `json:"nodePools"`
+	NoteCount                         int                          `json:"noteCount"`
 
 	// OrgShortName Deprecated: orgShortName has been replaced with organizationShortName
 	OrgShortName               *string                     `json:"orgShortName,omitempty"`
@@ -1530,6 +1775,7 @@ type ClusterDetailed struct {
 	ProviderAccount            string                      `json:"providerAccount"`
 	RdsSnapshotIdentifier      *string                     `json:"rdsSnapshotIdentifier,omitempty"`
 	Region                     string                      `json:"region"`
+	SecondaryPodRanges         *[]SecondaryPodRange        `json:"secondaryPodRanges,omitempty"`
 	ServicePeeringRange        string                      `json:"servicePeeringRange"`
 	ServiceSubnetRange         string                      `json:"serviceSubnetRange"`
 	Status                     ClusterDetailedStatus       `json:"status"`
@@ -1557,6 +1803,16 @@ type ClusterDetailedStatus string
 // ClusterDetailedType defines model for ClusterDetailed.Type.
 type ClusterDetailedType string
 
+// ClusterHealthDetailMute defines model for ClusterHealthDetailMute.
+type ClusterHealthDetailMute struct {
+	ClusterId string               `json:"clusterId"`
+	Code      string               `json:"code"`
+	Component string               `json:"component"`
+	CreatedBy *BasicSubjectProfile `json:"createdBy,omitempty"`
+	Expires   string               `json:"expires"`
+	Note      string               `json:"note"`
+}
+
 // ClusterHealthStatus defines model for ClusterHealthStatus.
 type ClusterHealthStatus struct {
 	Details  *[]ClusterHealthStatusDetail `json:"details,omitempty"`
@@ -1572,10 +1828,12 @@ type ClusterHealthStatusValue string
 
 // ClusterHealthStatusDetail defines model for ClusterHealthStatusDetail.
 type ClusterHealthStatusDetail struct {
-	Code        string  `json:"code"`
-	Component   *string `json:"component,omitempty"`
-	Description string  `json:"description"`
-	Severity    string  `json:"severity"`
+	Code                 string                     `json:"code"`
+	Component            *string                    `json:"component,omitempty"`
+	Description          string                     `json:"description"`
+	Muted                bool                       `json:"muted"`
+	RecentlyExpiredMutes *[]ClusterHealthDetailMute `json:"recentlyExpiredMutes,omitempty"`
+	Severity             string                     `json:"severity"`
 }
 
 // ClusterMetadata defines model for ClusterMetadata.
@@ -1723,6 +1981,53 @@ type ConnectionAuthTypeParameter struct {
 	IsRequired       bool    `json:"isRequired"`
 	IsSecret         bool    `json:"isSecret"`
 }
+
+// CreateAstroIdeProjectRemoteRequest defines model for CreateAstroIdeProjectRemoteRequest.
+type CreateAstroIdeProjectRemoteRequest struct {
+	GitAccount    string                                        `json:"gitAccount"`
+	GitBranch     *string                                       `json:"gitBranch,omitempty"`
+	GitPath       *string                                       `json:"gitPath,omitempty"`
+	GitProvider   CreateAstroIdeProjectRemoteRequestGitProvider `json:"gitProvider"`
+	GitRepository string                                        `json:"gitRepository"`
+}
+
+// CreateAstroIdeProjectRemoteRequestGitProvider defines model for CreateAstroIdeProjectRemoteRequest.GitProvider.
+type CreateAstroIdeProjectRemoteRequestGitProvider string
+
+// CreateAstroIdeProjectRequest defines model for CreateAstroIdeProjectRequest.
+type CreateAstroIdeProjectRequest struct {
+	Description   *string                                 `json:"description,omitempty"`
+	Name          *string                                 `json:"name,omitempty"`
+	PromptForName *string                                 `json:"promptForName,omitempty"`
+	Remote        *CreateAstroIdeProjectRemoteRequest     `json:"remote,omitempty"`
+	Template      *string                                 `json:"template,omitempty"`
+	Visibility    *CreateAstroIdeProjectRequestVisibility `json:"visibility,omitempty"`
+}
+
+// CreateAstroIdeProjectRequestVisibility defines model for CreateAstroIdeProjectRequest.Visibility.
+type CreateAstroIdeProjectRequestVisibility string
+
+// CreateAstroIdeSession defines model for CreateAstroIdeSession.
+type CreateAstroIdeSession struct {
+	DeploymentError *string                         `json:"deploymentError,omitempty"`
+	DeploymentId    *string                         `json:"deploymentId,omitempty"`
+	Id              string                          `json:"id"`
+	Permission      CreateAstroIdeSessionPermission `json:"permission"`
+	RemoteBranch    *string                         `json:"remoteBranch,omitempty"`
+}
+
+// CreateAstroIdeSessionPermission defines model for CreateAstroIdeSession.Permission.
+type CreateAstroIdeSessionPermission string
+
+// CreateAstroIdeSessionRequest defines model for CreateAstroIdeSessionRequest.
+type CreateAstroIdeSessionRequest struct {
+	AutoDeploy   *bool                                   `json:"autoDeploy,omitempty"`
+	Permission   *CreateAstroIdeSessionRequestPermission `json:"permission,omitempty"`
+	RemoteBranch *string                                 `json:"remoteBranch,omitempty"`
+}
+
+// CreateAstroIdeSessionRequestPermission defines model for CreateAstroIdeSessionRequest.Permission.
+type CreateAstroIdeSessionRequestPermission string
 
 // CreateAwsClusterRequest defines model for CreateAwsClusterRequest.
 type CreateAwsClusterRequest struct {
@@ -1945,7 +2250,11 @@ type CreateEnvironmentObjectConnectionOverridesRequest struct {
 	Password *string                 `json:"password,omitempty"`
 	Port     *int                    `json:"port,omitempty"`
 	Schema   *string                 `json:"schema,omitempty"`
-	Type     *string                 `json:"type,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Type           *string `json:"type,omitempty"`
 }
 
 // CreateEnvironmentObjectConnectionRequest defines model for CreateEnvironmentObjectConnectionRequest.
@@ -1972,28 +2281,44 @@ type CreateEnvironmentObjectLinkRequestScope string
 
 // CreateEnvironmentObjectMetricsExportOverridesRequest defines model for CreateEnvironmentObjectMetricsExportOverridesRequest.
 type CreateEnvironmentObjectMetricsExportOverridesRequest struct {
+	AuthType     *CreateEnvironmentObjectMetricsExportOverridesRequestAuthType     `json:"authType,omitempty"`
 	BasicToken   *string                                                           `json:"basicToken,omitempty"`
 	Endpoint     *string                                                           `json:"endpoint,omitempty"`
 	ExporterType *CreateEnvironmentObjectMetricsExportOverridesRequestExporterType `json:"exporterType,omitempty"`
 	Headers      *map[string]string                                                `json:"headers,omitempty"`
 	Labels       *map[string]string                                                `json:"labels,omitempty"`
 	Password     *string                                                           `json:"password,omitempty"`
-	Username     *string                                                           `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
+
+// CreateEnvironmentObjectMetricsExportOverridesRequestAuthType defines model for CreateEnvironmentObjectMetricsExportOverridesRequest.AuthType.
+type CreateEnvironmentObjectMetricsExportOverridesRequestAuthType string
 
 // CreateEnvironmentObjectMetricsExportOverridesRequestExporterType defines model for CreateEnvironmentObjectMetricsExportOverridesRequest.ExporterType.
 type CreateEnvironmentObjectMetricsExportOverridesRequestExporterType string
 
 // CreateEnvironmentObjectMetricsExportRequest defines model for CreateEnvironmentObjectMetricsExportRequest.
 type CreateEnvironmentObjectMetricsExportRequest struct {
+	AuthType     *CreateEnvironmentObjectMetricsExportRequestAuthType    `json:"authType,omitempty"`
 	BasicToken   *string                                                 `json:"basicToken,omitempty"`
 	Endpoint     string                                                  `json:"endpoint"`
 	ExporterType CreateEnvironmentObjectMetricsExportRequestExporterType `json:"exporterType"`
 	Headers      *map[string]string                                      `json:"headers,omitempty"`
 	Labels       *map[string]string                                      `json:"labels,omitempty"`
 	Password     *string                                                 `json:"password,omitempty"`
-	Username     *string                                                 `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
+
+// CreateEnvironmentObjectMetricsExportRequestAuthType defines model for CreateEnvironmentObjectMetricsExportRequest.AuthType.
+type CreateEnvironmentObjectMetricsExportRequestAuthType string
 
 // CreateEnvironmentObjectMetricsExportRequestExporterType defines model for CreateEnvironmentObjectMetricsExportRequest.ExporterType.
 type CreateEnvironmentObjectMetricsExportRequestExporterType string
@@ -2048,6 +2373,12 @@ type CreateGcpClusterRequest struct {
 
 // CreateGcpClusterRequestType defines model for CreateGcpClusterRequest.Type.
 type CreateGcpClusterRequestType string
+
+// CreateGitRepositoryBranchRequest defines model for CreateGitRepositoryBranchRequest.
+type CreateGitRepositoryBranchRequest struct {
+	Branch     string `json:"branch"`
+	FromBranch string `json:"fromBranch"`
+}
 
 // CreateHybridDeploymentRequest defines model for CreateHybridDeploymentRequest.
 type CreateHybridDeploymentRequest struct {
@@ -2119,33 +2450,6 @@ type CreateOrganizationRequest struct {
 	Metadata *map[string]interface{} `json:"metadata,omitempty"`
 	Name     string                  `json:"name"`
 }
-
-// CreatePolarisProjectRequest defines model for CreatePolarisProjectRequest.
-type CreatePolarisProjectRequest struct {
-	Description *string                                `json:"description,omitempty"`
-	Name        *string                                `json:"name,omitempty"`
-	Visibility  *CreatePolarisProjectRequestVisibility `json:"visibility,omitempty"`
-}
-
-// CreatePolarisProjectRequestVisibility defines model for CreatePolarisProjectRequest.Visibility.
-type CreatePolarisProjectRequestVisibility string
-
-// CreatePolarisSession defines model for CreatePolarisSession.
-type CreatePolarisSession struct {
-	Id         string                         `json:"id"`
-	Permission CreatePolarisSessionPermission `json:"permission"`
-}
-
-// CreatePolarisSessionPermission defines model for CreatePolarisSession.Permission.
-type CreatePolarisSessionPermission string
-
-// CreatePolarisSessionRequest defines model for CreatePolarisSessionRequest.
-type CreatePolarisSessionRequest struct {
-	Permission *CreatePolarisSessionRequestPermission `json:"permission,omitempty"`
-}
-
-// CreatePolarisSessionRequestPermission defines model for CreatePolarisSessionRequest.Permission.
-type CreatePolarisSessionRequestPermission string
 
 // CreateStandardDeploymentRequest defines model for CreateStandardDeploymentRequest.
 type CreateStandardDeploymentRequest struct {
@@ -2301,7 +2605,6 @@ type DeactivateOrganization struct {
 	ClusterCount           *int  `json:"clusterCount,omitempty"`
 	DeploymentCount        *int  `json:"deploymentCount,omitempty"`
 	HasComputeDependencies *bool `json:"hasComputeDependencies,omitempty"`
-	ProjectCount           *int  `json:"projectCount,omitempty"`
 }
 
 // DeactivateOrganizationRequest defines model for DeactivateOrganizationRequest.
@@ -2443,6 +2746,7 @@ type Deployment struct {
 	BlockInternetAccess            *bool                            `json:"blockInternetAccess,omitempty"`
 	Bundles                        *[]Bundle                        `json:"bundles,omitempty"`
 	ClusterCloudProvider           *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
+	ClusterCloudProviderAccount    *string                          `json:"clusterCloudProviderAccount,omitempty"`
 	ClusterId                      string                           `json:"clusterId"`
 	ClusterName                    *string                          `json:"clusterName,omitempty"`
 	ClusterRegion                  *string                          `json:"clusterRegion,omitempty"`
@@ -2627,17 +2931,18 @@ type DeploymentHibernationStatusNextEventType string
 
 // DeploymentIncident defines model for DeploymentIncident.
 type DeploymentIncident struct {
-	CreatedAt     time.Time                  `json:"createdAt"`
-	DeploymentId  string                     `json:"deploymentId"`
-	Description   string                     `json:"description"`
-	EnabledForOrg bool                       `json:"enabledForOrg"`
-	IncidentData  *map[string]interface{}    `json:"incidentData,omitempty"`
-	IncidentType  string                     `json:"incidentType"`
-	ResolvedAt    *time.Time                 `json:"resolvedAt,omitempty"`
-	Severity      DeploymentIncidentSeverity `json:"severity"`
-	Subject       string                     `json:"subject"`
-	UpdatedAt     *time.Time                 `json:"updatedAt,omitempty"`
-	WorkspaceId   *string                    `json:"workspaceId,omitempty"`
+	CreatedAt         time.Time                  `json:"createdAt"`
+	DeploymentId      string                     `json:"deploymentId"`
+	Description       string                     `json:"description"`
+	EnabledForOrg     bool                       `json:"enabledForOrg"`
+	ExternallyVisible *bool                      `json:"externallyVisible,omitempty"`
+	IncidentData      *map[string]interface{}    `json:"incidentData,omitempty"`
+	IncidentType      string                     `json:"incidentType"`
+	ResolvedAt        *time.Time                 `json:"resolvedAt,omitempty"`
+	Severity          DeploymentIncidentSeverity `json:"severity"`
+	Subject           string                     `json:"subject"`
+	UpdatedAt         *time.Time                 `json:"updatedAt,omitempty"`
+	WorkspaceId       *string                    `json:"workspaceId,omitempty"`
 }
 
 // DeploymentIncidentSeverity defines model for DeploymentIncident.Severity.
@@ -2862,28 +3167,51 @@ type EnvironmentObjectLinkScope string
 
 // EnvironmentObjectMetricsExport defines model for EnvironmentObjectMetricsExport.
 type EnvironmentObjectMetricsExport struct {
+	AuthType     *EnvironmentObjectMetricsExportAuthType    `json:"authType,omitempty"`
 	BasicToken   *string                                    `json:"basicToken,omitempty"`
 	Endpoint     string                                     `json:"endpoint"`
 	ExporterType EnvironmentObjectMetricsExportExporterType `json:"exporterType"`
 	Headers      *map[string]string                         `json:"headers,omitempty"`
 	Labels       *map[string]string                         `json:"labels,omitempty"`
 	Password     *string                                    `json:"password,omitempty"`
-	Username     *string                                    `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
+
+// EnvironmentObjectMetricsExportAuthType defines model for EnvironmentObjectMetricsExport.AuthType.
+type EnvironmentObjectMetricsExportAuthType string
 
 // EnvironmentObjectMetricsExportExporterType defines model for EnvironmentObjectMetricsExport.ExporterType.
 type EnvironmentObjectMetricsExportExporterType string
 
+// EnvironmentObjectMetricsExportLogEntry defines model for EnvironmentObjectMetricsExportLogEntry.
+type EnvironmentObjectMetricsExportLogEntry struct {
+	Raw        string  `json:"raw"`
+	Resolution *string `json:"resolution,omitempty"`
+	Timestamp  string  `json:"timestamp"`
+}
+
 // EnvironmentObjectMetricsExportOverrides defines model for EnvironmentObjectMetricsExportOverrides.
 type EnvironmentObjectMetricsExportOverrides struct {
+	AuthType     *EnvironmentObjectMetricsExportOverridesAuthType     `json:"authType,omitempty"`
 	BasicToken   *string                                              `json:"basicToken,omitempty"`
 	Endpoint     *string                                              `json:"endpoint,omitempty"`
 	ExporterType *EnvironmentObjectMetricsExportOverridesExporterType `json:"exporterType,omitempty"`
 	Headers      *map[string]string                                   `json:"headers,omitempty"`
 	Labels       *map[string]string                                   `json:"labels,omitempty"`
 	Password     *string                                              `json:"password,omitempty"`
-	Username     *string                                              `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
+
+// EnvironmentObjectMetricsExportOverridesAuthType defines model for EnvironmentObjectMetricsExportOverrides.AuthType.
+type EnvironmentObjectMetricsExportOverridesAuthType string
 
 // EnvironmentObjectMetricsExportOverridesExporterType defines model for EnvironmentObjectMetricsExportOverrides.ExporterType.
 type EnvironmentObjectMetricsExportOverridesExporterType string
@@ -2974,9 +3302,9 @@ type HibernationStatus struct {
 	Reason        *string    `json:"reason,omitempty"`
 }
 
-// ImportPolarisSession defines model for ImportPolarisSession.
-type ImportPolarisSession struct {
-	Edit PolarisSessionEdit `json:"edit"`
+// ImportAstroIdeSession defines model for ImportAstroIdeSession.
+type ImportAstroIdeSession struct {
+	Edit AstroIdeSessionEdit `json:"edit"`
 }
 
 // Invite defines model for Invite.
@@ -3013,6 +3341,16 @@ type ListApiTokensPaginated struct {
 	Limit      int        `json:"limit"`
 	Offset     int        `json:"offset"`
 	TotalCount int        `json:"totalCount"`
+}
+
+// ListEnvironmentObjectMetricsExportsLogsPaginated defines model for ListEnvironmentObjectMetricsExportsLogsPaginated.
+type ListEnvironmentObjectMetricsExportsLogsPaginated struct {
+	Limit         int                                      `json:"limit"`
+	MaxNumResults int                                      `json:"maxNumResults"`
+	Offset        int                                      `json:"offset"`
+	ResultCount   int                                      `json:"resultCount"`
+	Results       []EnvironmentObjectMetricsExportLogEntry `json:"results"`
+	SearchId      string                                   `json:"searchId"`
 }
 
 // ListWorkspaceDags defines model for ListWorkspaceDags.
@@ -3115,6 +3453,7 @@ type NodePool struct {
 
 // Organization defines model for Organization.
 type Organization struct {
+	AllowEnhancedSupportAccess  bool                       `json:"allowEnhancedSupportAccess"`
 	AuthServiceId               string                     `json:"authServiceId"`
 	AzurePlanId                 *string                    `json:"azurePlanId,omitempty"`
 	AzureSubscriptionId         *string                    `json:"azureSubscriptionId,omitempty"`
@@ -3137,18 +3476,21 @@ type Organization struct {
 	NoteCount                   int                        `json:"noteCount"`
 	PaymentMethod               *OrganizationPaymentMethod `json:"paymentMethod,omitempty"`
 	Product                     *OrganizationProduct       `json:"product,omitempty"`
+	ProductPlans                []OrganizationProductPlan  `json:"productPlans"`
 	SalesforceId                *string                    `json:"salesforceId,omitempty"`
 	ShortName                   string                     `json:"shortName"`
 	Status                      *OrganizationStatus        `json:"status,omitempty"`
 	StripeId                    *string                    `json:"stripeId,omitempty"`
 	StripePaymentMethodId       *string                    `json:"stripePaymentMethodId,omitempty"`
-	SupportPlan                 OrganizationSupportPlan    `json:"supportPlan"`
-	TerminateAt                 *time.Time                 `json:"terminateAt,omitempty"`
-	TrialExpiresAt              *time.Time                 `json:"trialExpiresAt,omitempty"`
-	UpdatedAt                   time.Time                  `json:"updatedAt"`
-	UpdatedBy                   *string                    `json:"updatedBy,omitempty"`
-	UpdatedBySubject            *BasicSubjectProfile       `json:"updatedBySubject,omitempty"`
-	UsesCustomMetronomePlan     *bool                      `json:"usesCustomMetronomePlan,omitempty"`
+
+	// SupportPlan Deprecated: use ProductPlans instead
+	SupportPlan             *OrganizationSupportPlan `json:"supportPlan,omitempty"`
+	TerminateAt             *time.Time               `json:"terminateAt,omitempty"`
+	TrialExpiresAt          *time.Time               `json:"trialExpiresAt,omitempty"`
+	UpdatedAt               time.Time                `json:"updatedAt"`
+	UpdatedBy               *string                  `json:"updatedBy,omitempty"`
+	UpdatedBySubject        *BasicSubjectProfile     `json:"updatedBySubject,omitempty"`
+	UsesCustomMetronomePlan *bool                    `json:"usesCustomMetronomePlan,omitempty"`
 }
 
 // OrganizationPaymentMethod defines model for Organization.PaymentMethod.
@@ -3160,52 +3502,22 @@ type OrganizationProduct string
 // OrganizationStatus defines model for Organization.Status.
 type OrganizationStatus string
 
-// OrganizationSupportPlan defines model for Organization.SupportPlan.
+// OrganizationSupportPlan Deprecated: use ProductPlans instead
 type OrganizationSupportPlan string
 
-// PolarisProject defines model for PolarisProject.
-type PolarisProject struct {
-	CreatedAt      time.Time                `json:"createdAt"`
-	CreatedBy      string                   `json:"createdBy"`
-	Description    *string                  `json:"description,omitempty"`
-	Id             string                   `json:"id"`
-	Lock           *PolarisProjectLock      `json:"lock,omitempty"`
-	Name           string                   `json:"name"`
-	OrganizationId string                   `json:"organizationId"`
-	Rules          *string                  `json:"rules,omitempty"`
-	UpdatedAt      time.Time                `json:"updatedAt"`
-	UpdatedBy      string                   `json:"updatedBy"`
-	Visibility     PolarisProjectVisibility `json:"visibility"`
-	WorkspaceId    string                   `json:"workspaceId"`
+// OrganizationProductPlan defines model for OrganizationProductPlan.
+type OrganizationProductPlan struct {
+	AstronomerProduct OrganizationProductPlanAstronomerProduct `json:"astronomerProduct"`
+	OrganizationId    string                                   `json:"organizationId"`
+	ProductPlanId     string                                   `json:"productPlanId"`
+	ProductPlanName   OrganizationProductPlanProductPlanName   `json:"productPlanName"`
 }
 
-// PolarisProjectVisibility defines model for PolarisProject.Visibility.
-type PolarisProjectVisibility string
+// OrganizationProductPlanAstronomerProduct defines model for OrganizationProductPlan.AstronomerProduct.
+type OrganizationProductPlanAstronomerProduct string
 
-// PolarisProjectLock defines model for PolarisProjectLock.
-type PolarisProjectLock struct {
-	LastEditedAt string              `json:"lastEditedAt"`
-	Subject      BasicSubjectProfile `json:"subject"`
-}
-
-// PolarisProjectsPaginated defines model for PolarisProjectsPaginated.
-type PolarisProjectsPaginated struct {
-	Limit      int              `json:"limit"`
-	Offset     int              `json:"offset"`
-	Projects   []PolarisProject `json:"projects"`
-	TotalCount int              `json:"totalCount"`
-}
-
-// PolarisSessionEdit defines model for PolarisSessionEdit.
-type PolarisSessionEdit struct {
-	Actor    PolarisSessionEditActor `json:"actor"`
-	EditedAt string                  `json:"editedAt"`
-	Id       string                  `json:"id"`
-	Message  string                  `json:"message"`
-}
-
-// PolarisSessionEditActor defines model for PolarisSessionEdit.Actor.
-type PolarisSessionEditActor string
+// OrganizationProductPlanProductPlanName defines model for OrganizationProductPlan.ProductPlanName.
+type OrganizationProductPlanProductPlanName string
 
 // ProviderInstanceType defines model for ProviderInstanceType.
 type ProviderInstanceType struct {
@@ -3263,10 +3575,18 @@ type RepositoriesPaginated struct {
 
 // RepositoryBranch defines model for RepositoryBranch.
 type RepositoryBranch struct {
-	CommitMessage string `json:"commitMessage"`
-	CommitSha     string `json:"commitSha"`
-	CommitUrl     string `json:"commitUrl"`
-	Name          string `json:"name"`
+	CommitMessage *string `json:"commitMessage,omitempty"`
+	CommitSha     *string `json:"commitSha,omitempty"`
+	CommitUrl     *string `json:"commitUrl,omitempty"`
+	Name          string  `json:"name"`
+}
+
+// RepositoryBranchesPaginated defines model for RepositoryBranchesPaginated.
+type RepositoryBranchesPaginated struct {
+	Branches    []RepositoryBranch `json:"branches"`
+	HasNextPage *bool              `json:"hasNextPage,omitempty"`
+	Page        *int               `json:"page,omitempty"`
+	PerPage     *int               `json:"perPage,omitempty"`
 }
 
 // ResourceOption defines model for ResourceOption.
@@ -3380,9 +3700,15 @@ type RuntimeRelease struct {
 	Version                  string `json:"version"`
 }
 
-// SavePolarisSessionRequest defines model for SavePolarisSessionRequest.
-type SavePolarisSessionRequest struct {
-	Message string `json:"message"`
+// SaveAstroIdeSession defines model for SaveAstroIdeSession.
+type SaveAstroIdeSession struct {
+	Version AstroIdeProjectVersion `json:"version"`
+}
+
+// SaveAstroIdeSessionRequest defines model for SaveAstroIdeSessionRequest.
+type SaveAstroIdeSessionRequest struct {
+	Message         string  `json:"message"`
+	NewRemoteBranch *string `json:"newRemoteBranch,omitempty"`
 }
 
 // SchedulerMachine defines model for SchedulerMachine.
@@ -3399,6 +3725,12 @@ type SchedulerMachineName string
 type Scope struct {
 	EntityId string `json:"entityId"`
 	Type     string `json:"type"`
+}
+
+// SecondaryPodRange defines model for SecondaryPodRange.
+type SecondaryPodRange struct {
+	Name     *string `json:"name,omitempty"`
+	PodRange *string `json:"podRange,omitempty"`
 }
 
 // Self defines model for Self.
@@ -3431,6 +3763,7 @@ type SharedCluster struct {
 	CreatedAt           time.Time                  `json:"createdAt"`
 	DbInstanceType      string                     `json:"dbInstanceType"`
 	DbInstanceVersion   string                     `json:"dbInstanceVersion"`
+	DrRegion            *string                    `json:"drRegion,omitempty"`
 	HealthStatus        *ClusterHealthStatus       `json:"healthStatus,omitempty"`
 	Id                  string                     `json:"id"`
 	IsCordoned          *bool                      `json:"isCordoned,omitempty"`
@@ -3439,6 +3772,7 @@ type SharedCluster struct {
 	Name                string                     `json:"name"`
 	PodSubnetRange      string                     `json:"podSubnetRange"`
 	Region              string                     `json:"region"`
+	SecondaryPodRanges  *[]SecondaryPodRange       `json:"secondaryPodRanges,omitempty"`
 	ServicePeeringRange string                     `json:"servicePeeringRange"`
 	ServiceSubnetRange  string                     `json:"serviceSubnetRange"`
 	Status              SharedClusterStatus        `json:"status"`
@@ -3551,6 +3885,23 @@ type TriggerGitDeployRequest struct {
 // TriggerGitDeployRequestDeployType The type of deploy to trigger. If omitted then the deploy type will be inferred
 type TriggerGitDeployRequestDeployType string
 
+// UpdateAstroIdeSession defines model for UpdateAstroIdeSession.
+type UpdateAstroIdeSession struct {
+	Id         string                          `json:"id"`
+	Permission UpdateAstroIdeSessionPermission `json:"permission"`
+}
+
+// UpdateAstroIdeSessionPermission defines model for UpdateAstroIdeSession.Permission.
+type UpdateAstroIdeSessionPermission string
+
+// UpdateAstroIdeSessionRequest defines model for UpdateAstroIdeSessionRequest.
+type UpdateAstroIdeSessionRequest struct {
+	Permission UpdateAstroIdeSessionRequestPermission `json:"permission"`
+}
+
+// UpdateAstroIdeSessionRequestPermission defines model for UpdateAstroIdeSessionRequest.Permission.
+type UpdateAstroIdeSessionRequestPermission string
+
 // UpdateAwsClusterRequest defines model for UpdateAwsClusterRequest.
 type UpdateAwsClusterRequest struct {
 	BlockInternetAccess            *bool                   `json:"blockInternetAccess,omitempty"`
@@ -3628,7 +3979,11 @@ type UpdateEnvironmentObjectConnectionOverridesRequest struct {
 	Password *string                 `json:"password,omitempty"`
 	Port     *int                    `json:"port,omitempty"`
 	Schema   *string                 `json:"schema,omitempty"`
-	Type     *string                 `json:"type,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Type           *string `json:"type,omitempty"`
 }
 
 // UpdateEnvironmentObjectConnectionRequest defines model for UpdateEnvironmentObjectConnectionRequest.
@@ -3655,28 +4010,44 @@ type UpdateEnvironmentObjectLinkRequestScope string
 
 // UpdateEnvironmentObjectMetricsExportOverridesRequest defines model for UpdateEnvironmentObjectMetricsExportOverridesRequest.
 type UpdateEnvironmentObjectMetricsExportOverridesRequest struct {
+	AuthType     *UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType     `json:"authType,omitempty"`
 	BasicToken   *string                                                           `json:"basicToken,omitempty"`
 	Endpoint     *string                                                           `json:"endpoint,omitempty"`
 	ExporterType *UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType `json:"exporterType,omitempty"`
 	Headers      *map[string]string                                                `json:"headers,omitempty"`
 	Labels       *map[string]string                                                `json:"labels,omitempty"`
 	Password     *string                                                           `json:"password,omitempty"`
-	Username     *string                                                           `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
+
+// UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType defines model for UpdateEnvironmentObjectMetricsExportOverridesRequest.AuthType.
+type UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType string
 
 // UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType defines model for UpdateEnvironmentObjectMetricsExportOverridesRequest.ExporterType.
 type UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType string
 
 // UpdateEnvironmentObjectMetricsExportRequest defines model for UpdateEnvironmentObjectMetricsExportRequest.
 type UpdateEnvironmentObjectMetricsExportRequest struct {
+	AuthType     *UpdateEnvironmentObjectMetricsExportRequestAuthType     `json:"authType,omitempty"`
 	BasicToken   *string                                                  `json:"basicToken,omitempty"`
 	Endpoint     *string                                                  `json:"endpoint,omitempty"`
 	ExporterType *UpdateEnvironmentObjectMetricsExportRequestExporterType `json:"exporterType,omitempty"`
 	Headers      *map[string]string                                       `json:"headers,omitempty"`
 	Labels       *map[string]string                                       `json:"labels,omitempty"`
 	Password     *string                                                  `json:"password,omitempty"`
-	Username     *string                                                  `json:"username,omitempty"`
+
+	// SigV4AssumeArn sigv4 auth params
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+	Username       *string `json:"username,omitempty"`
 }
+
+// UpdateEnvironmentObjectMetricsExportRequestAuthType defines model for UpdateEnvironmentObjectMetricsExportRequest.AuthType.
+type UpdateEnvironmentObjectMetricsExportRequestAuthType string
 
 // UpdateEnvironmentObjectMetricsExportRequestExporterType defines model for UpdateEnvironmentObjectMetricsExportRequest.ExporterType.
 type UpdateEnvironmentObjectMetricsExportRequestExporterType string
@@ -3840,6 +4211,7 @@ type UpdateOrganizationApiTokenRolesRequest struct {
 
 // UpdateOrganizationRequest defines model for UpdateOrganizationRequest.
 type UpdateOrganizationRequest struct {
+	AllowEnhancedSupportAccess *bool  `json:"allowEnhancedSupportAccess,omitempty"`
 	BillingEmail               string `json:"billingEmail"`
 	EnvironmentSecretsShowable *bool  `json:"environmentSecretsShowable,omitempty"`
 	IsScimEnabled              bool   `json:"isScimEnabled"`
@@ -3853,23 +4225,6 @@ type UpdateOrganizationSupportPlanRequest struct {
 
 // UpdateOrganizationSupportPlanRequestSupportPlan defines model for UpdateOrganizationSupportPlanRequest.SupportPlan.
 type UpdateOrganizationSupportPlanRequestSupportPlan string
-
-// UpdatePolarisSession defines model for UpdatePolarisSession.
-type UpdatePolarisSession struct {
-	Id         string                         `json:"id"`
-	Permission UpdatePolarisSessionPermission `json:"permission"`
-}
-
-// UpdatePolarisSessionPermission defines model for UpdatePolarisSession.Permission.
-type UpdatePolarisSessionPermission string
-
-// UpdatePolarisSessionRequest defines model for UpdatePolarisSessionRequest.
-type UpdatePolarisSessionRequest struct {
-	Permission UpdatePolarisSessionRequestPermission `json:"permission"`
-}
-
-// UpdatePolarisSessionRequestPermission defines model for UpdatePolarisSessionRequest.Permission.
-type UpdatePolarisSessionRequestPermission string
 
 // UpdateTeamRequest defines model for UpdateTeamRequest.
 type UpdateTeamRequest struct {
@@ -3890,11 +4245,29 @@ type UpdateWorkspaceApiTokenRolesRequest struct {
 	Workspace  *string                          `json:"workspace,omitempty"`
 }
 
+// UpdateWorkspaceAstroIdeDeploymentsRequest defines model for UpdateWorkspaceAstroIdeDeploymentsRequest.
+type UpdateWorkspaceAstroIdeDeploymentsRequest struct {
+	AutoStart     *bool                                                   `json:"autoStart,omitempty"`
+	CloudProvider *UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider `json:"cloudProvider,omitempty"`
+	ClusterId     *string                                                 `json:"clusterId,omitempty"`
+	Region        *string                                                 `json:"region,omitempty"`
+	TimeoutMins   *int                                                    `json:"timeoutMins,omitempty"`
+}
+
+// UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider defines model for UpdateWorkspaceAstroIdeDeploymentsRequest.CloudProvider.
+type UpdateWorkspaceAstroIdeDeploymentsRequestCloudProvider string
+
+// UpdateWorkspaceAstroIdeRequest defines model for UpdateWorkspaceAstroIdeRequest.
+type UpdateWorkspaceAstroIdeRequest struct {
+	Deployments UpdateWorkspaceAstroIdeDeploymentsRequest `json:"deployments"`
+}
+
 // UpdateWorkspaceRequest defines model for UpdateWorkspaceRequest.
 type UpdateWorkspaceRequest struct {
-	ApiKeyOnlyDeploymentsDefault bool    `json:"apiKeyOnlyDeploymentsDefault"`
-	Description                  *string `json:"description,omitempty"`
-	Name                         string  `json:"name"`
+	ApiKeyOnlyDeploymentsDefault bool                            `json:"apiKeyOnlyDeploymentsDefault"`
+	AstroIde                     *UpdateWorkspaceAstroIdeRequest `json:"astroIde,omitempty"`
+	Description                  *string                         `json:"description,omitempty"`
+	Name                         string                          `json:"name"`
 }
 
 // User defines model for User.
@@ -4039,6 +4412,7 @@ type WorkloadIdentityOption struct {
 // Workspace defines model for Workspace.
 type Workspace struct {
 	ApiKeyOnlyDeploymentsDefault bool                 `json:"apiKeyOnlyDeploymentsDefault"`
+	AstroIde                     WorkspaceAstroIde    `json:"astroIde"`
 	CreatedAt                    time.Time            `json:"createdAt"`
 	CreatedBy                    *BasicSubjectProfile `json:"createdBy,omitempty"`
 	DeploymentCount              *int                 `json:"deploymentCount,omitempty"`
@@ -4056,6 +4430,23 @@ type Workspace struct {
 	UpdatedBy             *BasicSubjectProfile `json:"updatedBy,omitempty"`
 	UserCount             *int                 `json:"userCount,omitempty"`
 }
+
+// WorkspaceAstroIde defines model for WorkspaceAstroIde.
+type WorkspaceAstroIde struct {
+	Deployments WorkspaceAstroIdeDeployments `json:"deployments"`
+}
+
+// WorkspaceAstroIdeDeployments defines model for WorkspaceAstroIdeDeployments.
+type WorkspaceAstroIdeDeployments struct {
+	AutoStart     bool                                       `json:"autoStart"`
+	CloudProvider *WorkspaceAstroIdeDeploymentsCloudProvider `json:"cloudProvider,omitempty"`
+	ClusterId     *string                                    `json:"clusterId,omitempty"`
+	Region        *string                                    `json:"region,omitempty"`
+	TimeoutMins   *int                                       `json:"timeoutMins,omitempty"`
+}
+
+// WorkspaceAstroIdeDeploymentsCloudProvider defines model for WorkspaceAstroIdeDeployments.CloudProvider.
+type WorkspaceAstroIdeDeploymentsCloudProvider string
 
 // WorkspaceDag defines model for WorkspaceDag.
 type WorkspaceDag struct {
@@ -4076,7 +4467,7 @@ type WorkspaceDagRun struct {
 	DataIntervalEnd   *time.Time `json:"dataIntervalEnd"`
 	DataIntervalStart *time.Time `json:"dataIntervalStart"`
 	EndDate           *time.Time `json:"endDate"`
-	LogicalDate       time.Time  `json:"logicalDate"`
+	LogicalDate       *time.Time `json:"logicalDate"`
 	RunId             string     `json:"runId"`
 	RunType           string     `json:"runType"`
 	StartDate         *time.Time `json:"startDate"`
@@ -4134,8 +4525,14 @@ type ListOrganizationsParams struct {
 	// TrialStatus filter by trial status, null for all orgs
 	TrialStatus *ListOrganizationsParamsTrialStatus `form:"trialStatus,omitempty" json:"trialStatus,omitempty"`
 
-	// SupportPlan filter by support plan, should be one of INTERNAL, POV, TRIAL, BASIC, STANDARD, PREMIUM, BUSINESS_CRITICAL, or null for all orgs
+	// SupportPlan filter by support plan, should be one of INACTIVE, INTERNAL, POV, TRIAL, BASIC, BASIC_PAYGO, TEAM_PAYGO, STANDARD, PREMIUM, BUSINESS_CRITICAL, BUSINESS, TEAM, ENTERPRISE, DEVELOPER_PAYGO, TEAM_V2, BUSINESS_V2, ENTERPRISE_V2, TRIAL_V2, or null for all orgs
 	SupportPlan *ListOrganizationsParamsSupportPlan `form:"supportPlan,omitempty" json:"supportPlan,omitempty"`
+
+	// ProductPlan filter by product plan, should be one of INACTIVE, INTERNAL, POV, TRIAL, BASIC, BASIC_PAYGO, TEAM_PAYGO, STANDARD, PREMIUM, BUSINESS_CRITICAL, BUSINESS, TEAM, ENTERPRISE, DEVELOPER_PAYGO, TEAM_V2, BUSINESS_V2, ENTERPRISE_V2, TRIAL_V2, or null for all orgs
+	ProductPlan *ListOrganizationsParamsProductPlan `form:"productPlan,omitempty" json:"productPlan,omitempty"`
+
+	// AstronomerProduct filter by astronomer product, should be one of ASTRO or OBSERVE
+	AstronomerProduct *ListOrganizationsParamsAstronomerProduct `form:"astronomerProduct,omitempty" json:"astronomerProduct,omitempty"`
 
 	// Product filter by product, null for all orgs
 	Product *ListOrganizationsParamsProduct `form:"product,omitempty" json:"product,omitempty"`
@@ -4152,6 +4549,12 @@ type ListOrganizationsParamsTrialStatus string
 
 // ListOrganizationsParamsSupportPlan defines parameters for ListOrganizations.
 type ListOrganizationsParamsSupportPlan string
+
+// ListOrganizationsParamsProductPlan defines parameters for ListOrganizations.
+type ListOrganizationsParamsProductPlan string
+
+// ListOrganizationsParamsAstronomerProduct defines parameters for ListOrganizations.
+type ListOrganizationsParamsAstronomerProduct string
 
 // ListOrganizationsParamsProduct defines parameters for ListOrganizations.
 type ListOrganizationsParamsProduct string
@@ -4291,6 +4694,30 @@ type GetDeploymentOptionsParamsExecutor string
 // GetDeploymentOptionsParamsCloudProvider defines parameters for GetDeploymentOptions.
 type GetDeploymentOptionsParamsCloudProvider string
 
+// ListDeploymentEnvironmentObjectMetricsExportsLogsParams defines parameters for ListDeploymentEnvironmentObjectMetricsExportsLogs.
+type ListDeploymentEnvironmentObjectMetricsExportsLogsParams struct {
+	// Limit limit of the count of the logs
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset offset of the log entries
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Range range of the log search in seconds
+	Range *int `form:"range,omitempty" json:"range,omitempty"`
+
+	// MaxNumResults maximum number of results across all pages
+	MaxNumResults *int `form:"maxNumResults,omitempty" json:"maxNumResults,omitempty"`
+
+	// SearchId searchId to get logs from
+	SearchId *string `form:"searchId,omitempty" json:"searchId,omitempty"`
+
+	// ObjectKey object key
+	ObjectKey string `form:"objectKey" json:"objectKey"`
+
+	// SourceScopeEntityId sourceScopeEntityId
+	SourceScopeEntityId string `form:"sourceScopeEntityId" json:"sourceScopeEntityId"`
+}
+
 // ListDeploymentsParams defines parameters for ListDeployments.
 type ListDeploymentsParams struct {
 	// DeploymentIds IDs that define the deployments
@@ -4298,6 +4725,9 @@ type ListDeploymentsParams struct {
 
 	// WorkspaceIds IDs that define the workspaces where deployments belong to
 	WorkspaceIds *[]string `form:"workspaceIds,omitempty" json:"workspaceIds,omitempty"`
+
+	// ClusterCloudProvider cloud provider to filter deployments on
+	ClusterCloudProvider *ListDeploymentsParamsClusterCloudProvider `form:"clusterCloudProvider,omitempty" json:"clusterCloudProvider,omitempty"`
 
 	// Names deployment names to filter on
 	Names *[]string `form:"names,omitempty" json:"names,omitempty"`
@@ -4314,6 +4744,9 @@ type ListDeploymentsParams struct {
 	// Search string to search for when listing deployments
 	Search *string `form:"search,omitempty" json:"search,omitempty"`
 }
+
+// ListDeploymentsParamsClusterCloudProvider defines parameters for ListDeployments.
+type ListDeploymentsParamsClusterCloudProvider string
 
 // ListDeploymentsParamsSorts defines parameters for ListDeployments.
 type ListDeploymentsParamsSorts string
@@ -4529,6 +4962,12 @@ type ListEnvironmentObjectsParams struct {
 
 	// ResolveLinked resolve linked objects
 	ResolveLinked *bool `form:"resolveLinked,omitempty" json:"resolveLinked,omitempty"`
+
+	// SourceScope source scope
+	SourceScope *ListEnvironmentObjectsParamsSourceScope `form:"sourceScope,omitempty" json:"sourceScope,omitempty"`
+
+	// SourceScopeEntityId source scope entity ID
+	SourceScopeEntityId *string `form:"sourceScopeEntityId,omitempty" json:"sourceScopeEntityId,omitempty"`
 }
 
 // ListEnvironmentObjectsParamsSorts defines parameters for ListEnvironmentObjects.
@@ -4536,6 +4975,27 @@ type ListEnvironmentObjectsParamsSorts string
 
 // ListEnvironmentObjectsParamsObjectType defines parameters for ListEnvironmentObjects.
 type ListEnvironmentObjectsParamsObjectType string
+
+// ListEnvironmentObjectsParamsSourceScope defines parameters for ListEnvironmentObjects.
+type ListEnvironmentObjectsParamsSourceScope string
+
+// ListEnvironmentObjectMetricsExportsLogsParams defines parameters for ListEnvironmentObjectMetricsExportsLogs.
+type ListEnvironmentObjectMetricsExportsLogsParams struct {
+	// Limit limit of the count of the logs
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset offset of the log entries
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Range range of the log search in seconds
+	Range *int `form:"range,omitempty" json:"range,omitempty"`
+
+	// MaxNumResults maximum number of results across all pages
+	MaxNumResults *int `form:"maxNumResults,omitempty" json:"maxNumResults,omitempty"`
+
+	// SearchId searchId to get logs from
+	SearchId *string `form:"searchId,omitempty" json:"searchId,omitempty"`
+}
 
 // ListRoleTemplatesParams defines parameters for ListRoleTemplates.
 type ListRoleTemplatesParams struct {
@@ -4696,6 +5156,63 @@ type ListWorkspaceApiTokensParamsTokenTypes string
 // ListWorkspaceApiTokensParamsSorts defines parameters for ListWorkspaceApiTokens.
 type ListWorkspaceApiTokensParamsSorts string
 
+// ListAstroIdeProjectsParams defines parameters for ListAstroIdeProjects.
+type ListAstroIdeProjectsParams struct {
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Search search string across name and description
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListAstroIdeProjectsParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+
+	// Visibility filter by visibility of projects
+	Visibility *ListAstroIdeProjectsParamsVisibility `form:"visibility,omitempty" json:"visibility,omitempty"`
+
+	// IncludeSubjectInfo include subject info
+	IncludeSubjectInfo *bool `form:"includeSubjectInfo,omitempty" json:"includeSubjectInfo,omitempty"`
+}
+
+// ListAstroIdeProjectsParamsSorts defines parameters for ListAstroIdeProjects.
+type ListAstroIdeProjectsParamsSorts string
+
+// ListAstroIdeProjectsParamsVisibility defines parameters for ListAstroIdeProjects.
+type ListAstroIdeProjectsParamsVisibility string
+
+// ExportAstroIdeSessionTarParams defines parameters for ExportAstroIdeSessionTar.
+type ExportAstroIdeSessionTarParams struct {
+	// Filename filename
+	Filename *string `form:"filename,omitempty" json:"filename,omitempty"`
+}
+
+// ExportAstroIdeSessionZipParams defines parameters for ExportAstroIdeSessionZip.
+type ExportAstroIdeSessionZipParams struct {
+	// Filename filename
+	Filename *string `form:"filename,omitempty" json:"filename,omitempty"`
+}
+
+// ImportAstroIdeSessionTarParams defines parameters for ImportAstroIdeSessionTar.
+type ImportAstroIdeSessionTarParams struct {
+	// Mode import mode Enums(OVERWRITE,UPSERT)
+	Mode *ImportAstroIdeSessionTarParamsMode `form:"mode,omitempty" json:"mode,omitempty"`
+}
+
+// ImportAstroIdeSessionTarParamsMode defines parameters for ImportAstroIdeSessionTar.
+type ImportAstroIdeSessionTarParamsMode string
+
+// ImportAstroIdeSessionZipParams defines parameters for ImportAstroIdeSessionZip.
+type ImportAstroIdeSessionZipParams struct {
+	// Mode import mode Enums(OVERWRITE,UPSERT)
+	Mode *ImportAstroIdeSessionZipParamsMode `form:"mode,omitempty" json:"mode,omitempty"`
+}
+
+// ImportAstroIdeSessionZipParamsMode defines parameters for ImportAstroIdeSessionZip.
+type ImportAstroIdeSessionZipParamsMode string
+
 // ListWorkspaceDagsParams defines parameters for ListWorkspaceDags.
 type ListWorkspaceDagsParams struct {
 	// PageSize page size, default of 20
@@ -4740,60 +5257,6 @@ type ListWorkspaceDagsParams struct {
 	// DeploymentIdIn filter by any of these deployment IDs
 	DeploymentIdIn *[]string `form:"deploymentId__in,omitempty" json:"deploymentId__in,omitempty"`
 }
-
-// ListPolarisProjectsParams defines parameters for ListPolarisProjects.
-type ListPolarisProjectsParams struct {
-	// Offset offset for pagination
-	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
-
-	// Limit limit for pagination
-	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
-
-	// Search search string across name and description
-	Search *string `form:"search,omitempty" json:"search,omitempty"`
-
-	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
-	Sorts *[]ListPolarisProjectsParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
-
-	// Visibility filter by visibility of projects
-	Visibility *ListPolarisProjectsParamsVisibility `form:"visibility,omitempty" json:"visibility,omitempty"`
-}
-
-// ListPolarisProjectsParamsSorts defines parameters for ListPolarisProjects.
-type ListPolarisProjectsParamsSorts string
-
-// ListPolarisProjectsParamsVisibility defines parameters for ListPolarisProjects.
-type ListPolarisProjectsParamsVisibility string
-
-// ExportPolarisSessionTarParams defines parameters for ExportPolarisSessionTar.
-type ExportPolarisSessionTarParams struct {
-	// Filename filename
-	Filename *string `form:"filename,omitempty" json:"filename,omitempty"`
-}
-
-// ExportPolarisSessionZipParams defines parameters for ExportPolarisSessionZip.
-type ExportPolarisSessionZipParams struct {
-	// Filename filename
-	Filename *string `form:"filename,omitempty" json:"filename,omitempty"`
-}
-
-// ImportPolarisSessionTarParams defines parameters for ImportPolarisSessionTar.
-type ImportPolarisSessionTarParams struct {
-	// Mode import mode Enums(OVERWRITE,UPSERT)
-	Mode *ImportPolarisSessionTarParamsMode `form:"mode,omitempty" json:"mode,omitempty"`
-}
-
-// ImportPolarisSessionTarParamsMode defines parameters for ImportPolarisSessionTar.
-type ImportPolarisSessionTarParamsMode string
-
-// ImportPolarisSessionZipParams defines parameters for ImportPolarisSessionZip.
-type ImportPolarisSessionZipParams struct {
-	// Mode import mode Enums(OVERWRITE,UPSERT)
-	Mode *ImportPolarisSessionZipParamsMode `form:"mode,omitempty" json:"mode,omitempty"`
-}
-
-// ImportPolarisSessionZipParamsMode defines parameters for ImportPolarisSessionZip.
-type ImportPolarisSessionZipParamsMode string
 
 // ListWorkspaceTeamsParams defines parameters for ListWorkspaceTeams.
 type ListWorkspaceTeamsParams struct {
@@ -4863,6 +5326,24 @@ type ListSelfUserRepositoriesParams struct {
 
 // ListSelfUserRepositoriesParamsGitProvider defines parameters for ListSelfUserRepositories.
 type ListSelfUserRepositoriesParamsGitProvider string
+
+// ListSelfUserRepositoryBranchesParams defines parameters for ListSelfUserRepositoryBranches.
+type ListSelfUserRepositoryBranchesParams struct {
+	// Prefix git branch name prefix
+	Prefix *string `form:"prefix,omitempty" json:"prefix,omitempty"`
+
+	// Page page (only if prefix not provided)
+	Page *int `form:"page,omitempty" json:"page,omitempty"`
+
+	// PerPage perPage (only if prefix not provided)
+	PerPage *int `form:"perPage,omitempty" json:"perPage,omitempty"`
+}
+
+// ListSelfUserRepositoryBranchesParamsGitProvider defines parameters for ListSelfUserRepositoryBranches.
+type ListSelfUserRepositoryBranchesParamsGitProvider string
+
+// CreateSelfUserRepositoryBranchParamsGitProvider defines parameters for CreateSelfUserRepositoryBranch.
+type CreateSelfUserRepositoryBranchParamsGitProvider string
 
 // GetSelfUserRepositoryBranchParamsGitProvider defines parameters for GetSelfUserRepositoryBranch.
 type GetSelfUserRepositoryBranchParamsGitProvider string
@@ -4999,26 +5480,29 @@ type CreateWorkspaceApiTokenJSONRequestBody = CreateWorkspaceApiTokenRequest
 // UpdateWorkspaceApiTokenJSONRequestBody defines body for UpdateWorkspaceApiToken for application/json ContentType.
 type UpdateWorkspaceApiTokenJSONRequestBody = UpdateWorkspaceApiTokenRequest
 
+// CreateAstroIdeProjectJSONRequestBody defines body for CreateAstroIdeProject for application/json ContentType.
+type CreateAstroIdeProjectJSONRequestBody = CreateAstroIdeProjectRequest
+
+// CreateAstroIdeSessionJSONRequestBody defines body for CreateAstroIdeSession for application/json ContentType.
+type CreateAstroIdeSessionJSONRequestBody = CreateAstroIdeSessionRequest
+
+// SaveAstroIdeSessionJSONRequestBody defines body for SaveAstroIdeSession for application/json ContentType.
+type SaveAstroIdeSessionJSONRequestBody = SaveAstroIdeSessionRequest
+
+// UpdateAstroIdeSessionJSONRequestBody defines body for UpdateAstroIdeSession for application/json ContentType.
+type UpdateAstroIdeSessionJSONRequestBody = UpdateAstroIdeSessionRequest
+
 // TransferDeploymentJSONRequestBody defines body for TransferDeployment for application/json ContentType.
 type TransferDeploymentJSONRequestBody = TransferDeploymentRequest
-
-// CreatePolarisProjectJSONRequestBody defines body for CreatePolarisProject for application/json ContentType.
-type CreatePolarisProjectJSONRequestBody = CreatePolarisProjectRequest
-
-// CreatePolarisSessionJSONRequestBody defines body for CreatePolarisSession for application/json ContentType.
-type CreatePolarisSessionJSONRequestBody = CreatePolarisSessionRequest
-
-// SavePolarisSessionJSONRequestBody defines body for SavePolarisSession for application/json ContentType.
-type SavePolarisSessionJSONRequestBody = SavePolarisSessionRequest
-
-// UpdatePolarisSessionJSONRequestBody defines body for UpdatePolarisSession for application/json ContentType.
-type UpdatePolarisSessionJSONRequestBody = UpdatePolarisSessionRequest
 
 // MutateWorkspaceTeamRoleJSONRequestBody defines body for MutateWorkspaceTeamRole for application/json ContentType.
 type MutateWorkspaceTeamRoleJSONRequestBody = MutateWorkspaceTeamRoleRequest
 
 // MutateWorkspaceUserRoleJSONRequestBody defines body for MutateWorkspaceUserRole for application/json ContentType.
 type MutateWorkspaceUserRoleJSONRequestBody = MutateWorkspaceUserRoleRequest
+
+// CreateSelfUserRepositoryBranchJSONRequestBody defines body for CreateSelfUserRepositoryBranch for application/json ContentType.
+type CreateSelfUserRepositoryBranchJSONRequestBody = CreateGitRepositoryBranchRequest
 
 // UpdateSelfUserInviteJSONRequestBody defines body for UpdateSelfUserInvite for application/json ContentType.
 type UpdateSelfUserInviteJSONRequestBody = UpdateInviteRequest
@@ -5419,6 +5903,9 @@ type ClientInterface interface {
 	// GetDeploymentOptions request
 	GetDeploymentOptions(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListDeploymentEnvironmentObjectMetricsExportsLogs request
+	ListDeploymentEnvironmentObjectMetricsExportsLogs(ctx context.Context, organizationId string, deploymentId string, params *ListDeploymentEnvironmentObjectMetricsExportsLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListDeployments request
 	ListDeployments(ctx context.Context, organizationId string, params *ListDeploymentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -5561,6 +6048,9 @@ type ClientInterface interface {
 
 	ExcludeLinkingEnvironmentObject(ctx context.Context, organizationId string, environmentObjectId string, body ExcludeLinkingEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListEnvironmentObjectMetricsExportsLogs request
+	ListEnvironmentObjectMetricsExportsLogs(ctx context.Context, organizationId string, environmentObjectId string, params *ListEnvironmentObjectMetricsExportsLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CreateUserInviteWithBody request with any body
 	CreateUserInviteWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -5686,6 +6176,44 @@ type ClientInterface interface {
 	// RotateWorkspaceApiToken request
 	RotateWorkspaceApiToken(ctx context.Context, organizationId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAstroIdeProjects request
+	ListAstroIdeProjects(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAstroIdeProjectWithBody request with any body
+	CreateAstroIdeProjectWithBody(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateAstroIdeProject(ctx context.Context, organizationId string, workspaceId string, body CreateAstroIdeProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAstroIdeProject request
+	GetAstroIdeProject(ctx context.Context, organizationId string, workspaceId string, projectId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAstroIdeSessionWithBody request with any body
+	CreateAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportAstroIdeSessionTar request
+	ExportAstroIdeSessionTar(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionTarParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportAstroIdeSessionZip request
+	ExportAstroIdeSessionZip(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionZipParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportAstroIdeSessionTarWithBody request with any body
+	ImportAstroIdeSessionTarWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportAstroIdeSessionZipWithBody request with any body
+	ImportAstroIdeSessionZipWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SaveAstroIdeSessionWithBody request with any body
+	SaveAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	SaveAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SaveAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAstroIdeSessionWithBody request with any body
+	UpdateAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListWorkspaceDagFilters request
 	ListWorkspaceDagFilters(ctx context.Context, organizationId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -5696,41 +6224,6 @@ type ClientInterface interface {
 	TransferDeploymentWithBody(ctx context.Context, organizationId string, workspaceId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	TransferDeployment(ctx context.Context, organizationId string, workspaceId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ListPolarisProjects request
-	ListPolarisProjects(ctx context.Context, organizationId string, workspaceId string, params *ListPolarisProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CreatePolarisProjectWithBody request with any body
-	CreatePolarisProjectWithBody(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	CreatePolarisProject(ctx context.Context, organizationId string, workspaceId string, body CreatePolarisProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CreatePolarisSessionWithBody request with any body
-	CreatePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	CreatePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ExportPolarisSessionTar request
-	ExportPolarisSessionTar(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionTarParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ExportPolarisSessionZip request
-	ExportPolarisSessionZip(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionZipParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ImportPolarisSessionTarWithBody request with any body
-	ImportPolarisSessionTarWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ImportPolarisSessionZipWithBody request with any body
-	ImportPolarisSessionZipWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SavePolarisSessionWithBody request with any body
-	SavePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	SavePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SavePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// UpdatePolarisSessionWithBody request with any body
-	UpdatePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	UpdatePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaceTeams request
 	ListWorkspaceTeams(ctx context.Context, organizationId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5762,6 +6255,14 @@ type ClientInterface interface {
 
 	// ListSelfUserRepositories request
 	ListSelfUserRepositories(ctx context.Context, gitProvider ListSelfUserRepositoriesParamsGitProvider, gitAccount string, params *ListSelfUserRepositoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSelfUserRepositoryBranches request
+	ListSelfUserRepositoryBranches(ctx context.Context, gitProvider ListSelfUserRepositoryBranchesParamsGitProvider, gitAccount string, gitRepository string, params *ListSelfUserRepositoryBranchesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSelfUserRepositoryBranchWithBody request with any body
+	CreateSelfUserRepositoryBranchWithBody(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateSelfUserRepositoryBranch(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, body CreateSelfUserRepositoryBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSelfUserRepositoryBranch request
 	GetSelfUserRepositoryBranch(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6260,6 +6761,18 @@ func (c *Client) DeactivateOrganization(ctx context.Context, organizationId stri
 
 func (c *Client) GetDeploymentOptions(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetDeploymentOptionsRequest(c.Server, organizationId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDeploymentEnvironmentObjectMetricsExportsLogs(ctx context.Context, organizationId string, deploymentId string, params *ListDeploymentEnvironmentObjectMetricsExportsLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDeploymentEnvironmentObjectMetricsExportsLogsRequest(c.Server, organizationId, deploymentId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -6894,6 +7407,18 @@ func (c *Client) ExcludeLinkingEnvironmentObject(ctx context.Context, organizati
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListEnvironmentObjectMetricsExportsLogs(ctx context.Context, organizationId string, environmentObjectId string, params *ListEnvironmentObjectMetricsExportsLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListEnvironmentObjectMetricsExportsLogsRequest(c.Server, organizationId, environmentObjectId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) CreateUserInviteWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateUserInviteRequestWithBody(c.Server, organizationId, contentType, body)
 	if err != nil {
@@ -7446,6 +7971,174 @@ func (c *Client) RotateWorkspaceApiToken(ctx context.Context, organizationId str
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListAstroIdeProjects(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAstroIdeProjectsRequest(c.Server, organizationId, workspaceId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAstroIdeProjectWithBody(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAstroIdeProjectRequestWithBody(c.Server, organizationId, workspaceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAstroIdeProject(ctx context.Context, organizationId string, workspaceId string, body CreateAstroIdeProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAstroIdeProjectRequest(c.Server, organizationId, workspaceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetAstroIdeProject(ctx context.Context, organizationId string, workspaceId string, projectId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAstroIdeProjectRequest(c.Server, organizationId, workspaceId, projectId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAstroIdeSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAstroIdeSessionRequest(c.Server, organizationId, workspaceId, projectId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ExportAstroIdeSessionTar(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionTarParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportAstroIdeSessionTarRequest(c.Server, organizationId, workspaceId, projectId, sessionId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ExportAstroIdeSessionZip(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionZipParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportAstroIdeSessionZipRequest(c.Server, organizationId, workspaceId, projectId, sessionId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ImportAstroIdeSessionTarWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportAstroIdeSessionTarRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ImportAstroIdeSessionZipWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportAstroIdeSessionZipRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SaveAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSaveAstroIdeSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SaveAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SaveAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSaveAstroIdeSessionRequest(c.Server, organizationId, workspaceId, projectId, sessionId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAstroIdeSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAstroIdeSessionRequest(c.Server, organizationId, workspaceId, projectId, sessionId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListWorkspaceDagFilters(ctx context.Context, organizationId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListWorkspaceDagFiltersRequest(c.Server, organizationId, workspaceId)
 	if err != nil {
@@ -7484,162 +8177,6 @@ func (c *Client) TransferDeploymentWithBody(ctx context.Context, organizationId 
 
 func (c *Client) TransferDeployment(ctx context.Context, organizationId string, workspaceId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTransferDeploymentRequest(c.Server, organizationId, workspaceId, deploymentId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ListPolarisProjects(ctx context.Context, organizationId string, workspaceId string, params *ListPolarisProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListPolarisProjectsRequest(c.Server, organizationId, workspaceId, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreatePolarisProjectWithBody(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreatePolarisProjectRequestWithBody(c.Server, organizationId, workspaceId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreatePolarisProject(ctx context.Context, organizationId string, workspaceId string, body CreatePolarisProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreatePolarisProjectRequest(c.Server, organizationId, workspaceId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreatePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreatePolarisSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreatePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreatePolarisSessionRequest(c.Server, organizationId, workspaceId, projectId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ExportPolarisSessionTar(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionTarParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportPolarisSessionTarRequest(c.Server, organizationId, workspaceId, projectId, sessionId, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ExportPolarisSessionZip(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionZipParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportPolarisSessionZipRequest(c.Server, organizationId, workspaceId, projectId, sessionId, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ImportPolarisSessionTarWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewImportPolarisSessionTarRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ImportPolarisSessionZipWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewImportPolarisSessionZipRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SavePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSavePolarisSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SavePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SavePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSavePolarisSessionRequest(c.Server, organizationId, workspaceId, projectId, sessionId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) UpdatePolarisSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdatePolarisSessionRequestWithBody(c.Server, organizationId, workspaceId, projectId, sessionId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) UpdatePolarisSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdatePolarisSessionRequest(c.Server, organizationId, workspaceId, projectId, sessionId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7772,6 +8309,42 @@ func (c *Client) ListSelfUserGitAccounts(ctx context.Context, gitProvider ListSe
 
 func (c *Client) ListSelfUserRepositories(ctx context.Context, gitProvider ListSelfUserRepositoriesParamsGitProvider, gitAccount string, params *ListSelfUserRepositoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListSelfUserRepositoriesRequest(c.Server, gitProvider, gitAccount, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListSelfUserRepositoryBranches(ctx context.Context, gitProvider ListSelfUserRepositoryBranchesParamsGitProvider, gitAccount string, gitRepository string, params *ListSelfUserRepositoryBranchesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSelfUserRepositoryBranchesRequest(c.Server, gitProvider, gitAccount, gitRepository, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateSelfUserRepositoryBranchWithBody(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSelfUserRepositoryBranchRequestWithBody(c.Server, gitProvider, gitAccount, gitRepository, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateSelfUserRepositoryBranch(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, body CreateSelfUserRepositoryBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSelfUserRepositoryBranchRequest(c.Server, gitProvider, gitAccount, gitRepository, body)
 	if err != nil {
 		return nil, err
 	}
@@ -8051,6 +8624,38 @@ func NewListOrganizationsRequest(server string, params *ListOrganizationsParams)
 		if params.SupportPlan != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "supportPlan", runtime.ParamLocationQuery, *params.SupportPlan); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProductPlan != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "productPlan", runtime.ParamLocationQuery, *params.ProductPlan); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.AstronomerProduct != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "astronomerProduct", runtime.ParamLocationQuery, *params.AstronomerProduct); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -9671,6 +10276,157 @@ func NewGetDeploymentOptionsRequest(server string, organizationId string, params
 	return req, nil
 }
 
+// NewListDeploymentEnvironmentObjectMetricsExportsLogsRequest generates requests for ListDeploymentEnvironmentObjectMetricsExportsLogs
+func NewListDeploymentEnvironmentObjectMetricsExportsLogsRequest(server string, organizationId string, deploymentId string, params *ListDeploymentEnvironmentObjectMetricsExportsLogsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployment/%s/environment-objects/metrics-exports/logs", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Range != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "range", runtime.ParamLocationQuery, *params.Range); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.MaxNumResults != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "maxNumResults", runtime.ParamLocationQuery, *params.MaxNumResults); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SearchId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "searchId", runtime.ParamLocationQuery, *params.SearchId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "objectKey", runtime.ParamLocationQuery, params.ObjectKey); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sourceScopeEntityId", runtime.ParamLocationQuery, params.SourceScopeEntityId); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListDeploymentsRequest generates requests for ListDeployments
 func NewListDeploymentsRequest(server string, organizationId string, params *ListDeploymentsParams) (*http.Request, error) {
 	var err error
@@ -9719,6 +10475,22 @@ func NewListDeploymentsRequest(server string, organizationId string, params *Lis
 		if params.WorkspaceIds != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "workspaceIds", runtime.ParamLocationQuery, *params.WorkspaceIds); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ClusterCloudProvider != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "clusterCloudProvider", runtime.ParamLocationQuery, *params.ClusterCloudProvider); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -12259,6 +13031,38 @@ func NewListEnvironmentObjectsRequest(server string, organizationId string, para
 
 		}
 
+		if params.SourceScope != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sourceScope", runtime.ParamLocationQuery, *params.SourceScope); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SourceScopeEntityId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sourceScopeEntityId", runtime.ParamLocationQuery, *params.SourceScopeEntityId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		queryURL.RawQuery = queryValues.Encode()
 	}
 
@@ -12503,6 +13307,133 @@ func NewExcludeLinkingEnvironmentObjectRequestWithBody(server string, organizati
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListEnvironmentObjectMetricsExportsLogsRequest generates requests for ListEnvironmentObjectMetricsExportsLogs
+func NewListEnvironmentObjectMetricsExportsLogsRequest(server string, organizationId string, environmentObjectId string, params *ListEnvironmentObjectMetricsExportsLogsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "environmentObjectId", runtime.ParamLocationPath, environmentObjectId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/environment-objects/%s/metrics-exports/logs", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Range != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "range", runtime.ParamLocationQuery, *params.Range); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.MaxNumResults != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "maxNumResults", runtime.ParamLocationQuery, *params.MaxNumResults); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SearchId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "searchId", runtime.ParamLocationQuery, *params.SearchId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -14612,6 +15543,760 @@ func NewRotateWorkspaceApiTokenRequest(server string, organizationId string, wor
 	return req, nil
 }
 
+// NewListAstroIdeProjectsRequest generates requests for ListAstroIdeProjects
+func NewListAstroIdeProjectsRequest(server string, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Search != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sorts != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Visibility != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "visibility", runtime.ParamLocationQuery, *params.Visibility); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeSubjectInfo != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeSubjectInfo", runtime.ParamLocationQuery, *params.IncludeSubjectInfo); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateAstroIdeProjectRequest calls the generic CreateAstroIdeProject builder with application/json body
+func NewCreateAstroIdeProjectRequest(server string, organizationId string, workspaceId string, body CreateAstroIdeProjectJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAstroIdeProjectRequestWithBody(server, organizationId, workspaceId, "application/json", bodyReader)
+}
+
+// NewCreateAstroIdeProjectRequestWithBody generates requests for CreateAstroIdeProject with any type of body
+func NewCreateAstroIdeProjectRequestWithBody(server string, organizationId string, workspaceId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetAstroIdeProjectRequest generates requests for GetAstroIdeProject
+func NewGetAstroIdeProjectRequest(server string, organizationId string, workspaceId string, projectId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateAstroIdeSessionRequest calls the generic CreateAstroIdeSession builder with application/json body
+func NewCreateAstroIdeSessionRequest(server string, organizationId string, workspaceId string, projectId string, body CreateAstroIdeSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAstroIdeSessionRequestWithBody(server, organizationId, workspaceId, projectId, "application/json", bodyReader)
+}
+
+// NewCreateAstroIdeSessionRequestWithBody generates requests for CreateAstroIdeSession with any type of body
+func NewCreateAstroIdeSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewExportAstroIdeSessionTarRequest generates requests for ExportAstroIdeSessionTar
+func NewExportAstroIdeSessionTarRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionTarParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/export/tar", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Filename != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "filename", runtime.ParamLocationQuery, *params.Filename); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewExportAstroIdeSessionZipRequest generates requests for ExportAstroIdeSessionZip
+func NewExportAstroIdeSessionZipRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionZipParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/export/zip", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Filename != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "filename", runtime.ParamLocationQuery, *params.Filename); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewImportAstroIdeSessionTarRequestWithBody generates requests for ImportAstroIdeSessionTar with any type of body
+func NewImportAstroIdeSessionTarRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionTarParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/import/tar", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Mode != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "mode", runtime.ParamLocationQuery, *params.Mode); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewImportAstroIdeSessionZipRequestWithBody generates requests for ImportAstroIdeSessionZip with any type of body
+func NewImportAstroIdeSessionZipRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionZipParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/import/zip", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Mode != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "mode", runtime.ParamLocationQuery, *params.Mode); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewSaveAstroIdeSessionRequest calls the generic SaveAstroIdeSession builder with application/json body
+func NewSaveAstroIdeSessionRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, body SaveAstroIdeSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSaveAstroIdeSessionRequestWithBody(server, organizationId, workspaceId, projectId, sessionId, "application/json", bodyReader)
+}
+
+// NewSaveAstroIdeSessionRequestWithBody generates requests for SaveAstroIdeSession with any type of body
+func NewSaveAstroIdeSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/save", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdateAstroIdeSessionRequest calls the generic UpdateAstroIdeSession builder with application/json body
+func NewUpdateAstroIdeSessionRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAstroIdeSessionRequestWithBody(server, organizationId, workspaceId, projectId, sessionId, "application/json", bodyReader)
+}
+
+// NewUpdateAstroIdeSessionRequestWithBody generates requests for UpdateAstroIdeSession with any type of body
+func NewUpdateAstroIdeSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/astroide/projects/%s/sessions/%s/update", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListWorkspaceDagFiltersRequest generates requests for ListWorkspaceDagFilters
 func NewListWorkspaceDagFiltersRequest(server string, organizationId string, workspaceId string) (*http.Request, error) {
 	var err error
@@ -14966,696 +16651,6 @@ func NewTransferDeploymentRequestWithBody(server string, organizationId string, 
 	}
 
 	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/deployments/%s/transfer", pathParam0, pathParam1, pathParam2)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewListPolarisProjectsRequest generates requests for ListPolarisProjects
-func NewListPolarisProjectsRequest(server string, organizationId string, workspaceId string, params *ListPolarisProjectsParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.Offset != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.Search != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.Sorts != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.Visibility != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "visibility", runtime.ParamLocationQuery, *params.Visibility); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreatePolarisProjectRequest calls the generic CreatePolarisProject builder with application/json body
-func NewCreatePolarisProjectRequest(server string, organizationId string, workspaceId string, body CreatePolarisProjectJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreatePolarisProjectRequestWithBody(server, organizationId, workspaceId, "application/json", bodyReader)
-}
-
-// NewCreatePolarisProjectRequestWithBody generates requests for CreatePolarisProject with any type of body
-func NewCreatePolarisProjectRequestWithBody(server string, organizationId string, workspaceId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewCreatePolarisSessionRequest calls the generic CreatePolarisSession builder with application/json body
-func NewCreatePolarisSessionRequest(server string, organizationId string, workspaceId string, projectId string, body CreatePolarisSessionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreatePolarisSessionRequestWithBody(server, organizationId, workspaceId, projectId, "application/json", bodyReader)
-}
-
-// NewCreatePolarisSessionRequestWithBody generates requests for CreatePolarisSession with any type of body
-func NewCreatePolarisSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam2 string
-
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions", pathParam0, pathParam1, pathParam2)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewExportPolarisSessionTarRequest generates requests for ExportPolarisSessionTar
-func NewExportPolarisSessionTarRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionTarParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam2 string
-
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam3 string
-
-	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/export/tar", pathParam0, pathParam1, pathParam2, pathParam3)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.Filename != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "filename", runtime.ParamLocationQuery, *params.Filename); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewExportPolarisSessionZipRequest generates requests for ExportPolarisSessionZip
-func NewExportPolarisSessionZipRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionZipParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam2 string
-
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam3 string
-
-	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/export/zip", pathParam0, pathParam1, pathParam2, pathParam3)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.Filename != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "filename", runtime.ParamLocationQuery, *params.Filename); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewImportPolarisSessionTarRequestWithBody generates requests for ImportPolarisSessionTar with any type of body
-func NewImportPolarisSessionTarRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionTarParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam2 string
-
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam3 string
-
-	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/import/tar", pathParam0, pathParam1, pathParam2, pathParam3)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.Mode != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "mode", runtime.ParamLocationQuery, *params.Mode); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewImportPolarisSessionZipRequestWithBody generates requests for ImportPolarisSessionZip with any type of body
-func NewImportPolarisSessionZipRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionZipParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam2 string
-
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam3 string
-
-	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/import/zip", pathParam0, pathParam1, pathParam2, pathParam3)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.Mode != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "mode", runtime.ParamLocationQuery, *params.Mode); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewSavePolarisSessionRequest calls the generic SavePolarisSession builder with application/json body
-func NewSavePolarisSessionRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, body SavePolarisSessionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSavePolarisSessionRequestWithBody(server, organizationId, workspaceId, projectId, sessionId, "application/json", bodyReader)
-}
-
-// NewSavePolarisSessionRequestWithBody generates requests for SavePolarisSession with any type of body
-func NewSavePolarisSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam2 string
-
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam3 string
-
-	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/save", pathParam0, pathParam1, pathParam2, pathParam3)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewUpdatePolarisSessionRequest calls the generic UpdatePolarisSession builder with application/json body
-func NewUpdatePolarisSessionRequest(server string, organizationId string, workspaceId string, projectId string, sessionId string, body UpdatePolarisSessionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdatePolarisSessionRequestWithBody(server, organizationId, workspaceId, projectId, sessionId, "application/json", bodyReader)
-}
-
-// NewUpdatePolarisSessionRequestWithBody generates requests for UpdatePolarisSession with any type of body
-func NewUpdatePolarisSessionRequestWithBody(server string, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam2 string
-
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "projectId", runtime.ParamLocationPath, projectId)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam3 string
-
-	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "sessionId", runtime.ParamLocationPath, sessionId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/polaris/projects/%s/sessions/%s/update", pathParam0, pathParam1, pathParam2, pathParam3)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -16341,6 +17336,169 @@ func NewListSelfUserRepositoriesRequest(server string, gitProvider ListSelfUserR
 	return req, nil
 }
 
+// NewListSelfUserRepositoryBranchesRequest generates requests for ListSelfUserRepositoryBranches
+func NewListSelfUserRepositoryBranchesRequest(server string, gitProvider ListSelfUserRepositoryBranchesParamsGitProvider, gitAccount string, gitRepository string, params *ListSelfUserRepositoryBranchesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "gitProvider", runtime.ParamLocationPath, gitProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "gitAccount", runtime.ParamLocationPath, gitAccount)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "gitRepository", runtime.ParamLocationPath, gitRepository)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/users/self/git-providers/%s/accounts/%s/repositories/%s/branches", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Prefix != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "prefix", runtime.ParamLocationQuery, *params.Prefix); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page", runtime.ParamLocationQuery, *params.Page); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PerPage != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "perPage", runtime.ParamLocationQuery, *params.PerPage); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateSelfUserRepositoryBranchRequest calls the generic CreateSelfUserRepositoryBranch builder with application/json body
+func NewCreateSelfUserRepositoryBranchRequest(server string, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, body CreateSelfUserRepositoryBranchJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSelfUserRepositoryBranchRequestWithBody(server, gitProvider, gitAccount, gitRepository, "application/json", bodyReader)
+}
+
+// NewCreateSelfUserRepositoryBranchRequestWithBody generates requests for CreateSelfUserRepositoryBranch with any type of body
+func NewCreateSelfUserRepositoryBranchRequestWithBody(server string, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "gitProvider", runtime.ParamLocationPath, gitProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "gitAccount", runtime.ParamLocationPath, gitAccount)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "gitRepository", runtime.ParamLocationPath, gitRepository)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/users/self/git-providers/%s/accounts/%s/repositories/%s/branches", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetSelfUserRepositoryBranchRequest generates requests for GetSelfUserRepositoryBranch
 func NewGetSelfUserRepositoryBranchRequest(server string, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string) (*http.Request, error) {
 	var err error
@@ -16695,6 +17853,9 @@ type ClientWithResponsesInterface interface {
 	// GetDeploymentOptionsWithResponse request
 	GetDeploymentOptionsWithResponse(ctx context.Context, organizationId string, params *GetDeploymentOptionsParams, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error)
 
+	// ListDeploymentEnvironmentObjectMetricsExportsLogsWithResponse request
+	ListDeploymentEnvironmentObjectMetricsExportsLogsWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListDeploymentEnvironmentObjectMetricsExportsLogsParams, reqEditors ...RequestEditorFn) (*ListDeploymentEnvironmentObjectMetricsExportsLogsResponse, error)
+
 	// ListDeploymentsWithResponse request
 	ListDeploymentsWithResponse(ctx context.Context, organizationId string, params *ListDeploymentsParams, reqEditors ...RequestEditorFn) (*ListDeploymentsResponse, error)
 
@@ -16837,6 +17998,9 @@ type ClientWithResponsesInterface interface {
 
 	ExcludeLinkingEnvironmentObjectWithResponse(ctx context.Context, organizationId string, environmentObjectId string, body ExcludeLinkingEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*ExcludeLinkingEnvironmentObjectResponse, error)
 
+	// ListEnvironmentObjectMetricsExportsLogsWithResponse request
+	ListEnvironmentObjectMetricsExportsLogsWithResponse(ctx context.Context, organizationId string, environmentObjectId string, params *ListEnvironmentObjectMetricsExportsLogsParams, reqEditors ...RequestEditorFn) (*ListEnvironmentObjectMetricsExportsLogsResponse, error)
+
 	// CreateUserInviteWithBodyWithResponse request with any body
 	CreateUserInviteWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUserInviteResponse, error)
 
@@ -16962,6 +18126,44 @@ type ClientWithResponsesInterface interface {
 	// RotateWorkspaceApiTokenWithResponse request
 	RotateWorkspaceApiTokenWithResponse(ctx context.Context, organizationId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateWorkspaceApiTokenResponse, error)
 
+	// ListAstroIdeProjectsWithResponse request
+	ListAstroIdeProjectsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*ListAstroIdeProjectsResponse, error)
+
+	// CreateAstroIdeProjectWithBodyWithResponse request with any body
+	CreateAstroIdeProjectWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAstroIdeProjectResponse, error)
+
+	CreateAstroIdeProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, body CreateAstroIdeProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAstroIdeProjectResponse, error)
+
+	// GetAstroIdeProjectWithResponse request
+	GetAstroIdeProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, reqEditors ...RequestEditorFn) (*GetAstroIdeProjectResponse, error)
+
+	// CreateAstroIdeSessionWithBodyWithResponse request with any body
+	CreateAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAstroIdeSessionResponse, error)
+
+	CreateAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAstroIdeSessionResponse, error)
+
+	// ExportAstroIdeSessionTarWithResponse request
+	ExportAstroIdeSessionTarWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionTarParams, reqEditors ...RequestEditorFn) (*ExportAstroIdeSessionTarResponse, error)
+
+	// ExportAstroIdeSessionZipWithResponse request
+	ExportAstroIdeSessionZipWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionZipParams, reqEditors ...RequestEditorFn) (*ExportAstroIdeSessionZipResponse, error)
+
+	// ImportAstroIdeSessionTarWithBodyWithResponse request with any body
+	ImportAstroIdeSessionTarWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportAstroIdeSessionTarResponse, error)
+
+	// ImportAstroIdeSessionZipWithBodyWithResponse request with any body
+	ImportAstroIdeSessionZipWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportAstroIdeSessionZipResponse, error)
+
+	// SaveAstroIdeSessionWithBodyWithResponse request with any body
+	SaveAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SaveAstroIdeSessionResponse, error)
+
+	SaveAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SaveAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*SaveAstroIdeSessionResponse, error)
+
+	// UpdateAstroIdeSessionWithBodyWithResponse request with any body
+	UpdateAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAstroIdeSessionResponse, error)
+
+	UpdateAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAstroIdeSessionResponse, error)
+
 	// ListWorkspaceDagFiltersWithResponse request
 	ListWorkspaceDagFiltersWithResponse(ctx context.Context, organizationId string, workspaceId string, reqEditors ...RequestEditorFn) (*ListWorkspaceDagFiltersResponse, error)
 
@@ -16972,41 +18174,6 @@ type ClientWithResponsesInterface interface {
 	TransferDeploymentWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TransferDeploymentResponse, error)
 
 	TransferDeploymentWithResponse(ctx context.Context, organizationId string, workspaceId string, deploymentId string, body TransferDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*TransferDeploymentResponse, error)
-
-	// ListPolarisProjectsWithResponse request
-	ListPolarisProjectsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListPolarisProjectsParams, reqEditors ...RequestEditorFn) (*ListPolarisProjectsResponse, error)
-
-	// CreatePolarisProjectWithBodyWithResponse request with any body
-	CreatePolarisProjectWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePolarisProjectResponse, error)
-
-	CreatePolarisProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, body CreatePolarisProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePolarisProjectResponse, error)
-
-	// CreatePolarisSessionWithBodyWithResponse request with any body
-	CreatePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePolarisSessionResponse, error)
-
-	CreatePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePolarisSessionResponse, error)
-
-	// ExportPolarisSessionTarWithResponse request
-	ExportPolarisSessionTarWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionTarParams, reqEditors ...RequestEditorFn) (*ExportPolarisSessionTarResponse, error)
-
-	// ExportPolarisSessionZipWithResponse request
-	ExportPolarisSessionZipWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionZipParams, reqEditors ...RequestEditorFn) (*ExportPolarisSessionZipResponse, error)
-
-	// ImportPolarisSessionTarWithBodyWithResponse request with any body
-	ImportPolarisSessionTarWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportPolarisSessionTarResponse, error)
-
-	// ImportPolarisSessionZipWithBodyWithResponse request with any body
-	ImportPolarisSessionZipWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportPolarisSessionZipResponse, error)
-
-	// SavePolarisSessionWithBodyWithResponse request with any body
-	SavePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SavePolarisSessionResponse, error)
-
-	SavePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SavePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*SavePolarisSessionResponse, error)
-
-	// UpdatePolarisSessionWithBodyWithResponse request with any body
-	UpdatePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePolarisSessionResponse, error)
-
-	UpdatePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePolarisSessionResponse, error)
 
 	// ListWorkspaceTeamsWithResponse request
 	ListWorkspaceTeamsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*ListWorkspaceTeamsResponse, error)
@@ -17038,6 +18205,14 @@ type ClientWithResponsesInterface interface {
 
 	// ListSelfUserRepositoriesWithResponse request
 	ListSelfUserRepositoriesWithResponse(ctx context.Context, gitProvider ListSelfUserRepositoriesParamsGitProvider, gitAccount string, params *ListSelfUserRepositoriesParams, reqEditors ...RequestEditorFn) (*ListSelfUserRepositoriesResponse, error)
+
+	// ListSelfUserRepositoryBranchesWithResponse request
+	ListSelfUserRepositoryBranchesWithResponse(ctx context.Context, gitProvider ListSelfUserRepositoryBranchesParamsGitProvider, gitAccount string, gitRepository string, params *ListSelfUserRepositoryBranchesParams, reqEditors ...RequestEditorFn) (*ListSelfUserRepositoryBranchesResponse, error)
+
+	// CreateSelfUserRepositoryBranchWithBodyWithResponse request with any body
+	CreateSelfUserRepositoryBranchWithBodyWithResponse(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSelfUserRepositoryBranchResponse, error)
+
+	CreateSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, body CreateSelfUserRepositoryBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSelfUserRepositoryBranchResponse, error)
 
 	// GetSelfUserRepositoryBranchWithResponse request
 	GetSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider GetSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, gitBranch string, reqEditors ...RequestEditorFn) (*GetSelfUserRepositoryBranchResponse, error)
@@ -17827,6 +19002,33 @@ func (r GetDeploymentOptionsResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetDeploymentOptionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListDeploymentEnvironmentObjectMetricsExportsLogsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListEnvironmentObjectMetricsExportsLogsPaginated
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON405      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDeploymentEnvironmentObjectMetricsExportsLogsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDeploymentEnvironmentObjectMetricsExportsLogsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -18834,6 +20036,33 @@ func (r ExcludeLinkingEnvironmentObjectResponse) StatusCode() int {
 	return 0
 }
 
+type ListEnvironmentObjectMetricsExportsLogsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListEnvironmentObjectMetricsExportsLogsPaginated
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON405      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListEnvironmentObjectMetricsExportsLogsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListEnvironmentObjectMetricsExportsLogsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type CreateUserInviteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -19715,6 +20944,250 @@ func (r RotateWorkspaceApiTokenResponse) StatusCode() int {
 	return 0
 }
 
+type ListAstroIdeProjectsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AstroIdeProjectsPaginated
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAstroIdeProjectsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAstroIdeProjectsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateAstroIdeProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AstroIdeProject
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAstroIdeProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAstroIdeProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetAstroIdeProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AstroIdeProject
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAstroIdeProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAstroIdeProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateAstroIdeSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *CreateAstroIdeSession
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAstroIdeSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAstroIdeSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ExportAstroIdeSessionTarResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportAstroIdeSessionTarResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportAstroIdeSessionTarResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ExportAstroIdeSessionZipResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportAstroIdeSessionZipResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportAstroIdeSessionZipResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ImportAstroIdeSessionTarResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ImportAstroIdeSession
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportAstroIdeSessionTarResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportAstroIdeSessionTarResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ImportAstroIdeSessionZipResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ImportAstroIdeSession
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportAstroIdeSessionZipResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportAstroIdeSessionZipResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SaveAstroIdeSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SaveAstroIdeSession
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r SaveAstroIdeSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SaveAstroIdeSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateAstroIdeSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *UpdateAstroIdeSession
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAstroIdeSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAstroIdeSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListWorkspaceDagFiltersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -19787,224 +21260,6 @@ func (r TransferDeploymentResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r TransferDeploymentResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type ListPolarisProjectsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *PolarisProjectsPaginated
-	JSON401      *Error
-	JSON403      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r ListPolarisProjectsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListPolarisProjectsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type CreatePolarisProjectResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *PolarisProject
-	JSON401      *Error
-	JSON403      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r CreatePolarisProjectResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreatePolarisProjectResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type CreatePolarisSessionResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *CreatePolarisSession
-	JSON401      *Error
-	JSON403      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r CreatePolarisSessionResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreatePolarisSessionResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type ExportPolarisSessionTarResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-}
-
-// Status returns HTTPResponse.Status
-func (r ExportPolarisSessionTarResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ExportPolarisSessionTarResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type ExportPolarisSessionZipResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-}
-
-// Status returns HTTPResponse.Status
-func (r ExportPolarisSessionZipResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ExportPolarisSessionZipResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type ImportPolarisSessionTarResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *ImportPolarisSession
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r ImportPolarisSessionTarResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ImportPolarisSessionTarResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type ImportPolarisSessionZipResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *ImportPolarisSession
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r ImportPolarisSessionZipResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ImportPolarisSessionZipResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type SavePolarisSessionResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON401      *Error
-	JSON403      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r SavePolarisSessionResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SavePolarisSessionResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type UpdatePolarisSessionResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *UpdatePolarisSession
-	JSON401      *Error
-	JSON403      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r UpdatePolarisSessionResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r UpdatePolarisSessionResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -20245,6 +21500,59 @@ func (r ListSelfUserRepositoriesResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ListSelfUserRepositoriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListSelfUserRepositoryBranchesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *RepositoryBranchesPaginated
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSelfUserRepositoryBranchesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSelfUserRepositoryBranchesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateSelfUserRepositoryBranchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *RepositoryBranch
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON405      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSelfUserRepositoryBranchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSelfUserRepositoryBranchResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -20715,6 +22023,15 @@ func (c *ClientWithResponses) GetDeploymentOptionsWithResponse(ctx context.Conte
 	return ParseGetDeploymentOptionsResponse(rsp)
 }
 
+// ListDeploymentEnvironmentObjectMetricsExportsLogsWithResponse request returning *ListDeploymentEnvironmentObjectMetricsExportsLogsResponse
+func (c *ClientWithResponses) ListDeploymentEnvironmentObjectMetricsExportsLogsWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListDeploymentEnvironmentObjectMetricsExportsLogsParams, reqEditors ...RequestEditorFn) (*ListDeploymentEnvironmentObjectMetricsExportsLogsResponse, error) {
+	rsp, err := c.ListDeploymentEnvironmentObjectMetricsExportsLogs(ctx, organizationId, deploymentId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDeploymentEnvironmentObjectMetricsExportsLogsResponse(rsp)
+}
+
 // ListDeploymentsWithResponse request returning *ListDeploymentsResponse
 func (c *ClientWithResponses) ListDeploymentsWithResponse(ctx context.Context, organizationId string, params *ListDeploymentsParams, reqEditors ...RequestEditorFn) (*ListDeploymentsResponse, error) {
 	rsp, err := c.ListDeployments(ctx, organizationId, params, reqEditors...)
@@ -21169,6 +22486,15 @@ func (c *ClientWithResponses) ExcludeLinkingEnvironmentObjectWithResponse(ctx co
 	return ParseExcludeLinkingEnvironmentObjectResponse(rsp)
 }
 
+// ListEnvironmentObjectMetricsExportsLogsWithResponse request returning *ListEnvironmentObjectMetricsExportsLogsResponse
+func (c *ClientWithResponses) ListEnvironmentObjectMetricsExportsLogsWithResponse(ctx context.Context, organizationId string, environmentObjectId string, params *ListEnvironmentObjectMetricsExportsLogsParams, reqEditors ...RequestEditorFn) (*ListEnvironmentObjectMetricsExportsLogsResponse, error) {
+	rsp, err := c.ListEnvironmentObjectMetricsExportsLogs(ctx, organizationId, environmentObjectId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListEnvironmentObjectMetricsExportsLogsResponse(rsp)
+}
+
 // CreateUserInviteWithBodyWithResponse request with arbitrary body returning *CreateUserInviteResponse
 func (c *ClientWithResponses) CreateUserInviteWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUserInviteResponse, error) {
 	rsp, err := c.CreateUserInviteWithBody(ctx, organizationId, contentType, body, reqEditors...)
@@ -21570,6 +22896,128 @@ func (c *ClientWithResponses) RotateWorkspaceApiTokenWithResponse(ctx context.Co
 	return ParseRotateWorkspaceApiTokenResponse(rsp)
 }
 
+// ListAstroIdeProjectsWithResponse request returning *ListAstroIdeProjectsResponse
+func (c *ClientWithResponses) ListAstroIdeProjectsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*ListAstroIdeProjectsResponse, error) {
+	rsp, err := c.ListAstroIdeProjects(ctx, organizationId, workspaceId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAstroIdeProjectsResponse(rsp)
+}
+
+// CreateAstroIdeProjectWithBodyWithResponse request with arbitrary body returning *CreateAstroIdeProjectResponse
+func (c *ClientWithResponses) CreateAstroIdeProjectWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAstroIdeProjectResponse, error) {
+	rsp, err := c.CreateAstroIdeProjectWithBody(ctx, organizationId, workspaceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAstroIdeProjectResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateAstroIdeProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, body CreateAstroIdeProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAstroIdeProjectResponse, error) {
+	rsp, err := c.CreateAstroIdeProject(ctx, organizationId, workspaceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAstroIdeProjectResponse(rsp)
+}
+
+// GetAstroIdeProjectWithResponse request returning *GetAstroIdeProjectResponse
+func (c *ClientWithResponses) GetAstroIdeProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, reqEditors ...RequestEditorFn) (*GetAstroIdeProjectResponse, error) {
+	rsp, err := c.GetAstroIdeProject(ctx, organizationId, workspaceId, projectId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAstroIdeProjectResponse(rsp)
+}
+
+// CreateAstroIdeSessionWithBodyWithResponse request with arbitrary body returning *CreateAstroIdeSessionResponse
+func (c *ClientWithResponses) CreateAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAstroIdeSessionResponse, error) {
+	rsp, err := c.CreateAstroIdeSessionWithBody(ctx, organizationId, workspaceId, projectId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAstroIdeSessionResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAstroIdeSessionResponse, error) {
+	rsp, err := c.CreateAstroIdeSession(ctx, organizationId, workspaceId, projectId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAstroIdeSessionResponse(rsp)
+}
+
+// ExportAstroIdeSessionTarWithResponse request returning *ExportAstroIdeSessionTarResponse
+func (c *ClientWithResponses) ExportAstroIdeSessionTarWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionTarParams, reqEditors ...RequestEditorFn) (*ExportAstroIdeSessionTarResponse, error) {
+	rsp, err := c.ExportAstroIdeSessionTar(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportAstroIdeSessionTarResponse(rsp)
+}
+
+// ExportAstroIdeSessionZipWithResponse request returning *ExportAstroIdeSessionZipResponse
+func (c *ClientWithResponses) ExportAstroIdeSessionZipWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportAstroIdeSessionZipParams, reqEditors ...RequestEditorFn) (*ExportAstroIdeSessionZipResponse, error) {
+	rsp, err := c.ExportAstroIdeSessionZip(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportAstroIdeSessionZipResponse(rsp)
+}
+
+// ImportAstroIdeSessionTarWithBodyWithResponse request with arbitrary body returning *ImportAstroIdeSessionTarResponse
+func (c *ClientWithResponses) ImportAstroIdeSessionTarWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportAstroIdeSessionTarResponse, error) {
+	rsp, err := c.ImportAstroIdeSessionTarWithBody(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportAstroIdeSessionTarResponse(rsp)
+}
+
+// ImportAstroIdeSessionZipWithBodyWithResponse request with arbitrary body returning *ImportAstroIdeSessionZipResponse
+func (c *ClientWithResponses) ImportAstroIdeSessionZipWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportAstroIdeSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportAstroIdeSessionZipResponse, error) {
+	rsp, err := c.ImportAstroIdeSessionZipWithBody(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportAstroIdeSessionZipResponse(rsp)
+}
+
+// SaveAstroIdeSessionWithBodyWithResponse request with arbitrary body returning *SaveAstroIdeSessionResponse
+func (c *ClientWithResponses) SaveAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SaveAstroIdeSessionResponse, error) {
+	rsp, err := c.SaveAstroIdeSessionWithBody(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSaveAstroIdeSessionResponse(rsp)
+}
+
+func (c *ClientWithResponses) SaveAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SaveAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*SaveAstroIdeSessionResponse, error) {
+	rsp, err := c.SaveAstroIdeSession(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSaveAstroIdeSessionResponse(rsp)
+}
+
+// UpdateAstroIdeSessionWithBodyWithResponse request with arbitrary body returning *UpdateAstroIdeSessionResponse
+func (c *ClientWithResponses) UpdateAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAstroIdeSessionResponse, error) {
+	rsp, err := c.UpdateAstroIdeSessionWithBody(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAstroIdeSessionResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAstroIdeSessionResponse, error) {
+	rsp, err := c.UpdateAstroIdeSession(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAstroIdeSessionResponse(rsp)
+}
+
 // ListWorkspaceDagFiltersWithResponse request returning *ListWorkspaceDagFiltersResponse
 func (c *ClientWithResponses) ListWorkspaceDagFiltersWithResponse(ctx context.Context, organizationId string, workspaceId string, reqEditors ...RequestEditorFn) (*ListWorkspaceDagFiltersResponse, error) {
 	rsp, err := c.ListWorkspaceDagFilters(ctx, organizationId, workspaceId, reqEditors...)
@@ -21603,119 +23051,6 @@ func (c *ClientWithResponses) TransferDeploymentWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseTransferDeploymentResponse(rsp)
-}
-
-// ListPolarisProjectsWithResponse request returning *ListPolarisProjectsResponse
-func (c *ClientWithResponses) ListPolarisProjectsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListPolarisProjectsParams, reqEditors ...RequestEditorFn) (*ListPolarisProjectsResponse, error) {
-	rsp, err := c.ListPolarisProjects(ctx, organizationId, workspaceId, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListPolarisProjectsResponse(rsp)
-}
-
-// CreatePolarisProjectWithBodyWithResponse request with arbitrary body returning *CreatePolarisProjectResponse
-func (c *ClientWithResponses) CreatePolarisProjectWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePolarisProjectResponse, error) {
-	rsp, err := c.CreatePolarisProjectWithBody(ctx, organizationId, workspaceId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreatePolarisProjectResponse(rsp)
-}
-
-func (c *ClientWithResponses) CreatePolarisProjectWithResponse(ctx context.Context, organizationId string, workspaceId string, body CreatePolarisProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePolarisProjectResponse, error) {
-	rsp, err := c.CreatePolarisProject(ctx, organizationId, workspaceId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreatePolarisProjectResponse(rsp)
-}
-
-// CreatePolarisSessionWithBodyWithResponse request with arbitrary body returning *CreatePolarisSessionResponse
-func (c *ClientWithResponses) CreatePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePolarisSessionResponse, error) {
-	rsp, err := c.CreatePolarisSessionWithBody(ctx, organizationId, workspaceId, projectId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreatePolarisSessionResponse(rsp)
-}
-
-func (c *ClientWithResponses) CreatePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, body CreatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePolarisSessionResponse, error) {
-	rsp, err := c.CreatePolarisSession(ctx, organizationId, workspaceId, projectId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreatePolarisSessionResponse(rsp)
-}
-
-// ExportPolarisSessionTarWithResponse request returning *ExportPolarisSessionTarResponse
-func (c *ClientWithResponses) ExportPolarisSessionTarWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionTarParams, reqEditors ...RequestEditorFn) (*ExportPolarisSessionTarResponse, error) {
-	rsp, err := c.ExportPolarisSessionTar(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseExportPolarisSessionTarResponse(rsp)
-}
-
-// ExportPolarisSessionZipWithResponse request returning *ExportPolarisSessionZipResponse
-func (c *ClientWithResponses) ExportPolarisSessionZipWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ExportPolarisSessionZipParams, reqEditors ...RequestEditorFn) (*ExportPolarisSessionZipResponse, error) {
-	rsp, err := c.ExportPolarisSessionZip(ctx, organizationId, workspaceId, projectId, sessionId, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseExportPolarisSessionZipResponse(rsp)
-}
-
-// ImportPolarisSessionTarWithBodyWithResponse request with arbitrary body returning *ImportPolarisSessionTarResponse
-func (c *ClientWithResponses) ImportPolarisSessionTarWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionTarParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportPolarisSessionTarResponse, error) {
-	rsp, err := c.ImportPolarisSessionTarWithBody(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseImportPolarisSessionTarResponse(rsp)
-}
-
-// ImportPolarisSessionZipWithBodyWithResponse request with arbitrary body returning *ImportPolarisSessionZipResponse
-func (c *ClientWithResponses) ImportPolarisSessionZipWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, params *ImportPolarisSessionZipParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportPolarisSessionZipResponse, error) {
-	rsp, err := c.ImportPolarisSessionZipWithBody(ctx, organizationId, workspaceId, projectId, sessionId, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseImportPolarisSessionZipResponse(rsp)
-}
-
-// SavePolarisSessionWithBodyWithResponse request with arbitrary body returning *SavePolarisSessionResponse
-func (c *ClientWithResponses) SavePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SavePolarisSessionResponse, error) {
-	rsp, err := c.SavePolarisSessionWithBody(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSavePolarisSessionResponse(rsp)
-}
-
-func (c *ClientWithResponses) SavePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body SavePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*SavePolarisSessionResponse, error) {
-	rsp, err := c.SavePolarisSession(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSavePolarisSessionResponse(rsp)
-}
-
-// UpdatePolarisSessionWithBodyWithResponse request with arbitrary body returning *UpdatePolarisSessionResponse
-func (c *ClientWithResponses) UpdatePolarisSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePolarisSessionResponse, error) {
-	rsp, err := c.UpdatePolarisSessionWithBody(ctx, organizationId, workspaceId, projectId, sessionId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdatePolarisSessionResponse(rsp)
-}
-
-func (c *ClientWithResponses) UpdatePolarisSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdatePolarisSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePolarisSessionResponse, error) {
-	rsp, err := c.UpdatePolarisSession(ctx, organizationId, workspaceId, projectId, sessionId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdatePolarisSessionResponse(rsp)
 }
 
 // ListWorkspaceTeamsWithResponse request returning *ListWorkspaceTeamsResponse
@@ -21813,6 +23148,32 @@ func (c *ClientWithResponses) ListSelfUserRepositoriesWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseListSelfUserRepositoriesResponse(rsp)
+}
+
+// ListSelfUserRepositoryBranchesWithResponse request returning *ListSelfUserRepositoryBranchesResponse
+func (c *ClientWithResponses) ListSelfUserRepositoryBranchesWithResponse(ctx context.Context, gitProvider ListSelfUserRepositoryBranchesParamsGitProvider, gitAccount string, gitRepository string, params *ListSelfUserRepositoryBranchesParams, reqEditors ...RequestEditorFn) (*ListSelfUserRepositoryBranchesResponse, error) {
+	rsp, err := c.ListSelfUserRepositoryBranches(ctx, gitProvider, gitAccount, gitRepository, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSelfUserRepositoryBranchesResponse(rsp)
+}
+
+// CreateSelfUserRepositoryBranchWithBodyWithResponse request with arbitrary body returning *CreateSelfUserRepositoryBranchResponse
+func (c *ClientWithResponses) CreateSelfUserRepositoryBranchWithBodyWithResponse(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSelfUserRepositoryBranchResponse, error) {
+	rsp, err := c.CreateSelfUserRepositoryBranchWithBody(ctx, gitProvider, gitAccount, gitRepository, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSelfUserRepositoryBranchResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateSelfUserRepositoryBranchWithResponse(ctx context.Context, gitProvider CreateSelfUserRepositoryBranchParamsGitProvider, gitAccount string, gitRepository string, body CreateSelfUserRepositoryBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSelfUserRepositoryBranchResponse, error) {
+	rsp, err := c.CreateSelfUserRepositoryBranch(ctx, gitProvider, gitAccount, gitRepository, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSelfUserRepositoryBranchResponse(rsp)
 }
 
 // GetSelfUserRepositoryBranchWithResponse request returning *GetSelfUserRepositoryBranchResponse
@@ -23587,6 +24948,67 @@ func ParseGetDeploymentOptionsResponse(rsp *http.Response) (*GetDeploymentOption
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDeploymentEnvironmentObjectMetricsExportsLogsResponse parses an HTTP response from a ListDeploymentEnvironmentObjectMetricsExportsLogsWithResponse call
+func ParseListDeploymentEnvironmentObjectMetricsExportsLogsResponse(rsp *http.Response) (*ListDeploymentEnvironmentObjectMetricsExportsLogsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDeploymentEnvironmentObjectMetricsExportsLogsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListEnvironmentObjectMetricsExportsLogsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -25743,6 +27165,67 @@ func ParseExcludeLinkingEnvironmentObjectResponse(rsp *http.Response) (*ExcludeL
 	return response, nil
 }
 
+// ParseListEnvironmentObjectMetricsExportsLogsResponse parses an HTTP response from a ListEnvironmentObjectMetricsExportsLogsWithResponse call
+func ParseListEnvironmentObjectMetricsExportsLogsResponse(rsp *http.Response) (*ListEnvironmentObjectMetricsExportsLogsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListEnvironmentObjectMetricsExportsLogsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListEnvironmentObjectMetricsExportsLogsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseCreateUserInviteResponse parses an HTTP response from a CreateUserInviteWithResponse call
 func ParseCreateUserInviteResponse(rsp *http.Response) (*CreateUserInviteResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -27686,6 +29169,428 @@ func ParseRotateWorkspaceApiTokenResponse(rsp *http.Response) (*RotateWorkspaceA
 	return response, nil
 }
 
+// ParseListAstroIdeProjectsResponse parses an HTTP response from a ListAstroIdeProjectsWithResponse call
+func ParseListAstroIdeProjectsResponse(rsp *http.Response) (*ListAstroIdeProjectsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAstroIdeProjectsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AstroIdeProjectsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAstroIdeProjectResponse parses an HTTP response from a CreateAstroIdeProjectWithResponse call
+func ParseCreateAstroIdeProjectResponse(rsp *http.Response) (*CreateAstroIdeProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAstroIdeProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AstroIdeProject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAstroIdeProjectResponse parses an HTTP response from a GetAstroIdeProjectWithResponse call
+func ParseGetAstroIdeProjectResponse(rsp *http.Response) (*GetAstroIdeProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAstroIdeProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AstroIdeProject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAstroIdeSessionResponse parses an HTTP response from a CreateAstroIdeSessionWithResponse call
+func ParseCreateAstroIdeSessionResponse(rsp *http.Response) (*CreateAstroIdeSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAstroIdeSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreateAstroIdeSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseExportAstroIdeSessionTarResponse parses an HTTP response from a ExportAstroIdeSessionTarWithResponse call
+func ParseExportAstroIdeSessionTarResponse(rsp *http.Response) (*ExportAstroIdeSessionTarResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportAstroIdeSessionTarResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseExportAstroIdeSessionZipResponse parses an HTTP response from a ExportAstroIdeSessionZipWithResponse call
+func ParseExportAstroIdeSessionZipResponse(rsp *http.Response) (*ExportAstroIdeSessionZipResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportAstroIdeSessionZipResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseImportAstroIdeSessionTarResponse parses an HTTP response from a ImportAstroIdeSessionTarWithResponse call
+func ParseImportAstroIdeSessionTarResponse(rsp *http.Response) (*ImportAstroIdeSessionTarResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportAstroIdeSessionTarResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ImportAstroIdeSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseImportAstroIdeSessionZipResponse parses an HTTP response from a ImportAstroIdeSessionZipWithResponse call
+func ParseImportAstroIdeSessionZipResponse(rsp *http.Response) (*ImportAstroIdeSessionZipResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportAstroIdeSessionZipResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ImportAstroIdeSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSaveAstroIdeSessionResponse parses an HTTP response from a SaveAstroIdeSessionWithResponse call
+func ParseSaveAstroIdeSessionResponse(rsp *http.Response) (*SaveAstroIdeSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SaveAstroIdeSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SaveAstroIdeSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAstroIdeSessionResponse parses an HTTP response from a UpdateAstroIdeSessionWithResponse call
+func ParseUpdateAstroIdeSessionResponse(rsp *http.Response) (*UpdateAstroIdeSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAstroIdeSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UpdateAstroIdeSession
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListWorkspaceDagFiltersResponse parses an HTTP response from a ListWorkspaceDagFiltersWithResponse call
 func ParseListWorkspaceDagFiltersResponse(rsp *http.Response) (*ListWorkspaceDagFiltersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -27835,374 +29740,6 @@ func ParseTransferDeploymentResponse(rsp *http.Response) (*TransferDeploymentRes
 			return nil, err
 		}
 		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseListPolarisProjectsResponse parses an HTTP response from a ListPolarisProjectsWithResponse call
-func ParseListPolarisProjectsResponse(rsp *http.Response) (*ListPolarisProjectsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ListPolarisProjectsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest PolarisProjectsPaginated
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseCreatePolarisProjectResponse parses an HTTP response from a CreatePolarisProjectWithResponse call
-func ParseCreatePolarisProjectResponse(rsp *http.Response) (*CreatePolarisProjectResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreatePolarisProjectResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest PolarisProject
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseCreatePolarisSessionResponse parses an HTTP response from a CreatePolarisSessionWithResponse call
-func ParseCreatePolarisSessionResponse(rsp *http.Response) (*CreatePolarisSessionResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreatePolarisSessionResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest CreatePolarisSession
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseExportPolarisSessionTarResponse parses an HTTP response from a ExportPolarisSessionTarWithResponse call
-func ParseExportPolarisSessionTarResponse(rsp *http.Response) (*ExportPolarisSessionTarResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ExportPolarisSessionTarResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	return response, nil
-}
-
-// ParseExportPolarisSessionZipResponse parses an HTTP response from a ExportPolarisSessionZipWithResponse call
-func ParseExportPolarisSessionZipResponse(rsp *http.Response) (*ExportPolarisSessionZipResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ExportPolarisSessionZipResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	return response, nil
-}
-
-// ParseImportPolarisSessionTarResponse parses an HTTP response from a ImportPolarisSessionTarWithResponse call
-func ParseImportPolarisSessionTarResponse(rsp *http.Response) (*ImportPolarisSessionTarResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ImportPolarisSessionTarResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ImportPolarisSession
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseImportPolarisSessionZipResponse parses an HTTP response from a ImportPolarisSessionZipWithResponse call
-func ParseImportPolarisSessionZipResponse(rsp *http.Response) (*ImportPolarisSessionZipResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ImportPolarisSessionZipResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ImportPolarisSession
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseSavePolarisSessionResponse parses an HTTP response from a SavePolarisSessionWithResponse call
-func ParseSavePolarisSessionResponse(rsp *http.Response) (*SavePolarisSessionResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SavePolarisSessionResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseUpdatePolarisSessionResponse parses an HTTP response from a UpdatePolarisSessionWithResponse call
-func ParseUpdatePolarisSessionResponse(rsp *http.Response) (*UpdatePolarisSessionResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &UpdatePolarisSessionResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest UpdatePolarisSession
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -28699,6 +30236,121 @@ func ParseListSelfUserRepositoriesResponse(rsp *http.Response) (*ListSelfUserRep
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest RepositoriesPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSelfUserRepositoryBranchesResponse parses an HTTP response from a ListSelfUserRepositoryBranchesWithResponse call
+func ParseListSelfUserRepositoryBranchesResponse(rsp *http.Response) (*ListSelfUserRepositoryBranchesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSelfUserRepositoryBranchesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RepositoryBranchesPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateSelfUserRepositoryBranchResponse parses an HTTP response from a CreateSelfUserRepositoryBranchWithResponse call
+func ParseCreateSelfUserRepositoryBranchResponse(rsp *http.Response) (*CreateSelfUserRepositoryBranchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSelfUserRepositoryBranchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RepositoryBranch
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
