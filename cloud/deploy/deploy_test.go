@@ -1091,25 +1091,25 @@ func TestValidRuntimeVersion(t *testing.T) {
 
 		// AF2 to AF3 upgrade cases
 		{
-			name:              "AF2 >= 8.7.0 to AF3 version with force flag is valid upgrade",
-			currentVersion:    "8.7.0",
+			name:              "AF2 >= 12.0.0 to AF3 version with force flag is valid upgrade",
+			currentVersion:    "12.0.0",
 			newVersion:        "3.0-1",
 			deploymentOptions: []string{"3.0-1"},
 			forceUpgradeToAF3: true,
 			expected:          true,
 		},
 		{
-			name:              "AF2 < 8.7.0 to AF3 version with force flag is invalid upgrade",
+			name:              "AF2 < 12.0.0 to AF3 version with force flag is invalid upgrade",
 			currentVersion:    "4.2.5",
 			newVersion:        "3.0-1",
 			deploymentOptions: []string{"3.0-1"},
 			forceUpgradeToAF3: true,
 			expected:          false,
-			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 8.7.0 or higher",
+			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 12.0.0 or higher",
 		},
 		{
-			name:              "AF2 >= 8.7.0 to AF3 version without force flag is invalid upgrade",
-			currentVersion:    "8.7.0",
+			name:              "AF2 >= 12.0.0 to AF3 version without force flag is invalid upgrade",
+			currentVersion:    "12.0.0",
 			newVersion:        "3.0-1",
 			deploymentOptions: []string{"3.0-1"},
 			forceUpgradeToAF3: false,
