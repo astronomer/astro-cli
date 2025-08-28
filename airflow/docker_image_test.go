@@ -755,10 +755,13 @@ func (s *Suite) TestDockerImagePush403Error() {
 		imageName: "testing",
 	}
 
-	s.Run("403 error with helpful message from pushWithClient", func() {
+	s.Run("403 error with helpful message after both methods fail", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			if args[0] == "tag" {
 				return nil
+			}
+			if args[0] == "push" {
+				return fmt.Errorf("Error response from daemon: authentication required")
 			}
 			return nil
 		}
