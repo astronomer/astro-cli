@@ -350,15 +350,10 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 
 	err = d.pushWithClient(&authConfig, remoteImage)
 	if err != nil {
-		// Check for 403 errors and provide helpful guidance
-		if is403Error(err) {
-			return "", errors.New(imagePush403ErrMsg)
-		}
-
 		// if it does not work with the go library use bash to run docker commands. Support for (old?) versions of Colima
 		err = pushWithBash(&authConfig, remoteImage)
 		if err != nil {
-			// Check for 403 errors in bash fallback too
+			// Check for 403 errors only after both methods fail
 			if is403Error(err) {
 				return "", errors.New(imagePush403ErrMsg)
 			}
@@ -746,6 +741,5 @@ func is403Error(err error) bool {
 	errStr := strings.ToLower(err.Error())
 	return strings.Contains(errStr, "403") ||
 		strings.Contains(errStr, "forbidden") ||
-		strings.Contains(errStr, "authentication required") ||
-		strings.Contains(errStr, "unauthorized")
+		strings.Contains(errStr, "authentication required")
 }

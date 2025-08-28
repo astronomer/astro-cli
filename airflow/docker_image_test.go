@@ -826,7 +826,7 @@ func (s *Suite) TestIs403Error() {
 		{"403 status", fmt.Errorf("HTTP 403 Forbidden"), true},
 		{"forbidden text", fmt.Errorf("access forbidden"), true},
 		{"authentication required", fmt.Errorf("authentication required"), true},
-		{"unauthorized", fmt.Errorf("unauthorized access"), true},
+		{"unauthorized should not match anymore", fmt.Errorf("unauthorized access"), false},
 		{"case insensitive 403", fmt.Errorf("HTTP 403 FORBIDDEN"), true},
 		{"case insensitive forbidden", fmt.Errorf("ACCESS FORBIDDEN"), true},
 		{"regular error", fmt.Errorf("network timeout"), false},
