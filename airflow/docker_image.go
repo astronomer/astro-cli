@@ -35,7 +35,7 @@ const (
 	prefix             = "Bearer "
 
 	// Enhanced error message for 403 authentication issues
-	imagePush403ErrMsg = `Failed to push image due to authentication error (403 Forbidden).
+	imagePush403ErrMsg = `failed to push image due to authentication error (403 Forbidden).
 
 This commonly occurs due to:
 1. Invalid cached Docker credentials
