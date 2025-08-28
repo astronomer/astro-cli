@@ -1,0 +1,259 @@
+Authenticated to Astro 
+
+Select a Deployment
+ #      DEPLOYMENT NAME                            RELEASE NAME                       DEPLOYMENT ID                 DAG DEPLOY ENABLED     
+ 1      caitlin_af3_sbx_DND                        telescopic-photon-1356             cm60u64ec0lj801ns7rsvuj29     true                   
+ 2      MLOps Prediction Trial Engagement          descriptive-cluster-9071           cm6tuqmfg29l801md7uve9vvd     true                   
+ 3      se-dev                                     nuclear-radiant-1558               cm7f91j5g0opj01lrr03dq7nd     true                   
+ 4      munnch-af3                                 nuclear-accelerometer-3430         cm9x6qrbu0po001nl9hvwvswo     true                   
+ 5      team-aistronomer_DND                       translunar-potential-9593          cma5mp7nr0nb201mwn2pwe7a9     true                   
+ 6      Competitive Insights                       ecliptical-spectrometry-3827       cma7bexpq0caz01jmmk1o8yfv     true                   
+ 7      ellen-af3-sandbox                          exact-phases-5293                  cmae86foc0cc501mgu5qlr0o8     true                   
+ 8      caitlin_af2_sbx_DND                        translunar-flux-6815               cmafqzuxv0qzf01ku97ipuw62     true                   
+ 9      dandy-sandbox_DND                          traditional-perturbation-4651      cmapxitg10uut01o5geaxage6     false                  
+ 10     dandy-sandbox-dev_DND                      newtonian-impulse-4002             cmapyv2od0we201og4roja8an     true                   
+ 11     tcon-af3                                   geometrical-superposition-8284     cmaq33mwq0xdf01ogb9f40p6z     true                   
+ 12     geoffrey-af2-sandbox-dev                   atomic-string-8918                 cmay9twpc2wja01oglwqgjqz1     true                   
+ 13     evan_farmers_demo_DND                      false-astronaut-2249               cmayt4wi631st01o5zq1r5n7k     true                   
+ 14     abhi_sandbox_dnd                           cold-conservation-3275             cmb9isc5m06gp01lryxoxqllt     true                   
+ 15     davies_RE_DND                              empty-drift-1022                   cmbet2ugt1hrv01rcrtlwwo9g     false                  
+ 16     test-dag-factory-celery                    endothermic-twinkling-8315         cmbjv9e7d0g5b01pi61kuvrp0     true                   
+ 17     Concurrency test                           electrical-constant-4153           cmbp8tf3b18qj01nw7d5m00x2     true                   
+ 18     custom-astro-api-alert-demo                weak-field-6083                    cmbz6hdeo1r3101l356crhsrn     true                   
+ 19     prod                                       geodetic-moon-2344                 cmc4lwisp140z01ih0r3zpl1j     true                   
+ 20     hatter-test-dagfactory                     boreal-radioactivity-5051          cmc96q07r24ga01lngodav1ga     true                   
+ 21     cosmos-hands-on_DND                        devoid-phases-5903                 cmc9bjjre27sy01ltof7aqpet     true                   
+ 22     chef_sandbox                               galactic-universe-7487             cmcknru971s1701nrf0bg3qvo     true                   
+ 23     coddy_ricch                                vaporous-conjunction-6490          cmcm4trnc0kd801kyszlk85d3     true                   
+ 24     test-gwi                                   molecular-area-7977                cmd4dtagp2j4u01nzqebwhk7i     true                   
+ 25     Everton                                    false-parsec-5878                  cmd5udswa0asl01kan4oopn96     true                   
+ 26     Starship (GCC) Migration Demo              complex-instrument-3960            cmd6bqa8r0gu001rfo5u897u2     true                   
+ 27     RCCL Environment 1 _DND                    desolate-buoyancy-2661             cmddb6s1g04kf01nb7mky1vum     true                   
+ 28     RCCL Environment 2 _DND                    absolute-nucleus-5883              cmddb783704k001n62etiolop     true                   
+ 29     anand-gcs-logging                          superconductive-lens-2264          cmdddj4d905mo01o9rfnd0ztx     true                   
+ 30     test-burn-cpu                              combusting-buoyancy-4400           cmdxa8bh12c9r01qhdn6d75yn     true                   
+ 31     astronomer-cosmos-cost-attribution_DND     nuclear-flare-2647                 cmdxevbnr2dsl01qhqdav84yn     true                   
+ 32     oleks-remote_DND                           primitive-optics-6982              cme2vlwos0p3u01qhkcmpn9xw     false                  
+ 33     cg-sandbox                                 asteroidic-kinematics-9072         cme7fjiac1u6d01npaq4hby0v     true                   
+ 34     Evan Performance Test                      modem-impulse-3441                 cme82u3l405bt01khxcvujqfp     true                   
+ 35     simcorp                                    fundamental-constellation-6300     cmebhv4so0crp01mdpb12yp8l     true                   
+ 36     oleks-aws-re                               molecular-aphelion-4911            cmed4e20k0tjq01l5kdxa751t     false                  
+ 37     test-ha-dev                                frigid-interference-8194           cmed93f4r0vcu01md4yeuhibr     true                   
+ 38     jimmy-test-azure                           ancient-barometer-6787             cmeevx6o918wf01mdtmn7wq5w     false                  
+ 39     caitlin_af2_sbx_gcp_DND                    dynamical-magnitude-3794           cmehjncf51xmu01mdqx6eljot     true                   
+ 40     create_hibernated                          hydrodynamic-amplitude-6692        cmeldx26y0em301pcidpi5yv0     true                   
+ 41     dandy-ai-sdk                               particle-density-8144              cmerk7cyj25xn01pwn90r69cd     true                   
+ 42     Example RE                                 explosive-level-3695               cmev9ii1d0qu501o4au1ob2q2     false                  
+ 43     cole_test                                  uninhabited-solstice-6715          cmevnh8m30y3v01psi7bywx32     true                   
+
+> Building image...
+Pushing image to Astronomer registry
+The push refers to repository [cllv3ecr2001l01mv0c4629nd.registry.astronomer.run/cl17wsdpe084o0rw3e46g3smn/cmevnh8m30y3v01psi7bywx32]
+c34b82e39652: Waiting
+53a59d926edb: Waiting
+55ccd19f96ba: Waiting
+7bc89b8ad468: Waiting
+d6be1bda0847: Waiting
+3be4efb8e5c1: Waiting
+205003acc38c: Waiting
+f7b04f22724d: Waiting
+41c26d11dedb: Waiting
+e7dfdfed6af0: Waiting
+811cec8c05c4: Waiting
+0bee284d9db2: Waiting
+f13395d6380f: Waiting
+b6ff73e7f2d8: Waiting
+aa3aca563ddd: Waiting
+c9eb3f692231: Waiting
+0d525e89be3f: Waiting
+f24974778811: Waiting
+7fba419b12a1: Waiting
+f065d2a5f79f: Waiting
+f94443d39c90: Waiting
+30891250f88c: Waiting
+3dd0cdb83b58: Waiting
+a254d47945a3: Waiting
+3a1746fc20ec: Waiting
+163a3fd23545: Waiting
+5ca9c9dbb847: Waiting
+5806ca49f351: Waiting
+36d06d5982e1: Waiting
+ac97266676e2: Waiting
+4d2aeb1eef78: Waiting
+bd9ddc54bea9: Waiting
+13d34a595185: Waiting
+8853f9baff03: Waiting
+3dd0cdb83b58: Waiting
+a254d47945a3: Waiting
+3a1746fc20ec: Waiting
+163a3fd23545: Waiting
+5ca9c9dbb847: Waiting
+5806ca49f351: Waiting
+36d06d5982e1: Waiting
+ac97266676e2: Waiting
+4d2aeb1eef78: Waiting
+bd9ddc54bea9: Waiting
+13d34a595185: Waiting
+8853f9baff03: Waiting
+c34b82e39652: Waiting
+53a59d926edb: Waiting
+55ccd19f96ba: Waiting
+7bc89b8ad468: Waiting
+d6be1bda0847: Waiting
+3be4efb8e5c1: Waiting
+205003acc38c: Waiting
+f7b04f22724d: Waiting
+41c26d11dedb: Waiting
+e7dfdfed6af0: Waiting
+811cec8c05c4: Waiting
+0bee284d9db2: Waiting
+f13395d6380f: Waiting
+b6ff73e7f2d8: Waiting
+aa3aca563ddd: Waiting
+c9eb3f692231: Waiting
+0d525e89be3f: Waiting
+f24974778811: Waiting
+7fba419b12a1: Waiting
+f065d2a5f79f: Waiting
+f94443d39c90: Waiting
+30891250f88c: Waiting
+f065d2a5f79f: Waiting
+f94443d39c90: Waiting
+30891250f88c: Waiting
+3dd0cdb83b58: Waiting
+a254d47945a3: Waiting
+3a1746fc20ec: Waiting
+163a3fd23545: Waiting
+5ca9c9dbb847: Waiting
+5806ca49f351: Waiting
+36d06d5982e1: Waiting
+ac97266676e2: Waiting
+4d2aeb1eef78: Waiting
+bd9ddc54bea9: Waiting
+13d34a595185: Waiting
+8853f9baff03: Waiting
+c34b82e39652: Waiting
+53a59d926edb: Waiting
+55ccd19f96ba: Waiting
+7bc89b8ad468: Waiting
+d6be1bda0847: Waiting
+3be4efb8e5c1: Waiting
+205003acc38c: Waiting
+f7b04f22724d: Waiting
+41c26d11dedb: Waiting
+e7dfdfed6af0: Waiting
+811cec8c05c4: Waiting
+0bee284d9db2: Waiting
+f13395d6380f: Waiting
+b6ff73e7f2d8: Waiting
+aa3aca563ddd: Waiting
+c9eb3f692231: Waiting
+0d525e89be3f: Waiting
+f24974778811: Waiting
+7fba419b12a1: Waiting
+Login Succeeded
+The push refers to repository [cllv3ecr2001l01mv0c4629nd.registry.astronomer.run/cl17wsdpe084o0rw3e46g3smn/cmevnh8m30y3v01psi7bywx32]
+0bee284d9db2: Waiting
+36d06d5982e1: Waiting
+41c26d11dedb: Waiting
+205003acc38c: Waiting
+d6be1bda0847: Waiting
+ac97266676e2: Waiting
+13d34a595185: Waiting
+a254d47945a3: Waiting
+f13395d6380f: Waiting
+3be4efb8e5c1: Waiting
+f065d2a5f79f: Waiting
+5806ca49f351: Waiting
+f24974778811: Waiting
+4d2aeb1eef78: Waiting
+3a1746fc20ec: Waiting
+811cec8c05c4: Waiting
+b6ff73e7f2d8: Waiting
+3dd0cdb83b58: Waiting
+aa3aca563ddd: Waiting
+7fba419b12a1: Waiting
+e7dfdfed6af0: Waiting
+8853f9baff03: Waiting
+bd9ddc54bea9: Waiting
+f94443d39c90: Waiting
+30891250f88c: Waiting
+55ccd19f96ba: Waiting
+7bc89b8ad468: Waiting
+c34b82e39652: Waiting
+c9eb3f692231: Waiting
+0d525e89be3f: Waiting
+5ca9c9dbb847: Waiting
+53a59d926edb: Waiting
+f7b04f22724d: Waiting
+163a3fd23545: Waiting
+36d06d5982e1: Waiting
+41c26d11dedb: Waiting
+205003acc38c: Waiting
+d6be1bda0847: Waiting
+ac97266676e2: Waiting
+13d34a595185: Waiting
+a254d47945a3: Waiting
+f13395d6380f: Waiting
+3be4efb8e5c1: Waiting
+f065d2a5f79f: Waiting
+5806ca49f351: Waiting
+f24974778811: Waiting
+4d2aeb1eef78: Waiting
+3a1746fc20ec: Waiting
+811cec8c05c4: Waiting
+b6ff73e7f2d8: Waiting
+3dd0cdb83b58: Waiting
+aa3aca563ddd: Waiting
+7fba419b12a1: Waiting
+e7dfdfed6af0: Waiting
+8853f9baff03: Waiting
+bd9ddc54bea9: Waiting
+f94443d39c90: Waiting
+30891250f88c: Waiting
+55ccd19f96ba: Waiting
+7bc89b8ad468: Waiting
+c34b82e39652: Waiting
+c9eb3f692231: Waiting
+0d525e89be3f: Waiting
+5ca9c9dbb847: Waiting
+53a59d926edb: Waiting
+f7b04f22724d: Waiting
+163a3fd23545: Waiting
+0bee284d9db2: Waiting
+bd9ddc54bea9: Waiting
+f94443d39c90: Waiting
+30891250f88c: Waiting
+55ccd19f96ba: Waiting
+7bc89b8ad468: Waiting
+c34b82e39652: Waiting
+c9eb3f692231: Waiting
+0d525e89be3f: Waiting
+5ca9c9dbb847: Waiting
+53a59d926edb: Waiting
+f7b04f22724d: Waiting
+163a3fd23545: Waiting
+0bee284d9db2: Waiting
+36d06d5982e1: Waiting
+41c26d11dedb: Waiting
+205003acc38c: Waiting
+d6be1bda0847: Waiting
+ac97266676e2: Waiting
+13d34a595185: Waiting
+a254d47945a3: Waiting
+f13395d6380f: Waiting
+3be4efb8e5c1: Waiting
+f065d2a5f79f: Waiting
+5806ca49f351: Waiting
+f24974778811: Waiting
+4d2aeb1eef78: Waiting
+3a1746fc20ec: Waiting
+811cec8c05c4: Waiting
+b6ff73e7f2d8: Waiting
+3dd0cdb83b58: Waiting
+aa3aca563ddd: Waiting
+7fba419b12a1: Waiting
+e7dfdfed6af0: Waiting
+8853f9baff03: Waiting
+unknown: unexpected status from HEAD request to https://cllv3ecr2001l01mv0c4629nd.registry.astronomer.run/v2/cl17wsdpe084o0rw3e46g3smn/cmevnh8m30y3v01psi7bywx32/blobs/sha256:e7dfdfed6af0587fcf1d77f5281317af592770abfdae04ee7ac07ef501d1d252: 403 Forbidden
+Error: failed to execute cmd: exit status 1
