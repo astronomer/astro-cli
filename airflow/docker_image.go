@@ -729,7 +729,7 @@ func pushWithBash(authConfig *cliTypes.AuthConfig, imageName string) error {
 			return err
 		}
 	}
-	
+
 	// docker push <imageName> - capture stderr to preserve error details
 	var stderr bytes.Buffer
 	err = cmdExec(containerRuntime, os.Stdout, &stderr, "push", imageName)
@@ -749,17 +749,17 @@ func is403Error(err error) bool {
 	if err == nil {
 		return false
 	}
-	
+
 	// Check the entire error chain, not just the top-level error
 	for currentErr := err; currentErr != nil; currentErr = errors.Unwrap(currentErr) {
 		errStr := strings.ToLower(currentErr.Error())
-		
+
 		if strings.Contains(errStr, "403") ||
 			strings.Contains(errStr, "forbidden") ||
 			strings.Contains(errStr, "authentication required") {
 			return true
 		}
 	}
-	
+
 	return false
 }
