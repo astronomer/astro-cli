@@ -749,3 +749,99 @@ func (s *Suite) TestDockerImageRun() {
 		s.Contains(err.Error(), errExecMock.Error())
 	})
 }
+
+func (s *Suite) TestDockerImagePush403Error() {
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
+	s.Run("403 error with helpful message after both methods fail", func() {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			if args[0] == "tag" {
+				return nil
+			}
+			if args[0] == "push" {
+				return fmt.Errorf("Error response from daemon: authentication required")
+			}
+			return nil
+		}
+
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+			return fmt.Errorf("Error response from daemon: authentication required")
+		}
+
+		_, err := handler.Push("test", "test-username", "test", false)
+		s.Error(err)
+		s.Contains(err.Error(), "This commonly occurs due to:")
+		s.Contains(err.Error(), "docker logout")
+		s.Contains(err.Error(), "containerd snapshotter")
+		s.Contains(err.Error(), "https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push")
+	})
+
+	s.Run("403 forbidden error from pushWithBash fallback", func() {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			if args[0] == "tag" {
+				return nil
+			}
+			if args[0] == "push" {
+				return fmt.Errorf("denied: access forbidden")
+			}
+			return nil
+		}
+
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+			return fmt.Errorf("client error")
+		}
+
+		_, err := handler.Push("test", "", "", false)
+		s.Error(err)
+		s.Contains(err.Error(), "authentication error (403 Forbidden)")
+	})
+
+	s.Run("non-403 error should not trigger enhanced message", func() {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			if args[0] == "tag" {
+				return nil
+			}
+			if args[0] == "push" {
+				return fmt.Errorf("network timeout")
+			}
+			return nil
+		}
+
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+			return fmt.Errorf("network error")
+		}
+
+		_, err := handler.Push("test", "", "", false)
+		s.Error(err)
+		s.NotContains(err.Error(), "This commonly occurs due to:")
+		s.Contains(err.Error(), "network timeout")
+	})
+}
+
+func (s *Suite) TestIs403Error() {
+	testCases := []struct {
+		name        string
+		err         error
+		expected403 bool
+	}{
+		{"403 status", fmt.Errorf("HTTP 403 Forbidden"), true},
+		{"forbidden text", fmt.Errorf("access forbidden"), true},
+		{"authentication required", fmt.Errorf("authentication required"), true},
+		{"unauthorized should not match anymore", fmt.Errorf("unauthorized access"), false},
+		{"case insensitive 403", fmt.Errorf("HTTP 403 FORBIDDEN"), true},
+		{"case insensitive forbidden", fmt.Errorf("ACCESS FORBIDDEN"), true},
+		{"regular error", fmt.Errorf("network timeout"), false},
+		{"nil error", nil, false},
+		{"empty error", fmt.Errorf(""), false},
+		{"404 error should not match", fmt.Errorf("HTTP 404 Not Found"), false},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			result := is403Error(tc.err)
+			s.Equal(tc.expected403, result, "Expected is403Error(%v) to be %v", tc.err, tc.expected403)
+		})
+	}
+}
