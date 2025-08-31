@@ -3,6 +3,7 @@ package deploy
 import (
 	"errors"
 	"fmt"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -409,8 +411,28 @@ func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) 
 }
 
 func getDagDeployURL(deploymentInfo *houston.Deployment) string {
-	c, _ := config.GetCurrentContext()
-	return fmt.Sprintf("https://deployments.%s/%s/dags/upload", c.Domain, deploymentInfo.ReleaseName)
+	// Running single loop to find either dag server or airflow URL
+	for _, url := range deploymentInfo.Urls {
+		switch url.Type {
+		case "dagserver":
+			// If we find dagserver URL, use it directly and return immediately
+			logger.Infof("Using dag deploy URL from dagserver: %s", url.URL)
+			return url.URL
+		default:
+			// Assuming no dag server upload URL is returned from api
+			parsedURL, err := neturl.Parse(url.URL)
+			if err != nil {
+				logger.Infof("Error parsing airflow URL: %v", err)
+				continue
+			}
+
+			// Use just the scheme and host from the URL
+			uploadURL := fmt.Sprintf("%s://%s/%s/dags/upload", parsedURL.Scheme, parsedURL.Host, deploymentInfo.ReleaseName)
+			logger.Infof("Constructed URL from airflow base URL: %s", uploadURL)
+			return uploadURL
+		}
+	}
+	return ""
 }
 
 func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
