@@ -411,15 +411,17 @@ func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) 
 }
 
 func getDagDeployURL(deploymentInfo *houston.Deployment) string {
-	// Running single loop to find either dag server or airflow URL
+	// Checks if dagserver URL exists and returns the URL
 	for _, url := range deploymentInfo.Urls {
-		switch url.Type {
-		case "dagserver":
-			// If we find dagserver URL, use it directly and return immediately
+		if url.Type == houston.DagServerURLType {
 			logger.Infof("Using dag deploy URL from dagserver: %s", url.URL)
 			return url.URL
-		default:
-			// Assuming no dag server upload URL is returned from api
+		}
+	}
+
+	// If no dagserver URL is found, it look for airflow URL
+	for _, url := range deploymentInfo.Urls {
+		if url.Type == houston.AirflowURLType {
 			parsedURL, err := neturl.Parse(url.URL)
 			if err != nil {
 				logger.Infof("Error parsing airflow URL: %v", err)
