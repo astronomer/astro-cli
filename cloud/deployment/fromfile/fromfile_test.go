@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/ghodss/yaml"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -2668,6 +2669,174 @@ deployment:
 		s.ErrorIs(err, errUpdateFailed)
 		s.ErrorContains(err, "failed to update deployment with input")
 		mockCoreClient.AssertExpectations(s.T())
+	})
+}
+
+// TestWaitForStatus verifies the behavior of createOrUpdateDeployment when the
+// waitForStatus flag is toggled. When waitForStatus is true, the helper
+// should poll the deployment until it becomes healthy by repeatedly calling
+// CoreGetDeployment. When waitForStatus is false (the default), no polling
+// should occur. Additional subtests validate error propagation when the
+// deployment never becomes healthy (timeout) and when the API returns an
+// error during polling.
+func (s *Suite) TestWaitForStatus() {
+	// a minimal deployment file encoded in YAML that satisfies the required
+	// fields for createOrUpdateDeployment.
+	const minimalDeploymentYAML = `
+deployment:
+  configuration:
+    name: test-deployment
+    workspace_name: test-workspace
+    deployment_type: HYBRID
+    executor: CeleryExecutor
+`
+
+	s.Run("create with wait polls until healthy", func() {
+		// HealthPoll should call CoreGetDeployment until it returns a deployment
+		// with status HEALTHY.  We simulate one intermediate DEPLOYING status
+		// followed by a HEALTHY status. The callCount should therefore end up at 2.
+		callCount := 0
+		statuses := []astroplatformcore.DeploymentStatus{
+			astroplatformcore.DeploymentStatusDEPLOYING,
+			astroplatformcore.DeploymentStatusHEALTHY,
+		}
+
+		// Save originals so we can restore after the subtest
+		origCreate := deployment.CoreCreateDeployment
+		origGet := deployment.CoreGetDeployment
+		origSleep := deployment.SleepTime
+		origTick := deployment.TickNum
+		origTimeout := deployment.TimeoutNum
+		defer func() {
+			deployment.CoreCreateDeployment = origCreate
+			deployment.CoreGetDeployment = origGet
+			deployment.SleepTime = origSleep
+			deployment.TickNum = origTick
+			deployment.TimeoutNum = origTimeout
+		}()
+
+		// Patch CoreCreateDeployment to return a stub deployment
+		deployment.CoreCreateDeployment = func(orgID string, req astroplatformcore.CreateDeploymentJSONRequestBody, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{Id: "test-id", Name: "test-deployment"}, nil
+		}
+		// Patch CoreGetDeployment to return DEPLOYING on the first call,
+		// then HEALTHY on the second call.
+		deployment.CoreGetDeployment = func(orgID, deploymentID string, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			status := astroplatformcore.DeploymentStatusDEPLOYING
+			if callCount < len(statuses) {
+				status = statuses[callCount]
+			}
+			callCount++
+			return astroplatformcore.Deployment{Id: deploymentID, Name: "test-deployment", Status: status}, nil
+		}
+
+		// Reduce wait timings so the test does not take long
+		deployment.SleepTime = 0
+		deployment.TickNum = 1
+		deployment.TimeoutNum = 3
+
+		// Build the FormattedDeployment from YAML
+		var fd inspect.FormattedDeployment
+		err := yaml.Unmarshal([]byte(minimalDeploymentYAML), &fd)
+		s.Require().NoError(err)
+
+		// Run createOrUpdateDeployment with waitForStatus=true
+		err = createOrUpdateDeployment(&fd, "", "ws-id", createAction, &astroplatformcore.Deployment{}, nil, false, nil, nil, nil, true)
+		s.NoError(err)
+		s.Equal(2, callCount, "expected two polling iterations before becoming healthy")
+	})
+
+	s.Run("create without wait does not poll", func() {
+		callCount := 0
+		origCreate := deployment.CoreCreateDeployment
+		origGet := deployment.CoreGetDeployment
+		defer func() {
+			deployment.CoreCreateDeployment = origCreate
+			deployment.CoreGetDeployment = origGet
+		}()
+
+		deployment.CoreCreateDeployment = func(orgID string, req astroplatformcore.CreateDeploymentJSONRequestBody, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{Id: "test-id", Name: "test-deployment"}, nil
+		}
+		deployment.CoreGetDeployment = func(orgID, deploymentID string, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			callCount++
+			return astroplatformcore.Deployment{Id: deploymentID, Name: "test-deployment", Status: astroplatformcore.DeploymentStatusHEALTHY}, nil
+		}
+
+		var fd inspect.FormattedDeployment
+		err := yaml.Unmarshal([]byte(minimalDeploymentYAML), &fd)
+		s.Require().NoError(err)
+
+		err = createOrUpdateDeployment(&fd, "", "ws-id", createAction, &astroplatformcore.Deployment{}, nil, false, nil, nil, nil, false)
+		s.NoError(err)
+		s.Equal(0, callCount, "expected no polling when waitForStatus is false")
+	})
+
+	s.Run("poll times out when deployment never becomes healthy", func() {
+		origCreate := deployment.CoreCreateDeployment
+		origGet := deployment.CoreGetDeployment
+		origSleep := deployment.SleepTime
+		origTick := deployment.TickNum
+		origTimeout := deployment.TimeoutNum
+		defer func() {
+			deployment.CoreCreateDeployment = origCreate
+			deployment.CoreGetDeployment = origGet
+			deployment.SleepTime = origSleep
+			deployment.TickNum = origTick
+			deployment.TimeoutNum = origTimeout
+		}()
+
+		deployment.CoreCreateDeployment = func(orgID string, req astroplatformcore.CreateDeploymentJSONRequestBody, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{Id: "test-id", Name: "test-deployment"}, nil
+		}
+		// Always return DEPLOYING; HealthPoll will eventually time out.
+		deployment.CoreGetDeployment = func(orgID, deploymentID string, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{Id: deploymentID, Name: "test-deployment", Status: astroplatformcore.DeploymentStatusDEPLOYING}, nil
+		}
+		deployment.SleepTime = 0
+		deployment.TickNum = 1
+		deployment.TimeoutNum = 1
+
+		var fd inspect.FormattedDeployment
+		err := yaml.Unmarshal([]byte(minimalDeploymentYAML), &fd)
+		s.Require().NoError(err)
+
+		err = createOrUpdateDeployment(&fd, "", "ws-id", createAction, &astroplatformcore.Deployment{}, nil, false, nil, nil, nil, true)
+		s.ErrorIs(err, deployment.ErrTimedOut, "expected ErrTimedOut when deployment does not become healthy")
+	})
+
+	s.Run("poll returns API error when CoreGetDeployment errors", func() {
+		origCreate := deployment.CoreCreateDeployment
+		origGet := deployment.CoreGetDeployment
+		origSleep := deployment.SleepTime
+		origTick := deployment.TickNum
+		origTimeout := deployment.TimeoutNum
+		defer func() {
+			deployment.CoreCreateDeployment = origCreate
+			deployment.CoreGetDeployment = origGet
+			deployment.SleepTime = origSleep
+			deployment.TickNum = origTick
+			deployment.TimeoutNum = origTimeout
+		}()
+
+		deployment.CoreCreateDeployment = func(orgID string, req astroplatformcore.CreateDeploymentJSONRequestBody, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{Id: "test-id", Name: "test-deployment"}, nil
+		}
+		// Simulate an API error
+		apiErr := errors.New("api error during polling")
+		deployment.CoreGetDeployment = func(orgID, deploymentID string, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{}, apiErr
+		}
+		deployment.SleepTime = 0
+		deployment.TickNum = 1
+		deployment.TimeoutNum = 2
+
+		var fd inspect.FormattedDeployment
+		err := yaml.Unmarshal([]byte(minimalDeploymentYAML), &fd)
+		s.Require().NoError(err)
+
+		err = createOrUpdateDeployment(&fd, "", "ws-id", createAction, &astroplatformcore.Deployment{}, nil, false, nil, nil, nil, true)
+		s.ErrorIs(err, apiErr, "expected error returned from CoreGetDeployment to propagate")
 	})
 }
 
