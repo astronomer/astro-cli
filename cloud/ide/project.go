@@ -11,9 +11,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -22,6 +22,7 @@ import (
 
 var (
 	ErrInvalidProjectSelection = errors.New("invalid project selection")
+	ErrNoProjectsFound         = errors.New("no Astro IDE projects found in workspace")
 	// DefaultDirPerm is the default permission for directories
 	DefaultDirPerm os.FileMode = 0o755
 )
@@ -37,29 +38,18 @@ func newTableOut() *printutil.Table {
 
 // List all IDE projects
 func List(client astrocore.CoreClient, out io.Writer) error {
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-
-	ws, err := ListProjects(client)
+	projects, err := ListProjects(client)
 	if err != nil {
 		return err
 	}
 
 	tab := newTableOut()
-	for i := range ws {
-		name := ws[i].Name
-		workspace := ws[i].Id
+	for i := range projects {
+		name := projects[i].Name
+		projectID := projects[i].Id
 
 		var color bool
-
-		if c.Workspace == ws[i].Id {
-			color = true
-		} else {
-			color = false
-		}
-		tab.AddRow([]string{name, workspace}, color)
+		tab.AddRow([]string{name, projectID}, color)
 	}
 
 	tab.Print(out)
@@ -96,7 +86,7 @@ func ListProjects(client astrocore.CoreClient) ([]astrocore.AstroIdeProject, err
 
 func selectIDEProject(projects []astrocore.AstroIdeProject) (astrocore.AstroIdeProject, error) {
 	if len(projects) == 0 {
-		return astrocore.AstroIdeProject{}, nil
+		return astrocore.AstroIdeProject{}, ErrNoProjectsFound
 	}
 
 	if len(projects) == 1 {
@@ -110,29 +100,26 @@ func selectIDEProject(projects []astrocore.AstroIdeProject) (astrocore.AstroIdeP
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"#", "PROJECTNAME", "ID"},
+		Header:         []string{"#", "PROJECT NAME", "ID"},
 	}
 
 	fmt.Println("\nPlease select the project from the list below:")
 
-	projectMap := map[string]astrocore.AstroIdeProject{}
 	for i := range projects {
-		index := i + 1
 		table.AddRow([]string{
-			strconv.Itoa(index),
+			strconv.Itoa(i + 1),
 			projects[i].Name,
 			projects[i].Id,
 		}, false)
-		projectMap[strconv.Itoa(index)] = projects[i]
 	}
 
 	table.Print(os.Stdout)
 	choice := input.Text("\n> ")
-	selected, ok := projectMap[choice]
-	if !ok {
+	choiceInt, err := strconv.Atoi(choice)
+	if err != nil || choiceInt < 1 || choiceInt > len(projects) {
 		return astrocore.AstroIdeProject{}, ErrInvalidProjectSelection
 	}
-	return selected, nil
+	return projects[choiceInt-1], nil
 }
 
 // createNewProject creates a new project and returns its ID
@@ -158,7 +145,18 @@ func createNewProject(client astrocore.CoreClient, organizationID, workspaceID s
 }
 
 // createSession creates a new session with the specified permission
-func createSession(client astrocore.CoreClient, organizationID, workspaceID, projectID string, permission astrocore.CreateAstroIdeSessionRequestPermission) (*astrocore.CreateAstroIdeSessionResponse, error) {
+func createSession(client astrocore.CoreClient, organizationID, workspaceID, projectID string) (*astrocore.CreateAstroIdeSessionResponse, error) {
+	sessionResp, err := client.CreateAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionJSONRequestBody{})
+	if err != nil {
+		return nil, err
+	}
+	if err := astrocore.NormalizeAPIError(sessionResp.HTTPResponse, sessionResp.Body); err != nil {
+		return nil, err
+	}
+	return sessionResp, nil
+}
+
+func createSessionWithPermission(client astrocore.CoreClient, organizationID, workspaceID, projectID string, permission astrocore.CreateAstroIdeSessionRequestPermission) (*astrocore.CreateAstroIdeSessionResponse, error) {
 	sessionResp, err := client.CreateAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionJSONRequestBody{
 		Permission: &permission,
 	})
@@ -208,7 +206,7 @@ func importArchiveToIde(client astrocore.CoreClient, organizationID, workspaceID
 	importParams := &astrocore.ImportAstroIdeSessionTarParams{
 		Mode: &mode,
 	}
-	importResp, err := client.ImportAstroIdeSessionTarWithBodyWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, importParams, "application/x-gzip", file)
+	importResp, err := client.ImportAstroIdeSessionTarWithBodyWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, importParams, "application/gzip", file)
 	if err != nil {
 		return err
 	}
@@ -243,19 +241,14 @@ func openProjectInBrowser(domain, workspaceID, projectID string, out io.Writer) 
 	}
 }
 
-// ExportProject exports a project from CLI to Astro IDE
-func ExportProject(client astrocore.CoreClient, projectID, organizationID, workspaceID, domain string, force bool, out io.Writer) error {
-	var err error
-
+// resolveProjectID handles project creation or selection when projectID is not provided
+func resolveProjectID(client astrocore.CoreClient, projectID, organizationID, workspaceID string, force bool, out io.Writer) (string, error) {
 	// Handle project creation or selection
 	if projectID == "" && !force {
 		fmt.Println("Do you want to create a new project? (y/n)")
 		choice := input.Text("\n> ")
 		if choice == "y" || choice == "Y" {
-			projectID, err = createNewProject(client, organizationID, workspaceID, out)
-			if err != nil {
-				return err
-			}
+			return createNewProject(client, organizationID, workspaceID, out)
 		}
 	}
 
@@ -263,13 +256,54 @@ func ExportProject(client astrocore.CoreClient, projectID, organizationID, works
 	if projectID == "" {
 		projects, err := ListProjects(client)
 		if err != nil {
-			return err
+			return "", err
 		}
 		selectedProject, err := selectIDEProject(projects)
 		if err != nil {
-			return err
+			return "", err
 		}
-		projectID = selectedProject.Id
+		return selectedProject.Id, nil
+	}
+
+	return projectID, nil
+}
+
+// handleProjectLock checks for project locks and handles permission upgrades
+func handleProjectLock(client astrocore.CoreClient, sessionResp *astrocore.CreateAstroIdeSessionResponse, organizationID, workspaceID, projectID string, force bool) (*astrocore.CreateAstroIdeSessionResponse, error) {
+	if sessionResp.JSON200.Permission != "READ_ONLY" {
+		return sessionResp, nil
+	}
+
+	if !force {
+		// Get project details to show who owns the lock
+		projectResp, err := getProject(client, organizationID, workspaceID, projectID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get project details: %w", err)
+		}
+
+		// Show project lock information and instructions
+		if projectResp.JSON200.Lock != nil && projectResp.JSON200.Lock.Subject.FullName != nil {
+			lastEditedAt := projectResp.JSON200.Lock.LastEditedAt
+			if parsedTime, err := time.Parse(time.RFC3339, lastEditedAt); err == nil {
+				lastEditedAt = parsedTime.Format("January 2, 2006 at 3:04 PM")
+			}
+			return nil, fmt.Errorf("project is locked by user %s and last edited at %s. Use --force flag to overwrite the existing project lock", *projectResp.JSON200.Lock.Subject.FullName, lastEditedAt)
+		}
+		return nil, fmt.Errorf("project is locked. Use --force flag to overwrite the existing project lock")
+	}
+
+	// Create a new session with READWRITE permission
+	return createSessionWithPermission(client, organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionRequestPermissionREADWRITE)
+}
+
+// ExportProject exports a project from CLI to Astro IDE
+func ExportProject(client astrocore.CoreClient, projectID, organizationID, workspaceID, domain string, force bool, out io.Writer) error {
+	var err error
+
+	// Resolve project ID (create or select)
+	projectID, err = resolveProjectID(client, projectID, organizationID, workspaceID, force, out)
+	if err != nil {
+		return err
 	}
 
 	// Create temporary directory and archive
@@ -285,31 +319,15 @@ func ExportProject(client astrocore.CoreClient, projectID, organizationID, works
 	}
 
 	// Create session and handle permissions
-	sessionResp, err := createSession(client, organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionRequestPermissionREADWRITE)
+	sessionResp, err := createSession(client, organizationID, workspaceID, projectID)
 	if err != nil {
 		return err
 	}
 
-	if sessionResp.JSON200.Permission == "READ_ONLY" {
-		if !force {
-			// Get project details to show who owns the lock
-			projectResp, err := getProject(client, organizationID, workspaceID, projectID)
-			if err != nil {
-				return fmt.Errorf("failed to get project details: %w", err)
-			}
-
-			// Show project lock information and instructions
-			if projectResp.JSON200.Lock != nil && projectResp.JSON200.Lock.Subject.FullName != nil {
-				return fmt.Errorf("project is locked by user '%s'. Use --force flag to overwrite the existing project lock", *projectResp.JSON200.Lock.Subject.FullName)
-			}
-			return fmt.Errorf("project is locked. Use --force flag to overwrite the existing project lock")
-		}
-
-		// Create a new session with READWRITE permission
-		sessionResp, err = createSession(client, organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionRequestPermissionREADWRITE)
-		if err != nil {
-			return err
-		}
+	// Handle project lock and permission upgrades
+	sessionResp, err = handleProjectLock(client, sessionResp, organizationID, workspaceID, projectID, force)
+	if err != nil {
+		return err
 	}
 
 	// Upload and import archive
@@ -419,7 +437,7 @@ func ImportProject(client astrocore.CoreClient, projectID, organizationID, works
 	}
 
 	// Create a new session with READ_ONLY permission
-	sessionResp, err := createSession(client, organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionRequestPermissionREADONLY)
+	sessionResp, err := createSessionWithPermission(client, organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionRequestPermissionREADONLY)
 	if err != nil {
 		return err
 	}
