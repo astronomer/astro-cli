@@ -354,6 +354,48 @@ func (s *Suite) TestGetAirflowUILinkFailure() {
 	s.Equal(actualResult, "")
 }
 
+func (s *Suite) TestGetDagDeployURL() {
+	s.Run("Returns dagserver URL when available in deployment", func() {
+		mockDeployment := &houston.Deployment{
+			ReleaseName: "test-deployment",
+			Urls: []houston.DeploymentURL{
+				{URL: "https://deployments.local.astronomer.io/testDeploymentName/dags/upload", Type: houston.DagServerURLType},
+				{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: houston.AirflowURLType},
+			},
+		}
+
+		expectedResult := "https://deployments.local.astronomer.io/testDeploymentName/dags/upload"
+		actualResult := getDagDeployURL(mockDeployment)
+		s.Equal(expectedResult, actualResult)
+	})
+
+	s.Run("Constructs URL from airflow URL when dagserver URL not available in deployment", func() {
+		mockDeployment := &houston.Deployment{
+			ReleaseName: "test-deployment",
+			Urls: []houston.DeploymentURL{
+				{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: houston.AirflowURLType},
+			},
+		}
+
+		expectedResult := "https://deployments.local.astronomer.io/test-deployment/dags/upload"
+		actualResult := getDagDeployURL(mockDeployment)
+		s.Equal(expectedResult, actualResult)
+	})
+
+	s.Run("Returns empty string when no valid URLs available", func() {
+		mockDeployment := &houston.Deployment{
+			ReleaseName: "test-deployment",
+			Urls: []houston.DeploymentURL{
+				{URL: "https://flower.example.com", Type: "flower"},
+			},
+		}
+
+		expectedResult := ""
+		actualResult := getDagDeployURL(mockDeployment)
+		s.Equal(expectedResult, actualResult)
+	})
+}
+
 func (s *Suite) TestAirflowFailure() {
 	// No workspace ID test case
 	_, err := Airflow(nil, "", "", "", "", false, false, false, description, false, "")
