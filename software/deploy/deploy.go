@@ -425,16 +425,16 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 			continue
 		}
 
-		parsedURL, err := neturl.Parse(url.URL)
+		parsedAirflowURL, err := neturl.Parse(url.URL)
 		if err != nil {
 			logger.Infof("Error parsing airflow URL: %v", err)
 			continue
 		}
 
 		// Use URL scheme and host from the airflow URL
-		uploadURL := fmt.Sprintf("%s://%s/%s/dags/upload", parsedURL.Scheme, parsedURL.Host, deploymentInfo.ReleaseName)
-		logger.Infof("Constructed URL from airflow base URL: %s", uploadURL)
-		return uploadURL
+		dagUploadURL := fmt.Sprintf("https://%s/%s/dags/upload", parsedAirflowURL.Host, deploymentInfo.ReleaseName)
+		logger.Infof("Constructed URL from airflow base URL: %s", dagUploadURL)
+		return dagUploadURL
 	}
 	return ""
 }
