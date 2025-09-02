@@ -428,7 +428,7 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 		parsedAirflowURL, err := neturl.Parse(url.URL)
 		if err != nil {
 			logger.Infof("Error parsing airflow URL: %v", err)
-			continue
+			break
 		}
 
 		// Use URL scheme and host from the airflow URL
