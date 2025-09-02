@@ -433,7 +433,7 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 
 		// Use URL scheme and host from the airflow URL
 		dagUploadURL := fmt.Sprintf("https://%s/%s/dags/upload", parsedAirflowURL.Host, deploymentInfo.ReleaseName)
-		logger.Infof("Constructed URL from airflow base URL: %s", dagUploadURL)
+		logger.Infof("Generated Dag Upload URL from airflow base URL: %s", dagUploadURL)
 		return dagUploadURL
 	}
 	return ""
