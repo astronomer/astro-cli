@@ -33,6 +33,21 @@ const (
 	astroRunContainer  = "astro-run"
 	pullingImagePrompt = "Pulling image from Astronomer registry"
 	prefix             = "Bearer "
+
+	// Enhanced error message for 403 authentication issues
+	imagePush403ErrMsg = `failed to push image due to authentication error (403 Forbidden).
+
+This commonly occurs due to:
+1. Invalid cached Docker credentials
+2. Incompatible containerd snapshotter configuration
+
+To resolve:
+• Run 'docker logout' for each Astro registry to clear cached credentials
+• Ensure containerd snapshotter is disabled (Docker Desktop users)
+• Try running 'astro deploy' again
+
+For detailed troubleshooting steps, visit:
+https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push`
 )
 
 var errGetImageLabel = errors.New("error getting image label")
@@ -338,6 +353,10 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 		// if it does not work with the go library use bash to run docker commands. Support for (old?) versions of Colima
 		err = pushWithBash(&authConfig, remoteImage)
 		if err != nil {
+			// Check for 403 errors only after both methods fail
+			if is403Error(err) {
+				return "", errors.New(imagePush403ErrMsg)
+			}
 			return "", err
 		}
 	}
@@ -710,6 +729,37 @@ func pushWithBash(authConfig *cliTypes.AuthConfig, imageName string) error {
 			return err
 		}
 	}
-	// docker push <imageName>
-	return cmdExec(containerRuntime, os.Stdout, os.Stderr, "push", imageName)
+
+	// docker push <imageName> - capture stderr to preserve error details
+	var stderr bytes.Buffer
+	err = cmdExec(containerRuntime, os.Stdout, &stderr, "push", imageName)
+	if err != nil {
+		// Include stderr output in the error so we can detect 403 errors
+		stderrOutput := stderr.String()
+		if stderrOutput != "" {
+			return fmt.Errorf("%w: %s", err, stderrOutput)
+		}
+		return err
+	}
+	return nil
+}
+
+// is403Error checks if the error is a 403 authentication error
+func is403Error(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check the entire error chain, not just the top-level error
+	for currentErr := err; currentErr != nil; currentErr = errors.Unwrap(currentErr) {
+		errStr := strings.ToLower(currentErr.Error())
+
+		if strings.Contains(errStr, "403") ||
+			strings.Contains(errStr, "forbidden") ||
+			strings.Contains(errStr, "authentication required") {
+			return true
+		}
+	}
+
+	return false
 }
