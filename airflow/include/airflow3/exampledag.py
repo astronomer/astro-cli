@@ -21,7 +21,8 @@ first DAG tutorial: https://www.astronomer.io/docs/learn/get-started-with-airflo
 """
 
 from airflow.sdk.definitions.asset import Asset
-from airflow.decorators import dag, task
+from airflow.sdk.types import RuntimeTaskInstanceProtocol
+from airflow.sdk import dag, task
 from pendulum import datetime
 import requests
 
@@ -41,7 +42,7 @@ def example_astronauts():
         # Define a dataset outlet for the task. This can be used to schedule downstream DAGs when this task has run.
         outlets=[Asset("current_astronauts")]
     )  # Define that this task updates the `current_astronauts` Dataset
-    def get_astronauts(**context) -> list[dict]:
+    def get_astronauts(ti: RuntimeTaskInstanceProtocol) -> list[dict]:
         """
         This task uses the requests library to retrieve a list of Astronauts
         currently in space. The results are pushed to XCom with a specific key
@@ -71,9 +72,7 @@ def example_astronauts():
                 {"craft": "Tiangong", "name": "Ye Guangfu"},
             ]
 
-        context["ti"].xcom_push(
-            key="number_of_people_in_space", value=number_of_people_in_space
-        )
+        ti.xcom_push(key="number_of_people_in_space", value=number_of_people_in_space)
         return list_of_people_in_space
 
     @task
