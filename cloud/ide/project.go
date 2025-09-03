@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/pkg/browser"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/context"
@@ -25,6 +26,7 @@ var (
 	ErrNoProjectsFound         = errors.New("no Astro IDE projects found in workspace")
 	// DefaultDirPerm is the default permission for directories
 	DefaultDirPerm os.FileMode = 0o755
+	openURL                    = browser.OpenURL
 )
 
 func newTableOut() *printutil.Table {
@@ -125,7 +127,7 @@ func selectIDEProject(projects []astrocore.AstroIdeProject) (astrocore.AstroIdeP
 // createNewProject creates a new project and returns its ID
 func createNewProject(client astrocore.CoreClient, organizationID, workspaceID string, out io.Writer) (string, error) {
 	fmt.Println("Enter project name:")
-	name := input.Text("\n>")
+	name := input.Text("\n> ")
 
 	req := astrocore.CreateAstroIdeProjectRequest{
 		Name: &name,
@@ -235,9 +237,8 @@ func openProjectInBrowser(domain, workspaceID, projectID string, out io.Writer) 
 	url := fmt.Sprintf("https://cloud.%s/%s/astro-ide/%s", domain, workspaceID, projectID)
 
 	// Open the URL in browser
-	cmd := exec.Command("open", url)
-	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(out, "Failed to open browser: %v\n", err)
+	if err := openURL(url); err != nil {
+		fmt.Fprintf(out, "Unable to open the Astro IDE project URL, please visit the following link: %s\n", url)
 	}
 }
 
