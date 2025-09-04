@@ -143,42 +143,6 @@ func (s *Suite) TestSelectDeployment() {
 	})
 }
 
-func (s *Suite) TestCheckManualReleaseNames() {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
-	s.Run("manual release names true", func() {
-		appConfig := &houston.AppConfig{
-			ManualReleaseNames: true,
-		}
-
-		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(appConfig, nil)
-
-		s.True(checkManualReleaseNames(api))
-		api.AssertExpectations(s.T())
-	})
-
-	s.Run("manual release names false", func() {
-		appConfig := &houston.AppConfig{
-			ManualReleaseNames: false,
-		}
-
-		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(appConfig, nil)
-
-		s.False(checkManualReleaseNames(api))
-		api.AssertExpectations(s.T())
-	})
-
-	s.Run("manual release names error", func() {
-		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(nil, errMock)
-
-		s.False(checkManualReleaseNames(api))
-		api.AssertExpectations(s.T())
-	})
-}
-
 func (s *Suite) TestCreate() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
@@ -223,16 +187,30 @@ func (s *Suite) TestCreate() {
 	dagDeploymentType := houston.ImageDeploymentType
 	nfsLocation := ""
 	triggerReplicas := 0
-	req := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas}
+	clusterID := "testClusterID"
+	req := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID}
 
-	s.Run("create success", func() {
+	s.Run("create success. Cluster is not passed in the payload", func() {
+		req.ClusterID = ""
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		// Have to use mock anything for now as vars is too big
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf)
+		err := Create(req, api, buf, mockAppConfig)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		api.AssertExpectations(s.T())
+		req.ClusterID = clusterID
+	})
+
+	s.Run("create success. Cluster is passed in the payload", func() {
+		api := new(mocks.ClientInterface)
+		// Have to use mock anything for now as vars is too big
+		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+
+		buf := new(bytes.Buffer)
+		err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
 		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 		api.AssertExpectations(s.T())
@@ -242,12 +220,11 @@ func (s *Suite) TestCreate() {
 		mockAppConfig.TriggererEnabled = true
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		triggerReplicas = 1
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf)
+		err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
 		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 		api.AssertExpectations(s.T())
@@ -257,13 +234,12 @@ func (s *Suite) TestCreate() {
 		mockAppConfig.TriggererEnabled = true
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		triggerReplicas = -1
 		buf := new(bytes.Buffer)
-		req = &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas}
-		err := Create(req, api, buf)
+		req = &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID}
+		err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
 		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 		api.AssertExpectations(s.T())
@@ -273,14 +249,13 @@ func (s *Suite) TestCreate() {
 		mockAppConfig.TriggererEnabled = false
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		nfsLocation = "test:/test"
 		triggerReplicas = 0
 
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf)
+		err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
 		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 		api.AssertExpectations(s.T())
@@ -288,7 +263,6 @@ func (s *Suite) TestCreate() {
 
 	s.Run("create git sync enabled", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		nfsLocation = ""
@@ -315,8 +289,8 @@ func (s *Suite) TestCreate() {
 
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
-			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, "", runtimeVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas}
-			err := Create(createReq, api, buf)
+			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, "", runtimeVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas, clusterID}
+			err := Create(createReq, api, buf, mockAppConfig)
 			if tt.expectedError != "" {
 				s.EqualError(err, tt.expectedError)
 			} else {
@@ -328,7 +302,6 @@ func (s *Suite) TestCreate() {
 
 	s.Run("create with pre-create namespace deployment success", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		releaseName = ""
@@ -349,7 +322,7 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(req, api, buf)
+		err = Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
 		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 		api.AssertExpectations(s.T())
@@ -366,8 +339,7 @@ func (s *Suite) TestCreate() {
 		}
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(&appConfig, nil)
-		api.On("GetAvailableNamespaces", nil).Return(mockNamespaces, nil)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockNamespaces, nil)
 
 		buf := new(bytes.Buffer)
 
@@ -383,7 +355,7 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(req, api, buf)
+		err = Create(req, api, buf, &appConfig)
 		s.EqualError(err, "number is out of available range")
 		api.AssertExpectations(s.T())
 	})
@@ -395,22 +367,20 @@ func (s *Suite) TestCreate() {
 		}
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(&appConfig, nil)
-		api.On("GetAvailableNamespaces", nil).Return([]houston.Namespace{}, errMock)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return([]houston.Namespace{}, errMock)
 
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf)
+		err := Create(req, api, buf, &appConfig)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
 
 	s.Run("create api error", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf)
+		err := Create(req, api, buf, mockAppConfig)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -419,7 +389,6 @@ func (s *Suite) TestCreate() {
 		mockAppConfig.Flags.NamespaceFreeFormEntry = true
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
@@ -435,14 +404,13 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(req, api, buf)
+		err = Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
 		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 		api.AssertExpectations(s.T())
 	})
 	s.Run("create free form namespace error", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("CreateDeployment", mock.Anything).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
@@ -458,7 +426,7 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(req, api, buf)
+		err = Create(req, api, buf, mockAppConfig)
 		s.EqualError(err, "no kubernetes namespaces specified")
 	})
 }
@@ -507,6 +475,7 @@ func (s *Suite) TestDelete() {
 }
 
 func (s *Suite) TestList() {
+	clusterID := "testClusterID"
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockDeployments := []houston.Deployment{
 		{
@@ -533,7 +502,7 @@ func (s *Suite) TestList() {
 		api.On("ListDeployments", expectedRequest).Return(mockDeployments, nil)
 
 		buf := new(bytes.Buffer)
-		err := List(mockDeployments[0].Workspace.ID, false, api, buf)
+		err := List(mockDeployments[0].Workspace.ID, false, api, buf, clusterID)
 		s.NoError(err)
 		expected := ` NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 TAG     IMAGE VERSION                  
  test     burning-terrestrial-5940     v1.1.0     ckbv801t300qh0760pck7ea0c     ?       Astronomer-Certified-1.1.0     
@@ -547,21 +516,22 @@ func (s *Suite) TestList() {
 		api.On("ListDeployments", expectedRequest).Return([]houston.Deployment{}, errMock)
 
 		buf := new(bytes.Buffer)
-		err := List(mockDeployments[0].Workspace.ID, false, api, buf)
+		err := List(mockDeployments[0].Workspace.ID, false, api, buf, clusterID)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
 
 	s.Run("list namespace all enabled", func() {
 		expectedRequest := houston.PaginatedDeploymentsRequest{
-			Take: -1,
+			Take:      -1,
+			ClusterID: clusterID,
 		}
 
 		api := new(mocks.ClientInterface)
 		api.On("ListPaginatedDeployments", expectedRequest).Return(mockDeployments, nil)
 
 		buf := new(bytes.Buffer)
-		err := List(mockDeployments[0].Workspace.ID, true, api, buf)
+		err := List(mockDeployments[0].Workspace.ID, true, api, buf, clusterID)
 		s.NoError(err)
 		expected := ` NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 TAG     IMAGE VERSION                  
  test     burning-terrestrial-5940     v1.1.0     ckbv801t300qh0760pck7ea0c     ?       Astronomer-Certified-1.1.0     
@@ -614,7 +584,6 @@ func (s *Suite) TestUpdate() {
 
 	s.Run("update success", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG         IMAGE VERSION                  
@@ -632,7 +601,7 @@ func (s *Suite) TestUpdate() {
 		}
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
-			err := Update(mockDeployment.ID, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", "", 1, 0, api, buf)
+			err := Update(mockDeployment.ID, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", "", 1, 0, api, buf, mockAppConfig)
 			s.NoError(err)
 			s.Equal(expected, buf.String())
 			api.AssertExpectations(s.T())
@@ -643,7 +612,6 @@ func (s *Suite) TestUpdate() {
 		mockAppConfig.TriggererEnabled = true
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG         IMAGE VERSION                  
@@ -661,7 +629,7 @@ func (s *Suite) TestUpdate() {
 		}
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
-			err := Update(mockDeployment.ID, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", "", 1, 1, api, buf)
+			err := Update(mockDeployment.ID, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", "", 1, 1, api, buf, mockAppConfig)
 			s.NoError(err)
 			s.Equal(expected, buf.String())
 			api.AssertExpectations(s.T())
@@ -670,14 +638,13 @@ func (s *Suite) TestUpdate() {
 
 	s.Run("update error", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 		api.On("UpdateDeployment", mock.Anything).Return(nil, errMock)
 
 		deploymentConfig := make(map[string]string)
 		deploymentConfig["executor"] = houston.CeleryExecutorType
 
 		buf := new(bytes.Buffer)
-		err := Update(mockDeployment.ID, role, deploymentConfig, "", "", "", "", "", "", "", "", "", 1, 0, api, buf)
+		err := Update(mockDeployment.ID, role, deploymentConfig, "", "", "", "", "", "", "", "", "", 1, 0, api, buf, mockAppConfig)
 
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
@@ -942,93 +909,6 @@ func (s *Suite) Test_meetsAirflowUpgradeReqs() {
 	s.EqualError(err, "Invalid Semantic Version")
 }
 
-func (s *Suite) TestCheckNFSMountDagDeploymentError() {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
-	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(nil, errMock)
-	s.Equal(false, CheckNFSMountDagDeployment(api))
-	api.AssertExpectations(s.T())
-}
-
-func (s *Suite) TestCheckNFSMountDagDeploymentSuccess() {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	mockAppConfig := &houston.AppConfig{
-		Version:                "0.15.1",
-		BaseDomain:             "local.astronomer.io",
-		SMTPConfigured:         true,
-		ManualReleaseNames:     false,
-		NfsMountDagDeployment:  true,
-		ConfigureDagDeployment: false,
-		Flags: houston.FeatureFlags{
-			ManualNamespaceNames:  false,
-			NfsMountDagDeployment: true,
-			HardDeleteDeployment:  false,
-		},
-	}
-	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
-	s.Equal(true, CheckNFSMountDagDeployment(api))
-	api.AssertExpectations(s.T())
-}
-
-func (s *Suite) TestCheckHardDeleteDeployment() {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	mockAppConfig := &houston.AppConfig{
-		Version:              "0.15.1",
-		BaseDomain:           "local.astronomer.io",
-		HardDeleteDeployment: true,
-		Flags: houston.FeatureFlags{
-			HardDeleteDeployment: true,
-		},
-	}
-
-	s.Run("check hard delete success", func() {
-		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
-
-		hardDelete := CheckHardDeleteDeployment(api)
-		s.Equal(true, hardDelete)
-		api.AssertExpectations(s.T())
-	})
-
-	s.Run("check hard delete error", func() {
-		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(nil, errRegMock)
-
-		hardDelete := CheckHardDeleteDeployment(api)
-		s.False(hardDelete)
-		api.AssertExpectations(s.T())
-	})
-}
-
-func (s *Suite) TestCheckTriggererEnabled() {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
-	mockAppConfig := &houston.AppConfig{
-		TriggererEnabled: true,
-		Flags: houston.FeatureFlags{
-			TriggererEnabled: true,
-		},
-	}
-
-	s.Run("success", func() {
-		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
-
-		triggererEnabled := CheckTriggererEnabled(api)
-		s.True(triggererEnabled)
-	})
-
-	s.Run("error", func() {
-		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig", nil).Return(nil, errRegMock)
-
-		triggererEnabled := CheckTriggererEnabled(api)
-		s.False(triggererEnabled)
-	})
-}
-
 func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
@@ -1039,7 +919,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 
 	s.Run("get available namespaces", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAvailableNamespaces", nil).Return(mockAvailableNamespaces, nil)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockAvailableNamespaces, nil)
 
 		buf := new(bytes.Buffer)
 
@@ -1055,7 +935,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		name, err := getDeploymentSelectionNamespaces(api, buf)
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
 		s.NoError(err)
 		expected := `#     AVAILABLE KUBERNETES NAMESPACES     
 1     test1                               
@@ -1068,10 +948,10 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 
 	s.Run("no namespace", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAvailableNamespaces", nil).Return([]houston.Namespace{}, nil)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return([]houston.Namespace{}, nil)
 
 		buf := new(bytes.Buffer)
-		name, err := getDeploymentSelectionNamespaces(api, buf)
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
 		expected := ``
 		s.Equal(expected, name)
 		s.EqualError(err, "no kubernetes namespaces are available")
@@ -1080,7 +960,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 
 	s.Run("parse error", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAvailableNamespaces", nil).Return(mockAvailableNamespaces, nil)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockAvailableNamespaces, nil)
 
 		buf := new(bytes.Buffer)
 
@@ -1096,7 +976,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		name, err := getDeploymentSelectionNamespaces(api, buf)
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
 		s.Equal("", name)
 		s.EqualError(err, "cannot parse test to int")
 		api.AssertExpectations(s.T())
@@ -1104,30 +984,13 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 
 	s.Run("api error", func() {
 		api := new(mocks.ClientInterface)
-		api.On("GetAvailableNamespaces", nil).Return(nil, errMock)
+		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
-		name, err := getDeploymentSelectionNamespaces(api, buf)
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
 		s.Equal("", name)
 		s.EqualError(err, errMock.Error())
 	})
-}
-
-func (s *Suite) TestCheckPreCreateNamespacesDeployment() {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
-	mockAppConfig := &houston.AppConfig{
-		Flags: houston.FeatureFlags{
-			ManualNamespaceNames: true,
-		},
-	}
-
-	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
-
-	usesPreCreateNamespace := CheckPreCreateNamespaceDeployment(api)
-	s.Equal(true, usesPreCreateNamespace)
-	api.AssertExpectations(s.T())
 }
 
 func (s *Suite) TestGetDeploymentNamespaceName() {
@@ -1323,7 +1186,9 @@ To cancel, run:
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": mockDeployment.DesiredRuntimeVersion}
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
+		vars := make(map[string]interface{})
+		vars["clusterId"] = ""
+		api.On("GetRuntimeReleases", vars).Return(mockRuntimeReleases, nil)
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
 
 		// mock os.Stdin for when prompted by getAirflowVersionSelection()
@@ -1431,10 +1296,43 @@ func (s *Suite) TestRuntimeMigrate() {
 
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.3", AirflowVersion: "2.2.3"}, houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
+		vars := make(map[string]interface{})
+		vars["airflowVersion"] = mockDeployment.AirflowVersion
+		vars["clusterId"] = ""
+		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.3", AirflowVersion: "2.2.3"}, houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
 		mockMigrateRuntimeResp := *mockDeployment
 		mockMigrateRuntimeResp.RuntimeVersion = "4.2.4"
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(&mockMigrateRuntimeResp, nil)
+		buf := new(bytes.Buffer)
+		err := RuntimeMigrate(mockDeployment.ID, api, buf)
+		s.NoError(err)
+		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
+ test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.4     
+
+The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to Astronomer.
+To cancel, run: 
+ $ astro deployment runtime migrate --cancel
+
+`
+
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
+	})
+
+	s.Run("migrate runtime success for 1.0.0", func() {
+		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": "4.2.4"}
+
+		mockDeploymentResp := *mockDeployment
+		mockDeploymentResp.ClusterID = "test-cluster-id"
+		api := new(mocks.ClientInterface)
+		api.On("GetDeployment", mockDeployment.ID).Return(&mockDeploymentResp, nil)
+		vars := make(map[string]interface{})
+		vars["airflowVersion"] = mockDeployment.AirflowVersion
+		vars["clusterId"] = "test-cluster-id"
+		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.3", AirflowVersion: "2.2.3"}, houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
+		mockMigrateRuntimeUpdateResp := *mockDeployment
+		mockMigrateRuntimeUpdateResp.RuntimeVersion = "4.2.4"
+		api.On("UpdateDeploymentRuntime", expectedVars).Return(&mockMigrateRuntimeUpdateResp, nil)
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
 		s.NoError(err)
@@ -1479,7 +1377,10 @@ To cancel, run:
 		mockError := errors.New("get runtime releases error")
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{}, mockError)
+		vars := make(map[string]interface{})
+		vars["airflowVersion"] = mockDeployment.AirflowVersion
+		vars["clusterId"] = ""
+		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, mockError)
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
@@ -1490,7 +1391,10 @@ To cancel, run:
 	s.Run("invalid airflow version to migrate to runtime", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{}, nil)
+		vars := make(map[string]interface{})
+		vars["airflowVersion"] = mockDeployment.AirflowVersion
+		vars["clusterId"] = ""
+		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 
 		buf := new(bytes.Buffer)
 		err := RuntimeMigrate(mockDeployment.ID, api, buf)
@@ -1503,7 +1407,10 @@ To cancel, run:
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": "4.2.4"}
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
+		vars := make(map[string]interface{})
+		vars["airflowVersion"] = mockDeployment.AirflowVersion
+		vars["clusterId"] = ""
+		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(nil, mockError)
 
 		buf := new(bytes.Buffer)

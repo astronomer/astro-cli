@@ -1956,6 +1956,132 @@ func (s *Suite) TestDockerComposeRunDAG() {
 
 var errExecMock = errors.New("docker is not running")
 
+func (s *Suite) TestInitSettings() {
+	testCases := []struct {
+		name                     string
+		settingsFile             string
+		envConns                 map[string]astrocore.EnvironmentObjectConnection
+		airflowMajorVersion      uint64
+		project                  *types.Project
+		containerSummary         []api.ContainerSummary
+		expectInitSettingsCalled bool
+	}{
+		{
+			name:                "initSettings called when only settings file exists",
+			settingsFile:        "./testfiles/airflow_settings.yaml",
+			envConns:            map[string]astrocore.EnvironmentObjectConnection{},
+			airflowMajorVersion: airflowMajorVersion2,
+			project: &types.Project{
+				Name: "test-project",
+				Services: map[string]types.ServiceConfig{
+					"webserver": {Name: "test-project-webserver"},
+				},
+			},
+			containerSummary: []api.ContainerSummary{
+				{ID: "test-webserver-id", Name: "test-project-webserver", State: "running"},
+			},
+			expectInitSettingsCalled: true,
+		},
+		{
+			name:         "initSettings called when only env connections exist",
+			settingsFile: "./testfiles/non_existent_settings.yaml",
+			envConns: map[string]astrocore.EnvironmentObjectConnection{
+				"test-conn": {},
+			},
+			airflowMajorVersion: airflowMajorVersion2,
+			project: &types.Project{
+				Name: "test-project",
+				Services: map[string]types.ServiceConfig{
+					"webserver": {Name: "test-project-webserver"},
+				},
+			},
+			containerSummary: []api.ContainerSummary{
+				{ID: "test-webserver-id", Name: "test-project-webserver", State: "running"},
+			},
+			expectInitSettingsCalled: true,
+		},
+		{
+			name:         "initSettings called when both settings file and env connections exist",
+			settingsFile: "./testfiles/airflow_settings.yaml",
+			envConns: map[string]astrocore.EnvironmentObjectConnection{
+				"test-conn": {},
+			},
+			airflowMajorVersion: airflowMajorVersion2,
+			project: &types.Project{
+				Name: "test-project",
+				Services: map[string]types.ServiceConfig{
+					"webserver": {Name: "test-project-webserver"},
+				},
+			},
+			containerSummary: []api.ContainerSummary{
+				{ID: "test-webserver-id", Name: "test-project-webserver", State: "running"},
+			},
+			expectInitSettingsCalled: true,
+		},
+		{
+			name:                "initSettings NOT called when neither settings file nor env connections exist",
+			settingsFile:        "./testfiles/non_existent_settings.yaml",
+			envConns:            map[string]astrocore.EnvironmentObjectConnection{},
+			airflowMajorVersion: airflowMajorVersion2,
+			project: &types.Project{
+				Name: "test-project",
+				Services: map[string]types.ServiceConfig{
+					"webserver": {Name: "test-project-webserver"},
+				},
+			},
+			containerSummary: []api.ContainerSummary{
+				{ID: "test-webserver-id", Name: "test-project-webserver", State: "running"},
+			},
+			expectInitSettingsCalled: false,
+		},
+		{
+			name:                "initSettings called for API server container in Airflow 3",
+			settingsFile:        "./testfiles/airflow_settings.yaml",
+			envConns:            map[string]astrocore.EnvironmentObjectConnection{},
+			airflowMajorVersion: airflowMajorVersion3,
+			project: &types.Project{
+				Name: "test-project",
+				Services: map[string]types.ServiceConfig{
+					"api-server": {Name: "test-project-api-server"},
+				},
+			},
+			containerSummary: []api.ContainerSummary{
+				{ID: "test-api-server-id", Name: "test-project-api-server", State: "running"},
+			},
+			expectInitSettingsCalled: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			initSettingsCalled := false
+
+			// Mock initSettings to track if it's called
+			originalInitSettings := initSettings
+			initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
+				initSettingsCalled = true
+				return nil
+			}
+			defer func() { initSettings = originalInitSettings }()
+
+			// Mock openURL to avoid opening browser
+			originalOpenURL := openURL
+			openURL = func(url string) error {
+				return nil
+			}
+			defer func() { openURL = originalOpenURL }()
+
+			composeMock := new(mocks.DockerComposeAPI)
+			composeMock.On("Ps", mock.Anything, tc.project.Name, api.PsOptions{All: true}).Return(tc.containerSummary, nil).Once()
+
+			err := printStatus(tc.settingsFile, tc.envConns, tc.project, composeMock, tc.airflowMajorVersion, true)
+			s.NoError(err)
+			s.Equal(tc.expectInitSettingsCalled, initSettingsCalled)
+			composeMock.AssertExpectations(s.T())
+		})
+	}
+}
+
 func (s *Suite) TestCreateDockerProject() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig(testUtil.LocalPlatform)

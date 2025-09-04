@@ -47,15 +47,15 @@ func (s *Suite) TestGetAppConfig() {
 		})
 		api := NewClient(client)
 
-		config, err := api.GetAppConfig(nil)
+		config, err := api.GetAppConfig("")
 		s.NoError(err)
 		s.Equal(config, mockAppConfig)
 
-		config, err = api.GetAppConfig(nil)
+		config, err = api.GetAppConfig("")
 		s.NoError(err)
 		s.Equal(config, mockAppConfig)
 
-		s.Equal(1, countCalls)
+		s.Equal(2, countCalls)
 	})
 
 	s.Run("error", func() {
@@ -74,15 +74,15 @@ func (s *Suite) TestGetAppConfig() {
 		appConfig = nil
 		appConfigErr = nil
 
-		config, err := api.GetAppConfig(nil)
+		config, err := api.GetAppConfig("")
 		s.Contains(err.Error(), "Internal Server Error")
 		s.Nil(config)
 
-		config, err = api.GetAppConfig(nil)
+		config, err = api.GetAppConfig("")
 		s.Contains(err.Error(), "Internal Server Error")
 		s.Nil(config)
 
-		s.Equal(1, countCalls)
+		s.Equal(2, countCalls)
 	})
 
 	s.Run("unavailable fields error", func() {
@@ -100,7 +100,7 @@ func (s *Suite) TestGetAppConfig() {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetAppConfig(nil)
+		_, err := api.GetAppConfig("")
 		s.EqualError(err, ErrFieldsNotAvailable{}.Error())
 	})
 }

@@ -92,7 +92,7 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 		return nil
 	}
 
-	appConfig, err := houston.Call(client.GetAppConfig)(nil)
+	appConfig, err := houston.Call(client.GetAppConfig)("")
 	if err != nil {
 		return err
 	}
