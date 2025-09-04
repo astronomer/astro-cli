@@ -32,6 +32,7 @@ import (
 var (
 	useAstronomerCertified bool
 	remoteExecutionEnabled bool
+	remoteImageRepository  string
 	projectName            string
 	runtimeVersion         string
 	airflowVersion         string
@@ -94,6 +95,9 @@ astro dev init --use-astronomer-certified --airflow-version 2.2.3
 
 # Initialize a new Astro project with remote execution support
 astro dev init --remote-execution-enabled
+
+# Initialize a new Astro project with remote execution support and specify the remote image repository
+astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme/my-deployment-image
 `
 
 	initCloudExample = `
@@ -111,6 +115,9 @@ astro dev init --from-template
 
 # Initialize a new Astro project with remote execution support
 astro dev init --remote-execution-enabled
+
+# Initialize a new Astro project with remote execution support and specify the remote image repository
+astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme/my-deployment-image
 `
 	dockerfile = "Dockerfile"
 
@@ -180,6 +187,7 @@ func newAirflowInitCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
 	cmd.Flags().StringVarP(&fromTemplate, "from-template", "t", "", "Provides a list of templates to select from and create the local astro project based on the selected template. Please note template based astro projects use the latest runtime version, so runtime-version and airflow-version flags will be ignored when creating a project with template flag")
 	cmd.Flags().BoolVarP(&remoteExecutionEnabled, "remote-execution-enabled", "", false, "Enable remote execution support for the Astro project. This will generate additional client files for the client/server architecture.")
+	cmd.Flags().StringVarP(&remoteImageRepository, "remote-image-repository", "", "", "Remote Docker repository for the client image (e.g. quay.io/acme/my-deployment-image). This flag is only used when --remote-execution-enabled is set.")
 	cmd.Flag("from-template").NoOptDefVal = "select-template"
 	var err error
 	var avoidACFlag bool
@@ -482,19 +490,28 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Handle remote execution setup - prompt for registry if needed
+	// Handle remote execution setup - use flag value or prompt for registry if needed
 	var registryEndpoint string
 	if remoteExecutionEnabled {
-		registryEndpoint = config.CFG.RemoteClientRegistry.GetString()
-		if registryEndpoint == "" {
-			fmt.Println("Enter the remote Docker repository for the client image (leave blank if not known")
-			fmt.Println("but you will not be able to use the Astro CLI to deploy the image until configured)")
-			registryEndpoint = input.Text("Remote client image repository endpoint (e.g. quay.io/acme/my-deployment-image): ")
+		// Use flag value if provided, otherwise check config, otherwise prompt
+		if remoteImageRepository != "" {
+			registryEndpoint = remoteImageRepository
+			// Validate the registry endpoint format
+			if err := validateRegistryEndpoint(registryEndpoint); err != nil {
+				return fmt.Errorf("invalid registry endpoint format: %w", err)
+			}
+		} else {
+			registryEndpoint = config.CFG.RemoteClientRegistry.GetString()
+			if registryEndpoint == "" {
+				fmt.Println("Enter the remote Docker repository for the client image (leave blank if not known")
+				fmt.Println("but you will not be able to use the Astro CLI to deploy the image until configured)")
+				registryEndpoint = input.Text("Remote client image repository endpoint (e.g. quay.io/acme/my-deployment-image): ")
 
-			if registryEndpoint != "" {
-				// Validate the registry endpoint format
-				if err := validateRegistryEndpoint(registryEndpoint); err != nil {
-					return fmt.Errorf("invalid registry endpoint format: %w", err)
+				if registryEndpoint != "" {
+					// Validate the registry endpoint format
+					if err := validateRegistryEndpoint(registryEndpoint); err != nil {
+						return fmt.Errorf("invalid registry endpoint format: %w", err)
+					}
 				}
 			}
 		}
