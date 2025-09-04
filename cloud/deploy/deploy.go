@@ -90,6 +90,7 @@ type deploymentInfo struct {
 	dagDeployEnabled         bool
 	cicdEnforcement          bool
 	name                     string
+	isRemoteExecutionEnabled bool
 }
 
 type InputDeploy struct {
@@ -184,15 +185,6 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		return err
 	}
 
-	var dagsPath string
-	if deployInput.DagsPath != "" {
-		dagsPath = deployInput.DagsPath
-	} else {
-		dagsPath = filepath.Join(deployInput.Path, "dags")
-	}
-
-	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
-
 	if c.Domain == astroDomain {
 		fmt.Printf(deploymentHeaderMsg, "Astro")
 	} else {
@@ -203,6 +195,19 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	if err != nil {
 		return err
 	}
+
+	var dagsPath string
+	if deployInput.DagsPath != "" {
+		dagsPath = deployInput.DagsPath
+	} else {
+		dagsPath = filepath.Join(deployInput.Path, "dags")
+	}
+
+	var dagFiles []string
+	if !deployInfo.isRemoteExecutionEnabled {
+		dagFiles = fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
+	}
+
 	if deployInfo.cicdEnforcement {
 		if !canCiCdDeploy(c.Token) {
 			return fmt.Errorf(errCiCdEnforcementUpdate, deployInfo.name) //nolint
@@ -261,7 +266,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			}
 		}
 		if deployInput.Pytest != "" {
-			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInput.ForceUpgradeToAF3, platformCoreClient)
+			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, deployInput.ForceUpgradeToAF3, platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -341,7 +346,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		// Build our image
-		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInput.ForceUpgradeToAF3, platformCoreClient)
+		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, deployInput.ForceUpgradeToAF3, platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -443,6 +448,7 @@ func getDeploymentInfo(
 			currentDeployment.IsDagDeployEnabled,
 			currentDeployment.IsCicdEnforced,
 			currentDeployment.Name,
+			deployment.IsRemoteExecutionEnabled(&currentDeployment),
 		}, nil
 	}
 	c, err := config.GetCurrentContext()
@@ -548,6 +554,7 @@ func getImageName(deploymentID, organizationID string, platformCoreClient astrop
 	webserverURL := resp.JSON200.WebServerUrl
 	dagDeployEnabled := resp.JSON200.IsDagDeployEnabled
 	cicdEnforcement := resp.JSON200.IsCicdEnforced
+	isRemoteExecutionEnabled := deployment.IsRemoteExecutionEnabled(resp.JSON200)
 	var desiredDagTarballVersion string
 	if resp.JSON200.DesiredDagTarballVersion != nil {
 		desiredDagTarballVersion = *resp.JSON200.DesiredDagTarballVersion
@@ -568,6 +575,7 @@ func getImageName(deploymentID, organizationID string, platformCoreClient astrop
 		dagDeployEnabled:         dagDeployEnabled,
 		desiredDagTarballVersion: desiredDagTarballVersion,
 		cicdEnforcement:          cicdEnforcement,
+		isRemoteExecutionEnabled: isRemoteExecutionEnabled,
 	}, nil
 }
 
@@ -633,14 +641,14 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 	return nil
 }
 
-func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, forceUpgradeToAF3 bool, platformCoreClient astroplatformcore.CoreClient) (version string, err error) {
+func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, isRemoteExecutionEnabled, forceUpgradeToAF3 bool, platformCoreClient astroplatformcore.CoreClient) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
 
 	if imageName == "" {
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
 
-		if dagDeployEnabled {
+		if dagDeployEnabled || isRemoteExecutionEnabled {
 			err := buildImageWithoutDags(path, buildSecretString, imageHandler)
 			if err != nil {
 				return "", err
@@ -764,12 +772,12 @@ func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVer
 		return false
 	}
 
-	// If upgrading from Airflow 2 to Airflow 3, we require at least Runtime 8.7.0 (Airflow 2.6.3) and that the user has forced the upgrade
+	// If upgrading from Airflow 2 to Airflow 3, we require at least Runtime 12.0.0 (Airflow 2.10.0) and that the user has forced the upgrade
 	currentVersionAirflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(currentVersion)
 	tagAirflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(tag)
 	if currentVersionAirflowMajorVersion == "2" && tagAirflowMajorVersion == "3" {
-		if airflowversions.CompareRuntimeVersions(currentVersion, "8.7.0") < 0 {
-			fmt.Println("Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 8.7.0 or higher")
+		if airflowversions.CompareRuntimeVersions(currentVersion, "12.0.0") < 0 {
+			fmt.Println("Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 12.0.0 or higher")
 			return false
 		}
 		if !forceUpgradeToAF3 {

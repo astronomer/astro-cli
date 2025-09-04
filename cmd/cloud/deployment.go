@@ -28,54 +28,62 @@ const (
 )
 
 var (
-	label                     string
-	runtimeVersion            string
-	deploymentID              string
-	logsKeyword               string
-	forceDelete               bool
-	description               string
-	clusterID                 string
-	dagDeploy                 string
-	schedulerAU               int
-	schedulerReplicas         int
-	updateSchedulerReplicas   int
-	updateSchedulerAU         int
-	forceUpdate               bool
-	allDeployments            bool
-	warnLogs                  bool
-	errorLogs                 bool
-	infoLogs                  bool
-	waitForStatus             bool
-	deploymentCreateEnforceCD bool
-	deploymentUpdateEnforceCD bool
-	logCount                  = 500
-	variableKey               string
-	variableValue             string
-	useEnvFile                bool
-	makeSecret                bool
-	executor                  string
-	inputFile                 string
-	cloudProvider             string
-	region                    string
-	schedulerSize             string
-	highAvailability          string
-	developmentMode           string
-	cicdEnforcement           string
-	defaultTaskPodMemory      string
-	resourceQuotaCPU          string
-	resourceQuotaMemory       string
-	defaultTaskPodCPU         string
-	addDeploymentRole         string
-	updateDeploymentRole      string
-	workloadIdentity          string
-	until                     string
-	forDuration               string
-	removeOverride            bool
-	forceOverride             bool
-	logWebserver              bool
-	logScheduler              bool
-	logWorkers                bool
-	logTriggerer              bool
+	label                      string
+	runtimeVersion             string
+	deploymentID               string
+	logsKeyword                string
+	forceDelete                bool
+	description                string
+	clusterID                  string
+	dagDeploy                  string
+	schedulerAU                int
+	schedulerReplicas          int
+	updateSchedulerReplicas    int
+	updateSchedulerAU          int
+	forceUpdate                bool
+	allDeployments             bool
+	warnLogs                   bool
+	errorLogs                  bool
+	infoLogs                   bool
+	waitForStatus              bool
+	deploymentCreateEnforceCD  bool
+	deploymentUpdateEnforceCD  bool
+	logCount                   = 500
+	variableKey                string
+	variableValue              string
+	useEnvFile                 bool
+	makeSecret                 bool
+	executor                   string
+	inputFile                  string
+	cloudProvider              string
+	region                     string
+	schedulerSize              string
+	highAvailability           string
+	developmentMode            string
+	cicdEnforcement            string
+	defaultTaskPodMemory       string
+	resourceQuotaCPU           string
+	resourceQuotaMemory        string
+	defaultTaskPodCPU          string
+	addDeploymentRole          string
+	updateDeploymentRole       string
+	workloadIdentity           string
+	until                      string
+	forDuration                string
+	removeOverride             bool
+	forceOverride              bool
+	logApiserver               bool
+	logWebserver               bool
+	logScheduler               bool
+	logWorkers                 bool
+	logTriggerer               bool
+	flagRemoteExecutionEnabled bool
+	flagAllowedIPAddressRanges string
+	flagTaskLogBucket          string
+	flagTaskLogURLPattern      string
+	allowedIPAddressRanges     *[]string
+	taskLogBucket              *string
+	taskLogURLPattern          *string
 
 	deploymentType                = standard
 	deploymentVariableListExample = `
@@ -364,6 +372,7 @@ func newDeploymentLogsCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&logCount, "log-count", "c", logCount, "Number of logs to show")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to show logs of")
 	cmd.Flags().BoolVar(&logWebserver, "webserver", false, "Show logs from the webserver")
+	cmd.Flags().BoolVar(&logApiserver, "apiserver", false, "Show logs from the api server")
 	cmd.Flags().BoolVar(&logScheduler, "scheduler", false, "Show logs from the scheduler")
 	cmd.Flags().BoolVar(&logWorkers, "workers", false, "Show logs from the workers")
 	cmd.Flags().BoolVar(&logTriggerer, "triggerer", false, "Show logs from the triggerer")
@@ -385,7 +394,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the Deployment")
-	cmd.Flags().StringVarP(&executor, "executor", "e", "CeleryExecutor", "The executor to use for the Deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
+	cmd.Flags().StringVarP(&executor, "executor", "e", "CeleryExecutor", "The executor to use for the Deployment. Possible values can be CeleryExecutor, KubernetesExecutor, or AstroExecutor.")
 	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable")
 	cmd.Flags().BoolVarP(&deploymentCreateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. This flag has been deprecated for the --cicd-enforcement flag.")
 	err := cmd.Flags().MarkDeprecated("enforce-cicd", "use --cicd-enforcement instead")
@@ -412,6 +421,10 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of scheduler for the Deployment. Possible values can be small, medium, large, extra_large")
 		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "disable", "Enables High Availability for the Deployment")
 		cmd.Flags().StringVarP(&developmentMode, "development-mode", "m", "disable", "Set to 'enable' to enable development-only features such as hibernation. When enabled, the Deployment will not have guaranteed uptime SLAs.'")
+		cmd.Flags().BoolVarP(&flagRemoteExecutionEnabled, "remote-execution-enabled", "", false, "Enables Remote Execution for the Deployment.")
+		cmd.Flags().StringVarP(&flagAllowedIPAddressRanges, "allowed-ip-address-ranges", "", "", "A comma-separated list of allowed IP address ranges for the Deployment. By default, there's no IP restriction. Example: 203.0.113.0/24,198.51.100.42/32")
+		cmd.Flags().StringVarP(&flagTaskLogBucket, "task-log-bucket", "", "", "The bucket to use for storing task logs. Example: s3://my-bucket/airflow-logs")
+		cmd.Flags().StringVarP(&flagTaskLogURLPattern, "task-log-url-pattern", "", "", "The URL pattern to use for accessing task logs. Example: dag_id={{ ti.dag_id }}/run_id={{ ti.run_id }}/task_id={{ ti.task_id }}/{% if ti.map_index >= 0 %}map_index={{ ti.map_index }}/{% endif %}attempt={{ try_number|default(ti.try_number) }}/{{ ti.id }}.log")
 	} else {
 		cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", 0, "The Deployment's scheduler resources in AUs")
 		cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", 0, "The number of scheduler replicas for the Deployment")
@@ -433,7 +446,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&label, "name", "n", "", "Update the Deployment's name. If the new name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "Workspace the Deployment is located in")
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
+	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the deployment. Possible values can be CeleryExecutor, KubernetesExecutor or AstroExecutor.")
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the deployment to update. File can be in either JSON or YAML format.")
 	cmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "Force update: Don't prompt a user before Deployment update")
 	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable.")
@@ -454,6 +467,9 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVarP(&resourceQuotaCPU, "resource-quota-cpu", "", "", "The Resource Quota CPU to use for the Deployment. Example value: 10")
 		cmd.Flags().StringVarP(&resourceQuotaMemory, "resource-quota-memory", "", "", "The Resource Quota Memory to use for the Deployment. Example value: 20Gi")
 		cmd.Flags().StringVarP(&developmentMode, "development-mode", "m", "", "Whether the Deployment is for development only. If 'disable', the Deployment can be considered production for the purposes of support case priority, but development-only features such as hibernation will not be available. You can't update this value to `enable` for existing non-development Deployments.'")
+		cmd.Flags().StringVarP(&flagAllowedIPAddressRanges, "allowed-ip-address-ranges", "", "", "A comma-separated list of allowed IP address ranges for the Deployment. By default, there's no IP restriction. Example: 203.0.113.0/24,198.51.100.42/32")
+		cmd.Flags().StringVarP(&flagTaskLogBucket, "task-log-bucket", "", "", "The bucket to use for storing task logs. Example: s3://my-bucket/airflow-logs")
+		cmd.Flags().StringVarP(&flagTaskLogURLPattern, "task-log-url-pattern", "", "", "The URL pattern to use for accessing task logs. Example: dag_id={{ ti.dag_id }}/run_id={{ ti.run_id }}/task_id={{ ti.task_id }}/{% if ti.map_index >= 0 %}map_index={{ ti.map_index }}/{% endif %}attempt={{ try_number|default(ti.try_number) }}/{{ ti.id }}.log")
 	} else {
 		cmd.Flags().IntVarP(&updateSchedulerAU, "scheduler-au", "s", 0, "The Deployment's Scheduler resources in AUs.")
 		cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment.")
@@ -621,8 +637,9 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid Workspace")
 	}
+	logServer := logWebserver || logApiserver
 
-	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logWebserver, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroCoreClient)
+	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logServer, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroCoreClient)
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo
@@ -636,13 +653,27 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// clean output
 	deployment.CleanOutput = cleanOutput
 
+	// Get latest runtime version
+	if runtimeVersion == "" {
+		airflowVersionClient := airflowversions.NewClient(httpClient, false)
+		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "", false)
+		if err != nil {
+			return err
+		}
+	}
+
 	// set default executor if none was specified
 	if executor == "" {
-		executor = deployment.CeleryExecutor
+		if airflowversions.IsAirflow3(runtimeVersion) {
+			executor = deployment.AstroExecutor
+		} else {
+			executor = deployment.CeleryExecutor
+		}
 	}
+
 	// check if executor is valid
-	if !isValidExecutor(executor) {
-		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
+	if !deployment.IsValidExecutor(executor, runtimeVersion, deploymentType) {
+		return fmt.Errorf("%s is %w for runtime version %s deployment type %s", executor, errInvalidExecutor, runtimeVersion, deploymentType)
 	}
 
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
@@ -655,13 +686,31 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		return errors.New("Invalid --type value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --cicd-enforcment value")
+		return errors.New("Invalid --cicd-enforcement value")
 	}
 	if deploymentCreateEnforceCD && cicdEnforcement == disable {
-		return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
+		return errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
 	}
 	if organization.IsOrgHosted() && clusterID != "" && (deploymentType == standard || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared) {
 		return errors.New("flag --cluster-id cannot be used to create a standard deployment. If you want to create a dedicated deployment, use --type dedicated along with --cluster-id")
+	}
+	if cmd.Flags().Changed("allowed-ip-address-ranges") {
+		if !flagRemoteExecutionEnabled {
+			return errors.New("flag --allowed-ip-address-ranges cannot be used when remote execution is disabled")
+		}
+		allowedIPAddressRanges = fromCsv(flagAllowedIPAddressRanges)
+	}
+	if cmd.Flags().Changed("task-log-bucket") {
+		if !flagRemoteExecutionEnabled {
+			return errors.New("flag --task-log-bucket cannot be used when remote execution is disabled")
+		}
+		taskLogBucket = &flagTaskLogBucket
+	}
+	if cmd.Flags().Changed("task-log-url-pattern") {
+		if !flagRemoteExecutionEnabled {
+			return errors.New("flag --task-log-url-pattern cannot be used when remote execution is disabled")
+		}
+		taskLogURLPattern = &flagTaskLogURLPattern
 	}
 	if deploymentCreateEnforceCD {
 		cicdEnforcement = enable
@@ -691,22 +740,13 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		return errors.New("Invalid --dag-deploy value)")
 	}
 	if dagDeploy == "" {
-		if organization.IsOrgHosted() {
+		if organization.IsOrgHosted() && !flagRemoteExecutionEnabled {
 			dagDeploy = enable
 		} else {
 			dagDeploy = disable
 		}
 	}
 
-	// Get latest runtime version
-	if runtimeVersion == "" {
-		airflowVersionClient := airflowversions.NewClient(httpClient, false)
-		// Excludes Airflow 3 until the command supports it
-		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "", true)
-		if err != nil {
-			return err
-		}
-	}
 	// validate cloudProvider
 	if cloudProvider != "" {
 		if !isValidCloudProvider(astrocore.SharedClusterCloudProvider(cloudProvider)) {
@@ -716,7 +756,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, platformCoreClient, astroCoreClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
@@ -733,7 +773,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 	deployment.CleanOutput = cleanOutput
 
 	// check if executor is valid
-	if !isValidExecutor(executor) {
+	if executor != "" && !deployment.IsValidExecutor(executor, runtimeVersion, deploymentType) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 	// request is to update from a file
@@ -756,21 +796,22 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		return errors.New("Invalid --development-mode value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --cicd-enforcment value")
+		return errors.New("Invalid --cicd-enforcement value")
 	}
 	if cmd.Flags().Changed("enforce-cicd") {
-		if deploymentUpdateEnforceCD && cicdEnforcement == disable {
-			return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
+		err1 := validateCICD()
+		if err1 != nil {
+			return err1
 		}
-		if !deploymentUpdateEnforceCD && cicdEnforcement == enable {
-			return errors.New("flags --enforce-cicd and --cicd-enforcment contradict each other. Use only --cicd-enforcment")
-		}
-		if deploymentUpdateEnforceCD {
-			cicdEnforcement = enable
-		}
-		if !deploymentUpdateEnforceCD {
-			cicdEnforcement = disable
-		}
+	}
+	if cmd.Flags().Changed("allowed-ip-address-ranges") {
+		allowedIPAddressRanges = fromCsv(flagAllowedIPAddressRanges)
+	}
+	if cmd.Flags().Changed("task-log-bucket") {
+		taskLogBucket = &flagTaskLogBucket
+	}
+	if cmd.Flags().Changed("task-log-url-pattern") {
+		taskLogURLPattern = &flagTaskLogURLPattern
 	}
 
 	// Get release name from args, if passed
@@ -778,7 +819,23 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, forceUpdate, astroCoreClient, platformCoreClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroCoreClient, platformCoreClient)
+}
+
+func validateCICD() error {
+	if deploymentUpdateEnforceCD && cicdEnforcement == disable {
+		return errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
+	}
+	if !deploymentUpdateEnforceCD && cicdEnforcement == enable {
+		return errors.New("flags --enforce-cicd and --cicd-enforcement contradict each other. Use only --cicd-enforcement")
+	}
+	if deploymentUpdateEnforceCD {
+		cicdEnforcement = enable
+	}
+	if !deploymentUpdateEnforceCD {
+		cicdEnforcement = disable
+	}
+	return nil
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
@@ -862,10 +919,6 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 	}
 
 	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, platformCoreClient)
-}
-
-func isValidExecutor(executor string) bool {
-	return strings.EqualFold(executor, deployment.KubeExecutor) || strings.EqualFold(executor, deployment.CeleryExecutor) || executor == "" || strings.EqualFold(executor, deployment.CELERY) || strings.EqualFold(executor, deployment.KUBERNETES)
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.
@@ -1400,4 +1453,9 @@ func getOverrideUntil(until, forDuration string) (*time.Time, error) {
 		return &overrideUntil, nil
 	}
 	return nil, nil
+}
+
+func fromCsv(s string) *[]string {
+	ss := strings.Split(strings.TrimSpace(s), ",")
+	return &ss
 }

@@ -1,5 +1,7 @@
 ---
 version: 2.1
+orbs:
+  coveralls: coveralls/coveralls@2.2.5
 jobs:
   lint:
     working_directory: /go/src/github.com/astronomer/astro-cli
@@ -104,7 +106,8 @@ commands:
             HOUSTON_HOST: houston
           command: |
             make test
-            bash -c "bash <(curl -s https://codecov.io/bash)"
+      - coveralls/upload:
+          coverage_file: coverage.txt
   integration-test:
     description: "Run integration tests"
     steps:

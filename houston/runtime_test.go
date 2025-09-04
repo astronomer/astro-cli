@@ -32,7 +32,25 @@ func (s *Suite) TestGetRuntimeReleases() {
 		})
 		api := NewClient(client)
 
-		resp, err := api.GetRuntimeReleases("")
+		vars := make(map[string]interface{})
+		resp, err := api.GetRuntimeReleases(vars)
+		s.NoError(err)
+		s.Equal(resp, mockResp.Data.RuntimeReleases)
+	})
+
+	s.Run("success without airflow version for 1.0.0", func() {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		vars := make(map[string]interface{})
+		vars["clusterId"] = "test-cluster-id"
+		resp, err := api.GetRuntimeReleases(vars)
 		s.NoError(err)
 		s.Equal(resp, mockResp.Data.RuntimeReleases)
 	})
@@ -47,7 +65,9 @@ func (s *Suite) TestGetRuntimeReleases() {
 		})
 		api := NewClient(client)
 
-		resp, err := api.GetRuntimeReleases("2.2.4")
+		vars := make(map[string]interface{})
+		vars["airflowVersion"] = "2.2.4"
+		resp, err := api.GetRuntimeReleases(vars)
 		s.NoError(err)
 		s.Equal(resp, mockResp.Data.RuntimeReleases)
 	})
@@ -62,7 +82,8 @@ func (s *Suite) TestGetRuntimeReleases() {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetRuntimeReleases("")
+		vars := make(map[string]interface{})
+		_, err := api.GetRuntimeReleases(vars)
 		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

@@ -129,6 +129,23 @@ var (
 			Name:               "test-deployment",
 		},
 	}
+	deploymentResponseRemoteExecution = astroplatformcore.GetDeploymentResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.Deployment{
+			Id:                 deploymentID,
+			RuntimeVersion:     "3.0-1",
+			Namespace:          "test-name",
+			WorkspaceId:        ws,
+			WebServerUrl:       "test-url",
+			IsDagDeployEnabled: false,
+			Type:               &hybridType,
+			RemoteExecution: &astroplatformcore.DeploymentRemoteExecution{
+				Enabled: true,
+			},
+		},
+	}
 	deploymentResponseDags = astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -177,6 +194,107 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
+		return mockImageHandler
+	}
+
+	mockContainerHandler := new(mocks.ContainerHandler)
+	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		return mockContainerHandler, nil
+	}
+
+	ctx, err := config.GetCurrentContext()
+	assert.NoError(t, err)
+	ctx.Token = "test testing"
+	err = ctx.SetContext()
+	assert.NoError(t, err)
+
+	// mock os.Stdin
+	input := []byte("1")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	defer testUtil.MockUserInput(t, "1")()
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
+	assert.NoError(t, err)
+
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.RuntimeID = "test-id"
+	deployInput.Pytest = "pytest"
+	deployInput.Prompt = false
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
+	assert.NoError(t, err)
+
+	// test custom image
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.ImageName = "custom-image"
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
+	assert.NoError(t, err)
+
+	config.CFG.ProjectDeployment.SetProjectString("test-id")
+	// test both deploymentID and name used
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.DeploymentName = "test-name"
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
+	assert.NoError(t, err)
+
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Pytest = ""
+	deployInput.WaitForStatus = true
+	sleepTime = 1
+	timeoutNum = 1
+	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
+	assert.ErrorIs(t, err, deployment.ErrTimedOut)
+
+	mockCoreClient.AssertExpectations(t)
+	mockImageHandler.AssertExpectations(t)
+	mockContainerHandler.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
+}
+
+func TestDeployOnRemoteExecutionDeployment(t *testing.T) {
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	deployInput := InputDeploy{
+		Path:           "./testfiles/",
+		RuntimeID:      "",
+		WsID:           ws,
+		Pytest:         "parse",
+		EnvFile:        "./testfiles/.env",
+		ImageName:      "",
+		DeploymentName: "",
+		Prompt:         true,
+		WaitForStatus:  false,
+		Dags:           false,
+	}
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseRemoteExecution, nil).Times(6)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(5)
+	mockPlatformCoreClient.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(5)
+	mockPlatformCoreClient.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&finalizeDeployResponse, nil).Times(5)
+
+	mockImageHandler := new(mocks.ImageHandler)
+	airflowImageHandler = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("3.0-1", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -910,7 +1028,7 @@ func TestBuildImageFailure(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
-	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
+	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -921,14 +1039,14 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// dockerfile parsing error
 	dockerfile = "Dockerfile.invalid"
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, false, mockPlatformCoreClient)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
 	// failed to get runtime releases
 	dockerfile = "Dockerfile"
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 	mockCoreClient.AssertExpectations(t)
 	mockPlatformCoreClient.AssertExpectations(t)
@@ -973,25 +1091,25 @@ func TestValidRuntimeVersion(t *testing.T) {
 
 		// AF2 to AF3 upgrade cases
 		{
-			name:              "AF2 >= 8.7.0 to AF3 version with force flag is valid upgrade",
-			currentVersion:    "8.7.0",
+			name:              "AF2 >= 12.0.0 to AF3 version with force flag is valid upgrade",
+			currentVersion:    "12.0.0",
 			newVersion:        "3.0-1",
 			deploymentOptions: []string{"3.0-1"},
 			forceUpgradeToAF3: true,
 			expected:          true,
 		},
 		{
-			name:              "AF2 < 8.7.0 to AF3 version with force flag is invalid upgrade",
+			name:              "AF2 < 12.0.0 to AF3 version with force flag is invalid upgrade",
 			currentVersion:    "4.2.5",
 			newVersion:        "3.0-1",
 			deploymentOptions: []string{"3.0-1"},
 			forceUpgradeToAF3: true,
 			expected:          false,
-			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 8.7.0 or higher",
+			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 12.0.0 or higher",
 		},
 		{
-			name:              "AF2 >= 8.7.0 to AF3 version without force flag is invalid upgrade",
-			currentVersion:    "8.7.0",
+			name:              "AF2 >= 12.0.0 to AF3 version without force flag is invalid upgrade",
+			currentVersion:    "12.0.0",
 			newVersion:        "3.0-1",
 			deploymentOptions: []string{"3.0-1"},
 			forceUpgradeToAF3: false,

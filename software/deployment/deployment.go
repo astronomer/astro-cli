@@ -84,83 +84,29 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-func checkManualReleaseNames(client houston.ClientInterface) bool {
-	logger.Debug("Checking checkManualReleaseNames through appConfig from houston-api")
-
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-
-	return config.ManualReleaseNames
-}
-
-// CheckNFSMountDagDeployment returns true when we can set custom NFS location for dags
-func CheckNFSMountDagDeployment(client houston.ClientInterface) bool {
-	logger.Debug("Checking checkNFSMountDagDeployment through appConfig from houston-api")
-
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-
-	return config.Flags.NfsMountDagDeployment
-}
-
-func CheckHardDeleteDeployment(client houston.ClientInterface) bool {
-	logger.Debug("Checking for hard delete deployment flag")
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-	return config.Flags.HardDeleteDeployment
-}
-
-func CheckPreCreateNamespaceDeployment(client houston.ClientInterface) bool {
-	logger.Debug("Checking for pre created deployment flag")
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-	return config.Flags.ManualNamespaceNames
-}
-
-func CheckNamespaceFreeFormEntryDeployment(client houston.ClientInterface) bool {
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-	return config.Flags.NamespaceFreeFormEntry
-}
-
-func CheckTriggererEnabled(client houston.ClientInterface) bool {
-	logger.Debug("Checking for triggerer flag")
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-	return config.Flags.TriggererEnabled
-}
-
-func addTriggererReplicasArg(vars map[string]interface{}, client houston.ClientInterface, triggererReplicas int) {
-	if CheckTriggererEnabled(client) && triggererReplicas != -1 {
+func addTriggererReplicasArg(vars map[string]interface{}, appConfig *houston.AppConfig, triggererReplicas int) {
+	if appConfig.Flags.TriggererEnabled && triggererReplicas != -1 {
 		vars["triggererReplicas"] = triggererReplicas
 	}
 }
 
 // Create airflow deployment
-func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io.Writer) error {
+func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io.Writer, appConfig *houston.AppConfig) error {
 	vars := map[string]interface{}{"label": req.Label, "workspaceId": req.WS, "executor": req.Executor, "cloudRole": req.CloudRole}
 
-	if CheckPreCreateNamespaceDeployment(client) {
-		namespace, err := getDeploymentSelectionNamespaces(client, out)
+	if req.ClusterID != "" {
+		vars["clusterId"] = req.ClusterID
+	}
+
+	if appConfig.Flags.ManualNamespaceNames {
+		namespace, err := getDeploymentSelectionNamespaces(client, out, req.ClusterID)
 		if err != nil {
 			return err
 		}
 		vars["namespace"] = namespace
 	}
 
-	if CheckNamespaceFreeFormEntryDeployment(client) {
+	if appConfig.Flags.NamespaceFreeFormEntry {
 		namespace, err := getDeploymentNamespaceName()
 		if err != nil {
 			return err
@@ -168,7 +114,7 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 		vars["namespace"] = namespace
 	}
 
-	if req.ReleaseName != "" && checkManualReleaseNames(client) {
+	if req.ReleaseName != "" && appConfig.ManualReleaseNames {
 		vars["releaseName"] = req.ReleaseName
 	}
 
@@ -183,7 +129,7 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 		return err
 	}
 
-	addTriggererReplicasArg(vars, client, req.TriggererReplicas)
+	addTriggererReplicasArg(vars, appConfig, req.TriggererReplicas)
 
 	d, err := houston.Call(client.CreateDeployment)(vars)
 	if err != nil {
@@ -245,7 +191,7 @@ func Delete(id string, hardDelete bool, client houston.ClientInterface, out io.W
 }
 
 // list all available namespaces
-func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Writer) (string, error) {
+func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Writer, clusterID string) (string, error) {
 	tab := &printutil.Table{
 		Padding:        []int{30},
 		DynamicPadding: true,
@@ -255,7 +201,7 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 	logger.Debug("checking namespaces available for platform")
 	tab.GetUserInput = true
 
-	names, err := houston.Call(client.GetAvailableNamespaces)(nil)
+	names, err := houston.Call(client.GetAvailableNamespaces)(map[string]interface{}{"clusterID": clusterID})
 	if err != nil {
 		return "", err
 	}
@@ -292,10 +238,11 @@ func getDeploymentNamespaceName() (string, error) {
 	return namespaceName, nil
 }
 
-func getDeploymentsFromHouston(ws string, all bool, client houston.ClientInterface) ([]houston.Deployment, error) {
+func getDeploymentsFromHouston(ws string, all bool, client houston.ClientInterface, clusterID string) ([]houston.Deployment, error) {
 	if all {
 		return houston.Call(client.ListPaginatedDeployments)(houston.PaginatedDeploymentsRequest{
-			Take: -1,
+			Take:      -1,
+			ClusterID: clusterID,
 		})
 	}
 	listDeploymentRequest := houston.ListDeploymentsRequest{}
@@ -304,8 +251,8 @@ func getDeploymentsFromHouston(ws string, all bool, client houston.ClientInterfa
 }
 
 // List all airflow deployments
-func List(ws string, all bool, client houston.ClientInterface, out io.Writer) error {
-	deployments, err := getDeploymentsFromHouston(ws, all, client)
+func List(ws string, all bool, client houston.ClientInterface, out io.Writer, clusterID string) error {
+	deployments, err := getDeploymentsFromHouston(ws, all, client, clusterID)
 	if err != nil {
 		return err
 	}
@@ -335,7 +282,7 @@ func List(ws string, all bool, client houston.ClientInterface, out io.Writer) er
 }
 
 // Update an airflow deployment
-func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts, executor string, gitSyncInterval, triggererReplicas int, client houston.ClientInterface, out io.Writer) error {
+func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts, executor string, gitSyncInterval, triggererReplicas int, client houston.ClientInterface, out io.Writer, appConfig *houston.AppConfig) error {
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole
@@ -353,7 +300,7 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 		return err
 	}
 
-	if CheckTriggererEnabled(client) && triggererReplicas != -1 {
+	if appConfig.Flags.TriggererEnabled && triggererReplicas != -1 {
 		vars["triggererReplicas"] = triggererReplicas
 	}
 
@@ -463,7 +410,7 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 	}
 
 	if desiredRuntimeVersion == "" {
-		selectedVersion, err := getRuntimeVersionSelection(deployment.RuntimeVersion, deployment.RuntimeAirflowVersion, client, out)
+		selectedVersion, err := getRuntimeVersionSelection(deployment.RuntimeVersion, deployment.RuntimeAirflowVersion, deployment.ClusterID, client, out)
 		if err != nil {
 			return err
 		}
@@ -536,7 +483,10 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 		return errDeploymentAlreadyOnRuntime
 	}
 
-	runtimeReleases, err := houston.Call(client.GetRuntimeReleases)(deployment.AirflowVersion)
+	vars := make(map[string]interface{})
+	vars["airflowVersion"] = deployment.AirflowVersion
+	vars["clusterId"] = deployment.ClusterID
+	runtimeReleases, err := houston.Call(client.GetRuntimeReleases)(vars)
 	if err != nil {
 		return err
 	}
@@ -556,7 +506,7 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 	}
 	desiredRuntimeVersion := latestRuntimeRelease.String()
 
-	vars := map[string]interface{}{"deploymentUuid": deploymentID, "desiredRuntimeVersion": desiredRuntimeVersion}
+	vars = map[string]interface{}{"deploymentUuid": deploymentID, "desiredRuntimeVersion": desiredRuntimeVersion}
 	resp, err := houston.Call(client.UpdateDeploymentRuntime)(vars)
 	if err != nil {
 		return err
@@ -644,7 +594,7 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 	return filteredVersions[i-1], nil
 }
 
-func getRuntimeVersionSelection(runtimeVersion, airflowVersion string, client houston.ClientInterface, out io.Writer) (string, error) {
+func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string, client houston.ClientInterface, out io.Writer) (string, error) {
 	currentRuntimeVersion, err := semver.NewVersion(runtimeVersion)
 	if err != nil {
 		return "", err
@@ -655,7 +605,9 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion string, client ho
 	}
 
 	// prepare list of AC airflow versions
-	runtimeVersions, err := houston.Call(client.GetRuntimeReleases)("")
+	vars := make(map[string]interface{})
+	vars["clusterId"] = clusterID
+	runtimeVersions, err := houston.Call(client.GetRuntimeReleases)(vars)
 	if err != nil {
 		return "", err
 	}

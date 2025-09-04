@@ -246,7 +246,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				if deploymentFromFile.Deployment.Configuration.Executor == deployment.KubeExecutor || deploymentFromFile.Deployment.Configuration.Executor == deployment.KUBERNETES {
 					return errNoUseWorkerQueues
 				}
-				err = workerqueue.IsHostedCeleryWorkerQueueInputValid(requestedWorkerQueue, defaultOptions, &astroMachine)
+				err = workerqueue.IsHostedWorkerQueueInputValid(requestedWorkerQueue, defaultOptions, &astroMachine)
 				if err != nil {
 					return err
 				}
@@ -267,7 +267,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				}
 				// set default values if none were specified
 				requestedHybridWorkerQueue := workerqueue.SetWorkerQueueValuesHybrid(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, workerQueue, defaultOptions)
-				err = workerqueue.IsCeleryWorkerQueueInputValid(requestedHybridWorkerQueue, defaultOptions)
+				err = workerqueue.IsWorkerQueueInputValid(requestedHybridWorkerQueue, defaultOptions)
 				if err != nil {
 					return err
 				}
@@ -280,6 +280,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 	switch action {
 	case createAction:
 		createDeploymentRequest := astroplatformcore.CreateDeploymentRequest{}
+		var defaultTaskPodCPU *string
+		var defaultTaskPodMemory *string
+		var resourceQuotaCPU *string
+		var resourceQuotaMemory *string
+		var remoteExecution *astroplatformcore.DeploymentRemoteExecutionRequest
 		if deployment.IsDeploymentStandard(deploymentType) || deployment.IsDeploymentDedicated(deploymentType) {
 			coreCloudProvider := deployment.GetCoreCloudProvider(deploymentFromFile.Deployment.Configuration.CloudProvider)
 			coreDeploymentType := astrocore.GetDeploymentOptionsParamsDeploymentType(deploymentType)
@@ -293,17 +298,18 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			if err != nil {
 				return err
 			}
-			if deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU == "" {
-				deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU = configOption.ResourceQuotas.DefaultPodSize.Cpu.Default
-			}
-			if deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory == "" {
-				deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory = configOption.ResourceQuotas.DefaultPodSize.Memory.Default
-			}
-			if deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU == "" {
-				deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU = configOption.ResourceQuotas.ResourceQuota.Cpu.Default
-			}
-			if deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory == "" {
-				deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory = configOption.ResourceQuotas.ResourceQuota.Memory.Default
+			remoteExecutionEnabled := deploymentFromFile.Deployment.Configuration.RemoteExecution != nil && deploymentFromFile.Deployment.Configuration.RemoteExecution.Enabled
+			defaultTaskPodCPU = deployment.CreateDefaultTaskPodCPU(deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU, remoteExecutionEnabled, &configOption)
+			defaultTaskPodMemory = deployment.CreateDefaultTaskPodMemory(deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory, remoteExecutionEnabled, &configOption)
+			resourceQuotaCPU = deployment.CreateResourceQuotaCPU(deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU, remoteExecutionEnabled, &configOption)
+			resourceQuotaMemory = deployment.CreateResourceQuotaMemory(deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory, remoteExecutionEnabled, &configOption)
+			if remoteExecutionEnabled {
+				remoteExecution = &astroplatformcore.DeploymentRemoteExecutionRequest{
+					Enabled:                true,
+					AllowedIpAddressRanges: deploymentFromFile.Deployment.Configuration.RemoteExecution.AllowedIPAddressRanges,
+					TaskLogBucket:          deploymentFromFile.Deployment.Configuration.RemoteExecution.TaskLogBucket,
+					TaskLogUrlPattern:      deploymentFromFile.Deployment.Configuration.RemoteExecution.TaskLogURLPattern,
+				}
 			}
 		}
 		if deployment.IsDeploymentStandard(deploymentType) {
@@ -323,6 +329,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorCELERY
 			case deployment.KubeExecutor, deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
+			case deployment.AstroExecutor, deployment.ASTRO:
+				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorASTRO
 			}
 
 			var schedulerSize astroplatformcore.CreateStandardDeploymentRequestSchedulerSize
@@ -355,10 +363,10 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				IsDevelopmentMode:    &deploymentFromFile.Deployment.Configuration.IsDevelopmentMode,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.CreateStandardDeploymentRequestTypeSTANDARD,
-				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU,
-				DefaultTaskPodMemory: deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory,
-				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU,
-				ResourceQuotaMemory:  deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory,
+				DefaultTaskPodCpu:    defaultTaskPodCPU,
+				DefaultTaskPodMemory: defaultTaskPodMemory,
+				ResourceQuotaCpu:     resourceQuotaCPU,
+				ResourceQuotaMemory:  resourceQuotaMemory,
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
 				WorkloadIdentity:     deplWorkloadIdentity,
@@ -383,6 +391,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorCELERY
 			case deployment.KubeExecutor, deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorKUBERNETES
+			case deployment.AstroExecutor, deployment.ASTRO:
+				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorASTRO
 			}
 
 			var schedulerSize astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize
@@ -414,13 +424,14 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				ClusterId:            clusterID,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.CreateDedicatedDeploymentRequestTypeDEDICATED,
-				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU,
-				DefaultTaskPodMemory: deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory,
-				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU,
-				ResourceQuotaMemory:  deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory,
+				DefaultTaskPodCpu:    defaultTaskPodCPU,
+				DefaultTaskPodMemory: defaultTaskPodMemory,
+				ResourceQuotaCpu:     resourceQuotaCPU,
+				ResourceQuotaMemory:  resourceQuotaMemory,
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
 				WorkloadIdentity:     deplWorkloadIdentity,
+				RemoteExecution:      remoteExecution,
 			}
 			if dedicatedDeploymentRequest.IsDevelopmentMode != nil && *dedicatedDeploymentRequest.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
@@ -489,6 +500,19 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				return fmt.Errorf("changing an existing deployment's cluster %w", errNotPermitted)
 			}
 		}
+		defaultTaskPodCPU := deployment.UpdateDefaultTaskPodCPU(deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU, existingDeployment, nil)
+		defaultTaskPodMemory := deployment.UpdateDefaultTaskPodMemory(deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory, existingDeployment, nil)
+		resourceQuotaCPU := deployment.UpdateResourceQuotaCPU(deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU, existingDeployment)
+		resourceQuotaMemory := deployment.UpdateResourceQuotaMemory(deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory, existingDeployment)
+		var remoteExecution *astroplatformcore.DeploymentRemoteExecutionRequest
+		if deployment.IsRemoteExecutionEnabled(existingDeployment) {
+			remoteExecution = &astroplatformcore.DeploymentRemoteExecutionRequest{
+				Enabled:                true,
+				AllowedIpAddressRanges: deploymentFromFile.Deployment.Configuration.RemoteExecution.AllowedIPAddressRanges,
+				TaskLogBucket:          deploymentFromFile.Deployment.Configuration.RemoteExecution.TaskLogBucket,
+				TaskLogUrlPattern:      deploymentFromFile.Deployment.Configuration.RemoteExecution.TaskLogURLPattern,
+			}
+		}
 		if deployment.IsDeploymentStandard(deploymentType) {
 			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.Executor) {
@@ -496,6 +520,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
 			case strings.ToUpper(deployment.KubeExecutor), deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
+			case strings.ToUpper(deployment.AstroExecutor), deployment.ASTRO:
+				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorASTRO
 			}
 
 			var schedulerSize astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize
@@ -508,19 +534,6 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
 			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE):
 				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeEXTRALARGE
-			}
-
-			if deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory == "" {
-				deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory = *existingDeployment.DefaultTaskPodMemory
-			}
-			if deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU == "" {
-				deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU = *existingDeployment.DefaultTaskPodCpu
-			}
-			if deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU == "" {
-				deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU = *existingDeployment.ResourceQuotaCpu
-			}
-			if deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory == "" {
-				deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory = *existingDeployment.ResourceQuotaMemory
 			}
 
 			var deplWorkloadIdentity *string
@@ -537,10 +550,10 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				IsHighAvailability:   deploymentFromFile.Deployment.Configuration.IsHighAvailability,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.UpdateStandardDeploymentRequestTypeSTANDARD,
-				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU,
-				DefaultTaskPodMemory: deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory,
-				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU,
-				ResourceQuotaMemory:  deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory,
+				DefaultTaskPodCpu:    defaultTaskPodCPU,
+				DefaultTaskPodMemory: defaultTaskPodMemory,
+				ResourceQuotaCpu:     resourceQuotaCPU,
+				ResourceQuotaMemory:  resourceQuotaMemory,
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
@@ -567,6 +580,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY
 			case strings.ToUpper(deployment.KubeExecutor), deployment.KUBERNETES:
 				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
+			case strings.ToUpper(deployment.AstroExecutor), deployment.ASTRO:
+				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorASTRO
 			}
 
 			var schedulerSize astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize
@@ -579,18 +594,6 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
 			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE):
 				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
-			}
-			if deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU == "" {
-				deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU = *existingDeployment.DefaultTaskPodCpu
-			}
-			if deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory == "" {
-				deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory = *existingDeployment.DefaultTaskPodMemory
-			}
-			if deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU == "" {
-				deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU = *existingDeployment.ResourceQuotaCpu
-			}
-			if deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory == "" {
-				deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory = *existingDeployment.ResourceQuotaMemory
 			}
 
 			var deplWorkloadIdentity *string
@@ -607,15 +610,16 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				IsHighAvailability:   deploymentFromFile.Deployment.Configuration.IsHighAvailability,
 				WorkspaceId:          workspaceID,
 				Type:                 astroplatformcore.UpdateDedicatedDeploymentRequestTypeDEDICATED,
-				DefaultTaskPodCpu:    deploymentFromFile.Deployment.Configuration.DefaultTaskPodCPU,
-				DefaultTaskPodMemory: deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory,
-				ResourceQuotaCpu:     deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU,
-				ResourceQuotaMemory:  deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory,
+				DefaultTaskPodCpu:    defaultTaskPodCPU,
+				DefaultTaskPodMemory: defaultTaskPodMemory,
+				ResourceQuotaCpu:     resourceQuotaCPU,
+				ResourceQuotaMemory:  resourceQuotaMemory,
 				WorkerQueues:         &listQueuesRequest,
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
 				WorkloadIdentity:     deplWorkloadIdentity,
+				RemoteExecution:      remoteExecution,
 			}
 			if existingDeployment.IsDevelopmentMode != nil && *existingDeployment.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
@@ -715,8 +719,9 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 	if deploymentFromFile.Deployment.Configuration.Executor == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.executor")
 	}
-	if !isValidExecutor(deploymentFromFile.Deployment.Configuration.Executor) {
-		return fmt.Errorf("executor %s %w. It can either be CeleryExecutor or KubernetesExecutor", deploymentFromFile.Deployment.Configuration.Executor, errInvalidValue)
+	// check if deployment is using Airflow 3 by validating runtime version
+	if !deployment.IsValidExecutor(deploymentFromFile.Deployment.Configuration.Executor, deploymentFromFile.Deployment.Configuration.RunTimeVersion, deploymentFromFile.Deployment.Configuration.DeploymentType) {
+		return fmt.Errorf("executor %s %w. It can be CeleryExecutor, KubernetesExecutor, or AstroExecutor", deploymentFromFile.Deployment.Configuration.Executor, errInvalidValue)
 	}
 	// if alert emails are requested
 	if hasAlertEmails(deploymentFromFile) {
@@ -993,11 +998,6 @@ func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment) (envV
 		envVars = append(envVars, envVar)
 	}
 	return envVars
-}
-
-// isValidExecutor returns true for valid executor values and false if not.
-func isValidExecutor(executor string) bool {
-	return strings.EqualFold(executor, deployment.KubeExecutor) || strings.EqualFold(executor, deployment.CeleryExecutor) || strings.EqualFold(executor, deployment.CELERY) || strings.EqualFold(executor, deployment.KUBERNETES)
 }
 
 func transformDeploymentType(deploymentType string) astroplatformcore.DeploymentType {

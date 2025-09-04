@@ -55,6 +55,7 @@ var (
 	knowHosts               string
 	runtimeVersion          string
 	desiredRuntimeVersion   string
+	clusterID               string
 	deploymentCreateExample = `
 # Create new deployment with Celery executor (default: celery without params).
 $ astro deployment create --label=new-deployment-name --executor=celery
@@ -68,10 +69,29 @@ $ astro deployment create --label=new-deployment-name-k8s --executor=k8s --airfl
 # Create new deployment with Astronomer Runtime.
 $ astro deployment create --label=my-new-deployment --executor=k8s --runtime-version=6.0.1
 `
+	deploymentCreateExampleSoftwareV1 = `
+# Create new deployment with Celery executor (default: celery without params).
+$ astro deployment create --label=new-deployment-name --executor=celery --cluster-id=123
+
+# Create new deployment with Local executor.
+$ astro deployment create --label=new-deployment-name-local --executor=local --cluster-id=123
+
+# Create new deployment with Kubernetes executor.
+$ astro deployment create --label=new-deployment-name-k8s --executor=k8s --airflow-version=2.4.1 --cluster-id=123
+
+# Create new deployment with Astronomer Runtime.
+$ astro deployment create --label=my-new-deployment --executor=k8s --runtime-version=6.0.1 --cluster-id=123
+`
+
 	createExampleDagDeployment = `
 # Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
 $ astro deployment create --label=my-new-deployment --executor=k8s --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=test:/test
 `
+	createExampleDagDeploymentSoftwareV1 = `
+# Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
+$ astro deployment create --label=my-new-deployment --executor=k8s --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=test:/test --cluster-id=123
+`
+
 	deploymentAirflowUpgradeExample = `
   $ astro deployment airflow upgrade --deployment-id=<deployment-id> --desired-airflow-version=<desired-airflow-version>
 
@@ -118,12 +138,24 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
+	// Try to get Houston version, but use global variable if client is not available
+	localHoustonVersion := houstonVersion
+	if houstonClient != nil {
+		if version, err := houstonClient.GetPlatformVersion(nil); err == nil {
+			localHoustonVersion = version
+		}
+	}
+
+	example := deploymentCreateExample
+	if localHoustonVersion >= "1.0.0" {
+		example = deploymentCreateExampleSoftwareV1
+	}
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create a new Astronomer Deployment",
 		Long:    "Create a new Astronomer Deployment",
-		Example: deploymentCreateExample,
+		Example: example,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentCreate(cmd, out)
 		},
@@ -146,7 +178,11 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	if nfsMountDAGDeploymentEnabled {
-		cmd.Example += createExampleDagDeployment
+		if localHoustonVersion >= "1.0.0" {
+			cmd.Example += createExampleDagDeploymentSoftwareV1
+		} else {
+			cmd.Example += createExampleDagDeployment
+		}
 		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
 	}
 
@@ -167,6 +203,11 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired Airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
+
+	if localHoustonVersion >= "1.0.0" {
+		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Set cluster ID to create deployment in ")
+		_ = cmd.MarkFlagRequired("cluster-id")
+	}
 	_ = cmd.MarkFlagRequired("label")
 	return cmd
 }
@@ -189,6 +230,13 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentListCmd(out io.Writer) *cobra.Command {
+	// Try to get Houston version, but use global variable if client is not available
+	localHoustonVersion := houstonVersion
+	if houstonClient != nil {
+		if version, err := houstonClient.GetPlatformVersion(nil); err == nil {
+			localHoustonVersion = version
+		}
+	}
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -199,6 +247,9 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show Deployments across all Workspaces")
+	if localHoustonVersion >= "1.0.0" {
+		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Show Deployments from the specified cluster")
+	}
 	return cmd
 }
 
@@ -362,6 +413,10 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
+	if clusterID != "" {
+		appConfig, _ = houston.Call(houstonClient.GetAppConfig)(clusterID)
+	}
+
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -420,8 +475,9 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		KnownHosts:        knowHosts,
 		GitSyncInterval:   gitSyncInterval,
 		TriggererReplicas: createTriggererReplicas,
+		ClusterID:         clusterID,
 	}
-	return deployment.Create(req, houstonClient, out)
+	return deployment.Create(req, houstonClient, out, appConfig)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -452,7 +508,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.List(ws, allDeployments, houstonClient, out)
+	return deployment.List(ws, allDeployments, houstonClient, out, clusterID)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, out io.Writer) error {
@@ -468,6 +524,14 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	cmd.SilenceUsage = true
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
+	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(args[0])
+	if err != nil {
+		return fmt.Errorf("failed to get deployment info: %w", err)
+	}
+	appConfig, err = houston.Call(houstonClient.GetAppConfig)(deploymentInfo.ClusterID)
+	if err != nil {
+		return fmt.Errorf("failed to get app config: %w", err)
+	}
 	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
@@ -476,11 +540,6 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 
 	// new dag deployment type or current dag deployment type is dag_deploy, confirm from user
 	if !skipPrompt {
-		deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(args[0])
-		if err != nil {
-			return fmt.Errorf("failed to get deployment info: %w", err)
-		}
-
 		// non dag_deploy to dag_deploy
 		if deploymentInfo.DagDeployment.Type != houston.DagOnlyDeploymentType && dagDeploymentType == houston.DagOnlyDeploymentType {
 			y, _ := input.Confirm(UpdateDeploymentTypeToDagDeployPromptMsg)
@@ -502,14 +561,13 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 
 	// we should validate only in case when this feature has been enabled
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
-		err := validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, true)
+		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, true)
 		if err != nil {
 			return err
 		}
 	}
 
 	var executorType string
-	var err error
 	if executorUpdate != "" {
 		executorType, err = validateExecutorArg(executorUpdate)
 		if err != nil {
@@ -517,7 +575,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		}
 	}
 
-	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, out)
+	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, out, appConfig)
 }
 
 func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {

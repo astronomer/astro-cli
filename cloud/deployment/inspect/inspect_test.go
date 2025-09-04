@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -24,11 +25,13 @@ import (
 var (
 	mockPlatformCoreClient     = new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	executorKubernetes         = astroplatformcore.DeploymentExecutorKUBERNETES
+	executorAstro              = astroplatformcore.DeploymentExecutorASTRO
 	errGetDeployment           = errors.New("test get deployment error")
 	errMarshal                 = errors.New("test error")
 	workloadIdentity           = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
 	deploymentID               = "test-deployment-id"
 	standardType               = astroplatformcore.DeploymentTypeSTANDARD
+	dedicatedType              = astroplatformcore.DeploymentTypeDEDICATED
 	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
 	region                     = "us-central1"
 	astroMachine               = "a5"
@@ -199,6 +202,38 @@ var (
 				Override:  &hibernationOverride,
 				Schedules: &hibernationSchedules,
 			},
+		},
+	}
+	taskLogBucket             = "task-log-bucket"
+	taskLogURLPattern         = "task-log-url-pattern"
+	sourceDeploymentDedicated = astroplatformcore.Deployment{
+		Id:                     deploymentID,
+		Name:                   "test-deployment-label",
+		Description:            &description,
+		WorkspaceName:          &workspaceName,
+		WorkspaceId:            "test-ws-id",
+		Namespace:              "great-release-name",
+		ClusterId:              &clusterID,
+		ClusterName:            &ClusterName,
+		ContactEmails:          &contactEmails,
+		Type:                   &dedicatedType,
+		Executor:               &executorAstro,
+		RuntimeVersion:         "3.0-1",
+		AirflowVersion:         "3.0.0",
+		SchedulerAu:            &schedulerAU,
+		SchedulerReplicas:      schedulerReplicas,
+		WebServerAirflowApiUrl: "some-url/api/v1",
+		EnvironmentVariables:   &deploymentEnvironmentVariable,
+		UpdatedAt:              time.Now(),
+		Status:                 "UNHEALTHY",
+		IsDagDeployEnabled:     false,
+		SchedulerSize:          &schedulerTestSize,
+		WorkloadIdentity:       &workloadIdentity,
+		RemoteExecution: &astroplatformcore.DeploymentRemoteExecution{
+			Enabled:                true,
+			AllowedIpAddressRanges: []string{"0.0.0.0/0"},
+			TaskLogBucket:          &taskLogBucket,
+			TaskLogUrlPattern:      &taskLogURLPattern,
 		},
 	}
 
@@ -549,6 +584,35 @@ func TestGetDeploymentConfig(t *testing.T) {
 		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
 		sourceDeployment.Type = &hybridType
 	})
+
+	t.Run("returns deployment config for the requested dedicated deployment with remote execution", func(t *testing.T) {
+		var actualDeploymentConfig deploymentConfig
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		expectedDeploymentConfig := deploymentConfig{
+			Name:             sourceDeploymentDedicated.Name,
+			Description:      *sourceDeploymentDedicated.Description,
+			WorkspaceName:    *sourceDeploymentDedicated.WorkspaceName,
+			RunTimeVersion:   sourceDeploymentDedicated.RuntimeVersion,
+			SchedulerAU:      *sourceDeploymentDedicated.SchedulerAu,
+			SchedulerCount:   sourceDeploymentDedicated.SchedulerReplicas,
+			DagDeployEnabled: &sourceDeploymentDedicated.IsDagDeployEnabled,
+			SchedulerSize:    string(*sourceDeploymentDedicated.SchedulerSize),
+			Executor:         string(*sourceDeploymentDedicated.Executor),
+			DeploymentType:   string(*sourceDeploymentDedicated.Type),
+			ClusterName:      *sourceDeploymentDedicated.ClusterName,
+			RemoteExecution: &RemoteExecution{
+				Enabled:                sourceDeploymentDedicated.RemoteExecution.Enabled,
+				AllowedIPAddressRanges: &sourceDeploymentDedicated.RemoteExecution.AllowedIpAddressRanges,
+				TaskLogBucket:          sourceDeploymentDedicated.RemoteExecution.TaskLogBucket,
+				TaskLogURLPattern:      sourceDeploymentDedicated.RemoteExecution.TaskLogUrlPattern,
+			},
+		}
+		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeploymentDedicated, mockPlatformCoreClient, false)
+		assert.NoError(t, err)
+		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
+	})
 }
 
 func TestGetPrintableDeployment(t *testing.T) {
@@ -580,39 +644,42 @@ func TestGetPrintableDeployment(t *testing.T) {
 func TestGetAdditionalNullableFields(t *testing.T) {
 	sourceDeployment.Type = &hybridType
 	sourceDeployment.TaskPodNodePoolId = nil
-	t.Run("returns alert emails, queues and variables for the requested deployment with CeleryExecutor", func(t *testing.T) {
-		var expectedAdditional, actualAdditional orderedPieces
-		qList := []map[string]interface{}{
-			{
-				"name":               "default",
-				"max_worker_count":   130,
-				"min_worker_count":   12,
-				"worker_concurrency": 110,
-				"worker_type":        "test-instance-type",
-			},
-			{
-				"name":               "test-queue-1",
-				"max_worker_count":   175,
-				"min_worker_count":   8,
-				"worker_concurrency": 150,
-				"worker_type":        "test-instance-type-1",
-			},
-		}
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		rawExpected := map[string]interface{}{
-			"alert_emails":          sourceDeployment.ContactEmails,
-			"worker_queues":         qList,
-			"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
-			"hibernation_schedules": getHibernationSchedulesMap(*sourceDeployment.ScalingSpec.HibernationSpec.Schedules),
-		}
-		rawAdditional := getAdditionalNullableFields(&sourceDeployment, nodePools)
-		err := decodeToStruct(rawAdditional, &actualAdditional)
-		assert.NoError(t, err)
-		err = decodeToStruct(rawExpected, &expectedAdditional)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedAdditional, actualAdditional)
-	})
-	t.Run("returns alert emails, queues and variables for the requested deployment with KubernetesExecutor", func(t *testing.T) {
+	for _, exec := range []astroplatformcore.DeploymentExecutor{executorCelery, executorAstro} {
+		t.Run(fmt.Sprintf("returns alert emails, queues and variables for the requested deployment with %s Executor", string(exec)), func(t *testing.T) {
+			var expectedAdditional, actualAdditional orderedPieces
+			sourceDeployment.Executor = &exec
+			qList := []map[string]interface{}{
+				{
+					"name":               "default",
+					"max_worker_count":   130,
+					"min_worker_count":   12,
+					"worker_concurrency": 110,
+					"worker_type":        "test-instance-type",
+				},
+				{
+					"name":               "test-queue-1",
+					"max_worker_count":   175,
+					"min_worker_count":   8,
+					"worker_concurrency": 150,
+					"worker_type":        "test-instance-type-1",
+				},
+			}
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			rawExpected := map[string]interface{}{
+				"alert_emails":          sourceDeployment.ContactEmails,
+				"worker_queues":         qList,
+				"environment_variables": getVariablesMap(*sourceDeployment.EnvironmentVariables), // API only returns values when !EnvironmentVariablesObject.isSecret
+				"hibernation_schedules": getHibernationSchedulesMap(*sourceDeployment.ScalingSpec.HibernationSpec.Schedules),
+			}
+			rawAdditional := getAdditionalNullableFields(&sourceDeployment, nodePools)
+			err := decodeToStruct(rawAdditional, &actualAdditional)
+			assert.NoError(t, err)
+			err = decodeToStruct(rawExpected, &expectedAdditional)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedAdditional, actualAdditional)
+		})
+	}
+	t.Run("returns alert emails, queues and variables for the requested deployment with KUBERNETES Executor", func(t *testing.T) {
 		var expectedAdditional, actualAdditional orderedPieces
 		sourceDeployment.Executor = &executorKubernetes
 		qList := []map[string]interface{}{
@@ -709,7 +776,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         status: UNHEALTHY
         created_at: 2022-11-17T13:25:55.275697-08:00
         updated_at: 2022-11-17T13:25:55.275697-08:00
-        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
         webserver_url: some-url
         hibernation_override:
             is_hibernating: true
@@ -902,7 +969,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         status: UNHEALTHY
         created_at: 2023-02-01T12:00:00Z
         updated_at: 2023-02-01T12:00:00Z
-        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
         webserver_url: some-url
         airflow_api_url: some-url/api/v1
         hibernation_override:
@@ -1002,7 +1069,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
             "webserver_url": "some-url",
             "airflow_api_url": "some-url/api/v1"
 			"hibernation_override": {

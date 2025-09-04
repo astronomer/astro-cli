@@ -41,7 +41,7 @@ func NewAirflowClient(c *httputil.HTTPClient) *HTTPClient {
 
 func (c *HTTPClient) GetConnections(airflowURL string) (Response, error) {
 	doOpts := &httputil.DoOptions{
-		Path:   "https://" + airflowURL + "/api/v1/connections",
+		Path:   "https://" + airflowURL + "/connections",
 		Method: http.MethodGet,
 	}
 
@@ -60,7 +60,7 @@ func (c *HTTPClient) CreateConnection(airflowURL string, conn *Connection) error
 		return err
 	}
 	doOpts := &httputil.DoOptions{
-		Path:   "https://" + airflowURL + "/api/v1/connections",
+		Path:   "https://" + airflowURL + "/connections",
 		Method: http.MethodPost,
 		Data:   connJSON,
 	}
@@ -80,7 +80,7 @@ func (c *HTTPClient) UpdateConnection(airflowURL string, conn *Connection) error
 	}
 
 	doOpts := &httputil.DoOptions{
-		Path:   fmt.Sprintf("https://%s/api/v1/connections/%s", airflowURL, conn.ConnID),
+		Path:   fmt.Sprintf("https://%s/connections/%s", airflowURL, conn.ConnID),
 		Method: http.MethodPatch,
 		Data:   connJSON,
 	}
@@ -95,7 +95,7 @@ func (c *HTTPClient) UpdateConnection(airflowURL string, conn *Connection) error
 
 func (c *HTTPClient) GetVariables(airflowURL string) (Response, error) {
 	doOpts := &httputil.DoOptions{
-		Path:   "https://" + airflowURL + "/api/v1/variables",
+		Path:   "https://" + airflowURL + "/variables",
 		Method: http.MethodGet,
 	}
 
@@ -114,7 +114,7 @@ func (c *HTTPClient) CreateVariable(airflowURL string, variable Variable) error 
 		return err
 	}
 	doOpts := &httputil.DoOptions{
-		Path:   "https://" + airflowURL + "/api/v1/variables",
+		Path:   "https://" + airflowURL + "/variables",
 		Method: http.MethodPost,
 		Data:   varJSON,
 	}
@@ -134,7 +134,7 @@ func (c *HTTPClient) UpdateVariable(airflowURL string, variable Variable) error 
 	}
 
 	doOpts := &httputil.DoOptions{
-		Path:   fmt.Sprintf("https://%s/api/v1/variables/%s", airflowURL, variable.Key),
+		Path:   fmt.Sprintf("https://%s/variables/%s", airflowURL, variable.Key),
 		Method: http.MethodPatch,
 		Data:   varJSON,
 	}
@@ -149,7 +149,7 @@ func (c *HTTPClient) UpdateVariable(airflowURL string, variable Variable) error 
 
 func (c *HTTPClient) GetPools(airflowURL string) (Response, error) {
 	doOpts := &httputil.DoOptions{
-		Path:   "https://" + airflowURL + "/api/v1/pools",
+		Path:   "https://" + airflowURL + "/pools",
 		Method: http.MethodGet,
 	}
 
@@ -168,7 +168,7 @@ func (c *HTTPClient) CreatePool(airflowURL string, pool Pool) error {
 		return err
 	}
 	doOpts := &httputil.DoOptions{
-		Path:   "https://" + airflowURL + "/api/v1/pools",
+		Path:   "https://" + airflowURL + "/pools",
 		Method: http.MethodPost,
 		Data:   varJSON,
 	}
@@ -188,7 +188,7 @@ func (c *HTTPClient) UpdatePool(airflowURL string, pool Pool) error {
 	}
 
 	doOpts := &httputil.DoOptions{
-		Path:   fmt.Sprintf("https://%s/api/v1/pools/%s", airflowURL, pool.Name),
+		Path:   fmt.Sprintf("https://%s/pools/%s", airflowURL, pool.Name),
 		Method: http.MethodPatch,
 		Data:   varJSON,
 	}
@@ -219,8 +219,8 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 	}
 	defer response.Body.Close()
 
-	// Check the response status code
-	if response.StatusCode != http.StatusOK {
+	// Check the response status code, return error for non-2xx codes
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil, fmt.Errorf("unexpected response status code: %d", response.StatusCode)
 	}
 

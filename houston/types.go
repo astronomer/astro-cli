@@ -21,6 +21,7 @@ type ResponseData struct {
 	AddWorkspaceUser               *Workspace                  `json:"workspaceAddUser,omitempty"`
 	RemoveWorkspaceUser            *Workspace                  `json:"workspaceRemoveUser,omitempty"`
 	CreateDeployment               *Deployment                 `json:"createDeployment,omitempty"`
+	UpsertDeployment               *Deployment                 `json:"upsertDeployment,omitempty"`
 	CreateToken                    *AuthUser                   `json:"createToken,omitempty"`
 	CreateWorkspaceServiceAccount  *WorkspaceServiceAccount    `json:"createWorkspaceServiceAccount,omitempty"`
 	CreateDeploymentServiceAccount *DeploymentServiceAccount   `json:"createDeploymentServiceAccount,omitempty"`
@@ -119,6 +120,7 @@ type Deployment struct {
 	CreatedAt             time.Time           `json:"createdAt"`
 	UpdatedAt             time.Time           `json:"updatedAt"`
 	DagDeployment         DagDeploymentConfig `json:"dagDeployment"`
+	ClusterID             string              `json:"clusterId"`
 }
 
 type DagDeploymentConfig struct {

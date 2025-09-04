@@ -38,29 +38,37 @@ type HibernationOverride struct {
 	OverrideUntil *time.Time `mapstructure:"override_until,omitempty" yaml:"override_until,omitempty" json:"override_until,omitempty"`
 }
 
+type RemoteExecution struct {
+	Enabled                bool      `mapstructure:"enabled,omitempty" yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	AllowedIPAddressRanges *[]string `mapstructure:"allowed_ip_address_ranges,omitempty" yaml:"allowed_ip_address_ranges,omitempty" json:"allowed_ip_address_ranges,omitempty"`
+	TaskLogBucket          *string   `mapstructure:"task_log_bucket,omitempty" yaml:"task_log_bucket,omitempty" json:"task_log_bucket,omitempty"`
+	TaskLogURLPattern      *string   `mapstructure:"task_log_url_pattern,omitempty" yaml:"task_log_url_pattern,omitempty" json:"task_log_url_pattern,omitempty"`
+}
+
 type deploymentConfig struct {
-	Name                  string `mapstructure:"name" yaml:"name" json:"name"`
-	Description           string `mapstructure:"description" yaml:"description" json:"description"`
-	RunTimeVersion        string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
-	DagDeployEnabled      *bool  `mapstructure:"dag_deploy_enabled,omitempty" yaml:"dag_deploy_enabled,omitempty" json:"dag_deploy_enabled,omitempty"`
-	APIKeyOnlyDeployments bool   `mapstructure:"ci_cd_enforcement" yaml:"ci_cd_enforcement" json:"ci_cd_enforcement"`
-	SchedulerSize         string `mapstructure:"scheduler_size,omitempty" yaml:"scheduler_size,omitempty" json:"scheduler_size,omitempty"`
-	IsHighAvailability    bool   `mapstructure:"is_high_availability" yaml:"is_high_availability" json:"is_high_availability"`
-	IsDevelopmentMode     bool   `mapstructure:"is_development_mode" yaml:"is_development_mode" json:"is_development_mode"`
-	Executor              string `mapstructure:"executor" yaml:"executor" json:"executor"`
-	SchedulerAU           int    `mapstructure:"scheduler_au,omitempty" yaml:"scheduler_au,omitempty" json:"scheduler_au,omitempty"`
-	SchedulerCount        int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
-	ClusterName           string `mapstructure:"cluster_name,omitempty" yaml:"cluster_name,omitempty" json:"cluster_name,omitempty"`
-	WorkspaceName         string `mapstructure:"workspace_name" yaml:"workspace_name" json:"workspace_name"`
-	DeploymentType        string `mapstructure:"deployment_type" yaml:"deployment_type" json:"deployment_type"`
-	CloudProvider         string `mapstructure:"cloud_provider" yaml:"cloud_provider" json:"cloud_provider"`
-	Region                string `mapstructure:"region" yaml:"region" json:"region"`
-	DefaultTaskPodCPU     string `mapstructure:"default_task_pod_cpu,omitempty" yaml:"default_task_pod_cpu,omitempty" json:"default_task_pod_cpu,omitempty"`
-	DefaultTaskPodMemory  string `mapstructure:"default_task_pod_memory,omitempty" yaml:"default_task_pod_memory,omitempty" json:"default_task_pod_memory,omitempty"`
-	ResourceQuotaCPU      string `mapstructure:"resource_quota_cpu,omitempty" yaml:"resource_quota_cpu,omitempty" json:"resource_quota_cpu,omitempty"`
-	ResourceQuotaMemory   string `mapstructure:"resource_quota_memory,omitempty" yaml:"resource_quota_memory,omitempty" json:"resource_quota_memory,omitempty"`
-	DefaultWorkerType     string `mapstructure:"default_worker_type,omitempty" yaml:"default_worker_type,omitempty" json:"default_worker_type,omitempty"`
-	WorkloadIdentity      string `mapstructure:"workload_identity" yaml:"workload_identity" json:"workload_identity"` // intentionally removing omitempty so we have an empty placeholder for this value if someone wants to set it
+	Name                  string           `mapstructure:"name" yaml:"name" json:"name"`
+	Description           string           `mapstructure:"description" yaml:"description" json:"description"`
+	RunTimeVersion        string           `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
+	DagDeployEnabled      *bool            `mapstructure:"dag_deploy_enabled,omitempty" yaml:"dag_deploy_enabled,omitempty" json:"dag_deploy_enabled,omitempty"`
+	APIKeyOnlyDeployments bool             `mapstructure:"ci_cd_enforcement" yaml:"ci_cd_enforcement" json:"ci_cd_enforcement"`
+	SchedulerSize         string           `mapstructure:"scheduler_size,omitempty" yaml:"scheduler_size,omitempty" json:"scheduler_size,omitempty"`
+	IsHighAvailability    bool             `mapstructure:"is_high_availability" yaml:"is_high_availability" json:"is_high_availability"`
+	IsDevelopmentMode     bool             `mapstructure:"is_development_mode" yaml:"is_development_mode" json:"is_development_mode"`
+	Executor              string           `mapstructure:"executor" yaml:"executor" json:"executor"`
+	SchedulerAU           int              `mapstructure:"scheduler_au,omitempty" yaml:"scheduler_au,omitempty" json:"scheduler_au,omitempty"`
+	SchedulerCount        int              `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
+	ClusterName           string           `mapstructure:"cluster_name,omitempty" yaml:"cluster_name,omitempty" json:"cluster_name,omitempty"`
+	WorkspaceName         string           `mapstructure:"workspace_name" yaml:"workspace_name" json:"workspace_name"`
+	DeploymentType        string           `mapstructure:"deployment_type" yaml:"deployment_type" json:"deployment_type"`
+	CloudProvider         string           `mapstructure:"cloud_provider" yaml:"cloud_provider" json:"cloud_provider"`
+	Region                string           `mapstructure:"region" yaml:"region" json:"region"`
+	DefaultTaskPodCPU     string           `mapstructure:"default_task_pod_cpu,omitempty" yaml:"default_task_pod_cpu,omitempty" json:"default_task_pod_cpu,omitempty"`
+	DefaultTaskPodMemory  string           `mapstructure:"default_task_pod_memory,omitempty" yaml:"default_task_pod_memory,omitempty" json:"default_task_pod_memory,omitempty"`
+	ResourceQuotaCPU      string           `mapstructure:"resource_quota_cpu,omitempty" yaml:"resource_quota_cpu,omitempty" json:"resource_quota_cpu,omitempty"`
+	ResourceQuotaMemory   string           `mapstructure:"resource_quota_memory,omitempty" yaml:"resource_quota_memory,omitempty" json:"resource_quota_memory,omitempty"`
+	DefaultWorkerType     string           `mapstructure:"default_worker_type,omitempty" yaml:"default_worker_type,omitempty" json:"default_worker_type,omitempty"`
+	WorkloadIdentity      string           `mapstructure:"workload_identity" yaml:"workload_identity" json:"workload_identity"` // intentionally removing omitempty so we have an empty placeholder for this value if someone wants to set it
+	RemoteExecution       *RemoteExecution `mapstructure:"remote_execution,omitempty" yaml:"remote_execution,omitempty" json:"remote_execution,omitempty"`
 }
 
 type Workerq struct {
@@ -240,10 +248,12 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	}
 	if deployment.IsDeploymentStandard(*coreDeployment.Type) || deployment.IsDeploymentDedicated(*coreDeployment.Type) {
 		deploymentMap["scheduler_size"] = *coreDeployment.SchedulerSize
-		deploymentMap["default_task_pod_cpu"] = *coreDeployment.DefaultTaskPodCpu
-		deploymentMap["default_task_pod_memory"] = *coreDeployment.DefaultTaskPodMemory
-		deploymentMap["resource_quota_cpu"] = *coreDeployment.ResourceQuotaCpu
-		deploymentMap["resource_quota_memory"] = *coreDeployment.ResourceQuotaMemory
+		if deployment.IsDeploymentStandard(*coreDeployment.Type) || !deployment.IsRemoteExecutionEnabled(&coreDeployment) {
+			deploymentMap["default_task_pod_cpu"] = *coreDeployment.DefaultTaskPodCpu
+			deploymentMap["default_task_pod_memory"] = *coreDeployment.DefaultTaskPodMemory
+			deploymentMap["resource_quota_cpu"] = *coreDeployment.ResourceQuotaCpu
+			deploymentMap["resource_quota_memory"] = *coreDeployment.ResourceQuotaMemory
+		}
 	}
 	if !deployment.IsDeploymentStandard(*coreDeployment.Type) {
 		deploymentMap["default_worker_type"] = defaultWorkerType
@@ -269,6 +279,15 @@ func getDeploymentConfig(coreDeploymentPointer *astroplatformcore.Deployment, pl
 	}
 	if showWorkloadIdentity && coreDeployment.WorkloadIdentity != nil {
 		deploymentMap["workload_identity"] = *coreDeployment.WorkloadIdentity
+	}
+	if coreDeployment.RemoteExecution != nil {
+		remoteExecution := coreDeployment.RemoteExecution
+		deploymentMap["remote_execution"] = map[string]interface{}{
+			"enabled":                   remoteExecution.Enabled,
+			"allowed_ip_address_ranges": remoteExecution.AllowedIpAddressRanges,
+			"task_log_bucket":           remoteExecution.TaskLogBucket,
+			"task_log_url_pattern":      remoteExecution.TaskLogUrlPattern,
+		}
 	}
 	return deploymentMap, nil
 }
@@ -334,7 +353,7 @@ func getQMap(coreDeploymentPointer *astroplatformcore.Deployment, sourceNodePool
 	var resources map[string]interface{}
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))
 	for _, queue := range sourceDeploymentQs { //nolint
-		if *coreDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY {
+		if *coreDeployment.Executor == astroplatformcore.DeploymentExecutorCELERY || *coreDeployment.Executor == astroplatformcore.DeploymentExecutorASTRO {
 			resources = map[string]interface{}{
 				"max_worker_count":   queue.MaxWorkerCount,
 				"min_worker_count":   queue.MinWorkerCount,

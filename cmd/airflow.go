@@ -259,10 +259,8 @@ func newAirflowStartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for webserver to get healthy. The default is 5 minutes. Use --wait 2m to wait for 2 minutes.")
 	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Location of a custom compose file to use for starting Airflow")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
-	if !config.CFG.DisableEnvObjects.GetBool() {
-		cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from. If not specified uses the current Workspace.")
-		cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
-	}
+	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from. If not specified uses the current Workspace.")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
 
 	return cmd
 }
@@ -347,10 +345,8 @@ func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
-	if !config.CFG.DisableEnvObjects.GetBool() {
-		cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from. If not specified uses the current Workspace.")
-		cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
-	}
+	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from. If not specified uses the current Workspace.")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
 
 	return cmd
 }
@@ -683,7 +679,7 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 	}
 
 	var envConns map[string]astrocore.EnvironmentObjectConnection
-	if !config.CFG.DisableEnvObjects.GetBool() && (workspaceID != "" || deploymentID != "") {
+	if workspaceID != "" || deploymentID != "" {
 		var err error
 		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
 		if err != nil {
@@ -736,8 +732,8 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	// default is to display all logs
 	containersNames := make([]string, 0)
 
-	if !schedulerLogs && !webserverLogs && !triggererLogs {
-		containersNames = append(containersNames, []string{airflow.WebserverDockerContainerName, airflow.SchedulerDockerContainerName, airflow.TriggererDockerContainerName}...)
+	if !schedulerLogs && !webserverLogs && !triggererLogs && !apiServerLogs && !dagProcessorLogs {
+		containersNames = append(containersNames, []string{airflow.WebserverDockerContainerName, airflow.SchedulerDockerContainerName, airflow.TriggererDockerContainerName, airflow.APIServerDockerContainerName, airflow.DAGProcessorDockerContainerName}...)
 	}
 	if webserverLogs {
 		containersNames = append(containersNames, []string{airflow.WebserverDockerContainerName}...)
@@ -815,7 +811,7 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 	noBrowser = true
 
 	var envConns map[string]astrocore.EnvironmentObjectConnection
-	if !config.CFG.DisableEnvObjects.GetBool() && (workspaceID != "" || deploymentID != "") {
+	if workspaceID != "" || deploymentID != "" {
 		var err error
 		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
 		if err != nil {
