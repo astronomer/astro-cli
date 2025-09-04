@@ -3,12 +3,47 @@ package environment
 import (
 	http_context "context"
 	"errors"
+	"strings"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/config"
 )
 
-var ErrorEntityIDNotSpecified = errors.New("workspace or deployment ID must be specified")
+var (
+	ErrorEntityIDNotSpecified = errors.New("workspace or deployment ID must be specified")
+
+	// Enhanced error message for secrets fetching permission issue
+	secretsFetchingNotAllowedErrMsg = `environment secrets fetching is not enabled for this organization.
+
+To resolve this issue:
+• Ask an organization administrator to enable "Environment Secrets Fetching" in organization settings
+• Navigate to Organization Settings > General > Environment Secrets Fetching
+• Toggle the setting to "Enabled"
+
+This setting controls whether deployments can access organization environment secrets during local development.
+
+Without this setting enabled, you can still use 'astro dev start' without the --deployment-id flag for local development.`
+)
+
+// isSecretsFetchingNotAllowedError checks if the error is due to showSecrets not being allowed for the organization
+func isSecretsFetchingNotAllowedError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check the entire error chain, not just the top-level error
+	for currentErr := err; currentErr != nil; currentErr = errors.Unwrap(currentErr) {
+		errStr := strings.ToLower(currentErr.Error())
+
+		if strings.Contains(errStr, "showsecrets") &&
+			strings.Contains(errStr, "organization") &&
+			strings.Contains(errStr, "not allowed") {
+			return true
+		}
+	}
+
+	return false
+}
 
 func ListConnections(workspaceID, deploymentID string, coreClient astrocore.CoreClient) (map[string]astrocore.EnvironmentObjectConnection, error) {
 	envObjs, err := listEnvironmentObjects(workspaceID, deploymentID, astrocore.CONNECTION, coreClient)
@@ -57,6 +92,10 @@ func listEnvironmentObjects(workspaceID, deploymentID string, objectType astroco
 	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
+		// Check for secrets fetching permission error and provide enhanced guidance
+		if isSecretsFetchingNotAllowedError(err) {
+			return nil, errors.New(secretsFetchingNotAllowedErrMsg)
+		}
 		return nil, err
 	}
 	envObjsPaginated := *resp.JSON200

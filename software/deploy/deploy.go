@@ -3,6 +3,7 @@ package deploy
 import (
 	"errors"
 	"fmt"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -96,6 +98,19 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
 		return deploymentID, fmt.Errorf("failed to get deployment info: %w", err)
+	}
+
+	appConfig, err := houston.Call(houstonClient.GetAppConfig)(deploymentInfo.ClusterID)
+	if err != nil {
+		return deploymentID, fmt.Errorf("failed to get app config: %w", err)
+	}
+
+	if appConfig != nil && appConfig.Flags.BYORegistryEnabled {
+		byoRegistryEnabled = true
+		byoRegistryDomain = appConfig.BYORegistryDomain
+		if byoRegistryDomain == "" {
+			return deploymentID, ErrBYORegistryDomainNotSet
+		}
 	}
 
 	// isImageOnlyDeploy is not valid for image-based deployments since image-based deployments inherently mean that the image itself contains dags.
@@ -396,16 +411,35 @@ func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) 
 }
 
 func getDagDeployURL(deploymentInfo *houston.Deployment) string {
-	c, _ := config.GetCurrentContext()
-	return fmt.Sprintf("https://deployments.%s/%s/dags/upload", c.Domain, deploymentInfo.ReleaseName)
-}
-
-func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.AppConfig, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
-	// Throw error if the feature is disabled at Houston level
-	if !isDagOnlyDeploymentEnabled(appConfig) {
-		return ErrDagOnlyDeployDisabledInConfig
+	// Checks if dagserver URL exists and returns the URL
+	for _, url := range deploymentInfo.Urls {
+		if url.Type == houston.DagServerURLType {
+			logger.Infof("Using dag deploy URL from dagserver: %s", url.URL)
+			return url.URL
+		}
 	}
 
+	// If no dagserver URL is found, we look for airflow URL to detect upload url
+	for _, url := range deploymentInfo.Urls {
+		if url.Type != houston.AirflowURLType {
+			continue
+		}
+
+		parsedAirflowURL, err := neturl.Parse(url.URL)
+		if err != nil {
+			logger.Infof("Error parsing airflow URL: %v", err)
+			break
+		}
+
+		// Use URL scheme and host from the airflow URL
+		dagUploadURL := fmt.Sprintf("https://%s/%s/dags/upload", parsedAirflowURL.Host, deploymentInfo.ReleaseName)
+		logger.Infof("Generated Dag Upload URL from airflow base URL: %s", dagUploadURL)
+		return dagUploadURL
+	}
+	return ""
+}
+
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 	deploymentID, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
 	if err != nil {
 		return err
@@ -419,6 +453,14 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, appConfig *houston.Ap
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info: %w", err)
+	}
+	appConfig, err := houston.Call(houstonClient.GetAppConfig)(deploymentInfo.ClusterID)
+	if err != nil {
+		return fmt.Errorf("failed to get app config: %w", err)
+	}
+	// Throw error if the feature is disabled at Houston level
+	if !isDagOnlyDeploymentEnabled(appConfig) {
+		return ErrDagOnlyDeployDisabledInConfig
 	}
 	if !isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
 		return ErrDagOnlyDeployNotEnabledForDeployment

@@ -526,28 +526,6 @@ func (s *AirflowSuite) TestAirflowStart() {
 		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	s.Run("success with deployment id flag set but environment objects disabled", func() {
-		cmd := newAirflowStartCmd(nil)
-		deploymentID = "test-deployment-id"
-		cmd.Flag("deployment-id").Value.Set(deploymentID)
-		args := []string{"test-env-file"}
-		config.CFG.DisableEnvObjects.SetHomeString("true")
-		defer config.CFG.DisableEnvObjects.SetHomeString("false")
-
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-
-		mockContainerHandler := new(mocks.ContainerHandler)
-		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", false, false, defaultWaitTime, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
-			return mockContainerHandler, nil
-		}
-
-		err := airflowStart(cmd, args, mockCoreClient)
-		s.NoError(err)
-		mockContainerHandler.AssertExpectations(s.T())
-		mockCoreClient.AssertExpectations(s.T())
-	})
-
 	s.Run("success with deployment id flag set", func() {
 		cmd := newAirflowStartCmd(nil)
 		deploymentID = "test-deployment-id"

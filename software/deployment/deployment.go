@@ -84,75 +84,21 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-func checkManualReleaseNames(client houston.ClientInterface) bool {
-	logger.Debug("Checking checkManualReleaseNames through appConfig from houston-api")
-
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-
-	return config.ManualReleaseNames
-}
-
-// CheckNFSMountDagDeployment returns true when we can set custom NFS location for dags
-func CheckNFSMountDagDeployment(client houston.ClientInterface) bool {
-	logger.Debug("Checking checkNFSMountDagDeployment through appConfig from houston-api")
-
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-
-	return config.Flags.NfsMountDagDeployment
-}
-
-func CheckHardDeleteDeployment(client houston.ClientInterface) bool {
-	logger.Debug("Checking for hard delete deployment flag")
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-	return config.Flags.HardDeleteDeployment
-}
-
-func CheckPreCreateNamespaceDeployment(client houston.ClientInterface) bool {
-	logger.Debug("Checking for pre created deployment flag")
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-	return config.Flags.ManualNamespaceNames
-}
-
-func CheckNamespaceFreeFormEntryDeployment(client houston.ClientInterface) bool {
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-	return config.Flags.NamespaceFreeFormEntry
-}
-
-func CheckTriggererEnabled(client houston.ClientInterface) bool {
-	logger.Debug("Checking for triggerer flag")
-	config, err := houston.Call(client.GetAppConfig)(nil)
-	if err != nil {
-		return false
-	}
-	return config.Flags.TriggererEnabled
-}
-
-func addTriggererReplicasArg(vars map[string]interface{}, client houston.ClientInterface, triggererReplicas int) {
-	if CheckTriggererEnabled(client) && triggererReplicas != -1 {
+func addTriggererReplicasArg(vars map[string]interface{}, appConfig *houston.AppConfig, triggererReplicas int) {
+	if appConfig.Flags.TriggererEnabled && triggererReplicas != -1 {
 		vars["triggererReplicas"] = triggererReplicas
 	}
 }
 
 // Create airflow deployment
-func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io.Writer) error {
+func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io.Writer, appConfig *houston.AppConfig) error {
 	vars := map[string]interface{}{"label": req.Label, "workspaceId": req.WS, "executor": req.Executor, "cloudRole": req.CloudRole}
 
-	if CheckPreCreateNamespaceDeployment(client) {
+	if req.ClusterID != "" {
+		vars["clusterId"] = req.ClusterID
+	}
+
+	if appConfig.Flags.ManualNamespaceNames {
 		namespace, err := getDeploymentSelectionNamespaces(client, out, req.ClusterID)
 		if err != nil {
 			return err
@@ -160,7 +106,7 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 		vars["namespace"] = namespace
 	}
 
-	if CheckNamespaceFreeFormEntryDeployment(client) {
+	if appConfig.Flags.NamespaceFreeFormEntry {
 		namespace, err := getDeploymentNamespaceName()
 		if err != nil {
 			return err
@@ -168,7 +114,7 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 		vars["namespace"] = namespace
 	}
 
-	if req.ReleaseName != "" && checkManualReleaseNames(client) {
+	if req.ReleaseName != "" && appConfig.ManualReleaseNames {
 		vars["releaseName"] = req.ReleaseName
 	}
 
@@ -183,7 +129,7 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 		return err
 	}
 
-	addTriggererReplicasArg(vars, client, req.TriggererReplicas)
+	addTriggererReplicasArg(vars, appConfig, req.TriggererReplicas)
 
 	d, err := houston.Call(client.CreateDeployment)(vars)
 	if err != nil {
@@ -336,7 +282,7 @@ func List(ws string, all bool, client houston.ClientInterface, out io.Writer, cl
 }
 
 // Update an airflow deployment
-func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts, executor string, gitSyncInterval, triggererReplicas int, client houston.ClientInterface, out io.Writer) error {
+func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts, executor string, gitSyncInterval, triggererReplicas int, client houston.ClientInterface, out io.Writer, appConfig *houston.AppConfig) error {
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole
@@ -354,7 +300,7 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 		return err
 	}
 
-	if CheckTriggererEnabled(client) && triggererReplicas != -1 {
+	if appConfig.Flags.TriggererEnabled && triggererReplicas != -1 {
 		vars["triggererReplicas"] = triggererReplicas
 	}
 
