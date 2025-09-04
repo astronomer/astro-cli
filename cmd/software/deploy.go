@@ -107,14 +107,6 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 
 	var byoRegistryEnabled bool
 	var byoRegistryDomain string
-	if appConfig != nil && appConfig.Flags.BYORegistryEnabled {
-		byoRegistryEnabled = true
-		byoRegistryDomain = appConfig.BYORegistryDomain
-		if byoRegistryDomain == "" {
-			return deploy.ErrBYORegistryDomainNotSet
-		}
-	}
-
 	if description == "" {
 		description = utils.GetDefaultDeployDescription(isDagOnlyDeploy)
 	}
@@ -124,7 +116,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	}
 
 	if isDagOnlyDeploy {
-		return DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true, description)
+		return DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description)
 	}
 
 	if imagePresentOnRemote {
@@ -149,7 +141,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	err = DagsOnlyDeploy(houstonClient, appConfig, ws, deploymentID, config.WorkingPath, nil, true, description)
+	err = DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description)
 	// Don't throw the error if dag-deploy itself is disabled
 	if errors.Is(err, deploy.ErrDagOnlyDeployDisabledInConfig) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
 		return nil

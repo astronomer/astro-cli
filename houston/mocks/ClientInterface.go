@@ -608,9 +608,9 @@ func (_m *ClientInterface) DeleteWorkspaceUser(req houston.DeleteWorkspaceUserRe
 	return r0, r1
 }
 
-// GetAppConfig provides a mock function with given fields: _a0
-func (_m *ClientInterface) GetAppConfig(_a0 interface{}) (*houston.AppConfig, error) {
-	ret := _m.Called(_a0)
+// GetAppConfig provides a mock function with given fields: clusterID
+func (_m *ClientInterface) GetAppConfig(clusterID string) (*houston.AppConfig, error) {
+	ret := _m.Called(clusterID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAppConfig")
@@ -618,19 +618,19 @@ func (_m *ClientInterface) GetAppConfig(_a0 interface{}) (*houston.AppConfig, er
 
 	var r0 *houston.AppConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(interface{}) (*houston.AppConfig, error)); ok {
-		return rf(_a0)
+	if rf, ok := ret.Get(0).(func(string) (*houston.AppConfig, error)); ok {
+		return rf(clusterID)
 	}
-	if rf, ok := ret.Get(0).(func(interface{}) *houston.AppConfig); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(string) *houston.AppConfig); ok {
+		r0 = rf(clusterID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*houston.AppConfig)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(_a0)
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(clusterID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -668,9 +668,9 @@ func (_m *ClientInterface) GetAuthConfig(ctx *config.Context) (*houston.AuthConf
 	return r0, r1
 }
 
-// GetAvailableNamespaces provides a mock function with given fields: _a0
-func (_m *ClientInterface) GetAvailableNamespaces(_a0 interface{}) ([]houston.Namespace, error) {
-	ret := _m.Called(_a0)
+// GetAvailableNamespaces provides a mock function with given fields: vars
+func (_m *ClientInterface) GetAvailableNamespaces(vars map[string]interface{}) ([]houston.Namespace, error) {
+	ret := _m.Called(vars)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAvailableNamespaces")
@@ -678,19 +678,19 @@ func (_m *ClientInterface) GetAvailableNamespaces(_a0 interface{}) ([]houston.Na
 
 	var r0 []houston.Namespace
 	var r1 error
-	if rf, ok := ret.Get(0).(func(interface{}) ([]houston.Namespace, error)); ok {
-		return rf(_a0)
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) ([]houston.Namespace, error)); ok {
+		return rf(vars)
 	}
-	if rf, ok := ret.Get(0).(func(interface{}) []houston.Namespace); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) []houston.Namespace); ok {
+		r0 = rf(vars)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]houston.Namespace)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(_a0)
+	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
+		r1 = rf(vars)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -786,9 +786,9 @@ func (_m *ClientInterface) GetPlatformVersion(_a0 interface{}) (string, error) {
 	return r0, r1
 }
 
-// GetRuntimeReleases provides a mock function with given fields: airflowVersion
-func (_m *ClientInterface) GetRuntimeReleases(airflowVersion string) (houston.RuntimeReleases, error) {
-	ret := _m.Called(airflowVersion)
+// GetRuntimeReleases provides a mock function with given fields: vars
+func (_m *ClientInterface) GetRuntimeReleases(vars map[string]interface{}) (houston.RuntimeReleases, error) {
+	ret := _m.Called(vars)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRuntimeReleases")
@@ -796,19 +796,19 @@ func (_m *ClientInterface) GetRuntimeReleases(airflowVersion string) (houston.Ru
 
 	var r0 houston.RuntimeReleases
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (houston.RuntimeReleases, error)); ok {
-		return rf(airflowVersion)
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) (houston.RuntimeReleases, error)); ok {
+		return rf(vars)
 	}
-	if rf, ok := ret.Get(0).(func(string) houston.RuntimeReleases); ok {
-		r0 = rf(airflowVersion)
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) houston.RuntimeReleases); ok {
+		r0 = rf(vars)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(houston.RuntimeReleases)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(airflowVersion)
+	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
+		r1 = rf(vars)
 	} else {
 		r1 = ret.Error(1)
 	}

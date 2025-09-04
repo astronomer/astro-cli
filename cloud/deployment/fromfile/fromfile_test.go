@@ -48,6 +48,11 @@ var (
 	hibernationDescription              string
 	hibernationSchedules                []astroplatformcore.DeploymentHibernationSchedule
 	deploymentResponse                  astroplatformcore.GetDeploymentResponse
+	taskLogBucket                       string
+	taskLogURLPattern                   string
+	executorAstro                       astroplatformcore.DeploymentExecutor
+	dedicatedType                       astroplatformcore.DeploymentType
+	deploymentResponseRemoteExecution   astroplatformcore.GetDeploymentResponse
 	mockCoreDeploymentResponse          []astroplatformcore.Deployment
 	mockCoreDeploymentCreateResponse    []astroplatformcore.Deployment
 	mockListDeploymentsResponse         astroplatformcore.ListDeploymentsResponse
@@ -130,6 +135,39 @@ func MockResponseInit() {
 				HibernationSpec: &astroplatformcore.DeploymentHibernationSpec{
 					Schedules: &hibernationSchedules,
 				},
+			},
+		},
+	}
+	taskLogBucket = "task-log-bucket"
+	taskLogURLPattern = "task-log-url-pattern"
+	executorAstro = astroplatformcore.DeploymentExecutorASTRO
+	dedicatedType = astroplatformcore.DeploymentTypeDEDICATED
+	deploymentResponseRemoteExecution = astroplatformcore.GetDeploymentResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.Deployment{
+			Id:                 "test-deployment-id",
+			RuntimeVersion:     "3.0-1",
+			Namespace:          "test-name",
+			WebServerUrl:       "test-url",
+			IsDagDeployEnabled: false,
+			Description:        &description,
+			Name:               "test-deployment-label",
+			Status:             "HEALTHY",
+			Type:               &dedicatedType,
+			ClusterId:          &clusterID,
+			Executor:           &executorAstro,
+			ClusterName:        &clusterName,
+			IsHighAvailability: &highAvailability,
+			SchedulerAu:        &schedulerAU,
+			SchedulerSize:      &schedulerTestSize,
+			WorkspaceName:      &workspace1.Name,
+			RemoteExecution: &astroplatformcore.DeploymentRemoteExecution{
+				Enabled:                true,
+				AllowedIpAddressRanges: []string{"0.0.0.0/0"},
+				TaskLogBucket:          &taskLogBucket,
+				TaskLogUrlPattern:      &taskLogURLPattern,
 			},
 		},
 	}
@@ -465,7 +503,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
 `
 		fileutil.WriteStringToFile(filePath, data)
@@ -522,7 +560,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -583,7 +621,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -645,7 +683,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -706,7 +744,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -769,7 +807,7 @@ deployment:
             "workloadIdentity": "astro-great-release-name@provider-account.iam.gserviceaccount.com",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -845,7 +883,7 @@ deployment:
     workloadIdentity: astro-great-release-name@provider-account.iam.gserviceaccount.com
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails: []
 `
@@ -925,7 +963,7 @@ deployment:
             "workloadIdentity": "astro-great-release-name@provider-account.iam.gserviceaccount.com",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -996,7 +1034,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1054,7 +1092,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1132,7 +1170,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1180,6 +1218,92 @@ deployment:
 		s.Contains(out.String(), "is_high_availability: true")
 		s.Contains(out.String(), "is_development_mode: true")
 		s.Contains(out.String(), "hibernation_schedules:\n        - hibernate_at: 1 * * * *\n          wake_at: 2 * * * *\n          description: hibernation schedule 1\n          enabled: true\n\n")
+		mockCoreClient.AssertExpectations(s.T())
+	})
+	s.Run("reads the yaml file and creates a hosted dedicated deployment with remote execution config", func() {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		filePath = "./deployment.yaml"
+		data = `
+deployment:
+  configuration:
+    name: test-deployment-label
+    description: description
+    runtime_version: 3.0-1
+    dag_deploy_enabled: false
+    executor: AstroExecutor
+    scheduler_au: 5
+    scheduler_count: 3
+    scheduler_size: small
+    cluster_name: test-cluster
+    workspace_name: test-workspace
+    deployment_type: DEDICATED
+    is_high_availability: true
+    remote_execution:
+      enabled: true
+      allowed_ip_address_ranges:
+        - 0.0.0.0/0
+      task_log_bucket: task-log-bucket
+      task_log_url_pattern: task-log-url-pattern
+  worker_queues:
+    - name: default
+      is_default: true
+      max_worker_count: 130
+      min_worker_count: 12
+      worker_concurrency: 10
+      worker_type: a5
+    - name: test-queue-1
+      is_default: false
+      max_worker_count: 175
+      min_worker_count: 8
+      worker_concurrency: 10
+      worker_type: a5
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
+    webserver_url: some-url
+  alert_emails:
+    - test1@test.com
+    - test2@test.com
+`
+		canCiCdDeploy = func(astroAPIToken string) bool {
+			return true
+		}
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.CreateDeploymentRequest) bool {
+				request, _ := input.AsCreateDedicatedDeploymentRequest()
+				return request.Name == "test-deployment-label" && request.RemoteExecution != nil
+			},
+		)).Return(&mockCreateDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.UpdateDeploymentRequest) bool {
+				request, _ := input.AsUpdateDedicatedDeploymentRequest()
+				return request.Name == "test-deployment-label" && request.RemoteExecution != nil
+			},
+		)).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(&deploymentResponseRemoteExecution, nil).Times(3)
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		s.NoError(err)
+		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
+		s.Contains(out.String(), "metadata:\n        deployment_id: test-deployment-id")
+		s.Contains(out.String(), "remote_execution:\n            enabled: true\n            allowed_ip_address_ranges:\n                - 0.0.0.0/0\n            task_log_bucket: task-log-bucket\n            task_log_url_pattern: task-log-url-pattern\n")
 		mockCoreClient.AssertExpectations(s.T())
 	})
 	s.Run("reads the json file and creates a deployment", func() {
@@ -1242,7 +1366,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -1334,7 +1458,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -1370,6 +1494,109 @@ deployment:
 		s.Contains(out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
 		s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
 		s.Contains(out.String(), "\"is_development_mode\": true")
+		mockCoreClient.AssertExpectations(s.T())
+	})
+	s.Run("reads the json file and creates a hosted standard deployment with astro executor", func() {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		filePath = "./deployment.yaml"
+		data = `{
+    "deployment": {
+        "environment_variables": [
+            {
+                "is_secret": false,
+                "key": "foo",
+                "updated_at": "NOW",
+                "value": "bar"
+            },
+            {
+                "is_secret": true,
+                "key": "bar",
+                "updated_at": "NOW+1",
+                "value": "baz"
+            }
+        ],
+        "configuration": {
+            "name": "test-deployment-label",
+            "description": "description",
+            "runtime_version": "3.0-1",
+            "dag_deploy_enabled": true,
+            "executor": "AstroExecutor",
+            "scheduler_au": 5,
+            "scheduler_count": 3,
+			"scheduler_size": "large",
+            "workspace_name": "test-workspace",
+			"deployment_type": "STANDARD",
+			"region": "test-region",
+			"cloud_provider": "aws",
+			"is_development_mode": true,
+			"workload_identity": "test-workload-identity"
+        },
+        "worker_queues": [
+            {
+                "name": "default",
+                "is_default": true,
+                "max_worker_count": 130,
+                "min_worker_count": 12,
+                "worker_concurrency": 10,
+                "worker_type": "a5"
+            },
+            {
+                "name": "test-queue-1",
+                "is_default": false,
+                "max_worker_count": 175,
+                "min_worker_count": 8,
+                "worker_concurrency": 10,
+                "worker_type": "a5"
+            }
+        ],
+        "metadata": {
+            "deployment_id": "test-deployment-id",
+            "workspace_id": "test-ws-id",
+            "release_name": "great-release-name",
+            "airflow_version": "2.4.0",
+            "status": "UNHEALTHY",
+            "created_at": "2022-11-17T12:26:45.362983-08:00",
+            "updated_at": "2022-11-17T12:26:45.362983-08:00",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
+            "webserver_url": "some-url"
+        },
+        "alert_emails": [
+            "test1@test.com",
+            "test2@test.com"
+        ]
+    }
+}`
+		mockCoreDeploymentResponse[0].ClusterId = nil
+		mockCoreDeploymentCreateResponse[0].ClusterId = nil
+		deploymentResponse.JSON200.ClusterId = nil
+		standardType := astroplatformcore.DeploymentTypeSTANDARD
+		deploymentResponse.JSON200.Type = &standardType
+		deploymentResponse.JSON200.Executor = &executorAstro
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
+		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
+			func(input astroplatformcore.CreateDeploymentRequest) bool {
+				request, err := input.AsCreateStandardDeploymentRequest()
+				s.NoError(err)
+				return request.WorkloadIdentity != nil && *request.WorkloadIdentity == "test-workload-identity" &&
+					request.Type == astroplatformcore.CreateStandardDeploymentRequestTypeSTANDARD && request.Executor == astroplatformcore.CreateStandardDeploymentRequestExecutorASTRO
+			},
+		)).Return(&mockCreateDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		s.NoError(err)
+		s.Contains(out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
+		s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
+		s.Contains(out.String(), "\"is_development_mode\": true")
+		s.Contains(out.String(), "\"executor\": \"ASTRO\"")
 		mockCoreClient.AssertExpectations(s.T())
 	})
 	s.Run("returns an error if listing workspace fails", func() {
@@ -1420,7 +1647,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1482,7 +1709,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1556,7 +1783,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -1636,7 +1863,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -1709,7 +1936,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1766,7 +1993,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1837,7 +2064,7 @@ deployment:
     status: HEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -1930,7 +2157,7 @@ deployment:
     status: HEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -2010,7 +2237,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -2097,7 +2324,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -2173,7 +2400,7 @@ deployment:
     status: HEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -2263,7 +2490,7 @@ deployment:
     status: UNHEALTHY
     created_at: 2022-11-17T13:25:55.275697-08:00
     updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
     webserver_url: some-url
   alert_emails:
     - test1@test.com
@@ -2338,7 +2565,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -2419,7 +2646,7 @@ deployment:
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
-            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/overview",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id",
             "webserver_url": "some-url"
         },
         "alert_emails": [
@@ -3145,7 +3372,7 @@ func (s *Suite) TestCheckRequiredFields() {
 		input.Deployment.Configuration.Executor = "test-executor"
 		err = checkRequiredFields(&input, "")
 		s.ErrorIs(err, errInvalidValue)
-		s.ErrorContains(err, "is not valid. It can either be CeleryExecutor or KubernetesExecutor")
+		s.ErrorContains(err, "is not valid. It can be CeleryExecutor, KubernetesExecutor, or AstroExecutor")
 	})
 	s.Run("returns an error if alert email is invalid", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
@@ -3965,44 +4192,5 @@ func (s *Suite) TestCheckEnvVars() {
 		input.Deployment.EnvVars = list
 		err = checkEnvVars(&input, "update")
 		s.NoError(err)
-	})
-}
-
-func (s *Suite) TestIsValidExecutor() {
-	s.Run("returns true if executor is Celery", func() {
-		actual := isValidExecutor(deployment.CeleryExecutor)
-		s.True(actual)
-	})
-	s.Run("returns true if executor is Kubernetes", func() {
-		actual := isValidExecutor(deployment.KubeExecutor)
-		s.True(actual)
-	})
-	s.Run("returns true if executor is CELERY", func() {
-		actual := isValidExecutor(deployment.CELERY)
-		s.True(actual)
-	})
-	s.Run("returns true if executor is KUBERNETES", func() {
-		actual := isValidExecutor(deployment.KUBERNETES)
-		s.True(actual)
-	})
-	s.Run("returns true if executor is celery", func() {
-		actual := isValidExecutor("celery")
-		s.True(actual)
-	})
-	s.Run("returns true if executor is kubernetes", func() {
-		actual := isValidExecutor("kubernetes")
-		s.True(actual)
-	})
-	s.Run("returns true if executor is celery", func() {
-		actual := isValidExecutor("celeryexecutor")
-		s.True(actual)
-	})
-	s.Run("returns true if executor is kubernetes", func() {
-		actual := isValidExecutor("kubernetesexecutor")
-		s.True(actual)
-	})
-	s.Run("returns false if executor is neither Celery nor Kubernetes", func() {
-		actual := isValidExecutor("test-executor")
-		s.False(actual)
 	})
 }
