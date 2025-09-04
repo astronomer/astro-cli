@@ -49,6 +49,7 @@ type cfgs struct {
 	MachineMemory         cfg
 	ShaAsTag              cfg
 	RuffImage             cfg
+	RemoteClientRegistry  cfg
 }
 
 // Creates a new cfg struct

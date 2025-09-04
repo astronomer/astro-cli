@@ -211,6 +211,77 @@ func (s *AirflowSuite) Test_airflowInitNoDefaultImageTag() {
 	})
 }
 
+func (s *AirflowSuite) Test_airflowInitWithRemoteExecution() {
+	s.Run("test airflow init with remote execution enabled", func() {
+		// Ensure we're in a clean state
+		config.WorkingPath = s.tempDir
+
+		cmd := newAirflowInitCmd()
+		cmd.Flags().Set("remote-execution-enabled", "true")
+		var args []string
+
+		defer testUtil.MockUserInput(s.T(), "quay.io/test/registry\n")()
+
+		err := airflowInit(cmd, args)
+		s.NoError(err)
+
+		// Check that client files were created
+		clientFiles := []string{"Dockerfile.client", "requirements-client.txt", "packages-client.txt"}
+		for _, file := range clientFiles {
+			filePath := filepath.Join(s.tempDir, file)
+			_, err := os.Stat(filePath)
+			s.NoError(err, "Expected file %s to exist", file)
+		}
+
+		// Check Dockerfile.client contents
+		b, err := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile.client"))
+		s.NoError(err)
+		dockerfileContents := string(b)
+		s.Contains(dockerfileContents, "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:")
+
+		// Check that registry was saved to config
+		configPath := filepath.Join(s.tempDir, ".astro", "config.yaml")
+		_, err = os.Stat(configPath)
+		s.NoError(err, "Expected config file to exist")
+
+		b, err = os.ReadFile(configPath)
+		s.NoError(err)
+		configContents := string(b)
+		s.Contains(configContents, "client_registry: quay.io/test/registry", "Expected config to contain registry endpoint, got: %s", configContents)
+	})
+}
+
+func (s *AirflowSuite) Test_validateRegistryEndpoint() {
+	s.Run("test valid registry endpoints", func() {
+		validEndpoints := []string{
+			"quay.io/test/registry",
+			"docker.io/user/repo",
+			"registry.example.com/namespace/repo",
+			"localhost:5000/test/repo",
+		}
+
+		for _, endpoint := range validEndpoints {
+			err := validateRegistryEndpoint(endpoint)
+			s.NoError(err, "Expected endpoint %s to be valid", endpoint)
+		}
+	})
+
+	s.Run("test invalid registry endpoints", func() {
+		invalidEndpoints := []string{
+			"",                          // empty
+			"invalid-registry",          // no slash
+			"registry with spaces/repo", // contains spaces
+			"/registry/repo",            // starts with slash
+			"registry/repo/",            // ends with slash
+		}
+
+		for _, endpoint := range invalidEndpoints {
+			err := validateRegistryEndpoint(endpoint)
+			s.Error(err, "Expected endpoint %s to be invalid", endpoint)
+		}
+	})
+}
+
 func (s *AirflowSuite) cleanUpInitFiles() {
 	s.T().Helper()
 	if s.tempDir != "" {

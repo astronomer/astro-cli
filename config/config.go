@@ -87,6 +87,7 @@ var (
 		MachineMemory:         newCfg("machine.memory", "4096"),
 		ShaAsTag:              newCfg("sha_as_tag", "false"),
 		RuffImage:             newCfg("ruff.image", "ghcr.io/astral-sh/ruff:latest"),
+		RemoteClientRegistry:  newCfg("remote.client_registry", ""),
 	}
 
 	// viperHome is the viper object in the users home directory

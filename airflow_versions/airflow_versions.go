@@ -90,6 +90,47 @@ func getAstroRuntimeTag(runtimeVersions, runtimeVersionsV3 map[string]RuntimeVer
 	return latestVersion, nil
 }
 
+// GetLatestClientImageTag returns the latest client image tag
+func GetLatestClientImageTag(httpClient *Client) (string, error) {
+	r := Request{}
+
+	resp, err := r.DoWithClient(httpClient)
+	if err != nil {
+		return "", err
+	}
+
+	if len(resp.ClientVersions) == 0 {
+		// Fallback to a default client image tag if no client versions are available
+		return "3.0-10-python3.10-base", nil
+	}
+
+	availableVersions := []string{}
+	for clientVersion, c := range resp.ClientVersions {
+		if c.Metadata.Channel != VersionChannelStable {
+			continue
+		}
+		availableVersions = append(availableVersions, clientVersion)
+	}
+
+	logger.Debugf("Available client versions: %v", availableVersions)
+
+	if len(availableVersions) == 0 {
+		// Fallback to a default client image tag if no stable versions are available
+		return "3.0-10-python3.10-base", nil
+	}
+
+	latestVersion := availableVersions[0]
+	for _, availableVersion := range availableVersions {
+		if CompareRuntimeVersions(availableVersion, latestVersion) > 0 {
+			latestVersion = availableVersion
+		}
+	}
+
+	logger.Debugf("Latest client version: %s", latestVersion)
+
+	return latestVersion, nil
+}
+
 func getAstronomerCertifiedTag(availableReleases []AirflowVersionRaw, airflowVersion string) (string, error) {
 	availableTags := []string{}
 	vs := make(AirflowVersions, len(availableReleases))

@@ -8,6 +8,7 @@ import (
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/pkg/errors"
 )
 
@@ -131,7 +132,7 @@ func initFiles(root string, files map[string]string) error {
 }
 
 // Init will scaffold out a new airflow project
-func Init(path, airflowImageName, airflowImageTag, template string) error {
+func Init(path, airflowImageName, airflowImageTag, template string, remoteExecutionEnabled bool) error {
 	if template != "" {
 		err := ExtractTemplate(template, path)
 		if err != nil {
@@ -188,6 +189,17 @@ func Init(path, airflowImageName, airflowImageTag, template string) error {
 		return errors.Wrap(err, "failed to create project files")
 	}
 
+	// Generate additional client files if remote execution is enabled
+	if remoteExecutionEnabled {
+		clientFiles, err := generateClientFiles(airflowImageTag)
+		if err != nil {
+			return errors.Wrap(err, "failed to generate client files")
+		}
+		if err := initFiles(path, clientFiles); err != nil {
+			return errors.Wrap(err, "failed to create client files")
+		}
+	}
+
 	return nil
 }
 
@@ -199,4 +211,23 @@ func repositoryName(name string) string {
 // imageName creates an airflow image name
 func ImageName(name, tag string) string {
 	return fmt.Sprintf("%s:%s", repositoryName(name), tag)
+}
+
+// generateClientFiles creates the additional client files for remote execution
+func generateClientFiles(airflowImageTag string) (map[string]string, error) {
+	// Query the latest client image tag from updates.astronomer.io
+	httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
+	clientImageTag, err := airflowversions.GetLatestClientImageTag(httpClient)
+	if err != nil {
+		// Fallback to a default client image tag if querying fails
+		clientImageTag = "3.0-10-python3.10-base"
+	}
+
+	clientFiles := map[string]string{
+		"Dockerfile.client":       fmt.Sprintf("FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:%s\n", clientImageTag),
+		"requirements-client.txt": "# Add client-specific Python packages here\n",
+		"packages-client.txt":     "# Add client-specific OS packages here\n",
+	}
+
+	return clientFiles, nil
 }
