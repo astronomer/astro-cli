@@ -56,7 +56,7 @@ func (s *Suite) TestInit() {
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = Init(tmpDir, "astro-runtime", "12.0.0", "")
+	err = Init(tmpDir, "astro-runtime", "12.0.0", "", false)
 	s.NoError(err)
 
 	expectedFiles := []string{
@@ -93,7 +93,7 @@ func (s *Suite) TestTemplateInit() {
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = Init(tmpDir, "astro-runtime", "test", "etl")
+	err = Init(tmpDir, "astro-runtime", "test", "etl", false)
 	s.NoError(err)
 
 	expectedFiles := []string{
@@ -114,6 +114,6 @@ func (s *Suite) TestTemplateInitFail() {
 	tmpDir, err := os.MkdirTemp("", "temp")
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
-	err = Init(tmpDir, "astro-runtime", "test", "etl")
+	err = Init(tmpDir, "astro-runtime", "test", "etl", false)
 	s.EqualError(err, "failed to set up template-based astro project: error extracting files")
 }

@@ -47,6 +47,9 @@ var (
 	// CFGStrMap maintains string to cfg mapping
 	CFGStrMap = make(map[string]cfg)
 
+	// currentFs is the current filesystem being used
+	currentFs afero.Fs
+
 	// CFG Houses configuration meta
 	CFG = cfgs{
 		CloudAPIProtocol:      newCfg("cloud.api.protocol", "https"),
@@ -87,6 +90,7 @@ var (
 		MachineMemory:         newCfg("machine.memory", "4096"),
 		ShaAsTag:              newCfg("sha_as_tag", "false"),
 		RuffImage:             newCfg("ruff.image", "ghcr.io/astral-sh/ruff:latest"),
+		RemoteClientRegistry:  newCfg("remote.client_registry", ""),
 	}
 
 	// viperHome is the viper object in the users home directory
@@ -100,6 +104,7 @@ var (
 
 // InitConfig initializes the config files
 func InitConfig(fs afero.Fs) {
+	currentFs = fs
 	initHome(fs)
 	initProject(fs)
 }
@@ -186,8 +191,13 @@ func CreateProjectConfig(projectPath string) {
 		return
 	}
 
-	// Add the new file
+	// Add the new file and read it
 	viperProject.SetConfigFile(projectConfigFile)
+	err = viperProject.ReadInConfig()
+	if err != nil {
+		fmt.Printf(configReadErrorMsg, err)
+		return
+	}
 }
 
 // configExists returns a boolean indicating if the config is backed by a file
@@ -197,18 +207,34 @@ func configExists(v *viper.Viper) bool {
 
 // CreateConfig creates a config file in the given directory
 func CreateConfig(v *viper.Viper, path, file string) error {
-	err := os.MkdirAll(path, dirPerm)
-	if err != nil {
-		return fmt.Errorf("error creating config directory: %w", err)
-	}
+	// Use the stored filesystem if available, otherwise fallback to real filesystem
+	fs := currentFs
+	if fs == nil {
+		// Fallback to real filesystem if no filesystem is stored
+		err := os.MkdirAll(path, dirPerm)
+		if err != nil {
+			return fmt.Errorf("error creating config directory: %w", err)
+		}
 
-	_, err = os.Create(file)
-	if err != nil {
-		return fmt.Errorf("error creating config file: %w", err)
-	}
-	err = os.Chmod(file, filePerm)
-	if err != nil {
-		return fmt.Errorf("error creating config file: %w", err)
+		_, err = os.Create(file)
+		if err != nil {
+			return fmt.Errorf("error creating config file: %w", err)
+		}
+		err = os.Chmod(file, filePerm)
+		if err != nil {
+			return fmt.Errorf("error creating config file: %w", err)
+		}
+	} else {
+		// Use the stored filesystem
+		err := fs.MkdirAll(path, dirPerm)
+		if err != nil {
+			return fmt.Errorf("error creating config directory: %w", err)
+		}
+
+		_, err = fs.Create(file)
+		if err != nil {
+			return fmt.Errorf("error creating config file: %w", err)
+		}
 	}
 
 	return saveConfig(v, file)
@@ -229,7 +255,13 @@ func IsProjectDir(path string) (bool, error) {
 		return false, nil
 	}
 
-	return fileutil.Exists(configFile, nil)
+	// Use the stored filesystem if available, otherwise fallback to real filesystem
+	fs := currentFs
+	if fs == nil {
+		return fileutil.Exists(configFile, nil)
+	}
+
+	return fileutil.Exists(configFile, fs)
 }
 
 // IsWithinProjectDir returns true if the path is at or within an Astro project directory
