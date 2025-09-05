@@ -139,7 +139,7 @@ func (s *Suite) TestGetWorkspaceSelection() {
 
 		buf := new(bytes.Buffer)
 		_, err = GetWorkspaceSelection(mockCoreClient, buf)
-		s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+		s.EqualError(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 		mockCoreClient.AssertExpectations(s.T())
 	})
 }
@@ -239,7 +239,7 @@ func (s *Suite) TestSwitch() {
 
 		buf := new(bytes.Buffer)
 		err = Switch("test-id-1", mockCoreClient, buf)
-		s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+		s.EqualError(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 		mockCoreClient.AssertExpectations(s.T())
 	})
 }
@@ -260,7 +260,7 @@ func (s *Suite) TestGetCurrentWorkspace() {
 
 	config.ResetCurrentContext()
 	_, err = GetCurrentWorkspace()
-	s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	s.EqualError(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 }
 
 var (

@@ -424,7 +424,7 @@ func (s *Suite) TestAirflowFailure() {
 	config.ResetCurrentContext()
 
 	_, err = Airflow(s.houstonMock, "", "", "test-workspace-id", "", false, false, false, description, false, "")
-	s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	s.EqualError(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 
 	context.Switch("localhost")
 
@@ -704,7 +704,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 
 		s.houstonMock.On("GetAppConfig", deployment.ClusterID).Return(appConfig, nil).Once()
 		err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description)
-		s.EqualError(err, "could not get current context! Error: no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+		s.EqualError(err, "could not get current context! Error: no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 		context.Switch("localhost")
 	})
 

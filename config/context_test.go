@@ -23,7 +23,7 @@ local:
 	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
 	InitConfig(fs)
 	_, err = GetCurrentContext()
-	s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	s.EqualError(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 }
 
 func (s *Suite) TestPrintContext() {

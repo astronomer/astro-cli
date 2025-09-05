@@ -30,7 +30,7 @@ func newLoginCommand(coreClient astrocore.CoreClient, platformCoreClient astropl
 	cmd := &cobra.Command{
 		Use:   "login [BASEDOMAIN]",
 		Short: "Log in to Astronomer",
-		Long:  "Authenticate to Astro or Astronomer Software",
+		Long:  "Authenticate to Astro or Astro Private Cloud",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return login(cmd, args, coreClient, platformCoreClient, out)
@@ -66,7 +66,7 @@ func login(cmd *cobra.Command, args []string, coreClient astrocore.CoreClient, p
 			// get the domain from context as an extra check
 			ctx, _ := context.GetCurrentContext()
 			if context.IsCloudDomain(ctx.Domain) {
-				fmt.Fprintf(out, "To login to Astronomer Software follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
+				fmt.Fprintf(out, "To login to Astro Private Cloud follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 			}
 			return softwareLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
 		}
