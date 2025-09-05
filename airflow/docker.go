@@ -412,7 +412,7 @@ func (d *DockerCompose) PS() error {
 	}
 
 	// Columns for table
-	infoColumns := []string{"Name", "State", "Ports"}
+	infoColumns := []string{"NAME", "STATE", "PORTS"}
 
 	// Create a new tabwriter
 	tw := new(tabwriter.Writer)
@@ -426,6 +426,48 @@ func (d *DockerCompose) PS() error {
 			data = append(data, fmt.Sprint(psInfo[i].Publishers[0].PublishedPort))
 		}
 		fmt.Fprintln(tw, strings.Join(data, "\t"))
+	}
+
+	// Flush to stdout
+	return tw.Flush()
+}
+
+func (d *DockerCompose) List() error {
+	// List all containers
+	containers, err := d.cliClient.ContainerList(context.Background(), container.ListOptions{All: true})
+	if err != nil {
+		return errors.Wrap(err, "error listing containers")
+	}
+
+	// Columns for table
+	infoColumns := []string{"PROJECT NAME", "DIRECTORY", "STATUS"}
+
+	// Create a new tabwriter
+	tw := new(tabwriter.Writer)
+	tw.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight) //nolint:mnd
+
+	// Append data to table
+	fmt.Fprintln(tw, strings.Join(infoColumns, "\t"))
+
+	projects := make(map[string]map[string]string)
+	for _, c := range containers {
+		if c.Labels[api.ProjectLabel] != "" && c.Labels[api.WorkingDirLabel] != "" {
+			projectName := c.Labels[api.ProjectLabel]
+			if projects[projectName] == nil {
+				projects[projectName] = make(map[string]string)
+			}
+			projects[projectName]["path"] = c.Labels[api.WorkingDirLabel]
+			if c.State == "running" {
+				projects[projectName]["status"] = "Running"
+			} else if projects[projectName]["status"] != "Running" {
+				projects[projectName]["status"] = "Stopped"
+			}
+		}
+	}
+
+	for name, data := range projects {
+		row := []string{name, data["path"], data["status"]}
+		fmt.Fprintln(tw, strings.Join(row, "\t"))
 	}
 
 	// Flush to stdout

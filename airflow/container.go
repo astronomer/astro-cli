@@ -27,6 +27,7 @@ type ContainerHandler interface {
 	Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error
 	Stop(waitForExit bool) error
 	PS() error
+	List() error
 	Kill() error
 	Logs(follow bool, containerNames ...string) error
 	Run(args []string, user string) error

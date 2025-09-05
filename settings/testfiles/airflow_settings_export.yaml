@@ -1,3 +1,4 @@
+---
 airflow:
   connections:
     - conn_id: local_postgres

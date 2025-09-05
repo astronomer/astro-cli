@@ -106,6 +106,24 @@ func (_m *ContainerHandler) Kill() error {
 	return r0
 }
 
+// List provides a mock function with no fields
+func (_m *ContainerHandler) List() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for List")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Logs provides a mock function with given fields: follow, containerNames
 func (_m *ContainerHandler) Logs(follow bool, containerNames ...string) error {
 	_va := make([]interface{}, len(containerNames))

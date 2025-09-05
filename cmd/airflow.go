@@ -154,6 +154,7 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
 		newAirflowUpgradeTestCmd(platformCoreClient),
+		newAirflowListCmd(),
 	)
 	return cmd
 }
@@ -272,6 +273,16 @@ func newAirflowPSCmd() *cobra.Command {
 		Long:    "List locally running Airflow containers",
 		PreRunE: SetRuntimeIfExists,
 		RunE:    airflowPS,
+	}
+	return cmd
+}
+
+func newAirflowListCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List locally running Airflow environments",
+		Long:  "List locally running Airflow environments",
+		RunE:  airflowList,
 	}
 	return cmd
 }
@@ -725,6 +736,19 @@ func airflowPS(cmd *cobra.Command, args []string) error {
 	}
 
 	return containerHandler.PS()
+}
+
+// List locally running Airflow environments
+func airflowList(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	containerHandler, err := containerHandlerInit("", "", "", "")
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.List()
 }
 
 // Outputs logs for a development airflow cluster
