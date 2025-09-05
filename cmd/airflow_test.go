@@ -167,13 +167,6 @@ func (s *AirflowSuite) TestNewAirflowLogsCmd() {
 	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
 }
 
-func (s *AirflowSuite) TestNewAirflowKillCmd() {
-	cmd := newAirflowInitCmd()
-	cmd.RunE(new(cobra.Command), []string{})
-	cmd = newAirflowKillCmd()
-	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
-}
-
 func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
 	s.Run("test airflow init with non empty dir", func() {
 		cmd := newAirflowInitCmd()
@@ -785,6 +778,65 @@ func (s *AirflowSuite) TestAirflowPS() {
 	})
 }
 
+func (s *AirflowSuite) TestAirflowKill() {
+	s.Run("success with project name", func() {
+		cmd := newAirflowKillCmd()
+		args := []string{"test-project"}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Kill").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowKill(cmd, args)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("success without project name", func() {
+		cmd := newAirflowKillCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Kill").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowKill(cmd, args)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("failure", func() {
+		cmd := newAirflowKillCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Kill").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowKill(cmd, args)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("containerHandlerInit failure", func() {
+		cmd := newAirflowKillCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowKill(cmd, args)
+		s.ErrorIs(err, errMock)
+	})
+}
+
 func (s *AirflowSuite) TestAirflowList() {
 	s.Run("success", func() {
 		cmd := newAirflowListCmd()
@@ -891,50 +943,6 @@ func (s *AirflowSuite) TestAirflowLogs() {
 		}
 
 		err := airflowLogs(cmd, args)
-		s.ErrorIs(err, errMock)
-	})
-}
-
-func (s *AirflowSuite) TestAirflowKill() {
-	s.Run("success", func() {
-		cmd := newAirflowKillCmd()
-		args := []string{}
-
-		mockContainerHandler := new(mocks.ContainerHandler)
-		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Kill").Return(nil).Once()
-			return mockContainerHandler, nil
-		}
-
-		err := airflowKill(cmd, args)
-		s.NoError(err)
-		mockContainerHandler.AssertExpectations(s.T())
-	})
-
-	s.Run("failure", func() {
-		cmd := newAirflowKillCmd()
-		args := []string{}
-
-		mockContainerHandler := new(mocks.ContainerHandler)
-		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Kill").Return(errMock).Once()
-			return mockContainerHandler, nil
-		}
-
-		err := airflowKill(cmd, args)
-		s.ErrorIs(err, errMock)
-		mockContainerHandler.AssertExpectations(s.T())
-	})
-
-	s.Run("containerHandlerInit failure", func() {
-		cmd := newAirflowKillCmd()
-		args := []string{}
-
-		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			return nil, errMock
-		}
-
-		err := airflowKill(cmd, args)
 		s.ErrorIs(err, errMock)
 	})
 }

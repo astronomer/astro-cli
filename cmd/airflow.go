@@ -330,10 +330,9 @@ func newAirflowStopCmd() *cobra.Command {
 
 func newAirflowKillCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:      "kill",
+		Use:      "kill [project-name]",
 		Short:    "Kill all locally running Airflow containers",
 		Long:     "Kill all Airflow containers running on your local machine. This command permanently deletes all container data.",
-		PreRunE:  KillPreRunHook,
 		RunE:     airflowKill,
 		PostRunE: KillPostRunHook,
 	}
@@ -791,7 +790,15 @@ func airflowKill(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
+	var containerHandler airflow.ContainerHandler
+	var err error
+
+	if len(args) > 0 {
+		containerHandler, err = containerHandlerInit("", "", "", args[0])
+	} else {
+		containerHandler, err = containerHandlerInit(config.WorkingPath, "", dockerfile, "")
+	}
+
 	if err != nil {
 		return err
 	}

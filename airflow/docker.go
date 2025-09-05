@@ -163,18 +163,17 @@ type DockerCompose struct {
 	ruffImageHandler ImageHandler
 }
 
-func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*DockerCompose, error) {
+func DockerComposeInit(airflowHome, envFile, dockerfile, projectName string) (*DockerCompose, error) {
 	// Get project name from config
-	projectName, err := ProjectNameUnique()
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving working directory: %w", err)
+	if projectName == "" {
+		name, err := ProjectNameUnique()
+		if err != nil {
+			return nil, fmt.Errorf("error retrieving working directory: %w", err)
+		}
+		projectName = name
 	}
 
-	if imageName == "" {
-		imageName = projectName
-	}
-
-	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
+	imageHandler := DockerImageInit(ImageName(projectName, "latest"))
 	ruffImageHandler := DockerImageInit(config.CFG.RuffImage.GetString())
 
 	// Route output streams according to verbosity.
