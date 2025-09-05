@@ -79,8 +79,8 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [service-account id]",
 		Aliases: []string{"de"},
-		Short:   "Delete a Service Account in the Astronomer Software platform",
-		Long:    "Delete a Service Account in the Astronomer Software platform",
+		Short:   "Delete a Service Account in the Astro Private Cloud platform",
+		Long:    "Delete a Service Account in the Astro Private Cloud platform",
 		Args:    cobra.ExactArgs(1),
 		Example: "astro workspace sa delete cl0wh207g0496759fx0qof80q",
 		RunE: func(cmd *cobra.Command, args []string) error {

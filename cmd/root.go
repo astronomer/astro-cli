@@ -27,7 +27,7 @@ var (
 )
 
 const (
-	softwarePlatform = "Astronomer Software"
+	softwarePlatform = "Astro Private Cloud"
 	cloudPlatform    = "Astro"
 )
 
@@ -64,7 +64,7 @@ func NewRootCmd() *cobra.Command {
    \:.\ \  \ \ /____\:\  \::\ \   \ \ '\ \ \\:\_\ \ \          \:\_\ \ \\:\/___/\/__\::\__/\
     \__\/\__\/ \_____\/   \__\/    \_\/ \_\/ \_____\/           \_____\/ \_____\/\________\/
 
-Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or Local Development.`,
+Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astro Private Cloud, or Local Development.`,
 		PersistentPreRunE: utils.ChainRunEs(
 			SetupLogging,
 			CreateRootPersistentPreRunE(astroCoreClient, platformCoreClient),
@@ -105,7 +105,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 func getResourcesHelpTemplate(houstonVersion, ctx string) string {
 	return fmt.Sprintf(`{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
 
-Current Context: %s{{if and (eq "%s" "Astronomer Software") (ne "%s" "")}}
+Current Context: %s{{if and (eq "%s" "Astro Private Cloud") (ne "%s" "")}}
 Platform Version: %s{{end}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
