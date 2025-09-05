@@ -11,7 +11,7 @@ import (
 var (
 	ErrCtxConfigErr = errors.New("context config invalid, no domain specified")
 
-	ErrGetHomeString = errors.New("no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	ErrGetHomeString = errors.New("no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 	errNotConnected  = errors.New("not connected, have you authenticated to Astro? Run astro login and try again")
 )
 

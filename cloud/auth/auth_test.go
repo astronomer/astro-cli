@@ -118,13 +118,13 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 	actual, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
+		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
 
 	domain = "fail.astronomer.io"
 	actual, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
+		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
 
 	domain = "astronomer-dev.io"
 	actual, err = FetchDomainAuthConfig(domain)
@@ -137,7 +137,7 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 	actual, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
+		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
 
 	domain = "astronomer-stage.io"
 	actual, err = FetchDomainAuthConfig(domain)
@@ -150,13 +150,13 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 	actual, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
+		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
 
 	domain = "fail.astronomer-perf.io"
 	actual, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
+		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
 
 	t.Run("pr preview is a valid domain", func(t *testing.T) {
 		// mocking this as once a PR closes, test would fail

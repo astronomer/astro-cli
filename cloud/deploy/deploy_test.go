@@ -794,7 +794,7 @@ func TestDeployFailure(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
-	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
