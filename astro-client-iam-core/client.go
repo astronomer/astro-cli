@@ -21,7 +21,7 @@ var (
 	ErrorBaseURL  = errors.New("invalid baseurl")
 	HTTPStatus200 = 200
 	HTTPStatus204 = 204
-	
+
 	// Enhanced error message for 401 authentication issues
 	authenticationRequiredErrMsg = `authentication required to access Astro API.
 

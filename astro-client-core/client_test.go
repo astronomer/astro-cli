@@ -12,64 +12,64 @@ import (
 
 func TestNormalizeAPIError(t *testing.T) {
 	testCases := []struct {
-		name            string
-		statusCode      int
-		responseBody    string
-		expectedError   string
+		name             string
+		statusCode       int
+		responseBody     string
+		expectedError    string
 		expectedContains []string
 	}{
 		{
-			name:         "401 error with non-JSON body should return enhanced auth message",
-			statusCode:   401,
-			responseBody: "Unauthorized",
+			name:          "401 error with non-JSON body should return enhanced auth message",
+			statusCode:    401,
+			responseBody:  "Unauthorized",
 			expectedError: "authentication required to access Astro API.\n\nTo resolve this issue:\n• Run 'astro login' to authenticate with your Astro account\n• Ensure you have valid credentials and access to the requested resource\n• If you recently logged in, your token may have expired - please login again\n\nYou must be authenticated to use commands that access Astro deployments, workspaces, or environment objects.",
 		},
 		{
-			name:         "401 error with empty body should return enhanced auth message",
-			statusCode:   401,
-			responseBody: "",
+			name:          "401 error with empty body should return enhanced auth message",
+			statusCode:    401,
+			responseBody:  "",
 			expectedError: "authentication required to access Astro API.\n\nTo resolve this issue:\n• Run 'astro login' to authenticate with your Astro account\n• Ensure you have valid credentials and access to the requested resource\n• If you recently logged in, your token may have expired - please login again\n\nYou must be authenticated to use commands that access Astro deployments, workspaces, or environment objects.",
 		},
 		{
-			name:         "401 error with HTML body should return enhanced auth message",
-			statusCode:   401,
-			responseBody: "<html><body><h1>Unauthorized</h1></body></html>",
+			name:          "401 error with HTML body should return enhanced auth message",
+			statusCode:    401,
+			responseBody:  "<html><body><h1>Unauthorized</h1></body></html>",
 			expectedError: "authentication required to access Astro API.\n\nTo resolve this issue:\n• Run 'astro login' to authenticate with your Astro account\n• Ensure you have valid credentials and access to the requested resource\n• If you recently logged in, your token may have expired - please login again\n\nYou must be authenticated to use commands that access Astro deployments, workspaces, or environment objects.",
 		},
 		{
-			name:         "401 error with valid JSON should return JSON message",
-			statusCode:   401,
-			responseBody: `{"message": "Invalid token provided"}`,
+			name:          "401 error with valid JSON should return JSON message",
+			statusCode:    401,
+			responseBody:  `{"message": "Invalid token provided"}`,
 			expectedError: "Invalid token provided",
 		},
 		{
-			name:         "403 error with non-JSON body should return generic error",
-			statusCode:   403,
-			responseBody: "Forbidden",
+			name:          "403 error with non-JSON body should return generic error",
+			statusCode:    403,
+			responseBody:  "Forbidden",
 			expectedError: "failed to perform request, status 403",
 		},
 		{
-			name:         "500 error with non-JSON body should return generic error",
-			statusCode:   500,
-			responseBody: "Internal Server Error",
+			name:          "500 error with non-JSON body should return generic error",
+			statusCode:    500,
+			responseBody:  "Internal Server Error",
 			expectedError: "failed to perform request, status 500",
 		},
 		{
-			name:         "404 error with valid JSON should return JSON message",
-			statusCode:   404,
-			responseBody: `{"message": "Resource not found"}`,
+			name:          "404 error with valid JSON should return JSON message",
+			statusCode:    404,
+			responseBody:  `{"message": "Resource not found"}`,
 			expectedError: "Resource not found",
 		},
 		{
-			name:         "200 success should return nil",
-			statusCode:   200,
-			responseBody: `{"data": "success"}`,
+			name:          "200 success should return nil",
+			statusCode:    200,
+			responseBody:  `{"data": "success"}`,
 			expectedError: "",
 		},
 		{
-			name:         "204 success should return nil", 
-			statusCode:   204,
-			responseBody: "",
+			name:          "204 success should return nil",
+			statusCode:    204,
+			responseBody:  "",
 			expectedError: "",
 		},
 	}
