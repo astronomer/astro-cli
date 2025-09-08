@@ -324,6 +324,10 @@ func UploadFile(args *UploadFileArguments) error {
 		headers := args.Headers
 		headers["Content-Type"] = writer.FormDataContentType()
 		fmt.Println(args.RetryDisplayMessage)
+		// Print the length of the body
+		fmt.Println("Deploy Body length:", body.Len())
+		// Print the body
+		fmt.Println("Deploy Body:", body.String())
 		req, err := newRequestWithContext(http_context.Background(), "POST", args.TargetURL, body)
 		if err != nil {
 			currentUploadError = err
