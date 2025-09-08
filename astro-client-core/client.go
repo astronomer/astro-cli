@@ -21,6 +21,16 @@ var (
 	ErrorBaseURL  = errors.New("invalid baseurl")
 	HTTPStatus200 = 200
 	HTTPStatus204 = 204
+	
+	// Enhanced error message for 401 authentication issues
+	authenticationRequiredErrMsg = `authentication required to access Astro API.
+
+To resolve this issue:
+• Run 'astro login' to authenticate with your Astro account
+• Ensure you have valid credentials and access to the requested resource
+• If you recently logged in, your token may have expired - please login again
+
+You must be authenticated to use commands that access Astro deployments, workspaces, or environment objects.`
 )
 
 const TrueString = "true"
@@ -40,6 +50,10 @@ func NormalizeAPIError(httpResp *http.Response, body []byte) error {
 		decode := Error{}
 		err := json.NewDecoder(bytes.NewReader(body)).Decode(&decode)
 		if err != nil {
+			// Check for 401 authentication errors and provide enhanced guidance
+			if httpResp.StatusCode == 401 {
+				return errors.New(authenticationRequiredErrMsg)
+			}
 			return fmt.Errorf("%w, status %d", ErrorRequest, httpResp.StatusCode)
 		}
 		return errors.New(decode.Message)
