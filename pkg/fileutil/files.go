@@ -353,6 +353,8 @@ func UploadFile(args *UploadFileArguments) error {
 		defer response.Body.Close() //nolint:gocritic
 		data, _ := io.ReadAll(response.Body)
 		responseStatusCode := response.StatusCode
+		fmt.Println("Try number:", i)
+		fmt.Println("Response Status Code:", responseStatusCode)
 
 		// Return success for 2xx status code
 		if response.StatusCode == http.StatusOK {
@@ -363,6 +365,7 @@ func UploadFile(args *UploadFileArguments) error {
 
 		strippedOutData, _ := util.StripOutKeysFromJSONByteArray(data, []string{"exceptions", "args", "path", "status"})
 		currentUploadError = fmt.Errorf("file upload failed. Status code: %d and Message: %s", responseStatusCode, string(strippedOutData)) //nolint
+		fmt.Println("Current Upload Error:", currentUploadError)
 
 		// don't retry for 4xx since it is a client side error
 		if responseStatusCode >= http.StatusBadRequest && responseStatusCode < http.StatusInternalServerError {
