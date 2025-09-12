@@ -98,6 +98,11 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 	}
 
 	var registry string
+	if appConfig.Version >= "1.0.0" && !appConfig.Flags.BYORegistryEnabled {
+		logger.Info("skipping registry login")
+		return nil
+	}
+
 	if appConfig.Flags.BYORegistryEnabled {
 		registry = appConfig.BYORegistryDomain
 	} else {
