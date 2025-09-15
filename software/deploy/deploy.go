@@ -203,7 +203,7 @@ func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, 
 	return deploymentID, err
 }
 
-func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string) error {
+func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string) error {
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
 		registry = byoRegistryDomain
@@ -216,7 +216,7 @@ func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, 
 			if err != nil {
 				logger.Debugf("There was an error logging into registry: %s", err.Error())
 			}
-			registry = "registry." + cloudDomain
+			registry = getDeploymentRegistryUrl(deploymentInfo.ID, deploymentInfo.Urls)
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
 			token = c.Token
 		} else {
@@ -320,7 +320,7 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 	if err != nil {
 		return err
 	}
-	return pushDockerImage(byoRegistryEnabled, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, c, customImageName)
+	return pushDockerImage(byoRegistryEnabled, deploymentInfo, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, c, customImageName)
 }
 
 func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentURL) string {
@@ -330,6 +330,19 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 
 	for _, url := range deploymentURLs {
 		if url.Type == houston.AirflowURLType {
+			return url.URL
+		}
+	}
+	return ""
+}
+
+func getDeploymentRegistryUrl(deploymentID string, deploymentURLs []houston.DeploymentURL) string {
+	if deploymentID == "" {
+		return ""
+	}
+
+	for _, url := range deploymentURLs {
+		if url.Type == houston.RegistryServerURLType {
 			return url.URL
 		}
 	}
