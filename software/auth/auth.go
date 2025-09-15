@@ -81,8 +81,8 @@ func oAuth(oAuthURL string) string {
 	return input.Text(inputOAuthToken)
 }
 
-// registryAuth authenticates with the private registry
-func registryAuth(client houston.ClientInterface, out io.Writer) error {
+// RegistryAuth authenticates with the private registry
+func RegistryAuth(client houston.ClientInterface, out io.Writer) error {
 	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -239,7 +239,7 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		}
 	}
 
-	err = registryAuth(client, out)
+	err = RegistryAuth(client, out)
 	if err != nil {
 		logger.Debugf("There was an error logging into registry: %s", err.Error())
 	}

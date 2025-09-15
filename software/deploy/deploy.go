@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/software/auth"
 )
 
 var (
@@ -208,9 +209,21 @@ func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, 
 		registry = byoRegistryDomain
 		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
 	} else {
-		registry = registryDomainPrefix + cloudDomain
-		remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
-		token = c.Token
+		platformVersion, _ := houstonClient.GetPlatformVersion(nil)
+		if platformVersion >= "1.0.0" {
+			// Do per deployment registry login
+			err := auth.RegistryAuth(houstonClient, os.Stdout)
+			if err != nil {
+				logger.Debugf("There was an error logging into registry: %s", err.Error())
+			}
+			registry = "registry." + cloudDomain
+			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
+			token = c.Token
+		} else {
+			registry = registryDomainPrefix + cloudDomain
+			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
+			token = c.Token
+		}
 	}
 	if customImageName != "" {
 		if tagFromImageName := getGetTagFromImageName(customImageName); tagFromImageName != "" {
