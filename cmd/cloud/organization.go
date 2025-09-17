@@ -95,10 +95,7 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false,
-		"Get login link to login on a separate device for organization switch")
-
-	// 🔹 Add this new flag:
+	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for organization switch")
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "The Workspace's unique identifier")
 
 	return cmd
