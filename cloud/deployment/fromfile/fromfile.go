@@ -487,15 +487,14 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 		}
 
-		d, err := deployment.CoreCreateDeployment("", createDeploymentRequest, astroPlatformCore)
+		deploymentResponse, err := deployment.CoreCreateDeployment("", createDeploymentRequest, astroPlatformCore)
 		if err != nil {
 			return err
 		}
-		deploymentID := d.Id
 
 		if waitForStatus {
 			err = deployment.HealthPoll(
-				deploymentID,
+				deploymentResponse.Id,
 				workspaceID,
 				deployment.SleepTime,
 				deployment.TickNum,
