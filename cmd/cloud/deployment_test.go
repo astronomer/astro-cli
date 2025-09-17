@@ -397,6 +397,11 @@ func execDeploymentCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
 	cmd := newDeploymentRootCmd(buf)
 	cmd.SetOut(buf)
+	// The real CLI registers --verbosity as a persistent flag on the root command.
+	// Tests invoke the deployment subcommand directly, so we stub the flag here to
+	// mirror production setup and avoid "unknown flag" errors when scenarios pass it.
+	var verbosity string
+	cmd.PersistentFlags().StringVar(&verbosity, "verbosity", "", "")
 	cmd.SetArgs(args)
 	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
@@ -679,6 +684,97 @@ deployment:
 	})
 	t.Run("returns an error if from-file is specified with any other flags", func(t *testing.T) {
 		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml", "--description", "fail"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorIs(t, err, errFlag)
+	})
+	t.Run("creates a deployment from file when supported flags are set", func(t *testing.T) {
+		filePath := "./test-deployment.yaml"
+		data := `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name: test-deployment-label
+    description: description
+    runtime_version: 6.0.0
+    dag_deploy_enabled: true
+    executor: CeleryExecutor
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_name: test-cluster
+    workspace_name: test-workspace
+    deployment_type: HYBRID
+  worker_queues:
+    - name: default
+      is_default: true
+      max_worker_count: 130
+      min_worker_count: 12
+      worker_concurrency: 180
+      worker_type: test-worker-1
+    - name: test-queue-1
+      is_default: false
+      max_worker_count: 175
+      min_worker_count: 8
+      worker_concurrency: 176
+      worker_type: test-worker-2
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
+    webserver_url: some-url
+  alert_emails:
+    - test1@test.com
+    - test2@test.com
+`
+		astroCoreClient = mockCoreClient
+		platformCoreClient = mockPlatformCoreClient
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
+		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
+		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(4)
+		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+
+		origSleep := deployment.SleepTime
+		origTick := deployment.TickNum
+		origTimeout := deployment.TimeoutNum
+		deployment.SleepTime = 0
+		deployment.TickNum = 1
+		deployment.TimeoutNum = 5
+		defer func() {
+			deployment.SleepTime = origSleep
+			deployment.TickNum = origTick
+			deployment.TimeoutNum = origTimeout
+		}()
+
+		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml", "--wait", "--verbosity", "debug"}
+		astroCoreClient = mockCoreClient
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+
+		mockPlatformCoreClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
+	t.Run("returns an error if from-file is specified with supported and unsupported flags", func(t *testing.T) {
+		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml", "--wait", "--description", "fail"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorIs(t, err, errFlag)
 	})
