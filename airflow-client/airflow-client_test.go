@@ -585,6 +585,43 @@ func (s *Suite) TestUpdatePool() {
 		s.NoError(err)
 	})
 
+	s.Run("success - default pool", func() {
+		defaultPool := Pool{
+			Description:     "Default pool",
+			Name:            "default_pool",
+			Slots:           64,
+			IncludeDeferred: true,
+		}
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			s.Equal("PATCH", req.Method)
+			expectedURL := "https://test-airflow-url/pools/default_pool?update_mask=slots&update_mask=include_deferred"
+			s.Equal(expectedURL, req.URL.String())
+			s.Equal("token", req.Header.Get("authorization"))
+
+			reqBody, err := io.ReadAll(req.Body)
+			s.NoError(err)
+
+			var body map[string]interface{}
+			err = json.Unmarshal(reqBody, &body)
+			s.NoError(err)
+
+			s.Equal(map[string]interface{}{
+				"slots":            float64(defaultPool.Slots),
+				"include_deferred": defaultPool.IncludeDeferred,
+			}, body)
+
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString("{}")),
+				Header:     make(http.Header),
+			}
+		})
+		airflowClient := NewAirflowClient(client)
+
+		err := airflowClient.UpdatePool("test-airflow-url", defaultPool)
+		s.NoError(err)
+	})
+
 	s.Run("error - http request failed", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
