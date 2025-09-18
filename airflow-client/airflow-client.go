@@ -181,21 +181,13 @@ func (c *HTTPClient) CreatePool(airflowURL string, pool Pool) error {
 }
 
 func (c *HTTPClient) UpdatePool(airflowURL string, pool Pool) error {
-	payload := interface{}(pool)
 	path := fmt.Sprintf("https://%s/pools/%s", airflowURL, pool.Name)
 
 	if pool.Name == "default_pool" {
-		payload = struct {
-			Slots           int  `json:"slots"`
-			IncludeDeferred bool `json:"include_deferred"`
-		}{
-			Slots:           pool.Slots,
-			IncludeDeferred: pool.IncludeDeferred,
-		}
 		path += "?update_mask=slots&update_mask=include_deferred"
 	}
 
-	varJSON, err := json.Marshal(payload)
+	varJSON, err := json.Marshal(pool)
 	if err != nil {
 		return err
 	}

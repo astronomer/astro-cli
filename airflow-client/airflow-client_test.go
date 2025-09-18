@@ -592,6 +592,8 @@ func (s *Suite) TestUpdatePool() {
 			Slots:           64,
 			IncludeDeferred: true,
 		}
+		defaultPoolJSON, err := json.Marshal(defaultPool)
+		s.NoError(err)
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			s.Equal("PATCH", req.Method)
 			expectedURL := "https://test-airflow-url/pools/default_pool?update_mask=slots&update_mask=include_deferred"
@@ -600,15 +602,7 @@ func (s *Suite) TestUpdatePool() {
 
 			reqBody, err := io.ReadAll(req.Body)
 			s.NoError(err)
-
-			var body map[string]interface{}
-			err = json.Unmarshal(reqBody, &body)
-			s.NoError(err)
-
-			s.Equal(map[string]interface{}{
-				"slots":            float64(defaultPool.Slots),
-				"include_deferred": defaultPool.IncludeDeferred,
-			}, body)
+			s.Equal(defaultPoolJSON, reqBody)
 
 			return &http.Response{
 				StatusCode: 200,
@@ -618,7 +612,7 @@ func (s *Suite) TestUpdatePool() {
 		})
 		airflowClient := NewAirflowClient(client)
 
-		err := airflowClient.UpdatePool("test-airflow-url", defaultPool)
+		err = airflowClient.UpdatePool("test-airflow-url", defaultPool)
 		s.NoError(err)
 	})
 
