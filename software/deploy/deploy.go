@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/software/auth"
+	"github.com/docker/docker/api/types/versions"
 )
 
 var (
@@ -210,7 +211,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
 	} else {
 		platformVersion, _ := houstonClient.GetPlatformVersion(nil)
-		if platformVersion >= "1.0.0" {
+		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
 			// Do per deployment registry login
 			err := auth.RegistryAuth(houstonClient, os.Stdout)
 			if err != nil {
