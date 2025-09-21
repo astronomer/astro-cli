@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 const (
@@ -728,13 +729,22 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 	// request is to create from a file
 	if inputFile != "" {
-		requestedFlags := cmd.Flags().NFlag()
-		if requestedFlags > 1 {
-			// other flags were requested
+		// Collect all requested flags except --deployment-file and --wait
+		allowedFlags := map[string]bool{
+			"wait":            true,
+			"deployment-file": true,
+			"verbosity":       true,
+		}
+		var disallowedFlagSet bool
+		cmd.Flags().Visit(func(f *pflag.Flag) {
+			if !allowedFlags[f.Name] {
+				disallowedFlagSet = true
+			}
+		})
+		if disallowedFlagSet {
 			return errFlag
 		}
-
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, waitForStatus)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
@@ -755,7 +765,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
 	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, platformCoreClient, astroCoreClient, waitForStatus)
 }
 
@@ -783,7 +792,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 			// other flags were requested
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, waitForStatus)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value")
