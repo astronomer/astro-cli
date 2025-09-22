@@ -29,7 +29,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to inspect.")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "yaml", "Output format can be one of: yaml or json. By default the inspected deployment will be in YAML format.")
 	cmd.Flags().BoolVarP(&template, "template", "t", false, "Create a template from the deployment being inspected.")
-	cmd.Flags().StringVarP(&requestedField, "key", "k", "", "A specific key for the deployment. Use --key configuration.cluster_id to get a deployment's cluster id.")
+	cmd.Flags().StringVarP(&requestedField, "key", "k", "", "A specific key for the deployment. Use --key deployment.configuration.cluster_id to get a deployment's cluster id.")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "clean output to only include inspect yaml or json file in any situation.")
 	cmd.Flags().BoolVarP(&showWorkloadIdentity, "show-workload-identity", "", false, "Include the workload identity configured for the deployment in the output.")
 	return cmd

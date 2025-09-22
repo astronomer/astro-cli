@@ -323,7 +323,7 @@ func (config *DeploymentConfig) GetValidTags(tag string) (tags []string) {
 	// if tag doesn't follow the semver standard return empty array
 	if err != nil {
 		fmt.Println(err)
-		return
+		return tags
 	}
 
 	for _, image := range config.AirflowImages {
@@ -336,7 +336,7 @@ func (config *DeploymentConfig) GetValidTags(tag string) (tags []string) {
 			tags = append(tags, image.Tag)
 		}
 	}
-	return
+	return tags
 }
 
 func (config *DeploymentConfig) IsValidTag(tag string) bool {

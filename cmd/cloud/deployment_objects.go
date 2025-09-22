@@ -33,7 +33,7 @@ var (
 )
 
 const (
-	webserverURLField        = "metadata.airflow_api_url"
+	webserverURLField        = "deployment.metadata.airflow_api_url"
 	warningConnectionCopyCMD = "WARNING! The password and extra field are not copied over. You will need to manually add these values"
 	warningVariableCopyCMD   = "WARNING! Secret values are not copied over. You will need to manually add these values"
 )

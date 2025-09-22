@@ -449,24 +449,22 @@ func formatPrintableDeployment(outputFormat string, template bool, printableDepl
 // it returns errKeyNotFound if either part of the requestedField are not found.
 func getSpecificField(deploymentMap map[string]interface{}, requestedField string) (any, error) {
 	keyParts := strings.Split(strings.ToLower(requestedField), ".")
-	// iterate over the top level maps in a deployment like deployment.information
-	for _, elem := range deploymentMap {
-		// check if the first key in the requested field exists and create a subMap
-		if subMap, exists := elem.(map[string]interface{})[keyParts[0]]; exists {
-			if len(keyParts) > 1 {
-				// check if the second key in the requested field exists
-				value, ok := subMap.(map[string]interface{})[keyParts[1]]
-				if ok {
-					// we found the requested field so return its value
-					return value, nil
-				}
-			} else {
-				// top level field was requested so we return it
-				return subMap, nil
-			}
+	current := any(deploymentMap)
+
+	for _, key := range keyParts {
+		// each step must be a map[string]interface{}
+		m, ok := current.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("requested key %s %w", requestedField, errKeyNotFound)
 		}
+		val, exists := m[key]
+		if !exists {
+			return nil, fmt.Errorf("requested key %s %w", requestedField, errKeyNotFound)
+		}
+		current = val
 	}
-	return nil, fmt.Errorf("requested key %s %w", requestedField, errKeyNotFound)
+
+	return current, nil
 }
 
 func getPrintableDeployment(infoMap, configMap, additionalMap map[string]interface{}) map[string]interface{} {

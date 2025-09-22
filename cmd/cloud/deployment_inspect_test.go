@@ -62,7 +62,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-		cmdArgs := []string{"inspect", "-n", "test", "-k", "metadata.cluster_id"}
+		cmdArgs := []string{"inspect", "-n", "test", "-k", "deployment.metadata.cluster_id"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)

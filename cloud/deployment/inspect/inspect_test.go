@@ -343,7 +343,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "configuration.cluster_name", false, false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "deployment.configuration.cluster_name", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), *deploymentResponse.ClusterName)
 		mockCoreClient.AssertExpectations(t)
@@ -452,7 +452,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "configuration.workload_identity", false, false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "deployment.configuration.workload_identity", false, false)
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, out.String(), "")
 		mockCoreClient.AssertExpectations(t)
@@ -465,7 +465,7 @@ func TestInspect(t *testing.T) {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "configuration.workload_identity", false, true)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "deployment.configuration.workload_identity", false, true)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), workloadIdentity)
 		mockCoreClient.AssertExpectations(t)
@@ -1233,55 +1233,55 @@ func TestGetSpecificField(t *testing.T) {
 		},
 	}
 	t.Run("returns a value if key is found in deployment.metadata", func(t *testing.T) {
-		requestedField := "metadata.workspace_id"
+		requestedField := "deployment.metadata.workspace_id"
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, sourceDeployment.WorkspaceId, actual)
 	})
 	t.Run("returns a value if key is found in deployment.configuration", func(t *testing.T) {
-		requestedField := "configuration.scheduler_count"
+		requestedField := "deployment.configuration.scheduler_count"
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, sourceDeployment.SchedulerReplicas, actual)
 	})
 	t.Run("returns a value if key is alert_emails", func(t *testing.T) {
-		requestedField := "alert_emails"
+		requestedField := "deployment.alert_emails"
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, sourceDeployment.ContactEmails, actual)
 	})
 	t.Run("returns a value if key is environment_variables", func(t *testing.T) {
-		requestedField := "environment_variables"
+		requestedField := "deployment.environment_variables"
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, getVariablesMap(*sourceDeployment.EnvironmentVariables), actual)
 	})
 	t.Run("returns a value if key is worker_queues", func(t *testing.T) {
-		requestedField := "worker_queues"
+		requestedField := "deployment.worker_queues"
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, getQMap(&sourceDeployment, nodePools), actual)
 	})
 	t.Run("returns a value if key is hibernation_schedules", func(t *testing.T) {
-		requestedField := "hibernation_schedules"
+		requestedField := "deployment.hibernation_schedules"
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, getHibernationSchedulesMap(*sourceDeployment.ScalingSpec.HibernationSpec.Schedules), actual)
 	})
 	t.Run("returns a value if key is metadata", func(t *testing.T) {
-		requestedField := "metadata"
+		requestedField := "deployment.metadata"
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, info, actual)
 	})
 	t.Run("returns value regardless of upper or lower case key", func(t *testing.T) {
-		requestedField := "Configuration.Cluster_NAME"
+		requestedField := "deployment.Configuration.Cluster_NAME"
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, *sourceDeployment.ClusterName, actual)
 	})
 	t.Run("returns correct boolean value", func(t *testing.T) {
-		requestedField := "configuration.is_development_mode"
+		requestedField := "deployment.configuration.is_development_mode"
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, *sourceDeployment.IsDevelopmentMode, actual)
@@ -1443,7 +1443,7 @@ func TestReturnSpecifiedValue(t *testing.T) {
 	t.Run("run function successfully", func(t *testing.T) {
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		value, err := ReturnSpecifiedValue(&sourceDeployment, "configuration.name", mockPlatformCoreClient)
+		value, err := ReturnSpecifiedValue(&sourceDeployment, "deployment.configuration.name", mockPlatformCoreClient)
 		assert.NoError(t, err)
 		assert.Contains(t, value, deploymentName)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -1453,7 +1453,7 @@ func TestReturnSpecifiedValue(t *testing.T) {
 		clusterErr := errors.New("test cluster error")
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, clusterErr).Once()
 
-		_, err := ReturnSpecifiedValue(&sourceDeployment, "configuration.name", mockPlatformCoreClient)
+		_, err := ReturnSpecifiedValue(&sourceDeployment, "deployment.configuration.name", mockPlatformCoreClient)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "test cluster error")
 		mockPlatformCoreClient.AssertExpectations(t)
