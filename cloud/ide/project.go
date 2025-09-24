@@ -232,9 +232,15 @@ func saveSessionAndCleanup(client astrocore.CoreClient, organizationID, workspac
 }
 
 // openProjectInBrowser opens the project URL in the default browser
-func openProjectInBrowser(domain, workspaceID, projectID string, out io.Writer) {
-	// Construct the URL
-	url := fmt.Sprintf("https://cloud.%s/%s/astro-ide/%s", domain, workspaceID, projectID)
+func openProjectInBrowser(client astrocore.CoreClient, organizationID, workspaceID, projectID, domain string, out io.Writer) {
+	projectResp, err := getProject(client, organizationID, workspaceID, projectID)
+	var url string
+	if err == nil && projectResp != nil && projectResp.JSON200 != nil && projectResp.JSON200.Url != nil && *projectResp.JSON200.Url != "" {
+		url = *projectResp.JSON200.Url
+	} else {
+		// Fallback to constructing the URL if API URL is unavailable
+		url = fmt.Sprintf("https://cloud.%s/%s/astro-ide/%s", domain, workspaceID, projectID)
+	}
 
 	// Open the URL in browser
 	if err := openURL(url); err != nil {
@@ -344,7 +350,7 @@ func ExportProject(client astrocore.CoreClient, projectID, organizationID, works
 	fmt.Fprintf(out, "Successfully exported project to %s\n", projectID)
 
 	// Open project in browser
-	openProjectInBrowser(domain, workspaceID, projectID, out)
+	openProjectInBrowser(client, organizationID, workspaceID, projectID, domain, out)
 
 	return nil
 }
