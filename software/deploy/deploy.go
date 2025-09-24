@@ -212,7 +212,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 	} else {
 		platformVersion, _ := houstonClient.GetPlatformVersion(nil)
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
-			// Do per deployment registry login
+			// Switch to per deployment registry login
 			err := auth.RegistryAuth(houstonClient, os.Stdout)
 			if err != nil {
 				logger.Debugf("There was an error logging into registry: %s", err.Error())
