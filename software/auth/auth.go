@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/software/workspace"
+	"github.com/docker/docker/api/types/versions"
 )
 
 const (
@@ -98,7 +99,7 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer) error {
 	}
 
 	var registry string
-	if appConfig.Version >= "1.0.0" && !appConfig.Flags.BYORegistryEnabled {
+	if versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0") && !appConfig.Flags.BYORegistryEnabled {
 		logger.Info("skipping registry login")
 		return nil
 	}
