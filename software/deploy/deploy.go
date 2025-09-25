@@ -212,12 +212,15 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 	} else {
 		platformVersion, _ := houstonClient.GetPlatformVersion(nil)
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
+			registry, err := getDeploymentRegistryUrl(deploymentInfo.Urls)
+			if err != nil {
+				return err
+			}
 			// Switch to per deployment registry login
-			err := auth.RegistryAuth(houstonClient, os.Stdout)
+			err = auth.RegistryAuth(houstonClient, os.Stdout)
 			if err != nil {
 				logger.Debugf("There was an error logging into registry: %s", err.Error())
 			}
-			registry = getDeploymentRegistryUrl(deploymentInfo.ID, deploymentInfo.Urls)
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
 			token = c.Token
 		} else {
@@ -337,17 +340,13 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 	return ""
 }
 
-func getDeploymentRegistryUrl(deploymentID string, deploymentURLs []houston.DeploymentURL) string {
-	if deploymentID == "" {
-		return ""
-	}
-
+func getDeploymentRegistryUrl(deploymentURLs []houston.DeploymentURL) (string, error) {
 	for _, url := range deploymentURLs {
 		if url.Type == houston.RegistryServerURLType {
-			return url.URL
+			return url.URL, nil
 		}
 	}
-	return ""
+	return "", errors.New("no valid registry url found failed to push")
 }
 
 func getDeploymentIDForCurrentCommand(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
