@@ -225,7 +225,6 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 	vars := make(map[string]interface{})
 	vars["clusterId"] = ""
 	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
-	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 	s.houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:test-test", AirflowVersion: "1.10.12", RuntimeVersion: ""}).Return(nil, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description, "")
@@ -288,7 +287,6 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistryAndCustomImageName
 	vars := make(map[string]interface{})
 	vars["clusterId"] = ""
 	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
-	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 	s.houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:latest", AirflowVersion: "1.10.12", RuntimeVersion: "12.2.0"}).Return(nil, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description, customImageName)
@@ -328,12 +326,12 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 	s.mockImageHandler.AssertExpectations(s.T())
 
 	s.mockImageHandler = new(mocks.ImageHandler)
-	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errSomeContainerIssue)
 		return s.mockImageHandler
 	}
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 
 	// push error test case
 	err = buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
