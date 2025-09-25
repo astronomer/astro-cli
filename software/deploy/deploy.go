@@ -212,7 +212,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 	} else {
 		platformVersion, _ := houstonClient.GetPlatformVersion(nil)
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
-			registry, err := getDeploymentRegistryUrl(deploymentInfo.Urls)
+			registry, err := getDeploymentRegistryURL(deploymentInfo.Urls)
 			if err != nil {
 				return err
 			}
@@ -340,7 +340,7 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 	return ""
 }
 
-func getDeploymentRegistryUrl(deploymentURLs []houston.DeploymentURL) (string, error) {
+func getDeploymentRegistryURL(deploymentURLs []houston.DeploymentURL) (string, error) {
 	for _, url := range deploymentURLs {
 		if url.Type == houston.RegistryURLType {
 			return url.URL, nil

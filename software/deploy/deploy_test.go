@@ -344,23 +344,23 @@ func (s *Suite) TestGetAirflowUILink() {
 	s.Equal(expectedResult, actualResult)
 }
 
-func (s *Suite) TestGetDeploymentRegistryUrl() {
+func (s *Suite) TestGetDeploymentRegistryURL() {
 	mockURLs := []houston.DeploymentURL{
 		{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
 		{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
 		{URL: "registry.local.astronomer.io", Type: "registry"},
 	}
 	expectedResult := "registry.local.astronomer.io"
-	actualResult, _ := getDeploymentRegistryUrl(mockURLs)
+	actualResult, _ := getDeploymentRegistryURL(mockURLs)
 	s.Equal(expectedResult, actualResult)
 }
 
-func (s *Suite) TestGetDeploymentRegistryUrlFailure() {
+func (s *Suite) TestGetDeploymentRegistryURLFailure() {
 	mockURLs := []houston.DeploymentURL{
 		{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
 		{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
 	}
-	_, err := getDeploymentRegistryUrl(mockURLs)
+	_, err := getDeploymentRegistryURL(mockURLs)
 	s.EqualError(err, "no valid registry url found failed to push")
 }
 
