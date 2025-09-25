@@ -46,6 +46,7 @@ var (
 		Urls: []houston.DeploymentURL{
 			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
 			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+			{URL: "registry.local.astronomer.io", Type: "registry"},
 		},
 		CreatedAt: time.Time{},
 		UpdatedAt: time.Time{},
@@ -157,6 +158,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithTagWarning() {
 	vars["clusterId"] = ""
 	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
 	s.NoError(err)
@@ -182,6 +184,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithImageRepoWarning() {
 	vars["clusterId"] = ""
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
 	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
 	s.NoError(err)
@@ -222,6 +225,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 	vars := make(map[string]interface{})
 	vars["clusterId"] = ""
 	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 	s.houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:test-test", AirflowVersion: "1.10.12", RuntimeVersion: ""}).Return(nil, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description, "")
@@ -234,6 +238,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 
 	// Case when SHA is used as tag
 	s.houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io@image_sha", AirflowVersion: "1.10.12", RuntimeVersion: ""}).Return(nil, nil)
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		// Mock the Build function, capturing the buildConfig
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.MatchedBy(func(buildConfig types.ImageBuildConfig) bool {
@@ -283,6 +288,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistryAndCustomImageName
 	vars := make(map[string]interface{})
 	vars["clusterId"] = ""
 	s.houstonMock.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 	s.houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:latest", AirflowVersion: "1.10.12", RuntimeVersion: "12.2.0"}).Return(nil, nil)
 
 	err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true, description, customImageName)
@@ -309,6 +315,7 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 	s.Error(err, errMockHouston)
 
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Twice()
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
@@ -321,6 +328,7 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 	s.mockImageHandler.AssertExpectations(s.T())
 
 	s.mockImageHandler = new(mocks.ImageHandler)
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errSomeContainerIssue)
@@ -381,6 +389,7 @@ func (s *Suite) TestGetDagDeployURL() {
 			Urls: []houston.DeploymentURL{
 				{URL: "https://deployments.local.astronomer.io/testDeploymentName/dags/upload", Type: houston.DagServerURLType},
 				{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: houston.AirflowURLType},
+				{URL: "registry.local.astronomer.io", Type: "registry"},
 			},
 		}
 
@@ -394,6 +403,7 @@ func (s *Suite) TestGetDagDeployURL() {
 			ReleaseName: "test-deployment",
 			Urls: []houston.DeploymentURL{
 				{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: houston.AirflowURLType},
+				{URL: "registry.local.astronomer.io", Type: "registry"},
 			},
 		}
 
@@ -407,6 +417,7 @@ func (s *Suite) TestGetDagDeployURL() {
 			ReleaseName: "test-deployment",
 			Urls: []houston.DeploymentURL{
 				{URL: "https://flower.example.com", Type: "flower"},
+				{URL: "registry.local.astronomer.io", Type: "registry"},
 			},
 		}
 
@@ -482,8 +493,8 @@ func (s *Suite) TestAirflowSuccess() {
 	config.InitConfig(s.fsForLocalConfig)
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
-		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
 		return s.mockImageHandler
 	}
 
@@ -497,8 +508,16 @@ func (s *Suite) TestAirflowSuccess() {
 	s.houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
 	s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Once()
-	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{ClusterID: "test-cluster-id"}, nil).Once()
+	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{
+		ClusterID: "test-cluster-id",
+		Urls: []houston.DeploymentURL{
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+			{URL: "registry.local.astronomer.io", Type: "registry"},
+		},
+	}, nil).Once()
 	s.houstonMock.On("GetAppConfig", "test-cluster-id").Return(&houston.AppConfig{}, nil).Once()
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 	vars := make(map[string]interface{})
 	vars["clusterId"] = "test-cluster-id"
 	s.houstonMock.On("GetRuntimeReleases", vars).Return(mockRuntimeReleases, nil)
