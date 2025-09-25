@@ -355,6 +355,15 @@ func (s *Suite) TestGetDeploymentRegistryUrl() {
 	s.Equal(expectedResult, actualResult)
 }
 
+func (s *Suite) TestGetDeploymentRegistryUrlFailure() {
+	mockURLs := []houston.DeploymentURL{
+		{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+		{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+	}
+	_, err := getDeploymentRegistryUrl(mockURLs)
+	s.EqualError(err, "no valid registry url found failed to push")
+}
+
 func (s *Suite) TestGetAirflowUILinkFailure() {
 	actualResult := getAirflowUILink("", []houston.DeploymentURL{})
 	s.Equal(actualResult, "")
