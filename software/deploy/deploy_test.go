@@ -330,6 +330,7 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errSomeContainerIssue)
 		return s.mockImageHandler
 	}
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 
 	// push error test case
 	err = buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
