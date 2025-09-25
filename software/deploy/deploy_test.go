@@ -591,10 +591,16 @@ func (s *Suite) TestAirflowSuccessForImageName() {
 		DagDeployment: *dagDeployment,
 		ClusterID:     "test-cluster-id",
 		ID:            "test-deployment-id",
+		Urls: []houston.DeploymentURL{
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+			{URL: "registry.local.astronomer.io", Type: "registry"},
+		},
 	}
 
 	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(deployment, nil).Once()
 	s.houstonMock.On("GetAppConfig", "test-cluster-id").Return(&houston.AppConfig{}, nil).Once()
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 	vars := make(map[string]interface{})
 	vars["clusterId"] = "test-cluster-id"
 	s.houstonMock.On("GetRuntimeReleases", vars).Return(mockRuntimeReleases, nil)
