@@ -344,6 +344,17 @@ func (s *Suite) TestGetAirflowUILink() {
 	s.Equal(expectedResult, actualResult)
 }
 
+func (s *Suite) TestGetDeploymentRegistryUrl() {
+	mockURLs := []houston.DeploymentURL{
+		{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+		{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+		{URL: "registry.local.astronomer.io", Type: "registry"},
+	}
+	expectedResult := "registry.local.astronomer.io"
+	actualResult, _ := getDeploymentRegistryUrl(mockURLs)
+	s.Equal(expectedResult, actualResult)
+}
+
 func (s *Suite) TestGetAirflowUILinkFailure() {
 	actualResult := getAirflowUILink("", []houston.DeploymentURL{})
 	s.Equal(actualResult, "")
