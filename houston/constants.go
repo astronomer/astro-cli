@@ -16,9 +16,9 @@ const (
 	NoneRole             = "NONE"
 
 	// Deployment
-	AirflowURLType        = "airflow"
-	DagServerURLType      = "dagserver"
-	RegistryServerURLType = "registry"
+	AirflowURLType   = "airflow"
+	DagServerURLType = "dagserver"
+	RegistryURLType  = "registry"
 
 	CeleryExecutorType     = "CeleryExecutor"
 	LocalExecutorType      = "LocalExecutor"

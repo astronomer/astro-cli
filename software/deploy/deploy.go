@@ -342,7 +342,7 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 
 func getDeploymentRegistryUrl(deploymentURLs []houston.DeploymentURL) (string, error) {
 	for _, url := range deploymentURLs {
-		if url.Type == houston.RegistryServerURLType {
+		if url.Type == houston.RegistryURLType {
 			return url.URL, nil
 		}
 	}
