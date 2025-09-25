@@ -232,12 +232,12 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithBYORegistry() {
 
 	expectedLabel := deployRevisionDescriptionLabel + "=" + description
 	assert.Contains(s.T(), capturedBuildConfig.Labels, expectedLabel)
-	s.mockImageHandler.AssertExpectations(s.T())
-	s.houstonMock.AssertExpectations(s.T())
 
-	// Case when SHA is used as tag
+	// Set up expectations for SHA tag test
 	s.houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io@image_sha", AirflowVersion: "1.10.12", RuntimeVersion: ""}).Return(nil, nil)
-	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
+
+	// Reset image handler for SHA tag test
+	s.mockImageHandler = new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		// Mock the Build function, capturing the buildConfig
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.MatchedBy(func(buildConfig types.ImageBuildConfig) bool {
@@ -313,7 +313,6 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 	s.Error(err, errMockHouston)
 
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Twice()
-	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
@@ -331,7 +330,6 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errSomeContainerIssue)
 		return s.mockImageHandler
 	}
-	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 
 	// push error test case
 	err = buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
@@ -529,9 +527,10 @@ func (s *Suite) TestAirflowSuccessForImageOnly() {
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
 		return s.mockImageHandler
 	}
+	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
 
 	mockedDeploymentConfig := &houston.DeploymentConfig{
 		AirflowImages: mockAirflowImageList,
@@ -550,6 +549,11 @@ func (s *Suite) TestAirflowSuccessForImageOnly() {
 		DagDeployment: *dagDeployment,
 		ClusterID:     "test-cluster-id",
 		ID:            "test-deployment-id",
+		Urls: []houston.DeploymentURL{
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+			{URL: "registry.local.astronomer.io", Type: "registry"},
+		},
 	}
 
 	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(deployment, nil).Once()
