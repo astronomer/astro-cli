@@ -377,14 +377,33 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 			return nil
 		}
 
-		// Create a header for the file
-		header, err := tar.FileInfoHeader(info, info.Name())
+		// Determine relative path
+		relPath, err := filepath.Rel(sourceDir, path)
 		if err != nil {
 			return err
 		}
 
-		// Set the relative path in the archive
-		relPath, err := filepath.Rel(sourceDir, path)
+		// Skip root itself; we don't archive a top-level "." entry
+		if relPath == "." {
+			return nil
+		}
+
+		// Skip all hidden dotfiles and dot-directories, except allow the root ".astro" file
+		base := filepath.Base(path)
+		if base != "" && base[0] == '.' && relPath != ".astro" {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Skip symlinks
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
+
+		// Create a header for the file/dir
+		header, err := tar.FileInfoHeader(info, "")
 		if err != nil {
 			return err
 		}
@@ -395,7 +414,7 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 			return err
 		}
 
-		// If it's a file, write its contents
+		// If it's a regular file, write its contents
 		if !info.IsDir() {
 			file, err := os.Open(path)
 			if err != nil {
@@ -403,8 +422,7 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 			}
 			defer file.Close()
 
-			_, err = io.Copy(tarWriter, file)
-			if err != nil {
+			if _, err = io.Copy(tarWriter, file); err != nil {
 				return err
 			}
 		}
