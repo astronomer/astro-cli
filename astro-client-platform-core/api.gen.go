@@ -250,11 +250,12 @@ const (
 
 // Defines values for OrganizationPaymentMethod.
 const (
-	AWSMARKETPLACE   OrganizationPaymentMethod = "AWS_MARKETPLACE"
-	AZUREMARKETPLACE OrganizationPaymentMethod = "AZURE_MARKETPLACE"
-	CREDITCARD       OrganizationPaymentMethod = "CREDIT_CARD"
-	GCPMARKETPLACE   OrganizationPaymentMethod = "GCP_MARKETPLACE"
-	INVOICE          OrganizationPaymentMethod = "INVOICE"
+	AWSMARKETPLACE       OrganizationPaymentMethod = "AWS_MARKETPLACE"
+	AZUREMARKETPLACE     OrganizationPaymentMethod = "AZURE_MARKETPLACE"
+	CREDITCARD           OrganizationPaymentMethod = "CREDIT_CARD"
+	GCPMARKETPLACE       OrganizationPaymentMethod = "GCP_MARKETPLACE"
+	INVOICE              OrganizationPaymentMethod = "INVOICE"
+	SNOWFLAKEMARKETPLACE OrganizationPaymentMethod = "SNOWFLAKE_MARKETPLACE"
 )
 
 // Defines values for OrganizationProduct.

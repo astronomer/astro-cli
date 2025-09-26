@@ -55,6 +55,12 @@ const (
 	AstroIdeProjectRemoteGitProviderGITHUB AstroIdeProjectRemoteGitProvider = "GITHUB"
 )
 
+// Defines values for AstroIdeSessionPermission.
+const (
+	AstroIdeSessionPermissionREADONLY  AstroIdeSessionPermission = "READ_ONLY"
+	AstroIdeSessionPermissionREADWRITE AstroIdeSessionPermission = "READ_WRITE"
+)
+
 // Defines values for AstroIdeSessionEditActor.
 const (
 	AstroIdeSessionEditActorAGENT AstroIdeSessionEditActor = "AGENT"
@@ -300,9 +306,10 @@ const (
 
 // Defines values for CreateEnvironmentObjectRequestObjectType.
 const (
-	CreateEnvironmentObjectRequestObjectTypeAIRFLOWVARIABLE CreateEnvironmentObjectRequestObjectType = "AIRFLOW_VARIABLE"
-	CreateEnvironmentObjectRequestObjectTypeCONNECTION      CreateEnvironmentObjectRequestObjectType = "CONNECTION"
-	CreateEnvironmentObjectRequestObjectTypeMETRICSEXPORT   CreateEnvironmentObjectRequestObjectType = "METRICS_EXPORT"
+	CreateEnvironmentObjectRequestObjectTypeAIRFLOWVARIABLE     CreateEnvironmentObjectRequestObjectType = "AIRFLOW_VARIABLE"
+	CreateEnvironmentObjectRequestObjectTypeCONNECTION          CreateEnvironmentObjectRequestObjectType = "CONNECTION"
+	CreateEnvironmentObjectRequestObjectTypeENVIRONMENTVARIABLE CreateEnvironmentObjectRequestObjectType = "ENVIRONMENT_VARIABLE"
+	CreateEnvironmentObjectRequestObjectTypeMETRICSEXPORT       CreateEnvironmentObjectRequestObjectType = "METRICS_EXPORT"
 )
 
 // Defines values for CreateEnvironmentObjectRequestScope.
@@ -419,6 +426,28 @@ const (
 	DeploymentExecutorKUBERNETES DeploymentExecutor = "KUBERNETES"
 )
 
+// Defines values for DeploymentOrganizationAstroProductPlan.
+const (
+	DeploymentOrganizationAstroProductPlanBASIC            DeploymentOrganizationAstroProductPlan = "BASIC"
+	DeploymentOrganizationAstroProductPlanBASICPAYGO       DeploymentOrganizationAstroProductPlan = "BASIC_PAYGO"
+	DeploymentOrganizationAstroProductPlanBUSINESS         DeploymentOrganizationAstroProductPlan = "BUSINESS"
+	DeploymentOrganizationAstroProductPlanBUSINESSCRITICAL DeploymentOrganizationAstroProductPlan = "BUSINESS_CRITICAL"
+	DeploymentOrganizationAstroProductPlanBUSINESSV2       DeploymentOrganizationAstroProductPlan = "BUSINESS_V2"
+	DeploymentOrganizationAstroProductPlanDEVELOPERPAYGO   DeploymentOrganizationAstroProductPlan = "DEVELOPER_PAYGO"
+	DeploymentOrganizationAstroProductPlanENTERPRISE       DeploymentOrganizationAstroProductPlan = "ENTERPRISE"
+	DeploymentOrganizationAstroProductPlanENTERPRISEV2     DeploymentOrganizationAstroProductPlan = "ENTERPRISE_V2"
+	DeploymentOrganizationAstroProductPlanINACTIVE         DeploymentOrganizationAstroProductPlan = "INACTIVE"
+	DeploymentOrganizationAstroProductPlanINTERNAL         DeploymentOrganizationAstroProductPlan = "INTERNAL"
+	DeploymentOrganizationAstroProductPlanPOV              DeploymentOrganizationAstroProductPlan = "POV"
+	DeploymentOrganizationAstroProductPlanPREMIUM          DeploymentOrganizationAstroProductPlan = "PREMIUM"
+	DeploymentOrganizationAstroProductPlanSTANDARD         DeploymentOrganizationAstroProductPlan = "STANDARD"
+	DeploymentOrganizationAstroProductPlanTEAM             DeploymentOrganizationAstroProductPlan = "TEAM"
+	DeploymentOrganizationAstroProductPlanTEAMPAYGO        DeploymentOrganizationAstroProductPlan = "TEAM_PAYGO"
+	DeploymentOrganizationAstroProductPlanTEAMV2           DeploymentOrganizationAstroProductPlan = "TEAM_V2"
+	DeploymentOrganizationAstroProductPlanTRIAL            DeploymentOrganizationAstroProductPlan = "TRIAL"
+	DeploymentOrganizationAstroProductPlanTRIALV2          DeploymentOrganizationAstroProductPlan = "TRIAL_V2"
+)
+
 // Defines values for DeploymentSchedulerSize.
 const (
 	DeploymentSchedulerSizeEXTRALARGE DeploymentSchedulerSize = "EXTRA_LARGE"
@@ -502,9 +531,10 @@ const (
 
 // Defines values for EnvironmentObjectObjectType.
 const (
-	EnvironmentObjectObjectTypeAIRFLOWVARIABLE EnvironmentObjectObjectType = "AIRFLOW_VARIABLE"
-	EnvironmentObjectObjectTypeCONNECTION      EnvironmentObjectObjectType = "CONNECTION"
-	EnvironmentObjectObjectTypeMETRICSEXPORT   EnvironmentObjectObjectType = "METRICS_EXPORT"
+	EnvironmentObjectObjectTypeAIRFLOWVARIABLE     EnvironmentObjectObjectType = "AIRFLOW_VARIABLE"
+	EnvironmentObjectObjectTypeCONNECTION          EnvironmentObjectObjectType = "CONNECTION"
+	EnvironmentObjectObjectTypeENVIRONMENTVARIABLE EnvironmentObjectObjectType = "ENVIRONMENT_VARIABLE"
+	EnvironmentObjectObjectTypeMETRICSEXPORT       EnvironmentObjectObjectType = "METRICS_EXPORT"
 )
 
 // Defines values for EnvironmentObjectScope.
@@ -583,11 +613,12 @@ const (
 
 // Defines values for OrganizationPaymentMethod.
 const (
-	AWSMARKETPLACE   OrganizationPaymentMethod = "AWS_MARKETPLACE"
-	AZUREMARKETPLACE OrganizationPaymentMethod = "AZURE_MARKETPLACE"
-	CREDITCARD       OrganizationPaymentMethod = "CREDIT_CARD"
-	GCPMARKETPLACE   OrganizationPaymentMethod = "GCP_MARKETPLACE"
-	INVOICE          OrganizationPaymentMethod = "INVOICE"
+	AWSMARKETPLACE       OrganizationPaymentMethod = "AWS_MARKETPLACE"
+	AZUREMARKETPLACE     OrganizationPaymentMethod = "AZURE_MARKETPLACE"
+	CREDITCARD           OrganizationPaymentMethod = "CREDIT_CARD"
+	GCPMARKETPLACE       OrganizationPaymentMethod = "GCP_MARKETPLACE"
+	INVOICE              OrganizationPaymentMethod = "INVOICE"
+	SNOWFLAKEMARKETPLACE OrganizationPaymentMethod = "SNOWFLAKE_MARKETPLACE"
 )
 
 // Defines values for OrganizationProduct.
@@ -736,12 +767,6 @@ const (
 const (
 	DAG   TriggerGitDeployRequestDeployType = "DAG"
 	IMAGE TriggerGitDeployRequestDeployType = "IMAGE"
-)
-
-// Defines values for UpdateAstroIdeSessionPermission.
-const (
-	UpdateAstroIdeSessionPermissionREADONLY  UpdateAstroIdeSessionPermission = "READ_ONLY"
-	UpdateAstroIdeSessionPermissionREADWRITE UpdateAstroIdeSessionPermission = "READ_WRITE"
 )
 
 // Defines values for UpdateAstroIdeSessionRequestPermission.
@@ -1249,9 +1274,10 @@ const (
 
 // Defines values for ListEnvironmentObjectsParamsObjectType.
 const (
-	AIRFLOWVARIABLE ListEnvironmentObjectsParamsObjectType = "AIRFLOW_VARIABLE"
-	CONNECTION      ListEnvironmentObjectsParamsObjectType = "CONNECTION"
-	METRICSEXPORT   ListEnvironmentObjectsParamsObjectType = "METRICS_EXPORT"
+	AIRFLOWVARIABLE     ListEnvironmentObjectsParamsObjectType = "AIRFLOW_VARIABLE"
+	CONNECTION          ListEnvironmentObjectsParamsObjectType = "CONNECTION"
+	ENVIRONMENTVARIABLE ListEnvironmentObjectsParamsObjectType = "ENVIRONMENT_VARIABLE"
+	METRICSEXPORT       ListEnvironmentObjectsParamsObjectType = "METRICS_EXPORT"
 )
 
 // Defines values for ListEnvironmentObjectsParamsSourceScope.
@@ -1357,8 +1383,8 @@ const (
 
 // Defines values for ListWorkspaceApiTokensParamsTokenTypes.
 const (
-	ORGANIZATION ListWorkspaceApiTokensParamsTokenTypes = "ORGANIZATION"
-	WORKSPACE    ListWorkspaceApiTokensParamsTokenTypes = "WORKSPACE"
+	ListWorkspaceApiTokensParamsTokenTypesORGANIZATION ListWorkspaceApiTokensParamsTokenTypes = "ORGANIZATION"
+	ListWorkspaceApiTokensParamsTokenTypesWORKSPACE    ListWorkspaceApiTokensParamsTokenTypes = "WORKSPACE"
 )
 
 // Defines values for ListWorkspaceApiTokensParamsSorts.
@@ -1587,6 +1613,7 @@ type AstroIdeProject struct {
 	Rules          *string                   `json:"rules,omitempty"`
 	UpdatedAt      time.Time                 `json:"updatedAt"`
 	UpdatedBy      *BasicSubjectProfile      `json:"updatedBy,omitempty"`
+	Url            *string                   `json:"url,omitempty"`
 	Visibility     AstroIdeProjectVisibility `json:"visibility"`
 	WorkspaceId    string                    `json:"workspaceId"`
 }
@@ -1639,6 +1666,18 @@ type AstroIdeProjectsPaginated struct {
 	TotalCount int               `json:"totalCount"`
 }
 
+// AstroIdeSession defines model for AstroIdeSession.
+type AstroIdeSession struct {
+	DeploymentId      *string                   `json:"deploymentId,omitempty"`
+	Id                string                    `json:"id"`
+	Permission        AstroIdeSessionPermission `json:"permission"`
+	RemoteBranch      *string                   `json:"remoteBranch,omitempty"`
+	RemoteBranchAhead *bool                     `json:"remoteBranchAhead,omitempty"`
+}
+
+// AstroIdeSessionPermission defines model for AstroIdeSession.Permission.
+type AstroIdeSessionPermission string
+
 // AstroIdeSessionEdit defines model for AstroIdeSessionEdit.
 type AstroIdeSessionEdit struct {
 	Actor    AstroIdeSessionEditActor  `json:"actor"`
@@ -1685,9 +1724,13 @@ type Cluster struct {
 	AppliedHarmonyVersion             *string                     `json:"appliedHarmonyVersion,omitempty"`
 	AppliedTemplateVersion            string                      `json:"appliedTemplateVersion"`
 	AuroraReplicationSourceIdentifier *string                     `json:"auroraReplicationSourceIdentifier,omitempty"`
+	AwsInstanceProfile                *string                     `json:"awsInstanceProfile,omitempty"`
+	AwsSecurityGroupId                *string                     `json:"awsSecurityGroupId,omitempty"`
+	AwsSubnetIds                      *[]string                   `json:"awsSubnetIds,omitempty"`
 	BlockInternetAccess               *bool                       `json:"blockInternetAccess,omitempty"`
 	CloudProvider                     ClusterCloudProvider        `json:"cloudProvider"`
 	Cohort                            *ClusterCohort              `json:"cohort,omitempty"`
+	ComponentVersions                 *[]ClusterComponentVersion  `json:"componentVersions,omitempty"`
 	CreatedAt                         time.Time                   `json:"createdAt"`
 	DbInstanceType                    string                      `json:"dbInstanceType"`
 	DbInstanceVersion                 string                      `json:"dbInstanceVersion"`
@@ -1698,6 +1741,7 @@ type Cluster struct {
 	Id                                string                      `json:"id"`
 	IsCordoned                        *bool                       `json:"isCordoned,omitempty"`
 	IsDryRun                          bool                        `json:"isDryRun"`
+	IsFailedOver                      *bool                       `json:"isFailedOver,omitempty"`
 	IsLimited                         bool                        `json:"isLimited"`
 	K8sTags                           []ClusterTag                `json:"k8sTags"`
 	Metadata                          ClusterMetadata             `json:"metadata"`
@@ -1735,15 +1779,26 @@ type ClusterStatus string
 // ClusterType defines model for Cluster.Type.
 type ClusterType string
 
+// ClusterComponentVersion defines model for ClusterComponentVersion.
+type ClusterComponentVersion struct {
+	AppliedVersion string `json:"appliedVersion"`
+	Component      string `json:"component"`
+	DesiredVersion string `json:"desiredVersion"`
+}
+
 // ClusterDetailed defines model for ClusterDetailed.
 type ClusterDetailed struct {
 	AppliedHarmonyVersion             *string                      `json:"appliedHarmonyVersion,omitempty"`
 	AppliedTemplateVersion            string                       `json:"appliedTemplateVersion"`
 	AuroraReplicationSourceIdentifier *string                      `json:"auroraReplicationSourceIdentifier,omitempty"`
+	AwsInstanceProfile                *string                      `json:"awsInstanceProfile,omitempty"`
+	AwsSecurityGroupId                *string                      `json:"awsSecurityGroupId,omitempty"`
+	AwsSubnetIds                      *[]string                    `json:"awsSubnetIds,omitempty"`
 	AzureDbReviveDropped              *bool                        `json:"azureDbReviveDropped,omitempty"`
 	BlockInternetAccess               *bool                        `json:"blockInternetAccess,omitempty"`
 	CloudProvider                     ClusterDetailedCloudProvider `json:"cloudProvider"`
 	Cohort                            *ClusterDetailedCohort       `json:"cohort,omitempty"`
+	ComponentVersions                 *[]ClusterComponentVersion   `json:"componentVersions,omitempty"`
 	CreatedAt                         time.Time                    `json:"createdAt"`
 	CreatedBy                         BasicSubjectProfile          `json:"createdBy"`
 	DbInstanceType                    string                       `json:"dbInstanceType"`
@@ -1757,6 +1812,7 @@ type ClusterDetailed struct {
 	Id                                string                       `json:"id"`
 	IsCordoned                        *bool                        `json:"isCordoned,omitempty"`
 	IsDryRun                          bool                         `json:"isDryRun"`
+	IsFailedOver                      *bool                        `json:"isFailedOver,omitempty"`
 	IsLimited                         bool                         `json:"isLimited"`
 	K8sTags                           []ClusterTag                 `json:"k8sTags"`
 	Metadata                          ClusterMetadata              `json:"metadata"`
@@ -1980,6 +2036,7 @@ type ConnectionAuthTypeParameter struct {
 	IsInExtra        bool    `json:"isInExtra"`
 	IsRequired       bool    `json:"isRequired"`
 	IsSecret         bool    `json:"isSecret"`
+	Pattern          *string `json:"pattern,omitempty"`
 }
 
 // CreateAstroIdeProjectRemoteRequest defines model for CreateAstroIdeProjectRemoteRequest.
@@ -2269,6 +2326,17 @@ type CreateEnvironmentObjectConnectionRequest struct {
 	Type       string                  `json:"type"`
 }
 
+// CreateEnvironmentObjectEnvironmentVariableOverridesRequest defines model for CreateEnvironmentObjectEnvironmentVariableOverridesRequest.
+type CreateEnvironmentObjectEnvironmentVariableOverridesRequest struct {
+	Value *string `json:"value,omitempty"`
+}
+
+// CreateEnvironmentObjectEnvironmentVariableRequest defines model for CreateEnvironmentObjectEnvironmentVariableRequest.
+type CreateEnvironmentObjectEnvironmentVariableRequest struct {
+	IsSecret *bool   `json:"isSecret,omitempty"`
+	Value    *string `json:"value,omitempty"`
+}
+
 // CreateEnvironmentObjectLinkRequest defines model for CreateEnvironmentObjectLinkRequest.
 type CreateEnvironmentObjectLinkRequest struct {
 	Overrides     *CreateEnvironmentObjectOverridesRequest `json:"overrides,omitempty"`
@@ -2325,23 +2393,25 @@ type CreateEnvironmentObjectMetricsExportRequestExporterType string
 
 // CreateEnvironmentObjectOverridesRequest defines model for CreateEnvironmentObjectOverridesRequest.
 type CreateEnvironmentObjectOverridesRequest struct {
-	AirflowVariable *CreateEnvironmentObjectAirflowVariableOverridesRequest `json:"airflowVariable,omitempty"`
-	Connection      *CreateEnvironmentObjectConnectionOverridesRequest      `json:"connection,omitempty"`
-	MetricsExport   *CreateEnvironmentObjectMetricsExportOverridesRequest   `json:"metricsExport,omitempty"`
+	AirflowVariable     *CreateEnvironmentObjectAirflowVariableOverridesRequest     `json:"airflowVariable,omitempty"`
+	Connection          *CreateEnvironmentObjectConnectionOverridesRequest          `json:"connection,omitempty"`
+	EnvironmentVariable *CreateEnvironmentObjectEnvironmentVariableOverridesRequest `json:"environmentVariable,omitempty"`
+	MetricsExport       *CreateEnvironmentObjectMetricsExportOverridesRequest       `json:"metricsExport,omitempty"`
 }
 
 // CreateEnvironmentObjectRequest defines model for CreateEnvironmentObjectRequest.
 type CreateEnvironmentObjectRequest struct {
-	AirflowVariable     *CreateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
-	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
-	Connection          *CreateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
-	ExcludeLinks        *[]ExcludeLinkEnvironmentObjectRequest         `json:"excludeLinks,omitempty"`
-	Links               *[]CreateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
-	MetricsExport       *CreateEnvironmentObjectMetricsExportRequest   `json:"metricsExport,omitempty"`
-	ObjectKey           string                                         `json:"objectKey"`
-	ObjectType          CreateEnvironmentObjectRequestObjectType       `json:"objectType"`
-	Scope               CreateEnvironmentObjectRequestScope            `json:"scope"`
-	ScopeEntityId       string                                         `json:"scopeEntityId"`
+	AirflowVariable     *CreateEnvironmentObjectAirflowVariableRequest     `json:"airflowVariable,omitempty"`
+	AutoLinkDeployments *bool                                              `json:"autoLinkDeployments,omitempty"`
+	Connection          *CreateEnvironmentObjectConnectionRequest          `json:"connection,omitempty"`
+	EnvironmentVariable *CreateEnvironmentObjectEnvironmentVariableRequest `json:"environmentVariable,omitempty"`
+	ExcludeLinks        *[]ExcludeLinkEnvironmentObjectRequest             `json:"excludeLinks,omitempty"`
+	Links               *[]CreateEnvironmentObjectLinkRequest              `json:"links,omitempty"`
+	MetricsExport       *CreateEnvironmentObjectMetricsExportRequest       `json:"metricsExport,omitempty"`
+	ObjectKey           string                                             `json:"objectKey"`
+	ObjectType          CreateEnvironmentObjectRequestObjectType           `json:"objectType"`
+	Scope               CreateEnvironmentObjectRequestScope                `json:"scope"`
+	ScopeEntityId       string                                             `json:"scopeEntityId"`
 }
 
 // CreateEnvironmentObjectRequestObjectType defines model for CreateEnvironmentObjectRequest.ObjectType.
@@ -2742,47 +2812,51 @@ type DeployStepsPaginated struct {
 
 // Deployment defines model for Deployment.
 type Deployment struct {
-	AirflowVersion                 string                           `json:"airflowVersion"`
-	BlockInternetAccess            *bool                            `json:"blockInternetAccess,omitempty"`
-	Bundles                        *[]Bundle                        `json:"bundles,omitempty"`
-	ClusterCloudProvider           *DeploymentClusterCloudProvider  `json:"clusterCloudProvider,omitempty"`
-	ClusterCloudProviderAccount    *string                          `json:"clusterCloudProviderAccount,omitempty"`
-	ClusterId                      string                           `json:"clusterId"`
-	ClusterName                    *string                          `json:"clusterName,omitempty"`
-	ClusterRegion                  *string                          `json:"clusterRegion,omitempty"`
-	ContactEmails                  []string                         `json:"contactEmails"`
-	CreatedAt                      time.Time                        `json:"createdAt"`
-	CreatedBy                      *BasicSubjectProfile             `json:"createdBy,omitempty"`
-	CurrentDagTarballVersion       *string                          `json:"currentDagTarballVersion,omitempty"`
-	CurrentEnvironmentSignatures   *EnvironmentSignatures           `json:"currentEnvironmentSignatures,omitempty"`
-	CurrentImageVersion            *string                          `json:"currentImageVersion,omitempty"`
-	DefaultTaskPodCpu              *string                          `json:"defaultTaskPodCpu,omitempty"`
-	DefaultTaskPodEphemeralStorage *string                          `json:"defaultTaskPodEphemeralStorage,omitempty"`
-	DefaultTaskPodMemory           *string                          `json:"defaultTaskPodMemory,omitempty"`
-	DeletedAt                      *time.Time                       `json:"deletedAt,omitempty"`
-	DeployId                       string                           `json:"deployId"`
-	DeploymentHealthStatus         *DeploymentHealthStatus          `json:"deploymentHealthStatus,omitempty"`
-	Description                    *string                          `json:"description,omitempty"`
-	DesiredDagTarballVersion       *string                          `json:"desiredDagTarballVersion,omitempty"`
-	DesiredEnvironmentSignatures   *EnvironmentSignatures           `json:"desiredEnvironmentSignatures,omitempty"`
-	DesiredImageVersion            *string                          `json:"desiredImageVersion,omitempty"`
-	EnvironmentVariables           *[]DeploymentEnvironmentVariable `json:"environmentVariables,omitempty"`
-	Executor                       *DeploymentExecutor              `json:"executor,omitempty"`
-	ExternalIPs                    *[]string                        `json:"externalIPs,omitempty"`
-	Id                             string                           `json:"id"`
-	ImageId                        string                           `json:"imageId"`
-	ImageRepository                string                           `json:"imageRepository"`
-	ImageTag                       string                           `json:"imageTag"`
-	IsCicdEnforced                 bool                             `json:"isCicdEnforced"`
-	IsDagDeployEnabled             bool                             `json:"isDagDeployEnabled"`
-	IsDevelopmentOnly              bool                             `json:"isDevelopmentOnly"`
-	IsHighAvailability             *bool                            `json:"isHighAvailability,omitempty"`
-	Name                           string                           `json:"name"`
-	NoteCount                      int                              `json:"noteCount"`
-	OidcIssuerUrl                  *string                          `json:"oidcIssuerUrl,omitempty"`
-	OrganizationId                 string                           `json:"organizationId"`
-	OrganizationName               string                           `json:"organizationName"`
-	OrganizationShortName          string                           `json:"organizationShortName"`
+	AirflowVersion                 string                                  `json:"airflowVersion"`
+	AstroIde                       *DeploymentAstroIde                     `json:"astroIde,omitempty"`
+	BlockInternetAccess            *bool                                   `json:"blockInternetAccess,omitempty"`
+	Bundles                        *[]Bundle                               `json:"bundles,omitempty"`
+	ClusterCloudProvider           *DeploymentClusterCloudProvider         `json:"clusterCloudProvider,omitempty"`
+	ClusterCloudProviderAccount    *string                                 `json:"clusterCloudProviderAccount,omitempty"`
+	ClusterId                      string                                  `json:"clusterId"`
+	ClusterName                    *string                                 `json:"clusterName,omitempty"`
+	ClusterRegion                  *string                                 `json:"clusterRegion,omitempty"`
+	ContactEmails                  []string                                `json:"contactEmails"`
+	CreatedAt                      time.Time                               `json:"createdAt"`
+	CreatedBy                      *BasicSubjectProfile                    `json:"createdBy,omitempty"`
+	CurrentDagTarballVersion       *string                                 `json:"currentDagTarballVersion,omitempty"`
+	CurrentEnvironmentSignatures   *EnvironmentSignatures                  `json:"currentEnvironmentSignatures,omitempty"`
+	CurrentImageVersion            *string                                 `json:"currentImageVersion,omitempty"`
+	DefaultTaskPodCpu              *string                                 `json:"defaultTaskPodCpu,omitempty"`
+	DefaultTaskPodEphemeralStorage *string                                 `json:"defaultTaskPodEphemeralStorage,omitempty"`
+	DefaultTaskPodMemory           *string                                 `json:"defaultTaskPodMemory,omitempty"`
+	DeletedAt                      *time.Time                              `json:"deletedAt,omitempty"`
+	DeployId                       string                                  `json:"deployId"`
+	DeploymentHealthStatus         *DeploymentHealthStatus                 `json:"deploymentHealthStatus,omitempty"`
+	Description                    *string                                 `json:"description,omitempty"`
+	DesiredDagTarballVersion       *string                                 `json:"desiredDagTarballVersion,omitempty"`
+	DesiredEnvironmentSignatures   *EnvironmentSignatures                  `json:"desiredEnvironmentSignatures,omitempty"`
+	DesiredImageVersion            *string                                 `json:"desiredImageVersion,omitempty"`
+	EnvironmentVariables           *[]DeploymentEnvironmentVariable        `json:"environmentVariables,omitempty"`
+	Executor                       *DeploymentExecutor                     `json:"executor,omitempty"`
+	ExternalIPs                    *[]string                               `json:"externalIPs,omitempty"`
+	Id                             string                                  `json:"id"`
+	ImageId                        string                                  `json:"imageId"`
+	ImageRepository                string                                  `json:"imageRepository"`
+	ImageTag                       string                                  `json:"imageTag"`
+	IsAstroIdeManaged              bool                                    `json:"isAstroIdeManaged"`
+	IsCicdEnforced                 bool                                    `json:"isCicdEnforced"`
+	IsDagDeployEnabled             bool                                    `json:"isDagDeployEnabled"`
+	IsDevelopmentOnly              bool                                    `json:"isDevelopmentOnly"`
+	IsHighAvailability             *bool                                   `json:"isHighAvailability,omitempty"`
+	Name                           string                                  `json:"name"`
+	NoteCount                      int                                     `json:"noteCount"`
+	OidcIssuerUrl                  *string                                 `json:"oidcIssuerUrl,omitempty"`
+	OrganizationAstroProductPlan   *DeploymentOrganizationAstroProductPlan `json:"organizationAstroProductPlan,omitempty"`
+	OrganizationId                 string                                  `json:"organizationId"`
+	OrganizationName               string                                  `json:"organizationName"`
+	OrganizationShortName          string                                  `json:"organizationShortName"`
+	OrganizationTrialExpiresAt     *time.Time                              `json:"organizationTrialExpiresAt,omitempty"`
 
 	// PrivateGatewayIsEnabled Whether the Deployment has a private gateway enabled.
 	PrivateGatewayIsEnabled *bool                      `json:"privateGatewayIsEnabled,omitempty"`
@@ -2828,6 +2902,9 @@ type DeploymentClusterCloudProvider string
 // DeploymentExecutor defines model for Deployment.Executor.
 type DeploymentExecutor string
 
+// DeploymentOrganizationAstroProductPlan defines model for Deployment.OrganizationAstroProductPlan.
+type DeploymentOrganizationAstroProductPlan string
+
 // DeploymentSchedulerSize defines model for Deployment.SchedulerSize.
 type DeploymentSchedulerSize string
 
@@ -2836,6 +2913,13 @@ type DeploymentStatus string
 
 // DeploymentType defines model for Deployment.Type.
 type DeploymentType string
+
+// DeploymentAstroIde defines model for DeploymentAstroIde.
+type DeploymentAstroIde struct {
+	ProjectId   *string `json:"projectId,omitempty"`
+	ProjectName *string `json:"projectName,omitempty"`
+	SessionId   *string `json:"sessionId,omitempty"`
+}
 
 // DeploymentEnvironmentVariable defines model for DeploymentEnvironmentVariable.
 type DeploymentEnvironmentVariable struct {
@@ -3082,23 +3166,24 @@ type EntitlementType string
 
 // EnvironmentObject defines model for EnvironmentObject.
 type EnvironmentObject struct {
-	AirflowVariable     *EnvironmentObjectAirflowVariable `json:"airflowVariable,omitempty"`
-	AutoLinkDeployments *bool                             `json:"autoLinkDeployments,omitempty"`
-	Connection          *EnvironmentObjectConnection      `json:"connection,omitempty"`
-	CreatedAt           *string                           `json:"createdAt,omitempty"`
-	CreatedBy           *BasicSubjectProfile              `json:"createdBy,omitempty"`
-	ExcludeLinks        *[]EnvironmentObjectExcludeLink   `json:"excludeLinks,omitempty"`
-	Id                  *string                           `json:"id,omitempty"`
-	Links               *[]EnvironmentObjectLink          `json:"links,omitempty"`
-	MetricsExport       *EnvironmentObjectMetricsExport   `json:"metricsExport,omitempty"`
-	ObjectKey           string                            `json:"objectKey"`
-	ObjectType          EnvironmentObjectObjectType       `json:"objectType"`
-	Scope               EnvironmentObjectScope            `json:"scope"`
-	ScopeEntityId       string                            `json:"scopeEntityId"`
-	SourceScope         *EnvironmentObjectSourceScope     `json:"sourceScope,omitempty"`
-	SourceScopeEntityId *string                           `json:"sourceScopeEntityId,omitempty"`
-	UpdatedAt           *string                           `json:"updatedAt,omitempty"`
-	UpdatedBy           *BasicSubjectProfile              `json:"updatedBy,omitempty"`
+	AirflowVariable     *EnvironmentObjectAirflowVariable     `json:"airflowVariable,omitempty"`
+	AutoLinkDeployments *bool                                 `json:"autoLinkDeployments,omitempty"`
+	Connection          *EnvironmentObjectConnection          `json:"connection,omitempty"`
+	CreatedAt           *string                               `json:"createdAt,omitempty"`
+	CreatedBy           *BasicSubjectProfile                  `json:"createdBy,omitempty"`
+	EnvironmentVariable *EnvironmentObjectEnvironmentVariable `json:"environmentVariable,omitempty"`
+	ExcludeLinks        *[]EnvironmentObjectExcludeLink       `json:"excludeLinks,omitempty"`
+	Id                  *string                               `json:"id,omitempty"`
+	Links               *[]EnvironmentObjectLink              `json:"links,omitempty"`
+	MetricsExport       *EnvironmentObjectMetricsExport       `json:"metricsExport,omitempty"`
+	ObjectKey           string                                `json:"objectKey"`
+	ObjectType          EnvironmentObjectObjectType           `json:"objectType"`
+	Scope               EnvironmentObjectScope                `json:"scope"`
+	ScopeEntityId       string                                `json:"scopeEntityId"`
+	SourceScope         *EnvironmentObjectSourceScope         `json:"sourceScope,omitempty"`
+	SourceScopeEntityId *string                               `json:"sourceScopeEntityId,omitempty"`
+	UpdatedAt           *string                               `json:"updatedAt,omitempty"`
+	UpdatedBy           *BasicSubjectProfile                  `json:"updatedBy,omitempty"`
 }
 
 // EnvironmentObjectObjectType defines model for EnvironmentObject.ObjectType.
@@ -3144,6 +3229,17 @@ type EnvironmentObjectConnectionOverrides struct {
 	Type     *string                 `json:"type,omitempty"`
 }
 
+// EnvironmentObjectEnvironmentVariable defines model for EnvironmentObjectEnvironmentVariable.
+type EnvironmentObjectEnvironmentVariable struct {
+	IsSecret bool   `json:"isSecret"`
+	Value    string `json:"value"`
+}
+
+// EnvironmentObjectEnvironmentVariableOverrides defines model for EnvironmentObjectEnvironmentVariableOverrides.
+type EnvironmentObjectEnvironmentVariableOverrides struct {
+	Value string `json:"value"`
+}
+
 // EnvironmentObjectExcludeLink defines model for EnvironmentObjectExcludeLink.
 type EnvironmentObjectExcludeLink struct {
 	Scope         EnvironmentObjectExcludeLinkScope `json:"scope"`
@@ -3155,11 +3251,12 @@ type EnvironmentObjectExcludeLinkScope string
 
 // EnvironmentObjectLink defines model for EnvironmentObjectLink.
 type EnvironmentObjectLink struct {
-	AirflowVariableOverrides *EnvironmentObjectAirflowVariableOverrides `json:"airflowVariableOverrides,omitempty"`
-	ConnectionOverrides      *EnvironmentObjectConnectionOverrides      `json:"connectionOverrides,omitempty"`
-	MetricsExportOverrides   *EnvironmentObjectMetricsExportOverrides   `json:"metricsExportOverrides,omitempty"`
-	Scope                    EnvironmentObjectLinkScope                 `json:"scope"`
-	ScopeEntityId            string                                     `json:"scopeEntityId"`
+	AirflowVariableOverrides     *EnvironmentObjectAirflowVariableOverrides     `json:"airflowVariableOverrides,omitempty"`
+	ConnectionOverrides          *EnvironmentObjectConnectionOverrides          `json:"connectionOverrides,omitempty"`
+	EnvironmentVariableOverrides *EnvironmentObjectEnvironmentVariableOverrides `json:"environmentVariableOverrides,omitempty"`
+	MetricsExportOverrides       *EnvironmentObjectMetricsExportOverrides       `json:"metricsExportOverrides,omitempty"`
+	Scope                        EnvironmentObjectLinkScope                     `json:"scope"`
+	ScopeEntityId                string                                         `json:"scopeEntityId"`
 }
 
 // EnvironmentObjectLinkScope defines model for EnvironmentObjectLink.Scope.
@@ -3453,35 +3550,37 @@ type NodePool struct {
 
 // Organization defines model for Organization.
 type Organization struct {
-	AllowEnhancedSupportAccess  bool                       `json:"allowEnhancedSupportAccess"`
-	AuthServiceId               string                     `json:"authServiceId"`
-	AzurePlanId                 *string                    `json:"azurePlanId,omitempty"`
-	AzureSubscriptionId         *string                    `json:"azureSubscriptionId,omitempty"`
-	BillingEmail                *string                    `json:"billingEmail,omitempty"`
-	CreatedAt                   time.Time                  `json:"createdAt"`
-	CreatedBy                   *string                    `json:"createdBy,omitempty"`
-	CreatedBySubject            *BasicSubjectProfile       `json:"createdBySubject,omitempty"`
-	Domains                     *[]string                  `json:"domains,omitempty"`
-	Entitlements                *map[string]Entitlement    `json:"entitlements,omitempty"`
-	EnvironmentSecretsShowable  bool                       `json:"environmentSecretsShowable"`
-	Id                          string                     `json:"id"`
-	IsAzureManaged              *bool                      `json:"isAzureManaged,omitempty"`
-	IsEgressChargebackEnabled   *bool                      `json:"isEgressChargebackEnabled,omitempty"`
-	IsRegionBasedPricingEnabled bool                       `json:"isRegionBasedPricingEnabled"`
-	IsScimEnabled               bool                       `json:"isScimEnabled"`
-	ManagedDomains              *[]ManagedDomain           `json:"managedDomains,omitempty"`
-	MetronomeId                 *string                    `json:"metronomeId,omitempty"`
-	MetronomePlanId             *string                    `json:"metronomePlanId,omitempty"`
-	Name                        string                     `json:"name"`
-	NoteCount                   int                        `json:"noteCount"`
-	PaymentMethod               *OrganizationPaymentMethod `json:"paymentMethod,omitempty"`
-	Product                     *OrganizationProduct       `json:"product,omitempty"`
-	ProductPlans                []OrganizationProductPlan  `json:"productPlans"`
-	SalesforceId                *string                    `json:"salesforceId,omitempty"`
-	ShortName                   string                     `json:"shortName"`
-	Status                      *OrganizationStatus        `json:"status,omitempty"`
-	StripeId                    *string                    `json:"stripeId,omitempty"`
-	StripePaymentMethodId       *string                    `json:"stripePaymentMethodId,omitempty"`
+	AllowEnhancedSupportAccess       bool                       `json:"allowEnhancedSupportAccess"`
+	AuthServiceId                    string                     `json:"authServiceId"`
+	AzurePlanId                      *string                    `json:"azurePlanId,omitempty"`
+	AzureSubscriptionId              *string                    `json:"azureSubscriptionId,omitempty"`
+	BillingEmail                     *string                    `json:"billingEmail,omitempty"`
+	CreatedAt                        time.Time                  `json:"createdAt"`
+	CreatedBy                        *string                    `json:"createdBy,omitempty"`
+	CreatedBySubject                 *BasicSubjectProfile       `json:"createdBySubject,omitempty"`
+	Domains                          *[]string                  `json:"domains,omitempty"`
+	Entitlements                     *map[string]Entitlement    `json:"entitlements,omitempty"`
+	EnvironmentSecretsShowable       bool                       `json:"environmentSecretsShowable"`
+	Id                               string                     `json:"id"`
+	IsAzureManaged                   *bool                      `json:"isAzureManaged,omitempty"`
+	IsDynamicTriggererPricingEnabled bool                       `json:"isDynamicTriggererPricingEnabled"`
+	IsDynamicWebserverPricingEnabled bool                       `json:"isDynamicWebserverPricingEnabled"`
+	IsEgressChargebackEnabled        *bool                      `json:"isEgressChargebackEnabled,omitempty"`
+	IsRegionBasedPricingEnabled      bool                       `json:"isRegionBasedPricingEnabled"`
+	IsScimEnabled                    bool                       `json:"isScimEnabled"`
+	ManagedDomains                   *[]ManagedDomain           `json:"managedDomains,omitempty"`
+	MetronomeId                      *string                    `json:"metronomeId,omitempty"`
+	MetronomePlanId                  *string                    `json:"metronomePlanId,omitempty"`
+	Name                             string                     `json:"name"`
+	NoteCount                        int                        `json:"noteCount"`
+	PaymentMethod                    *OrganizationPaymentMethod `json:"paymentMethod,omitempty"`
+	Product                          *OrganizationProduct       `json:"product,omitempty"`
+	ProductPlans                     []OrganizationProductPlan  `json:"productPlans"`
+	SalesforceId                     *string                    `json:"salesforceId,omitempty"`
+	ShortName                        string                     `json:"shortName"`
+	Status                           *OrganizationStatus        `json:"status,omitempty"`
+	StripeId                         *string                    `json:"stripeId,omitempty"`
+	StripePaymentMethodId            *string                    `json:"stripePaymentMethodId,omitempty"`
 
 	// SupportPlan Deprecated: use ProductPlans instead
 	SupportPlan             *OrganizationSupportPlan `json:"supportPlan,omitempty"`
@@ -3768,6 +3867,7 @@ type SharedCluster struct {
 	Id                  string                     `json:"id"`
 	IsCordoned          *bool                      `json:"isCordoned,omitempty"`
 	IsDryRun            bool                       `json:"isDryRun"`
+	IsFailedOver        *bool                      `json:"isFailedOver,omitempty"`
 	Metadata            ClusterMetadata            `json:"metadata"`
 	Name                string                     `json:"name"`
 	PodSubnetRange      string                     `json:"podSubnetRange"`
@@ -3885,15 +3985,6 @@ type TriggerGitDeployRequest struct {
 // TriggerGitDeployRequestDeployType The type of deploy to trigger. If omitted then the deploy type will be inferred
 type TriggerGitDeployRequestDeployType string
 
-// UpdateAstroIdeSession defines model for UpdateAstroIdeSession.
-type UpdateAstroIdeSession struct {
-	Id         string                          `json:"id"`
-	Permission UpdateAstroIdeSessionPermission `json:"permission"`
-}
-
-// UpdateAstroIdeSessionPermission defines model for UpdateAstroIdeSession.Permission.
-type UpdateAstroIdeSessionPermission string
-
 // UpdateAstroIdeSessionRequest defines model for UpdateAstroIdeSessionRequest.
 type UpdateAstroIdeSessionRequest struct {
 	Permission UpdateAstroIdeSessionRequestPermission `json:"permission"`
@@ -3998,6 +4089,16 @@ type UpdateEnvironmentObjectConnectionRequest struct {
 	Type       string                  `json:"type"`
 }
 
+// UpdateEnvironmentObjectEnvironmentVariableOverridesRequest defines model for UpdateEnvironmentObjectEnvironmentVariableOverridesRequest.
+type UpdateEnvironmentObjectEnvironmentVariableOverridesRequest struct {
+	Value *string `json:"value,omitempty"`
+}
+
+// UpdateEnvironmentObjectEnvironmentVariableRequest defines model for UpdateEnvironmentObjectEnvironmentVariableRequest.
+type UpdateEnvironmentObjectEnvironmentVariableRequest struct {
+	Value *string `json:"value,omitempty"`
+}
+
 // UpdateEnvironmentObjectLinkRequest defines model for UpdateEnvironmentObjectLinkRequest.
 type UpdateEnvironmentObjectLinkRequest struct {
 	Overrides     *UpdateEnvironmentObjectOverridesRequest `json:"overrides,omitempty"`
@@ -4054,19 +4155,21 @@ type UpdateEnvironmentObjectMetricsExportRequestExporterType string
 
 // UpdateEnvironmentObjectOverridesRequest defines model for UpdateEnvironmentObjectOverridesRequest.
 type UpdateEnvironmentObjectOverridesRequest struct {
-	AirflowVariable *UpdateEnvironmentObjectAirflowVariableOverridesRequest `json:"airflowVariable,omitempty"`
-	Connection      *UpdateEnvironmentObjectConnectionOverridesRequest      `json:"connection,omitempty"`
-	MetricsExport   *UpdateEnvironmentObjectMetricsExportOverridesRequest   `json:"metricsExport,omitempty"`
+	AirflowVariable     *UpdateEnvironmentObjectAirflowVariableOverridesRequest     `json:"airflowVariable,omitempty"`
+	Connection          *UpdateEnvironmentObjectConnectionOverridesRequest          `json:"connection,omitempty"`
+	EnvironmentVariable *UpdateEnvironmentObjectEnvironmentVariableOverridesRequest `json:"environmentVariable,omitempty"`
+	MetricsExport       *UpdateEnvironmentObjectMetricsExportOverridesRequest       `json:"metricsExport,omitempty"`
 }
 
 // UpdateEnvironmentObjectRequest defines model for UpdateEnvironmentObjectRequest.
 type UpdateEnvironmentObjectRequest struct {
-	AirflowVariable     *UpdateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
-	AutoLinkDeployments *bool                                          `json:"autoLinkDeployments,omitempty"`
-	Connection          *UpdateEnvironmentObjectConnectionRequest      `json:"connection,omitempty"`
-	ExcludeLinks        *[]ExcludeLinkEnvironmentObjectRequest         `json:"excludeLinks,omitempty"`
-	Links               *[]UpdateEnvironmentObjectLinkRequest          `json:"links,omitempty"`
-	MetricsExport       *UpdateEnvironmentObjectMetricsExportRequest   `json:"metricsExport,omitempty"`
+	AirflowVariable     *UpdateEnvironmentObjectAirflowVariableRequest     `json:"airflowVariable,omitempty"`
+	AutoLinkDeployments *bool                                              `json:"autoLinkDeployments,omitempty"`
+	Connection          *UpdateEnvironmentObjectConnectionRequest          `json:"connection,omitempty"`
+	EnvironmentVariable *UpdateEnvironmentObjectEnvironmentVariableRequest `json:"environmentVariable,omitempty"`
+	ExcludeLinks        *[]ExcludeLinkEnvironmentObjectRequest             `json:"excludeLinks,omitempty"`
+	Links               *[]UpdateEnvironmentObjectLinkRequest              `json:"links,omitempty"`
+	MetricsExport       *UpdateEnvironmentObjectMetricsExportRequest       `json:"metricsExport,omitempty"`
 }
 
 // UpdateGcpClusterRequest defines model for UpdateGcpClusterRequest.
@@ -5199,6 +5302,9 @@ type ExportAstroIdeSessionZipParams struct {
 type ImportAstroIdeSessionTarParams struct {
 	// Mode import mode Enums(OVERWRITE,UPSERT)
 	Mode *ImportAstroIdeSessionTarParamsMode `form:"mode,omitempty" json:"mode,omitempty"`
+
+	// Path path within project to extract archive to
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
 }
 
 // ImportAstroIdeSessionTarParamsMode defines parameters for ImportAstroIdeSessionTar.
@@ -5208,6 +5314,9 @@ type ImportAstroIdeSessionTarParamsMode string
 type ImportAstroIdeSessionZipParams struct {
 	// Mode import mode Enums(OVERWRITE,UPSERT)
 	Mode *ImportAstroIdeSessionZipParamsMode `form:"mode,omitempty" json:"mode,omitempty"`
+
+	// Path path within project to extract archive to
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
 }
 
 // ImportAstroIdeSessionZipParamsMode defines parameters for ImportAstroIdeSessionZip.
@@ -16069,6 +16178,22 @@ func NewImportAstroIdeSessionTarRequestWithBody(server string, organizationId st
 
 		}
 
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "path", runtime.ParamLocationQuery, *params.Path); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		queryURL.RawQuery = queryValues.Encode()
 	}
 
@@ -16135,6 +16260,22 @@ func NewImportAstroIdeSessionZipRequestWithBody(server string, organizationId st
 		if params.Mode != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "mode", runtime.ParamLocationQuery, *params.Mode); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "path", runtime.ParamLocationQuery, *params.Path); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -21166,7 +21307,7 @@ func (r SaveAstroIdeSessionResponse) StatusCode() int {
 type UpdateAstroIdeSessionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *UpdateAstroIdeSession
+	JSON200      *AstroIdeSession
 	JSON401      *Error
 	JSON403      *Error
 	JSON500      *Error
@@ -29559,7 +29700,7 @@ func ParseUpdateAstroIdeSessionResponse(rsp *http.Response) (*UpdateAstroIdeSess
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest UpdateAstroIdeSession
+		var dest AstroIdeSession
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
