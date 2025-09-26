@@ -140,6 +140,7 @@ func (s *Suite) TearDownTest() {
 
 func (s *Suite) TestBuildPushDockerImageSuccessWithTagWarning() {
 	config.InitConfig(s.fsForDockerConfig)
+	context.Switch("localhost")
 	dockerfile = "Dockerfile.warning"
 	defer func() { dockerfile = "Dockerfile" }()
 
@@ -166,6 +167,7 @@ func (s *Suite) TestBuildPushDockerImageSuccessWithTagWarning() {
 
 func (s *Suite) TestBuildPushDockerImageSuccessWithImageRepoWarning() {
 	config.InitConfig(s.fsForDockerConfig)
+	context.Switch("localhost")
 	dockerfile = "Dockerfile.privateImageRepo"
 	defer func() { dockerfile = "Dockerfile" }()
 
@@ -301,6 +303,7 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 	dockerfile = "Dockerfile"
 
 	config.InitConfig(s.fsForDockerConfig)
+	context.Switch("localhost")
 	mockedDeploymentConfig := &houston.DeploymentConfig{
 		AirflowImages: mockAirflowImageList,
 	}
