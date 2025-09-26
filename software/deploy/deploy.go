@@ -220,7 +220,6 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 			err = auth.RegistryAuth(houstonClient, os.Stdout)
 			if err != nil {
 				logger.Debugf("There was an error logging into registry: %s", err.Error())
-				return err
 			}
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
 			token = c.Token
