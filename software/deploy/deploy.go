@@ -19,6 +19,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/software/auth"
+	"github.com/docker/docker/api/types/versions"
 )
 
 var (
@@ -202,15 +204,31 @@ func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, 
 	return deploymentID, err
 }
 
-func pushDockerImage(byoRegistryEnabled bool, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string) error {
+func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string) error {
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
 		registry = byoRegistryDomain
 		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
 	} else {
-		registry = registryDomainPrefix + cloudDomain
-		remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
-		token = c.Token
+		platformVersion, _ := houstonClient.GetPlatformVersion(nil)
+		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
+			registry, err := getDeploymentRegistryURL(deploymentInfo.Urls)
+			if err != nil {
+				return err
+			}
+			// Switch to per deployment registry login
+			err = auth.RegistryAuth(houstonClient, os.Stdout)
+			if err != nil {
+				logger.Debugf("There was an error logging into registry: %s", err.Error())
+				return err
+			}
+			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
+			token = c.Token
+		} else {
+			registry = registryDomainPrefix + cloudDomain
+			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
+			token = c.Token
+		}
 	}
 	if customImageName != "" {
 		if tagFromImageName := getGetTagFromImageName(customImageName); tagFromImageName != "" {
@@ -307,7 +325,7 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 	if err != nil {
 		return err
 	}
-	return pushDockerImage(byoRegistryEnabled, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, c, customImageName)
+	return pushDockerImage(byoRegistryEnabled, deploymentInfo, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, c, customImageName)
 }
 
 func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentURL) string {
@@ -321,6 +339,15 @@ func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentUR
 		}
 	}
 	return ""
+}
+
+func getDeploymentRegistryURL(deploymentURLs []houston.DeploymentURL) (string, error) {
+	for _, url := range deploymentURLs {
+		if url.Type == houston.RegistryURLType {
+			return url.URL, nil
+		}
+	}
+	return "", errors.New("no valid registry url found failed to push")
 }
 
 func getDeploymentIDForCurrentCommand(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {

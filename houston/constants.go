@@ -18,6 +18,7 @@ const (
 	// Deployment
 	AirflowURLType   = "airflow"
 	DagServerURLType = "dagserver"
+	RegistryURLType  = "registry"
 
 	CeleryExecutorType     = "CeleryExecutor"
 	LocalExecutorType      = "LocalExecutor"
