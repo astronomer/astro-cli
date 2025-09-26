@@ -34,6 +34,8 @@ var (
 	gzipFile = fileutil.GzipFile
 
 	getDeploymentIDForCurrentCommandVar = getDeploymentIDForCurrentCommand
+
+	registryAuthSuccessMsg = "\nSuccessfully authenticated to %s\n"
 )
 
 var (
@@ -210,6 +212,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		registry = byoRegistryDomain
 		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
 	} else {
+		token = c.Token
 		platformVersion, _ := houstonClient.GetPlatformVersion(nil)
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
 			registry, err := getDeploymentRegistryURL(deploymentInfo.Urls)
@@ -218,12 +221,17 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 			}
 			// Switch to per deployment registry login
 			err = auth.RegistryAuth(houstonClient, os.Stdout)
+			registryHandlerInit := airflow.RegistryHandlerInit
+			registryHandler, _ := registryHandlerInit(registry)
+			if err != nil {
+				return err
+			}
+			err = registryHandler.Login("user", token)
 			if err != nil {
 				logger.Debugf("There was an error logging into registry: %s", err.Error())
 				return err
 			}
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
-			token = c.Token
 		} else {
 			registry = registryDomainPrefix + cloudDomain
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
