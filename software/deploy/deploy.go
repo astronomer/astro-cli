@@ -34,8 +34,6 @@ var (
 	gzipFile = fileutil.GzipFile
 
 	getDeploymentIDForCurrentCommandVar = getDeploymentIDForCurrentCommand
-
-	registryAuthSuccessMsg = "\nSuccessfully authenticated to %s\n"
 )
 
 var (
