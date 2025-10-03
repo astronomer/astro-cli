@@ -419,7 +419,7 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 			return err
 		}
 
-		// If it's a regular file, write its contents
+		// If it's a file, write its contents
 		if !info.IsDir() {
 			file, err := os.Open(path)
 			if err != nil {
@@ -427,7 +427,8 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 			}
 			defer file.Close()
 
-			if _, err = io.Copy(tarWriter, file); err != nil {
+			_, err = io.Copy(tarWriter, file)
+			if err != nil {
 				return err
 			}
 		}
