@@ -83,7 +83,7 @@ func oAuth(oAuthURL string) string {
 }
 
 // RegistryAuth authenticates with the private registry
-func RegistryAuth(client houston.ClientInterface, out io.Writer, registry string) error {
+func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain string) error {
 	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -98,12 +98,14 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer, registry string
 		return err
 	}
 
-	var registryDomain string
+	var registry string
 
 	if appConfig.Flags.BYORegistryEnabled {
+		logger.Info(appConfig.BYORegistryDomain)
 		registry = appConfig.BYORegistryDomain
-	} else if versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0") && !appConfig.Flags.BYORegistryEnabled {
-		registryDomain = registry
+		registryDomain = strings.Split(registry, "/")[0]
+	} else if versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0") {
+		registry = registryDomain
 	} else {
 		registry = registryDomainPrefix + c.Domain
 		registryDomain = strings.Split(registry, "/")[0]
