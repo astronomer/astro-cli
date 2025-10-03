@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -524,6 +525,79 @@ func (s *Suite) TestAirflowSuccess() {
 
 	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", false, false, description, false, "")
 	s.NoError(err)
+}
+
+func (s *Suite) TestAirflowSuccessForBYORegistry() {
+	config.InitConfig(s.fsForLocalConfig)
+
+	imageHandlerInit = func(image string) airflow.ImageHandler {
+		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		s.mockImageHandler.On("Push", mock.MatchedBy(func(remoteImage string) bool { return strings.Contains(remoteImage, "my.registry.domain") }), mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
+		s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("4.2.5", nil)
+		s.mockImageHandler.On("GetLabel", "", airflow.AirflowImageLabel).Return("2.2.5", nil)
+		return s.mockImageHandler
+	}
+
+	mockedDeploymentConfig := &houston.DeploymentConfig{
+		AirflowImages: mockAirflowImageList,
+	}
+	mockRuntimeReleases := houston.RuntimeReleases{
+		houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.5"},
+		houston.RuntimeRelease{Version: "4.2.5", AirflowVersion: "2.2.5"},
+	}
+	s.houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
+	s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
+	s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Once()
+	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{
+		ClusterID: "test-cluster-id",
+		Urls: []houston.DeploymentURL{
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+			{URL: "registry.local.astronomer.io", Type: "registry"},
+		},
+	}, nil).Once()
+	s.houstonMock.On("GetAppConfig", "test-cluster-id").Return(&houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			BYORegistryEnabled: true,
+		},
+		BYORegistryDomain: "my.registry.domain",
+	}, nil).Once()
+	vars := make(map[string]interface{})
+	vars["clusterId"] = "test-cluster-id"
+	s.houstonMock.On("GetRuntimeReleases", vars).Return(mockRuntimeReleases, nil)
+	s.houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(&houston.UpdateDeploymentImageResp{}, nil).Once()
+
+	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", false, false, description, false, "")
+
+	s.NoError(err)
+}
+
+func (s *Suite) TestAirflowFailureForNoBYORegistryDomain() {
+	config.InitConfig(s.fsForLocalConfig)
+
+	// mockedDeploymentConfig := &houston.DeploymentConfig{
+	// 	AirflowImages: mockAirflowImageList,
+	// }
+	s.houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
+	s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
+	// s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Once()
+	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{
+		ClusterID: "test-cluster-id",
+		Urls: []houston.DeploymentURL{
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+			{URL: "registry.local.astronomer.io", Type: "registry"},
+		},
+	}, nil).Once()
+	s.houstonMock.On("GetAppConfig", "test-cluster-id").Return(&houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			BYORegistryEnabled: true,
+		},
+	}, nil).Once()
+
+	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", false, false, description, false, "")
+
+	s.ErrorIs(err, ErrBYORegistryDomainNotSet)
 }
 
 func (s *Suite) TestAirflowSuccessForImageOnly() {
