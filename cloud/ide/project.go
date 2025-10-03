@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/browser"
@@ -19,6 +20,9 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+
+	"github.com/go-git/go-billy/v5/osfs"
+	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 )
 
 var (
@@ -351,6 +355,11 @@ func ExportProject(client astrocore.CoreClient, projectID, organizationID, works
 
 // createTarGzArchive creates a tar.gz archive of the given directory
 func createTarGzArchive(sourceDir, targetFile string) error {
+	// Prepare .gitignore matcher using go-git
+	fs := osfs.New(sourceDir)
+	patterns, _ := gitignore.ReadPatterns(fs, []string{})
+	matcher := gitignore.NewMatcher(patterns)
+
 	// Create the target file
 	target, err := os.Create(targetFile)
 	if err != nil {
@@ -388,13 +397,26 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 			return nil
 		}
 
-		// Skip all hidden dotfiles and dot-directories, except allow the root ".astro" file
-		base := filepath.Base(path)
-		if base != "" && base[0] == '.' && relPath != ".astro" {
+		// Always skip the .git directory
+		if relPath == ".git" || strings.HasPrefix(relPath, ".git"+string(filepath.Separator)) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
 			return nil
+		}
+
+		// include .astro directory, gitignore and dockerignore files
+		includeAllowed := relPath == ".astro" || strings.HasPrefix(relPath, ".astro"+string(filepath.Separator)) || relPath == ".gitignore" || relPath == ".dockerignore"
+
+		// Exclude files/dirs ignored by .gitignore
+		if !includeAllowed {
+			pathParts := strings.Split(relPath, string(filepath.Separator))
+			if matcher.Match(pathParts, info.IsDir()) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
 		}
 
 		// Skip symlinks
