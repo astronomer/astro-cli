@@ -239,7 +239,7 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		}
 	}
 
-	err = RegistryAuth(client, out)
+	err = RegistryAuth(client, out, "")
 	if err != nil {
 		logger.Debugf("There was an error logging into registry: %s", err.Error())
 	}
