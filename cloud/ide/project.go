@@ -355,10 +355,7 @@ func ExportProject(client astrocore.CoreClient, projectID, organizationID, works
 
 // createTarGzArchive creates a tar.gz archive of the given directory
 func createTarGzArchive(sourceDir, targetFile string) error {
-	// Prepare .gitignore matcher using go-git
-	fs := osfs.New(sourceDir)
-	patterns, _ := gitignore.ReadPatterns(fs, []string{})
-	matcher := gitignore.NewMatcher(patterns)
+	matcher := gitignoreMatcher(sourceDir)
 
 	// Create the target file
 	target, err := os.Create(targetFile)
@@ -397,26 +394,12 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 			return nil
 		}
 
-		// Always skip the .git directory
-		if relPath == ".git" || strings.HasPrefix(relPath, ".git"+string(filepath.Separator)) {
-			if info.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
+		skipEntry, skipDir := decideArchiveEntry(relPath, info, matcher)
+		if skipDir {
+			return filepath.SkipDir
 		}
-
-		// include .astro directory, gitignore and dockerignore files
-		includeAllowed := relPath == ".astro" || strings.HasPrefix(relPath, ".astro"+string(filepath.Separator)) || relPath == ".gitignore" || relPath == ".dockerignore"
-
-		// Exclude files/dirs ignored by .gitignore
-		if !includeAllowed {
-			pathParts := strings.Split(relPath, string(filepath.Separator))
-			if matcher.Match(pathParts, info.IsDir()) {
-				if info.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
+		if skipEntry {
+			return nil
 		}
 
 		// Skip symlinks
@@ -451,6 +434,41 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 
 		return nil
 	})
+}
+
+// gitignoreMatcher creates a matcher from .gitignore patterns in the given root.
+func gitignoreMatcher(root string) gitignore.Matcher {
+	fs := osfs.New(root)
+	patterns, _ := gitignore.ReadPatterns(fs, []string{})
+	return gitignore.NewMatcher(patterns)
+}
+
+// decideArchiveEntry determines whether to include a path, skip it, or skip its subtree.
+func decideArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.Matcher) (skipEntry, skipDir bool) {
+	// Always skip the .git directory entirely
+	if relPath == ".git" || strings.HasPrefix(relPath, ".git"+string(filepath.Separator)) {
+		if info.IsDir() {
+			return true, true
+		}
+		return true, false
+	}
+
+	// Include .astro directory, gitignore and dockerignore files
+	includeAllowed := relPath == ".astro" || strings.HasPrefix(relPath, ".astro"+string(filepath.Separator)) || relPath == ".gitignore" || relPath == ".dockerignore"
+	if includeAllowed {
+		return false, false
+	}
+
+	// Respect .gitignore for everything else
+	pathParts := strings.Split(relPath, string(filepath.Separator))
+	if matcher.Match(pathParts, info.IsDir()) {
+		if info.IsDir() {
+			return true, true
+		}
+		return true, false
+	}
+
+	return false, false
 }
 
 // ImportProject imports a project from Astro IDE to the local directory
