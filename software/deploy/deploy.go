@@ -25,8 +25,7 @@ import (
 
 var (
 	// this is used to monkey patch the function in order to write unit test cases
-	imageHandlerInit    = airflow.ImageHandlerInit
-	registryHandlerInit = airflow.RegistryHandlerInit
+	imageHandlerInit = airflow.ImageHandlerInit
 
 	dockerfile = "Dockerfile"
 
