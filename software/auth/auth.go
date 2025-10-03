@@ -103,7 +103,6 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer, registry string
 	if appConfig.Flags.BYORegistryEnabled {
 		registry = appConfig.BYORegistryDomain
 	} else if versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0") && !appConfig.Flags.BYORegistryEnabled {
-		//registry = registry
 		registryDomain = registry
 	} else {
 		registry = registryDomainPrefix + c.Domain
