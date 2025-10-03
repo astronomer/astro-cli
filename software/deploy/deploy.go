@@ -25,7 +25,8 @@ import (
 
 var (
 	// this is used to monkey patch the function in order to write unit test cases
-	imageHandlerInit = airflow.ImageHandlerInit
+	imageHandlerInit    = airflow.ImageHandlerInit
+	registryHandlerInit = airflow.RegistryHandlerInit
 
 	dockerfile = "Dockerfile"
 
@@ -218,8 +219,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 				return err
 			}
 			// Switch to per deployment registry login
-			err = auth.RegistryAuth(houstonClient, os.Stdout)
-			registryHandlerInit := airflow.RegistryHandlerInit
+			err = auth.RegistryAuth(houstonClient, os.Stdout, registry)
 			registryHandler, _ := registryHandlerInit(registry)
 			if err != nil {
 				return err
