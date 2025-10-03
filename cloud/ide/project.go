@@ -29,8 +29,9 @@ var (
 	ErrInvalidProjectSelection = errors.New("invalid project selection")
 	ErrNoProjectsFound         = errors.New("no Astro IDE projects found in workspace")
 	// DefaultDirPerm is the default permission for directories
-	DefaultDirPerm os.FileMode = 0o755
-	openURL                    = browser.OpenURL
+	DefaultDirPerm           os.FileMode = 0o755
+	openURL                              = browser.OpenURL
+	gitignoreParseWarningMsg             = "Warning: failed to parse .gitignore: %v. Continuing without gitignore filtering."
 )
 
 func newTableOut() *printutil.Table {
@@ -394,11 +395,10 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 			return nil
 		}
 
-		skipEntry, skipDir := decideArchiveEntry(relPath, info, matcher)
-		if skipDir {
-			return filepath.SkipDir
-		}
-		if skipEntry {
+		if shouldSkipArchiveEntry(relPath, info, matcher) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 
@@ -440,36 +440,31 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 // gitignoreMatcher creates a matcher from .gitignore patterns in the given root.
 func gitignoreMatcher(root string) gitignore.Matcher {
 	fs := osfs.New(root)
-	patterns, _ := gitignore.ReadPatterns(fs, []string{})
+	patterns, err := gitignore.ReadPatterns(fs, []string{})
+	if err != nil {
+		fmt.Println(fmt.Sprintf(gitignoreParseWarningMsg, err))
+		return gitignore.NewMatcher(nil)
+	}
 	return gitignore.NewMatcher(patterns)
 }
 
-// decideArchiveEntry determines whether to include a path, skip it, or skip its subtree.
-func decideArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.Matcher) (skipEntry, skipDir bool) {
-	// Always skip the .git directory entirely
+// shouldSkipArchiveEntry determines whether a path should be skipped.
+func shouldSkipArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.Matcher) bool {
+	// Always skip the .git directory
 	if relPath == ".git" || strings.HasPrefix(relPath, ".git"+string(filepath.Separator)) {
-		if info.IsDir() {
-			return true, true
-		}
-		return true, false
+		return true
 	}
 
 	// Include .astro directory, gitignore and dockerignore files
-	includeAllowed := relPath == ".astro" || strings.HasPrefix(relPath, ".astro"+string(filepath.Separator)) || relPath == ".gitignore" || relPath == ".dockerignore"
+	base := filepath.Base(relPath)
+	includeAllowed := relPath == ".astro" || strings.HasPrefix(relPath, ".astro"+string(filepath.Separator)) || relPath == ".gitignore" || relPath == ".dockerignore" || base == ".airflowignore"
 	if includeAllowed {
-		return false, false
+		return false
 	}
 
 	// Respect .gitignore for everything else
 	pathParts := strings.Split(relPath, string(filepath.Separator))
-	if matcher.Match(pathParts, info.IsDir()) {
-		if info.IsDir() {
-			return true, true
-		}
-		return true, false
-	}
-
-	return false, false
+	return matcher.Match(pathParts, info.IsDir())
 }
 
 // ImportProject imports a project from Astro IDE to the local directory
