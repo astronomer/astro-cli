@@ -575,12 +575,8 @@ func (s *Suite) TestAirflowSuccessForBYORegistry() {
 func (s *Suite) TestAirflowFailureForNoBYORegistryDomain() {
 	config.InitConfig(s.fsForLocalConfig)
 
-	// mockedDeploymentConfig := &houston.DeploymentConfig{
-	// 	AirflowImages: mockAirflowImageList,
-	// }
 	s.houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
 	s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
-	// s.houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Once()
 	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{
 		ClusterID: "test-cluster-id",
 		Urls: []houston.DeploymentURL{
