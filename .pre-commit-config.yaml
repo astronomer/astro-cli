@@ -8,8 +8,8 @@ repos:
         types: [go]
         language: system
         entry: 'gofmt -w -s'
-  - repo: https://github.com/psf/black
-    rev: 25.1.0
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 25.9.0
     hooks:
       - id: black
   - repo: https://github.com/pre-commit/pre-commit-hooks
