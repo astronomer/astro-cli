@@ -31,6 +31,8 @@ import (
 
 var (
 	useAstronomerCertified bool
+	remoteExecutionEnabled bool
+	remoteImageRepository  string
 	projectName            string
 	runtimeVersion         string
 	airflowVersion         string
@@ -104,6 +106,12 @@ astro dev init --airflow-version 2.2.3
 
 # Initialize a new template based Astro project with the latest Astro Runtime version
 astro dev init --from-template
+
+# Initialize a new Astro project with remote execution support
+astro dev init --remote-execution-enabled
+
+# Initialize a new Astro project with remote execution support and specify the remote image repository
+astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme/my-deployment-image
 `
 	dockerfile = "Dockerfile"
 
@@ -179,6 +187,8 @@ func newAirflowInitCmd() *cobra.Command {
 	// In case user is connected to Astronomer Platform and is connected to older version of platform
 	if context.IsCloudContext() || houstonVersion == "" || (!context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.29.0"})) {
 		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Specify a version of Astro Runtime that you want to create an Astro project with. If not specified, the latest is assumed. You can change this version in your Dockerfile at any time.")
+		cmd.Flags().BoolVarP(&remoteExecutionEnabled, "remote-execution-enabled", "", false, "Enable remote execution support for the Astro project. This will generate additional client files that would be useful to maintain agents in remote deployment.")
+		cmd.Flags().StringVarP(&remoteImageRepository, "remote-image-repository", "", "", "Remote Docker repository for the client image (e.g. quay.io/acme/my-deployment-image). This flag is only used when --remote-execution-enabled is set.")
 	} else { // default to using AC flag, since runtime is not available for these cases
 		useAstronomerCertified = true
 		avoidACFlag = true
@@ -193,6 +203,8 @@ func newAirflowInitCmd() *cobra.Command {
 	if err != nil && !avoidACFlag { // Case when user is not logged in to any platform
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
 		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
+		cmd.Flags().BoolVarP(&remoteExecutionEnabled, "remote-execution-enabled", "", false, "Enable remote execution support for the Astro project. This will generate additional client files that would be useful to maintain agents in remote deployment.")
+		cmd.Flags().StringVarP(&remoteImageRepository, "remote-image-repository", "", "", "Remote Docker repository for the client image (e.g. quay.io/acme/my-deployment-image). This flag is only used when --remote-execution-enabled is set.")
 	}
 	return cmd
 }
@@ -451,7 +463,7 @@ func newObjectExportCmd() *cobra.Command {
 }
 
 // Use project name for image name
-func airflowInit(cmd *cobra.Command, args []string) error {
+func airflowInit(cmd *cobra.Command, args []string) error { //nolint:gocognit,gocyclo
 	name, err := ensureProjectName(args, projectName)
 	if err != nil {
 		return err
@@ -474,6 +486,15 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Handle remote execution setup - use flag value or prompt for registry if needed
+	var registryEndpoint string
+	if remoteExecutionEnabled {
+		registryEndpoint, err = getRegistryEndpoint()
+		if err != nil {
+			return fmt.Errorf("unable to get registry endpoint: %w", err)
+		}
+	}
+
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersions
@@ -486,7 +507,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided)
 	imageTag := runtimeVersion
 	if imageTag == "" {
-		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
+		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified, false)
 		imageTag, err = getDefaultImageTag(httpClient, airflowVersion, false)
 		if err != nil {
 			return fmt.Errorf("error getting default image tag: %w", err)
@@ -504,6 +525,15 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 			imageName = airflow.AstroRuntimeAirflow2ImageName
 		default:
 			return errors.New("unsupported Airflow major version for runtime version " + imageTag)
+		}
+	}
+
+	clientImageTag := ""
+	if remoteExecutionEnabled {
+		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), false, true)
+		clientImageTag, err = getDefaultImageTag(httpClient, "", false)
+		if err != nil {
+			return fmt.Errorf("error getting default client image tag: %w", err)
 		}
 	}
 
@@ -541,11 +571,20 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Save the registry endpoint if provided during remote execution setup
+	if remoteExecutionEnabled && registryEndpoint != "" {
+		err := config.CFG.RemoteClientRegistry.SetProjectString(registryEndpoint)
+		if err != nil {
+			return fmt.Errorf("failed to save remote client registry: %w", err)
+		}
+		fmt.Println("If you want to modify the remote repository down the line, use the `astro config set <config-name> <config-value>` command while being inside the local project")
+	}
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err = airflow.Init(config.WorkingPath, imageName, imageTag, fromTemplate)
+	err = airflow.Init(config.WorkingPath, imageName, imageTag, fromTemplate, clientImageTag)
 	if err != nil {
 		return err
 	}
@@ -634,7 +673,7 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 		fmt.Printf("Testing an upgrade to custom Airflow image: %s\n", customImageName)
 	} else if runtimeVersion == "" {
 		// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided
-		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
+		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified, false)
 		var err error
 		runtimeVersion, err = getDefaultImageTag(httpClient, airflowVersion, false)
 		if err != nil {
@@ -979,4 +1018,54 @@ func selectedTemplate() (string, error) {
 	}
 
 	return selectedTemplate, nil
+}
+
+// validateRegistryEndpoint validates the format of a Docker registry endpoint
+func validateRegistryEndpoint(endpoint string) error {
+	if endpoint == "" {
+		return fmt.Errorf("registry endpoint cannot be empty")
+	}
+
+	// Basic validation: should contain at least one slash (registry/repository format)
+	if !strings.Contains(endpoint, "/") {
+		return fmt.Errorf("registry endpoint must be in format 'registry/repository' (e.g. quay.io/acme/my-deployment-image)")
+	}
+
+	// Should not contain spaces
+	if strings.Contains(endpoint, " ") {
+		return fmt.Errorf("registry endpoint cannot contain spaces")
+	}
+
+	// Should not start or end with slashes
+	if strings.HasPrefix(endpoint, "/") || strings.HasSuffix(endpoint, "/") {
+		return fmt.Errorf("registry endpoint cannot start or end with slashes")
+	}
+
+	return nil
+}
+
+func getRegistryEndpoint() (string, error) {
+	var registryEndpoint string
+	// Use flag value if provided, otherwise check config, otherwise prompt
+	if remoteImageRepository != "" {
+		registryEndpoint = remoteImageRepository
+		// Validate the registry endpoint format
+		if err := validateRegistryEndpoint(registryEndpoint); err != nil {
+			return "", fmt.Errorf("invalid registry endpoint format: %w", err)
+		}
+	} else {
+		registryEndpoint = config.CFG.RemoteClientRegistry.GetString()
+		if registryEndpoint == "" {
+			fmt.Println("Enter the remote Docker repository for the client image (leave blank if not known but you will not be able to use the Astro CLI to deploy the client image until configured)")
+			registryEndpoint = input.Text("Remote client image repository endpoint (e.g. quay.io/acme/my-deployment-image): ")
+
+			if registryEndpoint != "" {
+				// Validate the registry endpoint format
+				if err := validateRegistryEndpoint(registryEndpoint); err != nil {
+					return "", fmt.Errorf("invalid registry endpoint format: %w", err)
+				}
+			}
+		}
+	}
+	return registryEndpoint, nil
 }
