@@ -187,7 +187,7 @@ func newAirflowInitCmd() *cobra.Command {
 	// In case user is connected to Astronomer Platform and is connected to older version of platform
 	if context.IsCloudContext() || houstonVersion == "" || (!context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.29.0"})) {
 		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Specify a version of Astro Runtime that you want to create an Astro project with. If not specified, the latest is assumed. You can change this version in your Dockerfile at any time.")
-		cmd.Flags().BoolVarP(&remoteExecutionEnabled, "remote-execution-enabled", "", false, "Enable remote execution support for the Astro project. This will generate additional client files for the client/server architecture.")
+		cmd.Flags().BoolVarP(&remoteExecutionEnabled, "remote-execution-enabled", "", false, "Enable remote execution support for the Astro project. This will generate additional client files that would be useful to maintain agents in remote deployment.")
 		cmd.Flags().StringVarP(&remoteImageRepository, "remote-image-repository", "", "", "Remote Docker repository for the client image (e.g. quay.io/acme/my-deployment-image). This flag is only used when --remote-execution-enabled is set.")
 	} else { // default to using AC flag, since runtime is not available for these cases
 		useAstronomerCertified = true
@@ -203,7 +203,7 @@ func newAirflowInitCmd() *cobra.Command {
 	if err != nil && !avoidACFlag { // Case when user is not logged in to any platform
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
 		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
-		cmd.Flags().BoolVarP(&remoteExecutionEnabled, "remote-execution-enabled", "", false, "Enable remote execution support for the Astro project. This will generate additional client files for the client/server architecture.")
+		cmd.Flags().BoolVarP(&remoteExecutionEnabled, "remote-execution-enabled", "", false, "Enable remote execution support for the Astro project. This will generate additional client files that would be useful to maintain agents in remote deployment.")
 		cmd.Flags().StringVarP(&remoteImageRepository, "remote-image-repository", "", "", "Remote Docker repository for the client image (e.g. quay.io/acme/my-deployment-image). This flag is only used when --remote-execution-enabled is set.")
 	}
 	return cmd
@@ -1056,8 +1056,7 @@ func getRegistryEndpoint() (string, error) {
 	} else {
 		registryEndpoint = config.CFG.RemoteClientRegistry.GetString()
 		if registryEndpoint == "" {
-			fmt.Println("Enter the remote Docker repository for the client image (leave blank if not known")
-			fmt.Println("but you will not be able to use the Astro CLI to deploy the image until configured)")
+			fmt.Println("Enter the remote Docker repository for the client image (leave blank if not known but you will not be able to use the Astro CLI to deploy the client image until configured)")
 			registryEndpoint = input.Text("Remote client image repository endpoint (e.g. quay.io/acme/my-deployment-image): ")
 
 			if registryEndpoint != "" {

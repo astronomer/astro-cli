@@ -63,7 +63,7 @@ func parseImageTag(imageTag string) (*ImageTagInfo, error) {
 	}, nil
 }
 
-// isBetterImage compares two ImageTagInfo objects to determine if the candidate is better
+// isBetterImage compares two ImageTagInfo objects to determine if the candidate has higher runtime version or python version than the current
 // Priority: Runtime version first, then Python version
 func isBetterImage(candidate, current *ImageTagInfo) bool {
 	if candidate == nil {
