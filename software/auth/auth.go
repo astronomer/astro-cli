@@ -100,7 +100,7 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain 
 
 	// return early if version is >= 1.0.0 and no registry domain is supplied since we cannot proceed
 	// the calling function should never supply a blank registry domain for versions >= 1.0.0
-	if versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0") && registryDomain == "" {
+	if versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0") && !appConfig.Flags.BYORegistryEnabled && registryDomain == "" {
 		return nil
 	}
 
