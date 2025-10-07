@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -200,6 +201,80 @@ func (s *Suite) TestRegistryAuthSuccess() {
 		})
 	}
 	mockRegistryHandler.AssertExpectations(s.T())
+}
+
+func (s *Suite) TestRegistryAuthRegistryDomain() {
+	fs := afero.NewMemMapFs()
+	configYaml := testUtil.NewTestConfig("localhost")
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	config.InitConfig(fs)
+
+	tests := []struct {
+		name               string
+		registryDomain     string
+		byoRegistryDomain  string
+		byoRegistryEnabled bool
+		version            string
+	}{
+		{
+			name:               "custom registry domain with byo registry enabled",
+			registryDomain:     "",
+			byoRegistryDomain:  "custom.registry.io/astro",
+			byoRegistryEnabled: true,
+			version:            "0.37.0",
+		},
+		{
+			name:               "custom registry domain with byo registry disabled, v1.0.0",
+			registryDomain:     "registry.dp01.astro.io",
+			byoRegistryDomain:  "",
+			byoRegistryEnabled: false,
+			version:            "1.0.0",
+		},
+		{
+			name:               "custom registry domain with byo registry disabled, v0.37.0",
+			registryDomain:     "registry.astro.io",
+			byoRegistryDomain:  "",
+			byoRegistryEnabled: false,
+			version:            "0.37.0",
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			ctx := config.Context{Domain: "astro.io"}
+			err := ctx.SetContext()
+			s.NoError(err)
+			err = ctx.SwitchContext()
+			s.NoError(err)
+
+			registryDomain := tt.registryDomain
+			if tt.byoRegistryEnabled {
+				registryDomain, _, _ = strings.Cut(tt.byoRegistryDomain, "/")
+			}
+
+			mockRegistryHandler := new(mocks.RegistryHandler)
+			mockRegistryHandler.On("Login", mock.Anything, mock.Anything).Return(nil).Once()
+
+			registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
+				assert.Equal(s.T(), registryDomain, registry)
+				return mockRegistryHandler, nil
+			}
+
+			houstonMock := new(houstonMocks.ClientInterface)
+			houstonMock.On("GetAppConfig", "").Return(&houston.AppConfig{
+				Flags: houston.FeatureFlags{
+					BYORegistryEnabled: tt.byoRegistryEnabled,
+				},
+				BYORegistryDomain: tt.byoRegistryDomain,
+				Version:           tt.version,
+			}, nil)
+
+			out := new(bytes.Buffer)
+			RegistryAuth(houstonMock, out, tt.registryDomain)
+
+			mockRegistryHandler.AssertExpectations(s.T())
+		})
+	}
+
 }
 
 func (s *Suite) TestRegistryAuthFailure() {
