@@ -274,7 +274,6 @@ func (s *Suite) TestRegistryAuthRegistryDomain() {
 			mockRegistryHandler.AssertExpectations(s.T())
 		})
 	}
-
 }
 
 func (s *Suite) TestRegistryAuthFailure() {

@@ -98,29 +98,34 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain 
 		return err
 	}
 
-	var registry string
-
-	if appConfig.Flags.BYORegistryEnabled {
-		registry = appConfig.BYORegistryDomain
-		registryDomain = strings.Split(registry, "/")[0]
-	} else if versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0") {
-		if registryDomain == "" {
-			return nil
-		}
-		registry = registryDomain
-	} else {
-		registry = registryDomainPrefix + c.Domain
-		registryDomain = strings.Split(registry, "/")[0]
+	// return early if version is >= 1.0.0 and no registry domain is supplied since we cannot proceed
+	// the calling function should never supply a blank registry domain for versions >= 1.0.0
+	if versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0") && registryDomain == "" {
+		return nil
 	}
 
-	token := c.Token
+	var registry string
+	switch {
+	case appConfig.Flags.BYORegistryEnabled:
+		// use the configured registry domain for BYO registry
+		registry = appConfig.BYORegistryDomain
+	case versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0"):
+		// use the registry passed in for versions >= 1.0.0
+		registry = registryDomain
+	default:
+		// default to registry.{domain} for versions < 1.0.0
+		registry = registryDomainPrefix + c.Domain
+	}
+
+	// return the host portion of the registry, strip out any path info
+	registryDomain, _, _ = strings.Cut(registry, "/")
 	registryHandler, err := registryHandlerInit(registryDomain)
 	if err != nil {
 		return err
 	}
 
 	if !appConfig.Flags.BYORegistryEnabled {
-		err = registryHandler.Login("user", token)
+		err = registryHandler.Login("user", c.Token)
 	} else {
 		err = registryHandler.Login("", "")
 	}
