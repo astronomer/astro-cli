@@ -75,7 +75,7 @@ var tab = printutil.Table{
 	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
 }
 
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
 		return deploymentID, err
@@ -93,10 +93,6 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 		}
 	}
 
-	if byoRegistryEnabled {
-		nextTag = "deploy-" + time.Now().UTC().Format("2006-01-02T15-04") // updating nextTag logic for private registry, since houston won't maintain next tag in case of BYO registry
-	}
-
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
 		return deploymentID, fmt.Errorf("failed to get deployment info: %w", err)
@@ -107,8 +103,11 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 		return deploymentID, fmt.Errorf("failed to get app config: %w", err)
 	}
 
-	if appConfig != nil && appConfig.Flags.BYORegistryEnabled {
-		byoRegistryEnabled = true
+	byoRegistryDomain := ""
+	byoRegistryEnabled := appConfig != nil && appConfig.Flags.BYORegistryEnabled
+	if byoRegistryEnabled {
+		// updating nextTag logic for private registry, since houston won't maintain next tag in case of BYO registry
+		nextTag = "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
 		byoRegistryDomain = appConfig.BYORegistryDomain
 		if byoRegistryDomain == "" {
 			return deploymentID, ErrBYORegistryDomainNotSet
@@ -210,6 +209,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		registry = byoRegistryDomain
 		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
 	} else {
+		token = c.Token
 		platformVersion, _ := houstonClient.GetPlatformVersion(nil)
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
 			registry, err := getDeploymentRegistryURL(deploymentInfo.Urls)
@@ -217,13 +217,12 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 				return err
 			}
 			// Switch to per deployment registry login
-			err = auth.RegistryAuth(houstonClient, os.Stdout)
+			err = auth.RegistryAuth(houstonClient, os.Stdout, registry)
 			if err != nil {
 				logger.Debugf("There was an error logging into registry: %s", err.Error())
 				return err
 			}
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
-			token = c.Token
 		} else {
 			registry = registryDomainPrefix + cloudDomain
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))

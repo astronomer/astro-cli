@@ -56,7 +56,7 @@ func (s *Suite) TestInit() {
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = Init(tmpDir, "astro-runtime", "12.0.0", "")
+	err = Init(tmpDir, "astro-runtime", "12.0.0", "", "")
 	s.NoError(err)
 
 	expectedFiles := []string{
@@ -93,7 +93,7 @@ func (s *Suite) TestTemplateInit() {
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = Init(tmpDir, "astro-runtime", "test", "etl")
+	err = Init(tmpDir, "astro-runtime", "test", "etl", "")
 	s.NoError(err)
 
 	expectedFiles := []string{
@@ -106,6 +106,72 @@ func (s *Suite) TestTemplateInit() {
 	}
 }
 
+func (s *Suite) TestInitWithClientImageTag() {
+	tmpDir, err := os.MkdirTemp("", "temp")
+	s.Require().NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Test with Airflow 3 and clientImageTag
+	err = Init(tmpDir, "astro-runtime", "3.0-1", "", "3.1-1-python-3.12-astro-agent-1.1.0")
+	s.NoError(err)
+
+	// Check that standard files are created
+	expectedFiles := []string{
+		".dockerignore",
+		"Dockerfile",
+		".gitignore",
+		"packages.txt",
+		"requirements.txt",
+		".env",
+		"airflow_settings.yaml",
+		"dags/exampledag.py",
+		"dags/.airflowignore",
+		"README.md",
+		"tests/dags/test_dag_example.py",
+		".astro/test_dag_integrity_default.py",
+		".astro/dag_integrity_exceptions.txt",
+	}
+	for _, file := range expectedFiles {
+		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
+		s.NoError(err)
+		s.True(exist, "Expected file %s to exist", file)
+	}
+
+	// Check that client-specific files are created when clientImageTag is provided
+	clientFiles := []string{
+		"Dockerfile.client",
+		"requirements-client.txt",
+		"packages-client.txt",
+	}
+	for _, file := range clientFiles {
+		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
+		s.NoError(err)
+		s.True(exist, "Expected client file %s to exist", file)
+	}
+}
+
+func (s *Suite) TestInitWithoutClientImageTag() {
+	tmpDir, err := os.MkdirTemp("", "temp")
+	s.Require().NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Test with Airflow 3 but no clientImageTag
+	err = Init(tmpDir, "astro-runtime", "3.0-1", "", "")
+	s.NoError(err)
+
+	// Check that client-specific files are NOT created when clientImageTag is empty
+	clientFiles := []string{
+		"Dockerfile.client",
+		"requirements-client.txt",
+		"packages-client.txt",
+	}
+	for _, file := range clientFiles {
+		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
+		s.NoError(err)
+		s.False(exist, "Expected client file %s to NOT exist", file)
+	}
+}
+
 func (s *Suite) TestTemplateInitFail() {
 	ExtractTemplate = func(templateDir, destDir string) error {
 		err := errors.New("error extracting files")
@@ -114,6 +180,6 @@ func (s *Suite) TestTemplateInitFail() {
 	tmpDir, err := os.MkdirTemp("", "temp")
 	s.Require().NoError(err)
 	defer os.RemoveAll(tmpDir)
-	err = Init(tmpDir, "astro-runtime", "test", "etl")
+	err = Init(tmpDir, "astro-runtime", "test", "etl", "")
 	s.EqualError(err, "failed to set up template-based astro project: error extracting files")
 }

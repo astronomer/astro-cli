@@ -277,7 +277,7 @@ func (s *Suite) TestGetDefaultImageTag() {
 				Header:     make(http.Header),
 			}
 		})
-		httpClient := NewClient(client, true)
+		httpClient := NewClient(client, true, false)
 
 		defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
 		s.NoError(err)
@@ -347,11 +347,51 @@ func (s *Suite) TestGetDefaultImageTag() {
 				Header:     make(http.Header),
 			}
 		})
-		httpClient := NewClient(client, false)
+		httpClient := NewClient(client, false, false)
 
 		defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
 		s.NoError(err)
 		s.Equal("4.0.0", defaultImageTag)
+	})
+
+	s.Run("agent", func() {
+		mockResp := &Response{
+			ClientVersions: map[string]ClientVersion{
+				"1.1.0": {
+					Metadata: ClientVersionMetadata{
+						Channel:     VersionChannelStable,
+						ReleaseDate: "2025-09-29",
+					},
+					ImageTags: []string{
+						"3.1-1-python-3.12-astro-agent-1.1.0",
+						"3.1-1-python-3.11-astro-agent-1.1.0",
+						"3.1-1-python-3.12-astro-agent-1.1.0-base",
+						"3.1-1-python-3.11-astro-agent-1.1.0-base",
+						"3.0-12-python-3.12-astro-agent-1.1.0",
+						"3.0-12-python-3.11-astro-agent-1.1.0",
+						"3.0-12-python-3.12-astro-agent-1.1.0-base",
+						"3.0-12-python-3.11-astro-agent-1.1.0-base",
+						"3.0-8-python-3.12-astro-agent-1.1.0",
+						"3.0-8-python-3.11-astro-agent-1.1.0",
+						"3.0-8-python-3.12-astro-agent-1.1.0-base",
+						"3.0-8-python-3.11-astro-agent-1.1.0-base",
+					},
+				},
+			},
+		}
+		jsonResp, _ := json.Marshal(mockResp)
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResp)),
+				Header:     make(http.Header),
+			}
+		})
+		httpClient := NewClient(client, false, true)
+
+		defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
+		s.NoError(err)
+		s.Equal("3.1-1-python-3.12-astro-agent-1.1.0", defaultImageTag)
 	})
 }
 
@@ -365,9 +405,173 @@ func (s *Suite) TestGetDefaultImageTagError() {
 			Header:     make(http.Header),
 		}
 	})
-	httpClient := NewClient(client, true)
+	httpClient := NewClient(client, true, false)
 
 	defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
 	s.Error(err)
 	s.Equal("", defaultImageTag)
+}
+
+func (s *Suite) TestParseImageTag() {
+	testCases := []struct {
+		name        string
+		imageTag    string
+		expected    *ImageTagInfo
+		shouldError bool
+	}{
+		{
+			name:     "valid non-base image",
+			imageTag: "3.1-1-python-3.12-astro-agent-1.1.0",
+			expected: &ImageTagInfo{
+				RuntimeVersion: "3.1-1",
+				PythonVersion:  "3.12",
+				AgentVersion:   "1.1.0",
+				IsBase:         false,
+			},
+		},
+		{
+			name:     "valid base image",
+			imageTag: "3.0-12-python-3.11-astro-agent-1.1.0-base",
+			expected: &ImageTagInfo{
+				RuntimeVersion: "3.0-12",
+				PythonVersion:  "3.11",
+				AgentVersion:   "1.1.0",
+				IsBase:         true,
+			},
+		},
+		{
+			name:     "runtime without patch version",
+			imageTag: "4.0-python-3.12-astro-agent-2.0.0",
+			expected: &ImageTagInfo{
+				RuntimeVersion: "4.0",
+				PythonVersion:  "3.12",
+				AgentVersion:   "2.0.0",
+				IsBase:         false,
+			},
+		},
+		{
+			name:        "invalid tag format",
+			imageTag:    "invalid-tag-format",
+			shouldError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			result, err := parseImageTag(tc.imageTag)
+
+			if tc.shouldError {
+				s.Error(err)
+				s.Nil(result)
+			} else {
+				s.NoError(err)
+				s.NotNil(result)
+				s.Equal(tc.expected.RuntimeVersion, result.RuntimeVersion)
+				s.Equal(tc.expected.PythonVersion, result.PythonVersion)
+				s.Equal(tc.expected.AgentVersion, result.AgentVersion)
+				s.Equal(tc.expected.IsBase, result.IsBase)
+			}
+		})
+	}
+}
+
+func (s *Suite) TestIsBetterImage() {
+	testCases := []struct {
+		name      string
+		candidate *ImageTagInfo
+		current   *ImageTagInfo
+		expected  bool
+	}{
+		{
+			name:      "nil candidate",
+			candidate: nil,
+			current:   &ImageTagInfo{PythonVersion: "3.11"},
+			expected:  false,
+		},
+		{
+			name:      "nil current",
+			candidate: &ImageTagInfo{PythonVersion: "3.11"},
+			current:   nil,
+			expected:  true,
+		},
+		{
+			name: "higher python version but lower runtime version",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.0-8",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.11",
+				RuntimeVersion: "3.1-1",
+			},
+			expected: false, // Runtime version takes priority, so 3.0-8 < 3.1-1 means false
+		},
+		{
+			name: "lower python version but higher runtime version",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.11",
+				RuntimeVersion: "3.1-1",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.0-8",
+			},
+			expected: true, // Runtime version takes priority, so 3.1-1 > 3.0-8 means true
+		},
+		{
+			name: "same python version, higher runtime",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-1",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.0-12",
+			},
+			expected: true,
+		},
+		{
+			name: "same python version, lower runtime",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.0-12",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-1",
+			},
+			expected: false,
+		},
+		{
+			name: "same runtime version, higher python version",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-1",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.11",
+				RuntimeVersion: "3.1-1",
+			},
+			expected: true, // Same runtime, so Python version is the tiebreaker
+		},
+		{
+			name: "same runtime version, lower python version",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.11",
+				RuntimeVersion: "3.1-1",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-1",
+			},
+			expected: false, // Same runtime, so Python version is the tiebreaker
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			result := isBetterImage(tc.candidate, tc.current)
+			s.Equal(tc.expected, result)
+		})
+	}
 }

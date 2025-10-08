@@ -83,7 +83,7 @@ func oAuth(oAuthURL string) string {
 }
 
 // RegistryAuth authenticates with the private registry
-func RegistryAuth(client houston.ClientInterface, out io.Writer) error {
+func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain string) error {
 	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -98,27 +98,34 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer) error {
 		return err
 	}
 
-	var registry string
-	if versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0") && !appConfig.Flags.BYORegistryEnabled {
-		logger.Info("skipping registry login")
+	// return early if version is >= 1.0.0 and no registry domain is supplied since we cannot proceed
+	// the calling function should never supply a blank registry domain for versions >= 1.0.0
+	if versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0") && !appConfig.Flags.BYORegistryEnabled && registryDomain == "" {
 		return nil
 	}
 
-	if appConfig.Flags.BYORegistryEnabled {
+	var registry string
+	switch {
+	case appConfig.Flags.BYORegistryEnabled:
+		// use the configured registry domain for BYO registry
 		registry = appConfig.BYORegistryDomain
-	} else {
+	case versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0"):
+		// use the registry passed in for versions >= 1.0.0
+		registry = registryDomain
+	default:
+		// default to registry.{domain} for versions < 1.0.0
 		registry = registryDomainPrefix + c.Domain
 	}
 
-	token := c.Token
-	registryDomain := strings.Split(registry, "/")[0]
+	// return the host portion of the registry, strip out any path info
+	registryDomain, _, _ = strings.Cut(registry, "/")
 	registryHandler, err := registryHandlerInit(registryDomain)
 	if err != nil {
 		return err
 	}
 
 	if !appConfig.Flags.BYORegistryEnabled {
-		err = registryHandler.Login("user", token)
+		err = registryHandler.Login("user", c.Token)
 	} else {
 		err = registryHandler.Login("", "")
 	}
@@ -240,7 +247,7 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		}
 	}
 
-	err = RegistryAuth(client, out)
+	err = RegistryAuth(client, out, "")
 	if err != nil {
 		logger.Debugf("There was an error logging into registry: %s", err.Error())
 	}

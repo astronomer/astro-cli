@@ -76,7 +76,7 @@ func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "NAMESPACE", "CLUSTER", "CLOUD PROVIDER", "REGION", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT", "DEPLOYMENT TYPE"},
+		Header:         []string{"NAME", "NAMESPACE", "CLUSTER", "CLOUD PROVIDER", "REGION", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT", "DEPLOYMENT TYPE", "REMOTE EXECUTION"},
 	}
 }
 
@@ -84,7 +84,7 @@ func newTableOutAll() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "WORKSPACE", "NAMESPACE", "CLUSTER", "CLOUD PROVIDER", "REGION", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT", "DEPLOYMENT TYPE"},
+		Header:         []string{"NAME", "WORKSPACE", "NAMESPACE", "CLUSTER", "CLOUD PROVIDER", "REGION", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT", "DEPLOYMENT TYPE", "REMOTE EXECUTION"},
 	}
 }
 
@@ -593,6 +593,7 @@ func deploymentToTableRow(table *printutil.Table, d *astroplatformcore.Deploymen
 	if !IsDeploymentStandard(*d.Type) {
 		clusterName = *d.ClusterName
 	}
+	isRemoteExecutionEnabled := IsRemoteExecutionEnabled(d)
 	cols := []string{
 		d.Name,
 		releaseName,
@@ -604,6 +605,7 @@ func deploymentToTableRow(table *printutil.Table, d *astroplatformcore.Deploymen
 		strconv.FormatBool(d.IsDagDeployEnabled),
 		strconv.FormatBool(d.IsCicdEnforced),
 		string(*d.Type),
+		strconv.FormatBool(isRemoteExecutionEnabled),
 	}
 	if includeWorkspaceName {
 		cols = slices.Insert(cols, 1, *d.WorkspaceName)
@@ -1883,7 +1885,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 	}
 	if currentDeployment.Id == "" {
 		// get latest runtime version
-		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
+		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false, false)
 		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "", false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
