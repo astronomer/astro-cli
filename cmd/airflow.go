@@ -87,7 +87,7 @@ astro dev init --runtime-version 4.1.0
 # Initialize a new Astro project with the latest Astro Runtime version based on Airflow 2.2.3
 astro dev init --airflow-version 2.2.3
 
-# Initialize a new Astro project with the latest version of Astronomer Certified. Use this only if you run on Astronomer Software
+# Initialize a new Astro project with the latest version of Astronomer Certified. Use this only if you run on Astro Private Cloud
 astro dev init --use-astronomer-certified
 
 # Initialize a new Astro project with the latest version of Astronomer Certified based on Airflow 2.2.3
@@ -170,7 +170,7 @@ func newAirflowInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "init",
 		Short:   "Create a new Astro project in your working directory",
-		Long:    "Create a new Astro project in your working directory. This generates the files you need to start an Airflow environment on your local machine and deploy your project to a Deployment on Astro or Astronomer Software.",
+		Long:    "Create a new Astro project in your working directory. This generates the files you need to start an Airflow environment on your local machine and deploy your project to a Deployment on Astro or Astro Private Cloud.",
 		Example: initCloudExample,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    airflowInit,
