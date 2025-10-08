@@ -183,6 +183,7 @@ func (c *HTTPClient) CreatePool(airflowURL string, pool Pool) error {
 func (c *HTTPClient) UpdatePool(airflowURL string, pool Pool) error {
 	path := fmt.Sprintf("https://%s/pools/%s", airflowURL, pool.Name)
 
+        // default pool does not allow updating other fields, such as description
 	if pool.Name == "default_pool" {
 		path += "?update_mask=slots&update_mask=include_deferred"
 	}
