@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/browser"
@@ -19,14 +20,18 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+
+	"github.com/go-git/go-billy/v5/osfs"
+	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 )
 
 var (
 	ErrInvalidProjectSelection = errors.New("invalid project selection")
 	ErrNoProjectsFound         = errors.New("no Astro IDE projects found in workspace")
 	// DefaultDirPerm is the default permission for directories
-	DefaultDirPerm os.FileMode = 0o755
-	openURL                    = browser.OpenURL
+	DefaultDirPerm           os.FileMode = 0o755
+	openURL                              = browser.OpenURL
+	gitignoreParseWarningMsg             = "Warning: failed to parse .gitignore: %v. Continuing without gitignore filtering."
 )
 
 func newTableOut() *printutil.Table {
@@ -232,9 +237,14 @@ func saveSessionAndCleanup(client astrocore.CoreClient, organizationID, workspac
 }
 
 // openProjectInBrowser opens the project URL in the default browser
-func openProjectInBrowser(domain, workspaceID, projectID string, out io.Writer) {
-	// Construct the URL
-	url := fmt.Sprintf("https://cloud.%s/%s/astro-ide/%s", domain, workspaceID, projectID)
+func openProjectInBrowser(client astrocore.CoreClient, organizationID, workspaceID, projectID string, out io.Writer) {
+	projectResp, err := getProject(client, organizationID, workspaceID, projectID)
+	var url string
+	if err == nil && projectResp != nil && projectResp.JSON200 != nil && projectResp.JSON200.Url != nil && *projectResp.JSON200.Url != "" {
+		url = *projectResp.JSON200.Url
+	} else {
+		return
+	}
 
 	// Open the URL in browser
 	if err := openURL(url); err != nil {
@@ -344,13 +354,15 @@ func ExportProject(client astrocore.CoreClient, projectID, organizationID, works
 	fmt.Fprintf(out, "Successfully exported project to %s\n", projectID)
 
 	// Open project in browser
-	openProjectInBrowser(domain, workspaceID, projectID, out)
+	openProjectInBrowser(client, organizationID, workspaceID, projectID, out)
 
 	return nil
 }
 
 // createTarGzArchive creates a tar.gz archive of the given directory
 func createTarGzArchive(sourceDir, targetFile string) error {
+	matcher := gitignoreMatcher(sourceDir)
+
 	// Create the target file
 	target, err := os.Create(targetFile)
 	if err != nil {
@@ -377,14 +389,31 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 			return nil
 		}
 
-		// Create a header for the file
-		header, err := tar.FileInfoHeader(info, info.Name())
+		// Determine relative path
+		relPath, err := filepath.Rel(sourceDir, path)
 		if err != nil {
 			return err
 		}
 
-		// Set the relative path in the archive
-		relPath, err := filepath.Rel(sourceDir, path)
+		// Skip root itself; we don't archive a top-level "." entry
+		if relPath == "." {
+			return nil
+		}
+
+		if shouldSkipArchiveEntry(relPath, info, matcher) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Skip symlinks
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
+
+		// Create a header for the file/dir
+		header, err := tar.FileInfoHeader(info, "")
 		if err != nil {
 			return err
 		}
@@ -411,6 +440,36 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 
 		return nil
 	})
+}
+
+// gitignoreMatcher creates a matcher from .gitignore patterns in the given root.
+func gitignoreMatcher(root string) gitignore.Matcher {
+	fs := osfs.New(root)
+	patterns, err := gitignore.ReadPatterns(fs, []string{})
+	if err != nil {
+		fmt.Println(fmt.Sprintf(gitignoreParseWarningMsg, err))
+		return gitignore.NewMatcher(nil)
+	}
+	return gitignore.NewMatcher(patterns)
+}
+
+// shouldSkipArchiveEntry determines whether a path should be skipped.
+func shouldSkipArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.Matcher) bool {
+	// Always skip the .git directory
+	if relPath == ".git" || strings.HasPrefix(relPath, ".git"+string(filepath.Separator)) {
+		return true
+	}
+
+	// Include .astro directory, gitignore and dockerignore files
+	base := filepath.Base(relPath)
+	includeAllowed := relPath == ".astro" || strings.HasPrefix(relPath, ".astro"+string(filepath.Separator)) || relPath == ".gitignore" || relPath == ".dockerignore" || base == ".airflowignore"
+	if includeAllowed {
+		return false
+	}
+
+	// Respect .gitignore for everything else
+	pathParts := strings.Split(relPath, string(filepath.Separator))
+	return matcher.Match(pathParts, info.IsDir())
 }
 
 // ImportProject imports a project from Astro IDE to the local directory

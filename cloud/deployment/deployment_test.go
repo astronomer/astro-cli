@@ -613,7 +613,7 @@ func (s *Suite) TestCoreGetDeployment() {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 
 		_, err := CoreGetDeployment("", deploymentID, mockPlatformCoreClient)
-		s.ErrorContains(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+		s.ErrorContains(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 	})
 
 	s.Run("error in api response", func() {

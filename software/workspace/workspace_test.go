@@ -241,7 +241,7 @@ func (s *Suite) TestGetCurrentWorkspaceError() {
 	_ = afero.WriteFile(fs, config.HomeConfigFile, []byte(""), 0o777)
 	config.InitConfig(fs)
 	_, err := GetCurrentWorkspace()
-	s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	s.EqualError(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 }
 
 func (s *Suite) TestGetCurrentWorkspaceErrorNoCurrentContext() {
@@ -444,7 +444,7 @@ func (s *Suite) TestGetWorkspaceSelection() {
 		out := new(bytes.Buffer)
 		workspaceSelection := getWorkspaceSelection(0, 0, api, out)
 
-		s.Contains(workspaceSelection.err.Error(), "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+		s.Contains(workspaceSelection.err.Error(), "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 		s.Equal("", workspaceSelection.id)
 	})
 

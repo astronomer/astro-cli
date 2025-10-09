@@ -12,6 +12,8 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
+	"github.com/astronomer/astro-cli/airflow/runtimes"
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	coreMocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/astronomer/astro-cli/config"
@@ -41,6 +43,13 @@ func (s *AirflowSuite) SetupTest() {
 	}
 	s.tempDir = dir
 	config.WorkingPath = s.tempDir
+
+	// Initialize container runtime for tests
+	var err2 error
+	containerRuntime, err2 = runtimes.GetContainerRuntime()
+	if err2 != nil {
+		s.T().Fatalf("failed to initialize container runtime: %v", err2)
+	}
 }
 
 func (s *AirflowSuite) SetupSubTest() {
@@ -208,6 +217,149 @@ func (s *AirflowSuite) Test_airflowInitNoDefaultImageTag() {
 		dockerfileContents := string(b)
 		// Check for the exact image name we expect
 		s.Contains(dockerfileContents, "FROM astrocrpublic.azurecr.io/runtime:")
+	})
+}
+
+func (s *AirflowSuite) Test_airflowInitWithRemoteExecution() {
+	s.Run("test airflow init with remote execution enabled", func() {
+		// Ensure we're in a clean state
+		config.WorkingPath = s.tempDir
+
+		// Mock getDefaultImageTag to return valid image tags
+		origGetDefaultImageTag := getDefaultImageTag
+		callCount := 0
+		getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string, excludeAirflow3 bool) (string, error) {
+			callCount++
+			if callCount == 1 {
+				// First call - return runtime image tag for Airflow 3 (new format)
+				return "3.0-7", nil
+			}
+			// Second call - return client image tag for remote execution
+			return "0.1.0", nil
+		}
+		defer func() { getDefaultImageTag = origGetDefaultImageTag }()
+
+		cmd := newAirflowInitCmd()
+		cmd.Flags().Set("remote-execution-enabled", "true")
+		var args []string
+
+		defer testUtil.MockUserInput(s.T(), "quay.io/test/registry\n")()
+
+		err := airflowInit(cmd, args)
+		s.NoError(err)
+
+		// Check that client files were created
+		clientFiles := []string{"Dockerfile.client", "requirements-client.txt", "packages-client.txt"}
+		for _, file := range clientFiles {
+			filePath := filepath.Join(s.tempDir, file)
+			_, err := os.Stat(filePath)
+			s.NoError(err, "Expected file %s to exist", file)
+		}
+
+		// Check Dockerfile.client contents
+		b, err := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile.client"))
+		s.NoError(err)
+		dockerfileContents := string(b)
+		s.Contains(dockerfileContents, "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:")
+
+		// Check that registry was saved to config
+		// Since we're using a fake filesystem in tests, we need to check the viper object directly
+		// instead of reading the file from the real filesystem
+		registryValue := config.CFG.RemoteClientRegistry.GetString()
+		s.Equal("quay.io/test/registry", registryValue, "Expected registry endpoint to be set in config")
+	})
+
+	s.Run("test airflow init with remote execution enabled and remote-image-repository flag", func() {
+		// Ensure we're in a clean state
+		config.WorkingPath = s.tempDir
+
+		// Mock getDefaultImageTag to return valid image tags
+		origGetDefaultImageTag := getDefaultImageTag
+		callCount := 0
+		getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string, excludeAirflow3 bool) (string, error) {
+			callCount++
+			if callCount == 1 {
+				// First call - return runtime image tag for Airflow 3 (new format)
+				return "3.0-7", nil
+			}
+			// Second call - return client image tag for remote execution
+			return "0.1.0", nil
+		}
+		defer func() { getDefaultImageTag = origGetDefaultImageTag }()
+
+		cmd := newAirflowInitCmd()
+		cmd.Flags().Set("remote-execution-enabled", "true")
+		cmd.Flags().Set("remote-image-repository", "quay.io/test/registry-flag")
+		var args []string
+
+		// No need to mock user input since we're using the flag
+		err := airflowInit(cmd, args)
+		s.NoError(err)
+
+		// Check that client files were created
+		clientFiles := []string{"Dockerfile.client", "requirements-client.txt", "packages-client.txt"}
+		for _, file := range clientFiles {
+			filePath := filepath.Join(s.tempDir, file)
+			_, err := os.Stat(filePath)
+			s.NoError(err, "Expected file %s to exist", file)
+		}
+
+		// Check Dockerfile.client contents
+		b, err := os.ReadFile(filepath.Join(s.tempDir, "Dockerfile.client"))
+		s.NoError(err)
+		dockerfileContents := string(b)
+		s.Contains(dockerfileContents, "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:")
+
+		// Check that registry was saved to config
+		// Since we're using a fake filesystem in tests, we need to check the viper object directly
+		// instead of reading the file from the real filesystem
+		registryValue := config.CFG.RemoteClientRegistry.GetString()
+		s.Equal("quay.io/test/registry-flag", registryValue, "Expected registry endpoint to be set in config")
+	})
+
+	s.Run("test airflow init with remote execution enabled and invalid remote-image-repository flag", func() {
+		// Ensure we're in a clean state
+		config.WorkingPath = s.tempDir
+
+		cmd := newAirflowInitCmd()
+		cmd.Flags().Set("remote-execution-enabled", "true")
+		cmd.Flags().Set("remote-image-repository", "invalid-registry") // Missing slash
+		var args []string
+
+		err := airflowInit(cmd, args)
+		s.Error(err)
+		s.Contains(err.Error(), "invalid registry endpoint format")
+	})
+}
+
+func (s *AirflowSuite) Test_validateRegistryEndpoint() {
+	s.Run("test valid registry endpoints", func() {
+		validEndpoints := []string{
+			"quay.io/test/registry",
+			"docker.io/user/repo",
+			"registry.example.com/namespace/repo",
+			"localhost:5000/test/repo",
+		}
+
+		for _, endpoint := range validEndpoints {
+			err := validateRegistryEndpoint(endpoint)
+			s.NoError(err, "Expected endpoint %s to be valid", endpoint)
+		}
+	})
+
+	s.Run("test invalid registry endpoints", func() {
+		invalidEndpoints := []string{
+			"",                          // empty
+			"invalid-registry",          // no slash
+			"registry with spaces/repo", // contains spaces
+			"/registry/repo",            // starts with slash
+			"registry/repo/",            // ends with slash
+		}
+
+		for _, endpoint := range invalidEndpoints {
+			err := validateRegistryEndpoint(endpoint)
+			s.Error(err, "Expected endpoint %s to be invalid", endpoint)
+		}
 	})
 }
 

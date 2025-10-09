@@ -68,6 +68,9 @@ var (
 	//go:embed include/airflow3/dockerfile
 	Af3Dockerfile string
 
+	//go:embed include/airflow3/dockerfile.client
+	Af3DockerfileClient string
+
 	//go:embed include/airflow3/dockerignore
 	Af3Dockerignore string
 
@@ -82,6 +85,9 @@ var (
 
 	//go:embed include/airflow3/requirements.txt
 	Af3RequirementsTxt string
+
+	//go:embed include/airflow3/requirements-client.txt
+	Af3RequirementsTxtClient string
 )
 
 func initDirs(root string, dirs []string) error {
@@ -131,7 +137,7 @@ func initFiles(root string, files map[string]string) error {
 }
 
 // Init will scaffold out a new airflow project
-func Init(path, airflowImageName, airflowImageTag, template string) error {
+func Init(path, airflowImageName, airflowImageTag, template, clientImageTag string) error {
 	if template != "" {
 		err := ExtractTemplate(template, path)
 		if err != nil {
@@ -164,6 +170,11 @@ func Init(path, airflowImageName, airflowImageTag, template string) error {
 			"tests/dags/test_dag_example.py":       Af3DagExampleTest,
 			".astro/test_dag_integrity_default.py": Af3DagIntegrityTestDefault,
 			".astro/dag_integrity_exceptions.txt":  "# Add dag files to exempt from parse test below. ex: dags/<test-file>",
+		}
+		if clientImageTag != "" {
+			files["Dockerfile.client"] = fmt.Sprintf(Af3DockerfileClient, clientImageTag)
+			files["requirements-client.txt"] = Af3RequirementsTxtClient
+			files["packages-client.txt"] = ""
 		}
 	case "2":
 		files = map[string]string{

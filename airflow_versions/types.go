@@ -19,6 +19,7 @@ type Response struct {
 	Version           string                    `json:"version"`
 	RuntimeVersions   map[string]RuntimeVersion `json:"runtimeVersions"`
 	RuntimeVersionsV3 map[string]RuntimeVersion `json:"runtimeVersionsV3"`
+	ClientVersions    map[string]ClientVersion  `json:"clientVersions"`
 }
 
 type RuntimeVersion struct {
@@ -34,6 +35,16 @@ type RuntimeVersionMetadata struct {
 
 type RuntimeVersionMigrations struct {
 	AirflowDatabase bool `json:"airflowDatabase"`
+}
+
+type ClientVersion struct {
+	Metadata  ClientVersionMetadata `json:"metadata"`
+	ImageTags []string              `json:"imageTags"`
+}
+
+type ClientVersionMetadata struct {
+	Channel     string `json:"channel"`
+	ReleaseDate string `json:"releaseDate"`
 }
 
 // AirflowVersionRaw represents a single airflow version.

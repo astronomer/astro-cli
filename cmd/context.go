@@ -14,8 +14,8 @@ func newContextCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "context",
 		Aliases: []string{"c"},
-		Short:   "Manage Astro & Astronomer Software contexts",
-		Long:    "Context represent a connection to Astro or Astronomer Software in the form of a Domain URL. If your context is set to astronomer.io, for example, you are connected to Astro",
+		Short:   "Manage Astro & Astro Private Cloud contexts",
+		Long:    "Context represent a connection to Astro or Astro Private Cloud in the form of a Domain URL. If your context is set to astronomer.io, for example, you are connected to Astro",
 	}
 	cmd.AddCommand(
 		newContextListCmd(out),
@@ -30,7 +30,7 @@ func newContextListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all contexts",
-		Long:    "List all Astro and Astronomer Software contexts or domains that you've authenticated to on this machine",
+		Long:    "List all Astro and Astro Private Cloud contexts or domains that you've authenticated to on this machine",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return context.ListContext(cmd, args, out)
 		},
@@ -55,7 +55,7 @@ func newContextDeleteCmd() *cobra.Command {
 		Use:     "delete [domain]",
 		Aliases: []string{"de"},
 		Short:   "Delete a context",
-		Long:    "Delete a locally stored context to Astro or Astronomer Software",
+		Long:    "Delete a locally stored context to Astro or Astro Private Cloud",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return context.DeleteContext(cmd, args, noPrompt)
 		},
