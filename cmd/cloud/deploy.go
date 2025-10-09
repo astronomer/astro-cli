@@ -64,7 +64,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&pytest, "pytest", false, "Deploy code to Astro only if the specified Pytests are passed")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables for Pytests")
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
-	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
+	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy, or image name with custom tag when used with --client")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
 	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have DAG Deploy enabled your DAGs will not be affected.")
 	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")

@@ -29,7 +29,6 @@ import (
 )
 
 const (
-	pushingImagePrompt = "Pushing image to Astronomer registry"
 	astroRunContainer  = "astro-run"
 	pullingImagePrompt = "Pulling image from Astronomer registry"
 	prefix             = "Bearer "
@@ -321,7 +320,7 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 	}
 
 	// Push image to registry
-	fmt.Println(pushingImagePrompt)
+	// Note: Caller is responsible for printing appropriate message
 
 	configFile := cliConfig.LoadDefaultConfigFile(os.Stderr)
 
