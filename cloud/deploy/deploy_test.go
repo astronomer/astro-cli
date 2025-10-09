@@ -1305,12 +1305,14 @@ func TestDeployClientImage(t *testing.T) {
 		airflow.DockerLogin = originalDockerLogin
 	}()
 
-	// Mock config
-	testConfig := &config.Context{
-		Token: "test-token",
-	}
-
 	t.Run("successful client deploy", func(t *testing.T) {
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
 		// Mock DockerLogin
 		dockerLoginCalled := false
 		var capturedRegistry, capturedUsername, capturedToken string
@@ -1337,15 +1339,14 @@ func TestDeployClientImage(t *testing.T) {
 		}()
 
 		// Mock config.CFG.RemoteClientRegistry
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
-		deployInput := InputDeploy{
+		deployInput := InputClientDeploy{
 			Path:              "/test/path",
 			BuildSecretString: "",
 		}
 
-		err := deployClientImage(deployInput, testConfig)
+		err = DeployClientImage(deployInput)
 		assert.NoError(t, err)
 		assert.True(t, dockerLoginCalled, "DockerLogin should have been called")
 		assert.Equal(t, "images.astronomer.cloud", capturedRegistry)
@@ -1355,25 +1356,40 @@ func TestDeployClientImage(t *testing.T) {
 	})
 
 	t.Run("docker login failure", func(t *testing.T) {
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+
 		// Mock DockerLogin to return error
 		airflow.DockerLogin = func(registry, username, token string) error {
 			return errors.New("login failed")
 		}
 
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
-		deployInput := InputDeploy{
+		deployInput := InputClientDeploy{
 			Path:              "/test/path",
 			BuildSecretString: "",
 		}
 
-		err := deployClientImage(deployInput, testConfig)
+		err = DeployClientImage(deployInput)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to authenticate with registry images.astronomer.cloud")
 	})
 
 	t.Run("missing registry configuration", func(t *testing.T) {
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+
 		// Mock DockerLogin (shouldn't be called)
 		dockerLoginCalled := false
 		airflow.DockerLogin = func(registry, username, token string) error {
@@ -1381,21 +1397,28 @@ func TestDeployClientImage(t *testing.T) {
 			return nil
 		}
 
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		config.CFG.RemoteClientRegistry.SetHomeString("") // Empty registry
 
-		deployInput := InputDeploy{
+		deployInput := InputClientDeploy{
 			Path:              "/test/path",
 			BuildSecretString: "",
 		}
 
-		err := deployClientImage(deployInput, testConfig)
+		err = DeployClientImage(deployInput)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "remote client registry is not configured")
 		assert.False(t, dockerLoginCalled, "DockerLogin should not have been called")
 	})
 
 	t.Run("build failure", func(t *testing.T) {
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+
 		// Mock successful DockerLogin
 		airflow.DockerLogin = func(registry, username, token string) error {
 			return nil
@@ -1414,21 +1437,28 @@ func TestDeployClientImage(t *testing.T) {
 			airflowImageHandler = originalAirflowImageHandler
 		}()
 
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
-		deployInput := InputDeploy{
+		deployInput := InputClientDeploy{
 			Path:              "/test/path",
 			BuildSecretString: "",
 		}
 
-		err := deployClientImage(deployInput, testConfig)
+		err = DeployClientImage(deployInput)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to build client image")
 		mockImageHandler.AssertExpectations(t)
 	})
 
 	t.Run("push failure", func(t *testing.T) {
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+
 		// Mock successful DockerLogin
 		airflow.DockerLogin = func(registry, username, token string) error {
 			return nil
@@ -1448,21 +1478,28 @@ func TestDeployClientImage(t *testing.T) {
 			airflowImageHandler = originalAirflowImageHandler
 		}()
 
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
-		deployInput := InputDeploy{
+		deployInput := InputClientDeploy{
 			Path:              "/test/path",
 			BuildSecretString: "",
 		}
 
-		err := deployClientImage(deployInput, testConfig)
+		err = DeployClientImage(deployInput)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to push client image")
 		mockImageHandler.AssertExpectations(t)
 	})
 
 	t.Run("deploy with custom image name", func(t *testing.T) {
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+
 		// Mock image handler
 		mockImageHandler := new(mocks.ImageHandler)
 		mockImageHandler.On("TagLocalImage", "custom-image:tag").Return(nil).Once()
@@ -1482,16 +1519,15 @@ func TestDeployClientImage(t *testing.T) {
 			airflowImageHandler = originalAirflowImageHandler
 		}()
 
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
-		deployInput := InputDeploy{
+		deployInput := InputClientDeploy{
 			Path:              "/test/path",
 			ImageName:         "custom-image:tag",
 			BuildSecretString: "",
 		}
 
-		err := deployClientImage(deployInput, testConfig)
+		err = DeployClientImage(deployInput)
 		assert.NoError(t, err)
 		mockImageHandler.AssertExpectations(t)
 	})

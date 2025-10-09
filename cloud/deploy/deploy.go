@@ -110,8 +110,14 @@ type InputDeploy struct {
 	Description       string
 	BuildSecretString string
 	ForceUpgradeToAF3 bool
-	ClientDeploy      bool
+}
+
+// InputClientDeploy contains inputs for client image deployments
+type InputClientDeploy struct {
+	Path              string
+	ImageName         string
 	Platform          string
+	BuildSecretString string
 }
 
 const accessYourDeploymentFmt = `
@@ -192,10 +198,6 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		fmt.Printf(deploymentHeaderMsg, "Astro")
 	} else {
 		fmt.Printf(deploymentHeaderMsg, c.Domain)
-	}
-
-	if deployInput.ClientDeploy {
-		return deployClientImage(deployInput, &c)
 	}
 
 	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, platformCoreClient, coreClient)
@@ -372,6 +374,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
 
 		imageHandler := airflowImageHandler(deployInfo.deployImage)
+		fmt.Println("Pushing image to Astronomer registry")
 		_, err = imageHandler.Push(remoteImage, registryUsername, c.Token, false)
 		if err != nil {
 			return err
@@ -809,9 +812,14 @@ func WarnIfNonLatestVersion(version string, httpClient *httputil.HTTPClient) {
 	}
 }
 
-// deployClientImage handles the client deploy functionality
-func deployClientImage(deployInput InputDeploy, c *config.Context) error { //nolint:gocritic
-	fmt.Println("Deploying client image...")
+// DeployClientImage handles the client deploy functionality
+func DeployClientImage(deployInput InputClientDeploy) error { //nolint:gocritic
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return errors.Wrap(err, "failed to get current context")
+	}
+
+	fmt.Printf(deploymentHeaderMsg, "Astro")
 
 	// Get the remote client registry endpoint from config
 	registryEndpoint := config.CFG.RemoteClientRegistry.GetString()
@@ -846,8 +854,6 @@ func deployClientImage(deployInput InputDeploy, c *config.Context) error { //nol
 		}
 
 		// Build the client image from the current directory
-		fmt.Println("Building client image...")
-
 		// Determine target platforms for client deploy
 		var targetPlatforms []string
 		if deployInput.Platform != "" {
@@ -857,11 +863,11 @@ func deployClientImage(deployInput InputDeploy, c *config.Context) error { //nol
 			for i, platform := range targetPlatforms {
 				targetPlatforms[i] = strings.TrimSpace(platform)
 			}
-			fmt.Printf("Building for platforms: %s\n", strings.Join(targetPlatforms, ", "))
+			fmt.Printf("Building client image for platforms: %s\n", strings.Join(targetPlatforms, ", "))
 		} else {
 			// Use empty slice to let Docker build for host platform by default
 			targetPlatforms = []string{}
-			fmt.Println("Building for host platform")
+			fmt.Println("Building client image for host platform")
 		}
 
 		buildConfig := types.ImageBuildConfig{
@@ -875,13 +881,13 @@ func deployClientImage(deployInput InputDeploy, c *config.Context) error { //nol
 		}
 	}
 
-	// Push the image to the remote registry
-	fmt.Printf("Pushing client image to %s...\n", remoteImage)
-	_, err := imageHandler.Push(remoteImage, "", "", false)
+	// Push the image to the remote registry (assumes docker login was done externally)
+	fmt.Println("Pushing client image to configured remote registry")
+	_, err = imageHandler.Push(remoteImage, "", "", false)
 	if err != nil {
 		return fmt.Errorf("failed to push client image: %w", err)
 	}
 
-	fmt.Printf("✓ Successfully pushed client image: %s\n", ansi.Bold(remoteImage))
+	fmt.Printf("Successfully pushed client image to %s\n", ansi.Bold(remoteImage))
 	return nil
 }

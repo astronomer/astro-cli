@@ -92,7 +92,7 @@ func dockerLogin(registryName, username, token string) error {
 		const prefix = "Bearer "
 		pass := strings.TrimPrefix(token, prefix)
 		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + registryName + " -u " + username + " --password-stdin"
-		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd)
+		err = cmdExec("bash", nil, os.Stderr, "-c", cmd)
 		if err != nil {
 			return fmt.Errorf("docker login failed: %w", err)
 		}

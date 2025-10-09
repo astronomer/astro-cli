@@ -41,8 +41,6 @@ Menu will be presented if you do not specify a deployment ID:
 	EnsureProjectDir  = utils.EnsureProjectDir
 	buildSecrets      = []string{}
 	forceUpgradeToAF3 bool
-	clientDeploy      bool
-	platform          string
 )
 
 const (
@@ -77,8 +75,6 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
 	cmd.Flags().BoolVar(&forceUpgradeToAF3, "force-upgrade-to-af3", false, "Force allow upgrade from Airflow 2 to Airflow 3")
-	cmd.Flags().BoolVar(&clientDeploy, "client", false, "Push the client image to the remote registry")
-	cmd.Flags().StringVar(&platform, "platform", "", "Target platform for client image build (e.g., linux/amd64,linux/arm64). Defaults to host machine platform - only works with --client flag")
 	return cmd
 }
 
@@ -116,10 +112,6 @@ func deploy(cmd *cobra.Command, args []string) error {
 
 	if dags && image {
 		return errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
-	}
-
-	if platform != "" && !clientDeploy {
-		return errors.New("--platform flag can only be used with --client flag")
 	}
 
 	// Save deploymentId in config if specified
@@ -163,8 +155,6 @@ func deploy(cmd *cobra.Command, args []string) error {
 		Description:       deployDescription,
 		BuildSecretString: BuildSecretString,
 		ForceUpgradeToAF3: forceUpgradeToAF3,
-		ClientDeploy:      clientDeploy,
-		Platform:          platform,
 	}
 
 	return DeployImage(deployInput, platformCoreClient, astroCoreClient)
