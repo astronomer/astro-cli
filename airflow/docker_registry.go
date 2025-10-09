@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
@@ -12,6 +14,9 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/registry"
 )
+
+// DockerLogin is a testable variable that holds the docker login function
+var DockerLogin = dockerLogin
 
 type DockerRegistry struct {
 	registry string
@@ -71,5 +76,27 @@ func (d *DockerRegistry) Login(username, token string) error {
 	if err := creds.Store(cliAuthConfig); err != nil {
 		return fmt.Errorf("error saving credentials: %w", err)
 	}
+	return nil
+}
+
+// dockerLogin performs docker login using bash command instead of Docker API
+// This is useful for OAuth-based registries that require special authentication flows
+func dockerLogin(registryName, username, token string) error {
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	if err != nil {
+		return err
+	}
+
+	if username != "" && token != "" {
+		// Remove Bearer prefix if present (consistent with pushWithBash)
+		const prefix = "Bearer "
+		pass := strings.TrimPrefix(token, prefix)
+		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + registryName + " -u " + username + " --password-stdin"
+		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd)
+		if err != nil {
+			return fmt.Errorf("docker login failed: %w", err)
+		}
+	}
+
 	return nil
 }

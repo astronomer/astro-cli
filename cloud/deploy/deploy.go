@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
@@ -109,6 +110,8 @@ type InputDeploy struct {
 	Description       string
 	BuildSecretString string
 	ForceUpgradeToAF3 bool
+	ClientDeploy      bool
+	Platform          string
 }
 
 const accessYourDeploymentFmt = `
@@ -189,6 +192,10 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		fmt.Printf(deploymentHeaderMsg, "Astro")
 	} else {
 		fmt.Printf(deploymentHeaderMsg, c.Domain)
+	}
+
+	if deployInput.ClientDeploy {
+		return deployClientImage(deployInput, &c)
 	}
 
 	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, platformCoreClient, coreClient)
@@ -800,4 +807,81 @@ func WarnIfNonLatestVersion(version string, httpClient *httputil.HTTPClient) {
 	if airflowversions.CompareRuntimeVersions(version, latestRuntimeVersion) < 0 {
 		fmt.Printf("WARNING! You are currently running Astro Runtime Version %s\nConsider upgrading to the latest version, Astro Runtime %s\n", version, latestRuntimeVersion)
 	}
+}
+
+// deployClientImage handles the client deploy functionality
+func deployClientImage(deployInput InputDeploy, c *config.Context) error { //nolint:gocritic
+	fmt.Println("Deploying client image...")
+
+	// Get the remote client registry endpoint from config
+	registryEndpoint := config.CFG.RemoteClientRegistry.GetString()
+	if registryEndpoint == "" {
+		return errors.New("remote client registry is not configured. Please run 'astro config set remote.client_registry <endpoint>' to configure the registry")
+	}
+
+	// Use consistent deploy-<timestamp> tagging mechanism like regular deploys
+	// The ImageName flag only specifies which local image to use, not the remote tag
+	imageTag := "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
+
+	// Build the full remote image name
+	remoteImage := fmt.Sprintf("%s:%s", registryEndpoint, imageTag)
+
+	// Create an image handler for building and pushing
+	imageHandler := airflowImageHandler(remoteImage)
+
+	if deployInput.ImageName != "" {
+		// Use the provided local image (tag will be ignored, remote tag is always timestamp-based)
+		fmt.Println("Using provided image:", deployInput.ImageName)
+		err := imageHandler.TagLocalImage(deployInput.ImageName)
+		if err != nil {
+			return fmt.Errorf("failed to tag local image: %w", err)
+		}
+	} else {
+		// Authenticate with the base image registry before building
+		// This is needed because Dockerfile.client uses base images from a private registry
+		baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
+		err := airflow.DockerLogin(baseImageRegistry, registryUsername, c.Token)
+		if err != nil {
+			return fmt.Errorf("failed to authenticate with registry %s: %w", baseImageRegistry, err)
+		}
+
+		// Build the client image from the current directory
+		fmt.Println("Building client image...")
+
+		// Determine target platforms for client deploy
+		var targetPlatforms []string
+		if deployInput.Platform != "" {
+			// Parse comma-separated platforms from --platform flag
+			targetPlatforms = strings.Split(deployInput.Platform, ",")
+			// Trim whitespace from each platform
+			for i, platform := range targetPlatforms {
+				targetPlatforms[i] = strings.TrimSpace(platform)
+			}
+			fmt.Printf("Building for platforms: %s\n", strings.Join(targetPlatforms, ", "))
+		} else {
+			// Use empty slice to let Docker build for host platform by default
+			targetPlatforms = []string{}
+			fmt.Println("Building for host platform")
+		}
+
+		buildConfig := types.ImageBuildConfig{
+			Path:            deployInput.Path,
+			TargetPlatforms: targetPlatforms,
+		}
+
+		err = imageHandler.Build("Dockerfile.client", deployInput.BuildSecretString, buildConfig)
+		if err != nil {
+			return fmt.Errorf("failed to build client image: %w", err)
+		}
+	}
+
+	// Push the image to the remote registry
+	fmt.Printf("Pushing client image to %s...\n", remoteImage)
+	_, err := imageHandler.Push(remoteImage, "", "", false)
+	if err != nil {
+		return fmt.Errorf("failed to push client image: %w", err)
+	}
+
+	fmt.Printf("✓ Successfully pushed client image: %s\n", ansi.Bold(remoteImage))
+	return nil
 }
