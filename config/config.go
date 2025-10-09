@@ -89,6 +89,7 @@ var (
 		RuffImage:               newCfg("ruff.image", "ghcr.io/astral-sh/ruff:latest"),
 		RemoteClientRegistry:    newCfg("remote.client_registry", ""),
 		RemoteBaseImageRegistry: newCfg("remote.base_image_registry", "images.astronomer.cloud"),
+		RemoteCmd:               newCfg("beta.remote_cmd", "false"),
 	}
 
 	// viperHome is the viper object in the users home directory
