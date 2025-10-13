@@ -1246,7 +1246,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if !IsDeploymentStandard(*d.Type) {
 			clusterName = *d.ClusterName
 		}
-		tabDeployment.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
+		isRemoteExecutionEnabled := IsRemoteExecutionEnabled(&d)
+		tabDeployment.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type), strconv.FormatBool(isRemoteExecutionEnabled)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
 	}
