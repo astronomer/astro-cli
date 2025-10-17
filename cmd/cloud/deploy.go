@@ -74,7 +74,8 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
-	cmd.Flags().BoolVar(&forceUpgradeToAF3, "force-upgrade-to-af3", false, "Force allow upgrade from Airflow 2 to Airflow 3")
+	cmd.Flags().BoolVar(&forceUpgradeToAF3, "force-upgrade-to-af3", false, "Deprecated: previously required to force an upgrade from Airflow 2 to Airflow 3")
+	cmd.Flags().MarkDeprecated("force-upgrade-to-af3", "This flag is deprecated and no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.") //nolint:errcheck
 	return cmd
 }
 
