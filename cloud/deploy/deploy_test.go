@@ -1062,6 +1062,7 @@ func TestValidRuntimeVersion(t *testing.T) {
 		forceUpgradeToAF3 bool
 		expected          bool
 		expectedError     string
+		expectedWarning   string
 	}{
 		// Empty current version cases
 		{
@@ -1097,6 +1098,7 @@ func TestValidRuntimeVersion(t *testing.T) {
 			deploymentOptions: []string{"3.0-1"},
 			forceUpgradeToAF3: true,
 			expected:          true,
+			expectedWarning:   "--force-upgrade-to-af3 is deprecated",
 		},
 		{
 			name:              "AF2 < 12.0.0 to AF3 version with force flag is invalid upgrade",
@@ -1108,13 +1110,12 @@ func TestValidRuntimeVersion(t *testing.T) {
 			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 12.0.0 or higher",
 		},
 		{
-			name:              "AF2 >= 12.0.0 to AF3 version without force flag is invalid upgrade",
+			name:              "AF2 >= 12.0.0 to AF3 version without force flag is valid upgrade",
 			currentVersion:    "12.0.0",
 			newVersion:        "3.0-1",
 			deploymentOptions: []string{"3.0-1"},
 			forceUpgradeToAF3: false,
-			expected:          false,
-			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with the --force-upgrade-to-af3 flag",
+			expected:          true,
 		},
 
 		// AF3 version cases
@@ -1183,9 +1184,14 @@ func TestValidRuntimeVersion(t *testing.T) {
 			assert.Equal(t, tc.expected, result)
 
 			// Check error message if expected
-			if tc.expectedError != "" {
+			if tc.expectedError != "" || tc.expectedWarning != "" {
 				output := <-outC
-				assert.Contains(t, output, tc.expectedError)
+				if tc.expectedError != "" {
+					assert.Contains(t, output, tc.expectedError)
+				}
+				if tc.expectedWarning != "" {
+					assert.Contains(t, output, tc.expectedWarning)
+				}
 			}
 		})
 	}
