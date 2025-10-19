@@ -1028,7 +1028,7 @@ func TestBuildImageFailure(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
-	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, false, mockPlatformCoreClient)
+	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -1039,14 +1039,14 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// dockerfile parsing error
 	dockerfile = "Dockerfile.invalid"
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, false, mockPlatformCoreClient)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
 	// failed to get runtime releases
 	dockerfile = "Dockerfile"
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, false, mockPlatformCoreClient)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 	mockCoreClient.AssertExpectations(t)
 	mockPlatformCoreClient.AssertExpectations(t)
@@ -1059,7 +1059,6 @@ func TestValidRuntimeVersion(t *testing.T) {
 		currentVersion    string
 		newVersion        string
 		deploymentOptions []string
-		forceUpgradeToAF3 bool
 		expected          bool
 		expectedError     string
 	}{
@@ -1091,30 +1090,19 @@ func TestValidRuntimeVersion(t *testing.T) {
 
 		// AF2 to AF3 upgrade cases
 		{
-			name:              "AF2 >= 12.0.0 to AF3 version with force flag is valid upgrade",
+			name:              "AF2 >= 12.0.0 to AF3 version is valid upgrade",
 			currentVersion:    "12.0.0",
 			newVersion:        "3.0-1",
 			deploymentOptions: []string{"3.0-1"},
-			forceUpgradeToAF3: true,
 			expected:          true,
 		},
 		{
-			name:              "AF2 < 12.0.0 to AF3 version with force flag is invalid upgrade",
+			name:              "AF2 < 12.0.0 to AF3 version is invalid upgrade",
 			currentVersion:    "4.2.5",
 			newVersion:        "3.0-1",
 			deploymentOptions: []string{"3.0-1"},
-			forceUpgradeToAF3: true,
 			expected:          false,
 			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 12.0.0 or higher",
-		},
-		{
-			name:              "AF2 >= 12.0.0 to AF3 version without force flag is invalid upgrade",
-			currentVersion:    "12.0.0",
-			newVersion:        "3.0-1",
-			deploymentOptions: []string{"3.0-1"},
-			forceUpgradeToAF3: false,
-			expected:          false,
-			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with the --force-upgrade-to-af3 flag",
 		},
 
 		// AF3 version cases
@@ -1173,7 +1161,7 @@ func TestValidRuntimeVersion(t *testing.T) {
 				outC <- buf.String()
 			}()
 
-			result := ValidRuntimeVersion(tc.currentVersion, tc.newVersion, tc.deploymentOptions, tc.forceUpgradeToAF3)
+			result := ValidRuntimeVersion(tc.currentVersion, tc.newVersion, tc.deploymentOptions)
 
 			// Restore stdout
 			w.Close()

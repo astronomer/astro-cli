@@ -109,7 +109,6 @@ type InputDeploy struct {
 	DagsPath          string
 	Description       string
 	BuildSecretString string
-	ForceUpgradeToAF3 bool
 }
 
 // InputClientDeploy contains inputs for client image deployments
@@ -275,7 +274,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			}
 		}
 		if deployInput.Pytest != "" {
-			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, deployInput.ForceUpgradeToAF3, platformCoreClient)
+			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -355,7 +354,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		// Build our image
-		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, deployInput.ForceUpgradeToAF3, platformCoreClient)
+		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -651,7 +650,7 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 	return nil
 }
 
-func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, isRemoteExecutionEnabled, forceUpgradeToAF3 bool, platformCoreClient astroplatformcore.CoreClient) (version string, err error) {
+func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, isRemoteExecutionEnabled bool, platformCoreClient astroplatformcore.CoreClient) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
 
 	if imageName == "" {
@@ -711,7 +710,7 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 		deploymentOptionsRuntimeVersions = append(deploymentOptionsRuntimeVersions, runtimeRelease.Version)
 	}
 
-	if !ValidRuntimeVersion(currentVersion, version, deploymentOptionsRuntimeVersions, forceUpgradeToAF3) {
+	if !ValidRuntimeVersion(currentVersion, version, deploymentOptionsRuntimeVersions) {
 		fmt.Println("Canceling deploy...")
 		os.Exit(1)
 	}
@@ -756,7 +755,7 @@ func createDeploy(organizationID, deploymentID string, request astroplatformcore
 	return resp.JSON200, err
 }
 
-func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVersions []string, forceUpgradeToAF3 bool) bool {
+func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVersions []string) bool {
 	// Allow old deployments which do not have runtimeVersion tag
 	if currentVersion == "" {
 		return true
@@ -782,16 +781,12 @@ func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVer
 		return false
 	}
 
-	// If upgrading from Airflow 2 to Airflow 3, we require at least Runtime 12.0.0 (Airflow 2.10.0) and that the user has forced the upgrade
+	// If upgrading from Airflow 2 to Airflow 3, we require at least Runtime 12.0.0 (Airflow 2.10.0)
 	currentVersionAirflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(currentVersion)
 	tagAirflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(tag)
 	if currentVersionAirflowMajorVersion == "2" && tagAirflowMajorVersion == "3" {
 		if airflowversions.CompareRuntimeVersions(currentVersion, "12.0.0") < 0 {
 			fmt.Println("Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 12.0.0 or higher")
-			return false
-		}
-		if !forceUpgradeToAF3 {
-			fmt.Println("Can only upgrade deployment from Airflow 2 to Airflow 3 with the --force-upgrade-to-af3 flag")
 			return false
 		}
 	}
