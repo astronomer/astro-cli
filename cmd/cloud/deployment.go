@@ -26,6 +26,8 @@ const (
 	disable   = "disable"
 	standard  = "standard"
 	dedicated = "dedicated"
+
+	deploymentWaitTime = 300 * time.Second
 )
 
 var (
@@ -47,6 +49,7 @@ var (
 	errorLogs                  bool
 	infoLogs                   bool
 	waitForStatus              bool
+	waitTimeForDeployment      time.Duration
 	deploymentCreateEnforceCD  bool
 	deploymentUpdateEnforceCD  bool
 	logCount                   = 500
@@ -404,6 +407,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the Deployment to create. File can be in either JSON or YAML format.")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
+	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
 	cmd.Flags().StringVarP(&workloadIdentity, "workload-identity", "", "", "The Workload Identity to use for the Deployment")
 	if organization.IsOrgHosted() {
@@ -713,6 +717,11 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		}
 		taskLogURLPattern = &flagTaskLogURLPattern
 	}
+
+	if cmd.Flags().Changed("wait-time") && !waitForStatus {
+		return errors.New("cannot use --wait-time with --wait=false")
+	}
+
 	if deploymentCreateEnforceCD {
 		cicdEnforcement = enable
 	}
@@ -732,6 +741,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		// Collect all requested flags except --deployment-file and --wait
 		allowedFlags := map[string]bool{
 			"wait":            true,
+			"wait-time":       true,
 			"deployment-file": true,
 			"verbosity":       true,
 		}
@@ -744,8 +754,9 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		if disallowedFlagSet {
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, waitForStatus)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, waitForStatus, waitTimeForDeployment)
 	}
+
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
 	}
@@ -765,7 +776,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, platformCoreClient, astroCoreClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, platformCoreClient, astroCoreClient, waitForStatus, waitTimeForDeployment)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
@@ -792,7 +803,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 			// other flags were requested
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, waitForStatus)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, false, 0*time.Second)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value")

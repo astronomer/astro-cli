@@ -755,14 +755,11 @@ deployment:
 
 		origSleep := deployment.SleepTime
 		origTick := deployment.TickNum
-		origTimeout := deployment.TimeoutNum
 		deployment.SleepTime = 0
 		deployment.TickNum = 1
-		deployment.TimeoutNum = 5
 		defer func() {
 			deployment.SleepTime = origSleep
 			deployment.TickNum = origTick
-			deployment.TimeoutNum = origTimeout
 		}()
 
 		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml", "--wait", "--verbosity", "debug"}

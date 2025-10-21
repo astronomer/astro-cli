@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -25,6 +26,7 @@ type DeployBundleInput struct {
 	BundleType         string
 	Description        string
 	Wait               bool
+	WaitTime           time.Duration
 	PlatformCoreClient astroplatformcore.CoreClient
 	CoreClient         astrocore.CoreClient
 }
@@ -85,7 +87,7 @@ func DeployBundle(input *DeployBundleInput) error {
 
 	// if requested, wait for the deploy to finish by polling the deployment until it is healthy
 	if input.Wait {
-		err = deployment.HealthPoll(currentDeployment.Id, currentDeployment.WorkspaceId, dagOnlyDeploySleepTime, tickNum, timeoutNum, input.PlatformCoreClient)
+		err = deployment.HealthPoll(currentDeployment.Id, currentDeployment.WorkspaceId, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.PlatformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -101,6 +103,7 @@ type DeleteBundleInput struct {
 	BundleType         string
 	Description        string
 	Wait               bool
+	WaitTime           time.Duration
 	CoreClient         astrocore.CoreClient
 	PlatformCoreClient astroplatformcore.CoreClient
 }
@@ -132,7 +135,7 @@ func DeleteBundle(input *DeleteBundleInput) error {
 
 	// if requested, wait for the deploy to finish by polling the deployment until it is healthy
 	if input.Wait {
-		err = deployment.HealthPoll(input.DeploymentID, input.WorkspaceID, dagOnlyDeploySleepTime, tickNum, timeoutNum, input.PlatformCoreClient)
+		err = deployment.HealthPoll(input.DeploymentID, input.WorkspaceID, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.PlatformCoreClient)
 		if err != nil {
 			return err
 		}
