@@ -51,7 +51,6 @@ type cfgs struct {
 	RuffImage               cfg
 	RemoteClientRegistry    cfg
 	RemoteBaseImageRegistry cfg
-	RemoteCmd               cfg
 }
 
 // Creates a new cfg struct
