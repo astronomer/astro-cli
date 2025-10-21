@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"fmt"
+	"time"
 
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cmd/utils"
@@ -20,6 +21,7 @@ var (
 	parse             bool
 	dags              bool
 	waitForDeploy     bool
+	waitTime          time.Duration
 	image             bool
 	dagsPath          string
 	pytestFile        string
@@ -44,6 +46,8 @@ Menu will be presented if you do not specify a deployment ID:
 
 const (
 	registryUncommitedChangesMsg = "Project directory has uncommitted changes, use `astro deploy [deployment-id] -f` to force deploy."
+
+	deployWaitTime = 300 * time.Second
 )
 
 func NewDeployCmd() *cobra.Command {
@@ -70,6 +74,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
+	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
@@ -100,6 +105,10 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// Get deploymentId from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
+	}
+
+	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
+		return errors.New("cannot use --wait-time with --wait=false")
 	}
 
 	if deploymentID == "" || forcePrompt || workspaceID == "" {
@@ -151,6 +160,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		Dags:              dags,
 		Image:             image,
 		WaitForStatus:     waitForDeploy,
+		WaitTime:          waitTime,
 		DagsPath:          dagsPath,
 		Description:       deployDescription,
 		BuildSecretString: BuildSecretString,

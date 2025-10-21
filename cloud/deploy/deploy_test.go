@@ -255,7 +255,6 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	deployInput.Pytest = ""
 	deployInput.WaitForStatus = true
 	sleepTime = 1
-	timeoutNum = 1
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.ErrorIs(t, err, deployment.ErrTimedOut)
 
@@ -356,7 +355,6 @@ func TestDeployOnRemoteExecutionDeployment(t *testing.T) {
 	deployInput.Pytest = ""
 	deployInput.WaitForStatus = true
 	sleepTime = 1
-	timeoutNum = 1
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.ErrorIs(t, err, deployment.ErrTimedOut)
 
@@ -611,7 +609,6 @@ func TestDagsDeploySuccess(t *testing.T) {
 	deployInput.Pytest = ""
 	deployInput.WaitForStatus = true
 	dagOnlyDeploySleepTime = 1
-	timeoutNum = 1
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.ErrorIs(t, err, deployment.ErrTimedOut)
 

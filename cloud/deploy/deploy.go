@@ -75,7 +75,6 @@ var (
 	sleepTime              = 90
 	dagOnlyDeploySleepTime = 30
 	tickNum                = 10
-	timeoutNum             = 180
 )
 
 type deploymentInfo struct {
@@ -106,6 +105,7 @@ type InputDeploy struct {
 	Dags              bool
 	Image             bool
 	WaitForStatus     bool
+	WaitTime          time.Duration
 	DagsPath          string
 	Description       string
 	BuildSecretString string
@@ -307,7 +307,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 
 		if deployInput.WaitForStatus {
 			// Keeping wait timeout low since dag only deploy is faster
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, dagOnlyDeploySleepTime, tickNum, timeoutNum, platformCoreClient)
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, dagOnlyDeploySleepTime, tickNum, int(deployInput.WaitTime.Seconds()), platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -396,7 +396,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		if deployInput.WaitForStatus {
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, timeoutNum, platformCoreClient)
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, int(deployInput.WaitTime.Seconds()), platformCoreClient)
 			if err != nil {
 				return err
 			}

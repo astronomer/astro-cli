@@ -67,7 +67,6 @@ const (
 var (
 	SleepTime        = 180
 	TickNum          = 10
-	TimeoutNum       = 180
 	listLimit        = 1000
 	dagDeployEnabled bool
 )
@@ -222,7 +221,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool, waitTimeForDeployment time.Duration) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
 
@@ -537,7 +536,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		return err
 	}
 	if waitForStatus {
-		err = HealthPoll(d.Id, workspaceID, SleepTime, TickNum, TimeoutNum, platformCoreClient)
+		err = HealthPoll(d.Id, workspaceID, SleepTime, TickNum, int(waitTimeForDeployment.Seconds()), platformCoreClient)
 		if err != nil {
 			errOutput := createOutput(workspaceID, &d)
 			if errOutput != nil {
@@ -1903,7 +1902,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 			dagDeploy = enable
 		}
 
-		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, false, nil, nil, nil, platformCoreClient, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, false, nil, nil, nil, platformCoreClient, coreClient, false, 0*time.Second)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
@@ -1941,29 +1940,6 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID
 	}
 	return deploymentURL, nil
-}
-
-// printWarning lets the user know
-// when going from CE -> KE and if multiple queues exist,
-// a new default queue will get created.
-// If going from KE -> CE, it lets user know that a new default worker queue will be created.
-// It returns true if a warning was printed and false if not.
-func printWarning(executor string, existingQLength int) bool {
-	var printed bool
-	if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
-		if existingQLength > 1 {
-			fmt.Println("\n Switching to KubernetesExecutor will replace all existing worker queues " +
-				"with one new default worker queue for this deployment.")
-			printed = true
-		}
-	} else {
-		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
-			fmt.Println("\n Switching to CeleryExecutor will replace the existing worker queue " +
-				"with a new default worker queue for this deployment.")
-			printed = true
-		}
-	}
-	return printed
 }
 
 func GetCoreCloudProvider(cloudProvider string) astrocore.GetDeploymentOptionsParamsCloudProvider {
