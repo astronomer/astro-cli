@@ -441,11 +441,18 @@ func (d *DockerImage) getRegistryToAuth(imageName string) (string, error) {
 	if domain == "localhost" {
 		return config.CFG.LocalRegistry.GetString(), nil
 	}
+
+	// Handle different image name formats:
+	// 1. Standard format: registry.com/namespace/repo:tag
+	// 2. ECR format: 123456789012.dkr.ecr.us-west-2.amazonaws.com/repo:tag
 	parts := strings.SplitN(imageName, "/", 2)
-	if len(parts) != 2 || !strings.Contains(parts[1], "/") {
-		// This _should_ be impossible for users to hit
+	if len(parts) != 2 {
 		return "", fmt.Errorf("internal logic error: unsure how to get registry from image name %q", imageName)
 	}
+
+	// Both formats have the registry as the first part before the first "/"
+	// Standard format: registry.com/namespace/repo:tag -> registry.com
+	// ECR format: 123456789012.dkr.ecr.us-west-2.amazonaws.com/repo:tag -> 123456789012.dkr.ecr.us-west-2.amazonaws.com
 	return parts[0], nil
 }
 
