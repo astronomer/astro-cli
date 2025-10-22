@@ -30,7 +30,7 @@ func SetupLogging(cmd *cobra.Command, _ []string) error {
 			level = flagValue
 		}
 	}
-	
+
 	return softwareCmd.SetUpLogs(os.Stdout, level)
 }
 
