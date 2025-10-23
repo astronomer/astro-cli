@@ -108,6 +108,11 @@ func configSet(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	// Validate the value using the registered validator (if any)
+	if err := cfg.Validate(args[1]); err != nil {
+		return fmt.Errorf("invalid value for %s: %w", cfg.Path, err)
+	}
+
 	var err error
 	if globalFlag {
 		err = cfg.SetHomeString(args[1])

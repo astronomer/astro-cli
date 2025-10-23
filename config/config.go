@@ -104,6 +104,7 @@ var (
 func InitConfig(fs afero.Fs) {
 	initHome(fs)
 	initProject(fs)
+	registerValidators()
 }
 
 // Init viper for config file in home directory
