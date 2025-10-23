@@ -1,9 +1,13 @@
 package config
 
+// ValidatorFunc is a function that validates a configuration value
+type ValidatorFunc func(value string) error
+
 // cfg defines settings a single configuration setting can have
 type cfg struct {
-	Path    string
-	Default string
+	Path      string
+	Default   string
+	validator ValidatorFunc
 }
 
 // cfgs houses all configurations for an astro project
@@ -55,7 +59,10 @@ type cfgs struct {
 
 // Creates a new cfg struct
 func newCfg(path, dflt string) cfg {
-	ncfg := cfg{path, dflt}
+	ncfg := cfg{
+		Path:    path,
+		Default: dflt,
+	}
 	CFGStrMap[path] = ncfg
 	return ncfg
 }
@@ -118,4 +125,17 @@ func (c cfg) GetProjectString() string {
 // GetHomeString will return config from home string
 func (c cfg) GetHomeString() string {
 	return viperHome.GetString(c.Path)
+}
+
+// RegisterValidator registers a validation function for this config
+func (c *cfg) RegisterValidator(fn ValidatorFunc) {
+	c.validator = fn
+}
+
+// Validate validates a value using the registered validator
+func (c cfg) Validate(value string) error {
+	if c.validator != nil {
+		return c.validator(value)
+	}
+	return nil
 }
