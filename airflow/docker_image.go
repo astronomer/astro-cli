@@ -49,9 +49,9 @@ To resolve:
 
 For detailed troubleshooting steps, visit:
 https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push`)
-)
 
-var errGetImageLabel = errors.New("error getting image label")
+	errGetImageLabel = errors.New("error getting image label")
+)
 
 var getDockerClient = func() (client.APIClient, error) {
 	return client.NewClientWithOpts(client.FromEnv)
