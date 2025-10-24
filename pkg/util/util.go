@@ -143,3 +143,19 @@ func Filter[T any](ss []T, test func(T) bool) (ret []T) {
 	}
 	return
 }
+
+// IsAstronomerRegistry checks if a given registry domain is one of the valid Astronomer registries
+func IsAstronomerRegistry(registry string) bool {
+	validRegistries := []string{
+		"images.astronomer.cloud",
+		"images.astronomer-dev.cloud",
+		"images.astronomer-stage.cloud",
+	}
+
+	for _, validRegistry := range validRegistries {
+		if strings.Contains(registry, validRegistry) {
+			return true
+		}
+	}
+	return false
+}

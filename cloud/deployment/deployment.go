@@ -1886,7 +1886,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 	if currentDeployment.Id == "" {
 		// get latest runtime version
 		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false, false)
-		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "", false)
+		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "", "", false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}

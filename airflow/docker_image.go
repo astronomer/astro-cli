@@ -32,9 +32,11 @@ const (
 	astroRunContainer  = "astro-run"
 	pullingImagePrompt = "Pulling image from Astronomer registry"
 	prefix             = "Bearer "
+)
 
+var (
 	// Enhanced error message for 403 authentication issues
-	imagePush403ErrMsg = `failed to push image due to authentication error (403 Forbidden).
+	ErrImagePush403 = fmt.Errorf(`failed to push image due to authentication error (403 Forbidden).
 
 This commonly occurs due to:
 1. Invalid cached Docker credentials
@@ -46,7 +48,7 @@ To resolve:
 • Try running 'astro deploy' again
 
 For detailed troubleshooting steps, visit:
-https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push`
+https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push`)
 )
 
 var errGetImageLabel = errors.New("error getting image label")
@@ -354,7 +356,7 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 		if err != nil {
 			// Check for 403 errors only after both methods fail
 			if is403Error(err) {
-				return "", errors.New(imagePush403ErrMsg)
+				return "", ErrImagePush403
 			}
 			return "", err
 		}
@@ -730,8 +732,13 @@ func pushWithBash(authConfig *cliTypes.AuthConfig, imageName string) error {
 		pass := authConfig.Password
 		pass = strings.TrimPrefix(pass, prefix)
 		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
-		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
+		var stderr bytes.Buffer
+		err = cmdExec("bash", os.Stdout, &stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
 		if err != nil {
+			stderrOutput := stderr.String()
+			if stderrOutput != "" {
+				return fmt.Errorf("%w: %s", err, stderrOutput)
+			}
 			return err
 		}
 	}

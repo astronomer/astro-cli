@@ -796,7 +796,7 @@ func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVer
 
 func WarnIfNonLatestVersion(version string, httpClient *httputil.HTTPClient) {
 	client := airflowversions.NewClient(httpClient, false, false)
-	latestRuntimeVersion, err := airflowversions.GetDefaultImageTag(client, "", false)
+	latestRuntimeVersion, err := airflowversions.GetDefaultImageTag(client, "", "", false)
 	if err != nil {
 		logger.Debugf("unable to get latest runtime version: %s", err)
 		return
@@ -814,12 +814,13 @@ func DeployClientImage(deployInput InputClientDeploy) error { //nolint:gocritic
 		return errors.Wrap(err, "failed to get current context")
 	}
 
-	fmt.Printf(deploymentHeaderMsg, "Astro")
-
 	// Get the remote client registry endpoint from config
 	registryEndpoint := config.CFG.RemoteClientRegistry.GetString()
 	if registryEndpoint == "" {
-		return errors.New("remote client registry is not configured. Please run 'astro config set remote.client_registry <endpoint>' to configure the registry")
+		fmt.Println("Astro CLI is not configured correctly to push the client images to your private registry.")
+		fmt.Println("For remote deployments, the client images are meant to be stored in your private registry, and not astronomer registries")
+		fmt.Println("So, CLI would need that information about your private registry to push the client images to your private registry.")
+		return errors.New("remote client registry is not configured. Please run 'astro config set remote.client_registry <endpoint>' to configure the registry and try again")
 	}
 
 	// Use consistent deploy-<timestamp> tagging mechanism like regular deploys
@@ -842,10 +843,23 @@ func DeployClientImage(deployInput InputClientDeploy) error { //nolint:gocritic
 	} else {
 		// Authenticate with the base image registry before building
 		// This is needed because Dockerfile.client uses base images from a private registry
-		baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
-		err := airflow.DockerLogin(baseImageRegistry, registryUsername, c.Token)
-		if err != nil {
-			return fmt.Errorf("failed to authenticate with registry %s: %w", baseImageRegistry, err)
+
+		// Skip registry login if the base image registry is not from astronomer, check the content of the Dockerfile.client file
+		dockerfileClientContent, err := fileutil.ReadFileToString(filepath.Join(deployInput.Path, "Dockerfile.client"))
+		if util.IsAstronomerRegistry(dockerfileClientContent) || err != nil {
+			// login to the registry
+			if err != nil {
+				fmt.Println("WARNING: Failed to read Dockerfile.client, so will assume the base image is using images.astronomer.cloud and try to login to the registry")
+			}
+			baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
+			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)
+			err := airflow.DockerLogin(baseImageRegistry, registryUsername, c.Token)
+			if err != nil {
+				fmt.Println("Failed to authenticate with Astronomer registry that contains the base agent image used in the Dockerfile.client file")
+				fmt.Println("It could be due to either your token has expired or you don't have permission to pull the base agent image")
+				fmt.Println("Please re-login via `astro login` to refresh the credentials or validate that `ASTRO_API_TOKEN` environment variable is set with the correct token and try again")
+				return fmt.Errorf("failed to authenticate with registry %s: %w", baseImageRegistry, err)
+			}
 		}
 
 		// Build the client image from the current directory
@@ -880,9 +894,23 @@ func DeployClientImage(deployInput InputClientDeploy) error { //nolint:gocritic
 	fmt.Println("Pushing client image to configured remote registry")
 	_, err = imageHandler.Push(remoteImage, "", "", false)
 	if err != nil {
+		if errors.Is(err, airflow.ErrImagePush403) {
+			fmt.Printf("\n--------------------------------\n")
+			fmt.Printf("Failed to push client image to %s\n", registryEndpoint)
+			fmt.Println("It could be due to either your registry token has expired or you don't have permission to push the client image")
+			fmt.Printf("Please ensure that you have logged in to `%s` via `docker login` and try again\n\n", registryEndpoint)
+		}
 		return fmt.Errorf("failed to push client image: %w", err)
 	}
 
 	fmt.Printf("Successfully pushed client image to %s\n", ansi.Bold(remoteImage))
+
+	fmt.Printf("\n--------------------------------\n")
+	fmt.Println("The client image has been pushed to your private registry.")
+	fmt.Println("You would now need to update the agent component to use the new client image.")
+	fmt.Println("For that you would either need to update the helm chart values.yaml file or update your CI/CD pipeline to use the new client image.")
+	fmt.Println("If you are using Astronomer provided Agent Helm chart, you would need to update the `image` field for each of the workers, dagProcessor, and triggerer component sections to the new image:")
+	fmt.Println("Once you have updated the helm chart values.yaml file, you can run 'helm upgrade' or update via your CI/CD pipeline to update the agent components")
+
 	return nil
 }

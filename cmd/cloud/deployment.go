@@ -27,7 +27,7 @@ const (
 	standard  = "standard"
 	dedicated = "dedicated"
 
-	deploymentWaitTime = 300 * time.Second
+	deploymentWaitTime = 600 * time.Second
 )
 
 var (
@@ -661,7 +661,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Get latest runtime version
 	if runtimeVersion == "" {
 		airflowVersionClient := airflowversions.NewClient(httpClient, false, false)
-		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "", false)
+		runtimeVersion, err = airflowversions.GetDefaultImageTag(airflowVersionClient, "", "", false)
 		if err != nil {
 			return err
 		}
