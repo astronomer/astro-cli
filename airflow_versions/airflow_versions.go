@@ -87,7 +87,7 @@ func isBetterImage(candidate, current *ImageTagInfo) bool {
 }
 
 // GetDefaultImageTag returns default airflow image tag
-func GetDefaultImageTag(httpClient *Client, airflowVersion string, excludeAirflow3 bool) (string, error) {
+func GetDefaultImageTag(httpClient *Client, airflowVersion string, runtimeVersion string, excludeAirflow3 bool) (string, error) { //nolint:gocritic
 	r := Request{}
 
 	resp, err := r.DoWithClient(httpClient)
@@ -100,7 +100,7 @@ func GetDefaultImageTag(httpClient *Client, airflowVersion string, excludeAirflo
 	}
 
 	if httpClient.useAstroAgent {
-		return getAstroAgentTag(resp.ClientVersions)
+		return getAstroAgentTag(resp.ClientVersions, runtimeVersion)
 	}
 
 	if excludeAirflow3 {
@@ -157,7 +157,7 @@ func getAstroRuntimeTag(runtimeVersions, runtimeVersionsV3 map[string]RuntimeVer
 }
 
 // get latest client tag
-func getAstroAgentTag(clientVersions map[string]ClientVersion) (string, error) {
+func getAstroAgentTag(clientVersions map[string]ClientVersion, runtimeVersion string) (string, error) {
 	if len(clientVersions) == 0 {
 		return "", fmt.Errorf("no client versions found")
 	}
@@ -176,40 +176,48 @@ func getAstroAgentTag(clientVersions map[string]ClientVersion) (string, error) {
 		return "", fmt.Errorf("no client versions found")
 	}
 
-	latestVersion := availableVersions[0]
-	for _, availableVersion := range availableVersions {
-		if CompareRuntimeVersions(availableVersion, latestVersion) > 0 {
-			latestVersion = availableVersion
-		}
-	}
-
-	logger.Debugf("Latest client version: %s", latestVersion)
+	// sort the available versions by runtime version in descending order
+	sort.Slice(availableVersions, func(i, j int) bool {
+		return CompareRuntimeVersions(availableVersions[i], availableVersions[j]) < 0
+	})
 
 	// Parse and filter image tags, prioritizing latest Python version
 	var bestImageTag string
 	var bestInfo *ImageTagInfo
 
-	for _, imageTags := range clientVersions[latestVersion].ImageTags {
-		tagInfo, err := parseImageTag(imageTags)
-		if err != nil {
-			logger.Debugf("Failed to parse image tag %s: %v", imageTags, err)
-			continue
-		}
+	for _, version := range availableVersions {
+		for _, imageTags := range clientVersions[version].ImageTags {
+			tagInfo, err := parseImageTag(imageTags)
+			if err != nil {
+				logger.Debugf("Failed to parse image tag %s: %v", imageTags, err)
+				continue
+			}
 
-		// Skip -base images
-		if tagInfo.IsBase {
-			continue
-		}
+			// If runtime version is provided, filter the image tags by runtime version if it's greater than the provided runtime version
+			// since we do not provide forward compatibility guarantees
+			if runtimeVersion != "" && CompareRuntimeVersions(tagInfo.RuntimeVersion, runtimeVersion) > 0 {
+				continue
+			}
 
-		// Select the best image based on runtime version first, then Python version
-		if bestImageTag == "" || isBetterImage(tagInfo, bestInfo) {
-			bestImageTag = imageTags
-			bestInfo = tagInfo
+			// Skip -base images
+			if tagInfo.IsBase {
+				continue
+			}
+
+			// Select the best image based on runtime version first, then Python version
+			if bestImageTag == "" || isBetterImage(tagInfo, bestInfo) {
+				bestImageTag = imageTags
+				bestInfo = tagInfo
+			}
 		}
 	}
 
 	if bestImageTag == "" {
-		return "", fmt.Errorf("no non-base images found for client version %s", latestVersion)
+		return "", fmt.Errorf("no non-base images found for client version")
+	}
+
+	if runtimeVersion != "" && !strings.HasPrefix(bestImageTag, runtimeVersion) {
+		fmt.Printf("The selected client image tag %s is the nearest compatible version with the provided runtime version %s\n", bestImageTag, runtimeVersion)
 	}
 
 	logger.Debugf("Latest image tag: %s", bestImageTag)

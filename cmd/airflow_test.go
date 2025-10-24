@@ -228,7 +228,7 @@ func (s *AirflowSuite) Test_airflowInitWithRemoteExecution() {
 		// Mock getDefaultImageTag to return valid image tags
 		origGetDefaultImageTag := getDefaultImageTag
 		callCount := 0
-		getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string, excludeAirflow3 bool) (string, error) {
+		getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string, runtimeVersion string, excludeAirflow3 bool) (string, error) {
 			callCount++
 			if callCount == 1 {
 				// First call - return runtime image tag for Airflow 3 (new format)
@@ -276,7 +276,7 @@ func (s *AirflowSuite) Test_airflowInitWithRemoteExecution() {
 		// Mock getDefaultImageTag to return valid image tags
 		origGetDefaultImageTag := getDefaultImageTag
 		callCount := 0
-		getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string, excludeAirflow3 bool) (string, error) {
+		getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string, runtimeVersion string, excludeAirflow3 bool) (string, error) {
 			callCount++
 			if callCount == 1 {
 				// First call - return runtime image tag for Airflow 3 (new format)

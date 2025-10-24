@@ -311,3 +311,71 @@ func (s *Suite) TestFilter() {
 		s.Equal(result, expectedResult)
 	})
 }
+
+func (s *Suite) TestIsAstronomerRegistry() {
+	type args struct {
+		registry string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "valid production registry",
+			args: args{registry: "images.astronomer.cloud"},
+			want: true,
+		},
+		{
+			name: "valid dev registry",
+			args: args{registry: "images.astronomer-dev.cloud"},
+			want: true,
+		},
+		{
+			name: "valid stage registry",
+			args: args{registry: "images.astronomer-stage.cloud"},
+			want: true,
+		},
+		{
+			name: "registry in dockerfile",
+			args: args{registry: "FROM images.astronomer.cloud/baseimages/runtime:latest"},
+			want: true,
+		},
+		{
+			name: "registry with path in dockerfile",
+			args: args{registry: "FROM images.astronomer-dev.cloud/baseimages/astro-remote-execution-agent:3.0-8"},
+			want: true,
+		},
+		{
+			name: "registry as part of URL",
+			args: args{registry: "https://images.astronomer-stage.cloud/v2/"},
+			want: true,
+		},
+		{
+			name: "non-astronomer registry",
+			args: args{registry: "quay.io/astronomer/astro-runtime"},
+			want: false,
+		},
+		{
+			name: "docker hub registry",
+			args: args{registry: "docker.io/postgres"},
+			want: false,
+		},
+		{
+			name: "similar but not exact match",
+			args: args{registry: "images.astronomer.com"},
+			want: false,
+		},
+		{
+			name: "empty string",
+			args: args{registry: ""},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			got := IsAstronomerRegistry(tt.args.registry)
+			s.Equal(tt.want, got)
+		})
+	}
+}
