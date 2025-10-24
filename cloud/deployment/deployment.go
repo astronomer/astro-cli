@@ -771,7 +771,9 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 				return err
 			}
 
-			if currentDeployment.Status == astroplatformcore.DeploymentStatusHEALTHY {
+			// considering hibernating as healthy state, since hibernation can only happen when the deployment is healthy.
+			// This covers for the case when the deployment is cretated and straight away goes into hibernation.
+			if currentDeployment.Status == astroplatformcore.DeploymentStatusHEALTHY || currentDeployment.Status == astroplatformcore.DeploymentStatusHIBERNATING {
 				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Name)
 				return nil
 			}
@@ -1886,7 +1888,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 	if currentDeployment.Id == "" {
 		// get latest runtime version
 		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false, false)
-		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "", false)
+		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "", "", false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
