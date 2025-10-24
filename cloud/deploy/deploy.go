@@ -909,7 +909,7 @@ func DeployClientImage(deployInput InputClientDeploy) error { //nolint:gocritic
 	fmt.Println("The client image has been pushed to your private registry.")
 	fmt.Println("You would now need to update the agent component to use the new client image.")
 	fmt.Println("For that you would either need to update the helm chart values.yaml file or update your CI/CD pipeline to use the new client image.")
-	fmt.Println("If you are using Astronomer provided Agent Helm chart, you would need to update the `image` field for each of the workers, dagProcessor, and triggerer component sections to the new image:")
+	fmt.Printf("If you are using Astronomer provided Agent Helm chart, you would need to update the `image` field for each of the workers, dagProcessor, and triggerer component sections to the new image: %s\n", remoteImage)
 	fmt.Println("Once you have updated the helm chart values.yaml file, you can run 'helm upgrade' or update via your CI/CD pipeline to update the agent components")
 
 	return nil

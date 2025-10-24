@@ -87,7 +87,7 @@ func isBetterImage(candidate, current *ImageTagInfo) bool {
 }
 
 // GetDefaultImageTag returns default airflow image tag
-func GetDefaultImageTag(httpClient *Client, airflowVersion string, runtimeVersion string, excludeAirflow3 bool) (string, error) {
+func GetDefaultImageTag(httpClient *Client, airflowVersion string, runtimeVersion string, excludeAirflow3 bool) (string, error) { //nolint:gocritic
 	r := Request{}
 
 	resp, err := r.DoWithClient(httpClient)
