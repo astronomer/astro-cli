@@ -771,7 +771,9 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 				return err
 			}
 
-			if currentDeployment.Status == astroplatformcore.DeploymentStatusHEALTHY {
+			// considering hibernating as healthy state, since hibernation can only happen when the deployment is healthy.
+			// This covers for the case when the deployment is cretated and straight away goes into hibernation.
+			if currentDeployment.Status == astroplatformcore.DeploymentStatusHEALTHY || currentDeployment.Status == astroplatformcore.DeploymentStatusHIBERNATING {
 				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Name)
 				return nil
 			}
