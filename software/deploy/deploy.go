@@ -47,7 +47,7 @@ var (
 	ErrEmptyDagFolderUserCancelledOperation  = errors.New("no DAGs found in the dags folder. User canceled the operation")
 	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
 	ErrDeploymentTypeIncorrectForImageOnly   = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
-	WarningInvalidImageNameMsg               = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Use an Astronomer Runtime image such as 'quay.io/astronomer/astro-runtime' or 'astrocrpublic.azurecr.io/astronomer/astro-runtime' to proceed.\n"
+	WarningInvalidImageNameMsg               = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Use an Astronomer Runtime image such as 'quay.io/astronomer/astro-runtime', 'astrocrpublic.azurecr.io/astronomer/astro-runtime', or 'astrocrpublic.azurecr.io/runtime' (for Runtime 3.x) to proceed.\n"
 	ErrNoRuntimeLabelOnCustomImage           = errors.New("the image should have label io.astronomer.docker.runtime.version")
 	ErrRuntimeVersionNotPassedForRemoteImage = errors.New("if --image-name and --remote is passed, it's mandatory to pass --runtime-version")
 )
