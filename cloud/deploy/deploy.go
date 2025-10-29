@@ -40,7 +40,7 @@ const (
 	composeSkipImageBuildingPromptMsg = "Skipping building image..."
 	deploymentHeaderMsg               = "Authenticated to %s \n\n"
 
-	warningInvalidImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
+	warningInvalidImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Use an Astronomer Runtime image such as 'quay.io/astronomer/astro-runtime' or 'astrocrpublic.azurecr.io/astronomer/astro-runtime' to proceed.\n"
 
 	allTests                 = "all-tests"
 	parseAndPytest           = "parse-and-all-tests"
