@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -1291,6 +1292,22 @@ func TestDeployClientImage(t *testing.T) {
 	}()
 
 	t.Run("successful client deploy", func(t *testing.T) {
+		// Set up temporary directory with Dockerfile.client
+		tempDir, err := os.MkdirTemp("", "test-deploy-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create a basic Dockerfile.client file for the test
+		dockerfileContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:latest"
+		err = os.WriteFile(filepath.Join(tempDir, "Dockerfile.client"), []byte(dockerfileContent), 0o644)
+		assert.NoError(t, err)
+
+		// Create required client dependency files
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte("requests==2.28.0"), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("curl"), 0o644)
+		assert.NoError(t, err)
+
 		// Set up current context
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := config.GetCurrentContext()
@@ -1327,7 +1344,7 @@ func TestDeployClientImage(t *testing.T) {
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
 		deployInput := InputClientDeploy{
-			Path:              "/test/path",
+			Path:              tempDir,
 			BuildSecretString: "",
 		}
 
@@ -1396,6 +1413,22 @@ func TestDeployClientImage(t *testing.T) {
 	})
 
 	t.Run("build failure", func(t *testing.T) {
+		// Set up temporary directory
+		tempDir, err := os.MkdirTemp("", "test-deploy-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create a basic Dockerfile.client file for the test
+		dockerfileContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:latest"
+		err = os.WriteFile(filepath.Join(tempDir, "Dockerfile.client"), []byte(dockerfileContent), 0o644)
+		assert.NoError(t, err)
+
+		// Create required client dependency files
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte("numpy==1.21.0"), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("git"), 0o644)
+		assert.NoError(t, err)
+
 		// Set up current context
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := config.GetCurrentContext()
@@ -1425,7 +1458,7 @@ func TestDeployClientImage(t *testing.T) {
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
 		deployInput := InputClientDeploy{
-			Path:              "/test/path",
+			Path:              tempDir,
 			BuildSecretString: "",
 		}
 
@@ -1436,6 +1469,22 @@ func TestDeployClientImage(t *testing.T) {
 	})
 
 	t.Run("push failure", func(t *testing.T) {
+		// Set up temporary directory
+		tempDir, err := os.MkdirTemp("", "test-deploy-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create a basic Dockerfile.client file for the test
+		dockerfileContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:latest"
+		err = os.WriteFile(filepath.Join(tempDir, "Dockerfile.client"), []byte(dockerfileContent), 0o644)
+		assert.NoError(t, err)
+
+		// Create required client dependency files
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte("flask==2.0.0"), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("vim"), 0o644)
+		assert.NoError(t, err)
+
 		// Set up current context
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := config.GetCurrentContext()
@@ -1466,7 +1515,7 @@ func TestDeployClientImage(t *testing.T) {
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
 		deployInput := InputClientDeploy{
-			Path:              "/test/path",
+			Path:              tempDir,
 			BuildSecretString: "",
 		}
 
@@ -1506,8 +1555,13 @@ func TestDeployClientImage(t *testing.T) {
 
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
+		// Set up temporary directory for consistency
+		tempDir, err := os.MkdirTemp("", "test-deploy-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
 		deployInput := InputClientDeploy{
-			Path:              "/test/path",
+			Path:              tempDir,
 			ImageName:         "custom-image:tag",
 			BuildSecretString: "",
 		}
@@ -1515,5 +1569,262 @@ func TestDeployClientImage(t *testing.T) {
 		err = DeployClientImage(deployInput)
 		assert.NoError(t, err)
 		mockImageHandler.AssertExpectations(t)
+	})
+}
+
+func TestPrepareClientBuildContext(t *testing.T) {
+	t.Run("creates build context with client files when they exist and have content", func(t *testing.T) {
+		// Setup temporary directory for testing
+		tempDir, err := os.MkdirTemp("", "test-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+		// Create test files with content
+		clientRequirementsContent := "requests==2.28.0\nnumpy==1.21.0"
+		clientPackagesContent := "curl\nwget"
+		regularRequirementsContent := "django==3.2.0"
+		regularPackagesContent := "vim"
+
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(clientRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte(clientPackagesContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Prepare build context
+		buildContext, err := prepareClientBuildContext(tempDir)
+		assert.NoError(t, err)
+		defer buildContext.CleanupFunc()
+
+		// Verify build context was created
+		assert.NotEqual(t, tempDir, buildContext.TempDir)
+		assert.Contains(t, buildContext.TempDir, "astro-client-build-")
+
+		// Verify that in the temp build directory, the client files are used as regular files
+		requirementsContent, err := os.ReadFile(filepath.Join(buildContext.TempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, clientRequirementsContent, string(requirementsContent))
+
+		packagesContent, err := os.ReadFile(filepath.Join(buildContext.TempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, clientPackagesContent, string(packagesContent))
+
+		// Verify that original files are UNCHANGED (no modification of original project)
+		originalRequirementsContent, err := os.ReadFile(filepath.Join(tempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, regularRequirementsContent, string(originalRequirementsContent))
+
+		originalPackagesContent, err := os.ReadFile(filepath.Join(tempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, regularPackagesContent, string(originalPackagesContent))
+	})
+
+	t.Run("uses regular files when client files are empty", func(t *testing.T) {
+		// Setup temporary directory for testing
+		tempDir, err := os.MkdirTemp("", "test-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create empty client files and regular files with content
+		regularRequirementsContent := "flask==2.0.0"
+		regularPackagesContent := "git"
+
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(""), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("   \n  "), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Prepare build context
+		buildContext, err := prepareClientBuildContext(tempDir)
+		assert.NoError(t, err)
+		defer buildContext.CleanupFunc()
+
+		// Verify that build context uses empty client file contents
+		requirementsContent, err := os.ReadFile(filepath.Join(buildContext.TempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, "", string(requirementsContent))
+
+		packagesContent, err := os.ReadFile(filepath.Join(buildContext.TempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, "   \n  ", string(packagesContent))
+
+		// Original files unchanged
+		originalRequirementsContent, err := os.ReadFile(filepath.Join(tempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, regularRequirementsContent, string(originalRequirementsContent))
+	})
+
+	t.Run("errors when client files don't exist", func(t *testing.T) {
+		// Setup temporary directory for testing
+		tempDir, err := os.MkdirTemp("", "test-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create only regular files, no client files
+		regularRequirementsContent := "fastapi==0.68.0"
+		regularPackagesContent := "htop"
+
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Prepare build context should error since client files don't exist
+		buildContext, err := prepareClientBuildContext(tempDir)
+		assert.Error(t, err)
+		assert.NotNil(t, buildContext) // Now returns buildContext even on error (for cleanup)
+		assert.Contains(t, err.Error(), "failed to setup client dependency files")
+		// Cleanup the temporary directory since function returns buildContext on error
+		defer buildContext.CleanupFunc()
+	})
+
+	t.Run("returns error when source directory doesn't exist", func(t *testing.T) {
+		// Setup temporary directory for testing
+		tempDir, err := os.MkdirTemp("", "test-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		nonExistentDir := filepath.Join(tempDir, "nonexistent")
+
+		buildContext, err2 := prepareClientBuildContext(nonExistentDir)
+		assert.Error(t, err2)
+		assert.NotNil(t, buildContext) // Now returns buildContext even on error (for cleanup)
+		assert.Contains(t, err2.Error(), "source directory does not exist")
+		// Cleanup the temporary directory since function returns buildContext on error
+		defer buildContext.CleanupFunc()
+	})
+
+	t.Run("errors when only some client files exist", func(t *testing.T) {
+		// Setup temporary directory for testing
+		tempDir, err := os.MkdirTemp("", "test-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create only one client file
+		clientRequirementsContent := "scikit-learn==1.0.0"
+		regularRequirementsContent := "tensorflow==2.6.0"
+		regularPackagesContent := "docker"
+
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(clientRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		// Don't create packages-client.txt
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Prepare build context should error since packages-client.txt doesn't exist
+		buildContext, err := prepareClientBuildContext(tempDir)
+		assert.Error(t, err)
+		assert.NotNil(t, buildContext) // Now returns buildContext even on error (for cleanup)
+		assert.Contains(t, err.Error(), "failed to setup client dependency files")
+		// Cleanup the temporary directory since function returns buildContext on error
+		defer buildContext.CleanupFunc()
+
+		// Verify original files are UNCHANGED
+		originalRequirementsContent, err := os.ReadFile(filepath.Join(tempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, regularRequirementsContent, string(originalRequirementsContent))
+
+		originalPackagesContent, err := os.ReadFile(filepath.Join(tempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, regularPackagesContent, string(originalPackagesContent))
+	})
+}
+
+func TestSetupClientDependencyFiles(t *testing.T) {
+	t.Run("copies client files to standard locations", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "test-setup-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create client files
+		clientRequirementsContent := "numpy==1.21.0"
+		clientPackagesContent := "curl\nwget"
+		regularRequirementsContent := "requests==2.28.0"
+		regularPackagesContent := "git"
+
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(clientRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte(clientPackagesContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Setup client dependency files
+		err = setupClientDependencyFiles(tempDir)
+		assert.NoError(t, err)
+
+		// Verify both files were replaced with client content
+		requirementsContent, err := os.ReadFile(filepath.Join(tempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, clientRequirementsContent, string(requirementsContent))
+
+		packagesContent, err := os.ReadFile(filepath.Join(tempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, clientPackagesContent, string(packagesContent))
+	})
+
+	t.Run("handles empty client files", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "test-setup-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create empty client files
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(""), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("   \n  "), 0o644)
+		assert.NoError(t, err)
+
+		// Create regular files with content
+		regularRequirementsContent := "django==4.0.0"
+		regularPackagesContent := "curl"
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Setup client dependency files
+		err = setupClientDependencyFiles(tempDir)
+		assert.NoError(t, err)
+
+		// Verify files were replaced with empty client content
+		requirementsContent, err := os.ReadFile(filepath.Join(tempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, "", string(requirementsContent))
+
+		packagesContent, err := os.ReadFile(filepath.Join(tempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, "   \n  ", string(packagesContent))
+	})
+
+	t.Run("errors when client files don't exist", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "test-setup-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create only regular files, no client files
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte("django==4.0.0"), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte("curl"), 0o644)
+		assert.NoError(t, err)
+
+		// Setup client dependency files should error since client files don't exist
+		err = setupClientDependencyFiles(tempDir)
+		assert.Error(t, err)
+		// Due to map iteration being non-deterministic, the error could mention either client file
+		errorMsg := err.Error()
+		assert.True(t,
+			strings.Contains(errorMsg, "failed to copy requirements-client.txt") ||
+				strings.Contains(errorMsg, "failed to copy packages-client.txt"),
+			"error should mention one of the missing client files, got: %s", errorMsg)
 	})
 }
