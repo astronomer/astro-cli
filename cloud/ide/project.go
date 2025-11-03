@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/browser"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -480,7 +481,11 @@ func ImportProject(client astrocore.CoreClient, projectID, organizationID, works
 		return fmt.Errorf("failed to read current directory: %w", err)
 	}
 	if len(entries) > 0 {
-		return fmt.Errorf("current directory is not empty. Please run this command in an empty directory")
+		proceed, _ := input.Confirm(fmt.Sprintf("Current directory is not empty. Do you want to import the project here? %s", config.WorkingPath))
+
+		if !proceed {
+			return fmt.Errorf("import canceled by user")
+		}
 	}
 
 	// If projectID is not provided, select one
