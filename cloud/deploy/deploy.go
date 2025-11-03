@@ -807,6 +807,78 @@ func WarnIfNonLatestVersion(version string, httpClient *httputil.HTTPClient) {
 	}
 }
 
+// ClientBuildContext represents a prepared build context for client deployment
+type ClientBuildContext struct {
+	// TempDir is the temporary directory containing the build context
+	TempDir string
+	// CleanupFunc should be called to clean up the temporary directory
+	CleanupFunc func()
+}
+
+// prepareClientBuildContext creates a temporary build context with client dependency files
+// This avoids modifying the original project files, preventing race conditions with concurrent deployments.
+func prepareClientBuildContext(sourcePath string) (*ClientBuildContext, error) {
+	// Create a temporary directory for the build context
+	tempBuildDir, err := os.MkdirTemp("", "astro-client-build-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary build directory: %w", err)
+	}
+
+	// Cleanup function to be called by the caller
+	cleanup := func() {
+		os.RemoveAll(tempBuildDir)
+	}
+
+	// Always return cleanup function if we created a temp directory, even on error
+	buildContext := &ClientBuildContext{
+		TempDir:     tempBuildDir,
+		CleanupFunc: cleanup,
+	}
+
+	// Check if source directory exists first
+	if exists, err := fileutil.Exists(sourcePath, nil); err != nil {
+		return buildContext, fmt.Errorf("failed to check if source directory exists: %w", err)
+	} else if !exists {
+		return buildContext, fmt.Errorf("source directory does not exist: %s", sourcePath)
+	}
+
+	// Copy all project files to the temporary directory
+	err = fileutil.CopyDirectory(sourcePath, tempBuildDir)
+	if err != nil {
+		return buildContext, fmt.Errorf("failed to copy project files to temporary directory: %w", err)
+	}
+
+	// Process client dependency files
+	err = setupClientDependencyFiles(tempBuildDir)
+	if err != nil {
+		return buildContext, fmt.Errorf("failed to setup client dependency files: %w", err)
+	}
+
+	return buildContext, nil
+}
+
+// setupClientDependencyFiles processes client-specific dependency files in the build context
+func setupClientDependencyFiles(buildDir string) error {
+	// Define dependency file pairs (client file -> regular file)
+	dependencyFiles := map[string]string{
+		"requirements-client.txt": "requirements.txt",
+		"packages-client.txt":     "packages.txt",
+	}
+
+	// Process client dependency files in the build directory
+	for clientFile, regularFile := range dependencyFiles {
+		clientPath := filepath.Join(buildDir, clientFile)
+		regularPath := filepath.Join(buildDir, regularFile)
+
+		// Copy client file content to the regular file location (requires client file to exist)
+		if err := fileutil.CopyFile(clientPath, regularPath); err != nil {
+			return fmt.Errorf("failed to copy %s to %s in build context: %w", clientFile, regularFile, err)
+		}
+	}
+
+	return nil
+}
+
 // DeployClientImage handles the client deploy functionality
 func DeployClientImage(deployInput InputClientDeploy) error { //nolint:gocritic
 	c, err := config.GetCurrentContext()
@@ -879,8 +951,18 @@ func DeployClientImage(deployInput InputClientDeploy) error { //nolint:gocritic
 			fmt.Println("Building client image for host platform")
 		}
 
+		// Prepare build context with client dependency files
+		buildContext, err := prepareClientBuildContext(deployInput.Path)
+		if buildContext != nil && buildContext.CleanupFunc != nil {
+			defer buildContext.CleanupFunc()
+		}
+		if err != nil {
+			return fmt.Errorf("failed to prepare client build context: %w", err)
+		}
+
+		// Build the image from the prepared context
 		buildConfig := types.ImageBuildConfig{
-			Path:            deployInput.Path,
+			Path:            buildContext.TempDir,
 			TargetPlatforms: targetPlatforms,
 		}
 

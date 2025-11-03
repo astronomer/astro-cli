@@ -875,3 +875,84 @@ func (s *Suite) TestUploadFile() {
 		s.NotContains(string(reqBody), "description")
 	})
 }
+
+func (s *Suite) TestCopyFile() {
+	tempDir := s.T().TempDir()
+
+	s.Run("copies file successfully", func() {
+		srcContent := "test file content"
+		srcFile := filepath.Join(tempDir, "source.txt")
+		dstFile := filepath.Join(tempDir, "destination.txt")
+
+		err := os.WriteFile(srcFile, []byte(srcContent), 0o644)
+		s.NoError(err)
+
+		err = CopyFile(srcFile, dstFile)
+		s.NoError(err)
+
+		dstContent, err := os.ReadFile(dstFile)
+		s.NoError(err)
+		s.Equal(srcContent, string(dstContent))
+
+		// Verify permissions are preserved
+		srcInfo, err := os.Stat(srcFile)
+		s.NoError(err)
+		dstInfo, err := os.Stat(dstFile)
+		s.NoError(err)
+		s.Equal(srcInfo.Mode(), dstInfo.Mode())
+	})
+
+	s.Run("returns error when source doesn't exist", func() {
+		srcFile := filepath.Join(tempDir, "nonexistent.txt")
+		dstFile := filepath.Join(tempDir, "destination.txt")
+
+		err := CopyFile(srcFile, dstFile)
+		s.Error(err)
+	})
+}
+
+func (s *Suite) TestCopyDirectory() {
+	tempDir := s.T().TempDir()
+
+	s.Run("copies directory successfully", func() {
+		srcDir := filepath.Join(tempDir, "src")
+		dstDir := filepath.Join(tempDir, "dst")
+
+		// Create source directory structure
+		err := os.MkdirAll(filepath.Join(srcDir, "subdir"), 0o755)
+		s.NoError(err)
+
+		file1Content := "file 1 content"
+		file2Content := "file 2 content"
+
+		err = os.WriteFile(filepath.Join(srcDir, "file1.txt"), []byte(file1Content), 0o644)
+		s.NoError(err)
+		err = os.WriteFile(filepath.Join(srcDir, "subdir", "file2.txt"), []byte(file2Content), 0o644)
+		s.NoError(err)
+
+		// Copy directory
+		err = CopyDirectory(srcDir, dstDir)
+		s.NoError(err)
+
+		// Verify files were copied correctly
+		copiedFile1, err := os.ReadFile(filepath.Join(dstDir, "file1.txt"))
+		s.NoError(err)
+		s.Equal(file1Content, string(copiedFile1))
+
+		copiedFile2, err := os.ReadFile(filepath.Join(dstDir, "subdir", "file2.txt"))
+		s.NoError(err)
+		s.Equal(file2Content, string(copiedFile2))
+
+		// Verify directory structure
+		_, err = os.Stat(filepath.Join(dstDir, "subdir"))
+		s.NoError(err)
+	})
+
+	s.Run("returns error when source doesn't exist", func() {
+		srcDir := filepath.Join(tempDir, "nonexistent")
+		dstDir := filepath.Join(tempDir, "dst")
+
+		err := CopyDirectory(srcDir, dstDir)
+		s.Error(err)
+	})
+}
