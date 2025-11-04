@@ -13,6 +13,6 @@ func TestAddCmds(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(nil, nil, nil, nil, buf)
 	for cmdIdx := range cmds {
-		assert.Contains(t, []string{"deployment", "deploy DEPLOYMENT-ID", "workspace", "user", "organization", "dbt", "ide"}, cmds[cmdIdx].Use)
+		assert.Contains(t, []string{"deployment", "deploy DEPLOYMENT-ID", "workspace", "user", "organization", "dbt", "ide", "remote"}, cmds[cmdIdx].Use)
 	}
 }

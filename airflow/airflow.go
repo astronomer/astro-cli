@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
 )
 
@@ -172,7 +174,11 @@ func Init(path, airflowImageName, airflowImageTag, template, clientImageTag stri
 			".astro/dag_integrity_exceptions.txt":  "# Add dag files to exempt from parse test below. ex: dags/<test-file>",
 		}
 		if clientImageTag != "" {
-			files["Dockerfile.client"] = fmt.Sprintf(Af3DockerfileClient, clientImageTag)
+			baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
+			if util.IsAstronomerRegistry(baseImageRegistry) {
+				baseImageRegistry = fmt.Sprintf("%s/baseimages", baseImageRegistry)
+			}
+			files["Dockerfile.client"] = fmt.Sprintf(Af3DockerfileClient, baseImageRegistry, clientImageTag)
 			files["requirements-client.txt"] = Af3RequirementsTxtClient
 			files["packages-client.txt"] = ""
 		}

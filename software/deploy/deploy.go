@@ -235,6 +235,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		}
 	}
 	useShaAsTag := config.CFG.ShaAsTag.GetBool()
+	fmt.Println("Pushing image to configured registry")
 	sha, err := imageHandler.Push(remoteImage, "", token, useShaAsTag)
 	if err != nil {
 		return err

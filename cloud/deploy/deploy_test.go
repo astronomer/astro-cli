@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -255,7 +256,6 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	deployInput.Pytest = ""
 	deployInput.WaitForStatus = true
 	sleepTime = 1
-	timeoutNum = 1
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.ErrorIs(t, err, deployment.ErrTimedOut)
 
@@ -356,7 +356,6 @@ func TestDeployOnRemoteExecutionDeployment(t *testing.T) {
 	deployInput.Pytest = ""
 	deployInput.WaitForStatus = true
 	sleepTime = 1
-	timeoutNum = 1
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.ErrorIs(t, err, deployment.ErrTimedOut)
 
@@ -611,7 +610,6 @@ func TestDagsDeploySuccess(t *testing.T) {
 	deployInput.Pytest = ""
 	deployInput.WaitForStatus = true
 	dagOnlyDeploySleepTime = 1
-	timeoutNum = 1
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.ErrorIs(t, err, deployment.ErrTimedOut)
 
@@ -1028,7 +1026,7 @@ func TestBuildImageFailure(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
-	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, false, mockPlatformCoreClient)
+	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -1039,14 +1037,14 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// dockerfile parsing error
 	dockerfile = "Dockerfile.invalid"
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, false, mockPlatformCoreClient)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
 	// failed to get runtime releases
 	dockerfile = "Dockerfile"
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, false, mockPlatformCoreClient)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 	mockCoreClient.AssertExpectations(t)
 	mockPlatformCoreClient.AssertExpectations(t)
@@ -1059,7 +1057,6 @@ func TestValidRuntimeVersion(t *testing.T) {
 		currentVersion    string
 		newVersion        string
 		deploymentOptions []string
-		forceUpgradeToAF3 bool
 		expected          bool
 		expectedError     string
 	}{
@@ -1091,30 +1088,19 @@ func TestValidRuntimeVersion(t *testing.T) {
 
 		// AF2 to AF3 upgrade cases
 		{
-			name:              "AF2 >= 12.0.0 to AF3 version with force flag is valid upgrade",
+			name:              "AF2 >= 12.0.0 to AF3 version is valid upgrade",
 			currentVersion:    "12.0.0",
 			newVersion:        "3.0-1",
 			deploymentOptions: []string{"3.0-1"},
-			forceUpgradeToAF3: true,
 			expected:          true,
 		},
 		{
-			name:              "AF2 < 12.0.0 to AF3 version with force flag is invalid upgrade",
+			name:              "AF2 < 12.0.0 to AF3 version is invalid upgrade",
 			currentVersion:    "4.2.5",
 			newVersion:        "3.0-1",
 			deploymentOptions: []string{"3.0-1"},
-			forceUpgradeToAF3: true,
 			expected:          false,
 			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 12.0.0 or higher",
-		},
-		{
-			name:              "AF2 >= 12.0.0 to AF3 version without force flag is invalid upgrade",
-			currentVersion:    "12.0.0",
-			newVersion:        "3.0-1",
-			deploymentOptions: []string{"3.0-1"},
-			forceUpgradeToAF3: false,
-			expected:          false,
-			expectedError:     "Can only upgrade deployment from Airflow 2 to Airflow 3 with the --force-upgrade-to-af3 flag",
 		},
 
 		// AF3 version cases
@@ -1173,7 +1159,7 @@ func TestValidRuntimeVersion(t *testing.T) {
 				outC <- buf.String()
 			}()
 
-			result := ValidRuntimeVersion(tc.currentVersion, tc.newVersion, tc.deploymentOptions, tc.forceUpgradeToAF3)
+			result := ValidRuntimeVersion(tc.currentVersion, tc.newVersion, tc.deploymentOptions)
 
 			// Restore stdout
 			w.Close()
@@ -1296,4 +1282,549 @@ func TestCheckPyTest(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
 	mockContainerHandler.AssertExpectations(t)
+}
+
+func TestDeployClientImage(t *testing.T) {
+	// Store original DockerLogin function to restore after tests
+	originalDockerLogin := airflow.DockerLogin
+	defer func() {
+		airflow.DockerLogin = originalDockerLogin
+	}()
+
+	t.Run("successful client deploy", func(t *testing.T) {
+		// Set up temporary directory with Dockerfile.client
+		tempDir, err := os.MkdirTemp("", "test-deploy-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create a basic Dockerfile.client file for the test
+		dockerfileContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:latest"
+		err = os.WriteFile(filepath.Join(tempDir, "Dockerfile.client"), []byte(dockerfileContent), 0o644)
+		assert.NoError(t, err)
+
+		// Create required client dependency files
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte("requests==2.28.0"), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("curl"), 0o644)
+		assert.NoError(t, err)
+
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+		// Mock DockerLogin
+		dockerLoginCalled := false
+		var capturedRegistry, capturedUsername, capturedToken string
+		airflow.DockerLogin = func(registry, username, token string) error {
+			dockerLoginCalled = true
+			capturedRegistry = registry
+			capturedUsername = username
+			capturedToken = token
+			return nil
+		}
+
+		// Mock image handler
+		mockImageHandler := new(mocks.ImageHandler)
+		mockImageHandler.On("Build", "Dockerfile.client", "", mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
+		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", nil).Once()
+
+		// Override airflowImageHandler
+		originalAirflowImageHandler := airflowImageHandler
+		airflowImageHandler = func(imageName string) airflow.ImageHandler {
+			return mockImageHandler
+		}
+		defer func() {
+			airflowImageHandler = originalAirflowImageHandler
+		}()
+
+		// Mock config.CFG.RemoteClientRegistry
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+
+		deployInput := InputClientDeploy{
+			Path:              tempDir,
+			BuildSecretString: "",
+		}
+
+		err = DeployClientImage(deployInput)
+		assert.NoError(t, err)
+		assert.True(t, dockerLoginCalled, "DockerLogin should have been called")
+		assert.Equal(t, "images.astronomer.cloud", capturedRegistry)
+		assert.Equal(t, "cli", capturedUsername)
+		assert.Equal(t, "test-token", capturedToken)
+		mockImageHandler.AssertExpectations(t)
+	})
+
+	t.Run("docker login failure", func(t *testing.T) {
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+
+		// Mock DockerLogin to return error
+		airflow.DockerLogin = func(registry, username, token string) error {
+			return errors.New("login failed")
+		}
+
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+
+		deployInput := InputClientDeploy{
+			Path:              "/test/path",
+			BuildSecretString: "",
+		}
+
+		err = DeployClientImage(deployInput)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to authenticate with registry images.astronomer.cloud")
+	})
+
+	t.Run("missing registry configuration", func(t *testing.T) {
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+
+		// Mock DockerLogin (shouldn't be called)
+		dockerLoginCalled := false
+		airflow.DockerLogin = func(registry, username, token string) error {
+			dockerLoginCalled = true
+			return nil
+		}
+
+		config.CFG.RemoteClientRegistry.SetHomeString("") // Empty registry
+
+		deployInput := InputClientDeploy{
+			Path:              "/test/path",
+			BuildSecretString: "",
+		}
+
+		err = DeployClientImage(deployInput)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "remote client registry is not configured")
+		assert.False(t, dockerLoginCalled, "DockerLogin should not have been called")
+	})
+
+	t.Run("build failure", func(t *testing.T) {
+		// Set up temporary directory
+		tempDir, err := os.MkdirTemp("", "test-deploy-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create a basic Dockerfile.client file for the test
+		dockerfileContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:latest"
+		err = os.WriteFile(filepath.Join(tempDir, "Dockerfile.client"), []byte(dockerfileContent), 0o644)
+		assert.NoError(t, err)
+
+		// Create required client dependency files
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte("numpy==1.21.0"), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("git"), 0o644)
+		assert.NoError(t, err)
+
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+
+		// Mock successful DockerLogin
+		airflow.DockerLogin = func(registry, username, token string) error {
+			return nil
+		}
+
+		// Mock image handler with build failure
+		mockImageHandler := new(mocks.ImageHandler)
+		mockImageHandler.On("Build", "Dockerfile.client", "", mock.AnythingOfType("types.ImageBuildConfig")).Return(errors.New("build failed")).Once()
+
+		// Override airflowImageHandler
+		originalAirflowImageHandler := airflowImageHandler
+		airflowImageHandler = func(imageName string) airflow.ImageHandler {
+			return mockImageHandler
+		}
+		defer func() {
+			airflowImageHandler = originalAirflowImageHandler
+		}()
+
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+
+		deployInput := InputClientDeploy{
+			Path:              tempDir,
+			BuildSecretString: "",
+		}
+
+		err = DeployClientImage(deployInput)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to build client image")
+		mockImageHandler.AssertExpectations(t)
+	})
+
+	t.Run("push failure", func(t *testing.T) {
+		// Set up temporary directory
+		tempDir, err := os.MkdirTemp("", "test-deploy-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create a basic Dockerfile.client file for the test
+		dockerfileContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:latest"
+		err = os.WriteFile(filepath.Join(tempDir, "Dockerfile.client"), []byte(dockerfileContent), 0o644)
+		assert.NoError(t, err)
+
+		// Create required client dependency files
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte("flask==2.0.0"), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("vim"), 0o644)
+		assert.NoError(t, err)
+
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+
+		// Mock successful DockerLogin
+		airflow.DockerLogin = func(registry, username, token string) error {
+			return nil
+		}
+
+		// Mock image handler with push failure
+		mockImageHandler := new(mocks.ImageHandler)
+		mockImageHandler.On("Build", "Dockerfile.client", "", mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
+		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", errors.New("push failed")).Once()
+
+		// Override airflowImageHandler
+		originalAirflowImageHandler := airflowImageHandler
+		airflowImageHandler = func(imageName string) airflow.ImageHandler {
+			return mockImageHandler
+		}
+		defer func() {
+			airflowImageHandler = originalAirflowImageHandler
+		}()
+
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+
+		deployInput := InputClientDeploy{
+			Path:              tempDir,
+			BuildSecretString: "",
+		}
+
+		err = DeployClientImage(deployInput)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to push client image")
+		mockImageHandler.AssertExpectations(t)
+	})
+
+	t.Run("deploy with custom image name", func(t *testing.T) {
+		// Set up current context
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Token = "test-token"
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+
+		// Mock image handler
+		mockImageHandler := new(mocks.ImageHandler)
+		mockImageHandler.On("TagLocalImage", "custom-image:tag").Return(nil).Once()
+		// Remote image will use timestamp tag, not the user-provided tag
+		mockImageHandler.On("Push", mock.MatchedBy(func(remoteImage string) bool {
+			// Verify it uses timestamp-based tag format, not "tag" from the user input
+			return strings.Contains(remoteImage, "test-registry:latest:deploy-") &&
+				!strings.Contains(remoteImage, ":tag")
+		}), "", "", false).Return("", nil).Once()
+
+		// Override airflowImageHandler
+		originalAirflowImageHandler := airflowImageHandler
+		airflowImageHandler = func(imageName string) airflow.ImageHandler {
+			return mockImageHandler
+		}
+		defer func() {
+			airflowImageHandler = originalAirflowImageHandler
+		}()
+
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+
+		// Set up temporary directory for consistency
+		tempDir, err := os.MkdirTemp("", "test-deploy-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		deployInput := InputClientDeploy{
+			Path:              tempDir,
+			ImageName:         "custom-image:tag",
+			BuildSecretString: "",
+		}
+
+		err = DeployClientImage(deployInput)
+		assert.NoError(t, err)
+		mockImageHandler.AssertExpectations(t)
+	})
+}
+
+func TestPrepareClientBuildContext(t *testing.T) {
+	t.Run("creates build context with client files when they exist and have content", func(t *testing.T) {
+		// Setup temporary directory for testing
+		tempDir, err := os.MkdirTemp("", "test-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+		// Create test files with content
+		clientRequirementsContent := "requests==2.28.0\nnumpy==1.21.0"
+		clientPackagesContent := "curl\nwget"
+		regularRequirementsContent := "django==3.2.0"
+		regularPackagesContent := "vim"
+
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(clientRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte(clientPackagesContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Prepare build context
+		buildContext, err := prepareClientBuildContext(tempDir)
+		assert.NoError(t, err)
+		defer buildContext.CleanupFunc()
+
+		// Verify build context was created
+		assert.NotEqual(t, tempDir, buildContext.TempDir)
+		assert.Contains(t, buildContext.TempDir, "astro-client-build-")
+
+		// Verify that in the temp build directory, the client files are used as regular files
+		requirementsContent, err := os.ReadFile(filepath.Join(buildContext.TempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, clientRequirementsContent, string(requirementsContent))
+
+		packagesContent, err := os.ReadFile(filepath.Join(buildContext.TempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, clientPackagesContent, string(packagesContent))
+
+		// Verify that original files are UNCHANGED (no modification of original project)
+		originalRequirementsContent, err := os.ReadFile(filepath.Join(tempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, regularRequirementsContent, string(originalRequirementsContent))
+
+		originalPackagesContent, err := os.ReadFile(filepath.Join(tempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, regularPackagesContent, string(originalPackagesContent))
+	})
+
+	t.Run("uses regular files when client files are empty", func(t *testing.T) {
+		// Setup temporary directory for testing
+		tempDir, err := os.MkdirTemp("", "test-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create empty client files and regular files with content
+		regularRequirementsContent := "flask==2.0.0"
+		regularPackagesContent := "git"
+
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(""), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("   \n  "), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Prepare build context
+		buildContext, err := prepareClientBuildContext(tempDir)
+		assert.NoError(t, err)
+		defer buildContext.CleanupFunc()
+
+		// Verify that build context uses empty client file contents
+		requirementsContent, err := os.ReadFile(filepath.Join(buildContext.TempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, "", string(requirementsContent))
+
+		packagesContent, err := os.ReadFile(filepath.Join(buildContext.TempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, "   \n  ", string(packagesContent))
+
+		// Original files unchanged
+		originalRequirementsContent, err := os.ReadFile(filepath.Join(tempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, regularRequirementsContent, string(originalRequirementsContent))
+	})
+
+	t.Run("errors when client files don't exist", func(t *testing.T) {
+		// Setup temporary directory for testing
+		tempDir, err := os.MkdirTemp("", "test-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create only regular files, no client files
+		regularRequirementsContent := "fastapi==0.68.0"
+		regularPackagesContent := "htop"
+
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Prepare build context should error since client files don't exist
+		buildContext, err := prepareClientBuildContext(tempDir)
+		assert.Error(t, err)
+		assert.NotNil(t, buildContext) // Now returns buildContext even on error (for cleanup)
+		assert.Contains(t, err.Error(), "failed to setup client dependency files")
+		// Cleanup the temporary directory since function returns buildContext on error
+		defer buildContext.CleanupFunc()
+	})
+
+	t.Run("returns error when source directory doesn't exist", func(t *testing.T) {
+		// Setup temporary directory for testing
+		tempDir, err := os.MkdirTemp("", "test-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		nonExistentDir := filepath.Join(tempDir, "nonexistent")
+
+		buildContext, err2 := prepareClientBuildContext(nonExistentDir)
+		assert.Error(t, err2)
+		assert.NotNil(t, buildContext) // Now returns buildContext even on error (for cleanup)
+		assert.Contains(t, err2.Error(), "source directory does not exist")
+		// Cleanup the temporary directory since function returns buildContext on error
+		defer buildContext.CleanupFunc()
+	})
+
+	t.Run("errors when only some client files exist", func(t *testing.T) {
+		// Setup temporary directory for testing
+		tempDir, err := os.MkdirTemp("", "test-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create only one client file
+		clientRequirementsContent := "scikit-learn==1.0.0"
+		regularRequirementsContent := "tensorflow==2.6.0"
+		regularPackagesContent := "docker"
+
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(clientRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		// Don't create packages-client.txt
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Prepare build context should error since packages-client.txt doesn't exist
+		buildContext, err := prepareClientBuildContext(tempDir)
+		assert.Error(t, err)
+		assert.NotNil(t, buildContext) // Now returns buildContext even on error (for cleanup)
+		assert.Contains(t, err.Error(), "failed to setup client dependency files")
+		// Cleanup the temporary directory since function returns buildContext on error
+		defer buildContext.CleanupFunc()
+
+		// Verify original files are UNCHANGED
+		originalRequirementsContent, err := os.ReadFile(filepath.Join(tempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, regularRequirementsContent, string(originalRequirementsContent))
+
+		originalPackagesContent, err := os.ReadFile(filepath.Join(tempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, regularPackagesContent, string(originalPackagesContent))
+	})
+}
+
+func TestSetupClientDependencyFiles(t *testing.T) {
+	t.Run("copies client files to standard locations", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "test-setup-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create client files
+		clientRequirementsContent := "numpy==1.21.0"
+		clientPackagesContent := "curl\nwget"
+		regularRequirementsContent := "requests==2.28.0"
+		regularPackagesContent := "git"
+
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(clientRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte(clientPackagesContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Setup client dependency files
+		err = setupClientDependencyFiles(tempDir)
+		assert.NoError(t, err)
+
+		// Verify both files were replaced with client content
+		requirementsContent, err := os.ReadFile(filepath.Join(tempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, clientRequirementsContent, string(requirementsContent))
+
+		packagesContent, err := os.ReadFile(filepath.Join(tempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, clientPackagesContent, string(packagesContent))
+	})
+
+	t.Run("handles empty client files", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "test-setup-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create empty client files
+		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(""), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("   \n  "), 0o644)
+		assert.NoError(t, err)
+
+		// Create regular files with content
+		regularRequirementsContent := "django==4.0.0"
+		regularPackagesContent := "curl"
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(regularRequirementsContent), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(regularPackagesContent), 0o644)
+		assert.NoError(t, err)
+
+		// Setup client dependency files
+		err = setupClientDependencyFiles(tempDir)
+		assert.NoError(t, err)
+
+		// Verify files were replaced with empty client content
+		requirementsContent, err := os.ReadFile(filepath.Join(tempDir, "requirements.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, "", string(requirementsContent))
+
+		packagesContent, err := os.ReadFile(filepath.Join(tempDir, "packages.txt"))
+		assert.NoError(t, err)
+		assert.Equal(t, "   \n  ", string(packagesContent))
+	})
+
+	t.Run("errors when client files don't exist", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "test-setup-client-deps-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create only regular files, no client files
+		err = os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte("django==4.0.0"), 0o644)
+		assert.NoError(t, err)
+		err = os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte("curl"), 0o644)
+		assert.NoError(t, err)
+
+		// Setup client dependency files should error since client files don't exist
+		err = setupClientDependencyFiles(tempDir)
+		assert.Error(t, err)
+		// Due to map iteration being non-deterministic, the error could mention either client file
+		errorMsg := err.Error()
+		assert.True(t,
+			strings.Contains(errorMsg, "failed to copy requirements-client.txt") ||
+				strings.Contains(errorMsg, "failed to copy packages-client.txt"),
+			"error should mention one of the missing client files, got: %s", errorMsg)
+	})
 }

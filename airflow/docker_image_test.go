@@ -845,3 +845,69 @@ func (s *Suite) TestIs403Error() {
 		})
 	}
 }
+
+func (s *Suite) TestDockerImageGetRegistryToAuth() {
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
+	s.Run("standard format", func() {
+		// Initialize cloud config for non-localhost tests
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		imageName := "registry.com/namespace/repo:tag"
+		expected := "registry.com"
+
+		registry, err := handler.getRegistryToAuth(imageName)
+		s.NoError(err)
+		s.Equal(expected, registry)
+	})
+
+	s.Run("ECR format", func() {
+		// Initialize cloud config for non-localhost tests
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		imageName := "123456789012.dkr.ecr.us-west-2.amazonaws.com/my-repo:tag"
+		expected := "123456789012.dkr.ecr.us-west-2.amazonaws.com"
+
+		registry, err := handler.getRegistryToAuth(imageName)
+		s.NoError(err)
+		s.Equal(expected, registry)
+	})
+
+	s.Run("localhost domain uses local registry", func() {
+		// Initialize localhost config
+		testUtil.InitTestConfig("localhost")
+
+		imageName := "any-image:tag"
+
+		registry, err := handler.getRegistryToAuth(imageName)
+		s.NoError(err)
+		// The localhost config should return the local registry
+		s.Contains(registry, "localhost")
+	})
+
+	s.Run("invalid format - no slash", func() {
+		// Initialize cloud config for non-localhost tests
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		imageName := "my-repo:tag"
+
+		_, err := handler.getRegistryToAuth(imageName)
+		s.Error(err)
+		s.Contains(err.Error(), "internal logic error")
+	})
+
+	s.Run("invalid format - empty image name", func() {
+		// Initialize cloud config for non-localhost tests
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		imageName := ""
+
+		_, err := handler.getRegistryToAuth(imageName)
+		s.Error(err)
+	})
+
+	// Restore test config for remaining tests
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+}

@@ -508,7 +508,7 @@ func airflowInit(cmd *cobra.Command, args []string) error { //nolint:gocognit,go
 	imageTag := runtimeVersion
 	if imageTag == "" {
 		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified, false)
-		imageTag, err = getDefaultImageTag(httpClient, airflowVersion, false)
+		imageTag, err = getDefaultImageTag(httpClient, airflowVersion, "", false)
 		if err != nil {
 			return fmt.Errorf("error getting default image tag: %w", err)
 		}
@@ -531,7 +531,7 @@ func airflowInit(cmd *cobra.Command, args []string) error { //nolint:gocognit,go
 	clientImageTag := ""
 	if remoteExecutionEnabled {
 		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), false, true)
-		clientImageTag, err = getDefaultImageTag(httpClient, "", false)
+		clientImageTag, err = getDefaultImageTag(httpClient, "", imageTag, false)
 		if err != nil {
 			return fmt.Errorf("error getting default client image tag: %w", err)
 		}
@@ -675,7 +675,7 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 		// If user provides a runtime version, use it, otherwise retrieve the latest one (matching Airflow Version if provided
 		httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified, false)
 		var err error
-		runtimeVersion, err = getDefaultImageTag(httpClient, airflowVersion, false)
+		runtimeVersion, err = getDefaultImageTag(httpClient, airflowVersion, "", false)
 		if err != nil {
 			return fmt.Errorf("error getting default image tag: %w", err)
 		}
@@ -1021,36 +1021,13 @@ func selectedTemplate() (string, error) {
 }
 
 // validateRegistryEndpoint validates the format of a Docker registry endpoint
-func validateRegistryEndpoint(endpoint string) error {
-	if endpoint == "" {
-		return fmt.Errorf("registry endpoint cannot be empty")
-	}
-
-	// Basic validation: should contain at least one slash (registry/repository format)
-	if !strings.Contains(endpoint, "/") {
-		return fmt.Errorf("registry endpoint must be in format 'registry/repository' (e.g. quay.io/acme/my-deployment-image)")
-	}
-
-	// Should not contain spaces
-	if strings.Contains(endpoint, " ") {
-		return fmt.Errorf("registry endpoint cannot contain spaces")
-	}
-
-	// Should not start or end with slashes
-	if strings.HasPrefix(endpoint, "/") || strings.HasSuffix(endpoint, "/") {
-		return fmt.Errorf("registry endpoint cannot start or end with slashes")
-	}
-
-	return nil
-}
-
 func getRegistryEndpoint() (string, error) {
 	var registryEndpoint string
 	// Use flag value if provided, otherwise check config, otherwise prompt
 	if remoteImageRepository != "" {
 		registryEndpoint = remoteImageRepository
 		// Validate the registry endpoint format
-		if err := validateRegistryEndpoint(registryEndpoint); err != nil {
+		if err := config.ValidateRegistryEndpoint(registryEndpoint); err != nil {
 			return "", fmt.Errorf("invalid registry endpoint format: %w", err)
 		}
 	} else {
@@ -1061,7 +1038,7 @@ func getRegistryEndpoint() (string, error) {
 
 			if registryEndpoint != "" {
 				// Validate the registry endpoint format
-				if err := validateRegistryEndpoint(registryEndpoint); err != nil {
+				if err := config.ValidateRegistryEndpoint(registryEndpoint); err != nil {
 					return "", fmt.Errorf("invalid registry endpoint format: %w", err)
 				}
 			}

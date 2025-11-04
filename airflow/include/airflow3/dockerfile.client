@@ -1,1 +1,1 @@
-FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:%s
+FROM %s/astro-remote-execution-agent:%s

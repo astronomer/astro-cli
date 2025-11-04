@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
@@ -74,7 +75,6 @@ var (
 	sleepTime              = 90
 	dagOnlyDeploySleepTime = 30
 	tickNum                = 10
-	timeoutNum             = 180
 )
 
 type deploymentInfo struct {
@@ -105,10 +105,18 @@ type InputDeploy struct {
 	Dags              bool
 	Image             bool
 	WaitForStatus     bool
+	WaitTime          time.Duration
 	DagsPath          string
 	Description       string
 	BuildSecretString string
-	ForceUpgradeToAF3 bool
+}
+
+// InputClientDeploy contains inputs for client image deployments
+type InputClientDeploy struct {
+	Path              string
+	ImageName         string
+	Platform          string
+	BuildSecretString string
 }
 
 const accessYourDeploymentFmt = `
@@ -266,7 +274,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			}
 		}
 		if deployInput.Pytest != "" {
-			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, deployInput.ForceUpgradeToAF3, platformCoreClient)
+			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -299,7 +307,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 
 		if deployInput.WaitForStatus {
 			// Keeping wait timeout low since dag only deploy is faster
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, dagOnlyDeploySleepTime, tickNum, timeoutNum, platformCoreClient)
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, dagOnlyDeploySleepTime, tickNum, int(deployInput.WaitTime.Seconds()), platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -346,7 +354,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		// Build our image
-		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, deployInput.ForceUpgradeToAF3, platformCoreClient)
+		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, platformCoreClient)
 		if err != nil {
 			return err
 		}
@@ -365,6 +373,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
 
 		imageHandler := airflowImageHandler(deployInfo.deployImage)
+		fmt.Println("Pushing image to Astronomer registry")
 		_, err = imageHandler.Push(remoteImage, registryUsername, c.Token, false)
 		if err != nil {
 			return err
@@ -387,7 +396,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		if deployInput.WaitForStatus {
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, timeoutNum, platformCoreClient)
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, int(deployInput.WaitTime.Seconds()), platformCoreClient)
 			if err != nil {
 				return err
 			}
@@ -641,7 +650,7 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 	return nil
 }
 
-func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, isRemoteExecutionEnabled, forceUpgradeToAF3 bool, platformCoreClient astroplatformcore.CoreClient) (version string, err error) {
+func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, isRemoteExecutionEnabled bool, platformCoreClient astroplatformcore.CoreClient) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
 
 	if imageName == "" {
@@ -701,7 +710,7 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 		deploymentOptionsRuntimeVersions = append(deploymentOptionsRuntimeVersions, runtimeRelease.Version)
 	}
 
-	if !ValidRuntimeVersion(currentVersion, version, deploymentOptionsRuntimeVersions, forceUpgradeToAF3) {
+	if !ValidRuntimeVersion(currentVersion, version, deploymentOptionsRuntimeVersions) {
 		fmt.Println("Canceling deploy...")
 		os.Exit(1)
 	}
@@ -746,7 +755,7 @@ func createDeploy(organizationID, deploymentID string, request astroplatformcore
 	return resp.JSON200, err
 }
 
-func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVersions []string, forceUpgradeToAF3 bool) bool {
+func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVersions []string) bool {
 	// Allow old deployments which do not have runtimeVersion tag
 	if currentVersion == "" {
 		return true
@@ -772,16 +781,12 @@ func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVer
 		return false
 	}
 
-	// If upgrading from Airflow 2 to Airflow 3, we require at least Runtime 12.0.0 (Airflow 2.10.0) and that the user has forced the upgrade
+	// If upgrading from Airflow 2 to Airflow 3, we require at least Runtime 12.0.0 (Airflow 2.10.0)
 	currentVersionAirflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(currentVersion)
 	tagAirflowMajorVersion := airflowversions.AirflowMajorVersionForRuntimeVersion(tag)
 	if currentVersionAirflowMajorVersion == "2" && tagAirflowMajorVersion == "3" {
 		if airflowversions.CompareRuntimeVersions(currentVersion, "12.0.0") < 0 {
 			fmt.Println("Can only upgrade deployment from Airflow 2 to Airflow 3 with deployment at Astro Runtime 12.0.0 or higher")
-			return false
-		}
-		if !forceUpgradeToAF3 {
-			fmt.Println("Can only upgrade deployment from Airflow 2 to Airflow 3 with the --force-upgrade-to-af3 flag")
 			return false
 		}
 	}
@@ -791,7 +796,7 @@ func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVer
 
 func WarnIfNonLatestVersion(version string, httpClient *httputil.HTTPClient) {
 	client := airflowversions.NewClient(httpClient, false, false)
-	latestRuntimeVersion, err := airflowversions.GetDefaultImageTag(client, "", false)
+	latestRuntimeVersion, err := airflowversions.GetDefaultImageTag(client, "", "", false)
 	if err != nil {
 		logger.Debugf("unable to get latest runtime version: %s", err)
 		return
@@ -800,4 +805,194 @@ func WarnIfNonLatestVersion(version string, httpClient *httputil.HTTPClient) {
 	if airflowversions.CompareRuntimeVersions(version, latestRuntimeVersion) < 0 {
 		fmt.Printf("WARNING! You are currently running Astro Runtime Version %s\nConsider upgrading to the latest version, Astro Runtime %s\n", version, latestRuntimeVersion)
 	}
+}
+
+// ClientBuildContext represents a prepared build context for client deployment
+type ClientBuildContext struct {
+	// TempDir is the temporary directory containing the build context
+	TempDir string
+	// CleanupFunc should be called to clean up the temporary directory
+	CleanupFunc func()
+}
+
+// prepareClientBuildContext creates a temporary build context with client dependency files
+// This avoids modifying the original project files, preventing race conditions with concurrent deployments.
+func prepareClientBuildContext(sourcePath string) (*ClientBuildContext, error) {
+	// Create a temporary directory for the build context
+	tempBuildDir, err := os.MkdirTemp("", "astro-client-build-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary build directory: %w", err)
+	}
+
+	// Cleanup function to be called by the caller
+	cleanup := func() {
+		os.RemoveAll(tempBuildDir)
+	}
+
+	// Always return cleanup function if we created a temp directory, even on error
+	buildContext := &ClientBuildContext{
+		TempDir:     tempBuildDir,
+		CleanupFunc: cleanup,
+	}
+
+	// Check if source directory exists first
+	if exists, err := fileutil.Exists(sourcePath, nil); err != nil {
+		return buildContext, fmt.Errorf("failed to check if source directory exists: %w", err)
+	} else if !exists {
+		return buildContext, fmt.Errorf("source directory does not exist: %s", sourcePath)
+	}
+
+	// Copy all project files to the temporary directory
+	err = fileutil.CopyDirectory(sourcePath, tempBuildDir)
+	if err != nil {
+		return buildContext, fmt.Errorf("failed to copy project files to temporary directory: %w", err)
+	}
+
+	// Process client dependency files
+	err = setupClientDependencyFiles(tempBuildDir)
+	if err != nil {
+		return buildContext, fmt.Errorf("failed to setup client dependency files: %w", err)
+	}
+
+	return buildContext, nil
+}
+
+// setupClientDependencyFiles processes client-specific dependency files in the build context
+func setupClientDependencyFiles(buildDir string) error {
+	// Define dependency file pairs (client file -> regular file)
+	dependencyFiles := map[string]string{
+		"requirements-client.txt": "requirements.txt",
+		"packages-client.txt":     "packages.txt",
+	}
+
+	// Process client dependency files in the build directory
+	for clientFile, regularFile := range dependencyFiles {
+		clientPath := filepath.Join(buildDir, clientFile)
+		regularPath := filepath.Join(buildDir, regularFile)
+
+		// Copy client file content to the regular file location (requires client file to exist)
+		if err := fileutil.CopyFile(clientPath, regularPath); err != nil {
+			return fmt.Errorf("failed to copy %s to %s in build context: %w", clientFile, regularFile, err)
+		}
+	}
+
+	return nil
+}
+
+// DeployClientImage handles the client deploy functionality
+func DeployClientImage(deployInput InputClientDeploy) error { //nolint:gocritic
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return errors.Wrap(err, "failed to get current context")
+	}
+
+	// Get the remote client registry endpoint from config
+	registryEndpoint := config.CFG.RemoteClientRegistry.GetString()
+	if registryEndpoint == "" {
+		fmt.Println("The Astro CLI is not configured to push client images to your private registry.")
+		fmt.Println("For remote Deployments, client images must be stored in your private registry, not in Astronomer managed registries.")
+		fmt.Println("Please provide your private registry information so the Astro CLI can push client images.")
+		return errors.New("remote client registry is not configured. To configure it, run: 'astro config set remote.client_registry <endpoint>' and try again.")
+	}
+
+	// Use consistent deploy-<timestamp> tagging mechanism like regular deploys
+	// The ImageName flag only specifies which local image to use, not the remote tag
+	imageTag := "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
+
+	// Build the full remote image name
+	remoteImage := fmt.Sprintf("%s:%s", registryEndpoint, imageTag)
+
+	// Create an image handler for building and pushing
+	imageHandler := airflowImageHandler(remoteImage)
+
+	if deployInput.ImageName != "" {
+		// Use the provided local image (tag will be ignored, remote tag is always timestamp-based)
+		fmt.Println("Using provided image:", deployInput.ImageName)
+		err := imageHandler.TagLocalImage(deployInput.ImageName)
+		if err != nil {
+			return fmt.Errorf("failed to tag local image: %w", err)
+		}
+	} else {
+		// Authenticate with the base image registry before building
+		// This is needed because Dockerfile.client uses base images from a private registry
+
+		// Skip registry login if the base image registry is not from astronomer, check the content of the Dockerfile.client file
+		dockerfileClientContent, err := fileutil.ReadFileToString(filepath.Join(deployInput.Path, "Dockerfile.client"))
+		if util.IsAstronomerRegistry(dockerfileClientContent) || err != nil {
+			// login to the registry
+			if err != nil {
+				fmt.Println("WARNING: Failed to read Dockerfile.client, so will assume the base image is using images.astronomer.cloud and try to login to the registry")
+			}
+			baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
+			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)
+			err := airflow.DockerLogin(baseImageRegistry, registryUsername, c.Token)
+			if err != nil {
+				fmt.Println("Failed to authenticate with Astronomer registry that contains the base agent image used in the Dockerfile.client file.")
+				fmt.Println("This could be because either your token has expired or you don't have permission to pull the base agent image.")
+				fmt.Println("Please re-login via `astro login` to refresh the credentials or validate that `ASTRO_API_TOKEN` environment variable is set with the correct token and try again")
+				return fmt.Errorf("failed to authenticate with registry %s: %w", baseImageRegistry, err)
+			}
+		}
+
+		// Build the client image from the current directory
+		// Determine target platforms for client deploy
+		var targetPlatforms []string
+		if deployInput.Platform != "" {
+			// Parse comma-separated platforms from --platform flag
+			targetPlatforms = strings.Split(deployInput.Platform, ",")
+			// Trim whitespace from each platform
+			for i, platform := range targetPlatforms {
+				targetPlatforms[i] = strings.TrimSpace(platform)
+			}
+			fmt.Printf("Building client image for platforms: %s\n", strings.Join(targetPlatforms, ", "))
+		} else {
+			// Use empty slice to let Docker build for host platform by default
+			targetPlatforms = []string{}
+			fmt.Println("Building client image for host platform")
+		}
+
+		// Prepare build context with client dependency files
+		buildContext, err := prepareClientBuildContext(deployInput.Path)
+		if buildContext != nil && buildContext.CleanupFunc != nil {
+			defer buildContext.CleanupFunc()
+		}
+		if err != nil {
+			return fmt.Errorf("failed to prepare client build context: %w", err)
+		}
+
+		// Build the image from the prepared context
+		buildConfig := types.ImageBuildConfig{
+			Path:            buildContext.TempDir,
+			TargetPlatforms: targetPlatforms,
+		}
+
+		err = imageHandler.Build("Dockerfile.client", deployInput.BuildSecretString, buildConfig)
+		if err != nil {
+			return fmt.Errorf("failed to build client image: %w", err)
+		}
+	}
+
+	// Push the image to the remote registry (assumes docker login was done externally)
+	fmt.Println("Pushing client image to configured remote registry")
+	_, err = imageHandler.Push(remoteImage, "", "", false)
+	if err != nil {
+		if errors.Is(err, airflow.ErrImagePush403) {
+			fmt.Printf("\n--------------------------------\n")
+			fmt.Printf("Failed to push client image to %s\n", registryEndpoint)
+			fmt.Println("It could be due to either your registry token has expired or you don't have permission to push the client image")
+			fmt.Printf("Please ensure that you have logged in to `%s` via `docker login` and try again\n\n", registryEndpoint)
+		}
+		return fmt.Errorf("failed to push client image: %w", err)
+	}
+
+	fmt.Printf("Successfully pushed client image to %s\n", ansi.Bold(remoteImage))
+
+	fmt.Printf("\n--------------------------------\n")
+	fmt.Println("The client image has been pushed to your private registry.")
+	fmt.Println("Your next step would be to update the agent component to use the new client image.")
+	fmt.Println("For that you would either need to update the helm chart values.yaml file or update your CI/CD pipeline to use the new client image.")
+	fmt.Printf("If you are using Astronomer provided Agent Helm chart, you would need to update the `image` field for each of the workers, dagProcessor, and triggerer component sections to the new image: %s\n", remoteImage)
+	fmt.Println("Once you have updated the helm chart values.yaml file, you can run 'helm upgrade' or update via your CI/CD pipeline to update the agent components")
+
+	return nil
 }

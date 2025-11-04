@@ -228,7 +228,7 @@ func (s *AirflowSuite) Test_airflowInitWithRemoteExecution() {
 		// Mock getDefaultImageTag to return valid image tags
 		origGetDefaultImageTag := getDefaultImageTag
 		callCount := 0
-		getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string, excludeAirflow3 bool) (string, error) {
+		getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string, runtimeVersion string, excludeAirflow3 bool) (string, error) {
 			callCount++
 			if callCount == 1 {
 				// First call - return runtime image tag for Airflow 3 (new format)
@@ -276,7 +276,7 @@ func (s *AirflowSuite) Test_airflowInitWithRemoteExecution() {
 		// Mock getDefaultImageTag to return valid image tags
 		origGetDefaultImageTag := getDefaultImageTag
 		callCount := 0
-		getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string, excludeAirflow3 bool) (string, error) {
+		getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string, runtimeVersion string, excludeAirflow3 bool) (string, error) {
 			callCount++
 			if callCount == 1 {
 				// First call - return runtime image tag for Airflow 3 (new format)
@@ -329,37 +329,6 @@ func (s *AirflowSuite) Test_airflowInitWithRemoteExecution() {
 		err := airflowInit(cmd, args)
 		s.Error(err)
 		s.Contains(err.Error(), "invalid registry endpoint format")
-	})
-}
-
-func (s *AirflowSuite) Test_validateRegistryEndpoint() {
-	s.Run("test valid registry endpoints", func() {
-		validEndpoints := []string{
-			"quay.io/test/registry",
-			"docker.io/user/repo",
-			"registry.example.com/namespace/repo",
-			"localhost:5000/test/repo",
-		}
-
-		for _, endpoint := range validEndpoints {
-			err := validateRegistryEndpoint(endpoint)
-			s.NoError(err, "Expected endpoint %s to be valid", endpoint)
-		}
-	})
-
-	s.Run("test invalid registry endpoints", func() {
-		invalidEndpoints := []string{
-			"",                          // empty
-			"invalid-registry",          // no slash
-			"registry with spaces/repo", // contains spaces
-			"/registry/repo",            // starts with slash
-			"registry/repo/",            // ends with slash
-		}
-
-		for _, endpoint := range invalidEndpoints {
-			err := validateRegistryEndpoint(endpoint)
-			s.Error(err, "Expected endpoint %s to be invalid", endpoint)
-		}
 	})
 }
 
