@@ -12,6 +12,7 @@ var (
 	remotePlatform     string
 	remoteImageName    string
 	remoteBuildSecrets = []string{}
+	remoteDeploymentID string
 )
 
 const (
@@ -31,6 +32,10 @@ Deploy a pre-built image:
 Deploy with build secrets:
 
   $ astro remote deploy --build-secrets id=mysecret,src=secrets.txt
+
+Deploy with deployment validation:
+
+  $ astro remote deploy --deployment-id my-deployment-id
 `
 )
 
@@ -60,6 +65,7 @@ func newRemoteDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&remotePlatform, "platform", "", "Target platform for client image build (e.g., linux/amd64,linux/arm64). Defaults to host machine platform")
 	cmd.Flags().StringVarP(&remoteImageName, "image-name", "i", "", "Name of a custom image to deploy, or image name with custom tag. The image should be present on the local machine.")
 	cmd.Flags().StringArrayVar(&remoteBuildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
+	cmd.Flags().StringVar(&remoteDeploymentID, "deployment-id", "", "Deployment ID to validate client image runtime version against deployment runtime version")
 
 	return cmd
 }
@@ -76,7 +82,8 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 		ImageName:         remoteImageName,
 		Platform:          remotePlatform,
 		BuildSecretString: buildSecretString,
+		DeploymentID:      remoteDeploymentID,
 	}
 
-	return cloud.DeployClientImage(deployInput)
+	return cloud.DeployClientImage(deployInput, platformCoreClient)
 }

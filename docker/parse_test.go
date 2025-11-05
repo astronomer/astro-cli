@@ -55,10 +55,34 @@ func (s *Suite) TestParseFile() {
 }
 
 func (s *Suite) TestGetImageFromParsedFile() {
-	s.Run("success", func() {
+	s.Run("success with real parser output", func() {
+		dockerfile := `FROM quay.io/astronomer/astro-runtime:3.0.2`
+		cmds, err := ParseReader(bytes.NewBufferString(dockerfile))
+		s.NoError(err)
+
+		image := GetImageFromParsedFile(cmds)
+		s.Equal("quay.io/astronomer/astro-runtime:3.0.2", image)
+	})
+
+	s.Run("success with artificial lowercase cmd (legacy)", func() {
 		cmds := []Command{
 			{
 				Cmd:       "from",
+				Original:  "FROM quay.io/astronomer/astro-runtime:3.0.2",
+				StartLine: 1,
+				EndLine:   1,
+				Flags:     []string{},
+				Value:     []string{"quay.io/astronomer/astro-runtime:3.0.2"},
+			},
+		}
+		image := GetImageFromParsedFile(cmds)
+		s.Equal("quay.io/astronomer/astro-runtime:3.0.2", image)
+	})
+
+	s.Run("success with uppercase cmd", func() {
+		cmds := []Command{
+			{
+				Cmd:       "FROM",
 				Original:  "FROM quay.io/astronomer/astro-runtime:3.0.2",
 				StartLine: 1,
 				EndLine:   1,
@@ -84,10 +108,36 @@ func (s *Suite) TestGetImageFromParsedFile() {
 		image := GetImageFromParsedFile(cmds)
 		s.Equal("", image)
 	})
+
+	s.Run("empty value array should not panic", func() {
+		cmds := []Command{
+			{
+				Cmd:       "FROM",
+				Original:  "FROM",
+				StartLine: 1,
+				EndLine:   1,
+				Flags:     []string{},
+				Value:     []string{}, // Empty value array - this would panic without bounds check
+			},
+		}
+		// This should return empty string, not panic
+		image := GetImageFromParsedFile(cmds)
+		s.Equal("", image)
+	})
 }
 
 func (s *Suite) TestGetImageTagFromParsedFile() {
-	s.Run("success", func() {
+	s.Run("success with real parser output", func() {
+		dockerfile := `FROM quay.io/astronomer/astro-runtime:3.0.2`
+		cmds, err := ParseReader(bytes.NewBufferString(dockerfile))
+		s.NoError(err)
+
+		image, tag := GetImageTagFromParsedFile(cmds)
+		s.Equal("quay.io/astronomer/astro-runtime", image)
+		s.Equal("3.0.2", tag)
+	})
+
+	s.Run("success with artificial lowercase cmd (legacy)", func() {
 		cmds := []Command{
 			{
 				Cmd:       "from",
@@ -114,6 +164,23 @@ func (s *Suite) TestGetImageTagFromParsedFile() {
 				Value:     []string{"$?"},
 			},
 		}
+		image, tag := GetImageTagFromParsedFile(cmds)
+		s.Equal("", image)
+		s.Equal("", tag)
+	})
+
+	s.Run("empty value array should not panic", func() {
+		cmds := []Command{
+			{
+				Cmd:       "FROM",
+				Original:  "FROM",
+				StartLine: 1,
+				EndLine:   1,
+				Flags:     []string{},
+				Value:     []string{}, // Empty value array - this would panic without bounds check
+			},
+		}
+		// This should return empty strings, not panic
 		image, tag := GetImageTagFromParsedFile(cmds)
 		s.Equal("", image)
 		s.Equal("", tag)
