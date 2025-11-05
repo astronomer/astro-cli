@@ -37,6 +37,11 @@ func TestRemoteDeployCmd(t *testing.T) {
 	assert.NotNil(t, imageNameFlag)
 	assert.Equal(t, "", imageNameFlag.DefValue)
 	assert.Contains(t, imageNameFlag.Usage, "Name of a custom image to deploy")
+
+	deploymentIDFlag := cmd.Flags().Lookup("deployment-id")
+	assert.NotNil(t, deploymentIDFlag)
+	assert.Equal(t, "", deploymentIDFlag.DefValue)
+	assert.Contains(t, deploymentIDFlag.Usage, "Deployment ID to validate client image runtime version")
 }
 
 func TestRemoteDeployCommandFlags(t *testing.T) {
@@ -118,6 +123,40 @@ func TestRemoteDeployCommandFlags(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"id=secret1,src=file1.txt", "id=secret2,src=file2.txt"}, buildSecretsValue)
 	})
+
+	t.Run("command accepts deployment-id flag", func(t *testing.T) {
+		cmd := newRemoteDeployCmd()
+
+		err := cmd.ParseFlags([]string{"--deployment-id", "test-deployment-123"})
+		assert.NoError(t, err)
+
+		deploymentIDValue, err := cmd.Flags().GetString("deployment-id")
+		assert.NoError(t, err)
+		assert.Equal(t, "test-deployment-123", deploymentIDValue)
+	})
+
+	t.Run("command accepts deployment-id with other flags", func(t *testing.T) {
+		cmd := newRemoteDeployCmd()
+
+		err := cmd.ParseFlags([]string{
+			"--deployment-id", "my-deployment",
+			"--platform", "linux/amd64",
+			"--image-name", "custom-image:latest",
+		})
+		assert.NoError(t, err)
+
+		deploymentIDValue, err := cmd.Flags().GetString("deployment-id")
+		assert.NoError(t, err)
+		assert.Equal(t, "my-deployment", deploymentIDValue)
+
+		platformValue, err := cmd.Flags().GetString("platform")
+		assert.NoError(t, err)
+		assert.Equal(t, "linux/amd64", platformValue)
+
+		imageNameValue, err := cmd.Flags().GetString("image-name")
+		assert.NoError(t, err)
+		assert.Equal(t, "custom-image:latest", imageNameValue)
+	})
 }
 
 func TestRemoteDeployFlags(t *testing.T) {
@@ -145,6 +184,67 @@ func TestRemoteDeployFlags(t *testing.T) {
 		assert.Equal(t, "[]", buildSecretsFlag.DefValue)
 		assert.Contains(t, buildSecretsFlag.Usage, "docker build --secret")
 	})
+
+	t.Run("deployment-id flag configuration", func(t *testing.T) {
+		deploymentIDFlag := cmd.Flags().Lookup("deployment-id")
+		assert.NotNil(t, deploymentIDFlag)
+		assert.Equal(t, "string", deploymentIDFlag.Value.Type())
+		assert.Equal(t, "", deploymentIDFlag.DefValue)
+		assert.Contains(t, deploymentIDFlag.Usage, "Deployment ID to validate")
+		assert.Contains(t, deploymentIDFlag.Usage, "runtime version")
+	})
+}
+
+// Test that ensures deployment validation works correctly in the command context
+func TestRemoteDeployDeploymentValidation(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("deployment-id flag sets global variable", func(t *testing.T) {
+		// Reset global variable
+		remoteDeploymentID = ""
+
+		cmd := newRemoteDeployCmd()
+		err := cmd.ParseFlags([]string{"--deployment-id", "validation-test-deployment"})
+		assert.NoError(t, err)
+
+		// Verify the global variable was set
+		assert.Equal(t, "validation-test-deployment", remoteDeploymentID)
+	})
+
+	t.Run("empty deployment-id works", func(t *testing.T) {
+		// Reset global variable
+		remoteDeploymentID = ""
+
+		cmd := newRemoteDeployCmd()
+		err := cmd.ParseFlags([]string{})
+		assert.NoError(t, err)
+
+		// Verify the global variable remains empty
+		assert.Equal(t, "", remoteDeploymentID)
+	})
+
+	t.Run("deployment-id with all flags", func(t *testing.T) {
+		// Reset global variables
+		remoteDeploymentID = ""
+		remotePlatform = ""
+		remoteImageName = ""
+		remoteBuildSecrets = []string{}
+
+		cmd := newRemoteDeployCmd()
+		err := cmd.ParseFlags([]string{
+			"--deployment-id", "full-test-deployment",
+			"--platform", "linux/amd64,linux/arm64",
+			"--image-name", "test-image:v1.0",
+			"--build-secrets", "id=secret1,src=file1.txt",
+		})
+		assert.NoError(t, err)
+
+		// Verify all global variables were set correctly
+		assert.Equal(t, "full-test-deployment", remoteDeploymentID)
+		assert.Equal(t, "linux/amd64,linux/arm64", remotePlatform)
+		assert.Equal(t, "test-image:v1.0", remoteImageName)
+		assert.Equal(t, []string{"id=secret1,src=file1.txt"}, remoteBuildSecrets)
+	})
 }
 
 // Test that ensures the remote command integrates properly with the root command
@@ -160,5 +260,12 @@ func TestRemoteCommandIntegration(t *testing.T) {
 	t.Run("help text is appropriate", func(t *testing.T) {
 		assert.Contains(t, rootCmd.Long, "remote registries")
 		assert.Contains(t, rootCmd.Long, "client images")
+	})
+
+	t.Run("deploy command includes deployment validation example", func(t *testing.T) {
+		deployCmd, _, err := rootCmd.Find([]string{"deploy"})
+		assert.NoError(t, err)
+		assert.Contains(t, deployCmd.Example, "--deployment-id")
+		assert.Contains(t, deployCmd.Example, "deployment validation")
 	})
 }

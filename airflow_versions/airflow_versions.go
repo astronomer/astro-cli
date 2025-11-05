@@ -36,8 +36,8 @@ type ImageTagInfo struct {
 	IsBase         bool
 }
 
-// parseImageTag extracts version information from an image tag using regex
-func parseImageTag(imageTag string) (*ImageTagInfo, error) {
+// ParseImageTag extracts version information from an image tag using regex
+func ParseImageTag(imageTag string) (*ImageTagInfo, error) {
 	// Check if it's a base image
 	isBase := strings.HasSuffix(imageTag, "-base")
 
@@ -187,7 +187,7 @@ func getAstroAgentTag(clientVersions map[string]ClientVersion, runtimeVersion st
 
 	for _, version := range availableVersions {
 		for _, imageTags := range clientVersions[version].ImageTags {
-			tagInfo, err := parseImageTag(imageTags)
+			tagInfo, err := ParseImageTag(imageTags)
 			if err != nil {
 				logger.Debugf("Failed to parse image tag %s: %v", imageTags, err)
 				continue
