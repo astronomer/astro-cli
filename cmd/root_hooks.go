@@ -20,8 +20,18 @@ import (
 
 // SetupLogging is a pre-run hook shared between software & cloud
 // setting up log verbosity.
-func SetupLogging(_ *cobra.Command, _ []string) error {
-	return softwareCmd.SetUpLogs(os.Stdout, verboseLevel)
+func SetupLogging(cmd *cobra.Command, _ []string) error {
+	// This fixes an issue where the package variable may not be properly bound in some build environments
+	level := verboseLevel
+	if cmd != nil {
+		if flagValue, err := cmd.Flags().GetString("verbosity"); err == nil && flagValue != "" {
+			level = flagValue
+		} else if flagValue, err := cmd.Root().PersistentFlags().GetString("verbosity"); err == nil && flagValue != "" {
+			level = flagValue
+		}
+	}
+
+	return softwareCmd.SetUpLogs(os.Stdout, level)
 }
 
 // CreateRootPersistentPreRunE takes clients as arguments and returns a cobra
