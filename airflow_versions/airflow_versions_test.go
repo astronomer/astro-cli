@@ -458,7 +458,7 @@ func (s *Suite) TestParseImageTag() {
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			result, err := parseImageTag(tc.imageTag)
+			result, err := ParseImageTag(tc.imageTag)
 
 			if tc.shouldError {
 				s.Error(err)

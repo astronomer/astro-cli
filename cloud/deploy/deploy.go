@@ -117,6 +117,7 @@ type InputClientDeploy struct {
 	ImageName         string
 	Platform          string
 	BuildSecretString string
+	DeploymentID      string
 }
 
 const accessYourDeploymentFmt = `
@@ -880,10 +881,15 @@ func setupClientDependencyFiles(buildDir string) error {
 }
 
 // DeployClientImage handles the client deploy functionality
-func DeployClientImage(deployInput InputClientDeploy) error { //nolint:gocritic
+func DeployClientImage(deployInput InputClientDeploy, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocritic
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return errors.Wrap(err, "failed to get current context")
+	}
+
+	// Validate deployment runtime version if deployment ID is provided
+	if err := validateClientImageRuntimeVersion(deployInput, platformCoreClient); err != nil {
+		return err
 	}
 
 	// Get the remote client registry endpoint from config
@@ -995,4 +1001,90 @@ func DeployClientImage(deployInput InputClientDeploy) error { //nolint:gocritic
 	fmt.Println("Once you have updated the helm chart values.yaml file, you can run 'helm upgrade' or update via your CI/CD pipeline to update the agent components")
 
 	return nil
+}
+
+// validateClientImageRuntimeVersion validates that the client image runtime version
+// is not newer than the deployment runtime version
+func validateClientImageRuntimeVersion(deployInput InputClientDeploy, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocritic
+	// Skip validation if no deployment ID provided
+	if deployInput.DeploymentID == "" {
+		return nil
+	}
+
+	// Get current context for organization info
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return errors.Wrap(err, "failed to get current context")
+	}
+
+	// Get deployment information
+	deployInfo, err := getImageName(deployInput.DeploymentID, c.Organization, platformCoreClient)
+	if err != nil {
+		return errors.Wrap(err, "failed to get deployment information")
+	}
+
+	// Parse Dockerfile.client to get client image runtime version
+	dockerfileClientPath := filepath.Join(deployInput.Path, "Dockerfile.client")
+	if _, err := os.Stat(dockerfileClientPath); os.IsNotExist(err) {
+		// If Dockerfile.client doesn't exist, skip validation
+		return nil
+	}
+
+	cmds, err := docker.ParseFile(dockerfileClientPath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse Dockerfile.client: %s", dockerfileClientPath)
+	}
+
+	baseImage := docker.GetImageFromParsedFile(cmds)
+	if baseImage == "" {
+		return errors.New("failed to find base image in Dockerfile.client")
+	}
+
+	// Extract runtime version from the base image tag
+	clientRuntimeVersion, err := extractRuntimeVersionFromImage(baseImage)
+	if err != nil {
+		// If we can't extract version, skip validation with a warning
+		fmt.Printf("Warning: Could not extract runtime version from client image %s, skipping version validation\n", baseImage)
+		return nil
+	}
+
+	// Compare versions
+	if airflowversions.CompareRuntimeVersions(clientRuntimeVersion, deployInfo.currentVersion) > 0 {
+		return fmt.Errorf(`client image runtime version validation failed:
+
+The client image is based on Astro Runtime version %s, which is newer than the deployment's runtime version %s.
+
+To fix this issue, you can either:
+1. Downgrade the client image version by updating the base image in Dockerfile.client to use runtime version %s or earlier
+2. Upgrade the deployment's runtime version to %s or later
+
+This validation ensures compatibility between your client image and the deployment environment`,
+			clientRuntimeVersion, deployInfo.currentVersion, deployInfo.currentVersion, clientRuntimeVersion)
+	}
+
+	fmt.Printf("✓ Client image runtime version %s is compatible with deployment runtime version %s\n",
+		clientRuntimeVersion, deployInfo.currentVersion)
+
+	return nil
+}
+
+// extractRuntimeVersionFromImage extracts the runtime version from an image tag
+// Example: "images.astronomer.cloud/baseimages/astro-remote-execution-agent:3.1-1-python-3.12-astro-agent-1.1.0"
+// Returns: "3.1-1"
+func extractRuntimeVersionFromImage(imageName string) (string, error) {
+	// Split image name to get the tag part
+	parts := strings.Split(imageName, ":")
+	if len(parts) < 2 {
+		return "", errors.New("image name does not contain a tag")
+	}
+
+	imageTag := parts[len(parts)-1] // Get the last part as the tag
+
+	// Use the existing ParseImageTag function from airflow_versions package
+	tagInfo, err := airflowversions.ParseImageTag(imageTag)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to parse image tag: %s", imageTag)
+	}
+
+	return tagInfo.RuntimeVersion, nil
 }
