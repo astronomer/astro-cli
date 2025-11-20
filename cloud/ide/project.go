@@ -502,7 +502,7 @@ func ImportProject(client astrocore.CoreClient, projectID, sessionID, organizati
 	}
 
 	if sessionID == "" {
-		// Create a new session with READ_ONLY permission
+		// Create a new session with READ_ONLY permission.
 		sessionResp, err := createSessionWithPermission(client, organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionRequestPermissionREADONLY)
 		if err != nil {
 			return err
