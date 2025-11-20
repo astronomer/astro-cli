@@ -474,7 +474,7 @@ func shouldSkipArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.
 }
 
 // ImportProject imports a project from Astro IDE to the local directory
-func ImportProject(client astrocore.CoreClient, projectID, organizationID, workspaceID string, out io.Writer) error {
+func ImportProject(client astrocore.CoreClient, projectID, sessionID, organizationID, workspaceID string, out io.Writer) error {
 	// Validate current directory is empty
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -501,12 +501,14 @@ func ImportProject(client astrocore.CoreClient, projectID, organizationID, works
 		projectID = selectedProject.Id
 	}
 
-	// Create a new session with READ_ONLY permission
-	sessionResp, err := createSessionWithPermission(client, organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionRequestPermissionREADONLY)
-	if err != nil {
-		return err
+	if sessionID == "" {
+		// Create a new session with READ_ONLY permission.
+		sessionResp, err := createSessionWithPermission(client, organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionRequestPermissionREADONLY)
+		if err != nil {
+			return err
+		}
+		sessionID = sessionResp.JSON200.Id
 	}
-	sessionID := sessionResp.JSON200.Id
 
 	// Create a temporary file for the archive
 	tempFile, err := os.CreateTemp("", "astro-export-*.tar.gz")

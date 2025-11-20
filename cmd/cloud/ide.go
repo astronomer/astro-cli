@@ -11,7 +11,10 @@ import (
 	"github.com/astronomer/astro-cli/context"
 )
 
-var ideProjectID string
+var (
+	ideProjectID string
+	ideSessionID string
+)
 
 func newIDECommand(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -70,9 +73,13 @@ astro ide project import
 
 # Import a project from a specific Astro IDE project
 astro ide project import --project-id <project-id>
+
+# Import a project from a specific Astro IDE session
+astro ide project import --project-id <project-id> --session-id <session-id>
 `,
 	}
 	cmd.Flags().StringVarP(&ideProjectID, "project-id", "p", "", "Project ID to import")
+	cmd.Flags().StringVarP(&ideSessionID, "session-id", "s", "", "Session ID to import")
 	return cmd
 }
 
@@ -118,7 +125,7 @@ func importIDEProject(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return ide.ImportProject(astroCoreClient, ideProjectID, orgID, wsID, out)
+	return ide.ImportProject(astroCoreClient, ideProjectID, ideSessionID, orgID, wsID, out)
 }
 
 func exportProject(cmd *cobra.Command, out io.Writer) error {
