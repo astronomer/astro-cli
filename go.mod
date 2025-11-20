@@ -33,8 +33,8 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/fatih/camelcase v1.0.0
 	github.com/ghodss/yaml v1.0.0
-	github.com/go-git/go-billy/v5 v5.5.0
-	github.com/go-git/go-git/v5 v5.12.0
+	github.com/go-git/go-billy/v5 v5.6.0
+	github.com/go-git/go-git/v5 v5.13.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golangci/golangci-lint v1.62.2
 	github.com/google/go-github/v48 v48.2.0
@@ -110,7 +110,7 @@ require (
 	github.com/containerd/ttrpc v1.2.7 // indirect
 	github.com/containerd/typeurl/v2 v2.2.3 // indirect
 	github.com/curioswitch/go-reassign v0.3.0 // indirect
-	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
+	github.com/cyphar/filepath-securejoin v0.2.5 // indirect
 	github.com/daixiang0/gci v0.13.5 // indirect
 	github.com/denis-tingaikin/go-header v0.5.0 // indirect
 	github.com/docker/cli-docs-tool v0.8.0 // indirect
