@@ -1938,7 +1938,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to get deployment information")
 	})
 
-	t.Run("skip validation when Dockerfile.client doesn't exist", func(t *testing.T) {
+	t.Run("error when Dockerfile.client doesn't exist", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		deployInput := InputClientDeploy{
@@ -1963,7 +1963,8 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 			}, nil)
 
 		err := validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
-		assert.NoError(t, err)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Dockerfile.client is required for client image runtime version validation")
 	})
 
 	t.Run("error when Dockerfile.client exists but fails to parse", func(t *testing.T) {
@@ -2036,7 +2037,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to find base image in Dockerfile.client")
 	})
 
-	t.Run("skip validation when runtime version extraction fails", func(t *testing.T) {
+	t.Run("error when runtime version extraction fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		// Create a Dockerfile.client with image that doesn't have extractable version
@@ -2066,9 +2067,10 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		// Should not error when version extraction fails (skips with warning)
+		// Should error when version extraction fails
 		err = validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
-		assert.NoError(t, err)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to extract runtime version from client image")
 	})
 
 	t.Run("error when client runtime version is newer than deployment version", func(t *testing.T) {
@@ -2111,9 +2113,9 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 	t.Run("success when client runtime version is compatible with deployment version", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-		// Create a Dockerfile.client with compatible runtime version (old format)
+		// Create a Dockerfile.client with compatible runtime version
 		dockerfilePath := filepath.Join(tempDir, "Dockerfile.client")
-		dockerContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:12.1.1-python-3.12-astro-agent-1.1.0\nCOPY . .\n"
+		dockerContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:3.0-5-python-3.12-astro-agent-1.1.0\nCOPY . .\n"
 		err := os.WriteFile(dockerfilePath, []byte(dockerContent), 0o644)
 		assert.NoError(t, err)
 
@@ -2124,7 +2126,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
-		// Mock deployment with newer runtime version (new format)
+		// Mock deployment with newer runtime version
 		runtimeVersion := "3.0-7"
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(
 			&astroplatformcore.GetDeploymentResponse{

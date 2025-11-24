@@ -465,7 +465,7 @@ func getDeploymentInfo(
 	if err != nil {
 		return deploymentInfo{}, err
 	}
-	deployInfo, err := getImageName(deploymentID, c.Organization, platformCoreClient)
+	deployInfo, err := fetchDeploymentDetails(deploymentID, c.Organization, platformCoreClient)
 	if err != nil {
 		return deploymentInfo{}, err
 	}
@@ -547,7 +547,7 @@ func checkPytest(pytest, deployImage, buildSecretString string, containerHandler
 	return err
 }
 
-func getImageName(deploymentID, organizationID string, platformCoreClient astroplatformcore.CoreClient) (deploymentInfo, error) {
+func fetchDeploymentDetails(deploymentID, organizationID string, platformCoreClient astroplatformcore.CoreClient) (deploymentInfo, error) {
 	resp, err := platformCoreClient.GetDeploymentWithResponse(httpContext.Background(), organizationID, deploymentID)
 	if err != nil {
 		return deploymentInfo{}, err
@@ -1018,7 +1018,7 @@ func validateClientImageRuntimeVersion(deployInput InputClientDeploy, platformCo
 	}
 
 	// Get deployment information
-	deployInfo, err := getImageName(deployInput.DeploymentID, c.Organization, platformCoreClient)
+	deployInfo, err := fetchDeploymentDetails(deployInput.DeploymentID, c.Organization, platformCoreClient)
 	if err != nil {
 		return errors.Wrap(err, "failed to get deployment information")
 	}
@@ -1026,8 +1026,7 @@ func validateClientImageRuntimeVersion(deployInput InputClientDeploy, platformCo
 	// Parse Dockerfile.client to get client image runtime version
 	dockerfileClientPath := filepath.Join(deployInput.Path, "Dockerfile.client")
 	if _, err := os.Stat(dockerfileClientPath); os.IsNotExist(err) {
-		// If Dockerfile.client doesn't exist, skip validation
-		return nil
+		return errors.New("Dockerfile.client is required for client image runtime version validation")
 	}
 
 	cmds, err := docker.ParseFile(dockerfileClientPath)
@@ -1043,9 +1042,7 @@ func validateClientImageRuntimeVersion(deployInput InputClientDeploy, platformCo
 	// Extract runtime version from the base image tag
 	clientRuntimeVersion, err := extractRuntimeVersionFromImage(baseImage)
 	if err != nil {
-		// If we can't extract version, skip validation with a warning
-		fmt.Printf("Warning: Could not extract runtime version from client image %s, skipping version validation\n", baseImage)
-		return nil
+		return errors.Wrapf(err, "failed to extract runtime version from client image %s", baseImage)
 	}
 
 	// Compare versions
@@ -1056,7 +1053,7 @@ The client image is based on Astro Runtime version %s, which is newer than the d
 
 To fix this issue, you can either:
 1. Downgrade the client image version by updating the base image in Dockerfile.client to use runtime version %s or earlier
-2. Upgrade the deployment's runtime version to %s or later
+2. Upgrade the deployment's runtime version to %s or higher
 
 This validation ensures compatibility between your client image and the deployment environment`,
 			clientRuntimeVersion, deployInfo.currentVersion, deployInfo.currentVersion, clientRuntimeVersion)
