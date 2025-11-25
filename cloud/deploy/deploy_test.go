@@ -1348,7 +1348,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecretString: "",
 		}
 
-		err = DeployClientImage(deployInput)
+		err = DeployClientImage(deployInput, nil)
 		assert.NoError(t, err)
 		assert.True(t, dockerLoginCalled, "DockerLogin should have been called")
 		assert.Equal(t, "images.astronomer.cloud", capturedRegistry)
@@ -1378,7 +1378,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecretString: "",
 		}
 
-		err = DeployClientImage(deployInput)
+		err = DeployClientImage(deployInput, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to authenticate with registry images.astronomer.cloud")
 	})
@@ -1406,7 +1406,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecretString: "",
 		}
 
-		err = DeployClientImage(deployInput)
+		err = DeployClientImage(deployInput, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "remote client registry is not configured")
 		assert.False(t, dockerLoginCalled, "DockerLogin should not have been called")
@@ -1462,7 +1462,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecretString: "",
 		}
 
-		err = DeployClientImage(deployInput)
+		err = DeployClientImage(deployInput, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to build client image")
 		mockImageHandler.AssertExpectations(t)
@@ -1519,7 +1519,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecretString: "",
 		}
 
-		err = DeployClientImage(deployInput)
+		err = DeployClientImage(deployInput, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to push client image")
 		mockImageHandler.AssertExpectations(t)
@@ -1566,7 +1566,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecretString: "",
 		}
 
-		err = DeployClientImage(deployInput)
+		err = DeployClientImage(deployInput, nil)
 		assert.NoError(t, err)
 		mockImageHandler.AssertExpectations(t)
 	})
@@ -1826,5 +1826,355 @@ func TestSetupClientDependencyFiles(t *testing.T) {
 			strings.Contains(errorMsg, "failed to copy requirements-client.txt") ||
 				strings.Contains(errorMsg, "failed to copy packages-client.txt"),
 			"error should mention one of the missing client files, got: %s", errorMsg)
+	})
+}
+
+func TestExtractRuntimeVersionFromImage(t *testing.T) {
+	tests := []struct {
+		name        string
+		imageName   string
+		expectedVer string
+		expectError bool
+	}{
+		{
+			name:        "valid image with runtime version",
+			imageName:   "images.astronomer.cloud/baseimages/astro-remote-execution-agent:3.1-1-python-3.12-astro-agent-1.1.0",
+			expectedVer: "3.1-1",
+			expectError: false,
+		},
+		{
+			name:        "valid image with different runtime version",
+			imageName:   "registry.example.com/astro-agent:12.5-2-python-3.11-astro-agent-2.0.0",
+			expectedVer: "12.5-2",
+			expectError: false,
+		},
+		{
+			name:        "image without tag",
+			imageName:   "images.astronomer.cloud/baseimages/astro-remote-execution-agent",
+			expectedVer: "",
+			expectError: true,
+		},
+		{
+			name:        "image with invalid tag format",
+			imageName:   "images.astronomer.cloud/baseimages/astro-remote-execution-agent:invalid-tag",
+			expectedVer: "",
+			expectError: true,
+		},
+		{
+			name:        "image with base suffix",
+			imageName:   "images.astronomer.cloud/baseimages/astro-remote-execution-agent:3.1-1-python-3.12-astro-agent-1.1.0-base",
+			expectedVer: "3.1-1",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			version, err := extractRuntimeVersionFromImage(tt.imageName)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedVer, version)
+			}
+		})
+	}
+}
+
+func TestValidateClientImageRuntimeVersion(t *testing.T) {
+	// Create a temporary directory for test files
+	tempDir, err := os.MkdirTemp("", "test-validate-client-image")
+	assert.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("skip validation when no deployment ID", func(t *testing.T) {
+		deployInput := InputClientDeploy{
+			Path: tempDir,
+		}
+
+		// Should not error when deployment ID is empty
+		err := validateClientImageRuntimeVersion(deployInput, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("error when getting current context fails", func(t *testing.T) {
+		// Reset current context to force context error
+		err := config.ResetCurrentContext()
+		assert.NoError(t, err)
+
+		deployInput := InputClientDeploy{
+			Path:         tempDir,
+			DeploymentID: "test-deployment-id",
+		}
+
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		err = validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get current context")
+	})
+
+	t.Run("error when getting deployment information fails", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		deployInput := InputClientDeploy{
+			Path:         tempDir,
+			DeploymentID: "test-deployment-id",
+		}
+
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		// Mock GetDeploymentWithResponse to return an error
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(
+			&astroplatformcore.GetDeploymentResponse{
+				HTTPResponse: &http.Response{StatusCode: 500},
+			}, nil)
+
+		err := validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get deployment information")
+	})
+
+	t.Run("error when Dockerfile.client doesn't exist", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		deployInput := InputClientDeploy{
+			Path:         tempDir,
+			DeploymentID: "test-deployment-id",
+		}
+
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		// Mock successful deployment response
+		runtimeVersion := "3.0.0"
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(
+			&astroplatformcore.GetDeploymentResponse{
+				HTTPResponse: &http.Response{StatusCode: 200},
+				JSON200: &astroplatformcore.Deployment{
+					Id:             "test-deployment-id",
+					RuntimeVersion: runtimeVersion,
+					Namespace:      "test-namespace",
+					WorkspaceId:    "test-workspace-id",
+					WebServerUrl:   "https://test.com",
+				},
+			}, nil)
+
+		err := validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Dockerfile.client is required for client image runtime version validation")
+	})
+
+	t.Run("error when Dockerfile.client exists but fails to parse", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		// Create a malformed Dockerfile.client that will fail parsing
+		dockerfilePath := filepath.Join(tempDir, "Dockerfile.client")
+		// This creates a Dockerfile with invalid JSON syntax that will cause parsing to fail
+		malformedDockerfile := "FROM ubuntu:20.04\nCMD [\"echo\", 1]"
+		err := os.WriteFile(dockerfilePath, []byte(malformedDockerfile), 0o644)
+		assert.NoError(t, err)
+
+		deployInput := InputClientDeploy{
+			Path:         tempDir,
+			DeploymentID: "test-deployment-id",
+		}
+
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		// Mock successful deployment response
+		runtimeVersion := "3.0.0"
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(
+			&astroplatformcore.GetDeploymentResponse{
+				HTTPResponse: &http.Response{StatusCode: 200},
+				JSON200: &astroplatformcore.Deployment{
+					Id:             "test-deployment-id",
+					RuntimeVersion: runtimeVersion,
+					Namespace:      "test-namespace",
+					WorkspaceId:    "test-workspace-id",
+					WebServerUrl:   "https://test.com",
+				},
+			}, nil)
+
+		err = validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse Dockerfile.client")
+	})
+
+	t.Run("error when no base image found in Dockerfile.client", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		// Create a Dockerfile.client without FROM instruction
+		dockerfilePath := filepath.Join(tempDir, "Dockerfile.client")
+		err := os.WriteFile(dockerfilePath, []byte("RUN echo 'test'\nCOPY . .\n"), 0o644)
+		assert.NoError(t, err)
+
+		deployInput := InputClientDeploy{
+			Path:         tempDir,
+			DeploymentID: "test-deployment-id",
+		}
+
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		// Mock successful deployment response
+		runtimeVersion := "3.0.0"
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(
+			&astroplatformcore.GetDeploymentResponse{
+				HTTPResponse: &http.Response{StatusCode: 200},
+				JSON200: &astroplatformcore.Deployment{
+					Id:             "test-deployment-id",
+					RuntimeVersion: runtimeVersion,
+					Namespace:      "test-namespace",
+					WorkspaceId:    "test-workspace-id",
+					WebServerUrl:   "https://test.com",
+				},
+			}, nil)
+
+		err = validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to find base image in Dockerfile.client")
+	})
+
+	t.Run("error when runtime version extraction fails", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		// Create a Dockerfile.client with image that doesn't have extractable version
+		dockerfilePath := filepath.Join(tempDir, "Dockerfile.client")
+		dockerContent := "FROM python:3.9\nCOPY . .\n"
+		err := os.WriteFile(dockerfilePath, []byte(dockerContent), 0o644)
+		assert.NoError(t, err)
+
+		deployInput := InputClientDeploy{
+			Path:         tempDir,
+			DeploymentID: "test-deployment-id",
+		}
+
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		// Mock successful deployment response
+		runtimeVersion := "3.0.0"
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(
+			&astroplatformcore.GetDeploymentResponse{
+				HTTPResponse: &http.Response{StatusCode: 200},
+				JSON200: &astroplatformcore.Deployment{
+					Id:             "test-deployment-id",
+					RuntimeVersion: runtimeVersion,
+					Namespace:      "test-namespace",
+					WorkspaceId:    "test-workspace-id",
+					WebServerUrl:   "https://test.com",
+				},
+			}, nil)
+
+		// Should error when version extraction fails
+		err = validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to extract runtime version from client image")
+	})
+
+	t.Run("error when client runtime version is newer than deployment version", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		// Create a Dockerfile.client with newer runtime version
+		dockerfilePath := filepath.Join(tempDir, "Dockerfile.client")
+		dockerContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:4.0-1-python-3.12-astro-agent-1.1.0\nCOPY . .\n"
+		err := os.WriteFile(dockerfilePath, []byte(dockerContent), 0o644)
+		assert.NoError(t, err)
+
+		deployInput := InputClientDeploy{
+			Path:         tempDir,
+			DeploymentID: "test-deployment-id",
+		}
+
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		// Mock deployment with older runtime version
+		runtimeVersion := "3.0.0"
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(
+			&astroplatformcore.GetDeploymentResponse{
+				HTTPResponse: &http.Response{StatusCode: 200},
+				JSON200: &astroplatformcore.Deployment{
+					Id:             "test-deployment-id",
+					RuntimeVersion: runtimeVersion,
+					Namespace:      "test-namespace",
+					WorkspaceId:    "test-workspace-id",
+					WebServerUrl:   "https://test.com",
+				},
+			}, nil)
+
+		err = validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "client image runtime version validation failed")
+		assert.Contains(t, err.Error(), "4.0-1")
+		assert.Contains(t, err.Error(), "3.0.0")
+	})
+
+	t.Run("success when client runtime version is compatible with deployment version", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		// Create a Dockerfile.client with compatible runtime version
+		dockerfilePath := filepath.Join(tempDir, "Dockerfile.client")
+		dockerContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:3.0-5-python-3.12-astro-agent-1.1.0\nCOPY . .\n"
+		err := os.WriteFile(dockerfilePath, []byte(dockerContent), 0o644)
+		assert.NoError(t, err)
+
+		deployInput := InputClientDeploy{
+			Path:         tempDir,
+			DeploymentID: "test-deployment-id",
+		}
+
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		// Mock deployment with newer runtime version
+		runtimeVersion := "3.0-7"
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(
+			&astroplatformcore.GetDeploymentResponse{
+				HTTPResponse: &http.Response{StatusCode: 200},
+				JSON200: &astroplatformcore.Deployment{
+					Id:             "test-deployment-id",
+					RuntimeVersion: runtimeVersion,
+					Namespace:      "test-namespace",
+					WorkspaceId:    "test-workspace-id",
+					WebServerUrl:   "https://test.com",
+				},
+			}, nil)
+
+		err = validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
+		assert.NoError(t, err)
+	})
+
+	t.Run("success when client runtime version equals deployment version", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		// Create a Dockerfile.client with same runtime version
+		dockerfilePath := filepath.Join(tempDir, "Dockerfile.client")
+		dockerContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:3.0-1-python-3.12-astro-agent-1.1.0\nCOPY . .\n"
+		err := os.WriteFile(dockerfilePath, []byte(dockerContent), 0o644)
+		assert.NoError(t, err)
+
+		deployInput := InputClientDeploy{
+			Path:         tempDir,
+			DeploymentID: "test-deployment-id",
+		}
+
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+		// Mock deployment with exact same runtime version
+		runtimeVersion := "3.0-1"
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(
+			&astroplatformcore.GetDeploymentResponse{
+				HTTPResponse: &http.Response{StatusCode: 200},
+				JSON200: &astroplatformcore.Deployment{
+					Id:             "test-deployment-id",
+					RuntimeVersion: runtimeVersion,
+					Namespace:      "test-namespace",
+					WorkspaceId:    "test-workspace-id",
+					WebServerUrl:   "https://test.com",
+				},
+			}, nil)
+
+		err = validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
+		assert.NoError(t, err)
 	})
 }

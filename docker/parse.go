@@ -101,9 +101,11 @@ var ParseFile = func(filename string) ([]Command, error) {
 // e.g. FROM ubuntu:xenial returns "ubuntu:xenial"
 func GetImageFromParsedFile(cmds []Command) (image string) {
 	for _, cmd := range cmds {
-		if cmd.Cmd == command.From {
-			from := cmd.Value[0]
-			return from
+		if strings.EqualFold(cmd.Cmd, command.From) {
+			if len(cmd.Value) > 0 {
+				from := cmd.Value[0]
+				return from
+			}
 		}
 	}
 	return ""
@@ -114,9 +116,11 @@ func GetImageFromParsedFile(cmds []Command) (image string) {
 func GetImageTagFromParsedFile(cmds []Command) (baseImage, tag string) {
 	for _, cmd := range cmds {
 		if strings.EqualFold(cmd.Cmd, command.From) {
-			from := cmd.Value[0]
-			baseImage, tag := parseImageName(from)
-			return baseImage, tag
+			if len(cmd.Value) > 0 {
+				from := cmd.Value[0]
+				baseImage, tag := parseImageName(from)
+				return baseImage, tag
+			}
 		}
 	}
 	return "", ""
