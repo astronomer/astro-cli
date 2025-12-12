@@ -65,9 +65,8 @@ const (
 )
 
 var (
-	sleepTime        = 180
-	tickNum          = 10
-	timeoutNum       = 180
+	SleepTime        = 180
+	TickNum          = 10
 	listLimit        = 1000
 	dagDeployEnabled bool
 )
@@ -76,7 +75,7 @@ func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "NAMESPACE", "CLUSTER", "CLOUD PROVIDER", "REGION", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT", "DEPLOYMENT TYPE"},
+		Header:         []string{"NAME", "NAMESPACE", "CLUSTER", "CLOUD PROVIDER", "REGION", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT", "DEPLOYMENT TYPE", "REMOTE EXECUTION"},
 	}
 }
 
@@ -84,7 +83,7 @@ func newTableOutAll() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "WORKSPACE", "NAMESPACE", "CLUSTER", "CLOUD PROVIDER", "REGION", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT", "DEPLOYMENT TYPE"},
+		Header:         []string{"NAME", "WORKSPACE", "NAMESPACE", "CLUSTER", "CLOUD PROVIDER", "REGION", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT", "DEPLOYMENT TYPE", "REMOTE EXECUTION"},
 	}
 }
 
@@ -222,7 +221,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astroplatformcore.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, waitForStatus bool, waitTimeForDeployment time.Duration) error { //nolint
 	var organizationID string
 	var currentWorkspace astrocore.Workspace
 
@@ -536,9 +535,8 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	if err != nil {
 		return err
 	}
-
 	if waitForStatus {
-		err = HealthPoll(d.Id, workspaceID, sleepTime, tickNum, timeoutNum, platformCoreClient)
+		err = HealthPoll(d.Id, workspaceID, SleepTime, TickNum, int(waitTimeForDeployment.Seconds()), platformCoreClient)
 		if err != nil {
 			errOutput := createOutput(workspaceID, &d)
 			if errOutput != nil {
@@ -594,6 +592,7 @@ func deploymentToTableRow(table *printutil.Table, d *astroplatformcore.Deploymen
 	if !IsDeploymentStandard(*d.Type) {
 		clusterName = *d.ClusterName
 	}
+	isRemoteExecutionEnabled := IsRemoteExecutionEnabled(d)
 	cols := []string{
 		d.Name,
 		releaseName,
@@ -605,6 +604,7 @@ func deploymentToTableRow(table *printutil.Table, d *astroplatformcore.Deploymen
 		strconv.FormatBool(d.IsDagDeployEnabled),
 		strconv.FormatBool(d.IsCicdEnforced),
 		string(*d.Type),
+		strconv.FormatBool(isRemoteExecutionEnabled),
 	}
 	if includeWorkspaceName {
 		cols = slices.Insert(cols, 1, *d.WorkspaceName)
@@ -771,7 +771,9 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, pla
 				return err
 			}
 
-			if currentDeployment.Status == astroplatformcore.DeploymentStatusHEALTHY {
+			// considering hibernating as healthy state, since hibernation can only happen when the deployment is healthy.
+			// This covers for the case when the deployment is cretated and straight away goes into hibernation.
+			if currentDeployment.Status == astroplatformcore.DeploymentStatusHEALTHY || currentDeployment.Status == astroplatformcore.DeploymentStatusHIBERNATING {
 				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Name)
 				return nil
 			}
@@ -1245,7 +1247,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if !IsDeploymentStandard(*d.Type) {
 			clusterName = *d.ClusterName
 		}
-		tabDeployment.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type)}, false)
+		isRemoteExecutionEnabled := IsRemoteExecutionEnabled(&d)
+		tabDeployment.AddRow([]string{d.Name, releaseName, clusterName, cloudProvider, region, d.Id, runtimeVersionText, strconv.FormatBool(d.IsDagDeployEnabled), strconv.FormatBool(d.IsCicdEnforced), string(*d.Type), strconv.FormatBool(isRemoteExecutionEnabled)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
 	}
@@ -1884,8 +1887,8 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 	}
 	if currentDeployment.Id == "" {
 		// get latest runtime version
-		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
-		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "", false)
+		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false, false)
+		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "", "", false)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
@@ -1901,7 +1904,7 @@ func deploymentSelectionProcess(ws string, deployments []astroplatformcore.Deplo
 			dagDeploy = enable
 		}
 
-		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, false, nil, nil, nil, platformCoreClient, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, false, nil, nil, nil, platformCoreClient, coreClient, false, 0*time.Second)
 		if err != nil {
 			return astroplatformcore.Deployment{}, err
 		}
@@ -1939,29 +1942,6 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID
 	}
 	return deploymentURL, nil
-}
-
-// printWarning lets the user know
-// when going from CE -> KE and if multiple queues exist,
-// a new default queue will get created.
-// If going from KE -> CE, it lets user know that a new default worker queue will be created.
-// It returns true if a warning was printed and false if not.
-func printWarning(executor string, existingQLength int) bool {
-	var printed bool
-	if strings.EqualFold(executor, KubeExecutor) || strings.EqualFold(executor, KUBERNETES) {
-		if existingQLength > 1 {
-			fmt.Println("\n Switching to KubernetesExecutor will replace all existing worker queues " +
-				"with one new default worker queue for this deployment.")
-			printed = true
-		}
-	} else {
-		if strings.EqualFold(executor, CeleryExecutor) || strings.EqualFold(executor, CELERY) {
-			fmt.Println("\n Switching to CeleryExecutor will replace the existing worker queue " +
-				"with a new default worker queue for this deployment.")
-			printed = true
-		}
-	}
-	return printed
 }
 
 func GetCoreCloudProvider(cloudProvider string) astrocore.GetDeploymentOptionsParamsCloudProvider {

@@ -1,0 +1,1 @@
+FROM %s/astro-remote-execution-agent:%s

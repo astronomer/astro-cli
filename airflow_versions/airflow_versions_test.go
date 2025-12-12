@@ -277,9 +277,9 @@ func (s *Suite) TestGetDefaultImageTag() {
 				Header:     make(http.Header),
 			}
 		})
-		httpClient := NewClient(client, true)
+		httpClient := NewClient(client, true, false)
 
-		defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
+		defaultImageTag, err := GetDefaultImageTag(httpClient, "", "", false)
 		s.NoError(err)
 		s.Equal("2.2.0-onbuild", defaultImageTag)
 	})
@@ -347,11 +347,51 @@ func (s *Suite) TestGetDefaultImageTag() {
 				Header:     make(http.Header),
 			}
 		})
-		httpClient := NewClient(client, false)
+		httpClient := NewClient(client, false, false)
 
-		defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
+		defaultImageTag, err := GetDefaultImageTag(httpClient, "", "", false)
 		s.NoError(err)
 		s.Equal("4.0.0", defaultImageTag)
+	})
+
+	s.Run("agent", func() {
+		mockResp := &Response{
+			ClientVersions: map[string]ClientVersion{
+				"1.1.0": {
+					Metadata: ClientVersionMetadata{
+						Channel:     VersionChannelStable,
+						ReleaseDate: "2025-09-29",
+					},
+					ImageTags: []string{
+						"3.1-1-python-3.12-astro-agent-1.1.0",
+						"3.1-1-python-3.11-astro-agent-1.1.0",
+						"3.1-1-python-3.12-astro-agent-1.1.0-base",
+						"3.1-1-python-3.11-astro-agent-1.1.0-base",
+						"3.0-12-python-3.12-astro-agent-1.1.0",
+						"3.0-12-python-3.11-astro-agent-1.1.0",
+						"3.0-12-python-3.12-astro-agent-1.1.0-base",
+						"3.0-12-python-3.11-astro-agent-1.1.0-base",
+						"3.0-8-python-3.12-astro-agent-1.1.0",
+						"3.0-8-python-3.11-astro-agent-1.1.0",
+						"3.0-8-python-3.12-astro-agent-1.1.0-base",
+						"3.0-8-python-3.11-astro-agent-1.1.0-base",
+					},
+				},
+			},
+		}
+		jsonResp, _ := json.Marshal(mockResp)
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResp)),
+				Header:     make(http.Header),
+			}
+		})
+		httpClient := NewClient(client, false, true)
+
+		defaultImageTag, err := GetDefaultImageTag(httpClient, "", "", false)
+		s.NoError(err)
+		s.Equal("3.1-1-python-3.12-astro-agent-1.1.0", defaultImageTag)
 	})
 }
 
@@ -365,9 +405,331 @@ func (s *Suite) TestGetDefaultImageTagError() {
 			Header:     make(http.Header),
 		}
 	})
-	httpClient := NewClient(client, true)
+	httpClient := NewClient(client, true, false)
 
-	defaultImageTag, err := GetDefaultImageTag(httpClient, "", false)
+	defaultImageTag, err := GetDefaultImageTag(httpClient, "", "", false)
 	s.Error(err)
 	s.Equal("", defaultImageTag)
+}
+
+func (s *Suite) TestParseImageTag() {
+	testCases := []struct {
+		name        string
+		imageTag    string
+		expected    *ImageTagInfo
+		shouldError bool
+	}{
+		{
+			name:     "valid non-base image",
+			imageTag: "3.1-1-python-3.12-astro-agent-1.1.0",
+			expected: &ImageTagInfo{
+				RuntimeVersion: "3.1-1",
+				PythonVersion:  "3.12",
+				AgentVersion:   "1.1.0",
+				IsBase:         false,
+			},
+		},
+		{
+			name:     "valid base image",
+			imageTag: "3.0-12-python-3.11-astro-agent-1.1.0-base",
+			expected: &ImageTagInfo{
+				RuntimeVersion: "3.0-12",
+				PythonVersion:  "3.11",
+				AgentVersion:   "1.1.0",
+				IsBase:         true,
+			},
+		},
+		{
+			name:     "runtime without patch version",
+			imageTag: "4.0-python-3.12-astro-agent-2.0.0",
+			expected: &ImageTagInfo{
+				RuntimeVersion: "4.0",
+				PythonVersion:  "3.12",
+				AgentVersion:   "2.0.0",
+				IsBase:         false,
+			},
+		},
+		{
+			name:        "invalid tag format",
+			imageTag:    "invalid-tag-format",
+			shouldError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			result, err := ParseImageTag(tc.imageTag)
+
+			if tc.shouldError {
+				s.Error(err)
+				s.Nil(result)
+			} else {
+				s.NoError(err)
+				s.NotNil(result)
+				s.Equal(tc.expected.RuntimeVersion, result.RuntimeVersion)
+				s.Equal(tc.expected.PythonVersion, result.PythonVersion)
+				s.Equal(tc.expected.AgentVersion, result.AgentVersion)
+				s.Equal(tc.expected.IsBase, result.IsBase)
+			}
+		})
+	}
+}
+
+func (s *Suite) TestIsBetterImage() {
+	testCases := []struct {
+		name      string
+		candidate *ImageTagInfo
+		current   *ImageTagInfo
+		expected  bool
+	}{
+		{
+			name:      "nil candidate",
+			candidate: nil,
+			current:   &ImageTagInfo{PythonVersion: "3.11"},
+			expected:  false,
+		},
+		{
+			name:      "nil current",
+			candidate: &ImageTagInfo{PythonVersion: "3.11"},
+			current:   nil,
+			expected:  true,
+		},
+		{
+			name: "higher python version but lower runtime version",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.0-8",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.11",
+				RuntimeVersion: "3.1-1",
+			},
+			expected: false, // Runtime version takes priority, so 3.0-8 < 3.1-1 means false
+		},
+		{
+			name: "lower python version but higher runtime version",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.11",
+				RuntimeVersion: "3.1-1",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.0-8",
+			},
+			expected: true, // Runtime version takes priority, so 3.1-1 > 3.0-8 means true
+		},
+		{
+			name: "same python version, higher runtime",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-1",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.0-12",
+			},
+			expected: true,
+		},
+		{
+			name: "same python version, lower runtime",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.0-12",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-1",
+			},
+			expected: false,
+		},
+		{
+			name: "same runtime version, higher python version",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-1",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.11",
+				RuntimeVersion: "3.1-1",
+			},
+			expected: true, // Same runtime, so Python version is the tiebreaker
+		},
+		{
+			name: "same runtime version, lower python version",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.11",
+				RuntimeVersion: "3.1-1",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-1",
+			},
+			expected: false, // Same runtime, so Python version is the tiebreaker
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			result := isBetterImage(tc.candidate, tc.current)
+			s.Equal(tc.expected, result)
+		})
+	}
+}
+
+func (s *Suite) TestGetAstroAgentTag() {
+	clientVersions := map[string]ClientVersion{
+		"1.0.0": {
+			Metadata: ClientVersionMetadata{
+				Channel:     VersionChannelStable,
+				ReleaseDate: "2025-08-29",
+			},
+			ImageTags: []string{
+				"3.0-8-python-3.11-astro-agent-1.0.0",
+				"3.0-8-python-3.12-astro-agent-1.0.0",
+				"3.0-8-python-3.11-astro-agent-1.0.0-base",
+				"3.0-8-python-3.12-astro-agent-1.0.0-base",
+			},
+		},
+		"1.1.0": {
+			Metadata: ClientVersionMetadata{
+				Channel:     VersionChannelStable,
+				ReleaseDate: "2025-09-29",
+			},
+			ImageTags: []string{
+				"3.1-1-python-3.12-astro-agent-1.1.0",
+				"3.1-1-python-3.11-astro-agent-1.1.0",
+				"3.1-1-python-3.12-astro-agent-1.1.0-base",
+				"3.1-1-python-3.11-astro-agent-1.1.0-base",
+				"3.0-12-python-3.12-astro-agent-1.1.0",
+				"3.0-12-python-3.11-astro-agent-1.1.0",
+				"3.0-12-python-3.12-astro-agent-1.1.0-base",
+				"3.0-12-python-3.11-astro-agent-1.1.0-base",
+			},
+		},
+		"1.2.0": {
+			Metadata: ClientVersionMetadata{
+				Channel:     "alpha",
+				ReleaseDate: "2025-10-01",
+			},
+			ImageTags: []string{
+				"3.2-1-python-3.12-astro-agent-1.2.0",
+				"3.2-1-python-3.11-astro-agent-1.2.0",
+			},
+		},
+	}
+
+	testCases := []struct {
+		name           string
+		clientVersions map[string]ClientVersion
+		runtimeVersion string
+		expected       string
+		shouldError    bool
+		errorMsg       string
+	}{
+		{
+			name:           "returns latest image without runtime version filter",
+			clientVersions: clientVersions,
+			runtimeVersion: "",
+			expected:       "3.1-1-python-3.12-astro-agent-1.1.0",
+			shouldError:    false,
+		},
+		{
+			name:           "filters out newer runtime versions when runtime version specified",
+			clientVersions: clientVersions,
+			runtimeVersion: "3.0-12",
+			expected:       "3.0-12-python-3.12-astro-agent-1.1.0",
+			shouldError:    false,
+		},
+		{
+			name:           "returns compatible version when exact runtime version not available",
+			clientVersions: clientVersions,
+			runtimeVersion: "3.0-10",
+			expected:       "3.0-8-python-3.12-astro-agent-1.0.0",
+			shouldError:    false,
+		},
+		{
+			name:           "selects higher Python version for same runtime",
+			clientVersions: clientVersions,
+			runtimeVersion: "3.0-8",
+			expected:       "3.0-8-python-3.12-astro-agent-1.0.0",
+			shouldError:    false,
+		},
+		{
+			name:           "empty client versions",
+			clientVersions: map[string]ClientVersion{},
+			runtimeVersion: "",
+			expected:       "",
+			shouldError:    true,
+			errorMsg:       "no client versions found",
+		},
+		{
+			name: "no stable versions",
+			clientVersions: map[string]ClientVersion{
+				"1.2.0": {
+					Metadata: ClientVersionMetadata{
+						Channel:     "alpha",
+						ReleaseDate: "2025-10-01",
+					},
+					ImageTags: []string{
+						"3.2-1-python-3.12-astro-agent-1.2.0",
+					},
+				},
+			},
+			runtimeVersion: "",
+			expected:       "",
+			shouldError:    true,
+			errorMsg:       "no client versions found",
+		},
+		{
+			name: "only base images available",
+			clientVersions: map[string]ClientVersion{
+				"1.0.0": {
+					Metadata: ClientVersionMetadata{
+						Channel:     VersionChannelStable,
+						ReleaseDate: "2025-08-29",
+					},
+					ImageTags: []string{
+						"3.0-8-python-3.11-astro-agent-1.0.0-base",
+						"3.0-8-python-3.12-astro-agent-1.0.0-base",
+					},
+				},
+			},
+			runtimeVersion: "",
+			expected:       "",
+			shouldError:    true,
+			errorMsg:       "no non-base images found for client version",
+		},
+		{
+			name: "runtime version too new - returns compatible older version",
+			clientVersions: map[string]ClientVersion{
+				"1.0.0": {
+					Metadata: ClientVersionMetadata{
+						Channel:     VersionChannelStable,
+						ReleaseDate: "2025-08-29",
+					},
+					ImageTags: []string{
+						"3.0-8-python-3.11-astro-agent-1.0.0",
+					},
+				},
+			},
+			runtimeVersion: "3.0-10",
+			expected:       "3.0-8-python-3.11-astro-agent-1.0.0",
+			shouldError:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			result, err := getAstroAgentTag(tc.clientVersions, tc.runtimeVersion)
+
+			if tc.shouldError {
+				s.Error(err)
+				s.Contains(err.Error(), tc.errorMsg)
+				s.Equal(tc.expected, result)
+			} else {
+				s.NoError(err)
+				s.Equal(tc.expected, result)
+			}
+		})
+	}
 }

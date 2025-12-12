@@ -29,13 +29,14 @@ import (
 )
 
 const (
-	pushingImagePrompt = "Pushing image to Astronomer registry"
 	astroRunContainer  = "astro-run"
 	pullingImagePrompt = "Pulling image from Astronomer registry"
 	prefix             = "Bearer "
+)
 
+var (
 	// Enhanced error message for 403 authentication issues
-	imagePush403ErrMsg = `failed to push image due to authentication error (403 Forbidden).
+	ErrImagePush403 = fmt.Errorf(`failed to push image due to authentication error (403 Forbidden).
 
 This commonly occurs due to:
 1. Invalid cached Docker credentials
@@ -47,10 +48,10 @@ To resolve:
 • Try running 'astro deploy' again
 
 For detailed troubleshooting steps, visit:
-https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push`
-)
+https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push`)
 
-var errGetImageLabel = errors.New("error getting image label")
+	errGetImageLabel = errors.New("error getting image label")
+)
 
 var getDockerClient = func() (client.APIClient, error) {
 	return client.NewClientWithOpts(client.FromEnv)
@@ -321,7 +322,7 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 	}
 
 	// Push image to registry
-	fmt.Println(pushingImagePrompt)
+	// Note: Caller is responsible for printing appropriate message
 
 	configFile := cliConfig.LoadDefaultConfigFile(os.Stderr)
 
@@ -355,7 +356,7 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 		if err != nil {
 			// Check for 403 errors only after both methods fail
 			if is403Error(err) {
-				return "", errors.New(imagePush403ErrMsg)
+				return "", ErrImagePush403
 			}
 			return "", err
 		}
@@ -442,11 +443,18 @@ func (d *DockerImage) getRegistryToAuth(imageName string) (string, error) {
 	if domain == "localhost" {
 		return config.CFG.LocalRegistry.GetString(), nil
 	}
+
+	// Handle different image name formats:
+	// 1. Standard format: registry.com/namespace/repo:tag
+	// 2. ECR format: 123456789012.dkr.ecr.us-west-2.amazonaws.com/repo:tag
 	parts := strings.SplitN(imageName, "/", 2)
-	if len(parts) != 2 || !strings.Contains(parts[1], "/") {
-		// This _should_ be impossible for users to hit
+	if len(parts) != 2 {
 		return "", fmt.Errorf("internal logic error: unsure how to get registry from image name %q", imageName)
 	}
+
+	// Both formats have the registry as the first part before the first "/"
+	// Standard format: registry.com/namespace/repo:tag -> registry.com
+	// ECR format: 123456789012.dkr.ecr.us-west-2.amazonaws.com/repo:tag -> 123456789012.dkr.ecr.us-west-2.amazonaws.com
 	return parts[0], nil
 }
 
@@ -724,8 +732,13 @@ func pushWithBash(authConfig *cliTypes.AuthConfig, imageName string) error {
 		pass := authConfig.Password
 		pass = strings.TrimPrefix(pass, prefix)
 		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
-		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
+		var stderr bytes.Buffer
+		err = cmdExec("bash", os.Stdout, &stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
 		if err != nil {
+			stderrOutput := stderr.String()
+			if stderrOutput != "" {
+				return fmt.Errorf("%w: %s", err, stderrOutput)
+			}
 			return err
 		}
 	}

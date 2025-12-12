@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
@@ -14,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/ghodss/yaml"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -427,7 +429,7 @@ func (s *Suite) TestCreateOrUpdate() {
 	)
 
 	s.Run("returns an error if file does not exist", func() {
-		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil, false, 0*time.Second)
 		s.ErrorContains(err, "open deployment.yaml: no such file or directory")
 	})
 	s.Run("returns an error if file exists but user provides incorrect path", func() {
@@ -436,7 +438,7 @@ func (s *Suite) TestCreateOrUpdate() {
 		err = fileutil.WriteStringToFile(filePath, data)
 		s.NoError(err)
 		defer afero.NewOsFs().RemoveAll("./2")
-		err = CreateOrUpdate("1/deployment.yaml", "create", nil, nil, nil)
+		err = CreateOrUpdate("1/deployment.yaml", "create", nil, nil, nil, false, 0*time.Second)
 		s.ErrorContains(err, "open 1/deployment.yaml: no such file or directory")
 	})
 	s.Run("returns an error if file is empty", func() {
@@ -444,7 +446,7 @@ func (s *Suite) TestCreateOrUpdate() {
 		data = ""
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
-		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil, false, 0*time.Second)
 		s.ErrorIs(err, errEmptyFile)
 		s.ErrorContains(err, "deployment.yaml has no content")
 	})
@@ -453,7 +455,7 @@ func (s *Suite) TestCreateOrUpdate() {
 		data = "test"
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
-		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil, false, 0*time.Second)
 		s.ErrorContains(err, "error unmarshaling JSON:")
 	})
 	s.Run("returns an error if required fields are missing", func() {
@@ -508,7 +510,7 @@ deployment:
 `
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
-		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil, false, 0*time.Second)
 		s.ErrorContains(err, "missing required field: deployment.configuration.name")
 	})
 	s.Run("returns an error if getting context fails", func() {
@@ -569,7 +571,7 @@ deployment:
 
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.ErrorContains(err, "no context set")
 	})
 	s.Run("returns an error if cluster does not exist", func() {
@@ -630,7 +632,7 @@ deployment:
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.ErrorIs(err, errNotFound)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -692,7 +694,7 @@ deployment:
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, errTest).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.ErrorIs(err, errTest)
 	})
 	s.Run("returns an error if listing deployment fails", func() {
@@ -755,7 +757,7 @@ deployment:
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errTest).Times(1)
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.ErrorIs(err, errTest)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -828,7 +830,7 @@ deployment:
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.NotNil(out)
 		mockCoreClient.AssertExpectations(s.T())
@@ -898,7 +900,7 @@ deployment:
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.NotNil(out)
 		mockCoreClient.AssertExpectations(s.T())
@@ -982,7 +984,7 @@ deployment:
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, errTest).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.ErrorIs(err, errTest)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -1051,7 +1053,7 @@ deployment:
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "metadata:\n        deployment_id: test-deployment-id")
@@ -1108,7 +1110,7 @@ deployment:
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "metadata:\n        deployment_id: test-deployment-id")
@@ -1210,7 +1212,7 @@ deployment:
 		)).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "metadata:\n        deployment_id: test-deployment-id")
@@ -1299,7 +1301,7 @@ deployment:
 		)).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(&deploymentResponseRemoteExecution, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "metadata:\n        deployment_id: test-deployment-id")
@@ -1389,7 +1391,7 @@ deployment:
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
 		s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
@@ -1489,7 +1491,7 @@ deployment:
 		)).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
 		s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
@@ -1591,7 +1593,7 @@ deployment:
 		)).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
 		s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
@@ -1657,7 +1659,7 @@ deployment:
 		defer afero.NewOsFs().Remove(filePath)
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&EmptyListWorkspacesResponseOK, errTest).Times(1)
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.ErrorIs(err, errTest)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -1720,7 +1722,7 @@ deployment:
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(1)
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.ErrorContains(err, "deployment: test-deployment-label already exists: use deployment update --deployment-file deployment.yaml instead")
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -1799,7 +1801,7 @@ deployment:
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.Error(err)
 		s.ErrorContains(err, "worker queue option is invalid: worker concurrency")
 		mockCoreClient.AssertExpectations(s.T())
@@ -1884,7 +1886,7 @@ deployment:
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(1)
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, errCreateFailed).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "create", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.ErrorIs(err, errCreateFailed)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -1951,7 +1953,7 @@ deployment:
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "\n        description: description 1")
@@ -2007,7 +2009,7 @@ deployment:
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "\n        description: description 1")
@@ -2095,7 +2097,7 @@ deployment:
 		)).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "\n        description: description 1")
@@ -2180,7 +2182,7 @@ deployment:
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "\n        description: description 1")
@@ -2259,7 +2261,7 @@ deployment:
 			return false
 		}
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		defer testUtil.MockUserInput(s.T(), "n")()
 		s.NoError(err)
 		mockCoreClient.AssertExpectations(s.T())
@@ -2343,7 +2345,7 @@ deployment:
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "test-deployment-label")
 		s.Contains(out.String(), "description 1")
@@ -2434,7 +2436,7 @@ deployment:
 		)).Return(&mockUpdateDeploymentResponse, nil)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out)
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, out, false, 0*time.Second)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "\n        description: description 1")
@@ -2502,7 +2504,7 @@ deployment:
 		mockPlatformCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.ErrorContains(err, "deployment: test-deployment-label does not exist: use deployment create --deployment-file deployment.yaml instead")
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -2582,7 +2584,7 @@ deployment:
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.Error(err)
 		s.ErrorContains(err, "worker queue option is invalid: worker concurrency")
 		mockCoreClient.AssertExpectations(s.T())
@@ -2664,10 +2666,169 @@ deployment:
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, errUpdateFailed).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, nil)
+		err = CreateOrUpdate("deployment.yaml", "update", mockPlatformCoreClient, mockCoreClient, nil, false, 0*time.Second)
 		s.ErrorIs(err, errUpdateFailed)
 		s.ErrorContains(err, "failed to update deployment with input")
 		mockCoreClient.AssertExpectations(s.T())
+	})
+}
+
+// TestWaitForStatus verifies the behavior of createOrUpdateDeployment when the
+// waitForStatus flag is toggled. When waitForStatus is true, the helper
+// should poll the deployment until it becomes healthy by repeatedly calling
+// CoreGetDeployment. When waitForStatus is false (the default), no polling
+// should occur. Additional subtests validate error propagation when the
+// deployment never becomes healthy (timeout) and when the API returns an
+// error during polling.
+func (s *Suite) TestWaitForStatus() {
+	// a minimal deployment file encoded in YAML that satisfies the required
+	// fields for createOrUpdateDeployment.
+	const minimalDeploymentYAML = `
+deployment:
+  configuration:
+    name: test-deployment
+    workspace_name: test-workspace
+    deployment_type: HYBRID
+    executor: CeleryExecutor
+`
+
+	s.Run("create with wait polls until healthy", func() {
+		// HealthPoll should call CoreGetDeployment until it returns a deployment
+		// with status HEALTHY.  We simulate one intermediate DEPLOYING status
+		// followed by a HEALTHY status. The callCount should therefore end up at 2.
+		callCount := 0
+		statuses := []astroplatformcore.DeploymentStatus{
+			astroplatformcore.DeploymentStatusDEPLOYING,
+			astroplatformcore.DeploymentStatusHEALTHY,
+		}
+
+		// Save originals so we can restore after the subtest
+		origCreate := deployment.CoreCreateDeployment
+		origGet := deployment.CoreGetDeployment
+		origSleep := deployment.SleepTime
+		origTick := deployment.TickNum
+		defer func() {
+			deployment.CoreCreateDeployment = origCreate
+			deployment.CoreGetDeployment = origGet
+			deployment.SleepTime = origSleep
+			deployment.TickNum = origTick
+		}()
+
+		// Patch CoreCreateDeployment to return a stub deployment
+		deployment.CoreCreateDeployment = func(orgID string, req astroplatformcore.CreateDeploymentJSONRequestBody, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{Id: "test-id", Name: "test-deployment"}, nil
+		}
+		// Patch CoreGetDeployment to return DEPLOYING on the first call,
+		// then HEALTHY on the second call.
+		deployment.CoreGetDeployment = func(orgID, deploymentID string, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			status := astroplatformcore.DeploymentStatusDEPLOYING
+			if callCount < len(statuses) {
+				status = statuses[callCount]
+			}
+			callCount++
+			return astroplatformcore.Deployment{Id: deploymentID, Name: "test-deployment", Status: status}, nil
+		}
+
+		// Reduce wait timings so the test does not take long
+		deployment.SleepTime = 0
+		deployment.TickNum = 1
+
+		// Build the FormattedDeployment from YAML
+		var fd inspect.FormattedDeployment
+		err := yaml.Unmarshal([]byte(minimalDeploymentYAML), &fd)
+		s.Require().NoError(err)
+
+		// Run createOrUpdateDeployment with waitForStatus=true, allow time for 2 polls
+		err = createOrUpdateDeployment(&fd, "", "ws-id", createAction, &astroplatformcore.Deployment{}, nil, false, nil, nil, nil, true, 3*time.Second)
+		s.NoError(err)
+		s.Equal(2, callCount, "expected two polling iterations before becoming healthy")
+	})
+
+	s.Run("create without wait does not poll", func() {
+		callCount := 0
+		origCreate := deployment.CoreCreateDeployment
+		origGet := deployment.CoreGetDeployment
+		defer func() {
+			deployment.CoreCreateDeployment = origCreate
+			deployment.CoreGetDeployment = origGet
+		}()
+
+		deployment.CoreCreateDeployment = func(orgID string, req astroplatformcore.CreateDeploymentJSONRequestBody, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{Id: "test-id", Name: "test-deployment"}, nil
+		}
+		deployment.CoreGetDeployment = func(orgID, deploymentID string, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			callCount++
+			return astroplatformcore.Deployment{Id: deploymentID, Name: "test-deployment", Status: astroplatformcore.DeploymentStatusHEALTHY}, nil
+		}
+
+		var fd inspect.FormattedDeployment
+		err := yaml.Unmarshal([]byte(minimalDeploymentYAML), &fd)
+		s.Require().NoError(err)
+
+		err = createOrUpdateDeployment(&fd, "", "ws-id", createAction, &astroplatformcore.Deployment{}, nil, false, nil, nil, nil, false, 0*time.Second)
+		s.NoError(err)
+		s.Equal(0, callCount, "expected no polling when waitForStatus is false")
+	})
+
+	s.Run("poll times out when deployment never becomes healthy", func() {
+		origCreate := deployment.CoreCreateDeployment
+		origGet := deployment.CoreGetDeployment
+		origSleep := deployment.SleepTime
+		origTick := deployment.TickNum
+		defer func() {
+			deployment.CoreCreateDeployment = origCreate
+			deployment.CoreGetDeployment = origGet
+			deployment.SleepTime = origSleep
+			deployment.TickNum = origTick
+		}()
+
+		deployment.CoreCreateDeployment = func(orgID string, req astroplatformcore.CreateDeploymentJSONRequestBody, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{Id: "test-id", Name: "test-deployment"}, nil
+		}
+		// Always return DEPLOYING; HealthPoll will eventually time out.
+		deployment.CoreGetDeployment = func(orgID, deploymentID string, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{Id: deploymentID, Name: "test-deployment", Status: astroplatformcore.DeploymentStatusDEPLOYING}, nil
+		}
+		deployment.SleepTime = 0
+		deployment.TickNum = 1
+
+		var fd inspect.FormattedDeployment
+		err := yaml.Unmarshal([]byte(minimalDeploymentYAML), &fd)
+		s.Require().NoError(err)
+
+		err = createOrUpdateDeployment(&fd, "", "ws-id", createAction, &astroplatformcore.Deployment{}, nil, false, nil, nil, nil, true, 100*time.Millisecond)
+		s.ErrorIs(err, deployment.ErrTimedOut, "expected ErrTimedOut when deployment does not become healthy")
+	})
+
+	s.Run("poll returns API error when CoreGetDeployment errors", func() {
+		origCreate := deployment.CoreCreateDeployment
+		origGet := deployment.CoreGetDeployment
+		origSleep := deployment.SleepTime
+		origTick := deployment.TickNum
+		defer func() {
+			deployment.CoreCreateDeployment = origCreate
+			deployment.CoreGetDeployment = origGet
+			deployment.SleepTime = origSleep
+			deployment.TickNum = origTick
+		}()
+
+		deployment.CoreCreateDeployment = func(orgID string, req astroplatformcore.CreateDeploymentJSONRequestBody, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{Id: "test-id", Name: "test-deployment"}, nil
+		}
+		// Simulate an API error
+		apiErr := errors.New("api error during polling")
+		deployment.CoreGetDeployment = func(orgID, deploymentID string, pc astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+			return astroplatformcore.Deployment{}, apiErr
+		}
+		deployment.SleepTime = 0
+		deployment.TickNum = 1
+
+		var fd inspect.FormattedDeployment
+		err := yaml.Unmarshal([]byte(minimalDeploymentYAML), &fd)
+		s.Require().NoError(err)
+
+		err = createOrUpdateDeployment(&fd, "", "ws-id", createAction, &astroplatformcore.Deployment{}, nil, false, nil, nil, nil, true, 3*time.Second)
+		s.ErrorIs(err, apiErr, "expected error returned from CoreGetDeployment to propagate")
 	})
 }
 
@@ -2725,7 +2886,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 			},
 		}
 
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.ErrorContains(err, "worker_type: test-worker-8 does not exist in cluster: test-cluster")
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -2771,7 +2932,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 			},
 		}
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.ErrorContains(err, "worker queue option is invalid: min worker count")
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -2817,7 +2978,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 			},
 		}
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, errTest).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.ErrorIs(err, errTest)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -2879,7 +3040,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 		}
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.NoError(err)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -2917,7 +3078,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 			},
 		}
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.ErrorContains(err, "don't use 'worker_queues' to update default queue with KubernetesExecutor")
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -2934,7 +3095,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, nil, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, nil, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.NoError(err)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -2964,7 +3125,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 		}
 
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.NoError(err)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -3030,7 +3191,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &astroplatformcore.Deployment{}, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.NoError(err)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -3066,7 +3227,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 		}
 
 		mockPlatformCoreClient.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "create", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.NoError(err)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -3087,7 +3248,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 			Name:      "test-deployment",
 			ClusterId: &clusterID,
 		}
-		err = createOrUpdateDeployment(&deploymentFromFile, "diff-cluster", workspaceID, "update", &existingDeployment, nil, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, "diff-cluster", workspaceID, "update", &existingDeployment, nil, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.ErrorIs(err, errNotPermitted)
 		s.ErrorContains(err, "changing an existing deployment's cluster is not permitted")
 		mockCoreClient.AssertExpectations(s.T())
@@ -3127,7 +3288,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 		}
 
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.NoError(err)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -3168,7 +3329,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 		}
 
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.NoError(err)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -3218,7 +3379,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 		}
 
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.NoError(err)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -3268,7 +3429,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 		}
 
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.NoError(err)
 		mockCoreClient.AssertExpectations(s.T())
 	})
@@ -3342,7 +3503,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 
 		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient)
+		err = createOrUpdateDeployment(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, dagDeploy, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, mockCoreClient, mockPlatformCoreClient, false, 0*time.Second)
 		s.NoError(err)
 		mockCoreClient.AssertExpectations(s.T())
 	})

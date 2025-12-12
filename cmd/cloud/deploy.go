@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"fmt"
+	"time"
 
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cmd/utils"
@@ -20,6 +21,7 @@ var (
 	parse             bool
 	dags              bool
 	waitForDeploy     bool
+	waitTime          time.Duration
 	image             bool
 	dagsPath          string
 	pytestFile        string
@@ -37,21 +39,22 @@ Menu will be presented if you do not specify a deployment ID:
   $ astro deploy
 `
 
-	DeployImage       = cloud.Deploy
-	EnsureProjectDir  = utils.EnsureProjectDir
-	buildSecrets      = []string{}
-	forceUpgradeToAF3 bool
+	DeployImage      = cloud.Deploy
+	EnsureProjectDir = utils.EnsureProjectDir
+	buildSecrets     = []string{}
 )
 
 const (
 	registryUncommitedChangesMsg = "Project directory has uncommitted changes, use `astro deploy [deployment-id] -f` to force deploy."
+
+	deployWaitTime = 300 * time.Second
 )
 
 func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT-ID",
 		Short:   "Deploy your project to a Deployment on Astro",
-		Long:    "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. It does not include any metadata associated with your local Airflow environment.",
+		Long:    "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use `astro remote deploy` instead. It does not include any metadata associated with your local Airflow environment.",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: EnsureProjectDir,
 		RunE:    deploy,
@@ -64,17 +67,19 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&pytest, "pytest", false, "Deploy code to Astro only if the specified Pytests are passed")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables for Pytests")
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
-	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
+	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy, or image name with custom tag when used with --client")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
 	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have DAG Deploy enabled your DAGs will not be affected.")
 	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
+	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
-	cmd.Flags().BoolVar(&forceUpgradeToAF3, "force-upgrade-to-af3", false, "Force allow upgrade from Airflow 2 to Airflow 3")
+	cmd.Flags().Bool("force-upgrade-to-af3", false, "This flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.")
+	cmd.Flags().MarkDeprecated("force-upgrade-to-af3", "this flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.") //nolint:errcheck
 	return cmd
 }
 
@@ -100,6 +105,10 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// Get deploymentId from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
+	}
+
+	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
+		return errors.New("cannot use --wait-time with --wait=false")
 	}
 
 	if deploymentID == "" || forcePrompt || workspaceID == "" {
@@ -151,10 +160,10 @@ func deploy(cmd *cobra.Command, args []string) error {
 		Dags:              dags,
 		Image:             image,
 		WaitForStatus:     waitForDeploy,
+		WaitTime:          waitTime,
 		DagsPath:          dagsPath,
 		Description:       deployDescription,
 		BuildSecretString: BuildSecretString,
-		ForceUpgradeToAF3: forceUpgradeToAF3,
 	}
 
 	return DeployImage(deployInput, platformCoreClient, astroCoreClient)

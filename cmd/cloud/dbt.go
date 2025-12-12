@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cloud/deployment"
@@ -25,6 +26,7 @@ const (
 	dbtDefaultMountPathPrefix = "/usr/local/airflow/dbt/"
 	dbtProjectYmlFilename     = "dbt_project.yml"
 	dbtBundleType             = "dbt"
+	dbtWaitTime               = 300 * time.Second
 )
 
 func newDbtCmd() *cobra.Command {
@@ -63,6 +65,7 @@ Menu will be presented if you do not specify a deployment ID:
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to deploy to")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Description to store on the deploy")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
+	cmd.Flags().DurationVarP(&waitTime, "wait-time", "t", dbtWaitTime, "Time to wait for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 
 	return cmd
 }
@@ -105,6 +108,10 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
+		return errors.New("cannot use --wait-time with --wait=false")
+	}
+
 	// get the deployment id to deploy the dbt project to
 	deploymentID, err := resolveDeploymentIDFromDbtArgsFlags(args, workspaceID, deploymentName)
 	if err != nil {
@@ -126,6 +133,7 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 		BundleType:         dbtBundleType,
 		Description:        deployDescription,
 		Wait:               waitForDeploy,
+		WaitTime:           waitTime,
 		PlatformCoreClient: platformCoreClient,
 		CoreClient:         astroCoreClient,
 	}
@@ -155,7 +163,7 @@ Menu will be presented if you do not specify a deployment ID:
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to delete the dbt project from")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Description to store on the deploy")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
-
+	cmd.Flags().DurationVarP(&waitTime, "wait-time", "t", dbtWaitTime, "Time to wait for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	return cmd
 }
 
@@ -169,6 +177,10 @@ func deleteDbt(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to find a valid workspace: %w", err)
 		}
+	}
+
+	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
+		return errors.New("cannot use --wait-time with --wait=false")
 	}
 
 	// get the deployment id to delete the dbt project
@@ -207,6 +219,7 @@ func deleteDbt(cmd *cobra.Command, args []string) error {
 		BundleType:         dbtBundleType,
 		Description:        deployDescription,
 		Wait:               waitForDeploy,
+		WaitTime:           waitTime,
 		PlatformCoreClient: platformCoreClient,
 		CoreClient:         astroCoreClient,
 	}

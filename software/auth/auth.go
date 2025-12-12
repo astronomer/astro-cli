@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/software/workspace"
+	"github.com/docker/docker/api/types/versions"
 )
 
 const (
@@ -81,8 +82,8 @@ func oAuth(oAuthURL string) string {
 	return input.Text(inputOAuthToken)
 }
 
-// registryAuth authenticates with the private registry
-func registryAuth(client houston.ClientInterface, out io.Writer) error {
+// RegistryAuth authenticates with the private registry
+func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain string) error {
 	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -97,22 +98,34 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 		return err
 	}
 
+	// return early if version is >= 1.0.0 and no registry domain is supplied since we cannot proceed
+	// the calling function should never supply a blank registry domain for versions >= 1.0.0
+	if versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0") && !appConfig.Flags.BYORegistryEnabled && registryDomain == "" {
+		return nil
+	}
+
 	var registry string
-	if appConfig.Flags.BYORegistryEnabled {
+	switch {
+	case appConfig.Flags.BYORegistryEnabled:
+		// use the configured registry domain for BYO registry
 		registry = appConfig.BYORegistryDomain
-	} else {
+	case versions.GreaterThanOrEqualTo(appConfig.Version, "1.0.0"):
+		// use the registry passed in for versions >= 1.0.0
+		registry = registryDomain
+	default:
+		// default to registry.{domain} for versions < 1.0.0
 		registry = registryDomainPrefix + c.Domain
 	}
 
-	token := c.Token
-	registryDomain := strings.Split(registry, "/")[0]
+	// return the host portion of the registry, strip out any path info
+	registryDomain, _, _ = strings.Cut(registry, "/")
 	registryHandler, err := registryHandlerInit(registryDomain)
 	if err != nil {
 		return err
 	}
 
 	if !appConfig.Flags.BYORegistryEnabled {
-		err = registryHandler.Login("user", token)
+		err = registryHandler.Login("user", c.Token)
 	} else {
 		err = registryHandler.Login("", "")
 	}
@@ -234,7 +247,7 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		}
 	}
 
-	err = registryAuth(client, out)
+	err = RegistryAuth(client, out, "")
 	if err != nil {
 		logger.Debugf("There was an error logging into registry: %s", err.Error())
 	}

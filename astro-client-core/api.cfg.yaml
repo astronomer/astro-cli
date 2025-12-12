@@ -15,4 +15,6 @@ include-tags:
   - Deploy
   - Environment
   - Role
+  - Polaris Project
+  - Polaris Session
 output: ./astro-client-core/api.gen.go

@@ -12,6 +12,7 @@ import (
 	roleClient "github.com/astronomer/astro-cli/cloud/role"
 	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"
+	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/spf13/cobra"
@@ -22,6 +23,7 @@ var (
 	orgList                            = organization.List
 	orgSwitch                          = organization.Switch
 	orgExportAuditLogs                 = organization.ExportAuditLogs
+	wsSwitch                           = workspace.Switch
 	orgName                            string
 	auditLogsOutputFilePath            string
 	auditLogsEarliestParam             int
@@ -94,6 +96,8 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for organization switch")
+	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "The Workspace's unique identifier")
+
 	return cmd
 }
 
@@ -202,7 +206,14 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationNameOrID = args[0]
 	}
 
-	return orgSwitch(organizationNameOrID, astroCoreClient, platformCoreClient, out, shouldDisplayLoginLink)
+	if err := orgSwitch(organizationNameOrID, astroCoreClient, platformCoreClient, out, shouldDisplayLoginLink); err != nil {
+		return err
+	}
+
+	if workspaceID != "" {
+		return wsSwitch(workspaceID, astroCoreClient, out)
+	}
+	return nil
 }
 
 func organizationExportAuditLogs(cmd *cobra.Command) error {

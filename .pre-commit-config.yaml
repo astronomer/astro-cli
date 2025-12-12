@@ -9,11 +9,11 @@ repos:
         language: system
         entry: 'gofmt -w -s'
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 25.1.0
     hooks:
       - id: black
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-case-conflict
       - id: check-executables-have-shebangs
@@ -44,11 +44,11 @@ repos:
       - id: beautysh
         args: ['--indent-size', '2']
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.35.1
+    rev: v1.37.1
     hooks:
       - id: yamllint
   - repo: https://github.com/astronomer/pre-commit-hooks
-    rev: 8b2d969bd549cd7c9454cc8bb54eec5b35c2e5e6
+    rev: 37614dad793bbbdea699c63c8b341ce1e2bf855a
     hooks:
       - id: CVE-2017-18342
       - id: replace-en-dashes

@@ -105,8 +105,6 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	var byoRegistryEnabled bool
-	var byoRegistryDomain string
 	if description == "" {
 		description = utils.GetDefaultDeployDescription(isDagOnlyDeploy)
 	}
@@ -129,7 +127,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
-		deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt, description, isImageOnlyDeploy, imageName)
+		deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, ignoreCacheDeploy, forcePrompt, description, isImageOnlyDeploy, imageName)
 		if err != nil {
 			return err
 		}

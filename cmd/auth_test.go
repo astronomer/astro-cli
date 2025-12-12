@@ -18,7 +18,7 @@ func (s *CmdSuite) TestAuthRootCommand() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	output, err := executeCommand("login", "--help")
 	s.NoError(err)
-	s.Contains(output, "Authenticate to Astro or Astronomer Software")
+	s.Contains(output, "Authenticate to Astro or Astro Private Cloud")
 }
 
 func (s *CmdSuite) TestLogin() {
@@ -58,7 +58,7 @@ func (s *CmdSuite) TestLogin() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	softwareDomain = "software.astronomer.io"
 	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, buf)
-	s.Contains(buf.String(), "To login to Astronomer Software follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
+	s.Contains(buf.String(), "To login to Astro Private Cloud follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 }
 
 func (s *CmdSuite) TestLogout() {
@@ -93,5 +93,5 @@ func (s *CmdSuite) TestLogout() {
 	// no domain, no current context set
 	config.ResetCurrentContext()
 	err = logout(&cobra.Command{}, []string{}, os.Stdout)
-	s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	s.EqualError(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 }

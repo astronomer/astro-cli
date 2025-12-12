@@ -250,11 +250,12 @@ const (
 
 // Defines values for OrganizationPaymentMethod.
 const (
-	AWSMARKETPLACE   OrganizationPaymentMethod = "AWS_MARKETPLACE"
-	AZUREMARKETPLACE OrganizationPaymentMethod = "AZURE_MARKETPLACE"
-	CREDITCARD       OrganizationPaymentMethod = "CREDIT_CARD"
-	GCPMARKETPLACE   OrganizationPaymentMethod = "GCP_MARKETPLACE"
-	INVOICE          OrganizationPaymentMethod = "INVOICE"
+	AWSMARKETPLACE       OrganizationPaymentMethod = "AWS_MARKETPLACE"
+	AZUREMARKETPLACE     OrganizationPaymentMethod = "AZURE_MARKETPLACE"
+	CREDITCARD           OrganizationPaymentMethod = "CREDIT_CARD"
+	GCPMARKETPLACE       OrganizationPaymentMethod = "GCP_MARKETPLACE"
+	INVOICE              OrganizationPaymentMethod = "INVOICE"
+	SNOWFLAKEMARKETPLACE OrganizationPaymentMethod = "SNOWFLAKE_MARKETPLACE"
 )
 
 // Defines values for OrganizationProduct.
@@ -1193,6 +1194,9 @@ type Deployment struct {
 	// AirflowVersion The Deployment's Airflow version.
 	AirflowVersion string `json:"airflowVersion"`
 
+	// ApiUrl The base URL to directly access the Airflow API.
+	ApiUrl string `json:"apiUrl"`
+
 	// AstroRuntimeVersion The Deployment's Astro Runtime version.
 	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
 
@@ -1313,6 +1317,9 @@ type Deployment struct {
 
 	// Type The type of cluster that the Deployment runs on.
 	Type *DeploymentType `json:"type,omitempty"`
+
+	// UiUrl The URL to access the Airflow UI.
+	UiUrl string `json:"uiUrl"`
 
 	// UpdatedAt The time when the Deployment was last updated in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
 	UpdatedAt time.Time           `json:"updatedAt"`
