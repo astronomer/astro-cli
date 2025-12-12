@@ -732,6 +732,30 @@ var (
 				}
 			}`,
 		},
+		{
+			version: "1.1.0",
+			query: `
+			query GetDeployment(
+				$id: String!
+			){
+				deployment(
+					where: {id: $id}
+				){
+					id
+					runtimeVersion
+					runtimeAirflowVersion
+					releaseName
+					urls {
+						type
+						url
+					}
+					dagDeployment {
+						type
+					}
+					clusterId
+				}
+			}`,
+		},
 	}
 
 	DeploymentDeleteRequest = `
