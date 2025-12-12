@@ -222,7 +222,7 @@ var (
 			    }`,
 		},
 		{
-			version: "1.1.0",
+			version: "1.0.1",
 			query: `
 			mutation upsertDeployment(
 				$label: String,
@@ -359,7 +359,7 @@ var (
 			}`,
 		},
 		{
-			version: "1.1.0",
+			version: "1.0.1",
 			query: `
 			query GetDeployment(
 				$workspaceId: Uuid!
@@ -452,7 +452,7 @@ var (
 			}`,
 		},
 		{
-			version: "1.1.0",
+			version: "1.0.1",
 			query: `
 			query paginatedDeployments( $take: Int, $name: String, $cursor: Uuid, $pageNumber: Int, $clusterId: Uuid) {
 				paginatedDeployments(
@@ -596,7 +596,7 @@ var (
 			    }`,
 		},
 		{
-			version: "1.1.0",
+			version: "1.0.1",
 			query: `
 			mutation upsertDeployment(
 			    $deploymentId: Uuid!,
@@ -709,7 +709,7 @@ var (
 			}`,
 		},
 		{
-			version: "1.1.0",
+			version: "1.0.1",
 			query: `
 			query GetDeployment(
 				$id: String!
@@ -733,7 +733,7 @@ var (
 			}`,
 		},
 		{
-			version: "1.1.0",
+			version: "1.0.1",
 			query: `
 			query GetDeployment(
 				$id: String!
