@@ -271,8 +271,14 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		nextTag = deploy.ImageTag
 	} else {
 		// Use v1beta1 API (default behavior)
+		// Still try to use commit message as description fallback
+		description := deployInput.Description
+		if description == "" {
+			_, commitMessage := retrieveLocalGitMetadata(deployInput.Path)
+			description = commitMessage
+		}
 		createDeployRequest := astroplatformcore.CreateDeployRequest{
-			Description: &deployInput.Description,
+			Description: &description,
 		}
 		switch {
 		case deployInput.Dags:
