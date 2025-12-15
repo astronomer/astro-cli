@@ -181,7 +181,6 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	config.CFG.DeployGitMetadata.SetHomeString("false")
 
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
@@ -282,7 +281,6 @@ func TestDeployOnRemoteExecutionDeployment(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	config.CFG.DeployGitMetadata.SetHomeString("false")
 
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
@@ -387,7 +385,6 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	config.CFG.DeployGitMetadata.SetHomeString("false")
 	canCiCdDeploy = func(astroAPIToken string) bool {
 		return false
 	}
@@ -425,7 +422,6 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	config.CFG.DeployGitMetadata.SetHomeString("false")
 
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(9)
@@ -558,7 +554,6 @@ func TestDagsDeploySuccess(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	config.CFG.DeployGitMetadata.SetHomeString("false")
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(6)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(12)
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(4)
@@ -644,7 +639,6 @@ func TestImageOnlyDeploySuccess(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	config.CFG.DeployGitMetadata.SetHomeString("false")
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Times(2)
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(1)
@@ -681,7 +675,6 @@ func TestImageOnlyDeploySuccess(t *testing.T) {
 func TestNoDagsDeploy(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("true")
-	config.CFG.DeployGitMetadata.SetHomeString("false")
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
@@ -718,7 +711,6 @@ func TestNoDagsDeploy(t *testing.T) {
 func TestDagsDeployFailed(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	config.CFG.DeployGitMetadata.SetHomeString("false")
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
@@ -803,7 +795,6 @@ func TestDeployFailure(t *testing.T) {
 	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	config.CFG.DeployGitMetadata.SetHomeString("false")
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Times(1)
@@ -877,7 +868,6 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	config.CFG.DeployGitMetadata.SetHomeString("false")
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
@@ -961,7 +951,6 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	config.CFG.DeployGitMetadata.SetHomeString("false")
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
