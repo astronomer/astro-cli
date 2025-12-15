@@ -239,15 +239,14 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		return err
 	}
 
-	// Determine deploy type
-	var deployType string
+	// Determine deploy type for v1alpha1 API (uses IMAGE, DAG, BUNDLE)
+	var deployTypeV1Alpha1 astrocore.CreateDeployRequestType
 	switch {
 	case deployInput.Dags:
-		deployType = "DAG"
-	case deployInput.Image:
-		deployType = "IMAGE"
+		deployTypeV1Alpha1 = astrocore.CreateDeployRequestTypeDAG
 	default:
-		deployType = "IMAGE_AND_DAG"
+		// v1alpha1 uses IMAGE for both image-only and image+dag deploys
+		deployTypeV1Alpha1 = astrocore.CreateDeployRequestTypeIMAGE
 	}
 
 	// Check if git metadata is enabled via config or environment variable
@@ -257,7 +256,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	var imageRepository string
 	if useGitMetadata {
 		// Use v1alpha1 API with git metadata support
-		deploy, err := createDeployWithGit(deployInfo.organizationID, deployInfo.deploymentID, deployType, deployInput.Description, deployInput.Path, coreClient)
+		deploy, err := createDeployWithGit(deployInfo.organizationID, deployInfo.deploymentID, deployTypeV1Alpha1, deployInput.Description, deployInput.Path, coreClient)
 		if err != nil {
 			return err
 		}
@@ -799,7 +798,7 @@ func createDeploy(organizationID, deploymentID string, request astroplatformcore
 
 // createDeployWithGit creates a deploy using the v1alpha1 API which supports git metadata.
 // This function retrieves git metadata from the local repository and includes it in the deploy request.
-func createDeployWithGit(organizationID, deploymentID, deployType, description, path string, coreClient astrocore.CoreClient) (*astrocore.Deploy, error) {
+func createDeployWithGit(organizationID, deploymentID string, deployType astrocore.CreateDeployRequestType, description, path string, coreClient astrocore.CoreClient) (*astrocore.Deploy, error) {
 	// Retrieve git metadata from local repository
 	deployGit, commitMessage := retrieveLocalGitMetadata(path)
 
@@ -809,7 +808,7 @@ func createDeployWithGit(organizationID, deploymentID, deployType, description, 
 	}
 
 	request := astrocore.CreateDeployRequest{
-		Type: astrocore.CreateDeployRequestType(deployType),
+		Type: deployType,
 	}
 	if description != "" {
 		request.Description = &description
