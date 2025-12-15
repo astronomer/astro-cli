@@ -238,31 +238,66 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	if err != nil {
 		return err
 	}
-	createDeployRequest := astroplatformcore.CreateDeployRequest{
-		Description: &deployInput.Description,
-	}
+
+	// Determine deploy type
+	var deployType string
 	switch {
 	case deployInput.Dags:
-		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeDAGONLY
+		deployType = "DAG"
 	case deployInput.Image:
-		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEONLY
+		deployType = "IMAGE"
 	default:
-		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEANDDAG
+		deployType = "IMAGE_AND_DAG"
 	}
-	deploy, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, createDeployRequest, platformCoreClient)
-	if err != nil {
-		return err
-	}
-	deployID := deploy.Id
-	if deploy.DagsUploadUrl != nil {
-		dagsUploadURL = *deploy.DagsUploadUrl
-	} else {
-		dagsUploadURL = ""
-	}
-	if deploy.ImageTag != "" {
+
+	// Check if git metadata is enabled via config or environment variable
+	useGitMetadata := config.CFG.DeployGitMetadata.GetBool() || util.CheckEnvBool(os.Getenv("ASTRO_DEPLOY_GIT_METADATA"))
+
+	var deployID string
+	var imageRepository string
+	if useGitMetadata {
+		// Use v1alpha1 API with git metadata support
+		deploy, err := createDeployWithGit(deployInfo.organizationID, deployInfo.deploymentID, deployType, deployInput.Description, deployInput.Path, coreClient)
+		if err != nil {
+			return err
+		}
+		deployID = deploy.Id
+		imageRepository = deploy.ImageRepository
+		if deploy.DagsUploadUrl != nil {
+			dagsUploadURL = *deploy.DagsUploadUrl
+		} else {
+			dagsUploadURL = ""
+		}
 		nextTag = deploy.ImageTag
 	} else {
-		nextTag = ""
+		// Use v1beta1 API (default behavior)
+		createDeployRequest := astroplatformcore.CreateDeployRequest{
+			Description: &deployInput.Description,
+		}
+		switch {
+		case deployInput.Dags:
+			createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeDAGONLY
+		case deployInput.Image:
+			createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEONLY
+		default:
+			createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEANDDAG
+		}
+		deploy, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, createDeployRequest, platformCoreClient)
+		if err != nil {
+			return err
+		}
+		deployID = deploy.Id
+		imageRepository = deploy.ImageRepository
+		if deploy.DagsUploadUrl != nil {
+			dagsUploadURL = *deploy.DagsUploadUrl
+		} else {
+			dagsUploadURL = ""
+		}
+		if deploy.ImageTag != "" {
+			nextTag = deploy.ImageTag
+		} else {
+			nextTag = ""
+		}
 	}
 
 	if deployInput.Dags {
@@ -369,7 +404,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			fmt.Println("No DAGs found. Skipping testing...")
 		}
 
-		repository := deploy.ImageRepository
+		repository := imageRepository
 		// TODO: Resolve the edge case where two people push the same nextTag at the same time
 		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
 
@@ -746,6 +781,49 @@ func finalizeDeploy(deployID, deploymentID, organizationID, dagTarballVersion st
 
 func createDeploy(organizationID, deploymentID string, request astroplatformcore.CreateDeployRequest, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Deploy, error) {
 	resp, err := platformCoreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, request)
+	if err != nil {
+		return nil, err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return resp.JSON200, err
+}
+
+// createDeployWithGit creates a deploy using the v1alpha1 API which supports git metadata.
+// This function retrieves git metadata from the local repository and includes it in the deploy request.
+func createDeployWithGit(organizationID, deploymentID, deployType, description, path string, coreClient astrocore.CoreClient) (*astrocore.Deploy, error) {
+	// Retrieve git metadata from local repository
+	deployGit, commitMessage := retrieveLocalGitMetadata(path)
+
+	// Fall back to commit message if no description provided
+	if description == "" && commitMessage != "" {
+		description = commitMessage
+	}
+
+	request := astrocore.CreateDeployRequest{
+		Type: astrocore.CreateDeployRequestType(deployType),
+	}
+	if description != "" {
+		request.Description = &description
+	}
+
+	// Add git metadata if available
+	if deployGit != nil {
+		request.Git = &astrocore.CreateDeployGitRequest{
+			Provider:   astrocore.CreateDeployGitRequestProvider(deployGit.Provider),
+			Account:    deployGit.Account,
+			Repo:       deployGit.Repo,
+			Branch:     deployGit.Branch,
+			CommitSha:  deployGit.CommitSha,
+			CommitUrl:  deployGit.CommitUrl,
+			AuthorName: deployGit.AuthorName,
+			Path:       deployGit.Path,
+		}
+	}
+
+	resp, err := coreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, request)
 	if err != nil {
 		return nil, err
 	}

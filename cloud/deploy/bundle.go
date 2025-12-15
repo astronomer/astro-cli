@@ -286,6 +286,8 @@ func finalizeBundleDeploy(organizationID, deploymentID, deployID, tarballVersion
 	return nil
 }
 
+// retrieveLocalGitMetadata retrieves git metadata from the local repository for deploy tracking.
+// Returns nil and empty string if the repository has uncommitted changes or if git metadata cannot be retrieved.
 func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrocore.DeployGit, commitMessage string) {
 	if git.HasUncommittedChanges(bundlePath) {
 		fmt.Println("Local repository has uncommitted changes, skipping Git metadata retrieval")
