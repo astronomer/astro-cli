@@ -221,6 +221,50 @@ var (
 			      }
 			    }`,
 		},
+		{
+			version: "1.0.1",
+			query: `
+			mutation upsertDeployment(
+				$label: String,
+			    $workspaceId: Uuid,
+			    $clusterId: Uuid,
+			    $releaseName: String,
+				$executor: ExecutorType,
+				$runtimeVersion: String,
+			    $namespace: String,
+				$cloudRole: String,
+				$dagDeployment: DagDeployment,
+				$triggererReplicas: Int,
+			  ) {
+			    upsertDeployment(
+			      workspaceUuid: $workspaceId,
+			      clusterId: $clusterId,
+			      label: $label,
+			      releaseName: $releaseName,
+			      namespace: $namespace,
+			      runtimeVersion: $runtimeVersion,
+			      executor: $executor,
+			      triggerer: {
+						replicas: $triggererReplicas
+					}
+			      dagDeployment: $dagDeployment,
+			      cloudRole: $cloudRole,
+			    ) {
+			        id
+					type
+					label
+					releaseName
+					version
+					runtimeVersion
+					urls {
+						type
+						url
+					}
+					createdAt
+					updatedAt
+			      }
+			    }`,
+		},
 	}
 
 	DeploymentsGetRequest = queryList{
@@ -314,6 +358,36 @@ var (
 				}
 			}`,
 		},
+		{
+			version: "1.0.1",
+			query: `
+			query GetDeployment(
+				$workspaceId: Uuid!
+				$releaseName: String
+			){
+				workspaceDeployments(
+					workspaceUuid: $workspaceId
+					releaseName: $releaseName
+				){
+					id
+					type
+					label
+					releaseName
+					workspace {
+						id
+					}
+					deployInfo {
+						nextCli
+						current
+					}
+					version
+					runtimeVersion
+					clusterId
+					createdAt
+					updatedAt
+				}
+			}`,
+		},
 	}
 
 	PaginatedDeploymentsGetRequest = queryList{
@@ -370,6 +444,36 @@ var (
 					}
 					version
 					airflowVersion
+					runtimeVersion
+					clusterId
+					createdAt
+					updatedAt
+				}
+			}`,
+		},
+		{
+			version: "1.0.1",
+			query: `
+			query paginatedDeployments( $take: Int, $name: String, $cursor: Uuid, $pageNumber: Int, $clusterId: Uuid) {
+				paginatedDeployments(
+					take: $take
+					name: $name
+					cursor: $cursor
+					pageNumber: $pageNumber
+					clusterId: $clusterId
+				) {
+					id
+					type
+					label
+					releaseName
+					workspace {
+						id
+					}
+					deployInfo {
+						nextCli
+						current
+					}
+					version
 					runtimeVersion
 					clusterId
 					createdAt
@@ -491,6 +595,44 @@ var (
 			      }
 			    }`,
 		},
+		{
+			version: "1.0.1",
+			query: `
+			mutation upsertDeployment(
+			    $deploymentId: Uuid!,
+				$label: String,
+			    $description: String,
+				$executor: ExecutorType,
+				$cloudRole: String,
+				$dagDeployment: DagDeployment,
+				$triggererReplicas: Int,
+			  ) {
+			    upsertDeployment(
+			      deploymentUuid: $deploymentId,
+			      label: $label,
+			      description: $description,
+			      executor: $executor,
+			      triggerer: {
+						replicas: $triggererReplicas
+					}
+			      dagDeployment: $dagDeployment,
+			      cloudRole: $cloudRole,
+			    ) {
+			        id
+					type
+					label
+					releaseName
+					version
+					runtimeVersion
+					urls {
+						type
+						url
+					}
+					createdAt
+					updatedAt
+			      }
+			    }`,
+		},
 	}
 
 	DeploymentGetRequest = queryList{
@@ -553,6 +695,30 @@ var (
 					desiredAirflowVersion
 					runtimeVersion
 					desiredRuntimeVersion
+					runtimeAirflowVersion
+					releaseName
+					urls {
+						type
+						url
+					}
+					dagDeployment {
+						type
+					}
+					clusterId
+				}
+			}`,
+		},
+		{
+			version: "1.0.1",
+			query: `
+			query GetDeployment(
+				$id: String!
+			){
+				deployment(
+					where: {id: $id}
+				){
+					id
+					runtimeVersion
 					runtimeAirflowVersion
 					releaseName
 					urls {
