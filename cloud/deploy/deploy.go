@@ -274,14 +274,14 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	// Add git metadata if available
 	if deployGit != nil {
 		createDeployRequest.Git = &astroplatformcore.CreateDeployGitRequest{
-			Provider:   astroplatformcore.GITHUB,
+			Provider:   astroplatformcore.CreateDeployGitRequestProvider(deployGit.Provider),
 			Account:    deployGit.Account,
 			Repo:       deployGit.Repo,
+			Path:       deployGit.Path,
 			Branch:     deployGit.Branch,
 			CommitSha:  deployGit.CommitSha,
 			CommitUrl:  deployGit.CommitUrl,
 			AuthorName: deployGit.AuthorName,
-			Path:       deployGit.Path,
 		}
 	}
 

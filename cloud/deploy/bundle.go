@@ -260,12 +260,12 @@ func createBundleDeploy(organizationID string, input *DeployBundleInput, deployG
 	if deployGit != nil {
 		request.Git = &astrocore.CreateDeployGitRequest{
 			Provider:   astrocore.CreateDeployGitRequestProvider(deployGit.Provider),
-			Repo:       deployGit.Repo,
 			Account:    deployGit.Account,
+			Repo:       deployGit.Repo,
 			Path:       deployGit.Path,
 			Branch:     deployGit.Branch,
 			CommitSha:  deployGit.CommitSha,
-			CommitUrl:  fmt.Sprintf("https://github.com/%s/%s/commit/%s", deployGit.Account, deployGit.Repo, deployGit.CommitSha),
+			CommitUrl:  deployGit.CommitUrl,
 			AuthorName: deployGit.AuthorName,
 		}
 	}
