@@ -239,8 +239,16 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		return err
 	}
 
-	// Retrieve git metadata from local repository
-	deployGit, commitMessage := retrieveLocalGitMetadata(deployInput.Path)
+	// Check if git metadata is enabled (default: true)
+	var deployGit *astrocore.DeployGit
+	var commitMessage string
+	gitMetadataEnabled := config.CFG.DeployGitMetadata.GetBool()
+	if envVal := os.Getenv("ASTRO_DEPLOY_GIT_METADATA"); envVal != "" {
+		gitMetadataEnabled = util.CheckEnvBool(envVal)
+	}
+	if gitMetadataEnabled {
+		deployGit, commitMessage = retrieveLocalGitMetadata(deployInput.Path)
+	}
 
 	// Use commit message as description fallback
 	description := deployInput.Description
