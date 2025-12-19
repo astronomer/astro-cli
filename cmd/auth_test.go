@@ -21,13 +21,35 @@ func (s *CmdSuite) TestAuthRootCommand() {
 	s.Contains(output, "Authenticate to Astro or Astro Private Cloud")
 }
 
+func setupTokenFile(token string) string {
+	tmpFile, err := os.CreateTemp("", "testfile_")
+	if err != nil {
+		return ""
+	}
+	defer tmpFile.Close()
+
+	_, err = tmpFile.Write([]byte(token))
+	if err != nil {
+		return ""
+	}
+	return tmpFile.Name()
+}
+
+func withTokenFlag(cmd *cobra.Command, token string) *cobra.Command {
+	cmd.Flags().Set("token-login", token)
+	return cmd
+}
+
 func (s *CmdSuite) TestLogin() {
 	buf := new(bytes.Buffer)
 	cloudDomain := "astronomer.io"
 	softwareDomain := "astronomer_dev.com"
+	token = "fake.jwt.claims"
+	tokenFilePath := setupTokenFile(token)
 
-	cloudLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+	cloudLogin = func(domain, tok string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 		s.Equal(cloudDomain, domain)
+		s.Equal(tok, token)
 		return nil
 	}
 
@@ -39,6 +61,12 @@ func (s *CmdSuite) TestLogin() {
 	// cloud login success
 	login(&cobra.Command{}, []string{cloudDomain}, nil, nil, buf)
 
+	// cloud login, token in flag value
+	login(withTokenFlag(&cobra.Command{}, token), []string{cloudDomain}, nil, nil, buf)
+
+	// cloud login, token in file
+	login(withTokenFlag(&cobra.Command{}, tokenFilePath), []string{cloudDomain}, nil, nil, buf)
+
 	// software login success
 	testUtil.InitTestConfig(testUtil.Initial)
 	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, buf)
@@ -46,6 +74,12 @@ func (s *CmdSuite) TestLogin() {
 	// no domain, cloud login
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	login(&cobra.Command{}, []string{}, nil, nil, buf)
+
+	// no domain, cloud login, token in flag value
+	login(withTokenFlag(&cobra.Command{}, token), []string{}, nil, nil, buf)
+
+	// no domain, cloud login, token in file
+	login(withTokenFlag(&cobra.Command{}, tokenFilePath), []string{}, nil, nil, buf)
 
 	// no domain, software login
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
