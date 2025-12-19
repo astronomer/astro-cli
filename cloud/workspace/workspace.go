@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -54,13 +55,17 @@ func GetCurrentWorkspace() (string, error) {
 func List(client astrocore.CoreClient, out io.Writer) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
+		logger.Debugf("Failed to get current context: %v", err)
 		return err
 	}
+	logger.Debugf("Current context - Organization: %s, Workspace: %s", c.Organization, c.Workspace)
 
 	ws, err := GetWorkspaces(client)
 	if err != nil {
+		logger.Debugf("Failed to fetch workspaces: %v", err)
 		return err
 	}
+	logger.Debugf("Successfully retrieved %d workspace(s)", len(ws))
 
 	tab := newTableOut()
 	for i := range ws {
@@ -71,6 +76,7 @@ func List(client astrocore.CoreClient, out io.Writer) error {
 
 		if c.Workspace == ws[i].Id {
 			color = true
+			logger.Debugf("Workspace '%s' (ID: %s) is the current workspace", name, workspace)
 		} else {
 			color = false
 		}
