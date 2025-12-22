@@ -1,11 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/astronomer/astro-cli/cmd"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/plugin"
 	"github.com/spf13/afero"
 )
 
@@ -18,7 +21,21 @@ func main() {
 	// TODO: Remove this when version logic is implemented
 	fs := afero.NewOsFs()
 	config.InitConfig(fs)
-	if err := cmd.NewRootCmd().Execute(); err != nil {
+
+	rootCmd := cmd.NewRootCmd()
+
+	// Silence errors so we can handle plugin fallback without Cobra printing the error first
+	rootCmd.SilenceErrors = true
+
+	if err := rootCmd.Execute(); err != nil {
+		// Check if this is an unknown command error and try to execute as plugin
+		if isUnknownCommandError(err) && len(os.Args) > 1 {
+			if tryExecutePlugin(os.Args[1:]) {
+				return // Plugin executed successfully
+			}
+		}
+		// Plugin not found or other error, print the original error
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
@@ -26,4 +43,28 @@ func main() {
 	// this should run for all commands,
 	// for most of the architectures there's no requirements:
 	ansi.InitConsole()
+}
+
+// isUnknownCommandError checks if the error indicates an unknown command
+func isUnknownCommandError(err error) bool {
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "unknown command") ||
+		strings.Contains(errMsg, "unknown subcommand")
+}
+
+// tryExecutePlugin attempts to find and execute a plugin for the given arguments
+func tryExecutePlugin(args []string) bool {
+	pluginPath, pluginArgs, err := plugin.FindPlugin(args)
+	if err != nil {
+		// No plugin found, let Cobra handle the error
+		return false
+	}
+
+	// Execute the plugin
+	if err := plugin.ExecutePlugin(pluginPath, pluginArgs); err != nil {
+		fmt.Fprintf(os.Stderr, "Error executing plugin: %v\n", err)
+		os.Exit(1)
+	}
+
+	return true
 }
