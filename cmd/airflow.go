@@ -70,6 +70,7 @@ var (
 	dagTest                bool
 	lintTest               bool
 	lintDeprecations       bool
+	lintFix                bool
 	lintConfigFile         string
 	waitTime               time.Duration
 	containerRuntime       runtimes.ContainerRuntime
@@ -224,6 +225,7 @@ func newAirflowUpgradeTestCmd(platformCoreClient astroplatformcore.CoreClient) *
 	cmd.Flags().BoolVarP(&dagTest, "dag-test", "d", false, "Only run DAG tests. These tests check whether your DAGs will generate import errors after you upgrade.")
 	cmd.Flags().BoolVarP(&lintTest, "lint-test", "l", false, "Only run ruff lint tests. These tests check whether your DAGs are compatible with Airflow.")
 	cmd.Flags().BoolVarP(&lintDeprecations, "lint-deprecations", "", false, "Include Airflow deprecations in lint tests.")
+	cmd.Flags().BoolVarP(&lintFix, "fix", "", false, "Automatically apply lint fixes where possible.")
 	cmd.Flags().StringVarP(&lintConfigFile, "lint-config-file", "", "", "Relative path within project to a custom ruff config file. If not specified, a default config will be used.")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against.")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "n", "", "Name of the upgraded image. Updates the FROM line in your Dockerfile to pull this image for the upgrade.")
@@ -699,7 +701,7 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	err = containerHandler.UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, lintDeprecations, lintConfigFile, platformCoreClient)
+	err = containerHandler.UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, lintDeprecations, lintFix, lintConfigFile, platformCoreClient)
 	if err != nil {
 		return err
 	}

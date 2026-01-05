@@ -563,7 +563,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations bool, lintConfigFile string, astroPlatformCore astroplatformcore.CoreClient) error { //nolint:gocognit,gocyclo
+func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroPlatformCore astroplatformcore.CoreClient) error { //nolint:gocognit,gocyclo
 	// figure out which tests to run
 	if !versionTest && !dagTest && !lintTest {
 		versionTest = true
@@ -643,7 +643,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 		fmt.Println("")
 		fmt.Println("Running ruff linter")
 
-		lintTestPassed, err := d.lintTest(testHomeDirectory, includeLintDeprecations, lintConfigFile)
+		lintTestPassed, err := d.lintTest(testHomeDirectory, includeLintDeprecations, lintFix, lintConfigFile)
 		if err != nil {
 			return err
 		}
@@ -783,7 +783,7 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, cu
 	return true, nil
 }
 
-func (d *DockerCompose) lintTest(testHomeDirectory string, includeDeprecations bool, configFile string) (bool, error) {
+func (d *DockerCompose) lintTest(testHomeDirectory string, includeDeprecations, fix bool, configFile string) (bool, error) {
 	var err error
 	if configFile == "" {
 		configFile, err = createTempRuffConfigFile(includeDeprecations)
@@ -812,6 +812,9 @@ func (d *DockerCompose) lintTest(testHomeDirectory string, includeDeprecations b
 
 	// Run ruff with the config file and the project directory
 	ruffArgs := []string{"check", "--config", "/app/ruff.toml", "/app/project"}
+	if fix {
+		ruffArgs = append(ruffArgs, "--fix", "--unsafe-fixes")
+	}
 	var buf bytes.Buffer
 	bufWriter := io.MultiWriter(os.Stdout, &buf)
 	ruffErr := d.ruffImageHandler.RunCommand(ruffArgs, mountDirs, bufWriter, bufWriter)
