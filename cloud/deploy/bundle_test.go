@@ -231,44 +231,6 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataDisabledViaConfig() {
 	s.mockPlatformCoreClient.AssertExpectations(s.T())
 }
 
-func (s *BundleSuite) TestBundleDeploy_GitMetadataDisabledViaEnvVar() {
-	// Create a git repo that would normally have metadata retrieved
-	_, gitPath := s.createTestGitRepository(false)
-	defer os.RemoveAll(gitPath)
-
-	// Disable git metadata via environment variable
-	s.T().Setenv("ASTRO_DEPLOY_GIT_METADATA", "false")
-
-	input := &DeployBundleInput{
-		BundlePath:         gitPath,
-		PlatformCoreClient: s.mockPlatformCoreClient,
-		CoreClient:         s.mockCoreClient,
-	}
-
-	mockGetDeployment(s.mockPlatformCoreClient, true, false)
-
-	// Expect deploy request WITHOUT git metadata (Git: nil)
-	expectedDeploy := &astrocore.CreateDeployRequest{
-		Type:            astrocore.CreateDeployRequestTypeBUNDLE,
-		BundleType:      &input.BundleType,
-		BundleMountPath: &input.MountPath,
-		Description:     &input.Description,
-		Git:             nil,
-	}
-	mockCreateDeploy(s.mockCoreClient, "http://bundle-upload-url", expectedDeploy)
-	mockUpdateDeploy(s.mockCoreClient, "version-id")
-
-	azureUploader = func(sasLink string, file io.Reader) (string, error) {
-		return "version-id", nil
-	}
-
-	err := DeployBundle(input)
-	assert.NoError(s.T(), err)
-
-	s.mockCoreClient.AssertExpectations(s.T())
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
-}
-
 func (s *BundleSuite) TestBundleDeploy_BundleUploadUrlMissing() {
 	input := &DeployBundleInput{
 		PlatformCoreClient: s.mockPlatformCoreClient,

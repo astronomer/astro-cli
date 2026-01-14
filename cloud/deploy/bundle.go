@@ -17,7 +17,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 type DeployBundleInput struct {
@@ -57,11 +56,7 @@ func DeployBundle(input *DeployBundleInput) error {
 	// Check if git metadata is enabled (default: true)
 	var deployGit *astrocore.DeployGit
 	var commitMessage string
-	gitMetadataEnabled := config.CFG.DeployGitMetadata.GetBool()
-	if envVal := os.Getenv("ASTRO_DEPLOY_GIT_METADATA"); envVal != "" {
-		gitMetadataEnabled = util.CheckEnvBool(envVal)
-	}
-	if gitMetadataEnabled {
+	if config.CFG.DeployGitMetadata.GetBool() {
 		deployGit, commitMessage = retrieveLocalGitMetadata(input.BundlePath)
 	}
 

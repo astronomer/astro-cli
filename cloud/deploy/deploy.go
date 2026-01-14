@@ -242,11 +242,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	// Check if git metadata is enabled (default: true)
 	var deployGit *astrocore.DeployGit
 	var commitMessage string
-	gitMetadataEnabled := config.CFG.DeployGitMetadata.GetBool()
-	if envVal := os.Getenv("ASTRO_DEPLOY_GIT_METADATA"); envVal != "" {
-		gitMetadataEnabled = util.CheckEnvBool(envVal)
-	}
-	if gitMetadataEnabled {
+	if config.CFG.DeployGitMetadata.GetBool() {
 		deployGit, commitMessage = retrieveLocalGitMetadata(deployInput.Path)
 	}
 
@@ -290,7 +286,6 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		return err
 	}
 	deployID := deploy.Id
-	imageRepository := deploy.ImageRepository
 	if deploy.DagsUploadUrl != nil {
 		dagsUploadURL = *deploy.DagsUploadUrl
 	} else {
@@ -406,7 +401,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			fmt.Println("No DAGs found. Skipping testing...")
 		}
 
-		repository := imageRepository
+		repository := deploy.ImageRepository
 		// TODO: Resolve the edge case where two people push the same nextTag at the same time
 		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
 
