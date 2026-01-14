@@ -238,9 +238,26 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	if err != nil {
 		return err
 	}
-	createDeployRequest := astroplatformcore.CreateDeployRequest{
-		Description: &deployInput.Description,
+
+	// Check if git metadata is enabled (default: true)
+	var deployGit *astrocore.DeployGit
+	var commitMessage string
+	if config.CFG.DeployGitMetadata.GetBool() {
+		deployGit, commitMessage = retrieveLocalGitMetadata(deployInput.Path)
 	}
+
+	// Use commit message as description fallback
+	description := deployInput.Description
+	if description == "" {
+		description = commitMessage
+	}
+
+	// Build the deploy request with git metadata
+	createDeployRequest := astroplatformcore.CreateDeployRequest{
+		Description: &description,
+	}
+
+	// Set deploy type
 	switch {
 	case deployInput.Dags:
 		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeDAGONLY
@@ -249,6 +266,21 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	default:
 		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEANDDAG
 	}
+
+	// Add git metadata if available
+	if deployGit != nil {
+		createDeployRequest.Git = &astroplatformcore.CreateDeployGitRequest{
+			Provider:   astroplatformcore.CreateDeployGitRequestProvider(deployGit.Provider),
+			Account:    deployGit.Account,
+			Repo:       deployGit.Repo,
+			Path:       deployGit.Path,
+			Branch:     deployGit.Branch,
+			CommitSha:  deployGit.CommitSha,
+			CommitUrl:  deployGit.CommitUrl,
+			AuthorName: deployGit.AuthorName,
+		}
+	}
+
 	deploy, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, createDeployRequest, platformCoreClient)
 	if err != nil {
 		return err

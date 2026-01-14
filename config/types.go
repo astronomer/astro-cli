@@ -55,6 +55,7 @@ type cfgs struct {
 	RuffImage               cfg
 	RemoteClientRegistry    cfg
 	RemoteBaseImageRegistry cfg
+	DeployGitMetadata       cfg
 }
 
 // Creates a new cfg struct

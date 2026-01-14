@@ -53,8 +53,12 @@ func DeployBundle(input *DeployBundleInput) error {
 		return fmt.Errorf(enableDagDeployMsg, input.DeploymentID)
 	}
 
-	// retrieve metadata about the local Git checkout. returns nil if not available
-	deployGit, commitMessage := retrieveLocalGitMetadata(input.BundlePath)
+	// Check if git metadata is enabled (default: true)
+	var deployGit *astrocore.DeployGit
+	var commitMessage string
+	if config.CFG.DeployGitMetadata.GetBool() {
+		deployGit, commitMessage = retrieveLocalGitMetadata(input.BundlePath)
+	}
 
 	// if no description was provided, use the commit message from the local Git checkout
 	if input.Description == "" {
@@ -251,12 +255,12 @@ func createBundleDeploy(organizationID string, input *DeployBundleInput, deployG
 	if deployGit != nil {
 		request.Git = &astrocore.CreateDeployGitRequest{
 			Provider:   astrocore.CreateDeployGitRequestProvider(deployGit.Provider),
-			Repo:       deployGit.Repo,
 			Account:    deployGit.Account,
+			Repo:       deployGit.Repo,
 			Path:       deployGit.Path,
 			Branch:     deployGit.Branch,
 			CommitSha:  deployGit.CommitSha,
-			CommitUrl:  fmt.Sprintf("https://github.com/%s/%s/commit/%s", deployGit.Account, deployGit.Repo, deployGit.CommitSha),
+			CommitUrl:  deployGit.CommitUrl,
 			AuthorName: deployGit.AuthorName,
 		}
 	}
@@ -286,6 +290,8 @@ func finalizeBundleDeploy(organizationID, deploymentID, deployID, tarballVersion
 	return nil
 }
 
+// retrieveLocalGitMetadata retrieves git metadata from the local repository for deploy tracking.
+// Returns nil and empty string if the repository has uncommitted changes or if git metadata cannot be retrieved.
 func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrocore.DeployGit, commitMessage string) {
 	if git.HasUncommittedChanges(bundlePath) {
 		fmt.Println("Local repository has uncommitted changes, skipping Git metadata retrieval")
