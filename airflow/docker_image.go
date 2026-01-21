@@ -518,8 +518,8 @@ func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 	if err != nil {
 		return label, err
 	}
-	if execErr := stderr.String(); execErr != "" {
-		return label, fmt.Errorf("%s: %w", execErr, errGetImageLabel)
+	if execWarn := strings.TrimSpace(stderr.String()); execWarn != "" {
+		logger.Debugf("container runtime stderr while inspecting %s: %s", imageName, execWarn)
 	}
 	label = stdout.String()
 	label = strings.Trim(label, "\n")
