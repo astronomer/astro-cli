@@ -12,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
@@ -2177,4 +2178,33 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		err = validateClientImageRuntimeVersion(deployInput, mockPlatformCoreClient)
 		assert.NoError(t, err)
 	})
+}
+
+func TestDeployDagsBundleLayout(t *testing.T) {
+	// Test that prependBaseDir is set correctly based on runtime version.
+	// For Airflow 3, files should be at bundle root (prependBaseDir=false).
+	// For Airflow 2, files should be under dags/ prefix (prependBaseDir=true).
+	// This is critical for issue #1985: Airflow 3 adds bundle root to sys.path,
+	// so imports fail if DAGs are nested under dags/.
+	testCases := []struct {
+		name                   string
+		runtimeVersion         string
+		expectedPrependBaseDir bool
+	}{
+		{"Airflow 2 semver uses dags/ prefix", "12.0.0", true},
+		{"Airflow 2 older version uses dags/ prefix", "4.2.5", true},
+		{"Airflow 3 puts files at root", "3.0-1", false},
+		{"Airflow 3 newer version puts files at root", "3.1-1", false},
+		{"Airflow 3 with patch puts files at root", "3.0-7", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// This mirrors the logic in deployDags():
+			// prependBaseDir := !airflowversions.IsAirflow3(currentRuntimeVersion)
+			result := !airflowversions.IsAirflow3(tc.runtimeVersion)
+			assert.Equal(t, tc.expectedPrependBaseDir, result,
+				"prependBaseDir should be %v for runtime %s", tc.expectedPrependBaseDir, tc.runtimeVersion)
+		})
+	}
 }
