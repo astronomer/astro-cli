@@ -179,7 +179,8 @@ func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, dep
 		defer os.Remove(monitoringDagPath)
 	}
 
-	versionID, err := UploadBundle(path, dagsPath, dagsUploadURL, true, currentRuntimeVersion)
+	prependBaseDir := !airflowversions.IsAirflow3(currentRuntimeVersion)
+	versionID, err := UploadBundle(path, dagsPath, dagsUploadURL, prependBaseDir, currentRuntimeVersion)
 	if err != nil {
 		return "", err
 	}
