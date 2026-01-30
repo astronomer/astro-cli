@@ -86,7 +86,8 @@ Variable.get = variable_get_monkeypatch
 # This ensures DAGs using 'from airflow.sdk import Variable' work with parse
 try:
     from airflow import sdk as airflow_sdk
-    if hasattr(airflow_sdk, 'Variable'):
+
+    if hasattr(airflow_sdk, "Variable"):
         airflow_sdk.Variable.get = variable_get_monkeypatch
 except ImportError:
     pass  # airflow.sdk not available (older Airflow 3.x version)
