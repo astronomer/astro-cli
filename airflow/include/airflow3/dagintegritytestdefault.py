@@ -81,6 +81,15 @@ def variable_get_monkeypatch(key: str, default_var=_no_default, deserialize_json
 
 
 Variable.get = variable_get_monkeypatch
+
+# Also patch airflow.sdk.Variable for Airflow 3.x SDK imports
+# This ensures DAGs using 'from airflow.sdk import Variable' work with parse
+try:
+    from airflow import sdk as airflow_sdk
+    if hasattr(airflow_sdk, 'Variable'):
+        airflow_sdk.Variable.get = variable_get_monkeypatch
+except ImportError:
+    pass  # airflow.sdk not available (older Airflow 3.x version)
 # # =========== /MONKEYPATCH VARIABLE.GET() ===========
 
 
