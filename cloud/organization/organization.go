@@ -42,7 +42,10 @@ func newTableOut() *printutil.Table {
 }
 
 func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Organization, error) {
-	organizationListParams := &astroplatformcore.ListOrganizationsParams{}
+	limit := 1000
+	organizationListParams := &astroplatformcore.ListOrganizationsParams{
+		Limit: &limit,
+	}
 	resp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 	if err != nil {
 		return nil, err

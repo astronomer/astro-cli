@@ -15,6 +15,7 @@ import (
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
@@ -113,6 +114,38 @@ func (s *Suite) TestList() {
 		s.Contains(err.Error(), "failed to fetch organizations")
 		mockClient.AssertExpectations(s.T())
 	})
+}
+
+func TestListOrganizations(t *testing.T) {
+	mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+	limit := 1000
+	orgs := []astroplatformcore.Organization{
+		{Id: "org-1", Name: "Org 1"},
+		{Id: "org-2", Name: "Org 2"},
+	}
+
+	resp := &astroplatformcore.ListOrganizationsResponse{
+		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		JSON200: &astroplatformcore.OrganizationsPaginated{
+			Organizations: orgs,
+		},
+	}
+
+	mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.MatchedBy(func(p *astroplatformcore.ListOrganizationsParams) bool {
+		return p != nil && p.Limit != nil && *p.Limit == limit
+	}),
+		mock.Anything,
+	).
+		Return(resp, nil).
+		Once()
+
+	organizations, err := ListOrganizations(mockClient)
+	assert.NoError(t, err)
+	assert.Len(t, organizations, 2)
+	assert.Equal(t, orgs, organizations)
+
+	mockClient.AssertExpectations(t)
 }
 
 func (s *Suite) TestGetOrganizationSelection() {
