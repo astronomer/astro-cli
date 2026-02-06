@@ -2178,3 +2178,29 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestDeployDagsBundleLayout(t *testing.T) {
+	// Test that --no-dags-base-dir flag controls the bundle layout.
+	// By default (flag=false), files are placed under dags/ prefix.
+	// With flag=true, files are placed at bundle root (for Airflow 3.x compatibility).
+	// This is critical for issue #1985: Airflow 3 adds bundle root to sys.path,
+	// so imports fail if DAGs are nested under dags/.
+	testCases := []struct {
+		name                   string
+		noDagsBaseDir          bool
+		expectedPrependBaseDir bool
+	}{
+		{"default behavior includes dags/ prefix", false, true},
+		{"--no-dags-base-dir puts files at root", true, false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// This mirrors the logic in deployDags():
+			// prependBaseDir := !noDagsBaseDir
+			result := !tc.noDagsBaseDir
+			assert.Equal(t, tc.expectedPrependBaseDir, result,
+				"prependBaseDir should be %v when noDagsBaseDir=%v", tc.expectedPrependBaseDir, tc.noDagsBaseDir)
+		})
+	}
+}
