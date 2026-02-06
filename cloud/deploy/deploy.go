@@ -181,7 +181,7 @@ func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, dep
 	}
 
 	// By default, prepend dags/ directory prefix. Use --no-dags-base-dir to place files at bundle root
-	// (required for Airflow 3.x where sys.path includes the bundle root, not dags/).
+	// (needed for some Airflow 3.x deployments where sys.path includes the bundle root, not dags/).
 	prependBaseDir := !noDagsBaseDir
 	versionID, err := UploadBundle(path, dagsPath, dagsUploadURL, prependBaseDir, currentRuntimeVersion)
 	if err != nil {
