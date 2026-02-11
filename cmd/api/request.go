@@ -249,8 +249,8 @@ func executeSingleRequest(opts *RequestOptions, method, requestURL, token string
 		return &SilentError{StatusCode: result.StatusCode}
 	}
 
-	// Cache successful response if caching is enabled
-	if opts.CacheTTL > 0 {
+	// Cache successful response if caching is enabled (GET requests only, to match cache reads)
+	if opts.CacheTTL > 0 && strings.EqualFold(method, "GET") {
 		saveCachedResponse(method, requestURL, result.Body, result.StatusCode)
 	}
 
@@ -318,14 +318,21 @@ func executePaginatedRequest(opts *RequestOptions, method, requestURL, token str
 		}
 
 		// Check if there are more pages
+		if totalCount <= 0 {
+			break
+		}
+		if limit <= 0 {
+			fmt.Fprintf(opts.GetErrOut(), "\nWarning: server returned totalCount=%d but no limit; stopping pagination\n", totalCount)
+			break
+		}
 		currentOffset += limit
-		if totalCount <= 0 || currentOffset >= totalCount {
+		if currentOffset >= totalCount {
 			break
 		}
 
 		// Safety limit to prevent infinite loops
 		if pageNum >= maxPaginationPages {
-			fmt.Fprintf(opts.Out, "\nWarning: reached maximum page limit (100)\n")
+			fmt.Fprintf(opts.GetErrOut(), "\nWarning: reached maximum page limit (100)\n")
 			break
 		}
 	}
@@ -360,9 +367,13 @@ func fetchPage(opts *RequestOptions, method, requestURL, token string, params ma
 		return nil, 0, 0, err
 	}
 
-	// Handle error responses
+	// Handle error responses: print the body for diagnostics, then return a
+	// SilentError to match the executeSingleRequest behaviour.
 	if result.StatusCode >= httpStatusError {
-		return nil, 0, 0, fmt.Errorf("API request failed with status %d", result.StatusCode)
+		if len(result.Body) > 0 {
+			_ = writeColorizedJSON(opts.Out, result.Body, isColorEnabled(opts.Out), "  ")
+		}
+		return nil, 0, 0, &SilentError{StatusCode: result.StatusCode}
 	}
 
 	// Parse response to get pagination info
@@ -613,6 +624,8 @@ func shellQuote(s string) string {
 
 // generateCurl generates a curl command for the request.
 func generateCurl(out io.Writer, method, requestURL, token string, headers []string, params map[string]interface{}, inputFile string) error {
+	method = strings.ToUpper(method)
+
 	parts := make([]string, 0, 10+len(headers)*2)
 	parts = append(parts, "curl")
 
@@ -622,7 +635,7 @@ func generateCurl(out io.Writer, method, requestURL, token string, headers []str
 	}
 
 	// URL (with query params for GET, or when input file is used)
-	if strings.EqualFold(method, "GET") && len(params) > 0 {
+	if method == "GET" && len(params) > 0 {
 		requestURL = addQueryParams(requestURL, params)
 	} else if inputFile != "" && len(params) > 0 {
 		// When using input file, add params as query string
@@ -641,7 +654,7 @@ func generateCurl(out io.Writer, method, requestURL, token string, headers []str
 	}
 
 	// Body for non-GET requests
-	if !strings.EqualFold(method, "GET") {
+	if method != "GET" {
 		if inputFile != "" {
 			// Read body from input file
 			bodyBytes, err := readInputFile(inputFile)
