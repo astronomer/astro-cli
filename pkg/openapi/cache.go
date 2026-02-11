@@ -39,6 +39,18 @@ func AirflowCacheFileNameForVersion(version string) string {
 	return fmt.Sprintf(AirflowCacheFileNameTemplate, normalizedVersion)
 }
 
+// CloudCacheFileNameForDomain returns the cache file name for a specific domain.
+// For the default domain (astronomer.io), it returns the standard cache file name
+// for backward compatibility. For other domains, a domain-qualified name is used
+// to avoid cache collisions between environments.
+func CloudCacheFileNameForDomain(domain string) string {
+	if domain == "" || domain == "astronomer.io" {
+		return CloudCacheFileName
+	}
+	normalized := strings.ReplaceAll(domain, ".", "_")
+	return fmt.Sprintf("openapi-cache-%s.json", normalized)
+}
+
 // CachedSpec wraps the OpenAPI spec with metadata for caching.
 type CachedSpec struct {
 	Spec      *OpenAPISpec `json:"spec"`
@@ -131,6 +143,11 @@ func (c *Cache) Load(forceRefresh bool) error {
 
 	// Save to cache
 	return c.saveCache()
+}
+
+// GetSpecURL returns the URL used to fetch the OpenAPI spec.
+func (c *Cache) GetSpecURL() string {
+	return c.specURL
 }
 
 // GetSpec returns the loaded OpenAPI spec.

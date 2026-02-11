@@ -547,3 +547,130 @@ func TestInitAirflowSpecCache_DetectsVersion(t *testing.T) {
 	assert.Equal(t, ts.URL+"/api/v2", result)
 	assert.Equal(t, "3.0.3", opts.detectedVersion)
 }
+
+// --- airflowConnectionError --------------------------------------------------
+
+func TestAirflowConnectionError_Localhost(t *testing.T) {
+	err := airflowConnectionError("http://localhost:8080/api/v2/dags")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not connect to Airflow")
+	assert.Contains(t, err.Error(), "localhost:8080")
+	assert.Contains(t, err.Error(), "astro dev start")
+	assert.Contains(t, err.Error(), "--api-url")
+	assert.Contains(t, err.Error(), "--deployment-id")
+}
+
+func TestAirflowConnectionError_Loopback(t *testing.T) {
+	err := airflowConnectionError("http://127.0.0.1:8080/api/v2/dags")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not connect to Airflow")
+	assert.Contains(t, err.Error(), "astro dev start")
+}
+
+func TestAirflowConnectionError_RemoteHost(t *testing.T) {
+	err := airflowConnectionError("https://airflow.example.com/api/v2/dags")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not connect to Airflow")
+	assert.Contains(t, err.Error(), "airflow.example.com")
+	assert.NotContains(t, err.Error(), "astro dev start")
+	assert.Contains(t, err.Error(), "Check that the URL is correct")
+}
+
+// --- runAirflow connection error handling ------------------------------------
+
+func TestRunAirflow_ConnectionRefused(t *testing.T) {
+	// Start and immediately close a server to get a valid URL that refuses connections
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	closedURL := ts.URL
+	ts.Close()
+
+	out := new(bytes.Buffer)
+	errOut := new(bytes.Buffer)
+	opts := &AirflowOptions{
+		APIURL:         closedURL,
+		AirflowVersion: "3.0.3", // Skip version auto-detection
+		RequestOptions: RequestOptions{
+			Out:         out,
+			ErrOut:      errOut,
+			RequestPath: "/dags",
+		},
+	}
+
+	err := runAirflow(opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not connect to Airflow")
+	// The closed httptest server is on 127.0.0.1, so we get the localhost suggestion
+	assert.Contains(t, err.Error(), "astro dev start")
+
+	// Should NOT print noisy warnings about auth or version detection
+	assert.NotContains(t, errOut.String(), "could not fetch auth token")
+	assert.NotContains(t, errOut.String(), "Could not detect Airflow version")
+}
+
+func TestRunAirflow_ConnectionRefused_OperationID(t *testing.T) {
+	// Verify friendly error also works when using an operation ID
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	closedURL := ts.URL
+	ts.Close()
+
+	out := new(bytes.Buffer)
+	errOut := new(bytes.Buffer)
+	opts := &AirflowOptions{
+		APIURL:         closedURL,
+		AirflowVersion: "3.0.3",
+		RequestOptions: RequestOptions{
+			Out:         out,
+			ErrOut:      errOut,
+			RequestPath: "get_dags",
+		},
+	}
+
+	err := runAirflow(opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not connect to Airflow")
+	assert.Contains(t, err.Error(), "astro dev start")
+}
+
+// --- warning suppression on connection errors --------------------------------
+
+func TestResolveAirflowAPIURL_ConnectionError_SuppressesWarning(t *testing.T) {
+	// Start and immediately close a server to get a refused connection
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	closedURL := ts.URL
+	ts.Close()
+
+	errOut := new(bytes.Buffer)
+	opts := &AirflowOptions{
+		APIURL: closedURL,
+		RequestOptions: RequestOptions{
+			ErrOut: errOut,
+		},
+	}
+
+	baseURL, authToken, err := resolveAirflowAPIURL(opts)
+	require.NoError(t, err)
+	assert.Equal(t, closedURL, baseURL)
+	assert.Empty(t, authToken)
+	// The noisy warning should be suppressed for connection errors
+	assert.Empty(t, errOut.String())
+}
+
+func TestInitAirflowSpecCache_ConnectionError_SuppressesWarning(t *testing.T) {
+	// Start and immediately close a server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	closedURL := ts.URL
+	ts.Close()
+
+	errOut := new(bytes.Buffer)
+	opts := &AirflowOptions{
+		RequestOptions: RequestOptions{
+			ErrOut: errOut,
+		},
+	}
+
+	_, err := initAirflowSpecCache(opts, closedURL+"/api/v2", "")
+	require.NoError(t, err)
+	assert.NotNil(t, opts.specCache)
+	// The noisy warning should be suppressed for connection errors
+	assert.Empty(t, errOut.String())
+}

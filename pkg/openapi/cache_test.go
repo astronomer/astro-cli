@@ -57,6 +57,27 @@ func TestNewAirflowCacheForVersion(t *testing.T) {
 	})
 }
 
+func TestCloudCacheFileNameForDomain(t *testing.T) {
+	tests := []struct {
+		name     string
+		domain   string
+		expected string
+	}{
+		{"default domain", "astronomer.io", CloudCacheFileName},
+		{"empty domain defaults", "", CloudCacheFileName},
+		{"dev domain", "astronomer-dev.io", "openapi-cache-astronomer-dev_io.json"},
+		{"stage domain", "astronomer-stage.io", "openapi-cache-astronomer-stage_io.json"},
+		{"perf domain", "astronomer-perf.io", "openapi-cache-astronomer-perf_io.json"},
+		{"PR preview domain", "pr1234.astronomer-dev.io", "openapi-cache-pr1234_astronomer-dev_io.json"},
+		{"localhost", "localhost", "openapi-cache-localhost.json"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, CloudCacheFileNameForDomain(tt.domain))
+		})
+	}
+}
+
 // --- getHTTPClient / SetHTTPClient -------------------------------------------
 
 func TestGetHTTPClient_Default(t *testing.T) {

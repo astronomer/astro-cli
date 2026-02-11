@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -879,4 +880,63 @@ func TestResponseCacheKey_CaseInsensitiveMethod(t *testing.T) {
 	key1 := responseCacheKey("get", "https://example.com/test")
 	key2 := responseCacheKey("GET", "https://example.com/test")
 	assert.Equal(t, key1, key2, "method should be case-insensitive")
+}
+
+// --- isConnectionError -------------------------------------------------------
+
+func TestIsConnectionError(t *testing.T) {
+	// nil error
+	assert.False(t, isConnectionError(nil))
+
+	// Regular error
+	assert.False(t, isConnectionError(fmt.Errorf("some error")))
+
+	// net.OpError (connection refused)
+	opErr := &net.OpError{
+		Op:  "dial",
+		Net: "tcp",
+		Err: fmt.Errorf("connection refused"),
+	}
+	assert.True(t, isConnectionError(opErr))
+
+	// Wrapped net.OpError (as produced by fetchAirflowToken → client.Do)
+	wrappedOpErr := fmt.Errorf("fetching auth token: %w", opErr)
+	assert.True(t, isConnectionError(wrappedOpErr))
+
+	// DNS error
+	dnsErr := &net.DNSError{
+		Err:  "no such host",
+		Name: "nonexistent.example.com",
+	}
+	assert.True(t, isConnectionError(dnsErr))
+
+	// Wrapped DNS error
+	wrappedDNSErr := fmt.Errorf("executing request: %w", dnsErr)
+	assert.True(t, isConnectionError(wrappedDNSErr))
+
+	// SilentError (HTTP-level, not a connection error)
+	silentErr := &SilentError{StatusCode: 404}
+	assert.False(t, isConnectionError(silentErr))
+}
+
+// --- isLocalhostURL ----------------------------------------------------------
+
+func TestIsLocalhostURL(t *testing.T) {
+	tests := []struct {
+		url      string
+		expected bool
+	}{
+		{"http://localhost:8080/api/v2", true},
+		{"http://127.0.0.1:8080/api/v2", true},
+		{"http://[::1]:8080/api/v2", true},
+		{"https://localhost:443/api/v2", true},
+		{"http://example.com:8080/api/v2", false},
+		{"https://deployment.airflow.astronomer.io/api/v2", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			assert.Equal(t, tt.expected, isLocalhostURL(tt.url))
+		})
+	}
 }

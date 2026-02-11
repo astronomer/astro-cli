@@ -241,7 +241,11 @@ func runAirflow(opts *AirflowOptions) error {
 	}
 
 	// Build and execute the request
-	return executeRequest(&opts.RequestOptions, method, url, authToken, params)
+	err = executeRequest(&opts.RequestOptions, method, url, authToken, params)
+	if isConnectionError(err) {
+		return airflowConnectionError(url)
+	}
+	return err
 }
 
 // resolveAirflowAPIURL determines the Airflow API base URL based on options.
@@ -273,8 +277,11 @@ func resolveAirflowAPIURL(opts *AirflowOptions) (baseURL, authToken string, err 
 		if opts.CredentialsExplicit {
 			return "", "", fmt.Errorf("authentication failed: %w", err)
 		}
-		// Otherwise, warn and continue without auth (user may have a different auth setup)
-		fmt.Fprintf(opts.GetErrOut(), "Warning: could not fetch auth token (%v), continuing without authentication\n", err)
+		// Suppress the warning for connection errors — the actual request will
+		// report a clear, actionable error if the host is truly unreachable.
+		if !isConnectionError(err) {
+			fmt.Fprintf(opts.GetErrOut(), "Warning: could not fetch auth token (%v), continuing without authentication\n", err)
+		}
 		return baseURL, "", nil
 	}
 
@@ -349,6 +356,20 @@ func airflowHostRoot(baseURL string) string {
 	u = strings.TrimSuffix(u, "/api/v2")
 	u = strings.TrimSuffix(u, "/api/v1")
 	return u
+}
+
+// airflowConnectionError returns a user-friendly error when Airflow is unreachable.
+func airflowConnectionError(requestURL string) error {
+	host := airflowHostRoot(requestURL)
+	if isLocalhostURL(host) {
+		return fmt.Errorf("could not connect to Airflow at %s\n\n"+
+			"Is Airflow running? Try one of:\n"+
+			"  astro dev start              Start a local Airflow environment\n"+
+			"  --api-url <url>              Use a different Airflow instance\n"+
+			"  --deployment-id <id>         Connect to an Astro Cloud deployment", host)
+	}
+	return fmt.Errorf("could not connect to Airflow at %s\n\n"+
+		"Check that the URL is correct and the server is running", host)
 }
 
 // FetchAirflowVersion detects the Airflow version from a running instance.
@@ -525,7 +546,11 @@ func initAirflowSpecCache(opts *AirflowOptions, baseURL, authToken string) (stri
 				return "", fmt.Errorf("could not detect Airflow version from deployment %s: %w. Use --airflow-version to specify manually", opts.DeploymentID, err)
 			}
 			// For local instances, warn and fall back — the instance may not be running.
-			fmt.Fprintf(opts.RequestOptions.GetErrOut(), "Warning: Could not detect Airflow version (%v), using default %s. Use --airflow-version to override.\n", err, defaultAirflowVersion)
+			// Suppress the warning for connection errors since the actual request
+			// will report a clear, actionable error.
+			if !isConnectionError(err) {
+				fmt.Fprintf(opts.RequestOptions.GetErrOut(), "Warning: Could not detect Airflow version (%v), using default %s. Use --airflow-version to override.\n", err, defaultAirflowVersion)
+			}
 			version = defaultAirflowVersion
 		} else {
 			version = detectedVersion
@@ -614,6 +639,7 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
 func NewAirflowDescribeCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Command {
 	var method string
 	var refresh bool
+	var verbose bool
 
 	cmd := &cobra.Command{
 		Use:   "describe <endpoint>",
@@ -652,6 +678,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 				Endpoint:  args[0],
 				Method:    method,
 				Refresh:   refresh,
+				Verbose:   verbose,
 			}
 
 			return runDescribe(descOpts)
@@ -660,6 +687,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
 
 	return cmd
 }

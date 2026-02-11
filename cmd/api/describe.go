@@ -9,7 +9,6 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/openapi"
 	"github.com/fatih/color"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -27,56 +26,19 @@ type DescribeOptions struct {
 	Endpoint  string
 	Method    string
 	Refresh   bool
-}
-
-// NewDescribeCmd creates the 'astro api <cmdName> describe' command.
-// cmdName should be "cloud" or "airflow".
-func NewDescribeCmd(out io.Writer, specCache *openapi.Cache, cmdName string) *cobra.Command {
-	opts := &DescribeOptions{
-		Out:       out,
-		specCache: specCache,
-	}
-
-	// Build examples based on command name
-	pathExample := "/organizations/{organizationId}/deployments"
-	opIDExample := "CreateDeployment"
-	if cmdName == "airflow" {
-		pathExample = "/dags/{dag_id}"
-		opIDExample = "get_dag"
-	}
-
-	cmd := &cobra.Command{
-		Use:   "describe <endpoint>",
-		Short: "Describe an API endpoint's request and response schema",
-		Long: `Show detailed information about an API endpoint, including:
-- Path and query parameters
-- Request body schema (for POST/PUT/PATCH)
-- Response schema
-
-The endpoint can be specified as a path or as an operation ID.`,
-		Example: fmt.Sprintf(`  # Describe an endpoint by path
-  astro api %s describe %s
-
-  # Describe a POST endpoint specifically
-  astro api %s describe %s -X POST
-
-  # Describe by operation ID
-  astro api %s describe %s`, cmdName, pathExample, cmdName, pathExample, cmdName, opIDExample),
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Endpoint = args[0]
-			return runDescribe(opts)
-		},
-	}
-
-	cmd.Flags().StringVarP(&opts.Method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
-	cmd.Flags().BoolVar(&opts.Refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
-
-	return cmd
+	Verbose   bool
 }
 
 // runDescribe executes the describe command.
 func runDescribe(opts *DescribeOptions) error {
+	if opts.specCache == nil {
+		return fmt.Errorf("API specification not initialized. Ensure you are logged in and try again")
+	}
+
+	if opts.Verbose {
+		fmt.Fprintf(opts.Out, "Spec URL: %s\n\n", opts.specCache.GetSpecURL())
+	}
+
 	// Load OpenAPI spec
 	if err := opts.specCache.Load(opts.Refresh); err != nil {
 		return fmt.Errorf("loading OpenAPI spec: %w", err)

@@ -12,31 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// --- NewListCmd --------------------------------------------------------------
-
-func TestNewListCmd_Cloud(t *testing.T) {
-	out := new(bytes.Buffer)
-	cache := openapi.NewCache()
-	cmd := NewListCmd(out, cache, "cloud")
-
-	assert.Equal(t, "ls [filter]", cmd.Use)
-	assert.Contains(t, cmd.Aliases, "list")
-	assert.Contains(t, cmd.Short, "Astro Cloud API")
-	assert.NotNil(t, cmd.Flags().Lookup("verbose"))
-	assert.NotNil(t, cmd.Flags().Lookup("refresh"))
-	assert.Contains(t, cmd.Example, "astro api cloud")
-}
-
-func TestNewListCmd_Airflow(t *testing.T) {
-	out := new(bytes.Buffer)
-	cache := openapi.NewCache()
-	cmd := NewListCmd(out, cache, "airflow")
-
-	assert.Contains(t, cmd.Short, "Airflow API")
-	assert.Contains(t, cmd.Example, "astro api airflow")
-	assert.Contains(t, cmd.Example, "dags")
-}
-
 // --- colorizeMethod ----------------------------------------------------------
 
 func TestColorizeMethod(t *testing.T) {

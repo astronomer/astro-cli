@@ -6,8 +6,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -38,6 +40,34 @@ type SilentError struct {
 
 func (e *SilentError) Error() string {
 	return fmt.Sprintf("API request failed with status %d", e.StatusCode)
+}
+
+// isConnectionError reports whether err indicates a network-level connection
+// failure (connection refused, DNS lookup failure, timeout, etc.) as opposed
+// to an HTTP-level error.
+func isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return true
+	}
+	return false
+}
+
+// isLocalhostURL checks if a URL string points to localhost, 127.0.0.1, or [::1].
+func isLocalhostURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 // RequestOptions holds the common options shared by all API commands (cloud, airflow, etc.).

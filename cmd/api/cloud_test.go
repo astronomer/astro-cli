@@ -9,9 +9,27 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/openapi"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// initTestConfig initializes the config with an in-memory filesystem for tests.
+func initTestConfig(t *testing.T) {
+	t.Helper()
+	fs := afero.NewMemMapFs()
+	configRaw := []byte(`context: astronomer_io
+contexts:
+  astronomer_io:
+    domain: astronomer.io
+    token: test-token
+    organization: test-org
+    workspace: test-ws
+`)
+	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+	config.InitConfig(fs)
+	config.CFG.CloudAPIProtocol.SetHomeString("https")
+}
 
 // --- NewCloudCmd -------------------------------------------------------------
 
@@ -263,10 +281,40 @@ func TestResolveOperationID(t *testing.T) {
 	})
 }
 
-// --- cloudAPIBaseURL constant ------------------------------------------------
+// --- initCloudSpecCache ------------------------------------------------------
 
-func TestCloudAPIBaseURLConstant(t *testing.T) {
-	assert.Equal(t, "https://api.astronomer.io/v1", cloudAPIBaseURL)
+func TestInitCloudSpecCache(t *testing.T) {
+	initTestConfig(t)
+
+	t.Run("initializes cache for default domain", func(t *testing.T) {
+		opts := &CloudOptions{}
+		ctx := &config.Context{Domain: "astronomer.io"}
+		err := initCloudSpecCache(opts, ctx)
+		require.NoError(t, err)
+		assert.NotNil(t, opts.specCache)
+	})
+
+	t.Run("initializes cache for dev domain", func(t *testing.T) {
+		opts := &CloudOptions{}
+		ctx := &config.Context{Domain: "astronomer-dev.io"}
+		err := initCloudSpecCache(opts, ctx)
+		require.NoError(t, err)
+		assert.NotNil(t, opts.specCache)
+	})
+
+	t.Run("no-op when cache already set", func(t *testing.T) {
+		existingCache := openapi.NewCacheWithOptions("https://example.com/spec", "/tmp/test.json")
+		opts := &CloudOptions{
+			RequestOptions: RequestOptions{
+				specCache: existingCache,
+			},
+		}
+		ctx := &config.Context{Domain: "astronomer.io"}
+		err := initCloudSpecCache(opts, ctx)
+		require.NoError(t, err)
+		// Should still be the same cache (not replaced)
+		assert.Equal(t, existingCache, opts.specCache)
+	})
 }
 
 // --- runCloudInteractive (requires cloud context, hard to unit test) ---------
@@ -323,8 +371,7 @@ func TestCloudCmd_NoArgs_ShowsHelp(t *testing.T) {
 // Full runCloud tests require cloud context. The underlying executeRequest,
 // generateCurl, fillPlaceholders, etc. are all tested via their own test files.
 
-func TestCloudConstants(t *testing.T) {
-	assert.Equal(t, "https://api.astronomer.io/v1", cloudAPIBaseURL)
+func TestCloudCmdLongDescription(t *testing.T) {
 	// NewCloudCmd should produce a command whose Long description mentions Astro
 	out := new(bytes.Buffer)
 	cmd := NewCloudCmd(out)

@@ -4,18 +4,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 	"github.com/spf13/cobra"
-)
-
-const (
-	cloudAPIBaseURL = "https://api.astronomer.io/v1"
 )
 
 // CloudOptions holds all options for the cloud api command.
@@ -29,9 +27,9 @@ type CloudOptions struct {
 func NewCloudCmd(out io.Writer) *cobra.Command {
 	opts := &CloudOptions{
 		RequestOptions: RequestOptions{
-			Out:       out,
-			ErrOut:    os.Stderr,
-			specCache: openapi.NewCache(),
+			Out:    out,
+			ErrOut: os.Stderr,
+			// specCache is initialized lazily when the domain is known
 		},
 	}
 
@@ -132,9 +130,9 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 	// Other flags
 	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Output a curl command instead of executing the request")
 
-	// Add list and describe subcommands
-	cmd.AddCommand(NewListCmd(out, opts.specCache, "cloud"))
-	cmd.AddCommand(NewDescribeCmd(out, opts.specCache, "cloud"))
+	// Add list and describe subcommands (cloud-specific to support lazy cache init)
+	cmd.AddCommand(NewCloudListCmd(out, opts))
+	cmd.AddCommand(NewCloudDescribeCmd(out, opts))
 
 	return cmd
 }
@@ -155,6 +153,11 @@ func runCloud(opts *CloudOptions) error {
 	// Check for token
 	if ctx.Token == "" {
 		return fmt.Errorf("not authenticated. Run 'astro login' to authenticate")
+	}
+
+	// Initialize the spec cache for this domain
+	if err := initCloudSpecCache(opts, &ctx); err != nil {
+		return fmt.Errorf("initializing API spec: %w", err)
 	}
 
 	// Resolve operation ID to path if needed
@@ -203,8 +206,9 @@ func runCloud(opts *CloudOptions) error {
 		method = "POST"
 	}
 
-	// Build the full URL
-	url := buildURL(cloudAPIBaseURL, requestPath)
+	// Build the full URL using the domain-derived base URL
+	baseURL := ctx.GetPublicRESTAPIURL("v1")
+	url := buildURL(baseURL, requestPath)
 
 	// Generate curl command if requested
 	if opts.GenerateCurl {
@@ -282,6 +286,17 @@ func runCloudInteractive(opts *CloudOptions) error {
 		return fmt.Errorf("the 'astro api cloud' command is only available in cloud context. Run 'astro login' to connect to Astro Cloud")
 	}
 
+	// Get current context for cache initialization
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return fmt.Errorf("getting current context: %w", err)
+	}
+
+	// Initialize the spec cache for this domain
+	if err := initCloudSpecCache(opts, &ctx); err != nil {
+		return fmt.Errorf("initializing API spec: %w", err)
+	}
+
 	// Load OpenAPI spec
 	if err := opts.specCache.Load(false); err != nil {
 		return fmt.Errorf("loading OpenAPI spec: %w", err)
@@ -350,6 +365,142 @@ func findMissingPathParams(path string) []string {
 		}
 	}
 	return missing
+}
+
+// initCloudSpecCache initializes the OpenAPI spec cache for the current cloud
+// context's domain. If the cache is already initialized, this is a no-op.
+func initCloudSpecCache(opts *CloudOptions, ctx *config.Context) error {
+	if opts.specCache != nil {
+		return nil
+	}
+	domain := domainutil.FormatDomain(ctx.Domain)
+	specURL := ctx.GetPublicRESTAPIURL("spec/v1.0")
+	if specURL == "" {
+		return fmt.Errorf("could not determine API spec URL for domain %q. Check your login context", ctx.Domain)
+	}
+	cachePath := filepath.Join(config.HomeConfigPath, openapi.CloudCacheFileNameForDomain(domain))
+	opts.specCache = openapi.NewCacheWithOptions(specURL, cachePath)
+	return nil
+}
+
+// NewCloudListCmd creates the 'astro api cloud ls' command.
+// It lazily initializes the spec cache so the correct domain-specific spec URL is used.
+func NewCloudListCmd(out io.Writer, parentOpts *CloudOptions) *cobra.Command {
+	var verbose bool
+	var refresh bool
+
+	cmd := &cobra.Command{
+		Use:     "ls [filter]",
+		Aliases: []string{"list"},
+		Short:   "List available Astro Cloud API endpoints",
+		Long: `List all available endpoints from the Astro Cloud API.
+
+You can optionally provide a filter to search for specific endpoints.
+The filter matches against endpoint paths, methods, operation IDs, summaries, and tags.`,
+		Example: `  # List all endpoints
+  astro api cloud ls
+
+  # Filter endpoints
+  astro api cloud ls deployments
+
+  # List POST endpoints
+  astro api cloud ls POST
+
+  # Show verbose output with descriptions
+  astro api cloud ls --verbose`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var filter string
+			if len(args) > 0 {
+				filter = args[0]
+			}
+
+			if !context.IsCloudContext() {
+				return fmt.Errorf("the 'astro api cloud' command is only available in cloud context. Run 'astro login' to connect to Astro Cloud")
+			}
+
+			ctx, err := context.GetCurrentContext()
+			if err != nil {
+				return fmt.Errorf("getting current context: %w", err)
+			}
+
+			if err := initCloudSpecCache(parentOpts, &ctx); err != nil {
+				return fmt.Errorf("initializing API spec: %w", err)
+			}
+
+			listOpts := &ListOptions{
+				Out:       out,
+				specCache: parentOpts.specCache,
+				Filter:    filter,
+				Verbose:   verbose,
+				Refresh:   refresh,
+			}
+			return runList(listOpts)
+		},
+	}
+
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+
+	return cmd
+}
+
+// NewCloudDescribeCmd creates the 'astro api cloud describe' command.
+// It lazily initializes the spec cache so the correct domain-specific spec URL is used.
+func NewCloudDescribeCmd(out io.Writer, parentOpts *CloudOptions) *cobra.Command {
+	var method string
+	var refresh bool
+	var verbose bool
+
+	cmd := &cobra.Command{
+		Use:   "describe <endpoint>",
+		Short: "Describe an Astro Cloud API endpoint's request and response schema",
+		Long: `Show detailed information about an Astro Cloud API endpoint, including:
+- Path and query parameters
+- Request body schema (for POST/PUT/PATCH)
+- Response schema
+
+The endpoint can be specified as a path or as an operation ID.`,
+		Example: `  # Describe an endpoint by path
+  astro api cloud describe /organizations/{organizationId}/deployments
+
+  # Describe a POST endpoint specifically
+  astro api cloud describe /organizations/{organizationId}/deployments -X POST
+
+  # Describe by operation ID
+  astro api cloud describe CreateDeployment`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !context.IsCloudContext() {
+				return fmt.Errorf("the 'astro api cloud' command is only available in cloud context. Run 'astro login' to connect to Astro Cloud")
+			}
+
+			ctx, err := context.GetCurrentContext()
+			if err != nil {
+				return fmt.Errorf("getting current context: %w", err)
+			}
+
+			if err := initCloudSpecCache(parentOpts, &ctx); err != nil {
+				return fmt.Errorf("initializing API spec: %w", err)
+			}
+
+			descOpts := &DescribeOptions{
+				Out:       out,
+				specCache: parentOpts.specCache,
+				Endpoint:  args[0],
+				Method:    method,
+				Refresh:   refresh,
+				Verbose:   verbose,
+			}
+			return runDescribe(descOpts)
+		},
+	}
+
+	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
+
+	return cmd
 }
 
 // buildURL constructs the full URL from base and path.

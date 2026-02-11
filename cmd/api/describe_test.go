@@ -12,29 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// --- NewDescribeCmd ----------------------------------------------------------
-
-func TestNewDescribeCmd_Cloud(t *testing.T) {
-	out := new(bytes.Buffer)
-	cache := openapi.NewCache()
-	cmd := NewDescribeCmd(out, cache, "cloud")
-
-	assert.Equal(t, "describe <endpoint>", cmd.Use)
-	assert.NotNil(t, cmd.Flags().Lookup("method"))
-	assert.NotNil(t, cmd.Flags().Lookup("refresh"))
-	assert.Contains(t, cmd.Example, "astro api cloud")
-	assert.Contains(t, cmd.Example, "CreateDeployment")
-}
-
-func TestNewDescribeCmd_Airflow(t *testing.T) {
-	out := new(bytes.Buffer)
-	cache := openapi.NewCache()
-	cmd := NewDescribeCmd(out, cache, "airflow")
-
-	assert.Contains(t, cmd.Example, "astro api airflow")
-	assert.Contains(t, cmd.Example, "get_dag")
-}
-
 // --- getTypeString -----------------------------------------------------------
 
 func TestGetTypeString(t *testing.T) {

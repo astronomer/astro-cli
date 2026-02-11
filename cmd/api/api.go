@@ -33,6 +33,16 @@ Available subcommands:
 
 Use "astro api [command] --help" for more information about a command.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			// Cobra does not inherit SilenceUsage to subcommands, so propagate
+			// it here. The cmd parameter is the actual subcommand being executed,
+			// not the parent where PersistentPreRun is defined.
+			//
+			// Note: we do NOT propagate SilenceErrors. The parent api command
+			// sets SilenceErrors to avoid double-printing HTTP error bodies
+			// (SilentError), but subcommands need cobra to print non-silent
+			// errors like connection failures.
+			cmd.SilenceUsage = true
+
 			if noColor {
 				color.NoColor = true
 			}
