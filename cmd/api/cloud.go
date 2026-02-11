@@ -125,7 +125,6 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template")
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
-	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 
 	// Other flags
 	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Output a curl command instead of executing the request")

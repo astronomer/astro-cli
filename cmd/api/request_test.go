@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -417,61 +416,6 @@ func TestAddQueryParam_TypeBranches(t *testing.T) {
 	}
 }
 
-// --- Response caching --------------------------------------------------------
-
-func TestResponseCache_RoundTrip(t *testing.T) {
-	ts := newTestServer(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"cached":"response"}`))
-	})
-	defer ts.Close()
-
-	// Use a temp dir for cache
-	tmpDir := t.TempDir()
-	origHome := os.Getenv("ASTRO_HOME_DIR")
-	t.Setenv("ASTRO_HOME_DIR", tmpDir)
-	defer func() {
-		if origHome != "" {
-			t.Setenv("ASTRO_HOME_DIR", origHome)
-		}
-	}()
-
-	// Save a response
-	saveCachedResponse("GET", ts.URL+"/test", []byte(`{"cached":"response"}`), 200)
-
-	// Load it back
-	body, ok := loadCachedResponse("GET", ts.URL+"/test", 1*time.Hour)
-	assert.True(t, ok)
-	assert.Equal(t, `{"cached":"response"}`, string(body))
-}
-
-func TestResponseCache_Expired(t *testing.T) {
-	// Manually write an expired cache entry
-	method := "GET"
-	url := "https://example.com/expired"
-	path := responseCachePath(method, url)
-
-	dir := filepath.Dir(path)
-	_ = os.MkdirAll(dir, 0o755)
-
-	cached := cachedResponse{
-		Body:       []byte(`{"old":"data"}`),
-		CachedAt:   time.Now().Add(-2 * time.Hour),
-		StatusCode: 200,
-	}
-	data, _ := json.Marshal(cached)
-	_ = os.WriteFile(path, data, 0o600)
-
-	// Should not load (TTL = 1 hour, entry is 2 hours old)
-	_, ok := loadCachedResponse(method, url, 1*time.Hour)
-	assert.False(t, ok)
-}
-
-func TestResponseCache_Miss(t *testing.T) {
-	_, ok := loadCachedResponse("GET", "https://example.com/nonexistent", 1*time.Hour)
-	assert.False(t, ok)
-}
-
 // --- maskToken ---------------------------------------------------------------
 
 func TestMaskToken(t *testing.T) {
@@ -601,34 +545,6 @@ func TestExecuteSingleRequest_EmptyResponse(t *testing.T) {
 	assert.Empty(t, buf.String())
 }
 
-// --- executeSingleRequest with CacheTTL (cache hit) --------------------------
-
-func TestExecuteSingleRequest_CacheHit(t *testing.T) {
-	callCount := 0
-	ts := newTestServer(func(w http.ResponseWriter, _ *http.Request) {
-		callCount++
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"live":true}`))
-	})
-	defer ts.Close()
-
-	var buf bytes.Buffer
-	opts := newTestOpts(&buf)
-	opts.CacheTTL = 1 * time.Hour
-
-	// First call hits the server
-	err := executeRequest(opts, "GET", ts.URL+"/cached", "", nil)
-	require.NoError(t, err)
-	assert.Equal(t, 1, callCount)
-
-	// Second call should use cache
-	buf.Reset()
-	err = executeRequest(opts, "GET", ts.URL+"/cached", "", nil)
-	require.NoError(t, err)
-	assert.Equal(t, 1, callCount) // No additional server call
-	assert.Contains(t, buf.String(), "live")
-}
-
 // --- executeSingleRequest with Template output -------------------------------
 
 func TestExecuteSingleRequest_Template(t *testing.T) {
@@ -703,56 +619,6 @@ func TestGenerateCurl_NoToken(t *testing.T) {
 	err := generateCurl(&buf, "GET", "https://example.com", "", nil, nil, "")
 	require.NoError(t, err)
 	assert.NotContains(t, buf.String(), "Authorization")
-}
-
-// --- cleanupResponseCache ----------------------------------------------------
-
-func TestCleanupResponseCache(t *testing.T) {
-	tmpDir := t.TempDir()
-	cacheDir := filepath.Join(tmpDir, responseCacheDir)
-	require.NoError(t, os.MkdirAll(cacheDir, 0o755))
-
-	// Create a "stale" file with old mod time
-	staleFile := filepath.Join(cacheDir, "stale.json")
-	require.NoError(t, os.WriteFile(staleFile, []byte(`{}`), 0o600))
-	oldTime := time.Now().Add(-8 * 24 * time.Hour) // 8 days ago
-	require.NoError(t, os.Chtimes(staleFile, oldTime, oldTime))
-
-	// Create a "fresh" file
-	freshFile := filepath.Join(cacheDir, "fresh.json")
-	require.NoError(t, os.WriteFile(freshFile, []byte(`{}`), 0o600))
-
-	// Point config to our temp dir
-	origHome := config.HomeConfigPath
-	config.HomeConfigPath = tmpDir
-	defer func() { config.HomeConfigPath = origHome }()
-
-	cleanupResponseCache()
-
-	// Stale file should be removed
-	_, err := os.Stat(staleFile)
-	assert.True(t, os.IsNotExist(err), "stale file should be removed")
-
-	// Fresh file should remain
-	_, err = os.Stat(freshFile)
-	assert.NoError(t, err, "fresh file should remain")
-}
-
-// --- loadCachedResponse with corrupt data ------------------------------------
-
-func TestLoadCachedResponse_CorruptData(t *testing.T) {
-	tmpDir := t.TempDir()
-	origHome := config.HomeConfigPath
-	config.HomeConfigPath = tmpDir
-	defer func() { config.HomeConfigPath = origHome }()
-
-	// Write corrupt data to the cache path
-	path := responseCachePath("GET", "https://example.com/corrupt")
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-	require.NoError(t, os.WriteFile(path, []byte(`not json`), 0o600))
-
-	_, ok := loadCachedResponse("GET", "https://example.com/corrupt", 1*time.Hour)
-	assert.False(t, ok)
 }
 
 // --- combinePages edge cases -------------------------------------------------
@@ -860,26 +726,6 @@ func TestGetHTTPClient_Custom(t *testing.T) {
 	custom := &http.Client{Timeout: 5 * time.Second}
 	opts := &RequestOptions{HTTPClient: custom}
 	assert.Equal(t, custom, opts.GetHTTPClient())
-}
-
-// --- responseCacheKey --------------------------------------------------------
-
-func TestResponseCacheKey_Deterministic(t *testing.T) {
-	key1 := responseCacheKey("GET", "https://example.com/test")
-	key2 := responseCacheKey("GET", "https://example.com/test")
-	assert.Equal(t, key1, key2, "same inputs should produce same key")
-
-	key3 := responseCacheKey("POST", "https://example.com/test")
-	assert.NotEqual(t, key1, key3, "different methods should produce different keys")
-
-	key4 := responseCacheKey("GET", "https://example.com/other")
-	assert.NotEqual(t, key1, key4, "different URLs should produce different keys")
-}
-
-func TestResponseCacheKey_CaseInsensitiveMethod(t *testing.T) {
-	key1 := responseCacheKey("get", "https://example.com/test")
-	key2 := responseCacheKey("GET", "https://example.com/test")
-	assert.Equal(t, key1, key2, "method should be case-insensitive")
 }
 
 // --- isConnectionError -------------------------------------------------------

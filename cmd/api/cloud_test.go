@@ -72,7 +72,6 @@ func TestCloudCmdFlags(t *testing.T) {
 	assert.NotNil(t, cmd.Flags().Lookup("template"))
 	assert.NotNil(t, cmd.Flags().Lookup("jq"))
 	assert.NotNil(t, cmd.Flags().Lookup("verbose"))
-	assert.NotNil(t, cmd.Flags().Lookup("cache"))
 
 	// Other
 	assert.NotNil(t, cmd.Flags().Lookup("generate"))

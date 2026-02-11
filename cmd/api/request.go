@@ -3,8 +3,6 @@ package api
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,12 +11,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 	"github.com/fatih/color"
 )
@@ -54,10 +50,7 @@ func isConnectionError(err error) bool {
 		return true
 	}
 	var dnsErr *net.DNSError
-	if errors.As(err, &dnsErr) {
-		return true
-	}
-	return false
+	return errors.As(err, &dnsErr)
 }
 
 // isLocalhostURL checks if a URL string points to localhost, 127.0.0.1, or [::1].
@@ -93,7 +86,6 @@ type RequestOptions struct {
 	Template            string
 	FilterOutput        string
 	Verbose             bool
-	CacheTTL            time.Duration
 
 	// Other options
 	GenerateCurl bool
@@ -207,7 +199,7 @@ func doRequest(opts *RequestOptions, method, requestURL, token string, body io.R
 // executeRequest builds and executes the HTTP request.
 func executeRequest(opts *RequestOptions, method, requestURL, token string, params map[string]interface{}) error {
 	// Handle pagination
-	if opts.Paginate && strings.EqualFold(method, "GET") {
+	if opts.Paginate && strings.EqualFold(method, http.MethodGet) {
 		return executePaginatedRequest(opts, method, requestURL, token, params)
 	}
 
@@ -233,7 +225,7 @@ func executeSingleRequest(opts *RequestOptions, method, requestURL, token string
 			requestURL = addQueryParams(requestURL, params)
 		}
 	} else if len(params) > 0 {
-		if strings.EqualFold(method, "GET") {
+		if strings.EqualFold(method, http.MethodGet) {
 			// For GET requests, add params as query string
 			requestURL = addQueryParams(requestURL, params)
 		} else {
@@ -244,16 +236,6 @@ func executeSingleRequest(opts *RequestOptions, method, requestURL, token string
 				return fmt.Errorf("marshaling request body: %w", err)
 			}
 			body = bytes.NewReader(bodyBytes)
-		}
-	}
-
-	// Check response cache (only for GET requests without a body)
-	if opts.CacheTTL > 0 && strings.EqualFold(method, "GET") {
-		// Best-effort cleanup of stale cache entries
-		cleanupResponseCache()
-
-		if cached, ok := loadCachedResponse(method, requestURL, opts.CacheTTL); ok {
-			return outputResponseBody(opts, cached)
 		}
 	}
 
@@ -277,11 +259,6 @@ func executeSingleRequest(opts *RequestOptions, method, requestURL, token string
 			_ = writeColorizedJSON(opts.Out, result.Body, isColorEnabled(opts.Out), "  ")
 		}
 		return &SilentError{StatusCode: result.StatusCode}
-	}
-
-	// Cache successful response if caching is enabled (GET requests only, to match cache reads)
-	if opts.CacheTTL > 0 && strings.EqualFold(method, "GET") {
-		saveCachedResponse(method, requestURL, result.Body, result.StatusCode)
 	}
 
 	return outputResponseBody(opts, result.Body)
@@ -398,7 +375,7 @@ func fetchPage(opts *RequestOptions, method, requestURL, token string, params ma
 	}
 
 	// Handle error responses: print the body for diagnostics, then return a
-	// SilentError to match the executeSingleRequest behaviour.
+	// SilentError to match the executeSingleRequest behavior.
 	if result.StatusCode >= httpStatusError {
 		if len(result.Body) > 0 {
 			_ = writeColorizedJSON(opts.Out, result.Body, isColorEnabled(opts.Out), "  ")
@@ -509,99 +486,6 @@ func readInputFile(filename string) ([]byte, error) {
 	return os.ReadFile(filename)
 }
 
-const (
-	// responseCacheDir is the subdirectory within the config home for response caches.
-	responseCacheDir = "api-cache"
-	// cacheDirPerm is the permission mode for created cache directories.
-	cacheDirPerm = 0o755
-	// cacheFilePerm is the permission mode for cache files.
-	cacheFilePerm = 0o600
-)
-
-// cachedResponse wraps a cached API response with metadata.
-type cachedResponse struct {
-	Body       []byte    `json:"body"`
-	CachedAt   time.Time `json:"cachedAt"`
-	StatusCode int       `json:"statusCode"`
-}
-
-// responseCacheKey builds a deterministic cache key from method + URL.
-func responseCacheKey(method, requestURL string) string {
-	h := sha256.Sum256([]byte(strings.ToUpper(method) + " " + requestURL))
-	return hex.EncodeToString(h[:])
-}
-
-// responseCachePath returns the file path for a cached response.
-func responseCachePath(method, requestURL string) string {
-	return filepath.Join(config.HomeConfigPath, responseCacheDir, responseCacheKey(method, requestURL)+".json")
-}
-
-// loadCachedResponse attempts to load a cached response within the given TTL.
-func loadCachedResponse(method, requestURL string, ttl time.Duration) ([]byte, bool) {
-	path := responseCachePath(method, requestURL)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, false
-	}
-
-	var cached cachedResponse
-	if err := json.Unmarshal(data, &cached); err != nil {
-		return nil, false
-	}
-
-	if time.Since(cached.CachedAt) > ttl {
-		return nil, false
-	}
-
-	return cached.Body, true
-}
-
-// responseCacheMaxAge is the maximum age for cached responses before cleanup removes them.
-const responseCacheMaxAge = 7 * 24 * time.Hour // 7 days
-
-// cleanupResponseCache removes stale cache entries older than responseCacheMaxAge.
-// Errors are silently ignored — cleanup is best-effort.
-func cleanupResponseCache() {
-	cacheDir := filepath.Join(config.HomeConfigPath, responseCacheDir)
-	entries, err := os.ReadDir(cacheDir)
-	if err != nil {
-		return // Directory may not exist yet
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		info, err := entry.Info()
-		if err != nil {
-			continue
-		}
-		if time.Since(info.ModTime()) > responseCacheMaxAge {
-			_ = os.Remove(filepath.Join(cacheDir, entry.Name()))
-		}
-	}
-}
-
-// saveCachedResponse saves a response to the cache.
-func saveCachedResponse(method, requestURL string, body []byte, statusCode int) {
-	cached := cachedResponse{
-		Body:       body,
-		CachedAt:   time.Now(),
-		StatusCode: statusCode,
-	}
-	data, err := json.Marshal(cached)
-	if err != nil {
-		return
-	}
-
-	path := responseCachePath(method, requestURL)
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, cacheDirPerm); err != nil {
-		return
-	}
-	_ = os.WriteFile(path, data, cacheFilePerm)
-}
-
 // addQueryParams adds params to the URL as query string.
 func addQueryParams(requestURL string, params map[string]interface{}) string {
 	if len(params) == 0 {
@@ -660,12 +544,12 @@ func generateCurl(out io.Writer, method, requestURL, token string, headers []str
 	parts = append(parts, "curl")
 
 	// Method
-	if method != "GET" {
+	if method != http.MethodGet {
 		parts = append(parts, "-X", method)
 	}
 
 	// URL (with query params for GET, or when input file is used)
-	if method == "GET" && len(params) > 0 {
+	if method == http.MethodGet && len(params) > 0 {
 		requestURL = addQueryParams(requestURL, params)
 	} else if inputFile != "" && len(params) > 0 {
 		// When using input file, add params as query string
@@ -684,7 +568,7 @@ func generateCurl(out io.Writer, method, requestURL, token string, headers []str
 	}
 
 	// Body for non-GET requests
-	if method != "GET" {
+	if method != http.MethodGet {
 		if inputFile != "" {
 			// Read body from input file
 			bodyBytes, err := readInputFile(inputFile)
