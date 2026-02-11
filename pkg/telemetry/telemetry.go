@@ -146,14 +146,14 @@ func TrackCommand(cmd *cobra.Command) {
 		Event:       EventCommandExecution,
 		WriteKey:    GetSegmentWriteKey(),
 		Properties: map[string]interface{}{
-			"command":        commandPath,
-			"cli_version":    version.CurrVersion,
-			"os":             runtime.GOOS,
-			"os_version":     getOSVersion(),
-			"go_version":     runtime.Version(),
-			"context":        DetectContext(),
-			"cli_name":       "astro-cli",
-			"platform":       runtime.GOARCH,
+			"command":     commandPath,
+			"cli_version": version.CurrVersion,
+			"os":          runtime.GOOS,
+			"os_version":  getOSVersion(),
+			"go_version":  runtime.Version(),
+			"context":     DetectContext(),
+			"cli_name":    "astro-cli",
+			"platform":    runtime.GOARCH,
 		},
 	}
 
