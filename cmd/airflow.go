@@ -73,6 +73,7 @@ var (
 	lintFix                bool
 	lintConfigFile         string
 	waitTime               time.Duration
+	forceKill              bool
 	containerRuntime       runtimes.ContainerRuntime
 	RunExample             = `
 # Create default admin user.
@@ -356,6 +357,7 @@ func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for webserver to get healthy. The default is 5 minutes. Use --wait 2m to wait for 2 minutes.")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
+	cmd.Flags().BoolVarP(&forceKill, "kill", "k", false, "Kill all running containers and remove all data before restarting. This permanently deletes all container data.")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
@@ -839,7 +841,11 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 		return err
 	}
 
-	err = containerHandler.Stop(true)
+	if forceKill {
+		err = containerHandler.Kill()
+	} else {
+		err = containerHandler.Stop(true)
+	}
 	if err != nil {
 		return err
 	}
