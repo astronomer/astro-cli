@@ -29,15 +29,75 @@ func (s *Suite) TestStandaloneHandlerInit() {
 	s.NotNil(handler)
 }
 
-func (s *Suite) TestStandaloneStart_Airflow2Rejected() {
-	// Mock parseFile to return an Airflow 2 runtime image
+func (s *Suite) TestStandaloneStart_Airflow2Accepted() {
+	// Airflow 2 runtime versions (old format like 12.0.0) should be accepted
+	tmpDir, err := os.MkdirTemp("", "standalone-af2-test")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Pre-create cached constraints
+	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(constraintsDir, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-12.0.0.txt"), []byte("apache-airflow==2.10.0+astro.1\n"), 0o644)
+	s.NoError(err)
+
+	// Create a fake airflow binary
+	venvBin := filepath.Join(tmpDir, ".venv", "bin")
+	err = os.MkdirAll(venvBin, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(venvBin, "airflow"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	s.NoError(err)
+
 	origParseFile := standaloneParseFile
-	defer func() { standaloneParseFile = origParseFile }()
+	origLookPath := lookPath
+	origRunCommand := runCommand
+	origCheckHealth := checkWebserverHealth
+	defer func() {
+		standaloneParseFile = origParseFile
+		lookPath = origLookPath
+		runCommand = origRunCommand
+		checkWebserverHealth = origCheckHealth
+	}()
 
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
 		return []docker.Command{
 			{Cmd: "from", Value: []string{"quay.io/astronomer/astro-runtime:12.0.0"}},
 		}, nil
+	}
+	lookPath = func(file string) (string, error) { return "/usr/local/bin/uv", nil }
+	runCommand = func(dir, name string, args ...string) error { return nil }
+	checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
+		// Verify Airflow 2 uses /health endpoint and webserver component
+		s.Contains(url, "/health")
+		s.NotContains(url, "/api/v2")
+		s.Equal("webserver", component)
+		return nil
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	s.NoError(err)
+	s.Equal("2", handler.airflowMajor)
+}
+
+func (s *Suite) TestStandaloneStart_UnsupportedVersion() {
+	origParseFile := standaloneParseFile
+	origGetImageTag := standaloneGetImageTag
+	defer func() {
+		standaloneParseFile = origParseFile
+		standaloneGetImageTag = origGetImageTag
+	}()
+
+	standaloneParseFile = func(filename string) ([]docker.Command, error) {
+		return []docker.Command{
+			{Cmd: "from", Value: []string{"some-image:unknown-tag"}},
+		}, nil
+	}
+	standaloneGetImageTag = func(cmds []docker.Command) (string, string) {
+		return "some-image", "unknown-tag"
 	}
 
 	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
@@ -45,7 +105,7 @@ func (s *Suite) TestStandaloneStart_Airflow2Rejected() {
 
 	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
 	s.Error(err)
-	s.Equal(errNotAirflow3, err)
+	s.Equal(errUnsupportedAirflowVersion, err)
 }
 
 func (s *Suite) TestStandaloneStart_MissingUV() {
@@ -508,6 +568,16 @@ func (s *Suite) TestStandaloneStart_InstallFails() {
 	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
 	s.Error(err)
 	s.Contains(err.Error(), "error installing dependencies")
+}
+
+func (s *Suite) TestStandaloneRuntimeImageName() {
+	handler, _ := StandaloneInit("/tmp/test", ".env", "Dockerfile")
+
+	handler.airflowMajor = "3"
+	s.Equal("astrocrpublic.azurecr.io/runtime:3.1-12", handler.runtimeImageName("3.1-12"))
+
+	handler.airflowMajor = "2"
+	s.Equal("quay.io/astronomer/astro-runtime:12.0.0", handler.runtimeImageName("12.0.0"))
 }
 
 func (s *Suite) TestStandaloneImplementsContainerHandler() {

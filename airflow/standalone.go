@@ -26,17 +26,15 @@ import (
 const (
 	standaloneDir          = ".astro/standalone"
 	defaultStandalonePort  = "8080"
-	standaloneHealthURL    = "http://localhost:8080/api/v2/monitor/health"
-	standaloneHealthComp   = "api-server"
 	standaloneIndexURL     = "https://pip.astronomer.io/v2/"
 	standalonePythonVer    = "3.12"
 	constraintsFileInImage = "/etc/pip-constraints.txt"
 )
 
 var (
-	errStandaloneNotSupported = errors.New("this command is not supported in standalone mode")
-	errNotAirflow3            = errors.New("standalone mode is only supported with Airflow 3 (runtime versions 3.x). Please use a runtime version >= 3.0-1")
-	errUVNotFound             = errors.New("'uv' is required for standalone mode but was not found on PATH.\nInstall it with: curl -LsSf https://astral.sh/uv/install.sh | sh\nSee https://docs.astral.sh/uv/getting-started/installation/ for more options")
+	errStandaloneNotSupported    = errors.New("this command is not supported in standalone mode")
+	errUnsupportedAirflowVersion = errors.New("standalone mode requires Airflow 2.2+ (runtime 4.0.0+) or Airflow 3 (runtime 3.x)")
+	errUVNotFound                = errors.New("'uv' is required for standalone mode but was not found on PATH.\nInstall it with: curl -LsSf https://astral.sh/uv/install.sh | sh\nSee https://docs.astral.sh/uv/getting-started/installation/ for more options")
 
 	// Function variables for testing
 	lookPath              = exec.LookPath
@@ -48,9 +46,10 @@ var (
 
 // Standalone implements ContainerHandler using `airflow standalone` instead of Docker Compose.
 type Standalone struct {
-	airflowHome string
-	envFile     string
-	dockerfile  string
+	airflowHome  string
+	envFile      string
+	dockerfile   string
+	airflowMajor string // "2" or "3", set during Start()
 }
 
 // StandaloneInit creates a new Standalone handler.
@@ -76,10 +75,10 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 		return errors.New("could not determine runtime version from Dockerfile")
 	}
 
-	// 2. Validate Airflow 3 only
-	airflowMajor := airflowversions.AirflowMajorVersionForRuntimeVersion(tag)
-	if airflowMajor != "3" {
-		return errNotAirflow3
+	// 2. Validate Airflow version (2.2+ or 3.x)
+	s.airflowMajor = airflowversions.AirflowMajorVersionForRuntimeVersion(tag)
+	if s.airflowMajor != "2" && s.airflowMajor != "3" {
+		return errUnsupportedAirflowVersion
 	}
 
 	// 3. Check uv is on PATH
@@ -192,9 +191,18 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 		}
 	}()
 
-	// Run health check in background
+	// Run health check in background (URL differs between Airflow 2 and 3)
+	var healthURL, healthComp string
+	switch s.airflowMajor {
+	case "3":
+		healthURL = "http://localhost:" + defaultStandalonePort + "/api/v2/monitor/health"
+		healthComp = "api-server"
+	default:
+		healthURL = "http://localhost:" + defaultStandalonePort + "/health"
+		healthComp = "webserver"
+	}
 	go func() {
-		err := checkWebserverHealth(standaloneHealthURL, waitTime, standaloneHealthComp)
+		err := checkWebserverHealth(healthURL, waitTime, healthComp)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "\n%s\n", err.Error())
 			return
@@ -225,6 +233,16 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 	return nil
 }
 
+// runtimeImageName returns the full Docker image name for the given runtime tag.
+func (s *Standalone) runtimeImageName(tag string) string {
+	switch s.airflowMajor {
+	case "3":
+		return fmt.Sprintf("%s/%s:%s", AstroImageRegistryBaseImageName, AstroRuntimeAirflow3ImageName, tag)
+	default:
+		return fmt.Sprintf("%s/%s:%s", QuayBaseImageName, AstroRuntimeAirflow2ImageName, tag)
+	}
+}
+
 // getConstraints extracts pip constraints from the runtime Docker image.
 // Results are cached in .astro/standalone/constraints-<tag>.txt.
 func (s *Standalone) getConstraints(tag string) (string, string, error) {
@@ -246,7 +264,7 @@ func (s *Standalone) getConstraints(tag string) (string, string, error) {
 	}
 
 	// Determine full image name
-	fullImageName := fmt.Sprintf("%s/%s:%s", AstroImageRegistryBaseImageName, AstroRuntimeAirflow3ImageName, tag)
+	fullImageName := s.runtimeImageName(tag)
 
 	// Run docker to extract constraints
 	out, err := execDockerRun(fullImageName, constraintsFileInImage)
@@ -372,7 +390,11 @@ func (s *Standalone) applySettings(settingsFile string, envConns map[string]astr
 	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
 	defer settings.SetExecAirflowCommand(origExec)
 
-	return settings.ConfigSettings("standalone", settingsFile, envConns, 3, true, true, true)
+	airflowVersion := uint64(3) //nolint:mnd
+	if s.airflowMajor == "2" {
+		airflowVersion = 2 //nolint:mnd
+	}
+	return settings.ConfigSettings("standalone", settingsFile, envConns, airflowVersion, true, true, true)
 }
 
 // standaloneExecAirflowCommand runs an airflow command via the local venv.
@@ -403,13 +425,14 @@ func (s *Standalone) Kill() error {
 	sp.Start()
 	defer sp.Stop()
 
-	// Remove venv, standalone cache, airflow.db, and logs
+	// Remove venv, standalone cache, airflow.db, logs, and credential files
 	pathsToRemove := []string{
 		filepath.Join(s.airflowHome, ".venv"),
 		filepath.Join(s.airflowHome, standaloneDir),
 		filepath.Join(s.airflowHome, "airflow.db"),
 		filepath.Join(s.airflowHome, "logs"),
-		filepath.Join(s.airflowHome, "simple_auth_manager_passwords.json.generated"),
+		filepath.Join(s.airflowHome, "simple_auth_manager_passwords.json.generated"), // Airflow 3
+		filepath.Join(s.airflowHome, "standalone_admin_password.txt"),                 // Airflow 2
 	}
 
 	for _, p := range pathsToRemove {
