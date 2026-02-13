@@ -432,7 +432,7 @@ func (s *Standalone) Kill() error {
 		filepath.Join(s.airflowHome, "airflow.db"),
 		filepath.Join(s.airflowHome, "logs"),
 		filepath.Join(s.airflowHome, "simple_auth_manager_passwords.json.generated"), // Airflow 3
-		filepath.Join(s.airflowHome, "standalone_admin_password.txt"),                 // Airflow 2
+		filepath.Join(s.airflowHome, "standalone_admin_password.txt"),                // Airflow 2
 	}
 
 	for _, p := range pathsToRemove {
