@@ -47,6 +47,12 @@ func EnsureRuntime(cmd *cobra.Command, args []string) error {
 	return containerRuntime.Initialize()
 }
 
+// EnsureStandaloneRuntime is a pre-run hook for standalone mode.
+// It ensures the project directory exists but skips Docker runtime initialization.
+func EnsureStandaloneRuntime(cmd *cobra.Command, args []string) error {
+	return utils.EnsureProjectDir(cmd, args)
+}
+
 // SetRuntimeIfExists is a pre-run hook that ensures the project directory exists
 // and sets the container runtime if its running, otherwise we bail with an error message.
 func SetRuntimeIfExists(cmd *cobra.Command, args []string) error {
