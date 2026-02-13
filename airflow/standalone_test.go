@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -77,6 +78,7 @@ func (s *Suite) TestStandaloneStart_Airflow2Accepted() {
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
+	handler.SetForeground(true) // Use foreground mode for this test
 
 	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
 	s.NoError(err)
@@ -173,8 +175,6 @@ func (s *Suite) TestStandaloneStubMethods() {
 	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
 	s.NoError(err)
 
-	s.Equal(errStandaloneNotSupported, handler.PS())
-	s.Equal(errStandaloneNotSupported, handler.Logs(false))
 	s.Equal(errStandaloneNotSupported, handler.Run(nil, ""))
 	s.Equal(errStandaloneNotSupported, handler.Bash(""))
 	s.Equal(errStandaloneNotSupported, handler.RunDAG("", "", "", "", false, false))
@@ -189,12 +189,40 @@ func (s *Suite) TestStandaloneStubMethods() {
 	s.Equal(errStandaloneNotSupported, handler.UpgradeTest("", "", "", "", false, false, false, false, false, "", nil))
 }
 
-func (s *Suite) TestStandaloneStop() {
-	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
+func (s *Suite) TestStandaloneStop_NoPIDFile() {
+	tmpDir, err := os.MkdirTemp("", "standalone-stop-test")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	// No PID file exists — should handle gracefully
+	err = handler.Stop(false)
+	s.NoError(err)
+}
+
+func (s *Suite) TestStandaloneStop_StalePID() {
+	tmpDir, err := os.MkdirTemp("", "standalone-stop-test")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create standalone dir and a PID file with a non-existent PID
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(standaloneStateDir, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.pid"), []byte("999999999"), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
 	err = handler.Stop(false)
 	s.NoError(err)
+
+	// PID file should be cleaned up
+	_, err = os.Stat(filepath.Join(standaloneStateDir, "airflow.pid"))
+	s.True(os.IsNotExist(err))
 }
 
 func (s *Suite) TestStandaloneKill() {
@@ -641,7 +669,221 @@ func (s *Suite) TestStandaloneStart_HappyPath() {
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
+	handler.SetForeground(true) // Use foreground mode for this test
 
 	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil))
 	s.NoError(err)
+}
+
+func (s *Suite) TestStandaloneStart_Background() {
+	tmpDir, err := os.MkdirTemp("", "standalone-bg-test")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Pre-create cached constraints and standalone dir
+	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(constraintsDir, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	s.NoError(err)
+
+	// Create a fake airflow binary that sleeps briefly then exits
+	venvBin := filepath.Join(tmpDir, ".venv", "bin")
+	err = os.MkdirAll(venvBin, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(venvBin, "airflow"), []byte("#!/bin/sh\necho 'standalone running'\nsleep 30\n"), 0o755)
+	s.NoError(err)
+
+	origParseFile := standaloneParseFile
+	origLookPath := lookPath
+	origRunCommand := runCommand
+	origCheckHealth := checkWebserverHealth
+	defer func() {
+		standaloneParseFile = origParseFile
+		lookPath = origLookPath
+		runCommand = origRunCommand
+		checkWebserverHealth = origCheckHealth
+	}()
+
+	standaloneParseFile = func(filename string) ([]docker.Command, error) {
+		return []docker.Command{
+			{Cmd: "from", Value: []string{"astrocrpublic.azurecr.io/runtime:3.1-12"}},
+		}, nil
+	}
+	lookPath = func(file string) (string, error) { return "/usr/local/bin/uv", nil }
+	runCommand = func(dir, name string, args ...string) error { return nil }
+	checkWebserverHealth = func(url string, timeout time.Duration, component string) error { return nil }
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+	// Default is background mode (foreground = false)
+
+	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	s.NoError(err)
+
+	// Verify PID file was written
+	pidFilePath := filepath.Join(constraintsDir, "airflow.pid")
+	_, err = os.Stat(pidFilePath)
+	s.NoError(err)
+
+	// Verify log file was created
+	logFilePath := filepath.Join(constraintsDir, "airflow.log")
+	_, err = os.Stat(logFilePath)
+	s.NoError(err)
+
+	// Clean up the process
+	handler.Stop(false) //nolint:errcheck
+}
+
+func (s *Suite) TestStandaloneStart_AlreadyRunning() {
+	tmpDir, err := os.MkdirTemp("", "standalone-already-running")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Pre-create standalone dir, constraints, venv
+	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(constraintsDir, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	s.NoError(err)
+
+	venvBin := filepath.Join(tmpDir, ".venv", "bin")
+	err = os.MkdirAll(venvBin, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(venvBin, "airflow"), []byte("#!/bin/sh\nsleep 30\n"), 0o755)
+	s.NoError(err)
+
+	// Write a PID file with our own PID (guaranteed to be alive)
+	err = os.WriteFile(filepath.Join(constraintsDir, "airflow.pid"), []byte(fmt.Sprintf("%d", os.Getpid())), 0o644)
+	s.NoError(err)
+
+	origParseFile := standaloneParseFile
+	origLookPath := lookPath
+	origRunCommand := runCommand
+	defer func() {
+		standaloneParseFile = origParseFile
+		lookPath = origLookPath
+		runCommand = origRunCommand
+	}()
+
+	standaloneParseFile = func(filename string) ([]docker.Command, error) {
+		return []docker.Command{
+			{Cmd: "from", Value: []string{"astrocrpublic.azurecr.io/runtime:3.1-12"}},
+		}, nil
+	}
+	lookPath = func(file string) (string, error) { return "/usr/local/bin/uv", nil }
+	runCommand = func(dir, name string, args ...string) error { return nil }
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	s.Error(err)
+	s.Contains(err.Error(), "already running")
+}
+
+func (s *Suite) TestStandaloneStop_Running() {
+	tmpDir, err := os.MkdirTemp("", "standalone-stop-running")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Start a real background process that we can stop
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(standaloneStateDir, 0o755)
+	s.NoError(err)
+
+	// Start a sleep process
+	cmd := exec.Command("sleep", "60")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	err = cmd.Start()
+	s.NoError(err)
+
+	// Write its PID
+	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.pid"), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Stop(false)
+	s.NoError(err)
+
+	// PID file should be removed
+	_, err = os.Stat(filepath.Join(standaloneStateDir, "airflow.pid"))
+	s.True(os.IsNotExist(err))
+}
+
+func (s *Suite) TestStandaloneLogs() {
+	tmpDir, err := os.MkdirTemp("", "standalone-logs-test")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create a log file with some content
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(standaloneStateDir, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.log"), []byte("log line 1\nlog line 2\n"), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	// Non-follow mode should return immediately
+	err = handler.Logs(false)
+	s.NoError(err)
+}
+
+func (s *Suite) TestStandaloneLogs_NoFile() {
+	tmpDir, err := os.MkdirTemp("", "standalone-logs-nofile")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Logs(false)
+	s.Error(err)
+	s.Contains(err.Error(), "no log file found")
+}
+
+func (s *Suite) TestStandalonePS_NotRunning() {
+	tmpDir, err := os.MkdirTemp("", "standalone-ps-test")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	// Should not error even when not running
+	err = handler.PS()
+	s.NoError(err)
+}
+
+func (s *Suite) TestStandalonePS_Running() {
+	tmpDir, err := os.MkdirTemp("", "standalone-ps-running")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(standaloneStateDir, 0o755)
+	s.NoError(err)
+
+	// Write our own PID (guaranteed alive)
+	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.pid"), []byte(fmt.Sprintf("%d", os.Getpid())), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.PS()
+	s.NoError(err)
+}
+
+func (s *Suite) TestStandaloneSetForeground() {
+	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
+	s.NoError(err)
+
+	s.False(handler.foreground)
+	handler.SetForeground(true)
+	s.True(handler.foreground)
 }

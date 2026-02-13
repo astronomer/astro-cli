@@ -25,10 +25,16 @@ import (
 
 const (
 	standaloneDir          = ".astro/standalone"
+	standalonePIDFile      = "airflow.pid"
+	standaloneLogFile      = "airflow.log"
 	defaultStandalonePort  = "8080"
 	standaloneIndexURL     = "https://pip.astronomer.io/v2/"
 	standalonePythonVer    = "3.12"
 	constraintsFileInImage = "/etc/pip-constraints.txt"
+	stopPollInterval       = 500 * time.Millisecond
+	stopTimeout            = 10 * time.Second
+	filePermissions        = os.FileMode(0o644)
+	dirPermissions         = os.FileMode(0o755)
 )
 
 var (
@@ -42,6 +48,8 @@ var (
 	standaloneGetImageTag = docker.GetImageTagFromParsedFile
 	runCommand            = execCommand
 	startCommand          = startCmd
+	osReadFile            = os.ReadFile
+	osFindProcess         = os.FindProcess
 )
 
 // Standalone implements ContainerHandler using `airflow standalone` instead of Docker Compose.
@@ -50,6 +58,7 @@ type Standalone struct {
 	envFile      string
 	dockerfile   string
 	airflowMajor string // "2" or "3", set during Start()
+	foreground   bool   // if true, run in foreground (stream output, block on Wait)
 }
 
 // StandaloneInit creates a new Standalone handler.
@@ -59,6 +68,21 @@ func StandaloneInit(airflowHome, envFile, dockerfile string) (*Standalone, error
 		envFile:     envFile,
 		dockerfile:  dockerfile,
 	}, nil
+}
+
+// SetForeground controls whether Start() runs the process in the foreground.
+func (s *Standalone) SetForeground(fg bool) {
+	s.foreground = fg
+}
+
+// pidFilePath returns the full path to the PID file.
+func (s *Standalone) pidFilePath() string {
+	return filepath.Join(s.airflowHome, standaloneDir, standalonePIDFile)
+}
+
+// logFilePath returns the full path to the log file.
+func (s *Standalone) logFilePath() string {
+	return filepath.Join(s.airflowHome, standaloneDir, standaloneLogFile)
 }
 
 // Start runs airflow standalone locally without Docker.
@@ -132,7 +156,7 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 	// 8. Build environment
 	env := s.buildEnv()
 
-	// 9. Start airflow standalone as foreground process
+	// 9. Start airflow standalone
 	fmt.Println("\nStarting Airflow in standalone mode…")
 
 	venvBin := filepath.Join(s.airflowHome, ".venv", "bin")
@@ -145,6 +169,14 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 	// tree (scheduler, triggerer, api-server, etc.) when the user sends Ctrl+C.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
+	if s.foreground {
+		return s.startForeground(cmd, waitTime)
+	}
+	return s.startBackground(cmd, waitTime)
+}
+
+// startForeground runs the airflow process in the foreground, streaming output to the terminal.
+func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) error {
 	// Set up pipes for stdout/stderr so we can stream output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -192,15 +224,7 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 	}()
 
 	// Run health check in background (URL differs between Airflow 2 and 3)
-	var healthURL, healthComp string
-	switch s.airflowMajor {
-	case "3":
-		healthURL = "http://localhost:" + defaultStandalonePort + "/api/v2/monitor/health"
-		healthComp = "api-server"
-	default:
-		healthURL = "http://localhost:" + defaultStandalonePort + "/health"
-		healthComp = "webserver"
-	}
+	healthURL, healthComp := s.healthEndpoint()
 	go func() {
 		err := checkWebserverHealth(healthURL, waitTime, healthComp)
 		if err != nil {
@@ -233,6 +257,65 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 	return nil
 }
 
+// startBackground runs the airflow process in the background, writes a PID file,
+// runs the health check, and returns.
+func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration) error {
+	// Check if already running
+	if pid, alive := s.readPID(); alive {
+		return fmt.Errorf("standalone Airflow is already running (PID %d). Run 'astro dev standalone stop' first", pid)
+	}
+
+	// Open log file for writing
+	logPath := s.logFilePath()
+	logFile, err := os.Create(logPath)
+	if err != nil {
+		return fmt.Errorf("error creating log file: %w", err)
+	}
+	defer logFile.Close()
+
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+
+	err = startCommand(cmd)
+	if err != nil {
+		return fmt.Errorf("error starting airflow standalone: %w", err)
+	}
+
+	// Write PID file
+	err = os.WriteFile(s.pidFilePath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), filePermissions)
+	if err != nil {
+		// Kill the process if we can't write the PID file
+		syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck
+		return fmt.Errorf("error writing PID file: %w", err)
+	}
+
+	// Run health check (blocking — wait for healthy or timeout)
+	healthURL, healthComp := s.healthEndpoint()
+	err = checkWebserverHealth(healthURL, waitTime, healthComp)
+	if err != nil {
+		return fmt.Errorf("airflow did not become healthy: %w", err)
+	}
+
+	bullet := ansi.Cyan("\u27A4") + " "
+	uiURL := "http://localhost:" + defaultStandalonePort
+	fmt.Printf("\n%s Airflow is ready! (PID %d)\n", ansi.Green("\u2714"), cmd.Process.Pid)
+	fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
+	fmt.Printf("%sView logs: %s\n", bullet, ansi.Bold("astro dev standalone logs -f"))
+	fmt.Printf("%sStop:      %s\n", bullet, ansi.Bold("astro dev standalone stop"))
+
+	return nil
+}
+
+// healthEndpoint returns the health check URL and component name for the current Airflow version.
+func (s *Standalone) healthEndpoint() (url, component string) {
+	switch s.airflowMajor {
+	case "3":
+		return "http://localhost:" + defaultStandalonePort + "/api/v2/monitor/health", "api-server"
+	default:
+		return "http://localhost:" + defaultStandalonePort + "/health", "webserver"
+	}
+}
+
 // runtimeImageName returns the full Docker image name for the given runtime tag.
 func (s *Standalone) runtimeImageName(tag string) string {
 	switch s.airflowMajor {
@@ -245,20 +328,20 @@ func (s *Standalone) runtimeImageName(tag string) string {
 
 // getConstraints extracts pip constraints from the runtime Docker image.
 // Results are cached in .astro/standalone/constraints-<tag>.txt.
-func (s *Standalone) getConstraints(tag string) (string, string, error) {
+func (s *Standalone) getConstraints(tag string) (constraintsPath, airflowVersion string, err error) {
 	constraintsDir := filepath.Join(s.airflowHome, standaloneDir)
 	constraintsFile := filepath.Join(constraintsDir, fmt.Sprintf("constraints-%s.txt", tag))
 
 	// Check cache
 	if exists, _ := fileutil.Exists(constraintsFile, nil); exists {
-		airflowVersion, err := parseAirflowVersionFromConstraints(constraintsFile)
+		airflowVersion, err = parseAirflowVersionFromConstraints(constraintsFile)
 		if err == nil && airflowVersion != "" {
 			return constraintsFile, airflowVersion, nil
 		}
 	}
 
 	// Create directory
-	err := os.MkdirAll(constraintsDir, os.FileMode(0o755))
+	err = os.MkdirAll(constraintsDir, dirPermissions)
 	if err != nil {
 		return "", "", fmt.Errorf("error creating standalone directory: %w", err)
 	}
@@ -267,18 +350,19 @@ func (s *Standalone) getConstraints(tag string) (string, string, error) {
 	fullImageName := s.runtimeImageName(tag)
 
 	// Run docker to extract constraints
-	out, err := execDockerRun(fullImageName, constraintsFileInImage)
+	var out string
+	out, err = execDockerRun(fullImageName, constraintsFileInImage)
 	if err != nil {
 		return "", "", fmt.Errorf("error extracting constraints from runtime image %s: %w", fullImageName, err)
 	}
 
 	// Write constraints to cache file
-	err = os.WriteFile(constraintsFile, []byte(out), os.FileMode(0o644))
+	err = os.WriteFile(constraintsFile, []byte(out), filePermissions)
 	if err != nil {
 		return "", "", fmt.Errorf("error caching constraints file: %w", err)
 	}
 
-	airflowVersion, err := parseAirflowVersionFromConstraints(constraintsFile)
+	airflowVersion, err = parseAirflowVersionFromConstraints(constraintsFile)
 	if err != nil {
 		return "", "", err
 	}
@@ -339,7 +423,7 @@ func (s *Standalone) buildEnv() []string {
 	}
 
 	// Start with inherited env, filtering out keys we override.
-	var env []string
+	env := make([]string, 0, len(os.Environ())+len(overrides))
 	for _, kv := range os.Environ() {
 		if idx := strings.IndexByte(kv, '='); idx >= 0 {
 			if _, overridden := overrides[kv[:idx]]; overridden {
@@ -413,14 +497,75 @@ func (s *Standalone) standaloneExecAirflowCommand(_, command string) (string, er
 	return string(out), nil
 }
 
-// Stop is mostly a no-op for standalone mode since Ctrl+C is the primary mechanism.
+// readPID reads the PID file and checks if the process is alive.
+// Returns the PID and true if the process is running, or 0 and false otherwise.
+func (s *Standalone) readPID() (int, bool) {
+	data, err := osReadFile(s.pidFilePath())
+	if err != nil {
+		return 0, false
+	}
+
+	pid := 0
+	if _, err := fmt.Sscanf(strings.TrimSpace(string(data)), "%d", &pid); err != nil || pid <= 0 {
+		return 0, false
+	}
+
+	// Check if process is alive
+	proc, err := osFindProcess(pid)
+	if err != nil {
+		return pid, false
+	}
+	// On Unix, FindProcess always succeeds; use signal 0 to probe.
+	if err := proc.Signal(syscall.Signal(0)); err != nil {
+		return pid, false
+	}
+	return pid, true
+}
+
+// Stop terminates the standalone Airflow process.
 func (s *Standalone) Stop(_ bool) error {
-	fmt.Println("Standalone mode runs in the foreground. Use Ctrl+C to stop.")
+	pid, alive := s.readPID()
+	if pid == 0 {
+		fmt.Println("No standalone Airflow process found.")
+		return nil
+	}
+
+	if !alive {
+		// Stale PID file — clean up
+		os.Remove(s.pidFilePath())
+		fmt.Println("No standalone Airflow process found (cleaned up stale PID file).")
+		return nil
+	}
+
+	// Send SIGTERM to the process group
+	fmt.Printf("Stopping Airflow standalone (PID %d)…\n", pid)
+	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck
+
+	// Poll for process exit
+	deadline := time.Now().Add(stopTimeout)
+	for time.Now().Before(deadline) {
+		time.Sleep(stopPollInterval)
+		if _, stillAlive := s.readPID(); !stillAlive {
+			break
+		}
+	}
+
+	// If still alive, send SIGKILL
+	if _, stillAlive := s.readPID(); stillAlive {
+		syscall.Kill(-pid, syscall.SIGKILL) //nolint:errcheck
+		time.Sleep(stopPollInterval)
+	}
+
+	os.Remove(s.pidFilePath())
+	fmt.Println("Airflow standalone stopped.")
 	return nil
 }
 
-// Kill cleans up standalone state files.
+// Kill stops a running process (if any) and cleans up standalone state files.
 func (s *Standalone) Kill() error {
+	// Stop the running process first
+	s.Stop(false) //nolint:errcheck
+
 	sp := spinner.NewSpinner("Cleaning up standalone environment…")
 	sp.Start()
 	defer sp.Stop()
@@ -447,12 +592,62 @@ func (s *Standalone) Kill() error {
 
 // Stub methods — not supported in standalone mode.
 
+// PS reports the status of the standalone Airflow process.
 func (s *Standalone) PS() error {
-	return errStandaloneNotSupported
+	pid, alive := s.readPID()
+	if alive {
+		fmt.Printf("Airflow standalone is running (PID %d)\n", pid)
+	} else {
+		fmt.Println("Airflow standalone is not running.")
+	}
+	return nil
 }
 
-func (s *Standalone) Logs(_ bool, _ ...string) error {
-	return errStandaloneNotSupported
+// Logs streams the standalone Airflow log file.
+func (s *Standalone) Logs(follow bool, _ ...string) error {
+	logPath := s.logFilePath()
+	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+		return fmt.Errorf("no log file found at %s — has standalone been started?", logPath)
+	}
+
+	if !follow {
+		data, err := osReadFile(logPath)
+		if err != nil {
+			return fmt.Errorf("error reading log file: %w", err)
+		}
+		fmt.Print(string(data))
+		return nil
+	}
+
+	// Follow mode: read existing content then poll for new data
+	f, err := os.Open(logPath)
+	if err != nil {
+		return fmt.Errorf("error opening log file: %w", err)
+	}
+	defer f.Close()
+
+	reader := bufio.NewReader(f)
+
+	// Set up signal handling so Ctrl+C exits cleanly
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+
+	for {
+		line, err := reader.ReadString('\n')
+		if line != "" {
+			fmt.Print(line)
+		}
+		if err != nil {
+			// At EOF, poll for new data
+			select {
+			case <-sigChan:
+				return nil
+			case <-time.After(stopPollInterval):
+				continue
+			}
+		}
+	}
 }
 
 func (s *Standalone) Run(_ []string, _ string) error {
@@ -492,7 +687,7 @@ func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string
 }
 
 // execCommand runs a command in the given directory.
-func execCommand(dir string, name string, args ...string) error {
+func execCommand(dir, name string, args ...string) error {
 	cmd := exec.Command(name, args...) //nolint:gosec
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
