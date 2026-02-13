@@ -39,11 +39,11 @@ var (
 	errUVNotFound             = errors.New("'uv' is required for standalone mode but was not found on PATH.\nInstall it with: curl -LsSf https://astral.sh/uv/install.sh | sh\nSee https://docs.astral.sh/uv/getting-started/installation/ for more options")
 
 	// Function variables for testing
-	lookPath       = exec.LookPath
+	lookPath              = exec.LookPath
 	standaloneParseFile   = docker.ParseFile
 	standaloneGetImageTag = docker.GetImageTagFromParsedFile
-	runCommand     = execCommand
-	startCommand   = startCmd
+	runCommand            = execCommand
+	startCommand          = startCmd
 )
 
 // Standalone implements ContainerHandler using `airflow standalone` instead of Docker Compose.
@@ -300,11 +300,11 @@ func (s *Standalone) buildEnv() []string {
 
 	// Build our override map — these take precedence over the inherited env.
 	overrides := map[string]string{
-		"PATH":                        fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH")),
-		"AIRFLOW_HOME":                s.airflowHome,
-		"ASTRONOMER_ENVIRONMENT":      "local",
+		"PATH":                         fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH")),
+		"AIRFLOW_HOME":                 s.airflowHome,
+		"ASTRONOMER_ENVIRONMENT":       "local",
 		"AIRFLOW__CORE__LOAD_EXAMPLES": "False",
-		"AIRFLOW__CORE__DAGS_FOLDER":  filepath.Join(s.airflowHome, "dags"),
+		"AIRFLOW__CORE__DAGS_FOLDER":   filepath.Join(s.airflowHome, "dags"),
 	}
 
 	// Load .env file if it exists — these also override inherited env.
