@@ -121,9 +121,10 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	configInitProjectConfigMsg   = "Initialized empty Astro project in %s\n"
 
 	// this is used to monkey patch the function in order to write unit test cases
-	containerHandlerInit = airflow.ContainerHandlerInit
-	getDefaultImageTag   = airflowversions.GetDefaultImageTag
-	projectNameUnique    = airflow.ProjectNameUnique
+	containerHandlerInit  = airflow.ContainerHandlerInit
+	standaloneHandlerInit = airflow.StandaloneHandlerInit
+	getDefaultImageTag    = airflowversions.GetDefaultImageTag
+	projectNameUnique     = airflow.ProjectNameUnique
 
 	pytestDir = "/tests"
 
@@ -164,6 +165,7 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
 		newAirflowUpgradeTestCmd(platformCoreClient),
+		newAirflowStandaloneCmd(astroCoreClient),
 	)
 	return cmd
 }
@@ -340,6 +342,40 @@ func newAirflowKillCmd() *cobra.Command {
 		PreRunE:  KillPreRunHook,
 		RunE:     airflowKill,
 		PostRunE: KillPostRunHook,
+	}
+	return cmd
+}
+
+func newAirflowStandaloneCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "standalone",
+		Short: "Run Airflow locally without Docker",
+		Long:  "Run Airflow locally without Docker using 'airflow standalone'. Requires 'uv' to be installed. The process runs in the foreground — use Ctrl+C to stop.",
+		// Override PersistentPreRunE so we don't require a container runtime.
+		PersistentPreRunE: SetupLogging,
+		PreRunE:           EnsureStandaloneRuntime,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return airflowStandalone(cmd, astroCoreClient)
+		},
+	}
+	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
+	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for the API server to become healthy")
+	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
+
+	cmd.AddCommand(newAirflowStandaloneResetCmd())
+
+	return cmd
+}
+
+func newAirflowStandaloneResetCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "reset",
+		Short:   "Reset the standalone environment",
+		Long:    "Reset the standalone environment by removing all generated files (.venv, cached constraints, airflow.db, logs). The next run of 'astro dev standalone' will start fresh.",
+		PreRunE: EnsureStandaloneRuntime,
+		RunE:    airflowStandaloneReset,
 	}
 	return cmd
 }
@@ -738,6 +774,39 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
 	return containerHandler.Start(customImageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns)
+}
+
+// airflowStandalone starts Airflow in standalone mode without Docker.
+func airflowStandalone(cmd *cobra.Command, astroCoreClient astrocore.CoreClient) error {
+	cmd.SilenceUsage = true
+
+	var envConns map[string]astrocore.EnvironmentObjectConnection
+	if workspaceID != "" || deploymentID != "" {
+		var err error
+		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+		if err != nil {
+			return err
+		}
+	}
+
+	containerHandler, err := standaloneHandlerInit(config.WorkingPath, envFile, dockerfile, "")
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.Start("", settingsFile, "", "", false, false, waitTime, envConns)
+}
+
+// airflowStandaloneReset removes standalone environment files.
+func airflowStandaloneReset(cmd *cobra.Command, _ []string) error {
+	cmd.SilenceUsage = true
+
+	containerHandler, err := standaloneHandlerInit(config.WorkingPath, envFile, dockerfile, "")
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.Kill()
 }
 
 // airflowRun
