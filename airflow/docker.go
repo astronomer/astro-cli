@@ -1201,6 +1201,19 @@ func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretStrin
 	return err
 }
 
+func (d *DockerCompose) Build(customImageName, buildSecretString string, noCache bool) error {
+	// If a custom image name is provided, tag it as our project image
+	if customImageName != "" {
+		return d.imageHandler.TagLocalImage(customImageName)
+	}
+
+	// Build the image
+	return d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{
+		Path:    d.airflowHome,
+		NoCache: noCache,
+	})
+}
+
 func (d *DockerCompose) Bash(component string) error {
 	// exec into schedueler by default
 	if component == "" {
