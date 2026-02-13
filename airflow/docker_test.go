@@ -1609,6 +1609,73 @@ func (s *Suite) TestDockerComposeParse() {
 	})
 }
 
+func (s *Suite) TestDockerComposeBuild() {
+	s.Run("success", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", mock.Anything, "", airflowTypes.ImageBuildConfig{Path: "", NoCache: false}).Return(nil).Once()
+
+		mockDockerCompose := DockerCompose{
+			imageHandler: imageHandler,
+		}
+
+		err := mockDockerCompose.Build("", "", false)
+		s.NoError(err)
+		imageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("success with no-cache", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", mock.Anything, "", airflowTypes.ImageBuildConfig{Path: "", NoCache: true}).Return(nil).Once()
+
+		mockDockerCompose := DockerCompose{
+			imageHandler: imageHandler,
+		}
+
+		err := mockDockerCompose.Build("", "", true)
+		s.NoError(err)
+		imageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("success with custom image", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("TagLocalImage", "my-custom-image:latest").Return(nil).Once()
+
+		mockDockerCompose := DockerCompose{
+			imageHandler: imageHandler,
+		}
+
+		err := mockDockerCompose.Build("my-custom-image:latest", "", false)
+		s.NoError(err)
+		imageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("build failure", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", mock.Anything, "", airflowTypes.ImageBuildConfig{Path: "", NoCache: false}).Return(errMock).Once()
+
+		mockDockerCompose := DockerCompose{
+			imageHandler: imageHandler,
+		}
+
+		err := mockDockerCompose.Build("", "", false)
+		s.ErrorIs(err, errMock)
+		imageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("tag local image failure", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("TagLocalImage", "my-custom-image:latest").Return(errMock).Once()
+
+		mockDockerCompose := DockerCompose{
+			imageHandler: imageHandler,
+		}
+
+		err := mockDockerCompose.Build("my-custom-image:latest", "", false)
+		s.ErrorIs(err, errMock)
+		imageHandler.AssertExpectations(s.T())
+	})
+}
+
 func (s *Suite) TestDockerComposeBash() {
 	mockDockerCompose := DockerCompose{projectName: "test"}
 	component := "scheduler"
