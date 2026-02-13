@@ -132,9 +132,9 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	buildSecrets                = []string{}
 	errNoCompose                = errors.New("cannot use '--compose-file' without '--compose' flag")
 	TemplateList                = airflow.FetchTemplateList
-	defaultWaitTime              = 1 * time.Minute
-	directoryPermissions  uint32 = 0o755
-	standaloneForeground         bool
+	defaultWaitTime             = 1 * time.Minute
+	directoryPermissions uint32 = 0o755
+	standaloneForeground bool
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
