@@ -1,0 +1,69 @@
+package cmd
+
+import (
+	"bytes"
+	"testing"
+
+	"github.com/astronomer/astro-cli/config"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestTelemetryCmd(t *testing.T) {
+	// Initialize config for tests
+	fs := afero.NewMemMapFs()
+	config.InitConfig(fs)
+
+	t.Run("telemetry command has subcommands", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		cmd := newTelemetryCmd(buf)
+
+		assert.Equal(t, "telemetry", cmd.Use)
+		assert.Equal(t, 3, len(cmd.Commands()), "Should have enable, disable, and status subcommands")
+	})
+
+	t.Run("telemetry enable", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		err := telemetryEnable(buf)
+
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "Telemetry enabled")
+	})
+
+	t.Run("telemetry disable", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		err := telemetryDisable(buf)
+
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "Telemetry disabled")
+	})
+
+	t.Run("telemetry status when enabled", func(t *testing.T) {
+		// First enable telemetry
+		_ = telemetryEnable(new(bytes.Buffer))
+
+		buf := new(bytes.Buffer)
+		err := telemetryStatus(buf)
+
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "Telemetry is enabled")
+	})
+
+	t.Run("telemetry status when disabled", func(t *testing.T) {
+		// First disable telemetry
+		_ = telemetryDisable(new(bytes.Buffer))
+
+		buf := new(bytes.Buffer)
+		err := telemetryStatus(buf)
+
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "Telemetry is disabled")
+	})
+}
+
+func TestTelemetrySendCmd(t *testing.T) {
+	cmd := newTelemetrySendCmd()
+
+	assert.Equal(t, "_telemetry-send", cmd.Use)
+	assert.True(t, cmd.Hidden, "Command should be hidden")
+}

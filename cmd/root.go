@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/telemetry"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -68,6 +69,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		PersistentPreRunE: utils.ChainRunEs(
 			SetupLogging,
 			CreateRootPersistentPreRunE(astroCoreClient, platformCoreClient),
+			telemetry.CreateTrackingHook(),
 		),
 	}
 
@@ -79,6 +81,8 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
+		newTelemetryCmd(os.Stdout),
+		newTelemetrySendCmd(),
 	)
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
