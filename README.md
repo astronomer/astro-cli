@@ -17,6 +17,7 @@ The Astro CLI is a command-line interface for data orchestration. It allows you 
   - `deploy`        Deploy code to a Deployment on Astro
   - `deployment`    Manage your Deployments running on Astronomer
   - `dev`           Run your Astro project locally
+  - `api`           Make authenticated requests to Airflow and Astro Cloud REST APIs
   - `help`          Help about any Astro CLI command
   - `version`       Show the running version of the Astro CLI
   - `workspace`     Manage Astronomer Workspaces
