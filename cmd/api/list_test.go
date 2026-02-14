@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/openapi"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -134,7 +135,7 @@ func TestPrintEndpointsVerbose_NoOptionalFields(t *testing.T) {
 
 // --- runList -----------------------------------------------------------------
 
-func newTestSpecServer(t *testing.T, spec *openapi.OpenAPISpec) *httptest.Server {
+func newTestSpecServer(t *testing.T, spec *openapi3.T) *httptest.Server {
 	t.Helper()
 	body, err := json.Marshal(spec)
 	require.NoError(t, err)
@@ -146,17 +147,17 @@ func newTestSpecServer(t *testing.T, spec *openapi.OpenAPISpec) *httptest.Server
 }
 
 func TestRunList(t *testing.T) {
-	spec := &openapi.OpenAPISpec{
+	paths := openapi3.NewPaths()
+	paths.Set("/dags", &openapi3.PathItem{
+		Get: &openapi3.Operation{OperationID: "get_dags", Summary: "List DAGs", Tags: []string{"DAGs"}},
+	})
+	paths.Set("/health", &openapi3.PathItem{
+		Get: &openapi3.Operation{OperationID: "health", Summary: "Health check"},
+	})
+	spec := &openapi3.T{
 		OpenAPI: "3.0.0",
-		Info:    openapi.Info{Title: "Test", Version: "1.0"},
-		Paths: map[string]openapi.PathItem{
-			"/dags": {
-				Get: &openapi.Operation{OperationID: "get_dags", Summary: "List DAGs", Tags: []string{"DAGs"}},
-			},
-			"/health": {
-				Get: &openapi.Operation{OperationID: "health", Summary: "Health check"},
-			},
-		},
+		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
+		Paths:   paths,
 	}
 	ts := newTestSpecServer(t, spec)
 	defer ts.Close()
@@ -208,10 +209,10 @@ func TestRunList(t *testing.T) {
 }
 
 func TestRunList_EmptySpec(t *testing.T) {
-	spec := &openapi.OpenAPISpec{
+	spec := &openapi3.T{
 		OpenAPI: "3.0.0",
-		Info:    openapi.Info{Title: "Test", Version: "1.0"},
-		Paths:   map[string]openapi.PathItem{},
+		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
+		Paths:   openapi3.NewPaths(),
 	}
 	ts := newTestSpecServer(t, spec)
 	defer ts.Close()

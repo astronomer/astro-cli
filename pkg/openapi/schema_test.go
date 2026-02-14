@@ -3,6 +3,7 @@ package openapi
 import (
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -51,7 +52,7 @@ func TestExtractRefName(t *testing.T) {
 // --- NewSchemaResolver -------------------------------------------------------
 
 func TestNewSchemaResolver(t *testing.T) {
-	spec := &OpenAPISpec{Info: Info{Title: "Test"}}
+	spec := &openapi3.T{Info: &openapi3.Info{Title: "Test"}}
 	r := NewSchemaResolver(spec)
 	assert.NotNil(t, r)
 	assert.Equal(t, spec, r.spec)
@@ -60,119 +61,36 @@ func TestNewSchemaResolver(t *testing.T) {
 // --- ResolveSchema -----------------------------------------------------------
 
 func TestResolveSchema_Nil(t *testing.T) {
-	r := NewSchemaResolver(&OpenAPISpec{})
+	r := NewSchemaResolver(&openapi3.T{})
 	resolved, refName := r.ResolveSchema(nil)
 	assert.Nil(t, resolved)
 	assert.Empty(t, refName)
 }
 
 func TestResolveSchema_NoRef(t *testing.T) {
-	r := NewSchemaResolver(&OpenAPISpec{})
-	schema := &Schema{Type: "string"}
-	resolved, refName := r.ResolveSchema(schema)
+	r := NewSchemaResolver(&openapi3.T{})
+	schema := openapi3.NewStringSchema()
+	ref := &openapi3.SchemaRef{Value: schema}
+	resolved, refName := r.ResolveSchema(ref)
 	assert.Equal(t, schema, resolved)
 	assert.Empty(t, refName)
 }
 
-func TestResolveSchema_WithRef_Found(t *testing.T) {
-	spec := &OpenAPISpec{
-		Components: &Components{
-			Schemas: map[string]Schema{
-				"Pet": {Type: "object", Properties: map[string]Schema{
-					"name": {Type: "string"},
-				}},
-			},
-		},
+func TestResolveSchema_WithRef(t *testing.T) {
+	r := NewSchemaResolver(&openapi3.T{})
+	resolvedSchema := openapi3.NewObjectSchema()
+	resolvedSchema.Properties = openapi3.Schemas{
+		"name": {Value: openapi3.NewStringSchema()},
 	}
-	r := NewSchemaResolver(spec)
-
-	schema := &Schema{Ref: "#/components/schemas/Pet"}
-	resolved, refName := r.ResolveSchema(schema)
+	ref := &openapi3.SchemaRef{
+		Ref:   "#/components/schemas/Pet",
+		Value: resolvedSchema,
+	}
+	resolved, refName := r.ResolveSchema(ref)
 	assert.Equal(t, "Pet", refName)
-	assert.Equal(t, "object", resolved.Type)
+	assert.Equal(t, resolvedSchema, resolved)
+	assert.True(t, resolved.Type.Is("object"))
 	assert.Contains(t, resolved.Properties, "name")
-}
-
-func TestResolveSchema_WithRef_NotFound(t *testing.T) {
-	spec := &OpenAPISpec{
-		Components: &Components{
-			Schemas: map[string]Schema{},
-		},
-	}
-	r := NewSchemaResolver(spec)
-
-	schema := &Schema{Ref: "#/components/schemas/Missing"}
-	resolved, refName := r.ResolveSchema(schema)
-	// Falls through to return original schema when ref not found
-	assert.Equal(t, schema, resolved)
-	assert.Empty(t, refName)
-}
-
-// --- lookupSchema ------------------------------------------------------------
-
-func TestLookupSchema_NilSpec(t *testing.T) {
-	r := &SchemaResolver{spec: nil}
-	assert.Nil(t, r.lookupSchema("Anything"))
-}
-
-func TestLookupSchema_NilComponents(t *testing.T) {
-	r := NewSchemaResolver(&OpenAPISpec{})
-	assert.Nil(t, r.lookupSchema("Anything"))
-}
-
-func TestLookupSchema_NilSchemas(t *testing.T) {
-	r := NewSchemaResolver(&OpenAPISpec{Components: &Components{}})
-	assert.Nil(t, r.lookupSchema("Anything"))
-}
-
-func TestLookupSchema_Found(t *testing.T) {
-	spec := &OpenAPISpec{
-		Components: &Components{
-			Schemas: map[string]Schema{
-				"User": {Type: "object"},
-			},
-		},
-	}
-	r := NewSchemaResolver(spec)
-	s := r.lookupSchema("User")
-	assert.NotNil(t, s)
-	assert.Equal(t, "object", s.Type)
-}
-
-func TestLookupSchema_NotFound(t *testing.T) {
-	spec := &OpenAPISpec{
-		Components: &Components{
-			Schemas: map[string]Schema{
-				"User": {Type: "object"},
-			},
-		},
-	}
-	r := NewSchemaResolver(spec)
-	assert.Nil(t, r.lookupSchema("Missing"))
-}
-
-// --- GetSchemaByRef ----------------------------------------------------------
-
-func TestGetSchemaByRef(t *testing.T) {
-	spec := &OpenAPISpec{
-		Components: &Components{
-			Schemas: map[string]Schema{
-				"Deployment": {Type: "object"},
-			},
-		},
-	}
-	r := NewSchemaResolver(spec)
-
-	t.Run("found", func(t *testing.T) {
-		s := r.GetSchemaByRef("#/components/schemas/Deployment")
-		assert.NotNil(t, s)
-		assert.Equal(t, "object", s.Type)
-	})
-
-	t.Run("not found", func(t *testing.T) {
-		s := r.GetSchemaByRef("#/components/schemas/Missing")
-		assert.Nil(t, s)
-	})
 }
 
 // --- IsRequired --------------------------------------------------------------

@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/openapi"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -237,17 +238,17 @@ func TestApplyPathParams(t *testing.T) {
 
 func TestResolveOperationID(t *testing.T) {
 	// Serve a minimal OpenAPI spec
-	spec := openapi.OpenAPISpec{
+	paths := openapi3.NewPaths()
+	paths.Set("/things", &openapi3.PathItem{
+		Get: &openapi3.Operation{OperationID: "listThings", Summary: "List things"},
+	})
+	paths.Set("/version", &openapi3.PathItem{
+		Get: &openapi3.Operation{OperationID: "getVersion"},
+	})
+	spec := openapi3.T{
 		OpenAPI: "3.0.0",
-		Info:    openapi.Info{Title: "Test", Version: "1.0"},
-		Paths: map[string]openapi.PathItem{
-			"/things": {
-				Get: &openapi.Operation{OperationID: "listThings", Summary: "List things"},
-			},
-			"/version": {
-				Get: &openapi.Operation{OperationID: "getVersion"},
-			},
-		},
+		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
+		Paths:   paths,
 	}
 	body, _ := json.Marshal(spec)
 

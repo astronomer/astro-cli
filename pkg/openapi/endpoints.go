@@ -3,19 +3,21 @@ package openapi
 import (
 	"sort"
 	"strings"
+
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const defaultMethodOrder = 99
 
 // ExtractEndpoints extracts all endpoints from an OpenAPI spec.
-func ExtractEndpoints(spec *OpenAPISpec) []Endpoint {
-	if spec == nil {
+func ExtractEndpoints(spec *openapi3.T) []Endpoint {
+	if spec == nil || spec.Paths == nil {
 		return nil
 	}
 
 	var endpoints []Endpoint
 
-	for path, pathItem := range spec.Paths {
+	for path, pathItem := range spec.Paths.Map() {
 		if pathItem.Get != nil {
 			endpoints = append(endpoints, newEndpoint("GET", path, pathItem.Get))
 		}
@@ -51,7 +53,7 @@ func ExtractEndpoints(spec *OpenAPISpec) []Endpoint {
 }
 
 // newEndpoint creates an Endpoint from an Operation.
-func newEndpoint(method, path string, op *Operation) Endpoint {
+func newEndpoint(method, path string, op *openapi3.Operation) Endpoint {
 	return Endpoint{
 		Method:      method,
 		Path:        path,

@@ -2,51 +2,32 @@ package openapi
 
 import (
 	"strings"
+
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
-// SchemaResolver resolves $ref references in an OpenAPI spec.
+// SchemaResolver provides helpers for working with OpenAPI schema references.
+// Since kin-openapi resolves $ref during loading, this is primarily used for
+// extracting ref names for display purposes.
 type SchemaResolver struct {
-	spec *OpenAPISpec
+	spec *openapi3.T
 }
 
 // NewSchemaResolver creates a new schema resolver.
-func NewSchemaResolver(spec *OpenAPISpec) *SchemaResolver {
+func NewSchemaResolver(spec *openapi3.T) *SchemaResolver {
 	return &SchemaResolver{spec: spec}
 }
 
-// ResolveSchema resolves a schema, following $ref if present.
-// Returns the resolved schema and the reference name (if it was a $ref).
-func (r *SchemaResolver) ResolveSchema(schema *Schema) (resolved *Schema, refName string) {
-	if schema == nil {
+// ResolveSchema extracts the resolved schema and ref name from a SchemaRef.
+// Since kin-openapi resolves references during loading, Value is already populated.
+func (r *SchemaResolver) ResolveSchema(ref *openapi3.SchemaRef) (resolved *openapi3.Schema, refName string) {
+	if ref == nil {
 		return nil, ""
 	}
-
-	if schema.Ref != "" {
-		refName := extractRefName(schema.Ref)
-		resolved := r.lookupSchema(refName)
-		if resolved != nil {
-			return resolved, refName
-		}
+	if ref.Ref != "" {
+		refName = extractRefName(ref.Ref)
 	}
-
-	return schema, ""
-}
-
-// lookupSchema looks up a schema by name in components/schemas.
-func (r *SchemaResolver) lookupSchema(name string) *Schema {
-	if r.spec == nil || r.spec.Components == nil || r.spec.Components.Schemas == nil {
-		return nil
-	}
-
-	if schema, ok := r.spec.Components.Schemas[name]; ok {
-		return &schema
-	}
-	return nil
-}
-
-// GetSchemaByRef looks up a schema by its full $ref path.
-func (r *SchemaResolver) GetSchemaByRef(ref string) *Schema {
-	return r.lookupSchema(extractRefName(ref))
+	return ref.Value, refName
 }
 
 // extractRefName extracts the schema name from a $ref string.

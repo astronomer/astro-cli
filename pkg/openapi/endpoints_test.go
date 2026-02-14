@@ -3,38 +3,24 @@ package openapi
 import (
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestExtractEndpoints(t *testing.T) {
-	spec := &OpenAPISpec{
-		Paths: map[string]PathItem{
-			"/organizations": {
-				Get: &Operation{
-					OperationID: "listOrganizations",
-					Summary:     "List organizations",
-					Tags:        []string{"Organizations"},
-				},
-				Post: &Operation{
-					OperationID: "createOrganization",
-					Summary:     "Create organization",
-					Tags:        []string{"Organizations"},
-				},
-			},
-			"/organizations/{organizationId}": {
-				Get: &Operation{
-					OperationID: "getOrganization",
-					Summary:     "Get organization",
-					Tags:        []string{"Organizations"},
-				},
-				Delete: &Operation{
-					OperationID: "deleteOrganization",
-					Summary:     "Delete organization",
-					Tags:        []string{"Organizations"},
-					Deprecated:  true,
-				},
-			},
-		},
+	paths := openapi3.NewPaths()
+	paths.Set("/organizations", &openapi3.PathItem{
+		Get:  &openapi3.Operation{OperationID: "listOrganizations", Summary: "List organizations", Tags: []string{"Organizations"}},
+		Post: &openapi3.Operation{OperationID: "createOrganization", Summary: "Create organization", Tags: []string{"Organizations"}},
+	})
+	paths.Set("/organizations/{organizationId}", &openapi3.PathItem{
+		Get:    &openapi3.Operation{OperationID: "getOrganization", Summary: "Get organization", Tags: []string{"Organizations"}},
+		Delete: &openapi3.Operation{OperationID: "deleteOrganization", Summary: "Delete organization", Tags: []string{"Organizations"}, Deprecated: true},
+	})
+	spec := &openapi3.T{
+		OpenAPI: "3.0.0",
+		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
+		Paths:   paths,
 	}
 
 	endpoints := ExtractEndpoints(spec)
@@ -137,18 +123,20 @@ func TestFindEndpointByPath(t *testing.T) {
 }
 
 func TestExtractEndpointsAllMethods(t *testing.T) {
-	spec := &OpenAPISpec{
-		Paths: map[string]PathItem{
-			"/resource": {
-				Get:     &Operation{OperationID: "getResource"},
-				Post:    &Operation{OperationID: "postResource"},
-				Put:     &Operation{OperationID: "putResource"},
-				Patch:   &Operation{OperationID: "patchResource"},
-				Delete:  &Operation{OperationID: "deleteResource"},
-				Options: &Operation{OperationID: "optionsResource"},
-				Head:    &Operation{OperationID: "headResource"},
-			},
-		},
+	paths := openapi3.NewPaths()
+	paths.Set("/resource", &openapi3.PathItem{
+		Get:     &openapi3.Operation{OperationID: "getResource"},
+		Post:    &openapi3.Operation{OperationID: "postResource"},
+		Put:     &openapi3.Operation{OperationID: "putResource"},
+		Patch:   &openapi3.Operation{OperationID: "patchResource"},
+		Delete:  &openapi3.Operation{OperationID: "deleteResource"},
+		Options: &openapi3.Operation{OperationID: "optionsResource"},
+		Head:    &openapi3.Operation{OperationID: "headResource"},
+	})
+	spec := &openapi3.T{
+		OpenAPI: "3.0.0",
+		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
+		Paths:   paths,
 	}
 
 	endpoints := ExtractEndpoints(spec)
@@ -162,7 +150,11 @@ func TestExtractEndpointsAllMethods(t *testing.T) {
 }
 
 func TestExtractEndpointsEmptyPaths(t *testing.T) {
-	spec := &OpenAPISpec{Paths: map[string]PathItem{}}
+	spec := &openapi3.T{
+		OpenAPI: "3.0.0",
+		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
+		Paths:   openapi3.NewPaths(),
+	}
 	endpoints := ExtractEndpoints(spec)
 	assert.Empty(t, endpoints)
 }

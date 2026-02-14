@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/config"
-	"gopkg.in/yaml.v3"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const (
@@ -51,10 +51,10 @@ func CloudCacheFileNameForDomain(domain string) string {
 	return fmt.Sprintf("openapi-cache-%s.json", normalized)
 }
 
-// CachedSpec wraps the OpenAPI spec with metadata for caching.
+// CachedSpec wraps raw spec data with metadata for caching.
 type CachedSpec struct {
-	Spec      *OpenAPISpec `json:"spec"`
-	FetchedAt time.Time    `json:"fetchedAt"`
+	RawSpec   json.RawMessage `json:"rawSpec"`
+	FetchedAt time.Time       `json:"fetchedAt"`
 }
 
 // Cache manages fetching and caching of an OpenAPI specification.
@@ -63,7 +63,7 @@ type Cache struct {
 	cachePath   string
 	stripPrefix string // optional prefix to strip from endpoint paths (e.g. "/api/v2")
 	httpClient  *http.Client
-	spec        *OpenAPISpec
+	spec        *openapi3.T
 	fetchedAt   time.Time
 }
 
@@ -151,7 +151,7 @@ func (c *Cache) GetSpecURL() string {
 }
 
 // GetSpec returns the loaded OpenAPI spec.
-func (c *Cache) GetSpec() *OpenAPISpec {
+func (c *Cache) GetSpec() *openapi3.T {
 	return c.spec
 }
 
@@ -187,15 +187,25 @@ func (c *Cache) readCache() error {
 		return err
 	}
 
-	c.spec = cached.Spec
+	spec, err := parseSpec(cached.RawSpec)
+	if err != nil {
+		return err
+	}
+
+	c.spec = spec
 	c.fetchedAt = cached.FetchedAt
 	return nil
 }
 
 // saveCache saves the current spec to disk.
 func (c *Cache) saveCache() error {
+	specBytes, err := json.Marshal(c.spec)
+	if err != nil {
+		return err
+	}
+
 	cached := CachedSpec{
-		Spec:      c.spec,
+		RawSpec:   specBytes,
 		FetchedAt: c.fetchedAt,
 	}
 
@@ -246,31 +256,21 @@ func (c *Cache) fetchSpec() error {
 		return fmt.Errorf("reading response body: %w", err)
 	}
 
-	var spec OpenAPISpec
-	contentType := resp.Header.Get("Content-Type")
-
-	// Try to parse based on content type, fallback to trying both formats
-	switch {
-	case strings.Contains(contentType, "yaml") || strings.Contains(contentType, "yml"):
-		if err := yaml.Unmarshal(body, &spec); err != nil {
-			return fmt.Errorf("parsing OpenAPI spec as YAML: %w", err)
-		}
-	case strings.Contains(contentType, "json"):
-		if err := json.Unmarshal(body, &spec); err != nil {
-			return fmt.Errorf("parsing OpenAPI spec as JSON: %w", err)
-		}
-	default:
-		// Content-Type not helpful, try YAML first (more common for OpenAPI), then JSON
-		if err := yaml.Unmarshal(body, &spec); err != nil {
-			if err := json.Unmarshal(body, &spec); err != nil {
-				return fmt.Errorf("parsing OpenAPI spec (tried YAML and JSON): %w", err)
-			}
-		}
+	spec, err := parseSpec(body)
+	if err != nil {
+		return fmt.Errorf("parsing OpenAPI spec: %w", err)
 	}
 
-	c.spec = &spec
+	c.spec = spec
 	c.fetchedAt = time.Now()
 	return nil
+}
+
+// parseSpec parses raw bytes into an OpenAPI spec using kin-openapi's loader.
+// This handles both JSON and YAML formats and resolves $ref references.
+func parseSpec(data []byte) (*openapi3.T, error) {
+	loader := openapi3.NewLoader()
+	return loader.LoadFromData(data)
 }
 
 // ClearCache removes the cached spec file.

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,7 +102,7 @@ func TestGetSpec_Nil(t *testing.T) {
 }
 
 func TestGetSpec_Loaded(t *testing.T) {
-	spec := &OpenAPISpec{Info: Info{Title: "Test"}}
+	spec := &openapi3.T{Info: &openapi3.Info{Title: "Test"}}
 	cache := &Cache{spec: spec}
 	assert.Equal(t, spec, cache.GetSpec())
 	assert.True(t, cache.IsLoaded())
@@ -115,12 +116,10 @@ func TestGetEndpoints_NilSpec(t *testing.T) {
 }
 
 func TestGetEndpoints_NoPrefix(t *testing.T) {
+	paths := openapi3.NewPaths()
+	paths.Set("/dags", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "get_dags"}})
 	cache := &Cache{
-		spec: &OpenAPISpec{
-			Paths: map[string]PathItem{
-				"/dags": {Get: &Operation{OperationID: "get_dags"}},
-			},
-		},
+		spec: &openapi3.T{Paths: paths},
 	}
 	endpoints := cache.GetEndpoints()
 	assert.Len(t, endpoints, 1)
@@ -128,13 +127,11 @@ func TestGetEndpoints_NoPrefix(t *testing.T) {
 }
 
 func TestGetEndpoints_WithPrefixStripping(t *testing.T) {
+	paths := openapi3.NewPaths()
+	paths.Set("/api/v2/dags", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "get_dags"}})
+	paths.Set("/api/v2/version", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "version"}})
 	cache := &Cache{
-		spec: &OpenAPISpec{
-			Paths: map[string]PathItem{
-				"/api/v2/dags":    {Get: &Operation{OperationID: "get_dags"}},
-				"/api/v2/version": {Get: &Operation{OperationID: "version"}},
-			},
-		},
+		spec:        &openapi3.T{Paths: paths},
 		stripPrefix: "/api/v2",
 	}
 	endpoints := cache.GetEndpoints()
@@ -169,12 +166,12 @@ func TestCacheReadWriteRoundTrip(t *testing.T) {
 	tmpDir := t.TempDir()
 	cachePath := filepath.Join(tmpDir, "cache.json")
 
-	spec := &OpenAPISpec{
+	paths := openapi3.NewPaths()
+	paths.Set("/test", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "getTest"}})
+	spec := &openapi3.T{
 		OpenAPI: "3.0.0",
-		Info:    Info{Title: "Test API", Version: "1.0"},
-		Paths: map[string]PathItem{
-			"/test": {Get: &Operation{OperationID: "getTest"}},
-		},
+		Info:    &openapi3.Info{Title: "Test API", Version: "1.0"},
+		Paths:   paths,
 	}
 
 	// Write
@@ -217,11 +214,12 @@ func TestReadCache_CorruptData(t *testing.T) {
 // --- fetchSpec ---------------------------------------------------------------
 
 func TestFetchSpec_JSON(t *testing.T) {
-	spec := OpenAPISpec{
+	spec := &openapi3.T{
 		OpenAPI: "3.0.0",
-		Info:    Info{Title: "JSON Spec", Version: "1.0"},
-		Paths:   map[string]PathItem{"/test": {Get: &Operation{OperationID: "test"}}},
+		Info:    &openapi3.Info{Title: "JSON Spec", Version: "1.0"},
+		Paths:   openapi3.NewPaths(),
 	}
+	spec.Paths.Set("/test", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "test"}})
 	body, _ := json.Marshal(spec)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -242,10 +240,7 @@ func TestFetchSpec_YAML(t *testing.T) {
 info:
   title: YAML Spec
   version: "1.0"
-paths:
-  /test:
-    get:
-      operationId: test
+paths: {}
 `
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/yaml")
@@ -260,7 +255,6 @@ paths:
 }
 
 func TestFetchSpec_UnknownContentType_YAML(t *testing.T) {
-	// YAML body with no helpful content-type — falls through to try YAML first
 	yamlBody := `openapi: "3.0.0"
 info:
   title: Unknown CT
@@ -280,8 +274,10 @@ paths: {}
 }
 
 func TestFetchSpec_UnknownContentType_JSON(t *testing.T) {
-	// JSON body with no helpful content-type — YAML parse succeeds (JSON is valid YAML)
-	spec := OpenAPISpec{OpenAPI: "3.0.0", Info: Info{Title: "JSON via unknown", Version: "1.0"}}
+	spec := &openapi3.T{
+		OpenAPI: "3.0.0",
+		Info:    &openapi3.Info{Title: "JSON via unknown", Version: "1.0"},
+	}
 	body, _ := json.Marshal(spec)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -318,7 +314,7 @@ func TestFetchSpec_InvalidBody(t *testing.T) {
 	cache := &Cache{specURL: ts.URL}
 	err := cache.fetchSpec()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "parsing OpenAPI spec as JSON")
+	assert.Contains(t, err.Error(), "parsing OpenAPI spec")
 }
 
 func TestFetchSpec_InvalidBody_UnknownCT(t *testing.T) {
@@ -331,7 +327,7 @@ func TestFetchSpec_InvalidBody_UnknownCT(t *testing.T) {
 	cache := &Cache{specURL: ts.URL}
 	err := cache.fetchSpec()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "tried YAML and JSON")
+	assert.Contains(t, err.Error(), "parsing OpenAPI spec")
 }
 
 func TestFetchSpec_AcceptHeader(t *testing.T) {
@@ -351,11 +347,12 @@ func TestFetchSpec_AcceptHeader(t *testing.T) {
 // --- Load --------------------------------------------------------------------
 
 func TestLoad_FetchAndCache(t *testing.T) {
-	spec := OpenAPISpec{
+	spec := &openapi3.T{
 		OpenAPI: "3.0.0",
-		Info:    Info{Title: "Load Test", Version: "1.0"},
-		Paths:   map[string]PathItem{"/test": {Get: &Operation{OperationID: "test"}}},
+		Info:    &openapi3.Info{Title: "Load Test", Version: "1.0"},
+		Paths:   openapi3.NewPaths(),
 	}
+	spec.Paths.Set("/test", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "test"}})
 	body, _ := json.Marshal(spec)
 
 	fetchCount := 0
@@ -382,10 +379,10 @@ func TestLoad_FetchAndCache(t *testing.T) {
 }
 
 func TestLoad_ForceRefresh(t *testing.T) {
-	spec := OpenAPISpec{
+	spec := &openapi3.T{
 		OpenAPI: "3.0.0",
-		Info:    Info{Title: "Refresh", Version: "1.0"},
-		Paths:   map[string]PathItem{},
+		Info:    &openapi3.Info{Title: "Refresh", Version: "1.0"},
+		Paths:   openapi3.NewPaths(),
 	}
 	body, _ := json.Marshal(spec)
 
@@ -409,10 +406,10 @@ func TestLoad_ForceRefresh(t *testing.T) {
 }
 
 func TestLoad_FetchFailWithStaleCache(t *testing.T) {
-	spec := OpenAPISpec{
+	spec := &openapi3.T{
 		OpenAPI: "3.0.0",
-		Info:    Info{Title: "Stale", Version: "1.0"},
-		Paths:   map[string]PathItem{},
+		Info:    &openapi3.Info{Title: "Stale", Version: "1.0"},
+		Paths:   openapi3.NewPaths(),
 	}
 	body, _ := json.Marshal(spec)
 

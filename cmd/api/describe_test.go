@@ -8,28 +8,33 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/openapi"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func strPtr(s string) *string { return &s }
+
+func typesPtr(t string) *openapi3.Types { return &openapi3.Types{t} }
 
 // --- getTypeString -----------------------------------------------------------
 
 func TestGetTypeString(t *testing.T) {
 	tests := []struct {
 		name     string
-		schema   *openapi.Schema
+		schema   *openapi3.Schema
 		refName  string
 		expected string
 	}{
 		{"nil schema", nil, "", "any"},
-		{"with ref name", &openapi.Schema{Type: "object"}, "MyModel", "MyModel"},
-		{"simple string", &openapi.Schema{Type: "string"}, "", "string"},
-		{"string with format", &openapi.Schema{Type: "string", Format: "date-time"}, "", "string (date-time)"},
-		{"integer", &openapi.Schema{Type: "integer"}, "", "integer"},
-		{"empty type defaults to object", &openapi.Schema{}, "", "object"},
-		{"array of strings", &openapi.Schema{Type: "array", Items: &openapi.Schema{Type: "string"}}, "", "array of string"},
-		{"array with ref items", &openapi.Schema{Type: "array", Items: &openapi.Schema{Ref: "#/components/schemas/DAG"}}, "", "array of DAG"},
-		{"array with empty items", &openapi.Schema{Type: "array", Items: &openapi.Schema{}}, "", "array of object"},
+		{"with ref name", &openapi3.Schema{Type: typesPtr("object")}, "MyModel", "MyModel"},
+		{"simple string", &openapi3.Schema{Type: typesPtr("string")}, "", "string"},
+		{"string with format", &openapi3.Schema{Type: typesPtr("string"), Format: "date-time"}, "", "string (date-time)"},
+		{"integer", &openapi3.Schema{Type: typesPtr("integer")}, "", "integer"},
+		{"empty type defaults to object", &openapi3.Schema{}, "", "object"},
+		{"array of strings", &openapi3.Schema{Type: typesPtr("array"), Items: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: typesPtr("string")}}}, "", "array of string"},
+		{"array with ref items", &openapi3.Schema{Type: typesPtr("array"), Items: &openapi3.SchemaRef{Ref: "#/components/schemas/DAG"}}, "", "array of DAG"},
+		{"array with empty items", &openapi3.Schema{Type: typesPtr("array"), Items: &openapi3.SchemaRef{Value: &openapi3.Schema{}}}, "", "array of object"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -41,16 +46,16 @@ func TestGetTypeString(t *testing.T) {
 // --- filterParams ------------------------------------------------------------
 
 func TestFilterParams(t *testing.T) {
-	params := []openapi.Parameter{
-		{Name: "dag_id", In: "path"},
-		{Name: "limit", In: "query"},
-		{Name: "offset", In: "query"},
-		{Name: "X-Auth", In: "header"},
+	params := openapi3.Parameters{
+		{Value: &openapi3.Parameter{Name: "dag_id", In: "path"}},
+		{Value: &openapi3.Parameter{Name: "limit", In: "query"}},
+		{Value: &openapi3.Parameter{Name: "offset", In: "query"}},
+		{Value: &openapi3.Parameter{Name: "X-Auth", In: "header"}},
 	}
 
 	path := filterParams(params, "path")
 	assert.Len(t, path, 1)
-	assert.Equal(t, "dag_id", path[0].Name)
+	assert.Equal(t, "dag_id", path[0].Value.Name)
 
 	query := filterParams(params, "query")
 	assert.Len(t, query, 2)
@@ -67,7 +72,7 @@ func TestFilterParams(t *testing.T) {
 func TestPrintParam(t *testing.T) {
 	t.Run("basic param", func(t *testing.T) {
 		var buf bytes.Buffer
-		p := openapi.Parameter{Name: "dag_id", In: "path", Required: true, Schema: &openapi.Schema{Type: "string"}}
+		p := &openapi3.Parameter{Name: "dag_id", In: "path", Required: true, Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: typesPtr("string")}}}
 		printParam(&buf, p)
 		output := buf.String()
 		assert.Contains(t, output, "dag_id")
@@ -77,7 +82,7 @@ func TestPrintParam(t *testing.T) {
 
 	t.Run("optional with description", func(t *testing.T) {
 		var buf bytes.Buffer
-		p := openapi.Parameter{Name: "limit", In: "query", Description: "Maximum items"}
+		p := &openapi3.Parameter{Name: "limit", In: "query", Description: "Maximum items"}
 		printParam(&buf, p)
 		output := buf.String()
 		assert.Contains(t, output, "limit")
@@ -87,14 +92,14 @@ func TestPrintParam(t *testing.T) {
 
 	t.Run("with format", func(t *testing.T) {
 		var buf bytes.Buffer
-		p := openapi.Parameter{Name: "created_at", Schema: &openapi.Schema{Type: "string", Format: "date-time"}}
+		p := &openapi3.Parameter{Name: "created_at", Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: typesPtr("string"), Format: "date-time"}}}
 		printParam(&buf, p)
 		assert.Contains(t, buf.String(), "date-time")
 	})
 
 	t.Run("array param", func(t *testing.T) {
 		var buf bytes.Buffer
-		p := openapi.Parameter{Name: "tags", Schema: &openapi.Schema{Type: "array", Items: &openapi.Schema{Type: "string"}}}
+		p := &openapi3.Parameter{Name: "tags", Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: typesPtr("array"), Items: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: typesPtr("string")}}}}}
 		printParam(&buf, p)
 		assert.Contains(t, buf.String(), "array of string")
 	})
@@ -102,13 +107,13 @@ func TestPrintParam(t *testing.T) {
 	t.Run("with default and enum", func(t *testing.T) {
 		var buf bytes.Buffer
 		limit := 100
-		p := openapi.Parameter{
+		p := &openapi3.Parameter{
 			Name: "limit",
-			Schema: &openapi.Schema{
-				Type:    "integer",
+			Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+				Type:    typesPtr("integer"),
 				Default: limit,
 				Enum:    []any{10, 50, 100},
-			},
+			}},
 		}
 		printParam(&buf, p)
 		output := buf.String()
@@ -118,7 +123,7 @@ func TestPrintParam(t *testing.T) {
 
 	t.Run("no schema defaults to string", func(t *testing.T) {
 		var buf bytes.Buffer
-		p := openapi.Parameter{Name: "q"}
+		p := &openapi3.Parameter{Name: "q"}
 		printParam(&buf, p)
 		assert.Contains(t, buf.String(), "string")
 	})
@@ -135,10 +140,10 @@ func TestPrintParameters(t *testing.T) {
 
 	t.Run("grouped by location", func(t *testing.T) {
 		var buf bytes.Buffer
-		params := []openapi.Parameter{
-			{Name: "id", In: "path"},
-			{Name: "limit", In: "query"},
-			{Name: "X-Custom", In: "header"},
+		params := openapi3.Parameters{
+			{Value: &openapi3.Parameter{Name: "id", In: "path"}},
+			{Value: &openapi3.Parameter{Name: "limit", In: "query"}},
+			{Value: &openapi3.Parameter{Name: "X-Custom", In: "header"}},
 		}
 		printParameters(&buf, params)
 		output := buf.String()
@@ -153,22 +158,24 @@ func TestPrintParameters(t *testing.T) {
 func TestPrintRequestBody(t *testing.T) {
 	t.Run("required with description", func(t *testing.T) {
 		var buf bytes.Buffer
-		body := &openapi.RequestBody{
-			Required:    true,
-			Description: "The DAG to create",
-			Content: map[string]openapi.MediaType{
-				"application/json": {
-					Schema: &openapi.Schema{
-						Type: "object",
-						Properties: map[string]openapi.Schema{
-							"name": {Type: "string"},
-						},
+		bodyRef := &openapi3.RequestBodyRef{
+			Value: &openapi3.RequestBody{
+				Required:    true,
+				Description: "The DAG to create",
+				Content: openapi3.Content{
+					"application/json": &openapi3.MediaType{
+						Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+							Type: typesPtr("object"),
+							Properties: map[string]*openapi3.SchemaRef{
+								"name": {Value: &openapi3.Schema{Type: typesPtr("string")}},
+							},
+						}},
 					},
 				},
 			},
 		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		printRequestBody(&buf, body, resolver)
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printRequestBody(&buf, bodyRef, resolver)
 		output := buf.String()
 		assert.Contains(t, output, "Request Body")
 		assert.Contains(t, output, "required")
@@ -178,25 +185,28 @@ func TestPrintRequestBody(t *testing.T) {
 
 	t.Run("with ref schema", func(t *testing.T) {
 		var buf bytes.Buffer
-		spec := &openapi.OpenAPISpec{
-			Components: &openapi.Components{
-				Schemas: map[string]openapi.Schema{
-					"DAG": {
-						Type:       "object",
-						Properties: map[string]openapi.Schema{"dag_id": {Type: "string"}},
+		dagSchema := &openapi3.Schema{
+			Type: typesPtr("object"),
+			Properties: map[string]*openapi3.SchemaRef{
+				"dag_id": {Value: &openapi3.Schema{Type: typesPtr("string")}},
+			},
+		}
+		spec := &openapi3.T{
+			Components: &openapi3.Components{
+				Schemas: map[string]*openapi3.SchemaRef{"DAG": {Ref: "#/components/schemas/DAG", Value: dagSchema}},
+			},
+		}
+		bodyRef := &openapi3.RequestBodyRef{
+			Value: &openapi3.RequestBody{
+				Content: openapi3.Content{
+					"application/json": &openapi3.MediaType{
+						Schema: &openapi3.SchemaRef{Ref: "#/components/schemas/DAG", Value: dagSchema},
 					},
 				},
 			},
 		}
-		body := &openapi.RequestBody{
-			Content: map[string]openapi.MediaType{
-				"application/json": {
-					Schema: &openapi.Schema{Ref: "#/components/schemas/DAG"},
-				},
-			},
-		}
 		resolver := openapi.NewSchemaResolver(spec)
-		printRequestBody(&buf, body, resolver)
+		printRequestBody(&buf, bodyRef, resolver)
 		output := buf.String()
 		assert.Contains(t, output, "DAG")
 		assert.Contains(t, output, "dag_id")
@@ -204,9 +214,9 @@ func TestPrintRequestBody(t *testing.T) {
 
 	t.Run("no content", func(t *testing.T) {
 		var buf bytes.Buffer
-		body := &openapi.RequestBody{}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		printRequestBody(&buf, body, resolver)
+		bodyRef := &openapi3.RequestBodyRef{Value: &openapi3.RequestBody{}}
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printRequestBody(&buf, bodyRef, resolver)
 		assert.Contains(t, buf.String(), "Request Body")
 	})
 }
@@ -222,24 +232,25 @@ func TestPrintResponses(t *testing.T) {
 
 	t.Run("success and error responses", func(t *testing.T) {
 		var buf bytes.Buffer
-		responses := map[string]openapi.Response{
-			"200": {
-				Description: "Successful response",
-				Content: map[string]openapi.MediaType{
-					"application/json": {
-						Schema: &openapi.Schema{
-							Type: "object",
-							Properties: map[string]openapi.Schema{
-								"id": {Type: "string"},
+		responses := openapi3.NewResponsesWithCapacity(3)
+		responses.Set("200", &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Description: strPtr("Successful response"),
+				Content: openapi3.Content{
+					"application/json": &openapi3.MediaType{
+						Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+							Type: typesPtr("object"),
+							Properties: map[string]*openapi3.SchemaRef{
+								"id": {Value: &openapi3.Schema{Type: typesPtr("string")}},
 							},
-						},
+						}},
 					},
 				},
 			},
-			"404": {Description: "Not found"},
-			"500": {Description: "Server error"},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
+		})
+		responses.Set("404", &openapi3.ResponseRef{Value: &openapi3.Response{Description: strPtr("Not found")}})
+		responses.Set("500", &openapi3.ResponseRef{Value: &openapi3.Response{Description: strPtr("Server error")}})
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
 		printResponses(&buf, responses, resolver)
 		output := buf.String()
 		assert.Contains(t, output, "Responses")
@@ -247,25 +258,23 @@ func TestPrintResponses(t *testing.T) {
 		assert.Contains(t, output, "Successful response")
 		assert.Contains(t, output, "404")
 		assert.Contains(t, output, "500")
-		assert.Contains(t, output, "id") // schema property from 200
+		assert.Contains(t, output, "id")
 	})
 
 	t.Run("redirect status", func(t *testing.T) {
 		var buf bytes.Buffer
-		responses := map[string]openapi.Response{
-			"301": {Description: "Moved permanently"},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
+		responses := openapi3.NewResponsesWithCapacity(1)
+		responses.Set("301", &openapi3.ResponseRef{Value: &openapi3.Response{Description: strPtr("Moved permanently")}})
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
 		printResponses(&buf, responses, resolver)
 		assert.Contains(t, buf.String(), "301")
 	})
 
 	t.Run("non-numeric code", func(t *testing.T) {
 		var buf bytes.Buffer
-		responses := map[string]openapi.Response{
-			"default": {Description: "Default error"},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
+		responses := openapi3.NewResponsesWithCapacity(1)
+		responses.Set("default", &openapi3.ResponseRef{Value: &openapi3.Response{Description: strPtr("Default error")}})
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
 		printResponses(&buf, responses, resolver)
 		assert.Contains(t, buf.String(), "default")
 	})
@@ -282,16 +291,16 @@ func TestPrintSchema(t *testing.T) {
 
 	t.Run("simple properties", func(t *testing.T) {
 		var buf bytes.Buffer
-		schema := &openapi.Schema{
-			Type:     "object",
+		schemaRef := &openapi3.SchemaRef{Value: &openapi3.Schema{
+			Type:     typesPtr("object"),
 			Required: []string{"name"},
-			Properties: map[string]openapi.Schema{
-				"name":        {Type: "string", Description: "The name"},
-				"description": {Type: "string"},
+			Properties: map[string]*openapi3.SchemaRef{
+				"name":        {Value: &openapi3.Schema{Type: typesPtr("string"), Description: "The name"}},
+				"description": {Value: &openapi3.Schema{Type: typesPtr("string")}},
 			},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		printSchema(&buf, schema, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
+		}}
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "name")
 		assert.Contains(t, output, "The name")
@@ -300,31 +309,31 @@ func TestPrintSchema(t *testing.T) {
 
 	t.Run("skips read-only in request opts", func(t *testing.T) {
 		var buf bytes.Buffer
-		schema := &openapi.Schema{
-			Type: "object",
-			Properties: map[string]openapi.Schema{
-				"id":   {Type: "string", ReadOnly: true},
-				"name": {Type: "string"},
+		schemaRef := &openapi3.SchemaRef{Value: &openapi3.Schema{
+			Type: typesPtr("object"),
+			Properties: map[string]*openapi3.SchemaRef{
+				"id":   {Value: &openapi3.Schema{Type: typesPtr("string"), ReadOnly: true}},
+				"name": {Value: &openapi3.Schema{Type: typesPtr("string")}},
 			},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		printSchema(&buf, schema, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
+		}}
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
-		assert.NotContains(t, output, "  id") // read-only skipped
+		assert.NotContains(t, output, "  id")
 		assert.Contains(t, output, "name")
 	})
 
 	t.Run("shows read-only in response opts", func(t *testing.T) {
 		var buf bytes.Buffer
-		schema := &openapi.Schema{
-			Type: "object",
-			Properties: map[string]openapi.Schema{
-				"id":   {Type: "string", ReadOnly: true},
-				"name": {Type: "string"},
+		schemaRef := &openapi3.SchemaRef{Value: &openapi3.Schema{
+			Type: typesPtr("object"),
+			Properties: map[string]*openapi3.SchemaRef{
+				"id":   {Value: &openapi3.Schema{Type: typesPtr("string"), ReadOnly: true}},
+				"name": {Value: &openapi3.Schema{Type: typesPtr("string")}},
 			},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		printSchema(&buf, schema, resolver, 2, make(map[string]bool), responseSchemaPrintOpts())
+		}}
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), responseSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "id")
 		assert.Contains(t, output, "name")
@@ -332,18 +341,18 @@ func TestPrintSchema(t *testing.T) {
 
 	t.Run("shows example and enum", func(t *testing.T) {
 		var buf bytes.Buffer
-		schema := &openapi.Schema{
-			Type: "object",
-			Properties: map[string]openapi.Schema{
-				"status": {
-					Type:    "string",
+		schemaRef := &openapi3.SchemaRef{Value: &openapi3.Schema{
+			Type: typesPtr("object"),
+			Properties: map[string]*openapi3.SchemaRef{
+				"status": {Value: &openapi3.Schema{
+					Type:    typesPtr("string"),
 					Example: "active",
 					Enum:    []any{"active", "inactive"},
-				},
+				}},
 			},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		printSchema(&buf, schema, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
+		}}
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "Example: active")
 		assert.Contains(t, output, "Enum:")
@@ -351,40 +360,40 @@ func TestPrintSchema(t *testing.T) {
 
 	t.Run("shows default in request opts", func(t *testing.T) {
 		var buf bytes.Buffer
-		schema := &openapi.Schema{
-			Type: "object",
-			Properties: map[string]openapi.Schema{
-				"limit": {Type: "integer", Default: 100},
+		schemaRef := &openapi3.SchemaRef{Value: &openapi3.Schema{
+			Type: typesPtr("object"),
+			Properties: map[string]*openapi3.SchemaRef{
+				"limit": {Value: &openapi3.Schema{Type: typesPtr("integer"), Default: 100}},
 			},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		printSchema(&buf, schema, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
+		}}
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		assert.Contains(t, buf.String(), "Default: 100")
 	})
 
 	t.Run("hides default in response opts", func(t *testing.T) {
 		var buf bytes.Buffer
-		schema := &openapi.Schema{
-			Type: "object",
-			Properties: map[string]openapi.Schema{
-				"limit": {Type: "integer", Default: 100},
+		schemaRef := &openapi3.SchemaRef{Value: &openapi3.Schema{
+			Type: typesPtr("object"),
+			Properties: map[string]*openapi3.SchemaRef{
+				"limit": {Value: &openapi3.Schema{Type: typesPtr("integer"), Default: 100}},
 			},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		printSchema(&buf, schema, resolver, 2, make(map[string]bool), responseSchemaPrintOpts())
+		}}
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), responseSchemaPrintOpts())
 		assert.NotContains(t, buf.String(), "Default:")
 	})
 
 	t.Run("oneOf composition", func(t *testing.T) {
 		var buf bytes.Buffer
-		schema := &openapi.Schema{
-			OneOf: []openapi.Schema{
-				{Type: "string"},
-				{Type: "integer"},
+		schemaRef := &openapi3.SchemaRef{Value: &openapi3.Schema{
+			OneOf: openapi3.SchemaRefs{
+				{Value: &openapi3.Schema{Type: typesPtr("string")}},
+				{Value: &openapi3.Schema{Type: typesPtr("integer")}},
 			},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		printSchema(&buf, schema, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
+		}}
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "One of the following")
 		assert.Contains(t, output, "Option 1")
@@ -393,28 +402,30 @@ func TestPrintSchema(t *testing.T) {
 
 	t.Run("anyOf composition", func(t *testing.T) {
 		var buf bytes.Buffer
-		schema := &openapi.Schema{
-			AnyOf: []openapi.Schema{
-				{Type: "string"},
+		schemaRef := &openapi3.SchemaRef{Value: &openapi3.Schema{
+			AnyOf: openapi3.SchemaRefs{
+				{Value: &openapi3.Schema{Type: typesPtr("string")}},
 			},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		printSchema(&buf, schema, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
+		}}
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		assert.Contains(t, buf.String(), "Any of the following")
 	})
 
 	t.Run("allOf composition", func(t *testing.T) {
 		var buf bytes.Buffer
-		schema := &openapi.Schema{
-			AllOf: []openapi.Schema{
-				{
-					Type:       "object",
-					Properties: map[string]openapi.Schema{"base": {Type: "string"}},
-				},
+		schemaRef := &openapi3.SchemaRef{Value: &openapi3.Schema{
+			AllOf: openapi3.SchemaRefs{
+				{Value: &openapi3.Schema{
+					Type: typesPtr("object"),
+					Properties: map[string]*openapi3.SchemaRef{
+						"base": {Value: &openapi3.Schema{Type: typesPtr("string")}},
+					},
+				}},
 			},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		printSchema(&buf, schema, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
+		}}
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "All of the following")
 		assert.Contains(t, output, "base")
@@ -422,62 +433,64 @@ func TestPrintSchema(t *testing.T) {
 
 	t.Run("ref cycle detection via composition", func(t *testing.T) {
 		var buf bytes.Buffer
-		spec := &openapi.OpenAPISpec{
-			Components: &openapi.Components{
-				Schemas: map[string]openapi.Schema{
-					"Node": {
-						OneOf: []openapi.Schema{
-							{Ref: "#/components/schemas/Node"},
-							{Type: "string"},
-						},
-					},
-				},
+		nodeSchema := &openapi3.Schema{}
+		selfRef := &openapi3.SchemaRef{Ref: "#/components/schemas/Node"}
+		nodeSchema.OneOf = openapi3.SchemaRefs{
+			selfRef,
+			{Value: &openapi3.Schema{Type: typesPtr("string")}},
+		}
+		selfRef.Value = nodeSchema
+
+		entryRef := &openapi3.SchemaRef{Ref: "#/components/schemas/Node", Value: nodeSchema}
+		spec := &openapi3.T{
+			Components: &openapi3.Components{
+				Schemas: map[string]*openapi3.SchemaRef{"Node": {Ref: "#/components/schemas/Node", Value: nodeSchema}},
 			},
 		}
-		// Start with a $ref that resolves to Node (which has oneOf referencing itself)
-		schema := &openapi.Schema{Ref: "#/components/schemas/Node"}
 		resolver := openapi.NewSchemaResolver(spec)
-		printSchema(&buf, schema, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
+		printSchema(&buf, entryRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "see Node above")
 	})
 
 	t.Run("direct ref already visited", func(t *testing.T) {
 		var buf bytes.Buffer
-		spec := &openapi.OpenAPISpec{
-			Components: &openapi.Components{
-				Schemas: map[string]openapi.Schema{
-					"Thing": {Type: "object", Properties: map[string]openapi.Schema{"id": {Type: "string"}}},
-				},
+		thingSchema := &openapi3.Schema{
+			Type: typesPtr("object"),
+			Properties: map[string]*openapi3.SchemaRef{
+				"id": {Value: &openapi3.Schema{Type: typesPtr("string")}},
 			},
 		}
-		schema := &openapi.Schema{Ref: "#/components/schemas/Thing"}
+		spec := &openapi3.T{
+			Components: &openapi3.Components{
+				Schemas: map[string]*openapi3.SchemaRef{"Thing": {Ref: "#/components/schemas/Thing", Value: thingSchema}},
+			},
+		}
+		schemaRef := &openapi3.SchemaRef{Ref: "#/components/schemas/Thing", Value: thingSchema}
 		resolver := openapi.NewSchemaResolver(spec)
-		// Pre-mark Thing as visited
 		visited := map[string]bool{"Thing": true}
-		printSchema(&buf, schema, resolver, 2, visited, requestSchemaPrintOpts())
+		printSchema(&buf, schemaRef, resolver, 2, visited, requestSchemaPrintOpts())
 		assert.Contains(t, buf.String(), "see Thing above")
 	})
 
 	t.Run("max indent stops recursion", func(t *testing.T) {
 		var buf bytes.Buffer
-		schema := &openapi.Schema{
-			Type: "object",
-			Properties: map[string]openapi.Schema{
-				"nested": {
-					Type: "object",
-					Properties: map[string]openapi.Schema{
-						"deep": {Type: "string"},
+		schemaRef := &openapi3.SchemaRef{Value: &openapi3.Schema{
+			Type: typesPtr("object"),
+			Properties: map[string]*openapi3.SchemaRef{
+				"nested": {Value: &openapi3.Schema{
+					Type: typesPtr("object"),
+					Properties: map[string]*openapi3.SchemaRef{
+						"deep": {Value: &openapi3.Schema{Type: typesPtr("string")}},
 					},
-				},
+				}},
 			},
-		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
-		// Set indent at maxSchemaIndent so nested object properties are not expanded
-		printSchema(&buf, schema, resolver, maxSchemaIndent, make(map[string]bool), requestSchemaPrintOpts())
+		}}
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
+		printSchema(&buf, schemaRef, resolver, maxSchemaIndent, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "nested")
-		assert.NotContains(t, output, "deep") // too deep
+		assert.NotContains(t, output, "deep")
 	})
 }
 
@@ -486,6 +499,8 @@ func TestPrintSchema(t *testing.T) {
 func TestPrintEndpointDetails(t *testing.T) {
 	t.Run("full endpoint", func(t *testing.T) {
 		var buf bytes.Buffer
+		responses := openapi3.NewResponsesWithCapacity(1)
+		responses.Set("201", &openapi3.ResponseRef{Value: &openapi3.Response{Description: strPtr("Created")}})
 		ep := &openapi.Endpoint{
 			Method:      "POST",
 			Path:        "/dags",
@@ -493,20 +508,27 @@ func TestPrintEndpointDetails(t *testing.T) {
 			Summary:     "Create a new DAG",
 			Description: "Creates a DAG in the system",
 			Tags:        []string{"DAGs"},
-			Parameters: []openapi.Parameter{
-				{Name: "dag_id", In: "path", Required: true, Schema: &openapi.Schema{Type: "string"}},
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{Name: "dag_id", In: "path", Required: true, Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: typesPtr("string")}}}},
 			},
-			RequestBody: &openapi.RequestBody{
-				Required: true,
-				Content: map[string]openapi.MediaType{
-					"application/json": {Schema: &openapi.Schema{Type: "object", Properties: map[string]openapi.Schema{"name": {Type: "string"}}}},
+			RequestBody: &openapi3.RequestBodyRef{
+				Value: &openapi3.RequestBody{
+					Required: true,
+					Content: openapi3.Content{
+						"application/json": &openapi3.MediaType{
+							Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+								Type: typesPtr("object"),
+								Properties: map[string]*openapi3.SchemaRef{
+									"name": {Value: &openapi3.Schema{Type: typesPtr("string")}},
+								},
+							}},
+						},
+					},
 				},
 			},
-			Responses: map[string]openapi.Response{
-				"201": {Description: "Created"},
-			},
+			Responses: responses,
 		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
 		printEndpointDetails(&buf, ep, resolver)
 		output := buf.String()
 
@@ -523,7 +545,7 @@ func TestPrintEndpointDetails(t *testing.T) {
 	t.Run("deprecated endpoint", func(t *testing.T) {
 		var buf bytes.Buffer
 		ep := &openapi.Endpoint{Method: "GET", Path: "/old", Deprecated: true}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
 		printEndpointDetails(&buf, ep, resolver)
 		assert.Contains(t, buf.String(), "DEPRECATED")
 	})
@@ -531,7 +553,7 @@ func TestPrintEndpointDetails(t *testing.T) {
 	t.Run("no optional fields", func(t *testing.T) {
 		var buf bytes.Buffer
 		ep := &openapi.Endpoint{Method: "GET", Path: "/health"}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
 		printEndpointDetails(&buf, ep, resolver)
 		output := buf.String()
 		assert.Contains(t, output, "/health")
@@ -547,9 +569,8 @@ func TestPrintEndpointDetails(t *testing.T) {
 			Summary:     "Same text",
 			Description: "Same text",
 		}
-		resolver := openapi.NewSchemaResolver(&openapi.OpenAPISpec{})
+		resolver := openapi.NewSchemaResolver(&openapi3.T{})
 		printEndpointDetails(&buf, ep, resolver)
-		// The string should appear exactly once for the summary, not twice
 		output := buf.String()
 		first := bytes.Index([]byte(output), []byte("Same text"))
 		second := bytes.Index([]byte(output[first+1:]), []byte("Same text"))
@@ -560,18 +581,18 @@ func TestPrintEndpointDetails(t *testing.T) {
 // --- runDescribe -------------------------------------------------------------
 
 func TestRunDescribe(t *testing.T) {
-	spec := openapi.OpenAPISpec{
+	paths := openapi3.NewPaths()
+	paths.Set("/dags", &openapi3.PathItem{
+		Get:  &openapi3.Operation{OperationID: "get_dags", Summary: "List DAGs"},
+		Post: &openapi3.Operation{OperationID: "create_dag", Summary: "Create DAG"},
+	})
+	paths.Set("/health", &openapi3.PathItem{
+		Get: &openapi3.Operation{OperationID: "health"},
+	})
+	spec := &openapi3.T{
 		OpenAPI: "3.0.0",
-		Info:    openapi.Info{Title: "Test", Version: "1.0"},
-		Paths: map[string]openapi.PathItem{
-			"/dags": {
-				Get:  &openapi.Operation{OperationID: "get_dags", Summary: "List DAGs"},
-				Post: &openapi.Operation{OperationID: "create_dag", Summary: "Create DAG"},
-			},
-			"/health": {
-				Get: &openapi.Operation{OperationID: "health"},
-			},
-		},
+		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
+		Paths:   paths,
 	}
 	body, _ := json.Marshal(spec)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -597,7 +618,6 @@ func TestRunDescribe(t *testing.T) {
 
 		err := runDescribe(opts)
 		require.NoError(t, err)
-		// Should show both GET and POST
 		assert.Contains(t, buf.String(), "List DAGs")
 		assert.Contains(t, buf.String(), "Create DAG")
 	})
@@ -645,10 +665,10 @@ func TestRunDescribe(t *testing.T) {
 }
 
 func TestRunDescribe_EmptySpec(t *testing.T) {
-	spec := openapi.OpenAPISpec{
+	spec := &openapi3.T{
 		OpenAPI: "3.0.0",
-		Info:    openapi.Info{Title: "Test", Version: "1.0"},
-		Paths:   map[string]openapi.PathItem{},
+		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
+		Paths:   openapi3.NewPaths(),
 	}
 	body, _ := json.Marshal(spec)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
