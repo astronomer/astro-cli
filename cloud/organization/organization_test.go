@@ -15,6 +15,7 @@ import (
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
@@ -82,13 +83,19 @@ var (
 	errNetwork = errors.New("network error")
 )
 
+func matchListOrganizationsLimit() interface{} {
+	return mock.MatchedBy(func(p *astroplatformcore.ListOrganizationsParams) bool {
+		return p != nil && p.Limit != nil && *p.Limit == listOrganizationsLimit
+	})
+}
+
 func (s *Suite) TestList() {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	s.Run("organization list success", func() {
 		mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
@@ -98,7 +105,7 @@ func (s *Suite) TestList() {
 
 	s.Run("organization network error", func() {
 		mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(nil, errNetwork).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(nil, errNetwork).Once()
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
 		s.Contains(err.Error(), "network error")
@@ -107,12 +114,44 @@ func (s *Suite) TestList() {
 
 	s.Run("organization list error", func() {
 		mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockErrorResponse, nil).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockErrorResponse, nil).Once()
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
 		s.Contains(err.Error(), "failed to fetch organizations")
 		mockClient.AssertExpectations(s.T())
 	})
+}
+
+func TestListOrganizations(t *testing.T) {
+	mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+
+	limit := listOrganizationsLimit
+	orgs := []astroplatformcore.Organization{
+		{Id: "org-1", Name: "Org 1"},
+		{Id: "org-2", Name: "Org 2"},
+	}
+
+	resp := &astroplatformcore.ListOrganizationsResponse{
+		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		JSON200: &astroplatformcore.OrganizationsPaginated{
+			Organizations: orgs,
+		},
+	}
+
+	mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.MatchedBy(func(p *astroplatformcore.ListOrganizationsParams) bool {
+		return p != nil && p.Limit != nil && *p.Limit == limit
+	}),
+		mock.Anything,
+	).
+		Return(resp, nil).
+		Once()
+
+	organizations, err := ListOrganizations(mockClient)
+	assert.NoError(t, err)
+	assert.Len(t, organizations, 2)
+	assert.Equal(t, orgs, organizations)
+
+	mockClient.AssertExpectations(t)
 }
 
 func (s *Suite) TestGetOrganizationSelection() {
@@ -121,7 +160,7 @@ func (s *Suite) TestGetOrganizationSelection() {
 	s.Run("get organiation selection success", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -144,7 +183,7 @@ func (s *Suite) TestGetOrganizationSelection() {
 
 	s.Run("get organization selection list error", func() {
 		mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockErrorResponse, nil).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockErrorResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
 		_, err := getOrganizationSelection(buf, mockClient)
@@ -154,7 +193,7 @@ func (s *Suite) TestGetOrganizationSelection() {
 
 	s.Run("get organization selection select error", func() {
 		mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("3")
@@ -181,7 +220,7 @@ func (s *Suite) TestSwitch() {
 	s.Run("successful switch with name", func() {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
@@ -196,7 +235,7 @@ func (s *Suite) TestSwitch() {
 	s.Run("switching to a current organization", func() {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err := Switch("org1", mockCoreClient, mockPlatformCoreClient, buf, false)
@@ -209,7 +248,7 @@ func (s *Suite) TestSwitch() {
 	s.Run("successful switch without name", func() {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
@@ -234,7 +273,7 @@ func (s *Suite) TestSwitch() {
 	s.Run("failed switch wrong name", func() {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
@@ -248,7 +287,7 @@ func (s *Suite) TestSwitch() {
 	s.Run("failed switch bad selection", func() {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
@@ -283,7 +322,7 @@ func (s *Suite) TestSwitch() {
 		}
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
@@ -359,7 +398,7 @@ func (s *Suite) TestExportAuditLogs() {
 	s.Run("export audit logs success", func() {
 		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
 		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
 		s.NoError(err)
@@ -369,7 +408,7 @@ func (s *Suite) TestExportAuditLogs() {
 	s.Run("export audit logs and select org success", func() {
 		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
 		err := ExportAuditLogs(mockClient, mockPlatformClient, "org1", "", 1)
 		s.NoError(err)
@@ -379,7 +418,7 @@ func (s *Suite) TestExportAuditLogs() {
 	s.Run("export failure", func() {
 		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
 		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
 		s.Contains(err.Error(), "network error")
@@ -389,7 +428,7 @@ func (s *Suite) TestExportAuditLogs() {
 	s.Run("list failure", func() {
 		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(nil, errNetwork).Once()
+		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(nil, errNetwork).Once()
 		err := ExportAuditLogs(mockClient, mockPlatformClient, "org1", "", 1)
 		s.Contains(err.Error(), "network error")
 		mockPlatformClient.AssertExpectations(s.T())
@@ -398,7 +437,7 @@ func (s *Suite) TestExportAuditLogs() {
 	s.Run("organization list error", func() {
 		mockPlatformClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		mockPlatformClient.On("ListOrganizationsWithResponse", mock.Anything, matchListOrganizationsLimit()).Return(&mockOKResponse, nil).Once()
 		mockClient.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponseError, nil).Once()
 		err := ExportAuditLogs(mockClient, mockPlatformClient, "", "", 1)
 		s.Contains(err.Error(), "failed to fetch organizations audit logs")

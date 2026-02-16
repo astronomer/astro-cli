@@ -21,6 +21,7 @@ import (
 
 const (
 	AstronomerConnectionErrMsg = "cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions. If you are using an API Key or Token make sure your context is correct.\n\nDetails"
+	listOrganizationsLimit     = 1000
 )
 
 var (
@@ -42,7 +43,10 @@ func newTableOut() *printutil.Table {
 }
 
 func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Organization, error) {
-	organizationListParams := &astroplatformcore.ListOrganizationsParams{}
+	limit := listOrganizationsLimit
+	organizationListParams := &astroplatformcore.ListOrganizationsParams{
+		Limit: &limit,
+	}
 	resp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 	if err != nil {
 		return nil, err
