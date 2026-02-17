@@ -12,19 +12,19 @@ import (
 
 // newRootWithAPI builds a minimal root -> api command tree for testing.
 // The root command's PersistentPreRunE is set to rootHook.
-func newRootWithAPI(rootHook func(cmd *cobra.Command, args []string) error) (*cobra.Command, *cobra.Command) {
+func newRootWithAPI(rootHook func(cmd *cobra.Command, args []string) error) *cobra.Command {
 	root := &cobra.Command{
 		Use:               "astro",
 		PersistentPreRunE: rootHook,
 	}
 	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer))
 	root.AddCommand(apiCmd)
-	return root, apiCmd
+	return apiCmd
 }
 
 func TestPersistentPreRunE_CallsRootHook(t *testing.T) {
 	called := false
-	_, apiCmd := newRootWithAPI(func(cmd *cobra.Command, args []string) error {
+	apiCmd := newRootWithAPI(func(cmd *cobra.Command, args []string) error {
 		called = true
 		return nil
 	})
@@ -39,7 +39,7 @@ func TestPersistentPreRunE_CallsRootHook(t *testing.T) {
 
 func TestPersistentPreRunE_RootHookErrorPropagates(t *testing.T) {
 	rootErr := errors.New("token refresh failed")
-	_, apiCmd := newRootWithAPI(func(cmd *cobra.Command, args []string) error {
+	apiCmd := newRootWithAPI(func(cmd *cobra.Command, args []string) error {
 		return rootErr
 	})
 
@@ -64,7 +64,7 @@ func TestPersistentPreRunE_NoRootHook(t *testing.T) {
 }
 
 func TestPersistentPreRunE_SilenceUsagePropagated(t *testing.T) {
-	_, apiCmd := newRootWithAPI(nil)
+	apiCmd := newRootWithAPI(nil)
 
 	child := &cobra.Command{Use: "child"}
 	apiCmd.AddCommand(child)
