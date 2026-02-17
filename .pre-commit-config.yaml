@@ -1,4 +1,7 @@
 ---
+ci:
+  # gofumpt and golangci-lint require Go tooling; covered by make lint in CircleCI
+  skip: [gofumpt, golangci-lint]
 exclude: '(vendor|.vscode)'  # regex
 repos:
   - repo: local
