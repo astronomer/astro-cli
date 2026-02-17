@@ -3,11 +3,17 @@ exclude: '(vendor|.vscode)'  # regex
 repos:
   - repo: local
     hooks:
-      - id: go-fmt
-        name: go fmt
+      - id: gofumpt
+        name: gofumpt
         types: [go]
         language: system
-        entry: 'gofmt -w -s'
+        entry: 'gofumpt -w'
+      - id: golangci-lint
+        name: golangci-lint
+        types: [go]
+        language: system
+        entry: go run github.com/golangci/golangci-lint/cmd/golangci-lint run --timeout 15m0s
+        pass_filenames: false
   - repo: https://github.com/psf/black
     rev: 25.1.0
     hooks:
