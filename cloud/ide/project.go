@@ -148,7 +148,12 @@ func createNewProject(client astrocore.CoreClient, organizationID, workspaceID s
 		return "", err
 	}
 
-	fmt.Fprintf(out, "Successfully created project '%s' in workspace '%s'\n", name, workspaceID)
+	workspaceName, err := getWorkspaceName(client, organizationID, workspaceID)
+	if err != nil {
+		// Fall back to workspace ID if we can't get the name
+		workspaceName = workspaceID
+	}
+	fmt.Fprintf(out, "Successfully created project '%s' in workspace '%s'\n", name, workspaceName)
 	return resp.JSON200.Id, nil
 }
 
@@ -187,6 +192,18 @@ func getProject(client astrocore.CoreClient, organizationID, workspaceID, projec
 		return nil, err
 	}
 	return projectResp, nil
+}
+
+// getWorkspaceName retrieves the workspace name for a given workspace ID
+func getWorkspaceName(client astrocore.CoreClient, organizationID, workspaceID string) (string, error) {
+	resp, err := client.GetWorkspaceWithResponse(httpContext.Background(), organizationID, workspaceID)
+	if err != nil {
+		return "", err
+	}
+	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		return "", err
+	}
+	return resp.JSON200.Name, nil
 }
 
 // updateSessionPermission updates the session permission
@@ -352,7 +369,12 @@ func ExportProject(client astrocore.CoreClient, projectID, organizationID, works
 		return err
 	}
 
-	fmt.Fprintf(out, "Successfully exported project to %s\n", projectID)
+	// Get project name for display
+	projectName := projectID
+	if projectResp, err := getProject(client, organizationID, workspaceID, projectID); err == nil {
+		projectName = projectResp.JSON200.Name
+	}
+	fmt.Fprintf(out, "Successfully exported project to %s\n", projectName)
 
 	// Open project in browser
 	openProjectInBrowser(client, organizationID, workspaceID, projectID, out)
@@ -543,7 +565,12 @@ func ImportProject(client astrocore.CoreClient, projectID, sessionID, organizati
 		return fmt.Errorf("failed to extract archive: %w", err)
 	}
 
-	fmt.Fprintf(out, "Successfully exported project from %s\n", projectID)
+	// Get project name for display
+	projectName := projectID
+	if projectResp, err := getProject(client, organizationID, workspaceID, projectID); err == nil {
+		projectName = projectResp.JSON200.Name
+	}
+	fmt.Fprintf(out, "Successfully exported project from %s\n", projectName)
 	return nil
 }
 
