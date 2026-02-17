@@ -3,6 +3,8 @@ package airflow
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -24,22 +26,22 @@ import (
 )
 
 const (
-	standaloneDir          = ".astro/standalone"
-	standalonePIDFile      = "airflow.pid"
-	standaloneLogFile      = "airflow.log"
-	defaultStandalonePort  = "8080"
-	standaloneIndexURL     = "https://pip.astronomer.io/v2/"
-	standalonePythonVer    = "3.12"
-	constraintsFileInImage = "/etc/pip-constraints.txt"
-	stopPollInterval       = 500 * time.Millisecond
-	stopTimeout            = 10 * time.Second
-	filePermissions        = os.FileMode(0o644)
-	dirPermissions         = os.FileMode(0o755)
+	standaloneDir         = ".astro/standalone"
+	standalonePIDFile     = "airflow.pid"
+	standaloneLogFile     = "airflow.log"
+	defaultStandalonePort = "8080"
+	standaloneIndexURL    = "https://pip.astronomer.io/v2/"
+	standalonePythonVer   = "3.12"
+	constraintsBaseURL    = "https://pip.astronomer.io/runtime-constraints"
+	stopPollInterval      = 500 * time.Millisecond
+	stopTimeout           = 10 * time.Second
+	filePermissions       = os.FileMode(0o644)
+	dirPermissions        = os.FileMode(0o755)
 )
 
 var (
 	errStandaloneNotSupported    = errors.New("this command is not supported in standalone mode")
-	errUnsupportedAirflowVersion = errors.New("standalone mode requires Airflow 2.2+ (runtime 4.0.0+) or Airflow 3 (runtime 3.x)")
+	errUnsupportedAirflowVersion = errors.New("standalone mode requires Airflow 3 (runtime 3.x)")
 	errUVNotFound                = errors.New("'uv' is required for standalone mode but was not found on PATH.\nInstall it with: curl -LsSf https://astral.sh/uv/install.sh | sh\nSee https://docs.astral.sh/uv/getting-started/installation/ for more options")
 
 	// Function variables for testing
@@ -54,11 +56,10 @@ var (
 
 // Standalone implements ContainerHandler using `airflow standalone` instead of Docker Compose.
 type Standalone struct {
-	airflowHome  string
-	envFile      string
-	dockerfile   string
-	airflowMajor string // "2" or "3", set during Start()
-	foreground   bool   // if true, run in foreground (stream output, block on Wait)
+	airflowHome string
+	envFile     string
+	dockerfile  string
+	foreground  bool // if true, run in foreground (stream output, block on Wait)
 }
 
 // StandaloneInit creates a new Standalone handler.
@@ -99,9 +100,8 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 		return errors.New("could not determine runtime version from Dockerfile")
 	}
 
-	// 2. Validate Airflow version (2.2+ or 3.x)
-	s.airflowMajor = airflowversions.AirflowMajorVersionForRuntimeVersion(tag)
-	if s.airflowMajor != "2" && s.airflowMajor != "3" {
+	// 2. Validate Airflow version (AF3 only)
+	if airflowversions.AirflowMajorVersionForRuntimeVersion(tag) != "3" {
 		return errUnsupportedAirflowVersion
 	}
 
@@ -111,8 +111,8 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 		return errUVNotFound
 	}
 
-	// 4. Extract constraints from runtime image (cached)
-	constraintsPath, airflowVersion, err := s.getConstraints(tag)
+	// 4. Fetch constraints from GCS (cached locally)
+	constraintsPath, airflowVersion, taskSDKVersion, err := s.getConstraints(tag)
 	if err != nil {
 		return err
 	}
@@ -127,22 +127,37 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 		return fmt.Errorf("error creating virtual environment: %w", err)
 	}
 
-	// 6. Install dependencies
-	requirementsPath := filepath.Join(s.airflowHome, "requirements.txt")
+	// 6. Install dependencies (2-step install)
+	// Step 1: Install airflow with full constraints (reproduces runtime env)
 	installArgs := []string{
 		"pip", "install",
 		fmt.Sprintf("apache-airflow==%s", airflowVersion),
 		"-c", constraintsPath,
 		"--index-url", standaloneIndexURL,
 	}
-	if exists, _ := fileutil.Exists(requirementsPath, nil); exists {
-		installArgs = append(installArgs, "-r", requirementsPath)
-	}
-
 	err = runCommand(s.airflowHome, "uv", installArgs...)
 	if err != nil {
 		sp.Stop()
 		return fmt.Errorf("error installing dependencies: %w", err)
+	}
+
+	// Step 2: Install user requirements with only airflow/sdk version locks
+	requirementsPath := filepath.Join(s.airflowHome, "requirements.txt")
+	if exists, _ := fileutil.Exists(requirementsPath, nil); exists {
+		userInstallArgs := []string{
+			"pip", "install",
+			"-r", requirementsPath,
+			fmt.Sprintf("apache-airflow==%s", airflowVersion),
+		}
+		if taskSDKVersion != "" {
+			userInstallArgs = append(userInstallArgs, fmt.Sprintf("apache-airflow-task-sdk==%s", taskSDKVersion))
+		}
+		userInstallArgs = append(userInstallArgs, "--index-url", standaloneIndexURL)
+		err = runCommand(s.airflowHome, "uv", userInstallArgs...)
+		if err != nil {
+			sp.Stop()
+			return fmt.Errorf("error installing user requirements: %w", err)
+		}
 	}
 
 	spinner.StopWithCheckmark(sp, "Environment ready")
@@ -223,7 +238,7 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) erro
 		}
 	}()
 
-	// Run health check in background (URL differs between Airflow 2 and 3)
+	// Run health check in background
 	healthURL, healthComp := s.healthEndpoint()
 	go func() {
 		err := checkWebserverHealth(healthURL, waitTime, healthComp)
@@ -306,29 +321,14 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration) erro
 	return nil
 }
 
-// healthEndpoint returns the health check URL and component name for the current Airflow version.
+// healthEndpoint returns the health check URL and component name.
 func (s *Standalone) healthEndpoint() (url, component string) {
-	switch s.airflowMajor {
-	case "3":
-		return "http://localhost:" + defaultStandalonePort + "/api/v2/monitor/health", "api-server"
-	default:
-		return "http://localhost:" + defaultStandalonePort + "/health", "webserver"
-	}
+	return "http://localhost:" + defaultStandalonePort + "/api/v2/monitor/health", "api-server"
 }
 
-// runtimeImageName returns the full Docker image name for the given runtime tag.
-func (s *Standalone) runtimeImageName(tag string) string {
-	switch s.airflowMajor {
-	case "3":
-		return fmt.Sprintf("%s/%s:%s", AstroImageRegistryBaseImageName, AstroRuntimeAirflow3ImageName, tag)
-	default:
-		return fmt.Sprintf("%s/%s:%s", QuayBaseImageName, AstroRuntimeAirflow2ImageName, tag)
-	}
-}
-
-// getConstraints extracts pip constraints from the runtime Docker image.
+// getConstraints fetches pip constraints from the published GCS URL.
 // Results are cached in .astro/standalone/constraints-<tag>.txt.
-func (s *Standalone) getConstraints(tag string) (constraintsPath, airflowVersion string, err error) {
+func (s *Standalone) getConstraints(tag string) (constraintsPath, airflowVersion, taskSDKVersion string, err error) {
 	constraintsDir := filepath.Join(s.airflowHome, standaloneDir)
 	constraintsFile := filepath.Join(constraintsDir, fmt.Sprintf("constraints-%s.txt", tag))
 
@@ -336,64 +336,78 @@ func (s *Standalone) getConstraints(tag string) (constraintsPath, airflowVersion
 	if exists, _ := fileutil.Exists(constraintsFile, nil); exists {
 		airflowVersion, err = parseAirflowVersionFromConstraints(constraintsFile)
 		if err == nil && airflowVersion != "" {
-			return constraintsFile, airflowVersion, nil
+			taskSDKVersion, _ = parsePackageVersionFromConstraints(constraintsFile, "apache-airflow-task-sdk")
+			return constraintsFile, airflowVersion, taskSDKVersion, nil
 		}
 	}
 
 	// Create directory
 	err = os.MkdirAll(constraintsDir, dirPermissions)
 	if err != nil {
-		return "", "", fmt.Errorf("error creating standalone directory: %w", err)
+		return "", "", "", fmt.Errorf("error creating standalone directory: %w", err)
 	}
 
-	// Determine full image name
-	fullImageName := s.runtimeImageName(tag)
-
-	// Run docker to extract constraints
+	// Fetch constraints from GCS
+	constraintsURL := fmt.Sprintf("%s/runtime-%s-python-%s.txt", constraintsBaseURL, tag, standalonePythonVer)
 	var out string
-	out, err = execDockerRun(fullImageName, constraintsFileInImage)
+	out, err = fetchConstraintsURL(constraintsURL)
 	if err != nil {
-		return "", "", fmt.Errorf("error extracting constraints from runtime image %s: %w", fullImageName, err)
+		return "", "", "", fmt.Errorf("error fetching constraints from %s: %w", constraintsURL, err)
 	}
 
 	// Write constraints to cache file
 	err = os.WriteFile(constraintsFile, []byte(out), filePermissions)
 	if err != nil {
-		return "", "", fmt.Errorf("error caching constraints file: %w", err)
+		return "", "", "", fmt.Errorf("error caching constraints file: %w", err)
 	}
 
 	airflowVersion, err = parseAirflowVersionFromConstraints(constraintsFile)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	return constraintsFile, airflowVersion, nil
+	taskSDKVersion, _ = parsePackageVersionFromConstraints(constraintsFile, "apache-airflow-task-sdk")
+
+	return constraintsFile, airflowVersion, taskSDKVersion, nil
 }
 
-// execDockerRun runs `docker run --rm --entrypoint cat <image> <path>` and returns stdout.
-var execDockerRun = func(imageName, filePath string) (string, error) {
-	cmd := exec.Command("docker", "run", "--rm", "--entrypoint", "cat", imageName, filePath) //nolint:gosec
-	out, err := cmd.Output()
+// fetchConstraintsURL fetches constraints from a URL and returns the body as a string.
+var fetchConstraintsURL = func(url string) (string, error) {
+	resp, err := http.Get(url) //nolint:gosec,noctx
 	if err != nil {
 		return "", err
 	}
-	return string(out), nil
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to fetch constraints: HTTP %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }
 
-// parseAirflowVersionFromConstraints reads a constraints file and extracts the apache-airflow version.
-func parseAirflowVersionFromConstraints(constraintsFile string) (string, error) {
+// parsePackageVersionFromConstraints reads a constraints file and extracts the version for a given package.
+func parsePackageVersionFromConstraints(constraintsFile, packageName string) (string, error) {
 	data, err := os.ReadFile(constraintsFile)
 	if err != nil {
 		return "", fmt.Errorf("error reading constraints file: %w", err)
 	}
 
+	prefix := packageName + "=="
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "apache-airflow==") {
-			return strings.TrimPrefix(line, "apache-airflow=="), nil
+		if strings.HasPrefix(line, prefix) {
+			return strings.TrimPrefix(line, prefix), nil
 		}
 	}
-	return "", errors.New("could not find apache-airflow version in constraints file")
+	return "", fmt.Errorf("could not find %s version in constraints file", packageName)
+}
+
+// parseAirflowVersionFromConstraints reads a constraints file and extracts the apache-airflow version.
+func parseAirflowVersionFromConstraints(constraintsFile string) (string, error) {
+	return parsePackageVersionFromConstraints(constraintsFile, "apache-airflow")
 }
 
 // buildEnv constructs the environment variables for the standalone process.
@@ -474,11 +488,7 @@ func (s *Standalone) applySettings(settingsFile string, envConns map[string]astr
 	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
 	defer settings.SetExecAirflowCommand(origExec)
 
-	airflowVersion := uint64(3) //nolint:mnd
-	if s.airflowMajor == "2" {
-		airflowVersion = 2 //nolint:mnd
-	}
-	return settings.ConfigSettings("standalone", settingsFile, envConns, airflowVersion, true, true, true)
+	return settings.ConfigSettings("standalone", settingsFile, envConns, 3, true, true, true) //nolint:mnd
 }
 
 // standaloneExecAirflowCommand runs an airflow command via the local venv.
@@ -576,8 +586,7 @@ func (s *Standalone) Kill() error {
 		filepath.Join(s.airflowHome, standaloneDir),
 		filepath.Join(s.airflowHome, "airflow.db"),
 		filepath.Join(s.airflowHome, "logs"),
-		filepath.Join(s.airflowHome, "simple_auth_manager_passwords.json.generated"), // Airflow 3
-		filepath.Join(s.airflowHome, "standalone_admin_password.txt"),                // Airflow 2
+		filepath.Join(s.airflowHome, "simple_auth_manager_passwords.json.generated"),
 	}
 
 	for _, p := range pathsToRemove {

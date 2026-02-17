@@ -30,59 +30,23 @@ func (s *Suite) TestStandaloneHandlerInit() {
 	s.NotNil(handler)
 }
 
-func (s *Suite) TestStandaloneStart_Airflow2Accepted() {
-	// Airflow 2 runtime versions (old format like 12.0.0) should be accepted
-	tmpDir, err := os.MkdirTemp("", "standalone-af2-test")
-	s.NoError(err)
-	defer os.RemoveAll(tmpDir)
-
-	// Pre-create cached constraints
-	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
-	err = os.MkdirAll(constraintsDir, 0o755)
-	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-12.0.0.txt"), []byte("apache-airflow==2.10.0+astro.1\n"), 0o644)
-	s.NoError(err)
-
-	// Create a fake airflow binary
-	venvBin := filepath.Join(tmpDir, ".venv", "bin")
-	err = os.MkdirAll(venvBin, 0o755)
-	s.NoError(err)
-	err = os.WriteFile(filepath.Join(venvBin, "airflow"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
-	s.NoError(err)
-
+func (s *Suite) TestStandaloneStart_Airflow2Rejected() {
+	// Airflow 2 runtime versions (old format like 12.0.0) should be rejected
 	origParseFile := standaloneParseFile
-	origLookPath := lookPath
-	origRunCommand := runCommand
-	origCheckHealth := checkWebserverHealth
-	defer func() {
-		standaloneParseFile = origParseFile
-		lookPath = origLookPath
-		runCommand = origRunCommand
-		checkWebserverHealth = origCheckHealth
-	}()
+	defer func() { standaloneParseFile = origParseFile }()
 
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
 		return []docker.Command{
 			{Cmd: "from", Value: []string{"quay.io/astronomer/astro-runtime:12.0.0"}},
 		}, nil
 	}
-	lookPath = func(file string) (string, error) { return "/usr/local/bin/uv", nil }
-	runCommand = func(dir, name string, args ...string) error { return nil }
-	checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
-		// Verify Airflow 2 uses /health endpoint and webserver component
-		s.Contains(url, "/health")
-		s.NotContains(url, "/api/v2")
-		s.Equal("webserver", component)
-		return nil
-	}
 
-	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
 	s.NoError(err)
-	handler.SetForeground(true) // Use foreground mode for this test
 
 	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
-	s.NoError(err)
-	s.Equal("2", handler.airflowMajor)
+	s.Error(err)
+	s.Equal(errUnsupportedAirflowVersion, err)
 }
 
 func (s *Suite) TestStandaloneStart_UnsupportedVersion() {
@@ -441,64 +405,67 @@ func (s *Suite) TestStandaloneGetConstraints_Cached() {
 	s.NoError(err)
 
 	constraintsFile := filepath.Join(constraintsDir, "constraints-3.1-12.txt")
-	content := "apache-airflow==3.0.1\nother-package==1.0.0\n"
+	content := "apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\nother-package==1.0.0\n"
 	err = os.WriteFile(constraintsFile, []byte(content), 0o644)
 	s.NoError(err)
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	path, version, err := handler.getConstraints("3.1-12")
+	path, version, taskSDKVersion, err := handler.getConstraints("3.1-12")
 	s.NoError(err)
 	s.Equal(constraintsFile, path)
 	s.Equal("3.0.1", version)
+	s.Equal("1.0.0", taskSDKVersion)
 }
 
-func (s *Suite) TestStandaloneGetConstraints_FetchesFromDocker() {
+func (s *Suite) TestStandaloneGetConstraints_FetchesFromURL() {
 	tmpDir, err := os.MkdirTemp("", "standalone-constraints-test")
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	// Mock execDockerRun
-	origExecDockerRun := execDockerRun
-	defer func() { execDockerRun = origExecDockerRun }()
+	// Mock fetchConstraintsURL
+	origFetch := fetchConstraintsURL
+	defer func() { fetchConstraintsURL = origFetch }()
 
-	execDockerRun = func(imageName, filePath string) (string, error) {
-		return "apache-airflow==3.0.2\nother-package==2.0.0\n", nil
+	fetchConstraintsURL = func(url string) (string, error) {
+		s.Contains(url, "runtime-3.1-13-python-3.12.txt")
+		return "apache-airflow==3.0.2\napache-airflow-task-sdk==1.0.0\nother-package==2.0.0\n", nil
 	}
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	path, version, err := handler.getConstraints("3.1-13")
+	path, version, taskSDKVersion, err := handler.getConstraints("3.1-13")
 	s.NoError(err)
 	s.Contains(path, "constraints-3.1-13.txt")
 	s.Equal("3.0.2", version)
+	s.Equal("1.0.0", taskSDKVersion)
 
 	// Verify file was cached
 	_, err = os.Stat(path)
 	s.NoError(err)
 }
 
-func (s *Suite) TestStandaloneGetConstraints_DockerRunFails() {
+func (s *Suite) TestStandaloneGetConstraints_FetchFails() {
 	tmpDir, err := os.MkdirTemp("", "standalone-constraints-test")
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	origExecDockerRun := execDockerRun
-	defer func() { execDockerRun = origExecDockerRun }()
+	origFetch := fetchConstraintsURL
+	defer func() { fetchConstraintsURL = origFetch }()
 
-	execDockerRun = func(imageName, filePath string) (string, error) {
-		return "", fmt.Errorf("docker not running")
+	fetchConstraintsURL = func(url string) (string, error) {
+		return "", fmt.Errorf("network error")
 	}
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	_, _, err = handler.getConstraints("3.1-99")
+	_, _, _, err = handler.getConstraints("3.1-99")
 	s.Error(err)
-	s.Contains(err.Error(), "error extracting constraints")
-	s.Contains(err.Error(), "docker not running")
+	s.Contains(err.Error(), "error fetching constraints")
+	s.Contains(err.Error(), "network error")
 }
 
 func (s *Suite) TestStandaloneStart_VenvCreationFails() {
@@ -539,7 +506,7 @@ func (s *Suite) TestStandaloneStart_VenvCreationFails() {
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
 	s.NoError(err)
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
@@ -587,7 +554,7 @@ func (s *Suite) TestStandaloneStart_InstallFails() {
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
 	s.NoError(err)
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
@@ -596,16 +563,6 @@ func (s *Suite) TestStandaloneStart_InstallFails() {
 	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
 	s.Error(err)
 	s.Contains(err.Error(), "error installing dependencies")
-}
-
-func (s *Suite) TestStandaloneRuntimeImageName() {
-	handler, _ := StandaloneInit("/tmp/test", ".env", "Dockerfile")
-
-	handler.airflowMajor = "3"
-	s.Equal("astrocrpublic.azurecr.io/runtime:3.1-12", handler.runtimeImageName("3.1-12"))
-
-	handler.airflowMajor = "2"
-	s.Equal("quay.io/astronomer/astro-runtime:12.0.0", handler.runtimeImageName("12.0.0"))
 }
 
 func (s *Suite) TestStandaloneImplementsContainerHandler() {
@@ -626,7 +583,7 @@ func (s *Suite) TestStandaloneStart_HappyPath() {
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
 	constraintsFile := filepath.Join(constraintsDir, "constraints-3.1-12.txt")
-	err = os.WriteFile(constraintsFile, []byte("apache-airflow==3.0.1\n"), 0o644)
+	err = os.WriteFile(constraintsFile, []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
 	s.NoError(err)
 
 	// Create a fake airflow binary that exits immediately
@@ -684,7 +641,7 @@ func (s *Suite) TestStandaloneStart_Background() {
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
 	s.NoError(err)
 
 	// Create a fake airflow binary that sleeps briefly then exits
@@ -744,7 +701,7 @@ func (s *Suite) TestStandaloneStart_AlreadyRunning() {
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
 	s.NoError(err)
 
 	venvBin := filepath.Join(tmpDir, ".venv", "bin")
