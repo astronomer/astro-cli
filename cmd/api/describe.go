@@ -289,6 +289,45 @@ func responseSchemaPrintOpts() schemaPrintOpts {
 	}
 }
 
+// responseCodeColorFn returns a color formatting function for an HTTP status code string.
+func responseCodeColorFn(code string) func(string, ...interface{}) string {
+	codeInt, err := strconv.Atoi(code)
+	if err != nil {
+		return color.GreenString
+	}
+	if codeInt >= httpStatusError {
+		return color.RedString
+	}
+	if codeInt >= httpStatusRedirect {
+		return color.YellowString
+	}
+	return color.GreenString
+}
+
+// isSuccessCode returns true when code is a 2xx status string.
+func isSuccessCode(code string) bool {
+	codeInt, err := strconv.Atoi(code)
+	return err == nil && codeInt >= 200 && codeInt < 300
+}
+
+// printResponseSchema prints the JSON schema for a success response, if present.
+func printResponseSchema(out io.Writer, resp *openapi3.Response, resolver *openapi.SchemaResolver) {
+	if resp.Content == nil {
+		return
+	}
+	mt, ok := resp.Content["application/json"]
+	if !ok || mt.Schema == nil {
+		return
+	}
+	_, refName := resolver.ResolveSchema(mt.Schema)
+	if refName != "" {
+		fmt.Fprintf(out, "    Schema: %s\n", color.CyanString(refName))
+	}
+	if mt.Schema.Value != nil && len(mt.Schema.Value.Properties) > 0 {
+		printSchema(out, mt.Schema, resolver, baseResponseDepth, make(map[string]bool), responseSchemaPrintOpts())
+	}
+}
+
 // printResponses prints response information.
 func printResponses(out io.Writer, responses *openapi3.Responses, resolver *openapi.SchemaResolver) {
 	if responses == nil || responses.Len() == 0 {
@@ -316,31 +355,10 @@ func printResponses(out io.Writer, responses *openapi3.Responses, resolver *open
 			description = *resp.Description
 		}
 
-		// Parse status code as integer; non-numeric keys like "default" stay green.
-		codeInt, parseErr := strconv.Atoi(code)
-		codeColor := color.GreenString
-		if parseErr == nil {
-			if codeInt >= httpStatusError {
-				codeColor = color.RedString
-			} else if codeInt >= httpStatusRedirect {
-				codeColor = color.YellowString
-			}
-		}
+		fmt.Fprintf(out, "  %s: %s\n", responseCodeColorFn(code)(code), description)
 
-		fmt.Fprintf(out, "  %s: %s\n", codeColor(code), description)
-
-		// Show success response schema (2xx)
-		isSuccess := parseErr == nil && codeInt >= 200 && codeInt < 300
-		if isSuccess && resp.Content != nil {
-			if mt, ok := resp.Content["application/json"]; ok && mt.Schema != nil {
-				_, refName := resolver.ResolveSchema(mt.Schema)
-				if refName != "" {
-					fmt.Fprintf(out, "    Schema: %s\n", color.CyanString(refName))
-				}
-				if mt.Schema.Value != nil && len(mt.Schema.Value.Properties) > 0 {
-					printSchema(out, mt.Schema, resolver, baseResponseDepth, make(map[string]bool), responseSchemaPrintOpts())
-				}
-			}
+		if isSuccessCode(code) {
+			printResponseSchema(out, resp, resolver)
 		}
 	}
 }
