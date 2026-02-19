@@ -469,7 +469,7 @@ func (s *Suite) TestStandaloneGetConstraints_FetchFails() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	_, _, _, err = handler.getConstraints("3.1-99")
+	_, _, _, err = handler.getConstraints("3.1-99") //nolint:dogsled
 	s.Error(err)
 	s.Contains(err.Error(), "error fetching constraints")
 	s.Contains(err.Error(), "network error")

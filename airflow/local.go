@@ -27,23 +27,23 @@ import (
 )
 
 const (
-	standaloneDir            = ".astro/standalone"
-	standalonePIDFile        = "airflow.pid"
-	standaloneLogFile        = "airflow.log"
-	defaultStandalonePort    = "8080"
-	standaloneIndexURL       = "https://pip.astronomer.io/v2/"
-	standalonePythonVer      = "3.12"
-	constraintsBaseURL       = "https://cdn.astronomer.io/runtime-constraints"
-	freezeBaseURL            = "https://cdn.astronomer.io/runtime-freeze"
-	stopPollInterval         = 500 * time.Millisecond
-	stopTimeout              = 10 * time.Second
-	filePermissions          = os.FileMode(0o644)
-	dirPermissions           = os.FileMode(0o755)
+	standaloneDir           = ".astro/standalone"
+	standalonePIDFile       = "airflow.pid"
+	standaloneLogFile       = "airflow.log"
+	defaultStandalonePort   = "8080"
+	standaloneIndexURL      = "https://pip.astronomer.io/v2/"
+	standalonePythonVer     = "3.12"
+	constraintsBaseURL      = "https://cdn.astronomer.io/runtime-constraints"
+	freezeBaseURL           = "https://cdn.astronomer.io/runtime-freeze"
+	stopPollInterval        = 500 * time.Millisecond
+	stopTimeout             = 10 * time.Second
+	filePermissions         = os.FileMode(0o644)
+	dirPermissions          = os.FileMode(0o755)
 	standaloneAdminUser     = "admin"
 	standaloneAdminPassword = "admin"
 	// standalonePasswordsFile lives inside standaloneDir (.astro/standalone/) so it stays
 	// out of the project root and is cleaned up automatically by Kill/reset.
-	standalonePasswordsFile = "simple_auth_manager_passwords.json.generated"
+	standalonePasswordsFile = "simple_auth_manager_passwords.json.generated" //nolint:gosec
 )
 
 var (
@@ -504,13 +504,13 @@ func (s *Standalone) buildEnv() []string {
 
 	// Build our override map — these take precedence over the inherited env.
 	overrides := map[string]string{
-		"PATH":                                               fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH")),
-		"AIRFLOW_HOME":                                       standaloneHome,
-		"ASTRONOMER_ENVIRONMENT":                             "local",
-		"AIRFLOW__CORE__LOAD_EXAMPLES":                       "False",
-		"AIRFLOW__CORE__DAGS_FOLDER":                         filepath.Join(s.airflowHome, "dags"),
-		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS":           standaloneAdminUser + ":admin",
-		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE":  s.passwordsFilePath(),
+		"PATH":                                     fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH")),
+		"AIRFLOW_HOME":                             standaloneHome,
+		"ASTRONOMER_ENVIRONMENT":                   "local",
+		"AIRFLOW__CORE__LOAD_EXAMPLES":             "False",
+		"AIRFLOW__CORE__DAGS_FOLDER":               filepath.Join(s.airflowHome, "dags"),
+		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS": standaloneAdminUser + ":admin",
+		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE": s.passwordsFilePath(),
 	}
 
 	// Load .env file if it exists — these also override inherited env.

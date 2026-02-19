@@ -121,10 +121,10 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	configInitProjectConfigMsg   = "Initialized empty Astro project in %s\n"
 
 	// this is used to monkey patch the function in order to write unit test cases
-	containerHandlerInit  = airflow.ContainerHandlerInit
-	localHandlerInit = airflow.StandaloneHandlerInit
-	getDefaultImageTag    = airflowversions.GetDefaultImageTag
-	projectNameUnique     = airflow.ProjectNameUnique
+	containerHandlerInit = airflow.ContainerHandlerInit
+	localHandlerInit     = airflow.StandaloneHandlerInit
+	getDefaultImageTag   = airflowversions.GetDefaultImageTag
+	projectNameUnique    = airflow.ProjectNameUnique
 
 	pytestDir = "/tests"
 
@@ -134,7 +134,7 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	TemplateList                = airflow.FetchTemplateList
 	defaultWaitTime             = 1 * time.Minute
 	directoryPermissions uint32 = 0o755
-	localForeground bool
+	localForeground      bool
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
