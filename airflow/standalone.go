@@ -749,6 +749,10 @@ func (s *Standalone) Logs(follow bool, _ ...string) error {
 	}
 }
 
+func (s *Standalone) Build(_, _ string, _ bool) error {
+	return errStandaloneNotSupported
+}
+
 func (s *Standalone) Run(_ []string, _ string) error {
 	return errStandaloneNotSupported
 }

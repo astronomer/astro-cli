@@ -1831,3 +1831,81 @@ func (s *AirflowSuite) TestAirflowStandaloneLogs() {
 		s.ErrorIs(err, errMock)
 	})
 }
+
+func (s *AirflowSuite) TestAirflowBuild() {
+	s.Run("success", func() {
+		cmd := newAirflowBuildCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Build", "", "", false).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBuild(cmd, args)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("success with no-cache flag", func() {
+		cmd := newAirflowBuildCmd()
+		noCache = true
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Build", "", "", true).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBuild(cmd, args)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+		noCache = false // reset
+	})
+
+	s.Run("success with custom image name", func() {
+		cmd := newAirflowBuildCmd()
+		customImageName = "my-custom-image:latest"
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Build", "my-custom-image:latest", "", false).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBuild(cmd, args)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+		customImageName = "" // reset
+	})
+
+	s.Run("failure", func() {
+		cmd := newAirflowBuildCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Build", "", "", false).Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBuild(cmd, args)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("containerHandlerInit failure", func() {
+		cmd := newAirflowBuildCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowBuild(cmd, args)
+		s.ErrorIs(err, errMock)
+	})
+}

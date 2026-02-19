@@ -31,6 +31,7 @@ type ContainerHandler interface {
 	Logs(follow bool, containerNames ...string) error
 	Run(args []string, user string) error
 	Bash(container string) error
+	Build(customImageName, buildSecretString string, noCache bool) error
 	RunDAG(dagID, settingsFile, dagFile, executionDate string, noCache, taskLogs bool) error
 	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
 	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error

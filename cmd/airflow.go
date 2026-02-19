@@ -155,6 +155,7 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 	cmd.AddCommand(
 		newAirflowInitCmd(),
 		newAirflowStartCmd(astroCoreClient),
+		newAirflowBuildCmd(),
 		newAirflowRunCmd(),
 		newAirflowPSCmd(),
 		newAirflowLogsCmd(),
@@ -457,6 +458,21 @@ func newAirflowParseCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to run parse with")
+	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
+
+	return cmd
+}
+
+func newAirflowBuildCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "build",
+		Short:   "Build your Astro project into a Docker image",
+		Long:    "Build your Astro project into a Docker image without starting the local Airflow environment. This is useful for testing that your project builds successfully or for preparing an image before deployment.",
+		PreRunE: EnsureRuntime,
+		RunE:    airflowBuild,
+	}
+	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to tag as the project image")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
 
 	return cmd
@@ -1063,6 +1079,26 @@ func airflowParse(cmd *cobra.Command, args []string) error {
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
 	return containerHandler.Parse(customImageName, "", buildSecretString)
+}
+
+// Build the Airflow project image
+func airflowBuild(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	imageName, err := projectNameUnique()
+	if err != nil {
+		return err
+	}
+
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
+	if err != nil {
+		return err
+	}
+
+	buildSecretString = util.GetbuildSecretString(buildSecrets)
+
+	return containerHandler.Build(customImageName, buildSecretString, noCache)
 }
 
 // Exec into an airflow container

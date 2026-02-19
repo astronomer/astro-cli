@@ -34,6 +34,24 @@ func (_m *ContainerHandler) Bash(container string) error {
 	return r0
 }
 
+// Build provides a mock function with given fields: customImageName, buildSecretString, noCache
+func (_m *ContainerHandler) Build(customImageName string, buildSecretString string, noCache bool) error {
+	ret := _m.Called(customImageName, buildSecretString, noCache)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Build")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, bool) error); ok {
+		r0 = rf(customImageName, buildSecretString, noCache)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ComposeExport provides a mock function with given fields: settingsFile, composeFile
 func (_m *ContainerHandler) ComposeExport(settingsFile string, composeFile string) error {
 	ret := _m.Called(settingsFile, composeFile)
