@@ -122,6 +122,7 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 
 	// this is used to monkey patch the function in order to write unit test cases
 	containerHandlerInit = airflow.ContainerHandlerInit
+	localHandlerInit     = airflow.StandaloneHandlerInit
 	getDefaultImageTag   = airflowversions.GetDefaultImageTag
 	projectNameUnique    = airflow.ProjectNameUnique
 
@@ -133,6 +134,7 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	TemplateList                = airflow.FetchTemplateList
 	defaultWaitTime             = 1 * time.Minute
 	directoryPermissions uint32 = 0o755
+	localForeground      bool
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
@@ -165,6 +167,7 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
 		newAirflowUpgradeTestCmd(platformCoreClient),
+		newAirflowLocalCmd(astroCoreClient),
 	)
 	return cmd
 }
@@ -342,6 +345,66 @@ func newAirflowKillCmd() *cobra.Command {
 		RunE:     airflowKill,
 		PostRunE: KillPostRunHook,
 	}
+	return cmd
+}
+
+func newAirflowLocalCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "local",
+		Short: "Run Airflow locally without Docker",
+		Long:  "Run Airflow locally without Docker using 'airflow standalone'. Requires 'uv' to be installed. By default the process is backgrounded; use --foreground to stream output in the terminal.",
+		// Override PersistentPreRunE so we don't require a container runtime.
+		PersistentPreRunE: SetupLogging,
+		PreRunE:           EnsureLocalRuntime,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return airflowLocal(cmd, astroCoreClient)
+		},
+	}
+	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
+	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for the API server to become healthy")
+	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
+	cmd.Flags().BoolVarP(&localForeground, "foreground", "f", false, "Run in the foreground instead of backgrounding the process")
+
+	cmd.AddCommand(
+		newAirflowLocalResetCmd(),
+		newAirflowLocalStopCmd(),
+		newAirflowLocalLogsCmd(),
+	)
+
+	return cmd
+}
+
+func newAirflowLocalResetCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "reset",
+		Short:   "Reset the local environment",
+		Long:    "Reset the local environment by removing all generated files (.venv, cached constraints, airflow.db, logs). The next run of 'astro dev local' will start fresh.",
+		PreRunE: EnsureLocalRuntime,
+		RunE:    airflowLocalReset,
+	}
+	return cmd
+}
+
+func newAirflowLocalStopCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "stop",
+		Short:   "Stop the local Airflow process",
+		PreRunE: EnsureLocalRuntime,
+		RunE:    airflowLocalStop,
+	}
+	return cmd
+}
+
+func newAirflowLocalLogsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "logs",
+		Short:   "View local Airflow logs",
+		PreRunE: EnsureLocalRuntime,
+		RunE:    airflowLocalLogs,
+	}
+	cmd.Flags().BoolVarP(&followLogs, "follow", "f", false, "Follow log output")
 	return cmd
 }
 
@@ -754,6 +817,68 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
 	return containerHandler.Start(customImageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns)
+}
+
+// airflowLocal starts Airflow locally without Docker.
+func airflowLocal(cmd *cobra.Command, astroCoreClient astrocore.CoreClient) error {
+	cmd.SilenceUsage = true
+
+	var envConns map[string]astrocore.EnvironmentObjectConnection
+	if workspaceID != "" || deploymentID != "" {
+		var err error
+		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+		if err != nil {
+			return err
+		}
+	}
+
+	containerHandler, err := localHandlerInit(config.WorkingPath, envFile, dockerfile, "")
+	if err != nil {
+		return err
+	}
+
+	// Set foreground mode if the flag was provided
+	if sa, ok := containerHandler.(*airflow.Standalone); ok {
+		sa.SetForeground(localForeground)
+	}
+
+	return containerHandler.Start("", settingsFile, "", "", false, false, waitTime, envConns)
+}
+
+// airflowLocalReset removes local environment files.
+func airflowLocalReset(cmd *cobra.Command, _ []string) error {
+	cmd.SilenceUsage = true
+
+	containerHandler, err := localHandlerInit(config.WorkingPath, envFile, dockerfile, "")
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.Kill()
+}
+
+// airflowLocalStop stops the local Airflow process.
+func airflowLocalStop(cmd *cobra.Command, _ []string) error {
+	cmd.SilenceUsage = true
+
+	containerHandler, err := localHandlerInit(config.WorkingPath, envFile, dockerfile, "")
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.Stop(false)
+}
+
+// airflowLocalLogs streams the local Airflow log file.
+func airflowLocalLogs(cmd *cobra.Command, _ []string) error {
+	cmd.SilenceUsage = true
+
+	containerHandler, err := localHandlerInit(config.WorkingPath, envFile, dockerfile, "")
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.Logs(followLogs)
 }
 
 // airflowRun

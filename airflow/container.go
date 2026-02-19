@@ -78,6 +78,10 @@ func ContainerHandlerInit(airflowHome, envFile, dockerfile, projectName string) 
 	return DockerComposeInit(airflowHome, envFile, dockerfile, projectName)
 }
 
+func StandaloneHandlerInit(airflowHome, envFile, dockerfile, projectName string) (ContainerHandler, error) {
+	return StandaloneInit(airflowHome, envFile, dockerfile)
+}
+
 func RegistryHandlerInit(registry string) (RegistryHandler, error) {
 	return DockerRegistryInit(registry)
 }
