@@ -2,6 +2,7 @@ package airflow
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,17 +27,23 @@ import (
 )
 
 const (
-	standaloneDir         = ".astro/standalone"
-	standalonePIDFile     = "airflow.pid"
-	standaloneLogFile     = "airflow.log"
-	defaultStandalonePort = "8080"
-	standaloneIndexURL    = "https://pip.astronomer.io/v2/"
-	standalonePythonVer   = "3.12"
-	constraintsBaseURL    = "https://pip.astronomer.io/runtime-constraints"
-	stopPollInterval      = 500 * time.Millisecond
-	stopTimeout           = 10 * time.Second
-	filePermissions       = os.FileMode(0o644)
-	dirPermissions        = os.FileMode(0o755)
+	standaloneDir            = ".astro/standalone"
+	standalonePIDFile        = "airflow.pid"
+	standaloneLogFile        = "airflow.log"
+	defaultStandalonePort    = "8080"
+	standaloneIndexURL       = "https://pip.astronomer.io/v2/"
+	standalonePythonVer      = "3.12"
+	constraintsBaseURL       = "https://cdn.astronomer.io/runtime-constraints"
+	freezeBaseURL            = "https://cdn.astronomer.io/runtime-freeze"
+	stopPollInterval         = 500 * time.Millisecond
+	stopTimeout              = 10 * time.Second
+	filePermissions          = os.FileMode(0o644)
+	dirPermissions           = os.FileMode(0o755)
+	standaloneAdminUser     = "admin"
+	standaloneAdminPassword = "admin"
+	// standalonePasswordsFile lives inside standaloneDir (.astro/standalone/) so it stays
+	// out of the project root and is cleaned up automatically by Kill/reset.
+	standalonePasswordsFile = "simple_auth_manager_passwords.json.generated"
 )
 
 var (
@@ -86,6 +93,13 @@ func (s *Standalone) logFilePath() string {
 	return filepath.Join(s.airflowHome, standaloneDir, standaloneLogFile)
 }
 
+// passwordsFilePath returns the full path to the SimpleAuthManager passwords file.
+// Keeping it inside standaloneDir means it stays out of the project root and is
+// cleaned up automatically by Kill/reset along with other standalone state.
+func (s *Standalone) passwordsFilePath() string {
+	return filepath.Join(s.airflowHome, standaloneDir, standalonePasswordsFile)
+}
+
 // Start runs airflow standalone locally without Docker.
 //
 //nolint:gocognit,gocyclo
@@ -111,8 +125,15 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 		return errUVNotFound
 	}
 
-	// 4. Fetch constraints from GCS (cached locally)
-	constraintsPath, airflowVersion, taskSDKVersion, err := s.getConstraints(tag)
+	// 3b. In background mode, bail early if already running (before any install work)
+	if !s.foreground {
+		if pid, alive := s.readPID(); alive {
+			return fmt.Errorf("standalone Airflow is already running (PID %d). Run 'astro dev standalone stop' first", pid)
+		}
+	}
+
+	// 4. Fetch constraints and freeze files from CDN (cached locally)
+	freezePath, airflowVersion, taskSDKVersion, err := s.getConstraints(tag)
 	if err != nil {
 		return err
 	}
@@ -128,11 +149,11 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 	}
 
 	// 6. Install dependencies (2-step install)
-	// Step 1: Install airflow with full constraints (reproduces runtime env)
+	// Step 1: Install airflow with full freeze constraints (reproduces runtime env exactly)
 	installArgs := []string{
 		"pip", "install",
 		fmt.Sprintf("apache-airflow==%s", airflowVersion),
-		"-c", constraintsPath,
+		"-c", freezePath,
 		"--index-url", standaloneIndexURL,
 	}
 	err = runCommand(s.airflowHome, "uv", installArgs...)
@@ -168,10 +189,15 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 		fmt.Printf("Warning: could not apply airflow settings: %s\n", err.Error())
 	}
 
-	// 8. Build environment
+	// 8. Seed credentials file (admin:admin) if this is a fresh environment
+	if err = s.ensureCredentials(); err != nil {
+		fmt.Printf("Warning: could not seed credentials file: %s\n", err.Error())
+	}
+
+	// 9. Build environment
 	env := s.buildEnv()
 
-	// 9. Start airflow standalone
+	// 10. Start airflow standalone
 	fmt.Println("\nStarting Airflow in standalone mode…")
 
 	venvBin := filepath.Join(s.airflowHome, ".venv", "bin")
@@ -250,7 +276,11 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) erro
 		uiURL := "http://localhost:" + defaultStandalonePort
 		fmt.Println("\n" + ansi.Green("\u2714") + " Airflow is ready!")
 		fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
-		fmt.Printf("%sCredentials are printed above by `airflow standalone`\n\n", bullet)
+		if user, pass := s.readCredentials(); user != "" {
+			fmt.Printf("%sUsername:   %s\n", bullet, ansi.Bold(user))
+			fmt.Printf("%sPassword:   %s\n", bullet, ansi.Bold(pass))
+		}
+		fmt.Println()
 	}()
 
 	// Wait for the process to complete
@@ -315,6 +345,10 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration) erro
 	uiURL := "http://localhost:" + defaultStandalonePort
 	fmt.Printf("\n%s Airflow is ready! (PID %d)\n", ansi.Green("\u2714"), cmd.Process.Pid)
 	fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
+	if user, pass := s.readCredentials(); user != "" {
+		fmt.Printf("%sUsername:   %s\n", bullet, ansi.Bold(user))
+		fmt.Printf("%sPassword:   %s\n", bullet, ansi.Bold(pass))
+	}
 	fmt.Printf("%sView logs: %s\n", bullet, ansi.Bold("astro dev standalone logs -f"))
 	fmt.Printf("%sStop:      %s\n", bullet, ansi.Bold("astro dev standalone stop"))
 
@@ -326,18 +360,61 @@ func (s *Standalone) healthEndpoint() (url, component string) {
 	return "http://localhost:" + defaultStandalonePort + "/api/v2/monitor/health", "api-server"
 }
 
-// getConstraints fetches pip constraints from the published GCS URL.
-// Results are cached in .astro/standalone/constraints-<tag>.txt.
-func (s *Standalone) getConstraints(tag string) (constraintsPath, airflowVersion, taskSDKVersion string, err error) {
+// ensureCredentials seeds the SimpleAuthManager passwords file with admin:admin
+// if it doesn't already exist. Airflow's init() uses "a+" mode, so if the entry
+// is already present it won't be overwritten — existing passwords survive a restart,
+// but a fresh environment always gets the predictable admin/admin default.
+func (s *Standalone) ensureCredentials() error {
+	path := s.passwordsFilePath()
+	if _, err := os.Stat(path); err == nil {
+		return nil // already exists, leave it alone
+	}
+	// Ensure .astro/standalone/ exists before writing into it
+	if err := os.MkdirAll(filepath.Dir(path), dirPermissions); err != nil {
+		return err
+	}
+	creds := map[string]string{standaloneAdminUser: standaloneAdminPassword}
+	data, err := json.Marshal(creds)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, filePermissions)
+}
+
+// readCredentials reads the SimpleAuthManager password file and returns (username, password).
+// Returns empty strings if the file doesn't exist or can't be parsed.
+func (s *Standalone) readCredentials() (username, password string) {
+	data, err := osReadFile(s.passwordsFilePath())
+	if err != nil {
+		return "", ""
+	}
+	var creds map[string]string
+	if err := json.Unmarshal(data, &creds); err != nil {
+		return "", ""
+	}
+	for u, p := range creds {
+		return u, p
+	}
+	return "", ""
+}
+
+// getConstraints fetches pip constraints and freeze files from the CDN.
+// The constraints file (small, 3 version pins) is used to extract version info.
+// The freeze file (full package list) is used as pip constraints for the install.
+// Both are cached in .astro/standalone/.
+func (s *Standalone) getConstraints(tag string) (freezePath, airflowVersion, taskSDKVersion string, err error) {
 	constraintsDir := filepath.Join(s.airflowHome, standaloneDir)
 	constraintsFile := filepath.Join(constraintsDir, fmt.Sprintf("constraints-%s.txt", tag))
+	freezeFile := filepath.Join(constraintsDir, fmt.Sprintf("freeze-%s.txt", tag))
 
-	// Check cache
-	if exists, _ := fileutil.Exists(constraintsFile, nil); exists {
+	// Check cache — both files must exist
+	constraintsCached, _ := fileutil.Exists(constraintsFile, nil)
+	freezeCached, _ := fileutil.Exists(freezeFile, nil)
+	if constraintsCached && freezeCached {
 		airflowVersion, err = parseAirflowVersionFromConstraints(constraintsFile)
 		if err == nil && airflowVersion != "" {
 			taskSDKVersion, _ = parsePackageVersionFromConstraints(constraintsFile, "apache-airflow-task-sdk")
-			return constraintsFile, airflowVersion, taskSDKVersion, nil
+			return freezeFile, airflowVersion, taskSDKVersion, nil
 		}
 	}
 
@@ -347,18 +424,24 @@ func (s *Standalone) getConstraints(tag string) (constraintsPath, airflowVersion
 		return "", "", "", fmt.Errorf("error creating standalone directory: %w", err)
 	}
 
-	// Fetch constraints from GCS
+	// Fetch constraints file (small — version pins only, used for parsing)
 	constraintsURL := fmt.Sprintf("%s/runtime-%s-python-%s.txt", constraintsBaseURL, tag, standalonePythonVer)
-	var out string
-	out, err = fetchConstraintsURL(constraintsURL)
-	if err != nil {
-		return "", "", "", fmt.Errorf("error fetching constraints from %s: %w", constraintsURL, err)
+	constraintsContent, fetchErr := fetchConstraintsURL(constraintsURL)
+	if fetchErr != nil {
+		return "", "", "", fmt.Errorf("error fetching constraints from %s: %w", constraintsURL, fetchErr)
+	}
+	if err = os.WriteFile(constraintsFile, []byte(constraintsContent), filePermissions); err != nil {
+		return "", "", "", fmt.Errorf("error caching constraints file: %w", err)
 	}
 
-	// Write constraints to cache file
-	err = os.WriteFile(constraintsFile, []byte(out), filePermissions)
-	if err != nil {
-		return "", "", "", fmt.Errorf("error caching constraints file: %w", err)
+	// Fetch freeze file (full package list, used as pip -c constraints)
+	freezeURL := fmt.Sprintf("%s/runtime-%s-python-%s.txt", freezeBaseURL, tag, standalonePythonVer)
+	freezeContent, fetchErr := fetchConstraintsURL(freezeURL)
+	if fetchErr != nil {
+		return "", "", "", fmt.Errorf("error fetching freeze file from %s: %w", freezeURL, fetchErr)
+	}
+	if err = os.WriteFile(freezeFile, []byte(freezeContent), filePermissions); err != nil {
+		return "", "", "", fmt.Errorf("error caching freeze file: %w", err)
 	}
 
 	airflowVersion, err = parseAirflowVersionFromConstraints(constraintsFile)
@@ -368,7 +451,7 @@ func (s *Standalone) getConstraints(tag string) (constraintsPath, airflowVersion
 
 	taskSDKVersion, _ = parsePackageVersionFromConstraints(constraintsFile, "apache-airflow-task-sdk")
 
-	return constraintsFile, airflowVersion, taskSDKVersion, nil
+	return freezeFile, airflowVersion, taskSDKVersion, nil
 }
 
 // fetchConstraintsURL fetches constraints from a URL and returns the body as a string.
@@ -414,13 +497,20 @@ func parseAirflowVersionFromConstraints(constraintsFile string) (string, error) 
 func (s *Standalone) buildEnv() []string {
 	venvBin := filepath.Join(s.airflowHome, ".venv", "bin")
 
+	// Point AIRFLOW_HOME at .astro/standalone/ so all Airflow-generated files
+	// (airflow.cfg, airflow.db, logs/) land there rather than in the project root.
+	// DAGS_FOLDER is pinned back to the project root so DAGs are still discovered.
+	standaloneHome := filepath.Join(s.airflowHome, standaloneDir)
+
 	// Build our override map — these take precedence over the inherited env.
 	overrides := map[string]string{
-		"PATH":                         fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH")),
-		"AIRFLOW_HOME":                 s.airflowHome,
-		"ASTRONOMER_ENVIRONMENT":       "local",
-		"AIRFLOW__CORE__LOAD_EXAMPLES": "False",
-		"AIRFLOW__CORE__DAGS_FOLDER":   filepath.Join(s.airflowHome, "dags"),
+		"PATH":                                               fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH")),
+		"AIRFLOW_HOME":                                       standaloneHome,
+		"ASTRONOMER_ENVIRONMENT":                             "local",
+		"AIRFLOW__CORE__LOAD_EXAMPLES":                       "False",
+		"AIRFLOW__CORE__DAGS_FOLDER":                         filepath.Join(s.airflowHome, "dags"),
+		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS":           standaloneAdminUser + ":admin",
+		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE":  s.passwordsFilePath(),
 	}
 
 	// Load .env file if it exists — these also override inherited env.
@@ -580,13 +670,13 @@ func (s *Standalone) Kill() error {
 	sp.Start()
 	defer sp.Stop()
 
-	// Remove venv, standalone cache, airflow.db, logs, and credential files
+	// Remove venv and the entire standaloneDir (.astro/standalone/).
+	// Since AIRFLOW_HOME points at standaloneDir, all Airflow-generated files
+	// (airflow.cfg, airflow.db, logs/, passwords file, constraint caches) live
+	// there and are cleaned up in one shot.
 	pathsToRemove := []string{
 		filepath.Join(s.airflowHome, ".venv"),
 		filepath.Join(s.airflowHome, standaloneDir),
-		filepath.Join(s.airflowHome, "airflow.db"),
-		filepath.Join(s.airflowHome, "logs"),
-		filepath.Join(s.airflowHome, "simple_auth_manager_passwords.json.generated"),
 	}
 
 	for _, p := range pathsToRemove {

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -195,11 +196,13 @@ func (s *Suite) TestStandaloneKill() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	// Create files that Kill should remove
+	// AIRFLOW_HOME is .astro/standalone/, so airflow.cfg, airflow.db, logs/ all
+	// live inside standaloneStateDir and are cleaned up when it is removed.
 	venvDir := filepath.Join(tmpDir, ".venv")
 	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
-	dbFile := filepath.Join(tmpDir, "airflow.db")
-	logsDir := filepath.Join(tmpDir, "logs")
+	// Simulate Airflow-generated files inside standaloneDir
+	dbFile := filepath.Join(standaloneStateDir, "airflow.db")
+	logsDir := filepath.Join(standaloneStateDir, "logs")
 
 	err = os.MkdirAll(venvDir, 0o755)
 	s.NoError(err)
@@ -216,14 +219,10 @@ func (s *Suite) TestStandaloneKill() {
 	err = handler.Kill()
 	s.NoError(err)
 
-	// Verify files were removed
+	// venv and entire standaloneDir (including db and logs inside it) removed
 	_, err = os.Stat(venvDir)
 	s.True(os.IsNotExist(err))
 	_, err = os.Stat(standaloneStateDir)
-	s.True(os.IsNotExist(err))
-	_, err = os.Stat(dbFile)
-	s.True(os.IsNotExist(err))
-	_, err = os.Stat(logsDir)
 	s.True(os.IsNotExist(err))
 }
 
@@ -320,7 +319,7 @@ func (s *Suite) TestStandaloneBuildEnv() {
 		}
 	}
 
-	s.Equal("/tmp/test-project", envMap["AIRFLOW_HOME"])
+	s.Equal("/tmp/test-project/.astro/standalone", envMap["AIRFLOW_HOME"])
 	s.Equal("local", envMap["ASTRONOMER_ENVIRONMENT"])
 	s.Equal("False", envMap["AIRFLOW__CORE__LOAD_EXAMPLES"])
 	s.Equal("/tmp/test-project/dags", envMap["AIRFLOW__CORE__DAGS_FOLDER"])
@@ -374,7 +373,7 @@ func (s *Suite) TestStandaloneBuildEnv_WithEnvFile() {
 	s.Equal("custom", envMap["ASTRONOMER_ENVIRONMENT"])
 	s.Equal("hello", envMap["MY_CUSTOM_VAR"])
 	// Other defaults should still be present
-	s.Equal(tmpDir, envMap["AIRFLOW_HOME"])
+	s.Equal(filepath.Join(tmpDir, ".astro", "standalone"), envMap["AIRFLOW_HOME"])
 }
 
 func splitEnvVar(s string) []string {
@@ -399,7 +398,7 @@ func (s *Suite) TestStandaloneGetConstraints_Cached() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	// Pre-create cached constraints
+	// Pre-create both cached files
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
@@ -409,12 +408,16 @@ func (s *Suite) TestStandaloneGetConstraints_Cached() {
 	err = os.WriteFile(constraintsFile, []byte(content), 0o644)
 	s.NoError(err)
 
+	freezeFile := filepath.Join(constraintsDir, "freeze-3.1-12.txt")
+	err = os.WriteFile(freezeFile, []byte("apache-airflow==3.0.1\nsome-dep==1.2.3\n"), 0o644)
+	s.NoError(err)
+
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
 	path, version, taskSDKVersion, err := handler.getConstraints("3.1-12")
 	s.NoError(err)
-	s.Equal(constraintsFile, path)
+	s.Equal(freezeFile, path)
 	s.Equal("3.0.1", version)
 	s.Equal("1.0.0", taskSDKVersion)
 }
@@ -424,13 +427,17 @@ func (s *Suite) TestStandaloneGetConstraints_FetchesFromURL() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	// Mock fetchConstraintsURL
+	// Mock fetchConstraintsURL — called twice (constraints then freeze)
 	origFetch := fetchConstraintsURL
 	defer func() { fetchConstraintsURL = origFetch }()
 
 	fetchConstraintsURL = func(url string) (string, error) {
 		s.Contains(url, "runtime-3.1-13-python-3.12.txt")
-		return "apache-airflow==3.0.2\napache-airflow-task-sdk==1.0.0\nother-package==2.0.0\n", nil
+		if strings.Contains(url, "runtime-constraints") {
+			return "apache-airflow==3.0.2\napache-airflow-task-sdk==1.0.0\n", nil
+		}
+		// freeze URL
+		return "apache-airflow==3.0.2\nsome-dep==1.2.3\n", nil
 	}
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
@@ -438,11 +445,11 @@ func (s *Suite) TestStandaloneGetConstraints_FetchesFromURL() {
 
 	path, version, taskSDKVersion, err := handler.getConstraints("3.1-13")
 	s.NoError(err)
-	s.Contains(path, "constraints-3.1-13.txt")
+	s.Contains(path, "freeze-3.1-13.txt")
 	s.Equal("3.0.2", version)
 	s.Equal("1.0.0", taskSDKVersion)
 
-	// Verify file was cached
+	// Verify freeze file was cached
 	_, err = os.Stat(path)
 	s.NoError(err)
 }
@@ -502,11 +509,13 @@ func (s *Suite) TestStandaloneStart_VenvCreationFails() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	// Pre-create constraints to skip Docker
+	// Pre-create cached constraints + freeze to skip URL fetch
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
 	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
 	s.NoError(err)
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
@@ -556,6 +565,8 @@ func (s *Suite) TestStandaloneStart_InstallFails() {
 	s.NoError(err)
 	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
 	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	s.NoError(err)
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
@@ -578,12 +589,13 @@ func (s *Suite) TestStandaloneStart_HappyPath() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	// Pre-create cached constraints
+	// Pre-create cached constraints + freeze
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
-	constraintsFile := filepath.Join(constraintsDir, "constraints-3.1-12.txt")
-	err = os.WriteFile(constraintsFile, []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
 	s.NoError(err)
 
 	// Create a fake airflow binary that exits immediately
@@ -637,11 +649,13 @@ func (s *Suite) TestStandaloneStart_Background() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	// Pre-create cached constraints and standalone dir
+	// Pre-create cached constraints + freeze and standalone dir
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
 	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
 	s.NoError(err)
 
 	// Create a fake airflow binary that sleeps briefly then exits
@@ -697,11 +711,13 @@ func (s *Suite) TestStandaloneStart_AlreadyRunning() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	// Pre-create standalone dir, constraints, venv
+	// Pre-create standalone dir, constraints + freeze, venv
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
 	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
 	s.NoError(err)
 
 	venvBin := filepath.Join(tmpDir, ".venv", "bin")
@@ -843,4 +859,77 @@ func (s *Suite) TestStandaloneSetForeground() {
 	s.False(handler.foreground)
 	handler.SetForeground(true)
 	s.True(handler.foreground)
+}
+
+func (s *Suite) TestStandaloneEnsureCredentials() {
+	tmpDir, err := os.MkdirTemp("", "standalone-ensure-creds")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	// File lives in .astro/standalone/, not the project root
+	credsPath := handler.passwordsFilePath()
+	s.Contains(credsPath, ".astro/standalone/")
+
+	// File doesn't exist — ensureCredentials should create it with admin:admin
+	err = handler.ensureCredentials()
+	s.NoError(err)
+
+	data, err := os.ReadFile(credsPath)
+	s.NoError(err)
+	s.Contains(string(data), `"admin"`)
+
+	// Called again — should be a no-op (not overwrite existing file)
+	err = os.WriteFile(credsPath, []byte(`{"admin":"custompassword"}`), 0o644)
+	s.NoError(err)
+	err = handler.ensureCredentials()
+	s.NoError(err)
+	data, err = os.ReadFile(credsPath)
+	s.NoError(err)
+	s.Contains(string(data), "custompassword") // unchanged
+}
+
+func (s *Suite) TestStandaloneReadCredentials() {
+	tmpDir, err := os.MkdirTemp("", "standalone-creds-test")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	// No file — should return empty strings gracefully
+	user, pass := handler.readCredentials()
+	s.Equal("", user)
+	s.Equal("", pass)
+
+	// Write a valid credentials file into .astro/standalone/
+	credsPath := handler.passwordsFilePath()
+	err = os.MkdirAll(filepath.Dir(credsPath), 0o755)
+	s.NoError(err)
+	err = os.WriteFile(credsPath, []byte(`{"admin":"supersecret"}`), 0o644)
+	s.NoError(err)
+
+	user, pass = handler.readCredentials()
+	s.Equal("admin", user)
+	s.Equal("supersecret", pass)
+}
+
+func (s *Suite) TestStandaloneReadCredentials_InvalidJSON() {
+	tmpDir, err := os.MkdirTemp("", "standalone-creds-invalid")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+	credsPath := handler.passwordsFilePath()
+	err = os.MkdirAll(filepath.Dir(credsPath), 0o755)
+	s.NoError(err)
+	err = os.WriteFile(credsPath, []byte(`not valid json`), 0o644)
+	s.NoError(err)
+
+	user, pass := handler.readCredentials()
+	s.Equal("", user)
+	s.Equal("", pass)
 }
