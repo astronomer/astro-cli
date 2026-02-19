@@ -226,6 +226,27 @@ func (s *Suite) TestStandaloneKill() {
 	s.True(os.IsNotExist(err))
 }
 
+func TestParseRuntimeTagPython(t *testing.T) {
+	tests := []struct {
+		tag        string
+		wantBase   string
+		wantPython string
+	}{
+		{"3.1-12", "3.1-12", "3.12"},
+		{"3.1-12-python-3.11", "3.1-12", "3.11"},
+		{"3.1-12-python-3.11-base", "3.1-12", "3.11"},
+		{"3.1-12-base", "3.1-12", "3.12"},
+		{"3.2-1-python-3.13", "3.2-1", "3.13"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tag, func(t *testing.T) {
+			base, python := parseRuntimeTagPython(tt.tag)
+			assert.Equal(t, tt.wantBase, base)
+			assert.Equal(t, tt.wantPython, python)
+		})
+	}
+}
+
 func TestParseAirflowVersionFromConstraints(t *testing.T) {
 	// Create a temp file with constraints
 	tmpDir, err := os.MkdirTemp("", "constraints-test")
@@ -403,19 +424,19 @@ func (s *Suite) TestStandaloneGetConstraints_Cached() {
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
 
-	constraintsFile := filepath.Join(constraintsDir, "constraints-3.1-12.txt")
+	constraintsFile := filepath.Join(constraintsDir, "constraints-3.1-12-python-3.12.txt")
 	content := "apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\nother-package==1.0.0\n"
 	err = os.WriteFile(constraintsFile, []byte(content), 0o644)
 	s.NoError(err)
 
-	freezeFile := filepath.Join(constraintsDir, "freeze-3.1-12.txt")
+	freezeFile := filepath.Join(constraintsDir, "freeze-3.1-12-python-3.12.txt")
 	err = os.WriteFile(freezeFile, []byte("apache-airflow==3.0.1\nsome-dep==1.2.3\n"), 0o644)
 	s.NoError(err)
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	path, version, taskSDKVersion, err := handler.getConstraints("3.1-12")
+	path, version, taskSDKVersion, err := handler.getConstraints("3.1-12", defaultPythonVersion)
 	s.NoError(err)
 	s.Equal(freezeFile, path)
 	s.Equal("3.0.1", version)
@@ -443,9 +464,9 @@ func (s *Suite) TestStandaloneGetConstraints_FetchesFromURL() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	path, version, taskSDKVersion, err := handler.getConstraints("3.1-13")
+	path, version, taskSDKVersion, err := handler.getConstraints("3.1-13", defaultPythonVersion)
 	s.NoError(err)
-	s.Contains(path, "freeze-3.1-13.txt")
+	s.Contains(path, "freeze-3.1-13-python-3.12.txt")
 	s.Equal("3.0.2", version)
 	s.Equal("1.0.0", taskSDKVersion)
 
@@ -469,7 +490,7 @@ func (s *Suite) TestStandaloneGetConstraints_FetchFails() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	_, _, _, err = handler.getConstraints("3.1-99") //nolint:dogsled
+	_, _, _, err = handler.getConstraints("3.1-99", defaultPythonVersion) //nolint:dogsled
 	s.Error(err)
 	s.Contains(err.Error(), "error fetching constraints")
 	s.Contains(err.Error(), "network error")
@@ -513,9 +534,9 @@ func (s *Suite) TestStandaloneStart_VenvCreationFails() {
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
 	s.NoError(err)
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
@@ -563,9 +584,9 @@ func (s *Suite) TestStandaloneStart_InstallFails() {
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
 	s.NoError(err)
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
@@ -593,9 +614,9 @@ func (s *Suite) TestStandaloneStart_HappyPath() {
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
 	s.NoError(err)
 
 	// Create a fake airflow binary that exits immediately
@@ -653,9 +674,9 @@ func (s *Suite) TestStandaloneStart_Background() {
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
 	s.NoError(err)
 
 	// Create a fake airflow binary that sleeps briefly then exits
@@ -715,9 +736,9 @@ func (s *Suite) TestStandaloneStart_AlreadyRunning() {
 	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
 	err = os.MkdirAll(constraintsDir, 0o755)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
 	s.NoError(err)
-	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
 	s.NoError(err)
 
 	venvBin := filepath.Join(tmpDir, ".venv", "bin")

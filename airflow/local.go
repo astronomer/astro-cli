@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -32,7 +33,7 @@ const (
 	standaloneLogFile       = "airflow.log"
 	defaultStandalonePort   = "8080"
 	standaloneIndexURL      = "https://pip.astronomer.io/v2/"
-	standalonePythonVer     = "3.12"
+	defaultPythonVersion    = "3.12" // default Python version for all Runtime 3.x images
 	constraintsBaseURL      = "https://cdn.astronomer.io/runtime-constraints"
 	freezeBaseURL           = "https://cdn.astronomer.io/runtime-freeze"
 	stopPollInterval        = 500 * time.Millisecond
@@ -60,6 +61,23 @@ var (
 	osReadFile            = os.ReadFile
 	osFindProcess         = os.FindProcess
 )
+
+// runtimePythonRe matches the optional -python-X.Y (and optional -base) suffix on a runtime tag.
+var runtimePythonRe = regexp.MustCompile(`-python-(\d+\.\d+)(-base)?$`)
+
+// parseRuntimeTagPython extracts the base runtime tag and the Python version from a
+// full image tag. Tags may look like:
+//
+//	"3.1-12"                    → base="3.1-12", python="3.12" (default)
+//	"3.1-12-python-3.11"       → base="3.1-12", python="3.11"
+//	"3.1-12-python-3.11-base"  → base="3.1-12", python="3.11"
+func parseRuntimeTagPython(tag string) (baseTag, pythonVersion string) {
+	loc := runtimePythonRe.FindStringSubmatchIndex(tag)
+	if loc == nil {
+		return strings.TrimSuffix(tag, "-base"), defaultPythonVersion
+	}
+	return tag[:loc[0]], tag[loc[2]:loc[3]]
+}
 
 // Standalone implements ContainerHandler using `airflow standalone` instead of Docker Compose.
 type Standalone struct {
@@ -114,8 +132,11 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 		return errors.New("could not determine runtime version from Dockerfile")
 	}
 
+	// Parse Python version from tag (e.g. "3.1-12-python-3.11" → base="3.1-12", python="3.11")
+	baseTag, pythonVersion := parseRuntimeTagPython(tag)
+
 	// 2. Validate Airflow version (AF3 only)
-	if airflowversions.AirflowMajorVersionForRuntimeVersion(tag) != "3" {
+	if airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag) != "3" {
 		return errUnsupportedAirflowVersion
 	}
 
@@ -133,7 +154,7 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 	}
 
 	// 4. Fetch constraints and freeze files from CDN (cached locally)
-	freezePath, airflowVersion, taskSDKVersion, err := s.getConstraints(tag)
+	freezePath, airflowVersion, taskSDKVersion, err := s.getConstraints(baseTag, pythonVersion)
 	if err != nil {
 		return err
 	}
@@ -142,7 +163,7 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 	sp.Start()
 
 	// 5. Create venv
-	err = runCommand(s.airflowHome, "uv", "venv", "--python", standalonePythonVer)
+	err = runCommand(s.airflowHome, "uv", "venv", "--python", pythonVersion)
 	if err != nil {
 		sp.Stop()
 		return fmt.Errorf("error creating virtual environment: %w", err)
@@ -402,10 +423,10 @@ func (s *Standalone) readCredentials() (username, password string) {
 // The constraints file (small, 3 version pins) is used to extract version info.
 // The freeze file (full package list) is used as pip constraints for the install.
 // Both are cached in .astro/standalone/.
-func (s *Standalone) getConstraints(tag string) (freezePath, airflowVersion, taskSDKVersion string, err error) {
+func (s *Standalone) getConstraints(tag, pythonVersion string) (freezePath, airflowVersion, taskSDKVersion string, err error) {
 	constraintsDir := filepath.Join(s.airflowHome, standaloneDir)
-	constraintsFile := filepath.Join(constraintsDir, fmt.Sprintf("constraints-%s.txt", tag))
-	freezeFile := filepath.Join(constraintsDir, fmt.Sprintf("freeze-%s.txt", tag))
+	constraintsFile := filepath.Join(constraintsDir, fmt.Sprintf("constraints-%s-python-%s.txt", tag, pythonVersion))
+	freezeFile := filepath.Join(constraintsDir, fmt.Sprintf("freeze-%s-python-%s.txt", tag, pythonVersion))
 
 	// Check cache — both files must exist
 	constraintsCached, _ := fileutil.Exists(constraintsFile, nil)
@@ -425,7 +446,7 @@ func (s *Standalone) getConstraints(tag string) (freezePath, airflowVersion, tas
 	}
 
 	// Fetch constraints file (small — version pins only, used for parsing)
-	constraintsURL := fmt.Sprintf("%s/runtime-%s-python-%s.txt", constraintsBaseURL, tag, standalonePythonVer)
+	constraintsURL := fmt.Sprintf("%s/runtime-%s-python-%s.txt", constraintsBaseURL, tag, pythonVersion)
 	constraintsContent, fetchErr := fetchConstraintsURL(constraintsURL)
 	if fetchErr != nil {
 		return "", "", "", fmt.Errorf("error fetching constraints from %s: %w", constraintsURL, fetchErr)
@@ -435,7 +456,7 @@ func (s *Standalone) getConstraints(tag string) (freezePath, airflowVersion, tas
 	}
 
 	// Fetch freeze file (full package list, used as pip -c constraints)
-	freezeURL := fmt.Sprintf("%s/runtime-%s-python-%s.txt", freezeBaseURL, tag, standalonePythonVer)
+	freezeURL := fmt.Sprintf("%s/runtime-%s-python-%s.txt", freezeBaseURL, tag, pythonVersion)
 	freezeContent, fetchErr := fetchConstraintsURL(freezeURL)
 	if fetchErr != nil {
 		return "", "", "", fmt.Errorf("error fetching freeze file from %s: %w", freezeURL, fetchErr)
