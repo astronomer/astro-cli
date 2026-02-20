@@ -231,25 +231,25 @@ func TestDetectContext(t *testing.T) {
 	}
 }
 
-func TestGetSegmentWriteKey(t *testing.T) {
+func TestGetTelemetryAPIURL(t *testing.T) {
 	// Save original env value
-	origEnv := os.Getenv(envSegmentWriteKey)
-	defer os.Setenv(envSegmentWriteKey, origEnv)
+	origEnv := os.Getenv(envTelemetryAPIURL)
+	defer os.Setenv(envTelemetryAPIURL, origEnv)
 
-	t.Run("custom key from env", func(t *testing.T) {
-		os.Setenv(envSegmentWriteKey, "custom-key")
-		defer os.Unsetenv(envSegmentWriteKey)
+	t.Run("custom URL from env", func(t *testing.T) {
+		os.Setenv(envTelemetryAPIURL, "http://custom:8080/v1alpha1/telemetry")
+		defer os.Unsetenv(envTelemetryAPIURL)
 
-		result := GetSegmentWriteKey()
-		assert.Equal(t, "custom-key", result)
+		result := GetTelemetryAPIURL()
+		assert.Equal(t, "http://custom:8080/v1alpha1/telemetry", result)
 	})
 
-	t.Run("default key without env", func(t *testing.T) {
-		os.Unsetenv(envSegmentWriteKey)
+	t.Run("default URL without env", func(t *testing.T) {
+		os.Unsetenv(envTelemetryAPIURL)
 
-		result := GetSegmentWriteKey()
-		// Should return either prod or dev key based on version
-		assert.True(t, result == SegmentWriteKeyProd || result == SegmentWriteKeyDev)
+		result := GetTelemetryAPIURL()
+		// Should return either prod or dev URL based on version
+		assert.True(t, result == TelemetryAPIURLProd || result == TelemetryAPIURLDev)
 	})
 }
 

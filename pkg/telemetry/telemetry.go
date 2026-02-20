@@ -14,15 +14,18 @@ import (
 )
 
 const (
-	// SegmentWriteKeyProd is the production Segment write key
-	SegmentWriteKeyProd = "pHCtHpueRKSdaMgrACkHXFxMaKxovlLR"
-	// SegmentWriteKeyDev is the development Segment write key
-	SegmentWriteKeyDev = "J8yCxB2fAmKTwRWg8rjkgeDqxYfAuEQT"
+	// TelemetryAPIURLProd is the production telemetry API endpoint
+	TelemetryAPIURLProd = "https://api.astronomer.io/v1alpha1/telemetry"
+	// TelemetryAPIURLDev is the development telemetry API endpoint
+	TelemetryAPIURLDev = "http://localhost:8080/v1alpha1/telemetry"
+
+	// SourceName identifies this CLI as the telemetry source
+	SourceName = "astro-cli"
 
 	// Environment variable to disable telemetry
 	envTelemetryDisabled = "ASTRO_TELEMETRY_DISABLED"
-	// Environment variable to override Segment write key
-	envSegmentWriteKey = "ASTRO_SEGMENT_WRITE_KEY"
+	// Environment variable to override telemetry API URL
+	envTelemetryAPIURL = "ASTRO_TELEMETRY_API_URL"
 )
 
 // Event types
@@ -30,12 +33,18 @@ const (
 	EventCommandExecution = "Command Execution"
 )
 
-// TelemetryPayload represents the data sent to Segment
+// TelemetryPayload represents the data sent to the telemetry API
 type TelemetryPayload struct {
-	AnonymousID string                 `json:"anonymous_id"`
+	Source      string                 `json:"source"`
 	Event       string                 `json:"event"`
-	Properties  map[string]interface{} `json:"properties"`
-	WriteKey    string                 `json:"write_key"`
+	AnonymousID string                 `json:"anonymousId"`
+	Properties  map[string]interface{} `json:"properties,omitempty"`
+}
+
+// senderPayload wraps TelemetryPayload with the API URL for the subprocess
+type senderPayload struct {
+	TelemetryPayload
+	APIURL string `json:"api_url"`
 }
 
 // agentEnvVars maps environment variables to agent names
@@ -81,18 +90,18 @@ func GetAnonymousID() string {
 	return newID
 }
 
-// GetSegmentWriteKey returns the appropriate Segment write key
-func GetSegmentWriteKey() string {
+// GetTelemetryAPIURL returns the appropriate telemetry API URL
+func GetTelemetryAPIURL() string {
 	// Check for environment variable override
-	if key := os.Getenv(envSegmentWriteKey); key != "" {
-		return key
+	if url := os.Getenv(envTelemetryAPIURL); url != "" {
+		return url
 	}
 
-	// Use dev key for SNAPSHOT builds, prod key otherwise
+	// Use dev URL for SNAPSHOT builds, prod URL otherwise
 	if strings.Contains(version.CurrVersion, "SNAPSHOT") {
-		return SegmentWriteKeyDev
+		return TelemetryAPIURLDev
 	}
-	return SegmentWriteKeyProd
+	return TelemetryAPIURLProd
 }
 
 // GetCommandPath extracts the command path from a cobra.Command
@@ -142,9 +151,9 @@ func TrackCommand(cmd *cobra.Command) {
 	}
 
 	payload := TelemetryPayload{
-		AnonymousID: GetAnonymousID(),
+		Source:      SourceName,
 		Event:       EventCommandExecution,
-		WriteKey:    GetSegmentWriteKey(),
+		AnonymousID: GetAnonymousID(),
 		Properties: map[string]interface{}{
 			"command":     commandPath,
 			"cli_version": version.CurrVersion,
@@ -158,7 +167,7 @@ func TrackCommand(cmd *cobra.Command) {
 	}
 
 	// Spawn subprocess to send telemetry
-	spawnTelemetrySender(payload)
+	spawnTelemetrySender(payload, GetTelemetryAPIURL())
 }
 
 // getOSVersion returns the OS version string
@@ -169,8 +178,12 @@ func getOSVersion() string {
 }
 
 // spawnTelemetrySender spawns a detached subprocess to send telemetry
-func spawnTelemetrySender(payload TelemetryPayload) {
-	payloadJSON, err := json.Marshal(payload)
+func spawnTelemetrySender(payload TelemetryPayload, apiURL string) {
+	sp := senderPayload{
+		TelemetryPayload: payload,
+		APIURL:           apiURL,
+	}
+	payloadJSON, err := json.Marshal(sp)
 	if err != nil {
 		return
 	}

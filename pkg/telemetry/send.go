@@ -1,13 +1,14 @@
 package telemetry
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"time"
-
-	segment "github.com/segmentio/analytics-go/v3"
 )
 
 const (
@@ -15,7 +16,7 @@ const (
 	sendTimeout = 5 * time.Second
 )
 
-// SendEvent reads a JSON payload from stdin and sends it to Segment
+// SendEvent reads a JSON payload from stdin and sends it to the telemetry API
 // This is meant to be called from the hidden _telemetry-send command
 func SendEvent() error {
 	// Read payload from stdin
@@ -24,49 +25,36 @@ func SendEvent() error {
 		return err
 	}
 
-	var payload TelemetryPayload
-	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+	var sp senderPayload
+	if err := json.Unmarshal(payloadBytes, &sp); err != nil {
 		return err
 	}
 
-	// Create Segment client with timeout
-	client, err := segment.NewWithConfig(payload.WriteKey, segment.Config{
-		BatchSize: 1,
-	})
+	// Marshal just the TelemetryPayload for the API request body
+	body, err := json.Marshal(sp.TelemetryPayload)
 	if err != nil {
 		return err
 	}
-	defer client.Close()
 
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
 
-	// Send the track event
-	err = client.Enqueue(segment.Track{
-		AnonymousId: payload.AnonymousID,
-		Event:       payload.Event,
-		Properties:  payload.Properties,
-		Context: &segment.Context{
-			Extra: map[string]interface{}{
-				"direct": true,
-			},
-		},
-	})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, sp.APIURL, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
-	// Wait for the event to be sent or timeout
-	done := make(chan error, 1)
-	go func() {
-		done <- client.Close()
-	}()
-
-	select {
-	case err := <-done:
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
 		return err
-	case <-ctx.Done():
-		return ctx.Err()
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("telemetry API returned status %d", resp.StatusCode)
+	}
+
+	return nil
 }
