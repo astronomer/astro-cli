@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -14,10 +15,8 @@ import (
 )
 
 const (
-	// TelemetryAPIURLProd is the production telemetry API endpoint
-	TelemetryAPIURLProd = "https://api.astronomer.io/v1alpha1/telemetry"
-	// TelemetryAPIURLDev is the development telemetry API endpoint
-	TelemetryAPIURLDev = "http://localhost:8080/v1alpha1/telemetry"
+	// TelemetryAPIURL is the telemetry API endpoint
+	TelemetryAPIURL = "https://api.astronomer.io/v1alpha1/telemetry"
 
 	// SourceName identifies this CLI as the telemetry source
 	SourceName = "astro-cli"
@@ -26,11 +25,13 @@ const (
 	envTelemetryDisabled = "ASTRO_TELEMETRY_DISABLED"
 	// Environment variable to override telemetry API URL
 	envTelemetryAPIURL = "ASTRO_TELEMETRY_API_URL"
+	// Environment variable to enable synchronous debug mode
+	envTelemetryDebug = "ASTRO_TELEMETRY_DEBUG"
 )
 
 // Event types
 const (
-	EventCommandExecution = "Command Execution"
+	EventCommandExecution = "CLI Command"
 )
 
 // TelemetryPayload represents the data sent to the telemetry API
@@ -90,18 +91,12 @@ func GetAnonymousID() string {
 	return newID
 }
 
-// GetTelemetryAPIURL returns the appropriate telemetry API URL
+// GetTelemetryAPIURL returns the telemetry API URL, allowing override via env var
 func GetTelemetryAPIURL() string {
-	// Check for environment variable override
 	if url := os.Getenv(envTelemetryAPIURL); url != "" {
 		return url
 	}
-
-	// Use dev URL for SNAPSHOT builds, prod URL otherwise
-	if strings.Contains(version.CurrVersion, "SNAPSHOT") {
-		return TelemetryAPIURLDev
-	}
-	return TelemetryAPIURLProd
+	return TelemetryAPIURL
 }
 
 // GetCommandPath extracts the command path from a cobra.Command
@@ -166,8 +161,34 @@ func TrackCommand(cmd *cobra.Command) {
 		},
 	}
 
+	apiURL := GetTelemetryAPIURL()
+
+	if isDebugMode() {
+		sendDebug(payload, apiURL)
+		return
+	}
+
 	// Spawn subprocess to send telemetry
-	spawnTelemetrySender(payload, GetTelemetryAPIURL())
+	spawnTelemetrySender(payload, apiURL)
+}
+
+// isDebugMode returns true if synchronous debug mode is enabled
+func isDebugMode() bool {
+	val := os.Getenv(envTelemetryDebug)
+	return val == "1" || strings.EqualFold(val, "true")
+}
+
+// sendDebug sends telemetry synchronously and prints debug output
+func sendDebug(payload TelemetryPayload, apiURL string) {
+	body, _ := json.MarshalIndent(payload, "", "  ")
+	fmt.Fprintf(os.Stderr, "[telemetry] POST %s\n%s\n", apiURL, body)
+
+	status, err := Send(payload, apiURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[telemetry] error: %v\n", err)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "[telemetry] response: %d OK\n", status)
 }
 
 // getOSVersion returns the OS version string

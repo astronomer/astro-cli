@@ -19,7 +19,17 @@ func TestTelemetryCmd(t *testing.T) {
 		cmd := newTelemetryCmd(buf)
 
 		assert.Equal(t, "telemetry", cmd.Use)
-		assert.Equal(t, 3, len(cmd.Commands()), "Should have enable, disable, and status subcommands")
+		assert.Equal(t, 2, len(cmd.Commands()), "Should have enable and disable subcommands")
+	})
+
+	t.Run("telemetry shows status by default", func(t *testing.T) {
+		_ = telemetryEnable(new(bytes.Buffer))
+
+		buf := new(bytes.Buffer)
+		err := telemetryStatus(buf)
+
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "Telemetry is enabled")
 	})
 
 	t.Run("telemetry enable", func(t *testing.T) {

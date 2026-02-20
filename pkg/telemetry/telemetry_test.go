@@ -248,8 +248,7 @@ func TestGetTelemetryAPIURL(t *testing.T) {
 		os.Unsetenv(envTelemetryAPIURL)
 
 		result := GetTelemetryAPIURL()
-		// Should return either prod or dev URL based on version
-		assert.True(t, result == TelemetryAPIURLProd || result == TelemetryAPIURLDev)
+		assert.Equal(t, TelemetryAPIURL, result)
 	})
 }
 

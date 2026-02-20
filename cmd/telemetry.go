@@ -25,11 +25,13 @@ We collect anonymous usage data including:
 No personally identifiable information is collected.
 You can opt out at any time using 'astro telemetry disable' or by setting
 the ASTRO_TELEMETRY_DISABLED=1 environment variable.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return telemetryStatus(out)
+		},
 	}
 	cmd.AddCommand(
 		newTelemetryEnableCmd(out),
 		newTelemetryDisableCmd(out),
-		newTelemetryStatusCmd(out),
 	)
 	return cmd
 }
@@ -53,18 +55,6 @@ func newTelemetryDisableCmd(out io.Writer) *cobra.Command {
 		Long:  "Disable anonymous telemetry collection for the Astro CLI.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return telemetryDisable(out)
-		},
-	}
-	return cmd
-}
-
-func newTelemetryStatusCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Show current telemetry status",
-		Long:  "Show whether anonymous telemetry is currently enabled or disabled.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return telemetryStatus(out)
 		},
 	}
 	return cmd
