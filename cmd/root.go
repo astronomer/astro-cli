@@ -67,11 +67,17 @@ func NewRootCmd() *cobra.Command {
     \__\/\__\/ \_____\/   \__\/    \_\/ \_\/ \_____\/           \_____\/ \_____\/\________\/
 
 Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astro Private Cloud, or Local Development.`,
-		PersistentPreRunE: utils.ChainRunEs(
-			SetupLogging,
-			CreateRootPersistentPreRunE(astroCoreClient, platformCoreClient),
-			telemetry.CreateTrackingHook(),
-		),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Skip heavy pre-run logic for the internal telemetry sender subprocess
+			if cmd.Name() == "_telemetry-send" {
+				return nil
+			}
+			return utils.ChainRunEs(
+				SetupLogging,
+				CreateRootPersistentPreRunE(astroCoreClient, platformCoreClient),
+				telemetry.CreateTrackingHook(),
+			)(cmd, args)
+		},
 	}
 
 	rootCmd.AddCommand(

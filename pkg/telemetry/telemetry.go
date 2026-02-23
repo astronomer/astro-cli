@@ -48,22 +48,29 @@ type senderPayload struct {
 	APIURL string `json:"api_url"`
 }
 
-// agentEnvVars maps environment variables to agent names
-var agentEnvVars = map[string]string{
-	"CLAUDECODE":             "claude-code",
-	"CLAUDE_CODE_ENTRYPOINT": "claude-code",
-	"CURSOR_TRACE_ID":        "cursor",
-	"AIDER_MODEL":            "aider",
-	"CONTINUE_GLOBAL_DIR":    "continue",
+// envMapping pairs an environment variable with a context name
+type envMapping struct {
+	envVar string
+	name   string
 }
 
-// ciEnvVars maps environment variables to CI system names
-var ciEnvVars = map[string]string{
-	"GITHUB_ACTIONS": "github-actions",
-	"GITLAB_CI":      "gitlab-ci",
-	"JENKINS_URL":    "jenkins",
-	"CIRCLECI":       "circleci",
-	"CI":             "ci-unknown",
+// agentEnvVars is an ordered list of environment variables to detect agent contexts
+var agentEnvVars = []envMapping{
+	{"CLAUDECODE", "claude-code"},
+	{"CLAUDE_CODE_ENTRYPOINT", "claude-code"},
+	{"CURSOR_TRACE_ID", "cursor"},
+	{"AIDER_MODEL", "aider"},
+	{"CONTINUE_GLOBAL_DIR", "continue"},
+}
+
+// ciEnvVars is an ordered list of environment variables to detect CI contexts.
+// Generic "CI" must be last so specific providers take precedence.
+var ciEnvVars = []envMapping{
+	{"GITHUB_ACTIONS", "github-actions"},
+	{"GITLAB_CI", "gitlab-ci"},
+	{"JENKINS_URL", "jenkins"},
+	{"CIRCLECI", "circleci"},
+	{"CI", "ci-unknown"},
 }
 
 // IsEnabled checks if telemetry is enabled
@@ -116,16 +123,16 @@ func GetCommandPath(cmd *cobra.Command) string {
 // DetectContext detects the invocation context (agent, CI, or interactive)
 func DetectContext() string {
 	// Check for agent environment variables first
-	for envVar, agentName := range agentEnvVars {
-		if os.Getenv(envVar) != "" {
-			return agentName
+	for _, m := range agentEnvVars {
+		if os.Getenv(m.envVar) != "" {
+			return m.name
 		}
 	}
 
-	// Check for CI environment variables
-	for envVar, ciName := range ciEnvVars {
-		if os.Getenv(envVar) != "" {
-			return ciName
+	// Check for CI environment variables (generic "CI" is last)
+	for _, m := range ciEnvVars {
+		if os.Getenv(m.envVar) != "" {
+			return m.name
 		}
 	}
 
@@ -191,11 +198,21 @@ func sendDebug(payload TelemetryPayload, apiURL string) {
 	fmt.Fprintf(os.Stderr, "[telemetry] response: %d OK\n", status)
 }
 
-// getOSVersion returns the OS version string
+// getOSVersion returns the OS version string (e.g., "Darwin 24.3.0", "Linux 6.5.0")
 func getOSVersion() string {
-	// For simplicity, we use runtime.GOOS + runtime.GOARCH
-	// A more detailed version could use platform-specific APIs
-	return runtime.GOOS + "/" + runtime.GOARCH
+	switch runtime.GOOS {
+	case "windows":
+		out, err := exec.Command("cmd", "/c", "ver").Output()
+		if err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	case "linux", "darwin":
+		out, err := exec.Command("uname", "-sr").Output()
+		if err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	}
+	return runtime.GOOS
 }
 
 // spawnTelemetrySender spawns a detached subprocess to send telemetry
