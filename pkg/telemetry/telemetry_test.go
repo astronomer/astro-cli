@@ -8,12 +8,19 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestIsEnabled(t *testing.T) {
-	// Initialize config for tests
+func initTestConfig(t *testing.T) {
+	t.Helper()
 	fs := afero.NewMemMapFs()
+	configRaw := []byte("telemetry:\n  enabled: true\n")
+	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
 	config.InitConfig(fs)
+}
+
+func TestIsEnabled(t *testing.T) {
+	initTestConfig(t)
 
 	// Save original env value
 	origEnv := os.Getenv(envTelemetryDisabled)
@@ -253,9 +260,7 @@ func TestGetTelemetryAPIURL(t *testing.T) {
 }
 
 func TestGetAnonymousID(t *testing.T) {
-	// Initialize config for tests
-	fs := afero.NewMemMapFs()
-	config.InitConfig(fs)
+	initTestConfig(t)
 
 	id1 := GetAnonymousID()
 	assert.NotEmpty(t, id1, "Should generate an ID")

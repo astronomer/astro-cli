@@ -7,11 +7,14 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTelemetryCmd(t *testing.T) {
-	// Initialize config for tests
+	// Initialize config with a minimal home config to keep tests hermetic
 	fs := afero.NewMemMapFs()
+	configRaw := []byte("telemetry:\n  enabled: true\n")
+	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
 	config.InitConfig(fs)
 
 	t.Run("telemetry command has subcommands", func(t *testing.T) {
