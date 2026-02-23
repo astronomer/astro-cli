@@ -266,6 +266,13 @@ func (rt PodmanRuntime) configureMachineForUsage(machine *types.InspectedMachine
 		return fmt.Errorf("error setting DOCKER_HOST: %s", err)
 	}
 
+	// Set CONTAINER_HOST for native Podman commands (e.g., podman build)
+	// This ensures podman commands also use the machine socket
+	err = os.Setenv("CONTAINER_HOST", dockerHost)
+	if err != nil {
+		return fmt.Errorf("error setting CONTAINER_HOST: %s", err)
+	}
+
 	// Set the podman default connection to our machine.
 	return rt.Engine.SetMachineAsDefault(machine.Name)
 }
