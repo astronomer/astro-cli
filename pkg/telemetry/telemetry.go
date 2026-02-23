@@ -157,13 +157,13 @@ func TrackCommand(cmd *cobra.Command) {
 		Event:       EventCommandExecution,
 		AnonymousID: GetAnonymousID(),
 		Properties: map[string]interface{}{
-			"command":     commandPath,
-			"cli_version": version.CurrVersion,
-			"os":          runtime.GOOS,
-			"os_version":  getOSVersion(),
-			"go_version":  runtime.Version(),
-			"context":     DetectContext(),
-			"platform":    runtime.GOARCH,
+			"command":      commandPath,
+			"cli_version":  version.CurrVersion,
+			"os":           runtime.GOOS,
+			"os_version":   getOSVersion(),
+			"go_version":   runtime.Version(),
+			"context":      DetectContext(),
+			"architecture": runtime.GOARCH,
 		},
 	}
 
