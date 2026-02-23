@@ -73,79 +73,54 @@ func TestIsEnabled(t *testing.T) {
 }
 
 func TestGetCommandPath(t *testing.T) {
+	rootCmd := &cobra.Command{Use: "astro"}
+	deployCmd := &cobra.Command{Use: "deploy"}
+	devCmd := &cobra.Command{Use: "dev"}
+	startCmd := &cobra.Command{Use: "start"}
+	workspaceCmd := &cobra.Command{Use: "workspace"}
+	userCmd := &cobra.Command{Use: "user"}
+	addCmd := &cobra.Command{Use: "add"}
+
+	rootCmd.AddCommand(deployCmd)
+	rootCmd.AddCommand(devCmd)
+	devCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(workspaceCmd)
+	workspaceCmd.AddCommand(userCmd)
+	userCmd.AddCommand(addCmd)
+
 	tests := []struct {
 		name     string
-		cmdPath  string
+		cmd      *cobra.Command
 		expected string
 	}{
 		{
 			name:     "simple command",
-			cmdPath:  "astro deploy",
+			cmd:      deployCmd,
 			expected: "deploy",
 		},
 		{
 			name:     "nested command",
-			cmdPath:  "astro dev start",
+			cmd:      startCmd,
 			expected: "dev start",
 		},
 		{
 			name:     "deeply nested command",
-			cmdPath:  "astro workspace user add",
+			cmd:      addCmd,
 			expected: "workspace user add",
 		},
 		{
 			name:     "root command only",
-			cmdPath:  "astro",
+			cmd:      rootCmd,
 			expected: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a mock command with the given path
-			cmd := &cobra.Command{Use: "test"}
-			// Override CommandPath for testing
-			cmd.SetUsageFunc(func(c *cobra.Command) error { return nil })
-
-			// Test the path extraction logic directly
-			result := extractCommandPath(tt.cmdPath)
+			result := GetCommandPath(tt.cmd)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
-}
-
-// extractCommandPath is a helper to test the path extraction logic
-func extractCommandPath(path string) string {
-	// This mirrors the logic in GetCommandPath
-	parts := splitCommandPath(path)
-	if len(parts) > 1 {
-		return parts[1]
-	}
-	return ""
-}
-
-func splitCommandPath(path string) []string {
-	var parts []string
-	start := 0
-	for i := 0; i < len(path); i++ {
-		if path[i] == ' ' {
-			if start < i {
-				parts = append(parts, path[start:i])
-			}
-			start = i + 1
-			// Return after first split to get "astro" and rest
-			if len(parts) == 1 {
-				if start < len(path) {
-					parts = append(parts, path[start:])
-				}
-				return parts
-			}
-		}
-	}
-	if start < len(path) {
-		parts = append(parts, path[start:])
-	}
-	return parts
 }
 
 func TestDetectContext(t *testing.T) {
