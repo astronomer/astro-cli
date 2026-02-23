@@ -163,7 +163,6 @@ func TrackCommand(cmd *cobra.Command) {
 			"os_version":  getOSVersion(),
 			"go_version":  runtime.Version(),
 			"context":     DetectContext(),
-			"cli_name":    "astro-cli",
 			"platform":    runtime.GOARCH,
 		},
 	}
