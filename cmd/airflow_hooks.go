@@ -13,12 +13,24 @@ import (
 
 const failedToCreatePluginsDir = "failed to create plugins directory: %w"
 
+// noOpContainerRuntime is a ContainerRuntime that does nothing.
+// It is used in standalone mode so that downstream hooks can call
+// containerRuntime methods without nil-pointer guards.
+type noOpContainerRuntime struct{}
+
+func (n noOpContainerRuntime) Initialize() error    { return nil }
+func (n noOpContainerRuntime) Configure() error     { return nil }
+func (n noOpContainerRuntime) ConfigureOrKill() error { return nil }
+func (n noOpContainerRuntime) Kill() error          { return nil }
+
 // ConfigureContainerRuntime sets up the containerRuntime variable and is defined
 // as a PersistentPreRunE hook for all astro dev sub-commands. The containerRuntime
 // variable is then used in the following pre-run and post-run hooks defined here.
-// In standalone mode, no Docker runtime is needed, so this is a no-op.
+// In standalone mode a no-op runtime is assigned so that downstream hooks never
+// encounter a nil containerRuntime.
 func ConfigureContainerRuntime(_ *cobra.Command, _ []string) error {
 	if isStandaloneMode() {
+		containerRuntime = noOpContainerRuntime{}
 		return nil
 	}
 	var err error
@@ -30,15 +42,10 @@ func ConfigureContainerRuntime(_ *cobra.Command, _ []string) error {
 }
 
 // EnsureRuntime is a pre-run hook that ensures that the project directory exists
-// and starts the container runtime if necessary. In standalone mode, only the
-// project directory check is performed.
+// and starts the container runtime if necessary.
 func EnsureRuntime(cmd *cobra.Command, args []string) error {
 	if err := utils.EnsureProjectDir(cmd, args); err != nil {
 		return err
-	}
-
-	if isStandaloneMode() {
-		return nil
 	}
 
 	// Check if the OS is Windows and create the plugins project directory if it doesn't exist.
@@ -53,41 +60,30 @@ func EnsureRuntime(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize the runtime if it's not running.
+	// In standalone mode this is a no-op via noOpContainerRuntime.
 	return containerRuntime.Initialize()
 }
 
 // SetRuntimeIfExists is a pre-run hook that ensures the project directory exists
 // and sets the container runtime if its running, otherwise we bail with an error message.
-// In standalone mode, only the project directory check is performed.
 func SetRuntimeIfExists(cmd *cobra.Command, args []string) error {
 	if err := utils.EnsureProjectDir(cmd, args); err != nil {
 		return err
-	}
-	if isStandaloneMode() {
-		return nil
 	}
 	return containerRuntime.Configure()
 }
 
 // KillPreRunHook sets the container runtime if its running,
 // otherwise we bail with an error message.
-// In standalone mode, only the project directory check is performed.
 func KillPreRunHook(cmd *cobra.Command, args []string) error {
 	if err := utils.EnsureProjectDir(cmd, args); err != nil {
 		return err
-	}
-	if isStandaloneMode() {
-		return nil
 	}
 	return containerRuntime.ConfigureOrKill()
 }
 
 // KillPostRunHook ensures that we stop and kill the
 // podman machine once a project has been killed.
-// In standalone mode, this is a no-op.
 func KillPostRunHook(_ *cobra.Command, _ []string) error {
-	if isStandaloneMode() {
-		return nil
-	}
 	return containerRuntime.Kill()
 }
