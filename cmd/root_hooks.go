@@ -28,6 +28,10 @@ func SetupLogging(_ *cobra.Command, _ []string) error {
 // pre-run hook that sets up the context and checks for the latest version.
 func CreateRootPersistentPreRunE(astroCoreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		if isShellCompletion() {
+			return nil
+		}
+
 		// Check for latest version
 		if config.CFG.UpgradeMessage.GetBool() {
 			// create github client with 3 second timeout, setting an aggressive timeout since its not mandatory to get a response in each command execution
@@ -39,6 +43,9 @@ func CreateRootPersistentPreRunE(astroCoreClient astrocore.CoreClient, platformC
 			}
 		}
 		if context.IsCloudContext() {
+			if isNexusCommand(cmd) {
+				return nil
+			}
 			err := cloudCmd.Setup(cmd, platformCoreClient, astroCoreClient)
 			if err != nil {
 				if strings.Contains(err.Error(), "token is invalid or malformed") {
@@ -53,4 +60,18 @@ func CreateRootPersistentPreRunE(astroCoreClient astrocore.CoreClient, platformC
 		softwareCmd.PrintDebugLogs()
 		return nil
 	}
+}
+
+func isShellCompletion() bool {
+	return len(os.Args) >= 2 &&
+		(os.Args[1] == "__complete" || os.Args[1] == "__completeNoDesc")
+}
+
+func isNexusCommand(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.Use == "nexus" {
+			return true
+		}
+	}
+	return false
 }
