@@ -239,21 +239,15 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 
 	spinner.StopWithCheckmark(sp, "Environment ready")
 
-	// 7. Apply settings
-	err = s.applySettings(settingsFile, envConns)
-	if err != nil {
-		fmt.Printf("Warning: could not apply airflow settings: %s\n", err.Error())
-	}
-
-	// 8. Seed credentials file (admin:admin) if this is a fresh environment
+	// 7. Seed credentials file (admin:admin) if this is a fresh environment
 	if err = s.ensureCredentials(); err != nil {
 		fmt.Printf("Warning: could not seed credentials file: %s\n", err.Error())
 	}
 
-	// 9. Build environment
+	// 8. Build environment
 	env := s.buildEnv()
 
-	// 10. Start airflow standalone
+	// 9. Start airflow standalone
 	fmt.Println("\nStarting Airflow in standalone mode…")
 
 	venvBin := filepath.Join(s.airflowHome, ".venv", "bin")
@@ -267,13 +261,13 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	if s.foreground {
-		return s.startForeground(cmd, waitTime)
+		return s.startForeground(cmd, waitTime, settingsFile, envConns)
 	}
-	return s.startBackground(cmd, waitTime)
+	return s.startBackground(cmd, waitTime, settingsFile, envConns)
 }
 
 // startForeground runs the airflow process in the foreground, streaming output to the terminal.
-func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) error {
+func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("error creating stdout pipe: %w", err)
@@ -325,6 +319,10 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) erro
 			fmt.Fprintf(os.Stderr, "\n%s\n", err.Error())
 			return
 		}
+		// Apply settings now that Airflow is running and the DB is initialized
+		if err := s.applySettings(settingsFile, envConns); err != nil {
+			fmt.Printf("Warning: could not apply airflow settings: %s\n", err.Error())
+		}
 		bullet := ansi.Cyan("\u27A4") + " "
 		uiURL := "http://localhost:" + s.webserverPort()
 		fmt.Println("\n" + ansi.Green("\u2714") + " Airflow is ready!")
@@ -356,7 +354,7 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) erro
 
 // startBackground runs the airflow process in the background, writes a PID file,
 // runs the health check, and returns.
-func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration) error {
+func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
 	logPath := s.logFilePath()
 	logFile, err := os.Create(logPath)
 	if err != nil {
@@ -384,6 +382,11 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration) erro
 	err = checkWebserverHealth(healthURL, waitTime, healthComp)
 	if err != nil {
 		return fmt.Errorf("airflow did not become healthy: %w", err)
+	}
+
+	// Apply settings now that Airflow is running and the DB is initialized
+	if err := s.applySettings(settingsFile, envConns); err != nil {
+		fmt.Printf("Warning: could not apply airflow settings: %s\n", err.Error())
 	}
 
 	bullet := ansi.Cyan("\u27A4") + " "
