@@ -191,7 +191,7 @@ func (s *AirflowSuite) TestNewAirflowRestartCmd() {
 	s.NotNil(killFlag)
 	s.Equal("k", killFlag.Shorthand)
 	s.Equal("false", killFlag.DefValue)
-	s.Contains(killFlag.Usage, "Kill all running containers")
+	s.Contains(killFlag.Usage, "Remove all data before restarting")
 }
 
 func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
