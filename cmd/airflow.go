@@ -134,10 +134,10 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	TemplateList                = airflow.FetchTemplateList
 	defaultWaitTime             = 1 * time.Minute
 	directoryPermissions uint32 = 0o755
-	localForeground  bool
-	localPort        string
-	standaloneFlag   bool
-	dockerFlag       bool
+	localForeground      bool
+	localPort            string
+	standaloneFlag       bool
+	dockerFlag           bool
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {

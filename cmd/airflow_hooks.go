@@ -18,10 +18,10 @@ const failedToCreatePluginsDir = "failed to create plugins directory: %w"
 // containerRuntime methods without nil-pointer guards.
 type noOpContainerRuntime struct{}
 
-func (n noOpContainerRuntime) Initialize() error    { return nil }
-func (n noOpContainerRuntime) Configure() error     { return nil }
+func (n noOpContainerRuntime) Initialize() error      { return nil }
+func (n noOpContainerRuntime) Configure() error       { return nil }
 func (n noOpContainerRuntime) ConfigureOrKill() error { return nil }
-func (n noOpContainerRuntime) Kill() error          { return nil }
+func (n noOpContainerRuntime) Kill() error            { return nil }
 
 // ConfigureContainerRuntime sets up the containerRuntime variable and is defined
 // as a PersistentPreRunE hook for all astro dev sub-commands. The containerRuntime
