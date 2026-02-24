@@ -43,8 +43,6 @@ const (
 	dirPermissions          = os.FileMode(0o755)
 	standaloneAdminUser     = "admin"
 	standaloneAdminPassword = "admin"
-	// standalonePasswordsFile lives inside standaloneDir (.astro/standalone/) so it stays
-	// out of the project root and is cleaned up automatically by Kill/reset.
 	standalonePasswordsFile = "simple_auth_manager_passwords.json.generated" //nolint:gosec
 )
 
@@ -142,19 +140,14 @@ func (s *Standalone) webserverPort() string {
 	return defaultStandalonePort
 }
 
-// pidFilePath returns the full path to the PID file.
 func (s *Standalone) pidFilePath() string {
 	return filepath.Join(s.airflowHome, standaloneDir, standalonePIDFile)
 }
 
-// logFilePath returns the full path to the log file.
 func (s *Standalone) logFilePath() string {
 	return filepath.Join(s.airflowHome, standaloneDir, standaloneLogFile)
 }
 
-// passwordsFilePath returns the full path to the SimpleAuthManager passwords file.
-// Keeping it inside standaloneDir means it stays out of the project root and is
-// cleaned up automatically by Kill/reset along with other standalone state.
 func (s *Standalone) passwordsFilePath() string {
 	return filepath.Join(s.airflowHome, standaloneDir, standalonePasswordsFile)
 }
@@ -173,11 +166,6 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 		return errors.New("could not determine runtime version from Dockerfile")
 	}
 
-	// Parse base tag and any explicit Python version from the Dockerfile image tag,
-	// then resolve the Python version using the 3-tier strategy:
-	//   1. Explicit -python-X.Y suffix in the tag
-	//   2. defaultPythonVersion from runtime versions JSON
-	//   3. Hardcoded fallback (3.12)
 	baseTag, tagPython := parseRuntimeTagPython(tag)
 
 	// 2. Validate Airflow version (AF3 only)
@@ -286,7 +274,6 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 
 // startForeground runs the airflow process in the foreground, streaming output to the terminal.
 func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) error {
-	// Set up pipes for stdout/stderr so we can stream output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("error creating stdout pipe: %w", err)
@@ -308,13 +295,11 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) erro
 	go func() {
 		<-sigChan
 		if cmd.Process != nil {
-			// Send SIGTERM to the entire process group (-pid).
 			syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck
 		}
 	}()
 	defer signal.Stop(sigChan)
 
-	// Stream output in background goroutines
 	var wg sync.WaitGroup
 	wg.Add(2) //nolint:mnd
 	go func() {
@@ -351,7 +336,6 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) erro
 		fmt.Println()
 	}()
 
-	// Wait for the process to complete
 	wg.Wait()
 	err = cmd.Wait()
 	if err != nil {
@@ -373,7 +357,6 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) erro
 // startBackground runs the airflow process in the background, writes a PID file,
 // runs the health check, and returns.
 func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration) error {
-	// Open log file for writing
 	logPath := s.logFilePath()
 	logFile, err := os.Create(logPath)
 	if err != nil {
@@ -389,7 +372,6 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration) erro
 		return fmt.Errorf("error starting airflow standalone: %w", err)
 	}
 
-	// Write PID file
 	err = os.WriteFile(s.pidFilePath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), filePermissions)
 	if err != nil {
 		// Kill the process if we can't write the PID file
@@ -423,16 +405,13 @@ func (s *Standalone) healthEndpoint() (url, component string) {
 	return "http://localhost:" + s.webserverPort() + "/api/v2/monitor/health", "api-server"
 }
 
-// ensureCredentials seeds the SimpleAuthManager passwords file with admin:admin
-// if it doesn't already exist. Airflow's init() uses "a+" mode, so if the entry
-// is already present it won't be overwritten — existing passwords survive a restart,
-// but a fresh environment always gets the predictable admin/admin default.
+// ensureCredentials seeds the passwords file with admin:admin on first run.
+// If the file already exists it is left untouched, preserving custom credentials.
 func (s *Standalone) ensureCredentials() error {
 	path := s.passwordsFilePath()
 	if _, err := os.Stat(path); err == nil {
-		return nil // already exists, leave it alone
+		return nil
 	}
-	// Ensure .astro/standalone/ exists before writing into it
 	if err := os.MkdirAll(filepath.Dir(path), dirPermissions); err != nil {
 		return err
 	}
@@ -485,7 +464,6 @@ func (s *Standalone) getConstraints(tag, pythonVersion string) (freezePath, airf
 		}
 	}
 
-	// Create directory
 	err = os.MkdirAll(constraintsDir, dirPermissions)
 	if err != nil {
 		return "", "", "", fmt.Errorf("error creating standalone directory: %w", err)
@@ -608,7 +586,6 @@ func (s *Standalone) buildEnv() []string {
 		env = append(env, kv)
 	}
 
-	// Append our overrides.
 	for k, v := range overrides {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -669,9 +646,7 @@ func (s *Standalone) applySettings(settingsFile string, envConns map[string]astr
 func (s *Standalone) standaloneExecAirflowCommand(_, command string) (string, error) {
 	env := s.buildEnv()
 
-	// Use the system bash (not venv — Python venvs don't include bash).
-	// The venv's bin/ is already prepended to PATH in env, so `airflow`
-	// and other venv binaries are found automatically.
+	// Use system bash — Python venvs don't include bash; venv bin/ is on PATH.
 	cmd := exec.Command("bash", "-c", command) //nolint:gosec
 	cmd.Dir = s.airflowHome
 	cmd.Env = env
@@ -696,7 +671,6 @@ func (s *Standalone) readPID() (int, bool) {
 		return 0, false
 	}
 
-	// Check if process is alive
 	proc, err := osFindProcess(pid)
 	if err != nil {
 		return pid, false
@@ -723,7 +697,6 @@ func (s *Standalone) Stop(_ bool) error {
 		return nil
 	}
 
-	// Send SIGTERM to the process group
 	fmt.Printf("Stopping Airflow standalone (PID %d)…\n", pid)
 	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck
 
@@ -749,17 +722,12 @@ func (s *Standalone) Stop(_ bool) error {
 
 // Kill stops a running process (if any) and cleans up standalone state files.
 func (s *Standalone) Kill() error {
-	// Stop the running process first
 	s.Stop(false) //nolint:errcheck
 
 	sp := spinner.NewSpinner("Cleaning up standalone environment…")
 	sp.Start()
 	defer sp.Stop()
 
-	// Remove venv and the entire standaloneDir (.astro/standalone/).
-	// Since AIRFLOW_HOME points at standaloneDir, all Airflow-generated files
-	// (airflow.cfg, airflow.db, logs/, passwords file, constraint caches) live
-	// there and are cleaned up in one shot.
 	pathsToRemove := []string{
 		filepath.Join(s.airflowHome, ".venv"),
 		filepath.Join(s.airflowHome, standaloneDir),
@@ -774,8 +742,6 @@ func (s *Standalone) Kill() error {
 	spinner.StopWithCheckmark(sp, "Standalone environment cleaned up")
 	return nil
 }
-
-// Stub methods — not supported in standalone mode.
 
 // PS reports the status of the standalone Airflow process.
 func (s *Standalone) PS() error {
