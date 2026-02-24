@@ -28,11 +28,11 @@ type RuntimeVersion struct {
 }
 
 type RuntimeVersionMetadata struct {
-	AirflowVersion      string   `json:"airflowVersion"`
-	Channel             string   `json:"channel"`
-	ReleaseDate         string   `json:"releaseDate"`
-	PythonVersions      []string `json:"pythonVersions,omitempty"`
-	DefaultPythonVersion string  `json:"defaultPythonVersion,omitempty"`
+	AirflowVersion       string   `json:"airflowVersion"`
+	Channel              string   `json:"channel"`
+	ReleaseDate          string   `json:"releaseDate"`
+	PythonVersions       []string `json:"pythonVersions,omitempty"`
+	DefaultPythonVersion string   `json:"defaultPythonVersion,omitempty"`
 }
 
 type RuntimeVersionMigrations struct {
