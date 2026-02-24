@@ -181,11 +181,19 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	if err != nil {
 		return "", err
 	}
+	// Bind-mount host directories into the pytest container, matching
+	// the mounts that astro dev start provides via docker-compose.
+	// This ensures tests/, plugins/, include/, and dags/ are all
+	// available without needing COPY in the Dockerfile.
 	args := []string{
 		"create",
 		"-i",
 		"--name",
 		"astro-pytest",
+		"-v", airflowHome + "/dags:/usr/local/airflow/dags:z",
+		"-v", airflowHome + "/tests:/usr/local/airflow/tests:z",
+		"-v", airflowHome + "/plugins:/usr/local/airflow/plugins:z",
+		"-v", airflowHome + "/include:/usr/local/airflow/include:z",
 	}
 	fileExist, err := util.Exists(airflowHome + "/" + envFile)
 	if err != nil {
@@ -212,17 +220,6 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		return "", err
 	}
 
-	// cp DAGs folder
-	args = []string{
-		"cp",
-		airflowHome + "/dags",
-		"astro-pytest:/usr/local/airflow/",
-	}
-	docErr := cmdExec(containerRuntime, stdout, stderr, args...)
-	if docErr != nil {
-		return "", docErr
-	}
-
 	// cp .astro folder
 	// on some machine .astro is being docker ignored, but not
 	// on every machine, hence to keep behavior consistent
@@ -232,7 +229,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		airflowHome + "/.astro",
 		"astro-pytest:/usr/local/airflow/",
 	}
-	docErr = cmdExec(containerRuntime, stdout, stderr, args...)
+	docErr := cmdExec(containerRuntime, stdout, stderr, args...)
 	if docErr != nil {
 		return "", docErr
 	}
@@ -261,12 +258,6 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		if docErr != nil {
 			logger.Debugf("Error copying dag-test-report.html file from the pytest container: %s", docErr.Error())
 		}
-	}
-
-	// Persist the include folder from the Docker container to local include folder
-	docErr = cmdExec(containerRuntime, nil, stderr, "cp", "astro-pytest:/usr/local/airflow/include/", ".")
-	if docErr != nil {
-		logger.Debugf("Error copying include folder from the pytest container: %s", docErr.Error())
 	}
 
 	// delete container
