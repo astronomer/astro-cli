@@ -263,3 +263,23 @@ func getAstronomerCertifiedTag(availableReleases []AirflowVersionRaw, airflowVer
 	// case when airflowVersion requested is not present in certified astronomer endpoint, but is valid version as per Houston configuration
 	return airflowVersion, nil
 }
+
+// GetDefaultPythonVersion fetches the runtime versions JSON and returns the
+// defaultPythonVersion for the given runtime version. Returns an empty string
+// if the version is not found or the field is not yet populated.
+func GetDefaultPythonVersion(runtimeVersion string) string {
+	r := Request{}
+	resp, err := r.Do()
+	if err != nil {
+		logger.Debugf("Failed to fetch runtime versions for Python version lookup: %v", err)
+		return ""
+	}
+
+	if rv, ok := resp.RuntimeVersionsV3[runtimeVersion]; ok {
+		if rv.Metadata.DefaultPythonVersion != "" {
+			return rv.Metadata.DefaultPythonVersion
+		}
+	}
+
+	return ""
+}

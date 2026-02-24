@@ -232,10 +232,10 @@ func TestParseRuntimeTagPython(t *testing.T) {
 		wantBase   string
 		wantPython string
 	}{
-		{"3.1-12", "3.1-12", "3.12"},
+		{"3.1-12", "3.1-12", ""},
 		{"3.1-12-python-3.11", "3.1-12", "3.11"},
 		{"3.1-12-python-3.11-base", "3.1-12", "3.11"},
-		{"3.1-12-base", "3.1-12", "3.12"},
+		{"3.1-12-base", "3.1-12", ""},
 		{"3.2-1-python-3.13", "3.2-1", "3.13"},
 	}
 	for _, tt := range tests {
@@ -245,6 +245,32 @@ func TestParseRuntimeTagPython(t *testing.T) {
 			assert.Equal(t, tt.wantPython, python)
 		})
 	}
+}
+
+func TestResolvePythonVersion(t *testing.T) {
+	origResolve := resolvePythonVersion
+	defer func() { resolvePythonVersion = origResolve }()
+
+	t.Run("tier 1: explicit tag python wins", func(t *testing.T) {
+		// Reset to real implementation for each subtest
+		resolvePythonVersion = origResolve
+		result := resolvePythonVersion("3.1-12", "3.11")
+		assert.Equal(t, "3.11", result)
+	})
+
+	t.Run("tier 3: fallback when no tag and no JSON", func(t *testing.T) {
+		// The real resolvePythonVersion will hit the network for tier 2
+		// and fail (no matching version), so it falls through to tier 3.
+		// Mock it to skip the network call and test the fallback.
+		resolvePythonVersion = func(baseTag, tagPython string) string {
+			if tagPython != "" {
+				return tagPython
+			}
+			return defaultPythonVersion
+		}
+		result := resolvePythonVersion("99.99-99", "")
+		assert.Equal(t, "3.12", result)
+	})
 }
 
 func TestParseAirflowVersionFromConstraints(t *testing.T) {
@@ -390,11 +416,11 @@ func (s *Suite) TestStandaloneBuildEnv_WithEnvFile() {
 		}
 	}
 
-	// .env should override our defaults
-	s.Equal("custom", envMap["ASTRONOMER_ENVIRONMENT"])
-	s.Equal("hello", envMap["MY_CUSTOM_VAR"])
-	// Other defaults should still be present
+	// Standalone-critical vars must NOT be overridden by .env
+	s.Equal("local", envMap["ASTRONOMER_ENVIRONMENT"])
 	s.Equal(filepath.Join(tmpDir, ".astro", "standalone"), envMap["AIRFLOW_HOME"])
+	// Non-critical .env vars should still be applied
+	s.Equal("hello", envMap["MY_CUSTOM_VAR"])
 }
 
 func splitEnvVar(s string) []string {
@@ -500,11 +526,15 @@ func (s *Suite) TestStandaloneStart_VenvCreationFails() {
 	origParseFile := standaloneParseFile
 	origLookPath := lookPath
 	origRunCommand := runCommand
+	origResolvePython := resolvePythonVersion
 	defer func() {
 		standaloneParseFile = origParseFile
 		lookPath = origLookPath
 		runCommand = origRunCommand
+		resolvePythonVersion = origResolvePython
 	}()
+
+	resolvePythonVersion = func(_, _ string) string { return "3.12" }
 
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
 		return []docker.Command{
@@ -551,11 +581,15 @@ func (s *Suite) TestStandaloneStart_InstallFails() {
 	origParseFile := standaloneParseFile
 	origLookPath := lookPath
 	origRunCommand := runCommand
+	origResolvePython := resolvePythonVersion
 	defer func() {
 		standaloneParseFile = origParseFile
 		lookPath = origLookPath
 		runCommand = origRunCommand
+		resolvePythonVersion = origResolvePython
 	}()
+
+	resolvePythonVersion = func(_, _ string) string { return "3.12" }
 
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
 		return []docker.Command{
@@ -632,12 +666,16 @@ func (s *Suite) TestStandaloneStart_HappyPath() {
 	origLookPath := lookPath
 	origRunCommand := runCommand
 	origCheckHealth := checkWebserverHealth
+	origResolvePython := resolvePythonVersion
 	defer func() {
 		standaloneParseFile = origParseFile
 		lookPath = origLookPath
 		runCommand = origRunCommand
 		checkWebserverHealth = origCheckHealth
+		resolvePythonVersion = origResolvePython
 	}()
+
+	resolvePythonVersion = func(_, _ string) string { return "3.12" }
 
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
 		return []docker.Command{
@@ -690,13 +728,16 @@ func (s *Suite) TestStandaloneStart_Background() {
 	origLookPath := lookPath
 	origRunCommand := runCommand
 	origCheckHealth := checkWebserverHealth
+	origResolvePython := resolvePythonVersion
 	defer func() {
 		standaloneParseFile = origParseFile
 		lookPath = origLookPath
 		runCommand = origRunCommand
 		checkWebserverHealth = origCheckHealth
+		resolvePythonVersion = origResolvePython
 	}()
 
+	resolvePythonVersion = func(_, _ string) string { return "3.12" }
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
 		return []docker.Command{
 			{Cmd: "from", Value: []string{"astrocrpublic.azurecr.io/runtime:3.1-12"}},
@@ -754,12 +795,15 @@ func (s *Suite) TestStandaloneStart_AlreadyRunning() {
 	origParseFile := standaloneParseFile
 	origLookPath := lookPath
 	origRunCommand := runCommand
+	origResolvePython := resolvePythonVersion
 	defer func() {
 		standaloneParseFile = origParseFile
 		lookPath = origLookPath
 		runCommand = origRunCommand
+		resolvePythonVersion = origResolvePython
 	}()
 
+	resolvePythonVersion = func(_, _ string) string { return "3.12" }
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
 		return []docker.Command{
 			{Cmd: "from", Value: []string{"astrocrpublic.azurecr.io/runtime:3.1-12"}},

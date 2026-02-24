@@ -66,17 +66,37 @@ var (
 var runtimePythonRe = regexp.MustCompile(`-python-(\d+\.\d+)(-base)?$`)
 
 // parseRuntimeTagPython extracts the base runtime tag and the Python version from a
-// full image tag. Tags may look like:
+// full image tag. Returns an empty pythonVersion when the tag has no explicit
+// `-python-X.Y` suffix so the caller can fall back to other sources.
 //
-//	"3.1-12"                    → base="3.1-12", python="3.12" (default)
+//	"3.1-12"                    → base="3.1-12", python=""
 //	"3.1-12-python-3.11"       → base="3.1-12", python="3.11"
 //	"3.1-12-python-3.11-base"  → base="3.1-12", python="3.11"
 func parseRuntimeTagPython(tag string) (baseTag, pythonVersion string) {
 	loc := runtimePythonRe.FindStringSubmatchIndex(tag)
 	if loc == nil {
-		return strings.TrimSuffix(tag, "-base"), defaultPythonVersion
+		return strings.TrimSuffix(tag, "-base"), ""
 	}
 	return tag[:loc[0]], tag[loc[2]:loc[3]]
+}
+
+// resolvePythonVersion determines the Python version using a 3-tier strategy:
+//  1. Explicit version from the Dockerfile image tag (-python-X.Y suffix)
+//  2. defaultPythonVersion from the runtime versions JSON (updates.astronomer.io)
+//  3. Hardcoded fallback (3.12)
+var resolvePythonVersion = func(baseTag, tagPython string) string {
+	// Tier 1: Dockerfile image tag had an explicit -python-X.Y suffix
+	if tagPython != "" {
+		return tagPython
+	}
+
+	// Tier 2: Fetch from runtime versions JSON
+	if v := airflowversions.GetDefaultPythonVersion(baseTag); v != "" {
+		return v
+	}
+
+	// Tier 3: Hardcoded fallback
+	return defaultPythonVersion
 }
 
 // Standalone implements ContainerHandler using `airflow standalone` instead of Docker Compose.
@@ -132,13 +152,19 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 		return errors.New("could not determine runtime version from Dockerfile")
 	}
 
-	// Parse Python version from tag (e.g. "3.1-12-python-3.11" → base="3.1-12", python="3.11")
-	baseTag, pythonVersion := parseRuntimeTagPython(tag)
+	// Parse base tag and any explicit Python version from the Dockerfile image tag,
+	// then resolve the Python version using the 3-tier strategy:
+	//   1. Explicit -python-X.Y suffix in the tag
+	//   2. defaultPythonVersion from runtime versions JSON
+	//   3. Hardcoded fallback (3.12)
+	baseTag, tagPython := parseRuntimeTagPython(tag)
 
 	// 2. Validate Airflow version (AF3 only)
 	if airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag) != "3" {
 		return errUnsupportedAirflowVersion
 	}
+
+	pythonVersion := resolvePythonVersion(baseTag, tagPython)
 
 	// 3. Check uv is on PATH
 	_, err = lookPath("uv")
@@ -523,18 +549,9 @@ func (s *Standalone) buildEnv() []string {
 	// DAGS_FOLDER is pinned back to the project root so DAGs are still discovered.
 	standaloneHome := filepath.Join(s.airflowHome, standaloneDir)
 
-	// Build our override map — these take precedence over the inherited env.
-	overrides := map[string]string{
-		"PATH":                                     fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH")),
-		"AIRFLOW_HOME":                             standaloneHome,
-		"ASTRONOMER_ENVIRONMENT":                   "local",
-		"AIRFLOW__CORE__LOAD_EXAMPLES":             "False",
-		"AIRFLOW__CORE__DAGS_FOLDER":               filepath.Join(s.airflowHome, "dags"),
-		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS": standaloneAdminUser + ":admin",
-		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE": s.passwordsFilePath(),
-	}
-
-	// Load .env file if it exists — these also override inherited env.
+	// Layer 1: Load .env file if it exists — user-specified env vars that
+	// override inherited env but NOT standalone-critical settings.
+	overrides := map[string]string{}
 	envFilePath := s.envFile
 	if envFilePath == "" {
 		envFilePath = filepath.Join(s.airflowHome, ".env")
@@ -546,6 +563,16 @@ func (s *Standalone) buildEnv() []string {
 			}
 		}
 	}
+
+	// Layer 2: Standalone-critical settings — these MUST take precedence over
+	// both inherited env and .env to prevent standalone mode from breaking.
+	overrides["PATH"] = fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH"))
+	overrides["AIRFLOW_HOME"] = standaloneHome
+	overrides["ASTRONOMER_ENVIRONMENT"] = "local"
+	overrides["AIRFLOW__CORE__LOAD_EXAMPLES"] = "False"
+	overrides["AIRFLOW__CORE__DAGS_FOLDER"] = filepath.Join(s.airflowHome, "dags")
+	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS"] = standaloneAdminUser + ":admin"
+	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE"] = s.passwordsFilePath()
 
 	// Start with inherited env, filtering out keys we override.
 	env := make([]string, 0, len(os.Environ())+len(overrides))
@@ -605,9 +632,11 @@ func (s *Standalone) applySettings(settingsFile string, envConns map[string]astr
 // standaloneExecAirflowCommand runs an airflow command via the local venv.
 func (s *Standalone) standaloneExecAirflowCommand(_, command string) (string, error) {
 	env := s.buildEnv()
-	venvBash := filepath.Join(s.airflowHome, ".venv", "bin", "bash")
 
-	cmd := exec.Command(venvBash, "-c", command) //nolint:gosec
+	// Use the system bash (not venv — Python venvs don't include bash).
+	// The venv's bin/ is already prepended to PATH in env, so `airflow`
+	// and other venv binaries are found automatically.
+	cmd := exec.Command("bash", "-c", command) //nolint:gosec
 	cmd.Dir = s.airflowHome
 	cmd.Env = env
 
