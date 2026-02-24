@@ -15,8 +15,11 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
+	nexuscmds "github.com/astronomer/astro-cli/internal/nexus"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+
+	nexusapp "github.com/astronomer/nexus/app"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -97,6 +100,11 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	rootCmd.AddCommand( // include all the commands for interacting with the registry
 		registry.AddCmds(os.Stdout)...,
 	)
+
+	nexusCtx, nexusErr := nexusapp.NewContext()
+	if nexusErr == nil {
+		nexuscmds.RegisterCommands(rootCmd, nexusCtx)
+	}
 
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
