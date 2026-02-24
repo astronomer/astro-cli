@@ -90,6 +90,7 @@ var (
 		RemoteClientRegistry:    newCfg("remote.client_registry", ""),
 		RemoteBaseImageRegistry: newCfg("remote.base_image_registry", "images.astronomer.cloud"),
 		DeployGitMetadata:       newCfg("deploy.git_metadata", "true"),
+		DevMode:                 newCfg("dev.mode", "docker"),
 	}
 
 	// viperHome is the viper object in the users home directory

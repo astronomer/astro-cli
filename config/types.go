@@ -56,6 +56,7 @@ type cfgs struct {
 	RemoteClientRegistry    cfg
 	RemoteBaseImageRegistry cfg
 	DeployGitMetadata       cfg
+	DevMode                 cfg
 }
 
 // Creates a new cfg struct

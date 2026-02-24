@@ -184,7 +184,7 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 	// 3b. In background mode, bail early if already running (before any install work)
 	if !s.foreground {
 		if pid, alive := s.readPID(); alive {
-			return fmt.Errorf("standalone Airflow is already running (PID %d). Run 'astro dev local stop' first", pid)
+			return fmt.Errorf("standalone Airflow is already running (PID %d). Run 'astro dev stop' first", pid)
 		}
 	}
 
@@ -397,8 +397,8 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 		fmt.Printf("%sUsername:   %s\n", bullet, ansi.Bold(user))
 		fmt.Printf("%sPassword:   %s\n", bullet, ansi.Bold(pass))
 	}
-	fmt.Printf("%sView logs: %s\n", bullet, ansi.Bold("astro dev local logs -f"))
-	fmt.Printf("%sStop:      %s\n", bullet, ansi.Bold("astro dev local stop"))
+	fmt.Printf("%sView logs: %s\n", bullet, ansi.Bold("astro dev logs -f"))
+	fmt.Printf("%sStop:      %s\n", bullet, ansi.Bold("astro dev stop"))
 
 	return nil
 }
