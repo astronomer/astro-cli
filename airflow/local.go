@@ -134,7 +134,7 @@ func (s *Standalone) webserverPort() string {
 	if s.port != "" {
 		return s.port
 	}
-	if p := config.CFG.APIServerPort.GetString(); p != "" {
+	if p := config.CFG.APIServerPort.GetString(); p != "" && p != "0" {
 		return p
 	}
 	return defaultStandalonePort
