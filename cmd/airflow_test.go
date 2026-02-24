@@ -1748,6 +1748,10 @@ func (s *AirflowSuite) TestAirflowLocal() {
 		logsCmd, _, err := cmd.Find([]string{"logs"})
 		s.NoError(err)
 		s.Equal("logs", logsCmd.Use)
+
+		psCmd, _, err := cmd.Find([]string{"ps"})
+		s.NoError(err)
+		s.Equal("ps", psCmd.Use)
 	})
 }
 
@@ -1828,6 +1832,33 @@ func (s *AirflowSuite) TestAirflowLocalLogs() {
 		}
 
 		err := airflowLocalLogs(cmd, nil)
+		s.ErrorIs(err, errMock)
+	})
+}
+
+func (s *AirflowSuite) TestAirflowLocalPS() {
+	s.Run("success", func() {
+		cmd := newAirflowLocalCmd(nil)
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		localHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("PS").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowLocalPS(cmd, nil)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("handler init error", func() {
+		cmd := newAirflowLocalCmd(nil)
+
+		localHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowLocalPS(cmd, nil)
 		s.ErrorIs(err, errMock)
 	})
 }

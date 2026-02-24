@@ -351,6 +351,53 @@ func TestLoadEnvFile_ValueWithEquals(t *testing.T) {
 	assert.Equal(t, "DB_URL=postgres://user:pass@host:5432/db?sslmode=require", envVars[0])
 }
 
+func TestLoadEnvFile_QuotedValues(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "envfile-quotes-test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	envFilePath := filepath.Join(tmpDir, ".env")
+	content := `DOUBLE="hello world"
+SINGLE='hello world'
+UNQUOTED=hello world
+MISMATCH="hello'
+EMPTY_DOUBLE=""
+EMPTY_SINGLE=''`
+	err = os.WriteFile(envFilePath, []byte(content), 0o644)
+	require.NoError(t, err)
+
+	envVars, err := loadEnvFile(envFilePath)
+	assert.NoError(t, err)
+	assert.Contains(t, envVars, "DOUBLE=hello world")
+	assert.Contains(t, envVars, "SINGLE=hello world")
+	assert.Contains(t, envVars, "UNQUOTED=hello world")
+	assert.Contains(t, envVars, `MISMATCH="hello'`)
+	assert.Contains(t, envVars, "EMPTY_DOUBLE=")
+	assert.Contains(t, envVars, "EMPTY_SINGLE=")
+}
+
+func TestStripQuotes(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`"hello"`, "hello"},
+		{`'hello'`, "hello"},
+		{`hello`, "hello"},
+		{`"hello'`, `"hello'`},
+		{`'hello"`, `'hello"`},
+		{`""`, ""},
+		{`''`, ""},
+		{`"`, `"`},
+		{``, ``},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.expected, stripQuotes(tt.input))
+		})
+	}
+}
+
 func (s *Suite) TestStandaloneBuildEnv() {
 	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
 	s.NoError(err)
@@ -924,6 +971,41 @@ func (s *Suite) TestStandaloneSetForeground() {
 	s.False(handler.foreground)
 	handler.SetForeground(true)
 	s.True(handler.foreground)
+}
+
+func (s *Suite) TestStandaloneSetPort() {
+	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
+	s.NoError(err)
+
+	// Default port
+	s.Equal("8080", handler.webserverPort())
+
+	// Override via SetPort
+	handler.SetPort("9090")
+	s.Equal("9090", handler.webserverPort())
+
+	// Health endpoint uses custom port
+	url, comp := handler.healthEndpoint()
+	s.Contains(url, ":9090/")
+	s.Equal("api-server", comp)
+}
+
+func (s *Suite) TestStandaloneBuildEnv_CustomPort() {
+	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
+	s.NoError(err)
+	handler.SetPort("9090")
+
+	env := handler.buildEnv()
+
+	envMap := make(map[string]string)
+	for _, e := range env {
+		parts := splitEnvVar(e)
+		if parts != nil {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	s.Equal("9090", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_PORT"])
 }
 
 func (s *Suite) TestStandaloneEnsureCredentials() {

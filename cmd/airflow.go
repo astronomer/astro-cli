@@ -135,6 +135,7 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	defaultWaitTime             = 1 * time.Minute
 	directoryPermissions uint32 = 0o755
 	localForeground      bool
+	localPort            string
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
@@ -366,11 +367,13 @@ func newAirflowLocalCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
 	cmd.Flags().BoolVarP(&localForeground, "foreground", "f", false, "Run in the foreground instead of backgrounding the process")
+	cmd.Flags().StringVarP(&localPort, "port", "p", "", "Port for the Airflow webserver (default: 8080)")
 
 	cmd.AddCommand(
 		newAirflowLocalResetCmd(),
 		newAirflowLocalStopCmd(),
 		newAirflowLocalLogsCmd(),
+		newAirflowLocalPSCmd(),
 	)
 
 	return cmd
@@ -405,6 +408,16 @@ func newAirflowLocalLogsCmd() *cobra.Command {
 		RunE:    airflowLocalLogs,
 	}
 	cmd.Flags().BoolVarP(&followLogs, "follow", "f", false, "Follow log output")
+	return cmd
+}
+
+func newAirflowLocalPSCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "ps",
+		Short:   "Check status of the local Airflow process",
+		PreRunE: EnsureLocalRuntime,
+		RunE:    airflowLocalPS,
+	}
 	return cmd
 }
 
@@ -837,9 +850,12 @@ func airflowLocal(cmd *cobra.Command, astroCoreClient astrocore.CoreClient) erro
 		return err
 	}
 
-	// Set foreground mode if the flag was provided
+	// Set options if the handler is a Standalone instance
 	if sa, ok := containerHandler.(*airflow.Standalone); ok {
 		sa.SetForeground(localForeground)
+		if localPort != "" {
+			sa.SetPort(localPort)
+		}
 	}
 
 	return containerHandler.Start("", settingsFile, "", "", false, false, waitTime, envConns)
@@ -879,6 +895,18 @@ func airflowLocalLogs(cmd *cobra.Command, _ []string) error {
 	}
 
 	return containerHandler.Logs(followLogs)
+}
+
+// airflowLocalPS checks the status of the local Airflow process.
+func airflowLocalPS(cmd *cobra.Command, _ []string) error {
+	cmd.SilenceUsage = true
+
+	containerHandler, err := localHandlerInit(config.WorkingPath, envFile, dockerfile, "")
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.PS()
 }
 
 // airflowRun

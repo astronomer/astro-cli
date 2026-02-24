@@ -19,6 +19,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -104,7 +105,8 @@ type Standalone struct {
 	airflowHome string
 	envFile     string
 	dockerfile  string
-	foreground  bool // if true, run in foreground (stream output, block on Wait)
+	foreground  bool   // if true, run in foreground (stream output, block on Wait)
+	port        string // webserver port; defaults to defaultStandalonePort
 }
 
 // StandaloneInit creates a new Standalone handler.
@@ -119,6 +121,25 @@ func StandaloneInit(airflowHome, envFile, dockerfile string) (*Standalone, error
 // SetForeground controls whether Start() runs the process in the foreground.
 func (s *Standalone) SetForeground(fg bool) {
 	s.foreground = fg
+}
+
+// SetPort overrides the default webserver port.
+func (s *Standalone) SetPort(port string) {
+	s.port = port
+}
+
+// webserverPort returns the configured port. It checks (in order):
+// 1. Explicit --port flag
+// 2. api-server.port from .astro/config.yaml (same config used by `astro dev start`)
+// 3. Default (8080)
+func (s *Standalone) webserverPort() string {
+	if s.port != "" {
+		return s.port
+	}
+	if p := config.CFG.APIServerPort.GetString(); p != "" {
+		return p
+	}
+	return defaultStandalonePort
 }
 
 // pidFilePath returns the full path to the PID file.
@@ -320,7 +341,7 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) erro
 			return
 		}
 		bullet := ansi.Cyan("\u27A4") + " "
-		uiURL := "http://localhost:" + defaultStandalonePort
+		uiURL := "http://localhost:" + s.webserverPort()
 		fmt.Println("\n" + ansi.Green("\u2714") + " Airflow is ready!")
 		fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
 		if user, pass := s.readCredentials(); user != "" {
@@ -352,11 +373,6 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration) erro
 // startBackground runs the airflow process in the background, writes a PID file,
 // runs the health check, and returns.
 func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration) error {
-	// Check if already running
-	if pid, alive := s.readPID(); alive {
-		return fmt.Errorf("standalone Airflow is already running (PID %d). Run 'astro dev local stop' first", pid)
-	}
-
 	// Open log file for writing
 	logPath := s.logFilePath()
 	logFile, err := os.Create(logPath)
@@ -389,7 +405,7 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration) erro
 	}
 
 	bullet := ansi.Cyan("\u27A4") + " "
-	uiURL := "http://localhost:" + defaultStandalonePort
+	uiURL := "http://localhost:" + s.webserverPort()
 	fmt.Printf("\n%s Airflow is ready! (PID %d)\n", ansi.Green("\u2714"), cmd.Process.Pid)
 	fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
 	if user, pass := s.readCredentials(); user != "" {
@@ -404,7 +420,7 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration) erro
 
 // healthEndpoint returns the health check URL and component name.
 func (s *Standalone) healthEndpoint() (url, component string) {
-	return "http://localhost:" + defaultStandalonePort + "/api/v2/monitor/health", "api-server"
+	return "http://localhost:" + s.webserverPort() + "/api/v2/monitor/health", "api-server"
 }
 
 // ensureCredentials seeds the SimpleAuthManager passwords file with admin:admin
@@ -438,6 +454,10 @@ func (s *Standalone) readCredentials() (username, password string) {
 	var creds map[string]string
 	if err := json.Unmarshal(data, &creds); err != nil {
 		return "", ""
+	}
+	// Return the well-known admin user if present; otherwise return the first entry.
+	if p, ok := creds[standaloneAdminUser]; ok {
+		return standaloneAdminUser, p
 	}
 	for u, p := range creds {
 		return u, p
@@ -573,6 +593,9 @@ func (s *Standalone) buildEnv() []string {
 	overrides["AIRFLOW__CORE__DAGS_FOLDER"] = filepath.Join(s.airflowHome, "dags")
 	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS"] = standaloneAdminUser + ":admin"
 	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE"] = s.passwordsFilePath()
+	if s.port != "" {
+		overrides["AIRFLOW__WEBSERVER__WEB_SERVER_PORT"] = s.port
+	}
 
 	// Start with inherited env, filtering out keys we override.
 	env := make([]string, 0, len(os.Environ())+len(overrides))
@@ -594,6 +617,8 @@ func (s *Standalone) buildEnv() []string {
 }
 
 // loadEnvFile reads a .env file and returns key=value pairs.
+// Values wrapped in matching single or double quotes are unquoted to match
+// the behavior of Docker Compose's .env loader.
 func loadEnvFile(path string) ([]string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -606,11 +631,22 @@ func loadEnvFile(path string) ([]string, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		if strings.Contains(line, "=") {
-			envVars = append(envVars, line)
+		if idx := strings.IndexByte(line, '='); idx >= 0 {
+			key := line[:idx]
+			val := line[idx+1:]
+			val = stripQuotes(val)
+			envVars = append(envVars, key+"="+val)
 		}
 	}
 	return envVars, nil
+}
+
+// stripQuotes removes matching surrounding single or double quotes from a value.
+func stripQuotes(s string) string {
+	if len(s) >= 2 && ((s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'')) {
+		return s[1 : len(s)-1]
+	}
+	return s
 }
 
 // applySettings imports airflow_settings.yaml using airflow CLI commands run via the venv.
