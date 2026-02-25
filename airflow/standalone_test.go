@@ -503,6 +503,7 @@ func (s *Suite) TestStandaloneBuildEnv() {
 	s.Equal("local", envMap["ASTRONOMER_ENVIRONMENT"])
 	s.Equal("False", envMap["AIRFLOW__CORE__LOAD_EXAMPLES"])
 	s.Equal("/tmp/test-project/dags", envMap["AIRFLOW__CORE__DAGS_FOLDER"])
+	s.Equal("True", envMap["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"])
 	s.Contains(envMap["PATH"], "/tmp/test-project/.venv/bin")
 }
 
@@ -1314,79 +1315,6 @@ func (s *Suite) TestStandaloneBuildEnv_CustomPort() {
 	}
 
 	s.Equal("9090", envMap["AIRFLOW__API__PORT"])
-}
-
-func (s *Suite) TestStandaloneEnsureCredentials() {
-	tmpDir, err := os.MkdirTemp("", "standalone-ensure-creds")
-	s.NoError(err)
-	defer os.RemoveAll(tmpDir)
-
-	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
-	s.NoError(err)
-
-	// File lives in .astro/standalone/, not the project root
-	credsPath := handler.passwordsFilePath()
-	s.Contains(credsPath, ".astro/standalone/")
-
-	// File doesn't exist — ensureCredentials should create it with admin:admin
-	err = handler.ensureCredentials()
-	s.NoError(err)
-
-	data, err := os.ReadFile(credsPath)
-	s.NoError(err)
-	s.Contains(string(data), `"admin"`)
-
-	// Called again — should be a no-op (not overwrite existing file)
-	err = os.WriteFile(credsPath, []byte(`{"admin":"custompassword"}`), 0o644)
-	s.NoError(err)
-	err = handler.ensureCredentials()
-	s.NoError(err)
-	data, err = os.ReadFile(credsPath)
-	s.NoError(err)
-	s.Contains(string(data), "custompassword") // unchanged
-}
-
-func (s *Suite) TestStandaloneReadCredentials() {
-	tmpDir, err := os.MkdirTemp("", "standalone-creds-test")
-	s.NoError(err)
-	defer os.RemoveAll(tmpDir)
-
-	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
-	s.NoError(err)
-
-	// No file — should return empty strings gracefully
-	user, pass := handler.readCredentials()
-	s.Equal("", user)
-	s.Equal("", pass)
-
-	// Write a valid credentials file into .astro/standalone/
-	credsPath := handler.passwordsFilePath()
-	err = os.MkdirAll(filepath.Dir(credsPath), 0o755)
-	s.NoError(err)
-	err = os.WriteFile(credsPath, []byte(`{"admin":"supersecret"}`), 0o644)
-	s.NoError(err)
-
-	user, pass = handler.readCredentials()
-	s.Equal("admin", user)
-	s.Equal("supersecret", pass)
-}
-
-func (s *Suite) TestStandaloneReadCredentials_InvalidJSON() {
-	tmpDir, err := os.MkdirTemp("", "standalone-creds-invalid")
-	s.NoError(err)
-	defer os.RemoveAll(tmpDir)
-
-	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
-	s.NoError(err)
-	credsPath := handler.passwordsFilePath()
-	err = os.MkdirAll(filepath.Dir(credsPath), 0o755)
-	s.NoError(err)
-	err = os.WriteFile(credsPath, []byte(`not valid json`), 0o644)
-	s.NoError(err)
-
-	user, pass := handler.readCredentials()
-	s.Equal("", user)
-	s.Equal("", pass)
 }
 
 // --- ensureVenv tests ---

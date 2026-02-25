@@ -2,7 +2,6 @@ package airflow
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -30,21 +29,18 @@ import (
 )
 
 const (
-	standaloneDir           = ".astro/standalone"
-	standalonePIDFile       = "airflow.pid"
-	standaloneLogFile       = "airflow.log"
-	defaultStandalonePort   = "8080"
-	standaloneIndexURL      = "https://pip.astronomer.io/v2/"
-	defaultPythonVersion    = "3.12" // default Python version for all Runtime 3.x images
-	constraintsBaseURL      = "https://cdn.astronomer.io/runtime-constraints"
-	freezeBaseURL           = "https://cdn.astronomer.io/runtime-freeze"
-	stopPollInterval        = 500 * time.Millisecond
-	stopTimeout             = 10 * time.Second
-	filePermissions         = os.FileMode(0o644)
-	dirPermissions          = os.FileMode(0o755)
-	standaloneAdminUser     = "admin"
-	standaloneAdminPassword = "admin"
-	standalonePasswordsFile = "simple_auth_manager_passwords.json.generated" //nolint:gosec
+	standaloneDir         = ".astro/standalone"
+	standalonePIDFile     = "airflow.pid"
+	standaloneLogFile     = "airflow.log"
+	defaultStandalonePort = "8080"
+	standaloneIndexURL    = "https://pip.astronomer.io/v2/"
+	defaultPythonVersion  = "3.12" // default Python version for all Runtime 3.x images
+	constraintsBaseURL    = "https://cdn.astronomer.io/runtime-constraints"
+	freezeBaseURL         = "https://cdn.astronomer.io/runtime-freeze"
+	stopPollInterval      = 500 * time.Millisecond
+	stopTimeout           = 10 * time.Second
+	filePermissions       = os.FileMode(0o644)
+	dirPermissions        = os.FileMode(0o755)
 )
 
 var (
@@ -152,10 +148,6 @@ func (s *Standalone) pidFilePath() string {
 
 func (s *Standalone) logFilePath() string {
 	return filepath.Join(s.airflowHome, standaloneDir, standaloneLogFile)
-}
-
-func (s *Standalone) passwordsFilePath() string {
-	return filepath.Join(s.airflowHome, standaloneDir, standalonePasswordsFile)
 }
 
 // Start runs airflow standalone locally without Docker.
@@ -266,12 +258,7 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 
 	spinner.StopWithCheckmark(sp, "Environment ready")
 
-	// 7. Seed credentials file (admin:admin) if this is a fresh environment
-	if err = s.ensureCredentials(); err != nil {
-		fmt.Printf("Warning: could not seed credentials file: %s\n", err.Error())
-	}
-
-	// 8. Build environment
+	// 7. Build environment
 	env := s.buildEnv()
 
 	// 9. Start airflow standalone
@@ -354,10 +341,6 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 		uiURL := "http://localhost:" + s.webserverPort()
 		fmt.Println("\n" + ansi.Green("\u2714") + " Airflow is ready!")
 		fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
-		if user, pass := s.readCredentials(); user != "" {
-			fmt.Printf("%sUsername:   %s\n", bullet, ansi.Bold(user))
-			fmt.Printf("%sPassword:   %s\n", bullet, ansi.Bold(pass))
-		}
 		fmt.Println()
 	}()
 
@@ -420,10 +403,6 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 	uiURL := "http://localhost:" + s.webserverPort()
 	fmt.Printf("\n%s Airflow is ready! (PID %d)\n", ansi.Green("\u2714"), cmd.Process.Pid)
 	fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
-	if user, pass := s.readCredentials(); user != "" {
-		fmt.Printf("%sUsername:   %s\n", bullet, ansi.Bold(user))
-		fmt.Printf("%sPassword:   %s\n", bullet, ansi.Bold(pass))
-	}
 	fmt.Printf("%sView logs: %s\n", bullet, ansi.Bold("astro dev logs -f"))
 	fmt.Printf("%sStop:      %s\n", bullet, ansi.Bold("astro dev stop"))
 
@@ -447,45 +426,6 @@ func checkPortAvailableDefault(port string) error {
 	}
 	conn.Close()
 	return fmt.Errorf("port %s is already in use — stop the other process or set a different port with 'astro config set api-server.port <port>'", port)
-}
-
-// ensureCredentials seeds the passwords file with admin:admin on first run.
-// If the file already exists it is left untouched, preserving custom credentials.
-func (s *Standalone) ensureCredentials() error {
-	path := s.passwordsFilePath()
-	if _, err := os.Stat(path); err == nil {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), dirPermissions); err != nil {
-		return err
-	}
-	creds := map[string]string{standaloneAdminUser: standaloneAdminPassword}
-	data, err := json.Marshal(creds)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, filePermissions)
-}
-
-// readCredentials reads the SimpleAuthManager password file and returns (username, password).
-// Returns empty strings if the file doesn't exist or can't be parsed.
-func (s *Standalone) readCredentials() (username, password string) {
-	data, err := osReadFile(s.passwordsFilePath())
-	if err != nil {
-		return "", ""
-	}
-	var creds map[string]string
-	if err := json.Unmarshal(data, &creds); err != nil {
-		return "", ""
-	}
-	// Return the well-known admin user if present; otherwise return the first entry.
-	if p, ok := creds[standaloneAdminUser]; ok {
-		return standaloneAdminUser, p
-	}
-	for u, p := range creds {
-		return u, p
-	}
-	return "", ""
 }
 
 // getConstraints fetches pip constraints and freeze files from the CDN.
@@ -613,8 +553,7 @@ func (s *Standalone) buildEnv() []string {
 	overrides["ASTRONOMER_ENVIRONMENT"] = "local"
 	overrides["AIRFLOW__CORE__LOAD_EXAMPLES"] = "False"
 	overrides["AIRFLOW__CORE__DAGS_FOLDER"] = filepath.Join(s.airflowHome, "dags")
-	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS"] = standaloneAdminUser + ":admin"
-	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE"] = s.passwordsFilePath()
+	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"] = "True"
 	if port := s.webserverPort(); port != defaultStandalonePort {
 		overrides["AIRFLOW__API__PORT"] = port
 	}
