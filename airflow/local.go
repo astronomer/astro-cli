@@ -57,6 +57,7 @@ var (
 	standaloneGetImageTag = docker.GetImageTagFromParsedFile
 	runCommand            = execCommand
 	startCommand          = startCmd
+	standaloneExec        = standaloneExecDefault
 	osReadFile            = os.ReadFile
 	osFindProcess         = os.FindProcess
 )
@@ -804,44 +805,200 @@ func (s *Standalone) Logs(follow bool, _ ...string) error {
 	}
 }
 
+// ensureVenv validates the venv exists before running commands.
+func (s *Standalone) ensureVenv() error {
+	venvBin := filepath.Join(s.airflowHome, ".venv", "bin")
+	if _, err := os.Stat(venvBin); os.IsNotExist(err) {
+		return fmt.Errorf("no virtual environment found — run 'astro dev start' first")
+	}
+	return nil
+}
+
+// standaloneExecDefault runs a command with the given env, dir, and I/O streams.
+// It resolves the binary using the env's PATH (not the parent process's PATH)
+// so that venv binaries like "airflow" and "pytest" are found correctly.
+func standaloneExecDefault(dir string, env, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	binary := resolveInEnvPath(args[0], env)
+	cmd := exec.Command(binary, args[1:]...) //nolint:gosec
+	cmd.Dir = dir
+	cmd.Env = env
+	cmd.Stdin = stdin
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	return cmd.Run()
+}
+
+// resolveInEnvPath looks up a binary name in the PATH from the given env slice.
+// This is needed because exec.Command uses the parent process's PATH, not cmd.Env.
+func resolveInEnvPath(binary string, env []string) string {
+	if filepath.IsAbs(binary) || strings.Contains(binary, string(filepath.Separator)) {
+		return binary
+	}
+	for _, e := range env {
+		if strings.HasPrefix(e, "PATH=") {
+			for _, dir := range filepath.SplitList(e[5:]) {
+				candidate := filepath.Join(dir, binary)
+				if _, err := os.Stat(candidate); err == nil {
+					return candidate
+				}
+			}
+		}
+	}
+	return binary // fallback to original
+}
+
 func (s *Standalone) Build(_, _ string, _ bool) error {
-	return errStandaloneNotSupported
+	return errors.New("astro dev build builds a Docker image and is not available in standalone mode")
 }
 
-func (s *Standalone) Run(_ []string, _ string) error {
-	return errStandaloneNotSupported
+// Run executes an arbitrary command in the Airflow venv environment.
+// The args slice already contains the full command (e.g. ["airflow", "dags", "list"]).
+func (s *Standalone) Run(args []string, _ string) error {
+	if err := s.ensureVenv(); err != nil {
+		return err
+	}
+	env := s.buildEnv()
+	return standaloneExec(s.airflowHome, env, args, os.Stdin, os.Stdout, os.Stderr)
 }
 
+// Bash opens an interactive shell with the Airflow venv environment.
 func (s *Standalone) Bash(_ string) error {
-	return errStandaloneNotSupported
+	if err := s.ensureVenv(); err != nil {
+		return err
+	}
+	env := s.buildEnv()
+	return standaloneExec(s.airflowHome, env, []string{"bash"}, os.Stdin, os.Stdout, os.Stderr)
 }
 
 func (s *Standalone) RunDAG(_, _, _, _ string, _, _ bool) error {
 	return errStandaloneNotSupported
 }
 
-func (s *Standalone) ImportSettings(_, _ string, _, _, _ bool) error {
-	return errStandaloneNotSupported
+// ImportSettings imports connections/variables/pools from the settings file.
+func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variables, pools bool) error {
+	if !connections && !variables && !pools {
+		connections = true
+		variables = true
+		pools = true
+	}
+
+	fileState, err := fileutil.Exists(settingsFile, nil)
+	if err != nil {
+		return fmt.Errorf("error looking for settings file: %w", err)
+	}
+	if !fileState {
+		return errors.New("file specified does not exist")
+	}
+
+	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
+	defer settings.SetExecAirflowCommand(origExec)
+
+	err = settings.ConfigSettings("standalone", settingsFile, nil, 3, connections, variables, pools) //nolint:mnd
+	if err != nil {
+		return err
+	}
+	fmt.Println("\nAirflow objects created from settings file")
+	return nil
 }
 
-func (s *Standalone) ExportSettings(_, _ string, _, _, _, _ bool) error {
-	return errStandaloneNotSupported
+// ExportSettings exports connections/variables/pools to a settings file or .env file.
+func (s *Standalone) ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error {
+	if !connections && !variables && !pools {
+		connections = true
+		variables = true
+		pools = true
+	}
+
+	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
+	defer settings.SetExecAirflowCommand(origExec)
+
+	if envExport {
+		err := settings.EnvExport("standalone", envFile, 3, connections, variables) //nolint:mnd
+		if err != nil {
+			return err
+		}
+		fmt.Println("\nAirflow objects exported to env file")
+		return nil
+	}
+
+	fileState, err := fileutil.Exists(settingsFile, nil)
+	if err != nil {
+		return fmt.Errorf("error looking for settings file: %w", err)
+	}
+	if !fileState {
+		return errors.New("file specified does not exist")
+	}
+
+	err = settings.Export("standalone", settingsFile, 3, connections, variables, pools) //nolint:mnd
+	if err != nil {
+		return err
+	}
+	fmt.Println("\nAirflow objects exported to settings file")
+	return nil
 }
 
 func (s *Standalone) ComposeExport(_, _ string) error {
-	return errStandaloneNotSupported
+	return errors.New("astro dev compose-export is not available in standalone mode")
 }
 
-func (s *Standalone) Pytest(_, _, _, _, _ string) (string, error) {
-	return "", errStandaloneNotSupported
+// Pytest runs pytest on DAGs using the local venv.
+func (s *Standalone) Pytest(pytestFile, _, _, pytestArgsString, _ string) (string, error) {
+	if err := s.ensureVenv(); err != nil {
+		return "", err
+	}
+	env := s.buildEnv()
+
+	// Resolve pytest file path (same logic as Docker handler)
+	if pytestFile != DefaultTestPath {
+		if !strings.Contains(pytestFile, "tests") {
+			pytestFile = "tests/" + pytestFile
+		}
+	}
+
+	args := []string{"pytest", pytestFile}
+	if pytestArgsString != "" {
+		args = append(args, strings.Fields(pytestArgsString)...)
+	}
+
+	err := standaloneExec(s.airflowHome, env, args, nil, os.Stdout, os.Stderr)
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return fmt.Sprintf("%d", exitErr.ExitCode()), errors.New("something went wrong while Pytesting your DAGs")
+		}
+		return "", err
+	}
+	return "", nil
 }
 
+// Parse validates DAGs by running the default integrity test.
 func (s *Standalone) Parse(_, _, _ string) error {
-	return errStandaloneNotSupported
+	path := filepath.Join(s.airflowHome, DefaultTestPath)
+
+	fileExist, err := fileutil.Exists(path, nil)
+	if err != nil {
+		return err
+	}
+	if !fileExist {
+		fmt.Println("\nThe file " + path + " which is needed for `astro dev parse` does not exist. Please run `astro dev init` to create it")
+		return nil
+	}
+
+	fmt.Println("Checking your DAGs for errors…")
+
+	exitCode, err := s.Pytest(DefaultTestPath, "", "", "", "")
+	if err != nil {
+		if strings.Contains(exitCode, "1") {
+			return errors.New("See above for errors detected in your DAGs")
+		}
+		return errors.Wrap(err, "something went wrong while parsing your DAGs")
+	}
+	fmt.Println(ansi.Green("\u2714") + " No errors detected in your DAGs ")
+	return nil
 }
 
 func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astroplatformcore.ClientWithResponsesInterface) error {
-	return errStandaloneNotSupported
+	return errors.New("astro dev upgrade-test is not available in standalone mode")
 }
 
 // execCommand runs a command in the given directory.

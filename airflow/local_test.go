@@ -2,6 +2,7 @@ package airflow
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -136,22 +137,23 @@ func (s *Suite) TestStandaloneStart_EmptyTag() {
 	s.Contains(err.Error(), "could not determine runtime version")
 }
 
-func (s *Suite) TestStandaloneStubMethods() {
+func (s *Suite) TestStandaloneUnsupportedCommands() {
 	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
 	s.NoError(err)
 
-	s.Equal(errStandaloneNotSupported, handler.Run(nil, ""))
-	s.Equal(errStandaloneNotSupported, handler.Bash(""))
 	s.Equal(errStandaloneNotSupported, handler.RunDAG("", "", "", "", false, false))
-	s.Equal(errStandaloneNotSupported, handler.ImportSettings("", "", false, false, false))
-	s.Equal(errStandaloneNotSupported, handler.ExportSettings("", "", false, false, false, false))
-	s.Equal(errStandaloneNotSupported, handler.ComposeExport("", ""))
 
-	_, pytestErr := handler.Pytest("", "", "", "", "")
-	s.Equal(errStandaloneNotSupported, pytestErr)
+	buildErr := handler.Build("", "", false)
+	s.Error(buildErr)
+	s.Contains(buildErr.Error(), "not available in standalone mode")
 
-	s.Equal(errStandaloneNotSupported, handler.Parse("", "", ""))
-	s.Equal(errStandaloneNotSupported, handler.UpgradeTest("", "", "", "", false, false, false, false, false, "", nil))
+	composeErr := handler.ComposeExport("", "")
+	s.Error(composeErr)
+	s.Contains(composeErr.Error(), "not available in standalone mode")
+
+	upgradeErr := handler.UpgradeTest("", "", "", "", false, false, false, false, false, "", nil)
+	s.Error(upgradeErr)
+	s.Contains(upgradeErr.Error(), "not available in standalone mode")
 }
 
 func (s *Suite) TestStandaloneStop_NoPIDFile() {
@@ -1079,4 +1081,433 @@ func (s *Suite) TestStandaloneReadCredentials_InvalidJSON() {
 	user, pass := handler.readCredentials()
 	s.Equal("", user)
 	s.Equal("", pass)
+}
+
+// --- ensureVenv tests ---
+
+func (s *Suite) TestStandaloneEnsureVenv_NoVenv() {
+	tmpDir, err := os.MkdirTemp("", "standalone-ensurevenv")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.ensureVenv()
+	s.Error(err)
+	s.Contains(err.Error(), "no virtual environment found")
+}
+
+func (s *Suite) TestStandaloneEnsureVenv_WithVenv() {
+	tmpDir, err := os.MkdirTemp("", "standalone-ensurevenv")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.ensureVenv()
+	s.NoError(err)
+}
+
+// --- Run tests ---
+
+func (s *Suite) TestStandaloneRun_NoVenv() {
+	tmpDir, err := os.MkdirTemp("", "standalone-run")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Run([]string{"airflow", "dags", "list"}, "")
+	s.Error(err)
+	s.Contains(err.Error(), "no virtual environment found")
+}
+
+func (s *Suite) TestStandaloneRun_Success() {
+	tmpDir, err := os.MkdirTemp("", "standalone-run")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	s.NoError(err)
+
+	origExec := standaloneExec
+	defer func() { standaloneExec = origExec }()
+
+	var capturedArgs []string
+	var capturedDir string
+	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
+		capturedArgs = args
+		capturedDir = dir
+		return nil
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Run([]string{"airflow", "dags", "list"}, "root")
+	s.NoError(err)
+	s.Equal([]string{"airflow", "dags", "list"}, capturedArgs)
+	s.Equal(tmpDir, capturedDir)
+}
+
+// --- Bash tests ---
+
+func (s *Suite) TestStandaloneBash_NoVenv() {
+	tmpDir, err := os.MkdirTemp("", "standalone-bash")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Bash("scheduler")
+	s.Error(err)
+	s.Contains(err.Error(), "no virtual environment found")
+}
+
+func (s *Suite) TestStandaloneBash_Success() {
+	tmpDir, err := os.MkdirTemp("", "standalone-bash")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	s.NoError(err)
+
+	origExec := standaloneExec
+	defer func() { standaloneExec = origExec }()
+
+	var capturedArgs []string
+	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
+		capturedArgs = args
+		return nil
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Bash("scheduler")
+	s.NoError(err)
+	s.Equal([]string{"bash"}, capturedArgs)
+}
+
+// --- ImportSettings tests ---
+
+func (s *Suite) TestStandaloneImportSettings_FileNotFound() {
+	tmpDir, err := os.MkdirTemp("", "standalone-import")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.ImportSettings(filepath.Join(tmpDir, "nonexistent.yaml"), "", false, false, false)
+	s.Error(err)
+	s.Contains(err.Error(), "file specified does not exist")
+}
+
+func (s *Suite) TestStandaloneImportSettings_DefaultsAllFlags() {
+	tmpDir, err := os.MkdirTemp("", "standalone-import")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create a minimal settings file
+	settingsFile := filepath.Join(tmpDir, "airflow_settings.yaml")
+	err = os.WriteFile(settingsFile, []byte("airflow:\n  connections: []\n  variables: []\n  pools: []\n"), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	// This will fail because there's no real airflow to exec, but we can verify
+	// it gets past the file check and flag defaulting
+	err = handler.ImportSettings(settingsFile, "", false, false, false)
+	// Error is expected since we don't have a real venv, but it should NOT be
+	// "file specified does not exist"
+	if err != nil {
+		s.NotContains(err.Error(), "file specified does not exist")
+	}
+}
+
+// --- ExportSettings tests ---
+
+func (s *Suite) TestStandaloneExportSettings_FileNotFound() {
+	tmpDir, err := os.MkdirTemp("", "standalone-export")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.ExportSettings(filepath.Join(tmpDir, "nonexistent.yaml"), "", false, false, false, false)
+	s.Error(err)
+	s.Contains(err.Error(), "file specified does not exist")
+}
+
+// --- Pytest tests ---
+
+func (s *Suite) TestStandalonePytest_NoVenv() {
+	tmpDir, err := os.MkdirTemp("", "standalone-pytest")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	_, err = handler.Pytest("", "", "", "", "")
+	s.Error(err)
+	s.Contains(err.Error(), "no virtual environment found")
+}
+
+func (s *Suite) TestStandalonePytest_Success() {
+	tmpDir, err := os.MkdirTemp("", "standalone-pytest")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	s.NoError(err)
+
+	origExec := standaloneExec
+	defer func() { standaloneExec = origExec }()
+
+	var capturedArgs []string
+	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
+		capturedArgs = args
+		return nil
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	exitCode, err := handler.Pytest("", "", "", "", "")
+	s.NoError(err)
+	s.Equal("", exitCode)
+	s.Equal([]string{"pytest", "tests/"}, capturedArgs)
+}
+
+func (s *Suite) TestStandalonePytest_WithFileAndArgs() {
+	tmpDir, err := os.MkdirTemp("", "standalone-pytest")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	s.NoError(err)
+
+	origExec := standaloneExec
+	defer func() { standaloneExec = origExec }()
+
+	var capturedArgs []string
+	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
+		capturedArgs = args
+		return nil
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	exitCode, err := handler.Pytest("test_dag.py", "", "", "-v --tb=short", "")
+	s.NoError(err)
+	s.Equal("", exitCode)
+	s.Equal([]string{"pytest", "tests/test_dag.py", "-v", "--tb=short"}, capturedArgs)
+}
+
+func (s *Suite) TestStandalonePytest_DefaultTestPath() {
+	tmpDir, err := os.MkdirTemp("", "standalone-pytest")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	s.NoError(err)
+
+	origExec := standaloneExec
+	defer func() { standaloneExec = origExec }()
+
+	var capturedArgs []string
+	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
+		capturedArgs = args
+		return nil
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	exitCode, err := handler.Pytest(DefaultTestPath, "", "", "", "")
+	s.NoError(err)
+	s.Equal("", exitCode)
+	// DefaultTestPath should NOT be prepended with tests/
+	s.Equal([]string{"pytest", DefaultTestPath}, capturedArgs)
+}
+
+func (s *Suite) TestStandalonePytest_FileInTestsDir() {
+	tmpDir, err := os.MkdirTemp("", "standalone-pytest")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	s.NoError(err)
+
+	origExec := standaloneExec
+	defer func() { standaloneExec = origExec }()
+
+	var capturedArgs []string
+	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
+		capturedArgs = args
+		return nil
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	exitCode, err := handler.Pytest("tests/test_my_dag.py", "", "", "", "")
+	s.NoError(err)
+	s.Equal("", exitCode)
+	// Already contains "tests", should not be prepended
+	s.Equal([]string{"pytest", "tests/test_my_dag.py"}, capturedArgs)
+}
+
+func (s *Suite) TestStandalonePytest_Failure() {
+	tmpDir, err := os.MkdirTemp("", "standalone-pytest")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	s.NoError(err)
+
+	origExec := standaloneExec
+	defer func() { standaloneExec = origExec }()
+
+	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
+		// Run a real command that exits with code 1 to produce an *exec.ExitError
+		cmd := exec.Command("sh", "-c", "exit 1") //nolint:gosec
+		return cmd.Run()
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	exitCode, err := handler.Pytest("", "", "", "", "")
+	s.Error(err)
+	s.Equal("1", exitCode)
+	s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
+}
+
+// --- Parse tests ---
+
+func (s *Suite) TestStandaloneParse_FileNotFound() {
+	tmpDir, err := os.MkdirTemp("", "standalone-parse")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	// No DefaultTestPath file exists — should return nil with a message
+	err = handler.Parse("", "", "")
+	s.NoError(err)
+}
+
+func (s *Suite) TestStandaloneParse_Success() {
+	tmpDir, err := os.MkdirTemp("", "standalone-parse")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create the DefaultTestPath file
+	err = os.MkdirAll(filepath.Join(tmpDir, ".astro"), 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(tmpDir, DefaultTestPath), []byte("test"), 0o644)
+	s.NoError(err)
+
+	// Create venv
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	s.NoError(err)
+
+	origExec := standaloneExec
+	defer func() { standaloneExec = origExec }()
+
+	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
+		return nil
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Parse("", "", "")
+	s.NoError(err)
+}
+
+func (s *Suite) TestStandaloneParse_DagErrors() {
+	tmpDir, err := os.MkdirTemp("", "standalone-parse")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".astro"), 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(tmpDir, DefaultTestPath), []byte("test"), 0o644)
+	s.NoError(err)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	s.NoError(err)
+
+	origExec := standaloneExec
+	defer func() { standaloneExec = origExec }()
+
+	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
+		cmd := exec.Command("sh", "-c", "exit 1") //nolint:gosec
+		return cmd.Run()
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Parse("", "", "")
+	s.Error(err)
+	s.Contains(err.Error(), "errors detected in your DAGs")
+}
+
+// --- resolveInEnvPath tests ---
+
+func TestResolveInEnvPath(t *testing.T) {
+	// Create a temp dir with a fake binary
+	tmpDir, err := os.MkdirTemp("", "resolve-path")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	fakeBin := filepath.Join(tmpDir, "mybinary")
+	err = os.WriteFile(fakeBin, []byte("#!/bin/sh\n"), 0o755)
+	require.NoError(t, err)
+
+	t.Run("resolves binary in env PATH", func(t *testing.T) {
+		env := []string{"PATH=" + tmpDir + ":/usr/bin"}
+		result := resolveInEnvPath("mybinary", env)
+		assert.Equal(t, fakeBin, result)
+	})
+
+	t.Run("returns original when not found", func(t *testing.T) {
+		env := []string{"PATH=/nonexistent"}
+		result := resolveInEnvPath("mybinary", env)
+		assert.Equal(t, "mybinary", result)
+	})
+
+	t.Run("skips resolution for absolute paths", func(t *testing.T) {
+		env := []string{"PATH=" + tmpDir}
+		result := resolveInEnvPath("/usr/bin/bash", env)
+		assert.Equal(t, "/usr/bin/bash", result)
+	})
+
+	t.Run("skips resolution for relative paths with separator", func(t *testing.T) {
+		env := []string{"PATH=" + tmpDir}
+		result := resolveInEnvPath("./mybinary", env)
+		assert.Equal(t, "./mybinary", result)
+	})
+
+	t.Run("no PATH in env falls through", func(t *testing.T) {
+		env := []string{"HOME=/tmp"}
+		result := resolveInEnvPath("mybinary", env)
+		assert.Equal(t, "mybinary", result)
+	})
 }
