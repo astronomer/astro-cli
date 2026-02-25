@@ -556,9 +556,11 @@ func (s *Standalone) buildEnv() []string {
 	overrides["AIRFLOW__CORE__LOAD_EXAMPLES"] = "False"
 	overrides["AIRFLOW__CORE__DAGS_FOLDER"] = filepath.Join(s.airflowHome, "dags")
 	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"] = "True"
-	if port := s.webserverPort(); port != defaultStandalonePort {
+	port := s.webserverPort()
+	if port != defaultStandalonePort {
 		overrides["AIRFLOW__API__PORT"] = port
 	}
+	overrides["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"] = "http://localhost:" + port + "/execution/"
 
 	// Start with inherited env, filtering out keys we override.
 	env := make([]string, 0, len(os.Environ())+len(overrides))
