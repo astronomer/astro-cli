@@ -23,9 +23,11 @@ import (
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/spinner"
 	"github.com/astronomer/astro-cli/settings"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -1030,11 +1032,14 @@ func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string
 }
 
 // execCommand runs a command in the given directory.
+// Output is suppressed unless verbose (debug) logging is enabled.
 func execCommand(dir, name string, args ...string) error {
 	cmd := exec.Command(name, args...) //nolint:gosec
 	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if logger.IsLevelEnabled(logrus.DebugLevel) {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	return cmd.Run()
 }
 
