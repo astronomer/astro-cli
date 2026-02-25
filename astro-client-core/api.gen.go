@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,6 +30,12 @@ const (
 	AgentStatusUNHEALTHY  AgentStatus = "UNHEALTHY"
 )
 
+// Defines values for ApiTokenKind.
+const (
+	ApiTokenKindDIRECTACCESS ApiTokenKind = "DIRECT_ACCESS"
+	ApiTokenKindSTANDARD     ApiTokenKind = "STANDARD"
+)
+
 // Defines values for ApiTokenType.
 const (
 	ApiTokenTypeAGENT        ApiTokenType = "AGENT"
@@ -39,6 +46,7 @@ const (
 
 // Defines values for ApiTokenRoleEntityType.
 const (
+	ApiTokenRoleEntityTypeDAG          ApiTokenRoleEntityType = "DAG"
 	ApiTokenRoleEntityTypeDEPLOYMENT   ApiTokenRoleEntityType = "DEPLOYMENT"
 	ApiTokenRoleEntityTypeORGANIZATION ApiTokenRoleEntityType = "ORGANIZATION"
 	ApiTokenRoleEntityTypeWORKSPACE    ApiTokenRoleEntityType = "WORKSPACE"
@@ -48,11 +56,6 @@ const (
 const (
 	AstroIdeProjectVisibilityPRIVATE   AstroIdeProjectVisibility = "PRIVATE"
 	AstroIdeProjectVisibilityWORKSPACE AstroIdeProjectVisibility = "WORKSPACE"
-)
-
-// Defines values for AstroIdeProjectRemoteGitProvider.
-const (
-	AstroIdeProjectRemoteGitProviderGITHUB AstroIdeProjectRemoteGitProvider = "GITHUB"
 )
 
 // Defines values for AstroIdeSessionPermission.
@@ -98,6 +101,8 @@ const (
 	ClusterStatusDELETED        ClusterStatus = "DELETED"
 	ClusterStatusDELETEFAILED   ClusterStatus = "DELETE_FAILED"
 	ClusterStatusDELETING       ClusterStatus = "DELETING"
+	ClusterStatusFAILINGOVER    ClusterStatus = "FAILING_OVER"
+	ClusterStatusFAILOVERFAILED ClusterStatus = "FAILOVER_FAILED"
 	ClusterStatusFORCEDELETED   ClusterStatus = "FORCE_DELETED"
 	ClusterStatusUPDATEFAILED   ClusterStatus = "UPDATE_FAILED"
 	ClusterStatusUPDATING       ClusterStatus = "UPDATING"
@@ -136,6 +141,8 @@ const (
 	ClusterDetailedStatusDELETED        ClusterDetailedStatus = "DELETED"
 	ClusterDetailedStatusDELETEFAILED   ClusterDetailedStatus = "DELETE_FAILED"
 	ClusterDetailedStatusDELETING       ClusterDetailedStatus = "DELETING"
+	ClusterDetailedStatusFAILINGOVER    ClusterDetailedStatus = "FAILING_OVER"
+	ClusterDetailedStatusFAILOVERFAILED ClusterDetailedStatus = "FAILOVER_FAILED"
 	ClusterDetailedStatusFORCEDELETED   ClusterDetailedStatus = "FORCE_DELETED"
 	ClusterDetailedStatusUPDATEFAILED   ClusterDetailedStatus = "UPDATE_FAILED"
 	ClusterDetailedStatusUPDATING       ClusterDetailedStatus = "UPDATING"
@@ -152,6 +159,7 @@ const (
 // Defines values for ClusterHealthStatusSeverity.
 const (
 	ClusterHealthStatusSeverityCRITICAL ClusterHealthStatusSeverity = "CRITICAL"
+	ClusterHealthStatusSeverityINFO     ClusterHealthStatusSeverity = "INFO"
 	ClusterHealthStatusSeverityMAJOR    ClusterHealthStatusSeverity = "MAJOR"
 	ClusterHealthStatusSeverityMINOR    ClusterHealthStatusSeverity = "MINOR"
 	ClusterHealthStatusSeverityMODERATE ClusterHealthStatusSeverity = "MODERATE"
@@ -187,11 +195,6 @@ const (
 // Defines values for ClusterRouteTargetType.
 const (
 	ClusterRouteTargetTypeAWSPCX ClusterRouteTargetType = "AWS_PCX"
-)
-
-// Defines values for CreateAstroIdeProjectRemoteRequestGitProvider.
-const (
-	CreateAstroIdeProjectRemoteRequestGitProviderGITHUB CreateAstroIdeProjectRemoteRequestGitProvider = "GITHUB"
 )
 
 // Defines values for CreateAstroIdeProjectRequestVisibility.
@@ -238,6 +241,7 @@ const (
 
 // Defines values for CreateCustomRoleRequestScopeType.
 const (
+	CreateCustomRoleRequestScopeTypeDAG        CreateCustomRoleRequestScopeType = "DAG"
 	CreateCustomRoleRequestScopeTypeDEPLOYMENT CreateCustomRoleRequestScopeType = "DEPLOYMENT"
 )
 
@@ -275,9 +279,16 @@ const (
 	CreateDeployRequestTypeIMAGE  CreateDeployRequestType = "IMAGE"
 )
 
+// Defines values for CreateDeploymentApiTokenRequestKind.
+const (
+	CreateDeploymentApiTokenRequestKindDIRECTACCESS CreateDeploymentApiTokenRequestKind = "DIRECT_ACCESS"
+	CreateDeploymentApiTokenRequestKindSTANDARD     CreateDeploymentApiTokenRequestKind = "STANDARD"
+)
+
 // Defines values for CreateEnvironmentObjectLinkRequestScope.
 const (
 	CreateEnvironmentObjectLinkRequestScopeDEPLOYMENT CreateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
+	CreateEnvironmentObjectLinkRequestScopePROJECT    CreateEnvironmentObjectLinkRequestScope = "PROJECT"
 )
 
 // Defines values for CreateEnvironmentObjectMetricsExportOverridesRequestAuthType.
@@ -315,6 +326,7 @@ const (
 // Defines values for CreateEnvironmentObjectRequestScope.
 const (
 	CreateEnvironmentObjectRequestScopeDEPLOYMENT CreateEnvironmentObjectRequestScope = "DEPLOYMENT"
+	CreateEnvironmentObjectRequestScopePROJECT    CreateEnvironmentObjectRequestScope = "PROJECT"
 	CreateEnvironmentObjectRequestScopeWORKSPACE  CreateEnvironmentObjectRequestScope = "WORKSPACE"
 )
 
@@ -336,6 +348,12 @@ const (
 	CreateHybridDeploymentRequestTypeDEDICATED CreateHybridDeploymentRequestType = "DEDICATED"
 	CreateHybridDeploymentRequestTypeHYBRID    CreateHybridDeploymentRequestType = "HYBRID"
 	CreateHybridDeploymentRequestTypeSTANDARD  CreateHybridDeploymentRequestType = "STANDARD"
+)
+
+// Defines values for CreateOrganizationApiTokenRequestKind.
+const (
+	CreateOrganizationApiTokenRequestKindDIRECTACCESS CreateOrganizationApiTokenRequestKind = "DIRECT_ACCESS"
+	CreateOrganizationApiTokenRequestKindSTANDARD     CreateOrganizationApiTokenRequestKind = "STANDARD"
 )
 
 // Defines values for CreateStandardDeploymentRequestCloudProvider.
@@ -367,6 +385,12 @@ const (
 	CreateStandardDeploymentRequestTypeSTANDARD  CreateStandardDeploymentRequestType = "STANDARD"
 )
 
+// Defines values for CreateWorkspaceApiTokenRequestKind.
+const (
+	CreateWorkspaceApiTokenRequestKindDIRECTACCESS CreateWorkspaceApiTokenRequestKind = "DIRECT_ACCESS"
+	CreateWorkspaceApiTokenRequestKindSTANDARD     CreateWorkspaceApiTokenRequestKind = "STANDARD"
+)
+
 // Defines values for DAGProcessorMachineName.
 const (
 	DAGProcessorMachineNameEXTRALARGE DAGProcessorMachineName = "EXTRA_LARGE"
@@ -377,6 +401,7 @@ const (
 
 // Defines values for DefaultRoleScopeType.
 const (
+	DefaultRoleScopeTypeDAG          DefaultRoleScopeType = "DAG"
 	DefaultRoleScopeTypeDEPLOYMENT   DefaultRoleScopeType = "DEPLOYMENT"
 	DefaultRoleScopeTypeORGANIZATION DefaultRoleScopeType = "ORGANIZATION"
 	DefaultRoleScopeTypeSYSTEM       DefaultRoleScopeType = "SYSTEM"
@@ -392,10 +417,13 @@ const (
 
 // Defines values for DeployType.
 const (
-	DeployTypeBASEIMAGE DeployType = "BASE_IMAGE"
-	DeployTypeBUNDLE    DeployType = "BUNDLE"
-	DeployTypeDAG       DeployType = "DAG"
-	DeployTypeIMAGE     DeployType = "IMAGE"
+	DeployTypeBASEIMAGE   DeployType = "BASE_IMAGE"
+	DeployTypeBUNDLE      DeployType = "BUNDLE"
+	DeployTypeDAG         DeployType = "DAG"
+	DeployTypeDAGONLY     DeployType = "DAG_ONLY"
+	DeployTypeIMAGE       DeployType = "IMAGE"
+	DeployTypeIMAGEANDDAG DeployType = "IMAGE_AND_DAG"
+	DeployTypeIMAGEONLY   DeployType = "IMAGE_ONLY"
 )
 
 // Defines values for DeployGitProvider.
@@ -540,23 +568,27 @@ const (
 // Defines values for EnvironmentObjectScope.
 const (
 	EnvironmentObjectScopeDEPLOYMENT EnvironmentObjectScope = "DEPLOYMENT"
+	EnvironmentObjectScopePROJECT    EnvironmentObjectScope = "PROJECT"
 	EnvironmentObjectScopeWORKSPACE  EnvironmentObjectScope = "WORKSPACE"
 )
 
 // Defines values for EnvironmentObjectSourceScope.
 const (
 	EnvironmentObjectSourceScopeDEPLOYMENT EnvironmentObjectSourceScope = "DEPLOYMENT"
+	EnvironmentObjectSourceScopePROJECT    EnvironmentObjectSourceScope = "PROJECT"
 	EnvironmentObjectSourceScopeWORKSPACE  EnvironmentObjectSourceScope = "WORKSPACE"
 )
 
 // Defines values for EnvironmentObjectExcludeLinkScope.
 const (
 	EnvironmentObjectExcludeLinkScopeDEPLOYMENT EnvironmentObjectExcludeLinkScope = "DEPLOYMENT"
+	EnvironmentObjectExcludeLinkScopePROJECT    EnvironmentObjectExcludeLinkScope = "PROJECT"
 )
 
 // Defines values for EnvironmentObjectLinkScope.
 const (
 	EnvironmentObjectLinkScopeDEPLOYMENT EnvironmentObjectLinkScope = "DEPLOYMENT"
+	EnvironmentObjectLinkScopePROJECT    EnvironmentObjectLinkScope = "PROJECT"
 )
 
 // Defines values for EnvironmentObjectMetricsExportAuthType.
@@ -586,6 +618,7 @@ const (
 // Defines values for ExcludeLinkEnvironmentObjectRequestScope.
 const (
 	ExcludeLinkEnvironmentObjectRequestScopeDEPLOYMENT ExcludeLinkEnvironmentObjectRequestScope = "DEPLOYMENT"
+	ExcludeLinkEnvironmentObjectRequestScopePROJECT    ExcludeLinkEnvironmentObjectRequestScope = "PROJECT"
 )
 
 // Defines values for GitHubAccountAccountType.
@@ -598,6 +631,11 @@ const (
 const (
 	PENDING  ManagedDomainStatus = "PENDING"
 	VERIFIED ManagedDomainStatus = "VERIFIED"
+)
+
+// Defines values for MigrateDeploymentEnvVarRequestTargetScope.
+const (
+	MigrateDeploymentEnvVarRequestTargetScopeWORKSPACE MigrateDeploymentEnvVarRequestTargetScope = "WORKSPACE"
 )
 
 // Defines values for MutateWorkerQueueRequestAstroMachine.
@@ -684,6 +722,11 @@ const (
 	OrganizationProductPlanProductPlanNameTRIALV2          OrganizationProductPlanProductPlanName = "TRIAL_V2"
 )
 
+// Defines values for PromoteEnvironmentObjectRequestTargetScope.
+const (
+	PromoteEnvironmentObjectRequestTargetScopeWORKSPACE PromoteEnvironmentObjectRequestTargetScope = "WORKSPACE"
+)
+
 // Defines values for RoleScopeType.
 const (
 	RoleScopeTypeDEPLOYMENT   RoleScopeType = "DEPLOYMENT"
@@ -705,6 +748,7 @@ const (
 
 // Defines values for RoleTemplateScopeType.
 const (
+	RoleTemplateScopeTypeDAG          RoleTemplateScopeType = "DAG"
 	RoleTemplateScopeTypeDEPLOYMENT   RoleTemplateScopeType = "DEPLOYMENT"
 	RoleTemplateScopeTypeORGANIZATION RoleTemplateScopeType = "ORGANIZATION"
 	RoleTemplateScopeTypeSYSTEM       RoleTemplateScopeType = "SYSTEM"
@@ -757,6 +801,8 @@ const (
 	SharedClusterStatusDELETED        SharedClusterStatus = "DELETED"
 	SharedClusterStatusDELETEFAILED   SharedClusterStatus = "DELETE_FAILED"
 	SharedClusterStatusDELETING       SharedClusterStatus = "DELETING"
+	SharedClusterStatusFAILINGOVER    SharedClusterStatus = "FAILING_OVER"
+	SharedClusterStatusFAILOVERFAILED SharedClusterStatus = "FAILOVER_FAILED"
 	SharedClusterStatusFORCEDELETED   SharedClusterStatus = "FORCE_DELETED"
 	SharedClusterStatusUPDATEFAILED   SharedClusterStatus = "UPDATE_FAILED"
 	SharedClusterStatusUPDATING       SharedClusterStatus = "UPDATING"
@@ -765,8 +811,8 @@ const (
 
 // Defines values for TriggerGitDeployRequestDeployType.
 const (
-	DAG   TriggerGitDeployRequestDeployType = "DAG"
-	IMAGE TriggerGitDeployRequestDeployType = "IMAGE"
+	TriggerGitDeployRequestDeployTypeDAG   TriggerGitDeployRequestDeployType = "DAG"
+	TriggerGitDeployRequestDeployTypeIMAGE TriggerGitDeployRequestDeployType = "IMAGE"
 )
 
 // Defines values for UpdateAstroIdeSessionRequestPermission.
@@ -778,6 +824,7 @@ const (
 // Defines values for UpdateEnvironmentObjectLinkRequestScope.
 const (
 	UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT UpdateEnvironmentObjectLinkRequestScope = "DEPLOYMENT"
+	UpdateEnvironmentObjectLinkRequestScopePROJECT    UpdateEnvironmentObjectLinkRequestScope = "PROJECT"
 )
 
 // Defines values for UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType.
@@ -994,6 +1041,12 @@ const (
 	ListOrganizationsParamsSortsUpdatedAtDesc     ListOrganizationsParamsSorts = "updatedAt:desc"
 )
 
+// Defines values for ListOrganizationApiTokensParamsKind.
+const (
+	ListOrganizationApiTokensParamsKindDIRECTACCESS ListOrganizationApiTokensParamsKind = "DIRECT_ACCESS"
+	ListOrganizationApiTokensParamsKindSTANDARD     ListOrganizationApiTokensParamsKind = "STANDARD"
+)
+
 // Defines values for ListOrganizationApiTokensParamsSorts.
 const (
 	ListOrganizationApiTokensParamsSortsCreatedAtAsc     ListOrganizationApiTokensParamsSorts = "createdAt:asc"
@@ -1060,6 +1113,8 @@ const (
 	DELETED        ListClustersParamsStatuses = "DELETED"
 	DELETEFAILED   ListClustersParamsStatuses = "DELETE_FAILED"
 	DELETING       ListClustersParamsStatuses = "DELETING"
+	FAILINGOVER    ListClustersParamsStatuses = "FAILING_OVER"
+	FAILOVERFAILED ListClustersParamsStatuses = "FAILOVER_FAILED"
 	FORCEDELETED   ListClustersParamsStatuses = "FORCE_DELETED"
 	UPDATEFAILED   ListClustersParamsStatuses = "UPDATE_FAILED"
 	UPDATING       ListClustersParamsStatuses = "UPDATING"
@@ -1182,6 +1237,12 @@ const (
 	ListDeploymentApiTokensParamsTokenTypesWORKSPACE    ListDeploymentApiTokensParamsTokenTypes = "WORKSPACE"
 )
 
+// Defines values for ListDeploymentApiTokensParamsKind.
+const (
+	ListDeploymentApiTokensParamsKindDIRECTACCESS ListDeploymentApiTokensParamsKind = "DIRECT_ACCESS"
+	ListDeploymentApiTokensParamsKindSTANDARD     ListDeploymentApiTokensParamsKind = "STANDARD"
+)
+
 // Defines values for ListDeploymentApiTokensParamsSorts.
 const (
 	ListDeploymentApiTokensParamsSortsCreatedAtAsc     ListDeploymentApiTokensParamsSorts = "createdAt:asc"
@@ -1202,6 +1263,63 @@ const (
 	ListDeploymentApiTokensParamsSortsUpdatedAtDesc    ListDeploymentApiTokensParamsSorts = "updatedAt:desc"
 	ListDeploymentApiTokensParamsSortsUpdatedByIdAsc   ListDeploymentApiTokensParamsSorts = "updatedById:asc"
 	ListDeploymentApiTokensParamsSortsUpdatedByIdDesc  ListDeploymentApiTokensParamsSorts = "updatedById:desc"
+)
+
+// Defines values for ListDagApiTokensParamsTokenTypes.
+const (
+	ListDagApiTokensParamsTokenTypesDEPLOYMENT   ListDagApiTokensParamsTokenTypes = "DEPLOYMENT"
+	ListDagApiTokensParamsTokenTypesORGANIZATION ListDagApiTokensParamsTokenTypes = "ORGANIZATION"
+	ListDagApiTokensParamsTokenTypesWORKSPACE    ListDagApiTokensParamsTokenTypes = "WORKSPACE"
+)
+
+// Defines values for ListDagApiTokensParamsKind.
+const (
+	ListDagApiTokensParamsKindDIRECTACCESS ListDagApiTokensParamsKind = "DIRECT_ACCESS"
+	ListDagApiTokensParamsKindSTANDARD     ListDagApiTokensParamsKind = "STANDARD"
+)
+
+// Defines values for ListDagApiTokensParamsSorts.
+const (
+	ListDagApiTokensParamsSortsCreatedAtAsc     ListDagApiTokensParamsSorts = "createdAt:asc"
+	ListDagApiTokensParamsSortsCreatedAtDesc    ListDagApiTokensParamsSorts = "createdAt:desc"
+	ListDagApiTokensParamsSortsDescriptionAsc   ListDagApiTokensParamsSorts = "description:asc"
+	ListDagApiTokensParamsSortsDescriptionDesc  ListDagApiTokensParamsSorts = "description:desc"
+	ListDagApiTokensParamsSortsNameAsc          ListDagApiTokensParamsSorts = "name:asc"
+	ListDagApiTokensParamsSortsNameDesc         ListDagApiTokensParamsSorts = "name:desc"
+	ListDagApiTokensParamsSortsTokenStartAtAsc  ListDagApiTokensParamsSorts = "tokenStartAt:asc"
+	ListDagApiTokensParamsSortsTokenStartAtDesc ListDagApiTokensParamsSorts = "tokenStartAt:desc"
+	ListDagApiTokensParamsSortsUpdatedAtAsc     ListDagApiTokensParamsSorts = "updatedAt:asc"
+	ListDagApiTokensParamsSortsUpdatedAtDesc    ListDagApiTokensParamsSorts = "updatedAt:desc"
+)
+
+// Defines values for ListDagTeamsParamsSorts.
+const (
+	ListDagTeamsParamsSortsCreatedAtAsc    ListDagTeamsParamsSorts = "createdAt:asc"
+	ListDagTeamsParamsSortsCreatedAtDesc   ListDagTeamsParamsSorts = "createdAt:desc"
+	ListDagTeamsParamsSortsDagRolesAsc     ListDagTeamsParamsSorts = "dagRoles:asc"
+	ListDagTeamsParamsSortsDagRolesDesc    ListDagTeamsParamsSorts = "dagRoles:desc"
+	ListDagTeamsParamsSortsDescriptionAsc  ListDagTeamsParamsSorts = "description:asc"
+	ListDagTeamsParamsSortsDescriptionDesc ListDagTeamsParamsSorts = "description:desc"
+	ListDagTeamsParamsSortsNameAsc         ListDagTeamsParamsSorts = "name:asc"
+	ListDagTeamsParamsSortsNameDesc        ListDagTeamsParamsSorts = "name:desc"
+	ListDagTeamsParamsSortsUpdatedAtAsc    ListDagTeamsParamsSorts = "updatedAt:asc"
+	ListDagTeamsParamsSortsUpdatedAtDesc   ListDagTeamsParamsSorts = "updatedAt:desc"
+)
+
+// Defines values for ListDagUsersParamsSorts.
+const (
+	ListDagUsersParamsSortsCreatedAtAsc       ListDagUsersParamsSorts = "createdAt:asc"
+	ListDagUsersParamsSortsCreatedAtDesc      ListDagUsersParamsSorts = "createdAt:desc"
+	ListDagUsersParamsSortsDeploymentRoleAsc  ListDagUsersParamsSorts = "deploymentRole:asc"
+	ListDagUsersParamsSortsDeploymentRoleDesc ListDagUsersParamsSorts = "deploymentRole:desc"
+	ListDagUsersParamsSortsFullNameAsc        ListDagUsersParamsSorts = "fullName:asc"
+	ListDagUsersParamsSortsFullNameDesc       ListDagUsersParamsSorts = "fullName:desc"
+	ListDagUsersParamsSortsStatusAsc          ListDagUsersParamsSorts = "status:asc"
+	ListDagUsersParamsSortsStatusDesc         ListDagUsersParamsSorts = "status:desc"
+	ListDagUsersParamsSortsUpdatedAtAsc       ListDagUsersParamsSorts = "updatedAt:asc"
+	ListDagUsersParamsSortsUpdatedAtDesc      ListDagUsersParamsSorts = "updatedAt:desc"
+	ListDagUsersParamsSortsUsernameAsc        ListDagUsersParamsSorts = "username:asc"
+	ListDagUsersParamsSortsUsernameDesc       ListDagUsersParamsSorts = "username:desc"
 )
 
 // Defines values for ListDeployStepsParamsSorts.
@@ -1288,6 +1406,7 @@ const (
 
 // Defines values for ListRoleTemplatesParamsScopeTypes.
 const (
+	ListRoleTemplatesParamsScopeTypesDAG          ListRoleTemplatesParamsScopeTypes = "DAG"
 	ListRoleTemplatesParamsScopeTypesDEPLOYMENT   ListRoleTemplatesParamsScopeTypes = "DEPLOYMENT"
 	ListRoleTemplatesParamsScopeTypesORGANIZATION ListRoleTemplatesParamsScopeTypes = "ORGANIZATION"
 	ListRoleTemplatesParamsScopeTypesWORKSPACE    ListRoleTemplatesParamsScopeTypes = "WORKSPACE"
@@ -1295,6 +1414,7 @@ const (
 
 // Defines values for ListRolesParamsScopeTypes.
 const (
+	ListRolesParamsScopeTypesDAG          ListRolesParamsScopeTypes = "DAG"
 	ListRolesParamsScopeTypesDEPLOYMENT   ListRolesParamsScopeTypes = "DEPLOYMENT"
 	ListRolesParamsScopeTypesORGANIZATION ListRolesParamsScopeTypes = "ORGANIZATION"
 	ListRolesParamsScopeTypesWORKSPACE    ListRolesParamsScopeTypes = "WORKSPACE"
@@ -1347,6 +1467,33 @@ const (
 	ListOrganizationTeamsParamsSortsWorkspaceCountDesc ListOrganizationTeamsParamsSorts = "workspaceCount:desc"
 )
 
+// Defines values for ListApiTokensParamsKind.
+const (
+	ListApiTokensParamsKindDIRECTACCESS ListApiTokensParamsKind = "DIRECT_ACCESS"
+	ListApiTokensParamsKindSTANDARD     ListApiTokensParamsKind = "STANDARD"
+)
+
+// Defines values for ListApiTokensParamsScopeType.
+const (
+	ListApiTokensParamsScopeTypeDEPLOYMENT   ListApiTokensParamsScopeType = "DEPLOYMENT"
+	ListApiTokensParamsScopeTypeORGANIZATION ListApiTokensParamsScopeType = "ORGANIZATION"
+	ListApiTokensParamsScopeTypeWORKSPACE    ListApiTokensParamsScopeType = "WORKSPACE"
+)
+
+// Defines values for ListApiTokensParamsSorts.
+const (
+	ListApiTokensParamsSortsCreatedAtAsc     ListApiTokensParamsSorts = "createdAt:asc"
+	ListApiTokensParamsSortsCreatedAtDesc    ListApiTokensParamsSorts = "createdAt:desc"
+	ListApiTokensParamsSortsDescriptionAsc   ListApiTokensParamsSorts = "description:asc"
+	ListApiTokensParamsSortsDescriptionDesc  ListApiTokensParamsSorts = "description:desc"
+	ListApiTokensParamsSortsNameAsc          ListApiTokensParamsSorts = "name:asc"
+	ListApiTokensParamsSortsNameDesc         ListApiTokensParamsSorts = "name:desc"
+	ListApiTokensParamsSortsTokenStartAtAsc  ListApiTokensParamsSorts = "tokenStartAt:asc"
+	ListApiTokensParamsSortsTokenStartAtDesc ListApiTokensParamsSorts = "tokenStartAt:desc"
+	ListApiTokensParamsSortsUpdatedAtAsc     ListApiTokensParamsSorts = "updatedAt:asc"
+	ListApiTokensParamsSortsUpdatedAtDesc    ListApiTokensParamsSorts = "updatedAt:desc"
+)
+
 // Defines values for ListOrgUsersParamsSorts.
 const (
 	ListOrgUsersParamsSortsCreatedAtAsc  ListOrgUsersParamsSorts = "createdAt:asc"
@@ -1387,6 +1534,12 @@ const (
 	ListWorkspaceApiTokensParamsTokenTypesWORKSPACE    ListWorkspaceApiTokensParamsTokenTypes = "WORKSPACE"
 )
 
+// Defines values for ListWorkspaceApiTokensParamsKind.
+const (
+	DIRECTACCESS ListWorkspaceApiTokensParamsKind = "DIRECT_ACCESS"
+	STANDARD     ListWorkspaceApiTokensParamsKind = "STANDARD"
+)
+
 // Defines values for ListWorkspaceApiTokensParamsSorts.
 const (
 	ListWorkspaceApiTokensParamsSortsCreatedAtAsc     ListWorkspaceApiTokensParamsSorts = "createdAt:asc"
@@ -1425,8 +1578,8 @@ const (
 
 // Defines values for ListAstroIdeProjectsParamsVisibility.
 const (
-	ListAstroIdeProjectsParamsVisibilityPRIVATE   ListAstroIdeProjectsParamsVisibility = "PRIVATE"
-	ListAstroIdeProjectsParamsVisibilityWORKSPACE ListAstroIdeProjectsParamsVisibility = "WORKSPACE"
+	PRIVATE   ListAstroIdeProjectsParamsVisibility = "PRIVATE"
+	WORKSPACE ListAstroIdeProjectsParamsVisibility = "WORKSPACE"
 )
 
 // Defines values for ImportAstroIdeSessionTarParamsMode.
@@ -1551,6 +1704,31 @@ type AgentsPaginated struct {
 	TotalCount int     `json:"totalCount"`
 }
 
+// AiAgentConfig defines model for AiAgentConfig.
+type AiAgentConfig struct {
+	RcaGuidance *string `json:"rcaGuidance,omitempty"`
+}
+
+// AiAgentConfigRequest defines model for AiAgentConfigRequest.
+type AiAgentConfigRequest struct {
+	RcaGuidance *string `json:"rcaGuidance,omitempty"`
+}
+
+// ApiDriven defines model for ApiDriven.
+type ApiDriven struct {
+	IsApiDriven    *bool   `json:"isApiDriven,omitempty"`
+	Packages       *string `json:"packages,omitempty"`
+	Requirements   *string `json:"requirements,omitempty"`
+	RuntimeVersion *string `json:"runtimeVersion,omitempty"`
+}
+
+// ApiDrivenRequest defines model for ApiDrivenRequest.
+type ApiDrivenRequest struct {
+	IsApiDriven  *bool   `json:"isApiDriven,omitempty"`
+	Packages     *string `json:"packages,omitempty"`
+	Requirements *string `json:"requirements,omitempty"`
+}
+
 // ApiToken defines model for ApiToken.
 type ApiToken struct {
 	CreatedAt          time.Time            `json:"createdAt"`
@@ -1561,6 +1739,7 @@ type ApiToken struct {
 	EndAt              *time.Time           `json:"endAt,omitempty"`
 	ExpiryPeriodInDays *int                 `json:"expiryPeriodInDays,omitempty"`
 	Id                 string               `json:"id"`
+	Kind               ApiTokenKind         `json:"kind"`
 	LastUsedAt         *time.Time           `json:"lastUsedAt,omitempty"`
 	Name               string               `json:"name"`
 	OrganizationId     *string              `json:"organizationId,omitempty"`
@@ -1575,8 +1754,19 @@ type ApiToken struct {
 	UpdatedById        string               `json:"updatedById"`
 }
 
+// ApiTokenKind defines model for ApiToken.Kind.
+type ApiTokenKind string
+
 // ApiTokenType defines model for ApiToken.Type.
 type ApiTokenType string
+
+// ApiTokenDagRoleRequest defines model for ApiTokenDagRoleRequest.
+type ApiTokenDagRoleRequest struct {
+	DagId        *string `json:"dagId,omitempty"`
+	DagTag       *string `json:"dagTag,omitempty"`
+	DeploymentId string  `json:"deploymentId"`
+	Role         string  `json:"role"`
+}
 
 // ApiTokenDeploymentRoleRequest defines model for ApiTokenDeploymentRoleRequest.
 type ApiTokenDeploymentRoleRequest struct {
@@ -1586,9 +1776,11 @@ type ApiTokenDeploymentRoleRequest struct {
 
 // ApiTokenRole defines model for ApiTokenRole.
 type ApiTokenRole struct {
-	EntityId   string                 `json:"entityId"`
-	EntityType ApiTokenRoleEntityType `json:"entityType"`
-	Role       string                 `json:"role"`
+	// DeploymentId The parent Deployment of the DAG when entityType is DAG.
+	DeploymentId *string                `json:"deploymentId,omitempty"`
+	EntityId     string                 `json:"entityId"`
+	EntityType   ApiTokenRoleEntityType `json:"entityType"`
+	Role         string                 `json:"role"`
 }
 
 // ApiTokenRoleEntityType defines model for ApiTokenRole.EntityType.
@@ -1609,7 +1801,6 @@ type AstroIdeProject struct {
 	Lock           *AstroIdeProjectLock      `json:"lock,omitempty"`
 	Name           string                    `json:"name"`
 	OrganizationId string                    `json:"organizationId"`
-	Remote         *AstroIdeProjectRemote    `json:"remote,omitempty"`
 	Rules          *string                   `json:"rules,omitempty"`
 	UpdatedAt      time.Time                 `json:"updatedAt"`
 	UpdatedBy      *BasicSubjectProfile      `json:"updatedBy,omitempty"`
@@ -1626,18 +1817,6 @@ type AstroIdeProjectLock struct {
 	LastEditedAt string              `json:"lastEditedAt"`
 	Subject      BasicSubjectProfile `json:"subject"`
 }
-
-// AstroIdeProjectRemote defines model for AstroIdeProjectRemote.
-type AstroIdeProjectRemote struct {
-	GitAccount    string                           `json:"gitAccount"`
-	GitBranch     *string                          `json:"gitBranch,omitempty"`
-	GitPath       *string                          `json:"gitPath,omitempty"`
-	GitProvider   AstroIdeProjectRemoteGitProvider `json:"gitProvider"`
-	GitRepository string                           `json:"gitRepository"`
-}
-
-// AstroIdeProjectRemoteGitProvider defines model for AstroIdeProjectRemote.GitProvider.
-type AstroIdeProjectRemoteGitProvider string
 
 // AstroIdeProjectVersion defines model for AstroIdeProjectVersion.
 type AstroIdeProjectVersion struct {
@@ -1721,50 +1900,59 @@ type Bundle struct {
 
 // Cluster defines model for Cluster.
 type Cluster struct {
-	AppliedHarmonyVersion             *string                     `json:"appliedHarmonyVersion,omitempty"`
-	AppliedTemplateVersion            string                      `json:"appliedTemplateVersion"`
-	AuroraReplicationSourceIdentifier *string                     `json:"auroraReplicationSourceIdentifier,omitempty"`
-	AwsInstanceProfile                *string                     `json:"awsInstanceProfile,omitempty"`
-	AwsSecurityGroupId                *string                     `json:"awsSecurityGroupId,omitempty"`
-	AwsSubnetIds                      *[]string                   `json:"awsSubnetIds,omitempty"`
-	BlockInternetAccess               *bool                       `json:"blockInternetAccess,omitempty"`
-	CloudProvider                     ClusterCloudProvider        `json:"cloudProvider"`
-	Cohort                            *ClusterCohort              `json:"cohort,omitempty"`
-	ComponentVersions                 *[]ClusterComponentVersion  `json:"componentVersions,omitempty"`
-	CreatedAt                         time.Time                   `json:"createdAt"`
-	DbInstanceType                    string                      `json:"dbInstanceType"`
-	DbInstanceVersion                 string                      `json:"dbInstanceVersion"`
-	DeletedAt                         *string                     `json:"deletedAt,omitempty"`
-	DrRegion                          *string                     `json:"drRegion,omitempty"`
-	HarmonyVersion                    string                      `json:"harmonyVersion"`
-	HealthStatus                      *ClusterHealthStatus        `json:"healthStatus,omitempty"`
-	Id                                string                      `json:"id"`
-	IsCordoned                        *bool                       `json:"isCordoned,omitempty"`
-	IsDryRun                          bool                        `json:"isDryRun"`
-	IsFailedOver                      *bool                       `json:"isFailedOver,omitempty"`
-	IsLimited                         bool                        `json:"isLimited"`
-	K8sTags                           []ClusterTag                `json:"k8sTags"`
-	Metadata                          ClusterMetadata             `json:"metadata"`
-	Name                              string                      `json:"name"`
-	NodePools                         []NodePool                  `json:"nodePools"`
-	OrganizationId                    string                      `json:"organizationId"`
-	PodSubnetRange                    string                      `json:"podSubnetRange"`
-	ProviderAccount                   string                      `json:"providerAccount"`
-	RdsSnapshotIdentifier             *string                     `json:"rdsSnapshotIdentifier,omitempty"`
-	Region                            string                      `json:"region"`
-	SecondaryPodRanges                *[]SecondaryPodRange        `json:"secondaryPodRanges,omitempty"`
-	ServicePeeringRange               string                      `json:"servicePeeringRange"`
-	ServiceSubnetRange                string                      `json:"serviceSubnetRange"`
-	Status                            ClusterStatus               `json:"status"`
-	TemplateUrl                       string                      `json:"templateUrl"`
-	TemplateVersion                   string                      `json:"templateVersion"`
-	TemporalRunId                     string                      `json:"temporalRunId"`
-	TenantId                          string                      `json:"tenantId"`
-	TgwNetworkConnections             *[]ClusterNetworkConnection `json:"tgwNetworkConnections,omitempty"`
-	Type                              ClusterType                 `json:"type"`
-	UpdatedAt                         time.Time                   `json:"updatedAt"`
-	VpcSubnetRange                    string                      `json:"vpcSubnetRange"`
-	Workspaces                        []string                    `json:"workspaces"`
+	AppliedHarmonyVersion             *string                    `json:"appliedHarmonyVersion,omitempty"`
+	AppliedTemplateVersion            string                     `json:"appliedTemplateVersion"`
+	AuroraReplicationSourceIdentifier *string                    `json:"auroraReplicationSourceIdentifier,omitempty"`
+	AwsInstanceProfile                *string                    `json:"awsInstanceProfile,omitempty"`
+	AwsSecurityGroupId                *string                    `json:"awsSecurityGroupId,omitempty"`
+	AwsSubnetIds                      *[]string                  `json:"awsSubnetIds,omitempty"`
+	BlockInternetAccess               *bool                      `json:"blockInternetAccess,omitempty"`
+	CloudProvider                     ClusterCloudProvider       `json:"cloudProvider"`
+	Cohort                            *ClusterCohort             `json:"cohort,omitempty"`
+	ComponentVersions                 *[]ClusterComponentVersion `json:"componentVersions,omitempty"`
+	CreatedAt                         time.Time                  `json:"createdAt"`
+	DbInstanceType                    string                     `json:"dbInstanceType"`
+	DbInstanceVersion                 string                     `json:"dbInstanceVersion"`
+	DeletedAt                         *string                    `json:"deletedAt,omitempty"`
+	DrMetadata                        *ClusterMetadata           `json:"drMetadata,omitempty"`
+	DrRegion                          *string                    `json:"drRegion,omitempty"`
+	DrSecondaryVpcCidr                *string                    `json:"drSecondaryVpcCidr,omitempty"`
+	DrVpcSubnetRange                  *string                    `json:"drVpcSubnetRange,omitempty"`
+	EnableReplicationTimeControl      *bool                      `json:"enableReplicationTimeControl,omitempty"`
+	FailoverInProgress                *bool                      `json:"failoverInProgress,omitempty"`
+
+	// HarmonyVersion Deprecated: cluster harmony_version has been replaced with cluster_component_version table
+	HarmonyVersion        string                      `json:"harmonyVersion"`
+	HealthStatus          *ClusterHealthStatus        `json:"healthStatus,omitempty"`
+	Id                    string                      `json:"id"`
+	IsCordoned            *bool                       `json:"isCordoned,omitempty"`
+	IsDrEnabled           *bool                       `json:"isDrEnabled,omitempty"`
+	IsDryRun              bool                        `json:"isDryRun"`
+	IsFailedOver          *bool                       `json:"isFailedOver,omitempty"`
+	IsLimited             bool                        `json:"isLimited"`
+	K8sTags               []ClusterTag                `json:"k8sTags"`
+	Metadata              ClusterMetadata             `json:"metadata"`
+	Name                  string                      `json:"name"`
+	NodePools             []NodePool                  `json:"nodePools"`
+	OrganizationId        string                      `json:"organizationId"`
+	PodSubnetRange        string                      `json:"podSubnetRange"`
+	ProviderAccount       string                      `json:"providerAccount"`
+	RdsSnapshotIdentifier *string                     `json:"rdsSnapshotIdentifier,omitempty"`
+	Region                string                      `json:"region"`
+	SecondaryPodRanges    *[]SecondaryPodRange        `json:"secondaryPodRanges,omitempty"`
+	SecondaryVpcCidr      *string                     `json:"secondaryVpcCidr,omitempty"`
+	ServicePeeringRange   string                      `json:"servicePeeringRange"`
+	ServiceSubnetRange    string                      `json:"serviceSubnetRange"`
+	Status                ClusterStatus               `json:"status"`
+	TemplateUrl           string                      `json:"templateUrl"`
+	TemplateVersion       string                      `json:"templateVersion"`
+	TemporalRunId         string                      `json:"temporalRunId"`
+	TenantId              string                      `json:"tenantId"`
+	TgwNetworkConnections *[]ClusterNetworkConnection `json:"tgwNetworkConnections,omitempty"`
+	Type                  ClusterType                 `json:"type"`
+	UpdatedAt             time.Time                   `json:"updatedAt"`
+	VpcSubnetRange        string                      `json:"vpcSubnetRange"`
+	Workspaces            []string                    `json:"workspaces"`
 }
 
 // ClusterCloudProvider defines model for Cluster.CloudProvider.
@@ -1784,6 +1972,7 @@ type ClusterComponentVersion struct {
 	AppliedVersion string `json:"appliedVersion"`
 	Component      string `json:"component"`
 	DesiredVersion string `json:"desiredVersion"`
+	IsPinned       bool   `json:"isPinned"`
 }
 
 // ClusterDetailed defines model for ClusterDetailed.
@@ -1804,21 +1993,32 @@ type ClusterDetailed struct {
 	DbInstanceType                    string                       `json:"dbInstanceType"`
 	DbInstanceVersion                 string                       `json:"dbInstanceVersion"`
 	DeletedAt                         *string                      `json:"deletedAt,omitempty"`
-	DisableHarmonyVersionUpgrades     bool                         `json:"disableHarmonyVersionUpgrades"`
-	DisableTemplateVersionUpgrades    bool                         `json:"disableTemplateVersionUpgrades"`
-	DrRegion                          *string                      `json:"drRegion,omitempty"`
-	HarmonyVersion                    string                       `json:"harmonyVersion"`
-	HealthStatus                      *ClusterHealthStatus         `json:"healthStatus,omitempty"`
-	Id                                string                       `json:"id"`
-	IsCordoned                        *bool                        `json:"isCordoned,omitempty"`
-	IsDryRun                          bool                         `json:"isDryRun"`
-	IsFailedOver                      *bool                        `json:"isFailedOver,omitempty"`
-	IsLimited                         bool                         `json:"isLimited"`
-	K8sTags                           []ClusterTag                 `json:"k8sTags"`
-	Metadata                          ClusterMetadata              `json:"metadata"`
-	Name                              string                       `json:"name"`
-	NodePools                         []NodePool                   `json:"nodePools"`
-	NoteCount                         int                          `json:"noteCount"`
+
+	// DisableHarmonyVersionUpgrades Deprecated: cluster harmony_version has been replaced with cluster_component_version table
+	DisableHarmonyVersionUpgrades  bool             `json:"disableHarmonyVersionUpgrades"`
+	DisableTemplateVersionUpgrades bool             `json:"disableTemplateVersionUpgrades"`
+	DrMetadata                     *ClusterMetadata `json:"drMetadata,omitempty"`
+	DrRegion                       *string          `json:"drRegion,omitempty"`
+	DrSecondaryVpcCidr             *string          `json:"drSecondaryVpcCidr,omitempty"`
+	DrVpcSubnetRange               *string          `json:"drVpcSubnetRange,omitempty"`
+	Drifted                        *bool            `json:"drifted,omitempty"`
+	EnableReplicationTimeControl   *bool            `json:"enableReplicationTimeControl,omitempty"`
+	FailoverInProgress             *bool            `json:"failoverInProgress,omitempty"`
+
+	// HarmonyVersion Deprecated: cluster harmony_version has been replaced with cluster_component_version table
+	HarmonyVersion string               `json:"harmonyVersion"`
+	HealthStatus   *ClusterHealthStatus `json:"healthStatus,omitempty"`
+	Id             string               `json:"id"`
+	IsCordoned     *bool                `json:"isCordoned,omitempty"`
+	IsDrEnabled    *bool                `json:"isDrEnabled,omitempty"`
+	IsDryRun       bool                 `json:"isDryRun"`
+	IsFailedOver   *bool                `json:"isFailedOver,omitempty"`
+	IsLimited      bool                 `json:"isLimited"`
+	K8sTags        []ClusterTag         `json:"k8sTags"`
+	Metadata       ClusterMetadata      `json:"metadata"`
+	Name           string               `json:"name"`
+	NodePools      []NodePool           `json:"nodePools"`
+	NoteCount      int                  `json:"noteCount"`
 
 	// OrgShortName Deprecated: orgShortName has been replaced with organizationShortName
 	OrgShortName               *string                     `json:"orgShortName,omitempty"`
@@ -1832,6 +2032,7 @@ type ClusterDetailed struct {
 	RdsSnapshotIdentifier      *string                     `json:"rdsSnapshotIdentifier,omitempty"`
 	Region                     string                      `json:"region"`
 	SecondaryPodRanges         *[]SecondaryPodRange        `json:"secondaryPodRanges,omitempty"`
+	SecondaryVpcCidr           *string                     `json:"secondaryVpcCidr,omitempty"`
 	ServicePeeringRange        string                      `json:"servicePeeringRange"`
 	ServiceSubnetRange         string                      `json:"serviceSubnetRange"`
 	Status                     ClusterDetailedStatus       `json:"status"`
@@ -1843,6 +2044,7 @@ type ClusterDetailed struct {
 	Type                       ClusterDetailedType         `json:"type"`
 	UpdatedAt                  time.Time                   `json:"updatedAt"`
 	UpdatedBy                  BasicSubjectProfile         `json:"updatedBy"`
+	UseAurora                  *bool                       `json:"useAurora,omitempty"`
 	VpcSubnetRange             string                      `json:"vpcSubnetRange"`
 	Workspaces                 []string                    `json:"workspaces"`
 }
@@ -1871,9 +2073,10 @@ type ClusterHealthDetailMute struct {
 
 // ClusterHealthStatus defines model for ClusterHealthStatus.
 type ClusterHealthStatus struct {
-	Details  *[]ClusterHealthStatusDetail `json:"details,omitempty"`
-	Severity *ClusterHealthStatusSeverity `json:"severity,omitempty"`
-	Value    ClusterHealthStatusValue     `json:"value"`
+	Details   *[]ClusterHealthStatusDetail `json:"details,omitempty"`
+	DrDetails *[]ClusterHealthStatusDetail `json:"drDetails,omitempty"`
+	Severity  *ClusterHealthStatusSeverity `json:"severity,omitempty"`
+	Value     ClusterHealthStatusValue     `json:"value"`
 }
 
 // ClusterHealthStatusSeverity defines model for ClusterHealthStatus.Severity.
@@ -1894,9 +2097,18 @@ type ClusterHealthStatusDetail struct {
 
 // ClusterMetadata defines model for ClusterMetadata.
 type ClusterMetadata struct {
-	ExternalIPs   *[]string `json:"externalIPs,omitempty"`
-	KubeDnsIp     *string   `json:"kubeDnsIp,omitempty"`
-	OidcIssuerUrl *string   `json:"oidcIssuerUrl,omitempty"`
+	DbInstanceIdentifier                    *string   `json:"dbInstanceIdentifier,omitempty"`
+	EksClusterSecurityGroup                 *string   `json:"eksClusterSecurityGroup,omitempty"`
+	ExternalIPs                             *[]string `json:"externalIPs,omitempty"`
+	KubeDnsIp                               *string   `json:"kubeDnsIp,omitempty"`
+	NodeSecurityGroup                       *string   `json:"nodeSecurityGroup,omitempty"`
+	OidcIssuerUrl                           *string   `json:"oidcIssuerUrl,omitempty"`
+	PrivateSecondarySubnet0AvailabilityZone *string   `json:"privateSecondarySubnet0AvailabilityZone,omitempty"`
+	PrivateSecondarySubnet0Id               *string   `json:"privateSecondarySubnet0Id,omitempty"`
+	PrivateSecondarySubnet1AvailabilityZone *string   `json:"privateSecondarySubnet1AvailabilityZone,omitempty"`
+	PrivateSecondarySubnet1Id               *string   `json:"privateSecondarySubnet1Id,omitempty"`
+	PrivateSubnetIDs                        *[]string `json:"privateSubnetIDs,omitempty"`
+	SelfManagedEKSNodeInstanceProfile       *string   `json:"selfManagedEKSNodeInstanceProfile,omitempty"`
 }
 
 // ClusterNetworkConnection defines model for ClusterNetworkConnection.
@@ -1906,6 +2118,9 @@ type ClusterNetworkConnection struct {
 
 	// Id The id of the network connection
 	Id string `json:"id"`
+
+	// IsDr Whether network connection applies to the secondary cluster when DR is enabled
+	IsDr bool `json:"isDr"`
 
 	// Name The name of the network connection
 	Name string `json:"name"`
@@ -1953,22 +2168,24 @@ type ClusterNetworkConnectionType string
 
 // ClusterOptions defines model for ClusterOptions.
 type ClusterOptions struct {
-	DatabaseInstances          []ProviderInstanceType `json:"databaseInstances"`
-	DefaultDatabaseInstance    ProviderInstanceType   `json:"defaultDatabaseInstance"`
-	DefaultNodeInstance        ProviderInstanceType   `json:"defaultNodeInstance"`
-	DefaultPodSubnetRange      *string                `json:"defaultPodSubnetRange,omitempty"`
-	DefaultRegion              ProviderRegion         `json:"defaultRegion"`
-	DefaultServicePeeringRange *string                `json:"defaultServicePeeringRange,omitempty"`
-	DefaultServiceSubnetRange  *string                `json:"defaultServiceSubnetRange,omitempty"`
-	DefaultVpcSubnetRange      string                 `json:"defaultVpcSubnetRange"`
-	HarmonyVersions            *[]string              `json:"harmonyVersions,omitempty"`
-	NodeCountDefault           int                    `json:"nodeCountDefault"`
-	NodeCountMax               int                    `json:"nodeCountMax"`
-	NodeCountMin               int                    `json:"nodeCountMin"`
-	NodeInstances              []ProviderInstanceType `json:"nodeInstances"`
-	Provider                   string                 `json:"provider"`
-	Regions                    []ProviderRegion       `json:"regions"`
-	TemplateVersions           []TemplateVersion      `json:"templateVersions"`
+	DRDatabaseInstances        *[]ProviderInstanceType `json:"dRDatabaseInstances,omitempty"`
+	DatabaseInstances          []ProviderInstanceType  `json:"databaseInstances"`
+	DefaultDRDatabaseInstance  *ProviderInstanceType   `json:"defaultDRDatabaseInstance,omitempty"`
+	DefaultDatabaseInstance    ProviderInstanceType    `json:"defaultDatabaseInstance"`
+	DefaultNodeInstance        ProviderInstanceType    `json:"defaultNodeInstance"`
+	DefaultPodSubnetRange      *string                 `json:"defaultPodSubnetRange,omitempty"`
+	DefaultRegion              ProviderRegion          `json:"defaultRegion"`
+	DefaultServicePeeringRange *string                 `json:"defaultServicePeeringRange,omitempty"`
+	DefaultServiceSubnetRange  *string                 `json:"defaultServiceSubnetRange,omitempty"`
+	DefaultVpcSubnetRange      string                  `json:"defaultVpcSubnetRange"`
+	HarmonyVersions            *[]string               `json:"harmonyVersions,omitempty"`
+	NodeCountDefault           int                     `json:"nodeCountDefault"`
+	NodeCountMax               int                     `json:"nodeCountMax"`
+	NodeCountMin               int                     `json:"nodeCountMin"`
+	NodeInstances              []ProviderInstanceType  `json:"nodeInstances"`
+	Provider                   string                  `json:"provider"`
+	Regions                    []ProviderRegion        `json:"regions"`
+	TemplateVersions           []TemplateVersion       `json:"templateVersions"`
 }
 
 // ClusterRoute defines model for ClusterRoute.
@@ -1979,6 +2196,7 @@ type ClusterRoute struct {
 	Description     *string                `json:"description,omitempty"`
 	DestinationCidr string                 `json:"destinationCidr"`
 	Id              string                 `json:"id"`
+	IsDr            bool                   `json:"isDr"`
 	Name            string                 `json:"name"`
 	Source          ClusterRouteSource     `json:"source"`
 	Target          string                 `json:"target"`
@@ -2039,24 +2257,11 @@ type ConnectionAuthTypeParameter struct {
 	Pattern          *string `json:"pattern,omitempty"`
 }
 
-// CreateAstroIdeProjectRemoteRequest defines model for CreateAstroIdeProjectRemoteRequest.
-type CreateAstroIdeProjectRemoteRequest struct {
-	GitAccount    string                                        `json:"gitAccount"`
-	GitBranch     *string                                       `json:"gitBranch,omitempty"`
-	GitPath       *string                                       `json:"gitPath,omitempty"`
-	GitProvider   CreateAstroIdeProjectRemoteRequestGitProvider `json:"gitProvider"`
-	GitRepository string                                        `json:"gitRepository"`
-}
-
-// CreateAstroIdeProjectRemoteRequestGitProvider defines model for CreateAstroIdeProjectRemoteRequest.GitProvider.
-type CreateAstroIdeProjectRemoteRequestGitProvider string
-
 // CreateAstroIdeProjectRequest defines model for CreateAstroIdeProjectRequest.
 type CreateAstroIdeProjectRequest struct {
 	Description   *string                                 `json:"description,omitempty"`
 	Name          *string                                 `json:"name,omitempty"`
 	PromptForName *string                                 `json:"promptForName,omitempty"`
-	Remote        *CreateAstroIdeProjectRemoteRequest     `json:"remote,omitempty"`
 	Template      *string                                 `json:"template,omitempty"`
 	Visibility    *CreateAstroIdeProjectRequestVisibility `json:"visibility,omitempty"`
 }
@@ -2090,8 +2295,11 @@ type CreateAstroIdeSessionRequestPermission string
 type CreateAwsClusterRequest struct {
 	BlockInternetAccess            *bool                       `json:"blockInternetAccess,omitempty"`
 	DbInstanceType                 string                      `json:"dbInstanceType"`
-	DisableHarmonyVersionUpgrades  *bool                       `json:"disableHarmonyVersionUpgrades,omitempty"`
 	DisableTemplateVersionUpgrades *bool                       `json:"disableTemplateVersionUpgrades,omitempty"`
+	DrRegion                       *string                     `json:"drRegion,omitempty"`
+	DrSecondaryVpcCidr             *string                     `json:"drSecondaryVpcCidr,omitempty"`
+	DrVpcSubnetRange               *string                     `json:"drVpcSubnetRange,omitempty"`
+	EnableReplicationTimeControl   *bool                       `json:"enableReplicationTimeControl,omitempty"`
 	HarmonyVersion                 *string                     `json:"harmonyVersion,omitempty"`
 	IsDryRun                       *bool                       `json:"isDryRun,omitempty"`
 	K8sTags                        *[]ClusterTag               `json:"k8sTags,omitempty"`
@@ -2099,6 +2307,7 @@ type CreateAwsClusterRequest struct {
 	NodePools                      *[]CreateNodePoolRequest    `json:"nodePools,omitempty"`
 	ProviderAccount                *string                     `json:"providerAccount,omitempty"`
 	Region                         string                      `json:"region"`
+	SecondaryVpcCidr               *string                     `json:"secondaryVpcCidr,omitempty"`
 	TemplateVersion                *string                     `json:"templateVersion,omitempty"`
 	Type                           CreateAwsClusterRequestType `json:"type"`
 	VpcSubnetRange                 string                      `json:"vpcSubnetRange"`
@@ -2111,8 +2320,9 @@ type CreateAwsClusterRequestType string
 type CreateAzureClusterRequest struct {
 	BlockInternetAccess            *bool                         `json:"blockInternetAccess,omitempty"`
 	DbInstanceType                 string                        `json:"dbInstanceType"`
-	DisableHarmonyVersionUpgrades  *bool                         `json:"disableHarmonyVersionUpgrades,omitempty"`
 	DisableTemplateVersionUpgrades *bool                         `json:"disableTemplateVersionUpgrades,omitempty"`
+	DrRegion                       *string                       `json:"drRegion,omitempty"`
+	EnableReplicationTimeControl   *bool                         `json:"enableReplicationTimeControl,omitempty"`
 	HarmonyVersion                 *string                       `json:"harmonyVersion,omitempty"`
 	IsDryRun                       *bool                         `json:"isDryRun,omitempty"`
 	K8sTags                        *[]ClusterTag                 `json:"k8sTags,omitempty"`
@@ -2134,6 +2344,7 @@ type CreateClusterRouteRequest struct {
 	ConnectionId    *string                             `json:"connectionId,omitempty"`
 	Description     *string                             `json:"description,omitempty"`
 	DestinationCidr string                              `json:"destinationCidr"`
+	IsDr            *bool                               `json:"isDr,omitempty"`
 	Name            string                              `json:"name"`
 	Source          CreateClusterRouteRequestSource     `json:"source"`
 	Target          *string                             `json:"target,omitempty"`
@@ -2160,12 +2371,18 @@ type CreateCustomRoleRequestScopeType string
 
 // CreateDedicatedDeploymentRequest defines model for CreateDedicatedDeploymentRequest.
 type CreateDedicatedDeploymentRequest struct {
+	ApiDriven *ApiDrivenRequest                `json:"apiDriven,omitempty"`
+	AstroIde  *CreateDeploymentAstroIdeRequest `json:"astroIde,omitempty"`
+
 	// AstroRuntimeVersion Version of the astro runtime to use
 	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
 
 	// ClusterId Cluster where the deployment should be created on
 	ClusterId     string    `json:"clusterId"`
 	ContactEmails *[]string `json:"contactEmails,omitempty"`
+
+	// DagsBundleType The type of DAGs bundle backend to use
+	DagsBundleType *string `json:"dagsBundleType,omitempty"`
 
 	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores. Required if remote execution is disabled.
 	DefaultTaskPodCpu *string `json:"defaultTaskPodCpu,omitempty"`
@@ -2179,11 +2396,17 @@ type CreateDedicatedDeploymentRequest struct {
 	// Description Optional description of the deployment
 	Description *string `json:"description,omitempty"`
 
+	// DrWorkloadIdentity The DR workload identity to use for the deployment
+	DrWorkloadIdentity *string `json:"drWorkloadIdentity,omitempty"`
+
 	// Executor Airflow executors, supported: CELERY, KUBERNETES, ASTRO
 	Executor CreateDedicatedDeploymentRequestExecutor `json:"executor"`
 
 	// IncludeDefaultAlerts If true, default alerts will be created for the deployment
 	IncludeDefaultAlerts *bool `json:"includeDefaultAlerts,omitempty"`
+
+	// IsApiDriven If true, deployment DAGs are managed via the bundle files API
+	IsApiDriven *bool `json:"isApiDriven,omitempty"`
 
 	// IsCicdEnforced If true, deployment specifications can only be updated through API token, changes will not be allowed through UI. This option can be turned off by admin
 	IsCicdEnforced bool `json:"isCicdEnforced"`
@@ -2272,10 +2495,19 @@ type CreateDeployRequestType string
 
 // CreateDeploymentApiTokenRequest defines model for CreateDeploymentApiTokenRequest.
 type CreateDeploymentApiTokenRequest struct {
-	Description             *string `json:"description,omitempty"`
-	Name                    string  `json:"name"`
-	Role                    string  `json:"role"`
-	TokenExpiryPeriodInDays *int    `json:"tokenExpiryPeriodInDays,omitempty"`
+	Description             *string                              `json:"description,omitempty"`
+	Kind                    *CreateDeploymentApiTokenRequestKind `json:"kind,omitempty"`
+	Name                    string                               `json:"name"`
+	Role                    string                               `json:"role"`
+	TokenExpiryPeriodInDays *int                                 `json:"tokenExpiryPeriodInDays,omitempty"`
+}
+
+// CreateDeploymentApiTokenRequestKind defines model for CreateDeploymentApiTokenRequest.Kind.
+type CreateDeploymentApiTokenRequestKind string
+
+// CreateDeploymentAstroIdeRequest defines model for CreateDeploymentAstroIdeRequest.
+type CreateDeploymentAstroIdeRequest struct {
+	ProjectId string `json:"projectId"`
 }
 
 // CreateDeploymentRequest defines model for CreateDeploymentRequest.
@@ -2403,7 +2635,9 @@ type CreateEnvironmentObjectOverridesRequest struct {
 type CreateEnvironmentObjectRequest struct {
 	AirflowVariable     *CreateEnvironmentObjectAirflowVariableRequest     `json:"airflowVariable,omitempty"`
 	AutoLinkDeployments *bool                                              `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                                              `json:"autoLinkProjects,omitempty"`
 	Connection          *CreateEnvironmentObjectConnectionRequest          `json:"connection,omitempty"`
+	Description         *string                                            `json:"description,omitempty"`
 	EnvironmentVariable *CreateEnvironmentObjectEnvironmentVariableRequest `json:"environmentVariable,omitempty"`
 	ExcludeLinks        *[]ExcludeLinkEnvironmentObjectRequest             `json:"excludeLinks,omitempty"`
 	Links               *[]CreateEnvironmentObjectLinkRequest              `json:"links,omitempty"`
@@ -2424,8 +2658,9 @@ type CreateEnvironmentObjectRequestScope string
 type CreateGcpClusterRequest struct {
 	BlockInternetAccess            *bool                       `json:"blockInternetAccess,omitempty"`
 	DbInstanceType                 string                      `json:"dbInstanceType"`
-	DisableHarmonyVersionUpgrades  *bool                       `json:"disableHarmonyVersionUpgrades,omitempty"`
 	DisableTemplateVersionUpgrades *bool                       `json:"disableTemplateVersionUpgrades,omitempty"`
+	DrRegion                       *string                     `json:"drRegion,omitempty"`
+	EnableReplicationTimeControl   *bool                       `json:"enableReplicationTimeControl,omitempty"`
 	HarmonyVersion                 *string                     `json:"harmonyVersion,omitempty"`
 	IsDryRun                       *bool                       `json:"isDryRun,omitempty"`
 	K8sTags                        *[]ClusterTag               `json:"k8sTags,omitempty"`
@@ -2452,6 +2687,8 @@ type CreateGitRepositoryBranchRequest struct {
 
 // CreateHybridDeploymentRequest defines model for CreateHybridDeploymentRequest.
 type CreateHybridDeploymentRequest struct {
+	ApiDriven *ApiDrivenRequest `json:"apiDriven,omitempty"`
+
 	// AstroRuntimeVersion Version of the astro runtime to use
 	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
 
@@ -2459,14 +2696,23 @@ type CreateHybridDeploymentRequest struct {
 	ClusterId     string    `json:"clusterId"`
 	ContactEmails *[]string `json:"contactEmails,omitempty"`
 
+	// DagsBundleType The type of DAGs bundle backend to use
+	DagsBundleType *string `json:"dagsBundleType,omitempty"`
+
 	// Description Optional description of the deployment
 	Description *string `json:"description,omitempty"`
+
+	// DrWorkloadIdentity The DR workload identity to use for the deployment
+	DrWorkloadIdentity *string `json:"drWorkloadIdentity,omitempty"`
 
 	// Executor Airflow executors, supported: CELERY, KUBERNETES
 	Executor CreateHybridDeploymentRequestExecutor `json:"executor"`
 
 	// IncludeDefaultAlerts If true, default alerts will be created for the deployment
 	IncludeDefaultAlerts *bool `json:"includeDefaultAlerts,omitempty"`
+
+	// IsApiDriven If true, deployment DAGs are managed via the bundle files API
+	IsApiDriven *bool `json:"isApiDriven,omitempty"`
 
 	// IsCicdEnforced If true, deployment specifications can only be updated through API token, changes will not be allowed through UI. This option can be turned off by admin
 	IsCicdEnforced bool `json:"isCicdEnforced"`
@@ -2509,11 +2755,15 @@ type CreateNodePoolRequest struct {
 
 // CreateOrganizationApiTokenRequest defines model for CreateOrganizationApiTokenRequest.
 type CreateOrganizationApiTokenRequest struct {
-	Description             *string `json:"description,omitempty"`
-	Name                    string  `json:"name"`
-	Role                    string  `json:"role"`
-	TokenExpiryPeriodInDays *int    `json:"tokenExpiryPeriodInDays,omitempty"`
+	Description             *string                                `json:"description,omitempty"`
+	Kind                    *CreateOrganizationApiTokenRequestKind `json:"kind,omitempty"`
+	Name                    string                                 `json:"name"`
+	Role                    string                                 `json:"role"`
+	TokenExpiryPeriodInDays *int                                   `json:"tokenExpiryPeriodInDays,omitempty"`
 }
+
+// CreateOrganizationApiTokenRequestKind defines model for CreateOrganizationApiTokenRequest.Kind.
+type CreateOrganizationApiTokenRequestKind string
 
 // CreateOrganizationRequest defines model for CreateOrganizationRequest.
 type CreateOrganizationRequest struct {
@@ -2523,6 +2773,9 @@ type CreateOrganizationRequest struct {
 
 // CreateStandardDeploymentRequest defines model for CreateStandardDeploymentRequest.
 type CreateStandardDeploymentRequest struct {
+	ApiDriven *ApiDrivenRequest                `json:"apiDriven,omitempty"`
+	AstroIde  *CreateDeploymentAstroIdeRequest `json:"astroIde,omitempty"`
+
 	// AstroRuntimeVersion Version of the astro runtime to use
 	AstroRuntimeVersion string `json:"astroRuntimeVersion"`
 
@@ -2532,6 +2785,9 @@ type CreateStandardDeploymentRequest struct {
 	// ClusterId Optional if cloud provider and region is specified
 	ClusterId     *string   `json:"clusterId,omitempty"`
 	ContactEmails *[]string `json:"contactEmails,omitempty"`
+
+	// DagsBundleType The type of DAGs bundle backend to use
+	DagsBundleType *string `json:"dagsBundleType,omitempty"`
 
 	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores. Required if remote execution is disabled.
 	DefaultTaskPodCpu *string `json:"defaultTaskPodCpu,omitempty"`
@@ -2545,11 +2801,17 @@ type CreateStandardDeploymentRequest struct {
 	// Description Optional description of the deployment
 	Description *string `json:"description,omitempty"`
 
+	// DrWorkloadIdentity The DR workload identity to use for the deployment
+	DrWorkloadIdentity *string `json:"drWorkloadIdentity,omitempty"`
+
 	// Executor Airflow executors, supported: CELERY, KUBERNETES, ASTRO
 	Executor CreateStandardDeploymentRequestExecutor `json:"executor"`
 
 	// IncludeDefaultAlerts If true, default alerts will be created for the deployment
 	IncludeDefaultAlerts *bool `json:"includeDefaultAlerts,omitempty"`
+
+	// IsApiDriven If true, deployment DAGs are managed via the bundle files API
+	IsApiDriven *bool `json:"isApiDriven,omitempty"`
 
 	// IsCicdEnforced If true, deployment specifications can only be updated through API token, changes will not be allowed through UI. This option can be turned off by admin
 	IsCicdEnforced bool `json:"isCicdEnforced"`
@@ -2627,11 +2889,15 @@ type CreateUserInviteRequest struct {
 
 // CreateWorkspaceApiTokenRequest defines model for CreateWorkspaceApiTokenRequest.
 type CreateWorkspaceApiTokenRequest struct {
-	Description             *string `json:"description,omitempty"`
-	Name                    string  `json:"name"`
-	Role                    string  `json:"role"`
-	TokenExpiryPeriodInDays *int    `json:"tokenExpiryPeriodInDays,omitempty"`
+	Description             *string                             `json:"description,omitempty"`
+	Kind                    *CreateWorkspaceApiTokenRequestKind `json:"kind,omitempty"`
+	Name                    string                              `json:"name"`
+	Role                    string                              `json:"role"`
+	TokenExpiryPeriodInDays *int                                `json:"tokenExpiryPeriodInDays,omitempty"`
 }
+
+// CreateWorkspaceApiTokenRequestKind defines model for CreateWorkspaceApiTokenRequest.Kind.
+type CreateWorkspaceApiTokenRequestKind string
 
 // CreateWorkspaceRequest defines model for CreateWorkspaceRequest.
 type CreateWorkspaceRequest struct {
@@ -2665,9 +2931,9 @@ type DagFilters struct {
 
 // DagSchedule defines model for DagSchedule.
 type DagSchedule struct {
-	CronExpression *CronExpressionSchema `json:"CronExpression,omitempty"`
-	RelativeDelta  *RelativeDeltaSchema  `json:"RelativeDelta,omitempty"`
-	TimeDelta      *TimeDeltaSchema      `json:"TimeDelta,omitempty"`
+	CronExpression *CronExpressionSchema `json:"CronExpression"`
+	RelativeDelta  *RelativeDeltaSchema  `json:"RelativeDelta"`
+	TimeDelta      *TimeDeltaSchema      `json:"TimeDelta"`
 }
 
 // DeactivateOrganization defines model for DeactivateOrganization.
@@ -2812,7 +3078,9 @@ type DeployStepsPaginated struct {
 
 // Deployment defines model for Deployment.
 type Deployment struct {
+	AiAgentConfig                  *AiAgentConfig                          `json:"aiAgentConfig,omitempty"`
 	AirflowVersion                 string                                  `json:"airflowVersion"`
+	ApiDriven                      *ApiDriven                              `json:"apiDriven,omitempty"`
 	AstroIde                       *DeploymentAstroIde                     `json:"astroIde,omitempty"`
 	BlockInternetAccess            *bool                                   `json:"blockInternetAccess,omitempty"`
 	Bundles                        *[]Bundle                               `json:"bundles,omitempty"`
@@ -2837,6 +3105,10 @@ type Deployment struct {
 	DesiredDagTarballVersion       *string                                 `json:"desiredDagTarballVersion,omitempty"`
 	DesiredEnvironmentSignatures   *EnvironmentSignatures                  `json:"desiredEnvironmentSignatures,omitempty"`
 	DesiredImageVersion            *string                                 `json:"desiredImageVersion,omitempty"`
+	DrExternalIPs                  *[]string                               `json:"drExternalIPs,omitempty"`
+	DrOidcIssuerUrl                *string                                 `json:"drOidcIssuerUrl,omitempty"`
+	DrWorkloadIdentity             *string                                 `json:"drWorkloadIdentity,omitempty"`
+	Drifted                        *bool                                   `json:"drifted,omitempty"`
 	EnvironmentVariables           *[]DeploymentEnvironmentVariable        `json:"environmentVariables,omitempty"`
 	Executor                       *DeploymentExecutor                     `json:"executor,omitempty"`
 	ExternalIPs                    *[]string                               `json:"externalIPs,omitempty"`
@@ -2844,7 +3116,7 @@ type Deployment struct {
 	ImageId                        string                                  `json:"imageId"`
 	ImageRepository                string                                  `json:"imageRepository"`
 	ImageTag                       string                                  `json:"imageTag"`
-	IsAstroIdeManaged              bool                                    `json:"isAstroIdeManaged"`
+	IsAstroIdeManaged              *bool                                   `json:"isAstroIdeManaged,omitempty"`
 	IsCicdEnforced                 bool                                    `json:"isCicdEnforced"`
 	IsDagDeployEnabled             bool                                    `json:"isDagDeployEnabled"`
 	IsDevelopmentOnly              bool                                    `json:"isDevelopmentOnly"`
@@ -2919,6 +3191,27 @@ type DeploymentAstroIde struct {
 	ProjectId   *string `json:"projectId,omitempty"`
 	ProjectName *string `json:"projectName,omitempty"`
 	SessionId   *string `json:"sessionId,omitempty"`
+}
+
+// DeploymentDagFilters defines model for DeploymentDagFilters.
+type DeploymentDagFilters struct {
+	Tags     []string  `json:"tags"`
+	Warnings *[]string `json:"warnings,omitempty"`
+}
+
+// DeploymentDagRole defines model for DeploymentDagRole.
+type DeploymentDagRole struct {
+	// DagId The DAG ID. Required if Tag is not specified.
+	DagId *string `json:"dagId,omitempty"`
+
+	// DagTag The DAG tag. Required if DagId is not specified.
+	DagTag *string `json:"dagTag,omitempty"`
+
+	// DeploymentId The Deployment ID containing the DAG.
+	DeploymentId string `json:"deploymentId"`
+
+	// Role The name of the DAG role. Must be DAG_VIEWER, DAG_AUTHOR, or a custom DAG role.
+	Role string `json:"role"`
 }
 
 // DeploymentEnvironmentVariable defines model for DeploymentEnvironmentVariable.
@@ -3066,18 +3359,19 @@ type DeploymentLogEntrySource string
 
 // DeploymentOptions defines model for DeploymentOptions.
 type DeploymentOptions struct {
-	ContactEmailsFallback   *[]string                 `json:"contactEmailsFallback,omitempty"`
-	DagProcessorMachines    *[]DAGProcessorMachine    `json:"dagProcessorMachines,omitempty"`
-	DefaultValues           DefaultValueOptions       `json:"defaultValues"`
-	Executors               []string                  `json:"executors"`
-	LegacyAstro             LegacyAstroOptions        `json:"legacyAstro"`
-	ResourceQuotas          ResourceQuotaOptions      `json:"resourceQuotas"`
-	RuntimeReleases         []RuntimeRelease          `json:"runtimeReleases"`
-	SchedulerMachines       []SchedulerMachine        `json:"schedulerMachines"`
-	WorkerMachines          []WorkerMachine           `json:"workerMachines"`
-	WorkerPodCeilings       *[]WorkerPodCeiling       `json:"workerPodCeilings,omitempty"`
-	WorkerQueues            WorkerQueueOptions        `json:"workerQueues"`
-	WorkloadIdentityOptions *[]WorkloadIdentityOption `json:"workloadIdentityOptions,omitempty"`
+	ContactEmailsFallback         *[]string                 `json:"contactEmailsFallback,omitempty"`
+	DagProcessorMachines          *[]DAGProcessorMachine    `json:"dagProcessorMachines,omitempty"`
+	DefaultValues                 DefaultValueOptions       `json:"defaultValues"`
+	Executors                     []string                  `json:"executors"`
+	IsLowLatencyDeploymentEnabled *bool                     `json:"isLowLatencyDeploymentEnabled,omitempty"`
+	LegacyAstro                   LegacyAstroOptions        `json:"legacyAstro"`
+	ResourceQuotas                ResourceQuotaOptions      `json:"resourceQuotas"`
+	RuntimeReleases               []RuntimeRelease          `json:"runtimeReleases"`
+	SchedulerMachines             []SchedulerMachine        `json:"schedulerMachines"`
+	WorkerMachines                []WorkerMachine           `json:"workerMachines"`
+	WorkerPodCeilings             *[]WorkerPodCeiling       `json:"workerPodCeilings,omitempty"`
+	WorkerQueues                  WorkerQueueOptions        `json:"workerQueues"`
+	WorkloadIdentityOptions       *[]WorkloadIdentityOption `json:"workloadIdentityOptions,omitempty"`
 }
 
 // DeploymentRemoteExecution defines model for DeploymentRemoteExecution.
@@ -3168,9 +3462,11 @@ type EntitlementType string
 type EnvironmentObject struct {
 	AirflowVariable     *EnvironmentObjectAirflowVariable     `json:"airflowVariable,omitempty"`
 	AutoLinkDeployments *bool                                 `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                                 `json:"autoLinkProjects,omitempty"`
 	Connection          *EnvironmentObjectConnection          `json:"connection,omitempty"`
 	CreatedAt           *string                               `json:"createdAt,omitempty"`
 	CreatedBy           *BasicSubjectProfile                  `json:"createdBy,omitempty"`
+	Description         *string                               `json:"description,omitempty"`
 	EnvironmentVariable *EnvironmentObjectEnvironmentVariable `json:"environmentVariable,omitempty"`
 	ExcludeLinks        *[]EnvironmentObjectExcludeLink       `json:"excludeLinks,omitempty"`
 	Id                  *string                               `json:"id,omitempty"`
@@ -3453,8 +3749,8 @@ type ListEnvironmentObjectMetricsExportsLogsPaginated struct {
 // ListWorkspaceDags defines model for ListWorkspaceDags.
 type ListWorkspaceDags struct {
 	Items          []WorkspaceDag `json:"items"`
-	NextCursor     *string        `json:"nextCursor,omitempty"`
-	PreviousCursor *string        `json:"previousCursor,omitempty"`
+	NextCursor     *string        `json:"nextCursor"`
+	PreviousCursor *string        `json:"previousCursor"`
 	TotalCount     *int           `json:"totalCount,omitempty"`
 	Warnings       *[]string      `json:"warnings,omitempty"`
 }
@@ -3486,6 +3782,17 @@ type ManagedDomain struct {
 
 // ManagedDomainStatus defines model for ManagedDomain.Status.
 type ManagedDomainStatus string
+
+// MigrateDeploymentEnvVarRequest defines model for MigrateDeploymentEnvVarRequest.
+type MigrateDeploymentEnvVarRequest struct {
+	DeploymentId        string                                    `json:"deploymentId"`
+	EnvVarKey           string                                    `json:"envVarKey"`
+	TargetScope         MigrateDeploymentEnvVarRequestTargetScope `json:"targetScope"`
+	TargetScopeEntityId string                                    `json:"targetScopeEntityId"`
+}
+
+// MigrateDeploymentEnvVarRequestTargetScope defines model for MigrateDeploymentEnvVarRequest.TargetScope.
+type MigrateDeploymentEnvVarRequestTargetScope string
 
 // MutateDeploymentTeamRoleRequest defines model for MutateDeploymentTeamRoleRequest.
 type MutateDeploymentTeamRoleRequest struct {
@@ -3561,11 +3868,15 @@ type Organization struct {
 	Domains                          *[]string                  `json:"domains,omitempty"`
 	Entitlements                     *map[string]Entitlement    `json:"entitlements,omitempty"`
 	EnvironmentSecretsShowable       bool                       `json:"environmentSecretsShowable"`
+	HasAiFeaturesDisabled            *bool                      `json:"hasAiFeaturesDisabled,omitempty"`
+	HasObserveContract               *bool                      `json:"hasObserveContract,omitempty"`
 	Id                               string                     `json:"id"`
 	IsAzureManaged                   *bool                      `json:"isAzureManaged,omitempty"`
+	IsBlockedEnableAiFeatures        bool                       `json:"isBlockedEnableAiFeatures"`
 	IsDynamicTriggererPricingEnabled bool                       `json:"isDynamicTriggererPricingEnabled"`
 	IsDynamicWebserverPricingEnabled bool                       `json:"isDynamicWebserverPricingEnabled"`
 	IsEgressChargebackEnabled        *bool                      `json:"isEgressChargebackEnabled,omitempty"`
+	IsObserveEnabled                 *bool                      `json:"isObserveEnabled,omitempty"`
 	IsRegionBasedPricingEnabled      bool                       `json:"isRegionBasedPricingEnabled"`
 	IsScimEnabled                    bool                       `json:"isScimEnabled"`
 	ManagedDomains                   *[]ManagedDomain           `json:"managedDomains,omitempty"`
@@ -3618,6 +3929,15 @@ type OrganizationProductPlanAstronomerProduct string
 // OrganizationProductPlanProductPlanName defines model for OrganizationProductPlan.ProductPlanName.
 type OrganizationProductPlanProductPlanName string
 
+// PromoteEnvironmentObjectRequest defines model for PromoteEnvironmentObjectRequest.
+type PromoteEnvironmentObjectRequest struct {
+	TargetScope         PromoteEnvironmentObjectRequestTargetScope `json:"targetScope"`
+	TargetScopeEntityId string                                     `json:"targetScopeEntityId"`
+}
+
+// PromoteEnvironmentObjectRequestTargetScope defines model for PromoteEnvironmentObjectRequest.TargetScope.
+type PromoteEnvironmentObjectRequestTargetScope string
+
 // ProviderInstanceType defines model for ProviderInstanceType.
 type ProviderInstanceType struct {
 	Cpu  int    `json:"cpu"`
@@ -3641,27 +3961,27 @@ type Range struct {
 
 // RelativeDeltaSchema defines model for RelativeDeltaSchema.
 type RelativeDeltaSchema struct {
-	Day          *int32   `json:"day,omitempty"`
-	Days         *int32   `json:"days,omitempty"`
-	Dt1          *string  `json:"dt1,omitempty"`
-	Dt2          *string  `json:"dt2,omitempty"`
-	Hour         *int32   `json:"hour,omitempty"`
-	Hours        *int32   `json:"hours,omitempty"`
-	Leapdays     *int32   `json:"leapdays,omitempty"`
-	Microsecond  *int32   `json:"microsecond,omitempty"`
-	Microseconds *int32   `json:"microseconds,omitempty"`
-	Minute       *int32   `json:"minute,omitempty"`
-	Minutes      *int32   `json:"minutes,omitempty"`
-	Month        *int32   `json:"month,omitempty"`
-	Months       *int32   `json:"months,omitempty"`
-	Nlyearday    *int32   `json:"nlyearday,omitempty"`
-	Second       *int32   `json:"second,omitempty"`
-	Seconds      *int32   `json:"seconds,omitempty"`
+	Day          *int32   `json:"day"`
+	Days         *int32   `json:"days"`
+	Dt1          *string  `json:"dt1"`
+	Dt2          *string  `json:"dt2"`
+	Hour         *int32   `json:"hour"`
+	Hours        *int32   `json:"hours"`
+	Leapdays     *int32   `json:"leapdays"`
+	Microsecond  *int32   `json:"microsecond"`
+	Microseconds *int32   `json:"microseconds"`
+	Minute       *int32   `json:"minute"`
+	Minutes      *int32   `json:"minutes"`
+	Month        *int32   `json:"month"`
+	Months       *int32   `json:"months"`
+	Nlyearday    *int32   `json:"nlyearday"`
+	Second       *int32   `json:"second"`
+	Seconds      *int32   `json:"seconds"`
 	Weekday      *Weekday `json:"weekday,omitempty"`
-	Weeks        *int32   `json:"weeks,omitempty"`
-	Year         *int32   `json:"year,omitempty"`
-	Yearday      *int32   `json:"yearday,omitempty"`
-	Years        *int32   `json:"years,omitempty"`
+	Weeks        *int32   `json:"weeks"`
+	Year         *int32   `json:"year"`
+	Yearday      *int32   `json:"yearday"`
+	Years        *int32   `json:"years"`
 }
 
 // RepositoriesPaginated defines model for RepositoriesPaginated.
@@ -3709,14 +4029,14 @@ type ResourceRange struct {
 
 // Role defines model for Role.
 type Role struct {
-	CreatedAt              string              `json:"createdAt"`
+	CreatedAt              time.Time           `json:"createdAt"`
 	CreatedBy              BasicSubjectProfile `json:"createdBy"`
 	Description            *string             `json:"description,omitempty"`
 	Id                     string              `json:"id"`
 	Name                   string              `json:"name"`
 	RestrictedWorkspaceIds []string            `json:"restrictedWorkspaceIds"`
 	ScopeType              RoleScopeType       `json:"scopeType"`
-	UpdatedAt              string              `json:"updatedAt"`
+	UpdatedAt              time.Time           `json:"updatedAt"`
 	UpdatedBy              BasicSubjectProfile `json:"updatedBy"`
 }
 
@@ -3765,7 +4085,7 @@ type RoleTemplateScopeType string
 
 // RoleWithPermission defines model for RoleWithPermission.
 type RoleWithPermission struct {
-	CreatedAt              string                      `json:"createdAt"`
+	CreatedAt              time.Time                   `json:"createdAt"`
 	CreatedBy              BasicSubjectProfile         `json:"createdBy"`
 	Description            *string                     `json:"description,omitempty"`
 	Id                     string                      `json:"id"`
@@ -3773,7 +4093,7 @@ type RoleWithPermission struct {
 	Permissions            []string                    `json:"permissions"`
 	RestrictedWorkspaceIds []string                    `json:"restrictedWorkspaceIds"`
 	ScopeType              RoleWithPermissionScopeType `json:"scopeType"`
-	UpdatedAt              string                      `json:"updatedAt"`
+	UpdatedAt              time.Time                   `json:"updatedAt"`
 	UpdatedBy              BasicSubjectProfile         `json:"updatedBy"`
 }
 
@@ -3822,8 +4142,11 @@ type SchedulerMachineName string
 
 // Scope defines model for Scope.
 type Scope struct {
-	EntityId string `json:"entityId"`
-	Type     string `json:"type"`
+	// DagTag Only applicable when Type is DAG
+	DagTag       *string `json:"dagTag,omitempty"`
+	DeploymentId *string `json:"deploymentId,omitempty"`
+	EntityId     string  `json:"entityId"`
+	Type         string  `json:"type"`
 }
 
 // SecondaryPodRange defines model for SecondaryPodRange.
@@ -3856,29 +4179,36 @@ type SelfSignupType string
 
 // SharedCluster defines model for SharedCluster.
 type SharedCluster struct {
-	BlockInternetAccess *bool                      `json:"blockInternetAccess,omitempty"`
-	CloudProvider       SharedClusterCloudProvider `json:"cloudProvider"`
-	Cohort              *SharedClusterCohort       `json:"cohort,omitempty"`
-	CreatedAt           time.Time                  `json:"createdAt"`
-	DbInstanceType      string                     `json:"dbInstanceType"`
-	DbInstanceVersion   string                     `json:"dbInstanceVersion"`
-	DrRegion            *string                    `json:"drRegion,omitempty"`
-	HealthStatus        *ClusterHealthStatus       `json:"healthStatus,omitempty"`
-	Id                  string                     `json:"id"`
-	IsCordoned          *bool                      `json:"isCordoned,omitempty"`
-	IsDryRun            bool                       `json:"isDryRun"`
-	IsFailedOver        *bool                      `json:"isFailedOver,omitempty"`
-	Metadata            ClusterMetadata            `json:"metadata"`
-	Name                string                     `json:"name"`
-	PodSubnetRange      string                     `json:"podSubnetRange"`
-	Region              string                     `json:"region"`
-	SecondaryPodRanges  *[]SecondaryPodRange       `json:"secondaryPodRanges,omitempty"`
-	ServicePeeringRange string                     `json:"servicePeeringRange"`
-	ServiceSubnetRange  string                     `json:"serviceSubnetRange"`
-	Status              SharedClusterStatus        `json:"status"`
-	TemplateVersion     string                     `json:"templateVersion"`
-	UpdatedAt           time.Time                  `json:"updatedAt"`
-	VpcSubnetRange      string                     `json:"vpcSubnetRange"`
+	BlockInternetAccess          *bool                      `json:"blockInternetAccess,omitempty"`
+	CloudProvider                SharedClusterCloudProvider `json:"cloudProvider"`
+	Cohort                       *SharedClusterCohort       `json:"cohort,omitempty"`
+	CreatedAt                    time.Time                  `json:"createdAt"`
+	DbInstanceType               string                     `json:"dbInstanceType"`
+	DbInstanceVersion            string                     `json:"dbInstanceVersion"`
+	DrMetadata                   *ClusterMetadata           `json:"drMetadata,omitempty"`
+	DrRegion                     *string                    `json:"drRegion,omitempty"`
+	DrSecondaryVpcCidr           *string                    `json:"drSecondaryVpcCidr,omitempty"`
+	DrVpcSubnetRange             *string                    `json:"drVpcSubnetRange,omitempty"`
+	EnableReplicationTimeControl *bool                      `json:"enableReplicationTimeControl,omitempty"`
+	FailoverInProgress           *bool                      `json:"failoverInProgress,omitempty"`
+	HealthStatus                 *ClusterHealthStatus       `json:"healthStatus,omitempty"`
+	Id                           string                     `json:"id"`
+	IsCordoned                   *bool                      `json:"isCordoned,omitempty"`
+	IsDrEnabled                  *bool                      `json:"isDrEnabled,omitempty"`
+	IsDryRun                     bool                       `json:"isDryRun"`
+	IsFailedOver                 *bool                      `json:"isFailedOver,omitempty"`
+	Metadata                     ClusterMetadata            `json:"metadata"`
+	Name                         string                     `json:"name"`
+	PodSubnetRange               string                     `json:"podSubnetRange"`
+	Region                       string                     `json:"region"`
+	SecondaryPodRanges           *[]SecondaryPodRange       `json:"secondaryPodRanges,omitempty"`
+	SecondaryVpcCidr             *string                    `json:"secondaryVpcCidr,omitempty"`
+	ServicePeeringRange          string                     `json:"servicePeeringRange"`
+	ServiceSubnetRange           string                     `json:"serviceSubnetRange"`
+	Status                       SharedClusterStatus        `json:"status"`
+	TemplateVersion              string                     `json:"templateVersion"`
+	UpdatedAt                    time.Time                  `json:"updatedAt"`
+	VpcSubnetRange               string                     `json:"vpcSubnetRange"`
 }
 
 // SharedClusterCloudProvider defines model for SharedCluster.CloudProvider.
@@ -3896,10 +4226,39 @@ type Subject struct {
 	Type     string `json:"type"`
 }
 
+// SubjectDeploymentDagRole defines model for SubjectDeploymentDagRole.
+type SubjectDeploymentDagRole struct {
+	DagId        *string `json:"dagId,omitempty"`
+	DagTag       *string `json:"dagTag,omitempty"`
+	DeploymentId string  `json:"deploymentId"`
+	Role         string  `json:"role"`
+}
+
+// SubjectDeploymentRole defines model for SubjectDeploymentRole.
+type SubjectDeploymentRole struct {
+	DeploymentId string `json:"deploymentId"`
+	Role         string `json:"role"`
+}
+
+// SubjectRoles defines model for SubjectRoles.
+type SubjectRoles struct {
+	DagRoles         *[]SubjectDeploymentDagRole `json:"dagRoles,omitempty"`
+	DeploymentRoles  *[]SubjectDeploymentRole    `json:"deploymentRoles,omitempty"`
+	OrganizationRole *string                     `json:"organizationRole,omitempty"`
+	WorkspaceRoles   *[]SubjectWorkspaceRole     `json:"workspaceRoles,omitempty"`
+}
+
+// SubjectWorkspaceRole defines model for SubjectWorkspaceRole.
+type SubjectWorkspaceRole struct {
+	Role        string `json:"role"`
+	WorkspaceId string `json:"workspaceId"`
+}
+
 // Team defines model for Team.
 type Team struct {
 	CreatedAt        time.Time             `json:"createdAt"`
 	CreatedBy        *BasicSubjectProfile  `json:"createdBy,omitempty"`
+	DagRoles         *[]TeamDagRole        `json:"dagRoles,omitempty"`
 	DeploymentRoles  *[]TeamDeploymentRole `json:"deploymentRoles,omitempty"`
 	Description      *string               `json:"description,omitempty"`
 	Id               string                `json:"id"`
@@ -3914,6 +4273,14 @@ type Team struct {
 	UpdatedAt        time.Time             `json:"updatedAt"`
 	UpdatedBy        *BasicSubjectProfile  `json:"updatedBy,omitempty"`
 	WorkspaceRoles   *[]TeamWorkspaceRole  `json:"workspaceRoles,omitempty"`
+}
+
+// TeamDagRole defines model for TeamDagRole.
+type TeamDagRole struct {
+	DagId        *string `json:"dagId,omitempty"`
+	DagTag       *string `json:"dagTag,omitempty"`
+	DeploymentId string  `json:"deploymentId"`
+	Role         string  `json:"role"`
 }
 
 // TeamDeploymentRole defines model for TeamDeploymentRole.
@@ -3933,9 +4300,11 @@ type TeamMember struct {
 
 // TeamRole defines model for TeamRole.
 type TeamRole struct {
-	EntityId   string `json:"entityId"`
-	EntityType string `json:"entityType"`
-	Role       string `json:"role"`
+	// DeploymentId Only applicable when EntityType is DAG or DAG_TAG
+	DeploymentId *string `json:"deploymentId,omitempty"`
+	EntityId     string  `json:"entityId"`
+	EntityType   string  `json:"entityType"`
+	Role         string  `json:"role"`
 }
 
 // TeamWorkspaceRole defines model for TeamWorkspaceRole.
@@ -3999,11 +4368,17 @@ type UpdateAwsClusterRequest struct {
 	CreateTokens                   *bool                   `json:"createTokens,omitempty"`
 	DbInstanceType                 string                  `json:"dbInstanceType"`
 	DbInstanceVersion              *string                 `json:"dbInstanceVersion,omitempty"`
-	DisableHarmonyVersionUpgrades  *bool                   `json:"disableHarmonyVersionUpgrades,omitempty"`
 	DisableTemplateVersionUpgrades *bool                   `json:"disableTemplateVersionUpgrades,omitempty"`
+	DrRegion                       *string                 `json:"drRegion,omitempty"`
+	DrSecondaryVpcCidr             *string                 `json:"drSecondaryVpcCidr,omitempty"`
+	DrVpcSubnetRange               *string                 `json:"drVpcSubnetRange,omitempty"`
+	EnableDr                       *bool                   `json:"enableDr,omitempty"`
+	EnableReplicationTimeControl   *bool                   `json:"enableReplicationTimeControl,omitempty"`
+	HarmonyVersion                 *string                 `json:"harmonyVersion,omitempty"`
 	K8sTags                        []ClusterTag            `json:"k8sTags"`
 	Name                           string                  `json:"name"`
 	NodePools                      []UpdateNodePoolRequest `json:"nodePools"`
+	SecondaryVpcCidr               *string                 `json:"secondaryVpcCidr,omitempty"`
 	TemplateVersion                string                  `json:"templateVersion"`
 	Workspaces                     *[]string               `json:"workspaces,omitempty"`
 }
@@ -4014,13 +4389,19 @@ type UpdateAzureClusterRequest struct {
 	CreateTokens                   *bool                   `json:"createTokens,omitempty"`
 	DbInstanceType                 string                  `json:"dbInstanceType"`
 	DbInstanceVersion              *string                 `json:"dbInstanceVersion,omitempty"`
-	DisableHarmonyVersionUpgrades  *bool                   `json:"disableHarmonyVersionUpgrades,omitempty"`
 	DisableTemplateVersionUpgrades *bool                   `json:"disableTemplateVersionUpgrades,omitempty"`
+	EnableReplicationTimeControl   *bool                   `json:"enableReplicationTimeControl,omitempty"`
+	HarmonyVersion                 *string                 `json:"harmonyVersion,omitempty"`
 	K8sTags                        []ClusterTag            `json:"k8sTags"`
 	Name                           string                  `json:"name"`
 	NodePools                      []UpdateNodePoolRequest `json:"nodePools"`
 	TemplateVersion                string                  `json:"templateVersion"`
 	Workspaces                     *[]string               `json:"workspaces,omitempty"`
+}
+
+// UpdateClusterFailedOverStatusRequest defines model for UpdateClusterFailedOverStatusRequest.
+type UpdateClusterFailedOverStatusRequest struct {
+	IsFailedOver bool `json:"isFailedOver"`
 }
 
 // UpdateCustomRoleRequest defines model for UpdateCustomRoleRequest.
@@ -4042,9 +4423,10 @@ type UpdateDeployRequest struct {
 
 // UpdateDeploymentApiTokenRequest defines model for UpdateDeploymentApiTokenRequest.
 type UpdateDeploymentApiTokenRequest struct {
-	Description string `json:"description"`
-	Name        string `json:"name"`
-	Role        string `json:"role"`
+	DagRoles    *[]DeploymentDagRole `json:"dagRoles,omitempty"`
+	Description string               `json:"description"`
+	Name        string               `json:"name"`
+	Role        string               `json:"role"`
 }
 
 // UpdateDeploymentRequest defines model for UpdateDeploymentRequest.
@@ -4165,7 +4547,9 @@ type UpdateEnvironmentObjectOverridesRequest struct {
 type UpdateEnvironmentObjectRequest struct {
 	AirflowVariable     *UpdateEnvironmentObjectAirflowVariableRequest     `json:"airflowVariable,omitempty"`
 	AutoLinkDeployments *bool                                              `json:"autoLinkDeployments,omitempty"`
+	AutoLinkProjects    *bool                                              `json:"autoLinkProjects,omitempty"`
 	Connection          *UpdateEnvironmentObjectConnectionRequest          `json:"connection,omitempty"`
+	Description         *string                                            `json:"description,omitempty"`
 	EnvironmentVariable *UpdateEnvironmentObjectEnvironmentVariableRequest `json:"environmentVariable,omitempty"`
 	ExcludeLinks        *[]ExcludeLinkEnvironmentObjectRequest             `json:"excludeLinks,omitempty"`
 	Links               *[]UpdateEnvironmentObjectLinkRequest              `json:"links,omitempty"`
@@ -4178,8 +4562,9 @@ type UpdateGcpClusterRequest struct {
 	CreateTokens                   *bool                   `json:"createTokens,omitempty"`
 	DbInstanceType                 string                  `json:"dbInstanceType"`
 	DbInstanceVersion              *string                 `json:"dbInstanceVersion,omitempty"`
-	DisableHarmonyVersionUpgrades  *bool                   `json:"disableHarmonyVersionUpgrades,omitempty"`
 	DisableTemplateVersionUpgrades *bool                   `json:"disableTemplateVersionUpgrades,omitempty"`
+	EnableReplicationTimeControl   *bool                   `json:"enableReplicationTimeControl,omitempty"`
+	HarmonyVersion                 *string                 `json:"harmonyVersion,omitempty"`
 	K8sTags                        []ClusterTag            `json:"k8sTags"`
 	Name                           string                  `json:"name"`
 	NodePools                      []UpdateNodePoolRequest `json:"nodePools"`
@@ -4189,7 +4574,11 @@ type UpdateGcpClusterRequest struct {
 
 // UpdateHostedDeploymentRequest defines model for UpdateHostedDeploymentRequest.
 type UpdateHostedDeploymentRequest struct {
-	ContactEmails *[]string `json:"contactEmails,omitempty"`
+	AiAgentConfig *AiAgentConfigRequest `json:"aiAgentConfig,omitempty"`
+
+	// AstroRuntimeVersion PATCH-style runtime version update for API-driven deployments
+	AstroRuntimeVersion *string   `json:"astroRuntimeVersion,omitempty"`
+	ContactEmails       *[]string `json:"contactEmails,omitempty"`
 
 	// DefaultTaskPodCpu Must be valid kubernetes cpu resource string, at least 0.25 in terms of cpu cores. Required if remote execution is disabled.
 	DefaultTaskPodCpu *string `json:"defaultTaskPodCpu,omitempty"`
@@ -4200,6 +4589,7 @@ type UpdateHostedDeploymentRequest struct {
 	// DefaultTaskPodMemory Must be valid kubernetes memory resource string, at least 0.5Gi in terms of Gibibytes (GiB).  Required if remote execution is disabled.
 	DefaultTaskPodMemory *string `json:"defaultTaskPodMemory,omitempty"`
 	Description          *string `json:"description,omitempty"`
+	DrWorkloadIdentity   *string `json:"drWorkloadIdentity,omitempty"`
 
 	// EnvironmentVariables List of deployment environment variables
 	EnvironmentVariables []DeploymentEnvironmentVariableRequest `json:"environmentVariables"`
@@ -4213,15 +4603,21 @@ type UpdateHostedDeploymentRequest struct {
 	IsDevelopmentOnly *bool `json:"isDevelopmentOnly,omitempty"`
 
 	// IsHighAvailability If true, deployment will have backup components
-	IsHighAvailability bool                              `json:"isHighAvailability"`
-	Name               string                            `json:"name"`
-	RemoteExecution    *DeploymentRemoteExecutionRequest `json:"remoteExecution,omitempty"`
+	IsHighAvailability bool   `json:"isHighAvailability"`
+	Name               string `json:"name"`
+
+	// Packages PATCH-style packages update for API-driven deployments
+	Packages        *string                           `json:"packages,omitempty"`
+	RemoteExecution *DeploymentRemoteExecutionRequest `json:"remoteExecution,omitempty"`
 
 	// RepositoryBranch Branch of the repository path to use for Git deploys
 	RepositoryBranch *string `json:"repositoryBranch,omitempty"`
 
 	// RepositoryPathId The workspace's repository path to use for Git deploys
 	RepositoryPathId *string `json:"repositoryPathId,omitempty"`
+
+	// Requirements PATCH-style requirements update for API-driven deployments
+	Requirements *string `json:"requirements,omitempty"`
 
 	// ResourceQuotaCpu Must be valid kubernetes cpu resource string, at least 1 in terms of cpu cores. Required if remote execution is disabled
 	ResourceQuotaCpu *string `json:"resourceQuotaCpu,omitempty"`
@@ -4251,8 +4647,13 @@ type UpdateHostedDeploymentRequestType string
 
 // UpdateHybridDeploymentRequest defines model for UpdateHybridDeploymentRequest.
 type UpdateHybridDeploymentRequest struct {
-	ContactEmails *[]string `json:"contactEmails,omitempty"`
-	Description   *string   `json:"description,omitempty"`
+	AiAgentConfig *AiAgentConfigRequest `json:"aiAgentConfig,omitempty"`
+
+	// AstroRuntimeVersion PATCH-style runtime version update for API-driven deployments
+	AstroRuntimeVersion *string   `json:"astroRuntimeVersion,omitempty"`
+	ContactEmails       *[]string `json:"contactEmails,omitempty"`
+	Description         *string   `json:"description,omitempty"`
+	DrWorkloadIdentity  *string   `json:"drWorkloadIdentity,omitempty"`
 
 	// EnvironmentVariables List of deployment environment variables
 	EnvironmentVariables []DeploymentEnvironmentVariableRequest `json:"environmentVariables"`
@@ -4262,7 +4663,13 @@ type UpdateHybridDeploymentRequest struct {
 	IsCicdEnforced     bool                                  `json:"isCicdEnforced"`
 	IsDagDeployEnabled bool                                  `json:"isDagDeployEnabled"`
 	Name               string                                `json:"name"`
-	Scheduler          DeploymentInstanceSpecRequest         `json:"scheduler"`
+
+	// Packages PATCH-style packages update for API-driven deployments
+	Packages *string `json:"packages,omitempty"`
+
+	// Requirements PATCH-style requirements update for API-driven deployments
+	Requirements *string                       `json:"requirements,omitempty"`
+	Scheduler    DeploymentInstanceSpecRequest `json:"scheduler"`
 
 	// TaskPodNodePoolId Must be non-empty if deployment Airflow executor is Kubernetes, ID of node pool to use for task pods
 	TaskPodNodePoolId *string                           `json:"taskPodNodePoolId,omitempty"`
@@ -4307,6 +4714,7 @@ type UpdateOrganizationApiTokenRequest struct {
 
 // UpdateOrganizationApiTokenRolesRequest defines model for UpdateOrganizationApiTokenRolesRequest.
 type UpdateOrganizationApiTokenRolesRequest struct {
+	Dag          *[]ApiTokenDagRoleRequest        `json:"dag,omitempty"`
 	Deployment   *[]ApiTokenDeploymentRoleRequest `json:"deployment,omitempty"`
 	Organization string                           `json:"organization"`
 	Workspace    *[]ApiTokenWorkspaceRoleRequest  `json:"workspace,omitempty"`
@@ -4317,6 +4725,7 @@ type UpdateOrganizationRequest struct {
 	AllowEnhancedSupportAccess *bool  `json:"allowEnhancedSupportAccess,omitempty"`
 	BillingEmail               string `json:"billingEmail"`
 	EnvironmentSecretsShowable *bool  `json:"environmentSecretsShowable,omitempty"`
+	HasAiFeaturesDisabled      *bool  `json:"hasAiFeaturesDisabled,omitempty"`
 	IsScimEnabled              bool   `json:"isScimEnabled"`
 	Name                       string `json:"name"`
 }
@@ -4335,6 +4744,22 @@ type UpdateTeamRequest struct {
 	Name        string `json:"name"`
 }
 
+// UpdateTeamRolesRequest defines model for UpdateTeamRolesRequest.
+type UpdateTeamRolesRequest struct {
+	DagRoles         *[]SubjectDeploymentDagRole `json:"dagRoles,omitempty"`
+	DeploymentRoles  *[]SubjectDeploymentRole    `json:"deploymentRoles,omitempty"`
+	OrganizationRole string                      `json:"organizationRole"`
+	WorkspaceRoles   *[]SubjectWorkspaceRole     `json:"workspaceRoles,omitempty"`
+}
+
+// UpdateUserRolesRequest defines model for UpdateUserRolesRequest.
+type UpdateUserRolesRequest struct {
+	DagRoles         *[]SubjectDeploymentDagRole `json:"dagRoles,omitempty"`
+	DeploymentRoles  *[]SubjectDeploymentRole    `json:"deploymentRoles,omitempty"`
+	OrganizationRole *string                     `json:"organizationRole,omitempty"`
+	WorkspaceRoles   *[]SubjectWorkspaceRole     `json:"workspaceRoles,omitempty"`
+}
+
 // UpdateWorkspaceApiTokenRequest defines model for UpdateWorkspaceApiTokenRequest.
 type UpdateWorkspaceApiTokenRequest struct {
 	Description string                               `json:"description"`
@@ -4344,6 +4769,7 @@ type UpdateWorkspaceApiTokenRequest struct {
 
 // UpdateWorkspaceApiTokenRolesRequest defines model for UpdateWorkspaceApiTokenRolesRequest.
 type UpdateWorkspaceApiTokenRolesRequest struct {
+	Dag        *[]ApiTokenDagRoleRequest        `json:"dag,omitempty"`
 	Deployment *[]ApiTokenDeploymentRoleRequest `json:"deployment,omitempty"`
 	Workspace  *string                          `json:"workspace,omitempty"`
 }
@@ -4367,6 +4793,7 @@ type UpdateWorkspaceAstroIdeRequest struct {
 
 // UpdateWorkspaceRequest defines model for UpdateWorkspaceRequest.
 type UpdateWorkspaceRequest struct {
+	AiAgentConfig                *AiAgentConfigRequest           `json:"aiAgentConfig,omitempty"`
 	ApiKeyOnlyDeploymentsDefault bool                            `json:"apiKeyOnlyDeploymentsDefault"`
 	AstroIde                     *UpdateWorkspaceAstroIdeRequest `json:"astroIde,omitempty"`
 	Description                  *string                         `json:"description,omitempty"`
@@ -4378,6 +4805,9 @@ type User struct {
 	AvatarUrl           string    `json:"avatarUrl"`
 	ColorModePreference *string   `json:"colorModePreference,omitempty"`
 	CreatedAt           time.Time `json:"createdAt"`
+
+	// DagRole Only shown if listing DAG users
+	DagRole *string `json:"dagRole,omitempty"`
 
 	// DeploymentCount Only shown if admin listing users
 	DeploymentCount *int `json:"deploymentCount,omitempty"`
@@ -4408,12 +4838,11 @@ type User struct {
 	OrgRole *string `json:"orgRole,omitempty"`
 
 	// OrgUserRelationIsIdpManaged Only shown if listing org users
-	OrgUserRelationIsIdpManaged *bool `json:"orgUserRelationIsIdpManaged,omitempty"`
-
-	// Roles Only shown if admin listing users
-	Roles      *[]UserRole     `json:"roles,omitempty"`
-	SignupType *UserSignupType `json:"signupType,omitempty"`
-	Status     string          `json:"status"`
+	OrgUserRelationIsIdpManaged *bool           `json:"orgUserRelationIsIdpManaged,omitempty"`
+	OrganizationInvite          *Invite         `json:"organizationInvite,omitempty"`
+	Roles                       *[]UserRole     `json:"roles,omitempty"`
+	SignupType                  *UserSignupType `json:"signupType,omitempty"`
+	Status                      string          `json:"status"`
 
 	// SystemRole Only shown if admin listing users
 	SystemRole *string   `json:"systemRole,omitempty"`
@@ -4455,7 +4884,7 @@ type Weekday1 = int32
 
 // WeekdaySchema defines model for WeekdaySchema.
 type WeekdaySchema struct {
-	N       *int32 `json:"n,omitempty"`
+	N       *int32 `json:"n"`
 	Weekday int32  `json:"weekday"`
 }
 
@@ -4514,6 +4943,7 @@ type WorkloadIdentityOption struct {
 
 // Workspace defines model for Workspace.
 type Workspace struct {
+	AiAgentConfig                *AiAgentConfig       `json:"aiAgentConfig,omitempty"`
 	ApiKeyOnlyDeploymentsDefault bool                 `json:"apiKeyOnlyDeploymentsDefault"`
 	AstroIde                     WorkspaceAstroIde    `json:"astroIde"`
 	CreatedAt                    time.Time            `json:"createdAt"`
@@ -4557,12 +4987,12 @@ type WorkspaceDag struct {
 	DeploymentId         string             `json:"deploymentId"`
 	IsActive             *bool              `json:"isActive,omitempty"`
 	IsPaused             bool               `json:"isPaused"`
-	NextRunAt            *time.Time         `json:"nextRunAt,omitempty"`
+	NextRunAt            *time.Time         `json:"nextRunAt"`
 	Owners               *[]string          `json:"owners,omitempty"`
 	Runs                 *[]WorkspaceDagRun `json:"runs,omitempty"`
-	Schedule             *DagSchedule       `json:"schedule,omitempty"`
+	Schedule             *DagSchedule       `json:"schedule"`
 	Tags                 *[]string          `json:"tags,omitempty"`
-	TimetableDescription *string            `json:"timetableDescription,omitempty"`
+	TimetableDescription *string            `json:"timetableDescription"`
 }
 
 // WorkspaceDagRun defines model for WorkspaceDagRun.
@@ -4592,6 +5022,16 @@ type AgentActionBody struct {
 
 // AgentActionBodyAction defines model for AgentActionBody.Action.
 type AgentActionBodyAction string
+
+// BundlefilesDuplicateFileRequest defines model for bundlefiles.duplicateFileRequest.
+type BundlefilesDuplicateFileRequest struct {
+	Destination string `json:"destination"`
+}
+
+// BundlefilesMoveFileRequest defines model for bundlefiles.moveFileRequest.
+type BundlefilesMoveFileRequest struct {
+	Destination string `json:"destination"`
+}
 
 // GetSharedClusterParams defines parameters for GetSharedCluster.
 type GetSharedClusterParams struct {
@@ -4676,6 +5116,9 @@ type GetOrganizationParams struct {
 
 // ListOrganizationApiTokensParams defines parameters for ListOrganizationApiTokens.
 type ListOrganizationApiTokensParams struct {
+	// Kind filters result set to the passed in token kind
+	Kind *ListOrganizationApiTokensParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
+
 	// Offset Offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
@@ -4685,6 +5128,9 @@ type ListOrganizationApiTokensParams struct {
 	// Sorts Sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
 	Sorts *[]ListOrganizationApiTokensParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
 }
+
+// ListOrganizationApiTokensParamsKind defines parameters for ListOrganizationApiTokens.
+type ListOrganizationApiTokensParamsKind string
 
 // ListOrganizationApiTokensParamsSorts defines parameters for ListOrganizationApiTokens.
 type ListOrganizationApiTokensParamsSorts string
@@ -4895,6 +5341,9 @@ type ListDeploymentApiTokensParams struct {
 	// TokenTypes filters result set to the passed in token types
 	TokenTypes *[]ListDeploymentApiTokensParamsTokenTypes `form:"tokenTypes,omitempty" json:"tokenTypes,omitempty"`
 
+	// Kind filters result set to the passed in token kind
+	Kind *ListDeploymentApiTokensParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
+
 	// Offset Offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
@@ -4908,8 +5357,104 @@ type ListDeploymentApiTokensParams struct {
 // ListDeploymentApiTokensParamsTokenTypes defines parameters for ListDeploymentApiTokens.
 type ListDeploymentApiTokensParamsTokenTypes string
 
+// ListDeploymentApiTokensParamsKind defines parameters for ListDeploymentApiTokens.
+type ListDeploymentApiTokensParamsKind string
+
 // ListDeploymentApiTokensParamsSorts defines parameters for ListDeploymentApiTokens.
 type ListDeploymentApiTokensParamsSorts string
+
+// UploadBundleArchiveParams defines parameters for UploadBundleArchive.
+type UploadBundleArchiveParams struct {
+	// Overwrite overwrite existing files
+	Overwrite *bool `form:"overwrite,omitempty" json:"overwrite,omitempty"`
+
+	// TargetPath target path within the bundle
+	TargetPath *string `form:"targetPath,omitempty" json:"targetPath,omitempty"`
+}
+
+// ListBundleFilesParams defines parameters for ListBundleFiles.
+type ListBundleFilesParams struct {
+	// Path path prefix to list
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+}
+
+// ListDagApiTokensParams defines parameters for ListDagApiTokens.
+type ListDagApiTokensParams struct {
+	// TokenTypes filters result set to the passed in token types
+	TokenTypes *[]ListDagApiTokensParamsTokenTypes `form:"tokenTypes,omitempty" json:"tokenTypes,omitempty"`
+
+	// Kind filters result set to the passed in token kind
+	Kind *ListDagApiTokensParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// Offset Offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit Limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts Sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListDagApiTokensParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+}
+
+// ListDagApiTokensParamsTokenTypes defines parameters for ListDagApiTokens.
+type ListDagApiTokensParamsTokenTypes string
+
+// ListDagApiTokensParamsKind defines parameters for ListDagApiTokens.
+type ListDagApiTokensParamsKind string
+
+// ListDagApiTokensParamsSorts defines parameters for ListDagApiTokens.
+type ListDagApiTokensParamsSorts string
+
+// ListDagTeamsParams defines parameters for ListDagTeams.
+type ListDagTeamsParams struct {
+	// IncludeMembers includes details about the teams members
+	IncludeMembers *bool `form:"includeMembers,omitempty" json:"includeMembers,omitempty"`
+
+	// IncludeMembersCount includes the count of members in the team
+	IncludeMembersCount *bool `form:"includeMembersCount,omitempty" json:"includeMembersCount,omitempty"`
+
+	// IncludeDagRoles include details about the teams DAG roles
+	IncludeDagRoles *bool `form:"includeDagRoles,omitempty" json:"includeDagRoles,omitempty"`
+
+	// IncludeSubjectInfo include details about who created or updated the team entry
+	IncludeSubjectInfo *bool `form:"includeSubjectInfo,omitempty" json:"includeSubjectInfo,omitempty"`
+
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListDagTeamsParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+
+	// Search string to search for when listing teams
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+}
+
+// ListDagTeamsParamsSorts defines parameters for ListDagTeams.
+type ListDagTeamsParamsSorts string
+
+// ListDagUsersParams defines parameters for ListDagUsers.
+type ListDagUsersParams struct {
+	// IncludeDagRoles include details about the users DAG roles
+	IncludeDagRoles *bool `form:"includeDagRoles,omitempty" json:"includeDagRoles,omitempty"`
+
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListDagUsersParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+
+	// Search string to search for when listing users
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+}
+
+// ListDagUsersParamsSorts defines parameters for ListDagUsers.
+type ListDagUsersParamsSorts string
 
 // ListDeploysParams defines parameters for ListDeploys.
 type ListDeploysParams struct {
@@ -4981,6 +5526,12 @@ type GetDeploymentLogsParams struct {
 
 	// SearchText an exact text search param used to filter the data on
 	SearchText *string `form:"searchText,omitempty" json:"searchText,omitempty"`
+
+	// StartDate start of time range for logs (RFC3339);  must  be  used  together  with  endDate
+	StartDate *time.Time `form:"startDate,omitempty" json:"startDate,omitempty"`
+
+	// EndDate end of time range for logs (RFC3339);    must  be  used  together  with  startDate
+	EndDate *time.Time `form:"endDate,omitempty" json:"endDate,omitempty"`
 }
 
 // GetDeploymentLogsParamsSources defines parameters for GetDeploymentLogs.
@@ -5168,6 +5719,9 @@ type ListOrganizationTeamsParams struct {
 	// IncludeDeploymentRoles include details about the teams deployment roles
 	IncludeDeploymentRoles *bool `form:"includeDeploymentRoles,omitempty" json:"includeDeploymentRoles,omitempty"`
 
+	// IncludeDagRoles include details about the teams DAG roles
+	IncludeDagRoles *bool `form:"includeDagRoles,omitempty" json:"includeDagRoles,omitempty"`
+
 	// IncludeSubjectInfo include details about who created or updated the team entry
 	IncludeSubjectInfo *bool `form:"includeSubjectInfo,omitempty" json:"includeSubjectInfo,omitempty"`
 
@@ -5187,13 +5741,49 @@ type ListOrganizationTeamsParams struct {
 // ListOrganizationTeamsParamsSorts defines parameters for ListOrganizationTeams.
 type ListOrganizationTeamsParamsSorts string
 
+// ListApiTokensParams defines parameters for ListApiTokens.
+type ListApiTokensParams struct {
+	// IncludeRoles Whether to include roles in response.
+	IncludeRoles *bool `form:"includeRoles,omitempty" json:"includeRoles,omitempty"`
+
+	// Kind The kind of the API token to list API tokens for.
+	Kind *ListApiTokensParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// ScopeType When provided, only API tokens of this scope type are returned.
+	ScopeType *ListApiTokensParamsScopeType `form:"scopeType,omitempty" json:"scopeType,omitempty"`
+
+	// ScopeEntityId When provided along with scopeType, only API tokens of this scope type and entity are returned.
+	ScopeEntityId *string `form:"scopeEntityId,omitempty" json:"scopeEntityId,omitempty"`
+
+	// Offset Offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit Limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts Sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListApiTokensParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+}
+
+// ListApiTokensParamsKind defines parameters for ListApiTokens.
+type ListApiTokensParamsKind string
+
+// ListApiTokensParamsScopeType defines parameters for ListApiTokens.
+type ListApiTokensParamsScopeType string
+
+// ListApiTokensParamsSorts defines parameters for ListApiTokens.
+type ListApiTokensParamsSorts string
+
 // ListOrgUsersParams defines parameters for ListOrgUsers.
 type ListOrgUsersParams struct {
-	// IncludeDeploymentRoles include details about the teams deployment roles
+	// IncludeDeploymentRoles include details about the users deployment roles
 	IncludeDeploymentRoles *bool `form:"includeDeploymentRoles,omitempty" json:"includeDeploymentRoles,omitempty"`
 
-	// IncludeWorkspaceRoles include details about the teams workspace roles
+	// IncludeWorkspaceRoles include details about the users workspace roles
 	IncludeWorkspaceRoles *bool `form:"includeWorkspaceRoles,omitempty" json:"includeWorkspaceRoles,omitempty"`
+
+	// IncludeDagRoles include details about the users DAG roles
+	IncludeDagRoles *bool `form:"includeDagRoles,omitempty" json:"includeDagRoles,omitempty"`
 
 	// Offset offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
@@ -5243,6 +5833,9 @@ type ListWorkspaceApiTokensParams struct {
 	// TokenTypes filters result set to the passed in token types
 	TokenTypes *[]ListWorkspaceApiTokensParamsTokenTypes `form:"tokenTypes,omitempty" json:"tokenTypes,omitempty"`
 
+	// Kind filters result set to the passed in token kind
+	Kind *ListWorkspaceApiTokensParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
+
 	// Offset Offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
@@ -5255,6 +5848,9 @@ type ListWorkspaceApiTokensParams struct {
 
 // ListWorkspaceApiTokensParamsTokenTypes defines parameters for ListWorkspaceApiTokens.
 type ListWorkspaceApiTokensParamsTokenTypes string
+
+// ListWorkspaceApiTokensParamsKind defines parameters for ListWorkspaceApiTokens.
+type ListWorkspaceApiTokensParamsKind string
 
 // ListWorkspaceApiTokensParamsSorts defines parameters for ListWorkspaceApiTokens.
 type ListWorkspaceApiTokensParamsSorts string
@@ -5505,6 +6101,9 @@ type UpdateGcpClusterJSONRequestBody = UpdateGcpClusterRequest
 // CreateClusterRouteJSONRequestBody defines body for CreateClusterRoute for application/json ContentType.
 type CreateClusterRouteJSONRequestBody = CreateClusterRouteRequest
 
+// UpdateClusterFailedOverStatusJSONRequestBody defines body for UpdateClusterFailedOverStatus for application/json ContentType.
+type UpdateClusterFailedOverStatusJSONRequestBody = UpdateClusterFailedOverStatusRequest
+
 // DeactivateOrganizationJSONRequestBody defines body for DeactivateOrganization for application/json ContentType.
 type DeactivateOrganizationJSONRequestBody = DeactivateOrganizationRequest
 
@@ -5522,6 +6121,12 @@ type CreateDeploymentApiTokenJSONRequestBody = CreateDeploymentApiTokenRequest
 
 // UpdateDeploymentApiTokenJSONRequestBody defines body for UpdateDeploymentApiToken for application/json ContentType.
 type UpdateDeploymentApiTokenJSONRequestBody = UpdateDeploymentApiTokenRequest
+
+// DuplicateBundleFileJSONRequestBody defines body for DuplicateBundleFile for application/json ContentType.
+type DuplicateBundleFileJSONRequestBody = BundlefilesDuplicateFileRequest
+
+// MoveBundleFileJSONRequestBody defines body for MoveBundleFile for application/json ContentType.
+type MoveBundleFileJSONRequestBody = BundlefilesMoveFileRequest
 
 // TriggerGitDeployJSONRequestBody defines body for TriggerGitDeploy for application/json ContentType.
 type TriggerGitDeployJSONRequestBody = TriggerGitDeployRequest
@@ -5544,11 +6149,17 @@ type MutateDeploymentUserRoleJSONRequestBody = MutateDeploymentUserRoleRequest
 // CreateEnvironmentObjectJSONRequestBody defines body for CreateEnvironmentObject for application/json ContentType.
 type CreateEnvironmentObjectJSONRequestBody = CreateEnvironmentObjectRequest
 
+// MigrateDeploymentEnvVarJSONRequestBody defines body for MigrateDeploymentEnvVar for application/json ContentType.
+type MigrateDeploymentEnvVarJSONRequestBody = MigrateDeploymentEnvVarRequest
+
 // UpdateEnvironmentObjectJSONRequestBody defines body for UpdateEnvironmentObject for application/json ContentType.
 type UpdateEnvironmentObjectJSONRequestBody = UpdateEnvironmentObjectRequest
 
 // ExcludeLinkingEnvironmentObjectJSONRequestBody defines body for ExcludeLinkingEnvironmentObject for application/json ContentType.
 type ExcludeLinkingEnvironmentObjectJSONRequestBody = ExcludeLinkEnvironmentObjectRequest
+
+// PromoteEnvironmentObjectJSONRequestBody defines body for PromoteEnvironmentObject for application/json ContentType.
+type PromoteEnvironmentObjectJSONRequestBody = PromoteEnvironmentObjectRequest
 
 // CreateUserInviteJSONRequestBody defines body for CreateUserInvite for application/json ContentType.
 type CreateUserInviteJSONRequestBody = CreateUserInviteRequest
@@ -5574,8 +6185,14 @@ type AddTeamMembersJSONRequestBody = AddTeamMembersRequest
 // MutateOrgTeamRoleJSONRequestBody defines body for MutateOrgTeamRole for application/json ContentType.
 type MutateOrgTeamRoleJSONRequestBody = MutateOrgTeamRoleRequest
 
+// UpdateTeamRolesJSONRequestBody defines body for UpdateTeamRoles for application/json ContentType.
+type UpdateTeamRolesJSONRequestBody = UpdateTeamRolesRequest
+
 // MutateOrgUserRoleJSONRequestBody defines body for MutateOrgUserRole for application/json ContentType.
 type MutateOrgUserRoleJSONRequestBody = MutateOrgUserRoleRequest
+
+// UpdateUserRolesJSONRequestBody defines body for UpdateUserRoles for application/json ContentType.
+type UpdateUserRolesJSONRequestBody = UpdateUserRolesRequest
 
 // CreateWorkspaceJSONRequestBody defines body for CreateWorkspace for application/json ContentType.
 type CreateWorkspaceJSONRequestBody = CreateWorkspaceRequest
@@ -5625,6 +6242,7 @@ func (t CreateDeploymentRequest) AsCreateDedicatedDeploymentRequest() (CreateDed
 
 // FromCreateDedicatedDeploymentRequest overwrites any union data inside the CreateDeploymentRequest as the provided CreateDedicatedDeploymentRequest
 func (t *CreateDeploymentRequest) FromCreateDedicatedDeploymentRequest(v CreateDedicatedDeploymentRequest) error {
+	v.Type = "DEDICATED"
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
@@ -5632,6 +6250,7 @@ func (t *CreateDeploymentRequest) FromCreateDedicatedDeploymentRequest(v CreateD
 
 // MergeCreateDedicatedDeploymentRequest performs a merge with any union data inside the CreateDeploymentRequest, using the provided CreateDedicatedDeploymentRequest
 func (t *CreateDeploymentRequest) MergeCreateDedicatedDeploymentRequest(v CreateDedicatedDeploymentRequest) error {
+	v.Type = "DEDICATED"
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -5651,6 +6270,7 @@ func (t CreateDeploymentRequest) AsCreateHybridDeploymentRequest() (CreateHybrid
 
 // FromCreateHybridDeploymentRequest overwrites any union data inside the CreateDeploymentRequest as the provided CreateHybridDeploymentRequest
 func (t *CreateDeploymentRequest) FromCreateHybridDeploymentRequest(v CreateHybridDeploymentRequest) error {
+	v.Type = "HYBRID"
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
@@ -5658,6 +6278,7 @@ func (t *CreateDeploymentRequest) FromCreateHybridDeploymentRequest(v CreateHybr
 
 // MergeCreateHybridDeploymentRequest performs a merge with any union data inside the CreateDeploymentRequest, using the provided CreateHybridDeploymentRequest
 func (t *CreateDeploymentRequest) MergeCreateHybridDeploymentRequest(v CreateHybridDeploymentRequest) error {
+	v.Type = "HYBRID"
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -5677,6 +6298,7 @@ func (t CreateDeploymentRequest) AsCreateStandardDeploymentRequest() (CreateStan
 
 // FromCreateStandardDeploymentRequest overwrites any union data inside the CreateDeploymentRequest as the provided CreateStandardDeploymentRequest
 func (t *CreateDeploymentRequest) FromCreateStandardDeploymentRequest(v CreateStandardDeploymentRequest) error {
+	v.Type = "STANDARD"
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
@@ -5684,6 +6306,7 @@ func (t *CreateDeploymentRequest) FromCreateStandardDeploymentRequest(v CreateSt
 
 // MergeCreateStandardDeploymentRequest performs a merge with any union data inside the CreateDeploymentRequest, using the provided CreateStandardDeploymentRequest
 func (t *CreateDeploymentRequest) MergeCreateStandardDeploymentRequest(v CreateStandardDeploymentRequest) error {
+	v.Type = "STANDARD"
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -5692,6 +6315,31 @@ func (t *CreateDeploymentRequest) MergeCreateStandardDeploymentRequest(v CreateS
 	merged, err := runtime.JSONMerge(t.union, b)
 	t.union = merged
 	return err
+}
+
+func (t CreateDeploymentRequest) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t CreateDeploymentRequest) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "DEDICATED":
+		return t.AsCreateDedicatedDeploymentRequest()
+	case "HYBRID":
+		return t.AsCreateHybridDeploymentRequest()
+	case "STANDARD":
+		return t.AsCreateStandardDeploymentRequest()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
 }
 
 func (t CreateDeploymentRequest) MarshalJSON() ([]byte, error) {
@@ -5713,6 +6361,7 @@ func (t UpdateDeploymentRequest) AsUpdateHostedDeploymentRequest() (UpdateHosted
 
 // FromUpdateHostedDeploymentRequest overwrites any union data inside the UpdateDeploymentRequest as the provided UpdateHostedDeploymentRequest
 func (t *UpdateDeploymentRequest) FromUpdateHostedDeploymentRequest(v UpdateHostedDeploymentRequest) error {
+	v.Type = "DEDICATED"
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
@@ -5720,6 +6369,7 @@ func (t *UpdateDeploymentRequest) FromUpdateHostedDeploymentRequest(v UpdateHost
 
 // MergeUpdateHostedDeploymentRequest performs a merge with any union data inside the UpdateDeploymentRequest, using the provided UpdateHostedDeploymentRequest
 func (t *UpdateDeploymentRequest) MergeUpdateHostedDeploymentRequest(v UpdateHostedDeploymentRequest) error {
+	v.Type = "DEDICATED"
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -5739,6 +6389,7 @@ func (t UpdateDeploymentRequest) AsUpdateHybridDeploymentRequest() (UpdateHybrid
 
 // FromUpdateHybridDeploymentRequest overwrites any union data inside the UpdateDeploymentRequest as the provided UpdateHybridDeploymentRequest
 func (t *UpdateDeploymentRequest) FromUpdateHybridDeploymentRequest(v UpdateHybridDeploymentRequest) error {
+	v.Type = "HYBRID"
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
@@ -5746,6 +6397,7 @@ func (t *UpdateDeploymentRequest) FromUpdateHybridDeploymentRequest(v UpdateHybr
 
 // MergeUpdateHybridDeploymentRequest performs a merge with any union data inside the UpdateDeploymentRequest, using the provided UpdateHybridDeploymentRequest
 func (t *UpdateDeploymentRequest) MergeUpdateHybridDeploymentRequest(v UpdateHybridDeploymentRequest) error {
+	v.Type = "HYBRID"
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -5754,6 +6406,29 @@ func (t *UpdateDeploymentRequest) MergeUpdateHybridDeploymentRequest(v UpdateHyb
 	merged, err := runtime.JSONMerge(t.union, b)
 	t.union = merged
 	return err
+}
+
+func (t UpdateDeploymentRequest) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t UpdateDeploymentRequest) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "DEDICATED":
+		return t.AsUpdateHostedDeploymentRequest()
+	case "HYBRID":
+		return t.AsUpdateHybridDeploymentRequest()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
 }
 
 func (t UpdateDeploymentRequest) MarshalJSON() ([]byte, error) {
@@ -6004,6 +6679,11 @@ type ClientInterface interface {
 	// DeleteClusterRoute request
 	DeleteClusterRoute(ctx context.Context, organizationId string, clusterId string, routeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UpdateClusterFailedOverStatusWithBody request with any body
+	UpdateClusterFailedOverStatusWithBody(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateClusterFailedOverStatus(ctx context.Context, organizationId string, clusterId string, body UpdateClusterFailedOverStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeactivateOrganizationWithBody request with any body
 	DeactivateOrganizationWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -6073,6 +6753,46 @@ type ClientInterface interface {
 	// RotateDeploymentApiToken request
 	RotateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DownloadBundleArchive request
+	DownloadBundleArchive(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadBundleArchive request
+	UploadBundleArchive(ctx context.Context, organizationId string, deploymentId string, params *UploadBundleArchiveParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListBundleFiles request
+	ListBundleFiles(ctx context.Context, organizationId string, deploymentId string, params *ListBundleFilesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBundleFile request
+	DeleteBundleFile(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DownloadBundleFile request
+	DownloadBundleFile(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DuplicateBundleFileWithBody request with any body
+	DuplicateBundleFileWithBody(ctx context.Context, organizationId string, deploymentId string, path string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DuplicateBundleFile(ctx context.Context, organizationId string, deploymentId string, path string, body DuplicateBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveBundleFileWithBody request with any body
+	MoveBundleFileWithBody(ctx context.Context, organizationId string, deploymentId string, path string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	MoveBundleFile(ctx context.Context, organizationId string, deploymentId string, path string, body MoveBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadBundleFile request
+	UploadBundleFile(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDeploymentDagFilters request
+	ListDeploymentDagFilters(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDagApiTokens request
+	ListDagApiTokens(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagApiTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDagTeams request
+	ListDagTeams(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDagUsers request
+	ListDagUsers(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// TriggerGitDeployWithBody request with any body
 	TriggerGitDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -6141,6 +6861,11 @@ type ClientInterface interface {
 
 	CreateEnvironmentObject(ctx context.Context, organizationId string, body CreateEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// MigrateDeploymentEnvVarWithBody request with any body
+	MigrateDeploymentEnvVarWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	MigrateDeploymentEnvVar(ctx context.Context, organizationId string, body MigrateDeploymentEnvVarJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteEnvironmentObject request
 	DeleteEnvironmentObject(ctx context.Context, organizationId string, environmentObjectId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -6159,6 +6884,11 @@ type ClientInterface interface {
 
 	// ListEnvironmentObjectMetricsExportsLogs request
 	ListEnvironmentObjectMetricsExportsLogs(ctx context.Context, organizationId string, environmentObjectId string, params *ListEnvironmentObjectMetricsExportsLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PromoteEnvironmentObjectWithBody request with any body
+	PromoteEnvironmentObjectWithBody(ctx context.Context, organizationId string, environmentObjectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PromoteEnvironmentObject(ctx context.Context, organizationId string, environmentObjectId string, body PromoteEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateUserInviteWithBody request with any body
 	CreateUserInviteWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6230,6 +6960,17 @@ type ClientInterface interface {
 
 	MutateOrgTeamRole(ctx context.Context, organizationId string, teamId string, body MutateOrgTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UpdateTeamRolesWithBody request with any body
+	UpdateTeamRolesWithBody(ctx context.Context, organizationId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateTeamRoles(ctx context.Context, organizationId string, teamId string, body UpdateTeamRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListApiTokens request
+	ListApiTokens(ctx context.Context, organizationId string, params *ListApiTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiToken request
+	GetApiToken(ctx context.Context, organizationId string, tokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListOrgUsers request
 	ListOrgUsers(ctx context.Context, organizationId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -6243,6 +6984,11 @@ type ClientInterface interface {
 	MutateOrgUserRoleWithBody(ctx context.Context, organizationId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	MutateOrgUserRole(ctx context.Context, organizationId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateUserRolesWithBody request with any body
+	UpdateUserRolesWithBody(ctx context.Context, organizationId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateUserRoles(ctx context.Context, organizationId string, userId string, body UpdateUserRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaces request
 	ListWorkspaces(ctx context.Context, organizationId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6844,6 +7590,30 @@ func (c *Client) DeleteClusterRoute(ctx context.Context, organizationId string, 
 	return c.Client.Do(req)
 }
 
+func (c *Client) UpdateClusterFailedOverStatusWithBody(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateClusterFailedOverStatusRequestWithBody(c.Server, organizationId, clusterId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateClusterFailedOverStatus(ctx context.Context, organizationId string, clusterId string, body UpdateClusterFailedOverStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateClusterFailedOverStatusRequest(c.Server, organizationId, clusterId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) DeactivateOrganizationWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeactivateOrganizationRequestWithBody(c.Server, organizationId, contentType, body)
 	if err != nil {
@@ -7134,6 +7904,174 @@ func (c *Client) UpdateDeploymentApiToken(ctx context.Context, organizationId st
 
 func (c *Client) RotateDeploymentApiToken(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRotateDeploymentApiTokenRequest(c.Server, organizationId, deploymentId, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DownloadBundleArchive(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadBundleArchiveRequest(c.Server, organizationId, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadBundleArchive(ctx context.Context, organizationId string, deploymentId string, params *UploadBundleArchiveParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadBundleArchiveRequest(c.Server, organizationId, deploymentId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListBundleFiles(ctx context.Context, organizationId string, deploymentId string, params *ListBundleFilesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListBundleFilesRequest(c.Server, organizationId, deploymentId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteBundleFile(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBundleFileRequest(c.Server, organizationId, deploymentId, path)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DownloadBundleFile(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadBundleFileRequest(c.Server, organizationId, deploymentId, path)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DuplicateBundleFileWithBody(ctx context.Context, organizationId string, deploymentId string, path string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDuplicateBundleFileRequestWithBody(c.Server, organizationId, deploymentId, path, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DuplicateBundleFile(ctx context.Context, organizationId string, deploymentId string, path string, body DuplicateBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDuplicateBundleFileRequest(c.Server, organizationId, deploymentId, path, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MoveBundleFileWithBody(ctx context.Context, organizationId string, deploymentId string, path string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMoveBundleFileRequestWithBody(c.Server, organizationId, deploymentId, path, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MoveBundleFile(ctx context.Context, organizationId string, deploymentId string, path string, body MoveBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMoveBundleFileRequest(c.Server, organizationId, deploymentId, path, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadBundleFile(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadBundleFileRequest(c.Server, organizationId, deploymentId, path)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDeploymentDagFilters(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDeploymentDagFiltersRequest(c.Server, organizationId, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDagApiTokens(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagApiTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDagApiTokensRequest(c.Server, organizationId, deploymentId, dagId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDagTeams(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDagTeamsRequest(c.Server, organizationId, deploymentId, dagId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDagUsers(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDagUsersRequest(c.Server, organizationId, deploymentId, dagId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -7444,6 +8382,30 @@ func (c *Client) CreateEnvironmentObject(ctx context.Context, organizationId str
 	return c.Client.Do(req)
 }
 
+func (c *Client) MigrateDeploymentEnvVarWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMigrateDeploymentEnvVarRequestWithBody(c.Server, organizationId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MigrateDeploymentEnvVar(ctx context.Context, organizationId string, body MigrateDeploymentEnvVarJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMigrateDeploymentEnvVarRequest(c.Server, organizationId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) DeleteEnvironmentObject(ctx context.Context, organizationId string, environmentObjectId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteEnvironmentObjectRequest(c.Server, organizationId, environmentObjectId)
 	if err != nil {
@@ -7518,6 +8480,30 @@ func (c *Client) ExcludeLinkingEnvironmentObject(ctx context.Context, organizati
 
 func (c *Client) ListEnvironmentObjectMetricsExportsLogs(ctx context.Context, organizationId string, environmentObjectId string, params *ListEnvironmentObjectMetricsExportsLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListEnvironmentObjectMetricsExportsLogsRequest(c.Server, organizationId, environmentObjectId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PromoteEnvironmentObjectWithBody(ctx context.Context, organizationId string, environmentObjectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPromoteEnvironmentObjectRequestWithBody(c.Server, organizationId, environmentObjectId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PromoteEnvironmentObject(ctx context.Context, organizationId string, environmentObjectId string, body PromoteEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPromoteEnvironmentObjectRequest(c.Server, organizationId, environmentObjectId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7840,6 +8826,54 @@ func (c *Client) MutateOrgTeamRole(ctx context.Context, organizationId string, t
 	return c.Client.Do(req)
 }
 
+func (c *Client) UpdateTeamRolesWithBody(ctx context.Context, organizationId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTeamRolesRequestWithBody(c.Server, organizationId, teamId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateTeamRoles(ctx context.Context, organizationId string, teamId string, body UpdateTeamRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTeamRolesRequest(c.Server, organizationId, teamId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListApiTokens(ctx context.Context, organizationId string, params *ListApiTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListApiTokensRequest(c.Server, organizationId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiToken(ctx context.Context, organizationId string, tokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiTokenRequest(c.Server, organizationId, tokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListOrgUsers(ctx context.Context, organizationId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListOrgUsersRequest(c.Server, organizationId, params)
 	if err != nil {
@@ -7890,6 +8924,30 @@ func (c *Client) MutateOrgUserRoleWithBody(ctx context.Context, organizationId s
 
 func (c *Client) MutateOrgUserRole(ctx context.Context, organizationId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMutateOrgUserRoleRequest(c.Server, organizationId, userId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateUserRolesWithBody(ctx context.Context, organizationId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateUserRolesRequestWithBody(c.Server, organizationId, userId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateUserRoles(ctx context.Context, organizationId string, userId string, body UpdateUserRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateUserRolesRequest(c.Server, organizationId, userId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -9024,6 +10082,22 @@ func NewListOrganizationApiTokensRequest(server string, organizationId string, p
 
 	if params != nil {
 		queryValues := queryURL.Query()
+
+		if params.Kind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "kind", runtime.ParamLocationQuery, *params.Kind); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
 
 		if params.Offset != nil {
 
@@ -10218,6 +11292,60 @@ func NewDeleteClusterRouteRequest(server string, organizationId string, clusterI
 	return req, nil
 }
 
+// NewUpdateClusterFailedOverStatusRequest calls the generic UpdateClusterFailedOverStatus builder with application/json body
+func NewUpdateClusterFailedOverStatusRequest(server string, organizationId string, clusterId string, body UpdateClusterFailedOverStatusJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateClusterFailedOverStatusRequestWithBody(server, organizationId, clusterId, "application/json", bodyReader)
+}
+
+// NewUpdateClusterFailedOverStatusRequestWithBody generates requests for UpdateClusterFailedOverStatus with any type of body
+func NewUpdateClusterFailedOverStatusRequestWithBody(server string, organizationId string, clusterId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/%s/failed-over", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDeactivateOrganizationRequest calls the generic DeactivateOrganization builder with application/json body
 func NewDeactivateOrganizationRequest(server string, organizationId string, body DeactivateOrganizationJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -11318,6 +12446,22 @@ func NewListDeploymentApiTokensRequest(server string, organizationId string, dep
 
 		}
 
+		if params.Kind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "kind", runtime.ParamLocationQuery, *params.Kind); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		if params.Offset != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
@@ -11629,6 +12773,946 @@ func NewRotateDeploymentApiTokenRequest(server string, organizationId string, de
 	}
 
 	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDownloadBundleArchiveRequest generates requests for DownloadBundleArchive
+func NewDownloadBundleArchiveRequest(server string, organizationId string, deploymentId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundle/archive", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUploadBundleArchiveRequest generates requests for UploadBundleArchive
+func NewUploadBundleArchiveRequest(server string, organizationId string, deploymentId string, params *UploadBundleArchiveParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundle/archive", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Overwrite != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "overwrite", runtime.ParamLocationQuery, *params.Overwrite); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.TargetPath != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "targetPath", runtime.ParamLocationQuery, *params.TargetPath); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListBundleFilesRequest generates requests for ListBundleFiles
+func NewListBundleFilesRequest(server string, organizationId string, deploymentId string, params *ListBundleFilesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundle/files", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "path", runtime.ParamLocationQuery, *params.Path); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteBundleFileRequest generates requests for DeleteBundleFile
+func NewDeleteBundleFileRequest(server string, organizationId string, deploymentId string, path string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "path", runtime.ParamLocationPath, path)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundle/files/delete/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDownloadBundleFileRequest generates requests for DownloadBundleFile
+func NewDownloadBundleFileRequest(server string, organizationId string, deploymentId string, path string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "path", runtime.ParamLocationPath, path)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundle/files/download/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDuplicateBundleFileRequest calls the generic DuplicateBundleFile builder with application/json body
+func NewDuplicateBundleFileRequest(server string, organizationId string, deploymentId string, path string, body DuplicateBundleFileJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDuplicateBundleFileRequestWithBody(server, organizationId, deploymentId, path, "application/json", bodyReader)
+}
+
+// NewDuplicateBundleFileRequestWithBody generates requests for DuplicateBundleFile with any type of body
+func NewDuplicateBundleFileRequestWithBody(server string, organizationId string, deploymentId string, path string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "path", runtime.ParamLocationPath, path)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundle/files/duplicate/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewMoveBundleFileRequest calls the generic MoveBundleFile builder with application/json body
+func NewMoveBundleFileRequest(server string, organizationId string, deploymentId string, path string, body MoveBundleFileJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMoveBundleFileRequestWithBody(server, organizationId, deploymentId, path, "application/json", bodyReader)
+}
+
+// NewMoveBundleFileRequestWithBody generates requests for MoveBundleFile with any type of body
+func NewMoveBundleFileRequestWithBody(server string, organizationId string, deploymentId string, path string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "path", runtime.ParamLocationPath, path)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundle/files/move/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUploadBundleFileRequest generates requests for UploadBundleFile
+func NewUploadBundleFileRequest(server string, organizationId string, deploymentId string, path string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "path", runtime.ParamLocationPath, path)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundle/files/upload/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListDeploymentDagFiltersRequest generates requests for ListDeploymentDagFilters
+func NewListDeploymentDagFiltersRequest(server string, organizationId string, deploymentId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/dag-filters", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListDagApiTokensRequest generates requests for ListDagApiTokens
+func NewListDagApiTokensRequest(server string, organizationId string, deploymentId string, dagId string, params *ListDagApiTokensParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "dagId", runtime.ParamLocationPath, dagId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/dags/%s/api-tokens", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.TokenTypes != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "tokenTypes", runtime.ParamLocationQuery, *params.TokenTypes); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Kind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "kind", runtime.ParamLocationQuery, *params.Kind); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sorts != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListDagTeamsRequest generates requests for ListDagTeams
+func NewListDagTeamsRequest(server string, organizationId string, deploymentId string, dagId string, params *ListDagTeamsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "dagId", runtime.ParamLocationPath, dagId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/dags/%s/teams", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.IncludeMembers != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeMembers", runtime.ParamLocationQuery, *params.IncludeMembers); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeMembersCount != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeMembersCount", runtime.ParamLocationQuery, *params.IncludeMembersCount); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeDagRoles != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeDagRoles", runtime.ParamLocationQuery, *params.IncludeDagRoles); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeSubjectInfo != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeSubjectInfo", runtime.ParamLocationQuery, *params.IncludeSubjectInfo); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sorts != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Search != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListDagUsersRequest generates requests for ListDagUsers
+func NewListDagUsersRequest(server string, organizationId string, deploymentId string, dagId string, params *ListDagUsersParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "deploymentId", runtime.ParamLocationPath, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "dagId", runtime.ParamLocationPath, dagId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/dags/%s/users", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.IncludeDagRoles != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeDagRoles", runtime.ParamLocationQuery, *params.IncludeDagRoles); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sorts != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Search != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -12436,6 +14520,38 @@ func NewGetDeploymentLogsRequest(server string, organizationId string, deploymen
 
 		}
 
+		if params.StartDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "startDate", runtime.ParamLocationQuery, *params.StartDate); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.EndDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "endDate", runtime.ParamLocationQuery, *params.EndDate); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		queryURL.RawQuery = queryValues.Encode()
 	}
 
@@ -13230,6 +15346,53 @@ func NewCreateEnvironmentObjectRequestWithBody(server string, organizationId str
 	return req, nil
 }
 
+// NewMigrateDeploymentEnvVarRequest calls the generic MigrateDeploymentEnvVar builder with application/json body
+func NewMigrateDeploymentEnvVarRequest(server string, organizationId string, body MigrateDeploymentEnvVarJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMigrateDeploymentEnvVarRequestWithBody(server, organizationId, "application/json", bodyReader)
+}
+
+// NewMigrateDeploymentEnvVarRequestWithBody generates requests for MigrateDeploymentEnvVar with any type of body
+func NewMigrateDeploymentEnvVarRequestWithBody(server string, organizationId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/environment-objects/migrate/env-var", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDeleteEnvironmentObjectRequest generates requests for DeleteEnvironmentObject
 func NewDeleteEnvironmentObjectRequest(server string, organizationId string, environmentObjectId string) (*http.Request, error) {
 	var err error
@@ -13543,6 +15706,60 @@ func NewListEnvironmentObjectMetricsExportsLogsRequest(server string, organizati
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewPromoteEnvironmentObjectRequest calls the generic PromoteEnvironmentObject builder with application/json body
+func NewPromoteEnvironmentObjectRequest(server string, organizationId string, environmentObjectId string, body PromoteEnvironmentObjectJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPromoteEnvironmentObjectRequestWithBody(server, organizationId, environmentObjectId, "application/json", bodyReader)
+}
+
+// NewPromoteEnvironmentObjectRequestWithBody generates requests for PromoteEnvironmentObject with any type of body
+func NewPromoteEnvironmentObjectRequestWithBody(server string, organizationId string, environmentObjectId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "environmentObjectId", runtime.ParamLocationPath, environmentObjectId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/environment-objects/%s/promote", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -14245,6 +16462,22 @@ func NewListOrganizationTeamsRequest(server string, organizationId string, param
 
 		}
 
+		if params.IncludeDagRoles != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeDagRoles", runtime.ParamLocationQuery, *params.IncludeDagRoles); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		if params.IncludeSubjectInfo != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeSubjectInfo", runtime.ParamLocationQuery, *params.IncludeSubjectInfo); err != nil {
@@ -14675,6 +16908,253 @@ func NewMutateOrgTeamRoleRequestWithBody(server string, organizationId string, t
 	return req, nil
 }
 
+// NewUpdateTeamRolesRequest calls the generic UpdateTeamRoles builder with application/json body
+func NewUpdateTeamRolesRequest(server string, organizationId string, teamId string, body UpdateTeamRolesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateTeamRolesRequestWithBody(server, organizationId, teamId, "application/json", bodyReader)
+}
+
+// NewUpdateTeamRolesRequestWithBody generates requests for UpdateTeamRoles with any type of body
+func NewUpdateTeamRolesRequestWithBody(server string, organizationId string, teamId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s/roles", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListApiTokensRequest generates requests for ListApiTokens
+func NewListApiTokensRequest(server string, organizationId string, params *ListApiTokensParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/tokens", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.IncludeRoles != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeRoles", runtime.ParamLocationQuery, *params.IncludeRoles); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Kind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "kind", runtime.ParamLocationQuery, *params.Kind); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ScopeType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "scopeType", runtime.ParamLocationQuery, *params.ScopeType); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ScopeEntityId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "scopeEntityId", runtime.ParamLocationQuery, *params.ScopeEntityId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sorts != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiTokenRequest generates requests for GetApiToken
+func NewGetApiTokenRequest(server string, organizationId string, tokenId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "tokenId", runtime.ParamLocationPath, tokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/tokens/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListOrgUsersRequest generates requests for ListOrgUsers
 func NewListOrgUsersRequest(server string, organizationId string, params *ListOrgUsersParams) (*http.Request, error) {
 	var err error
@@ -14723,6 +17203,22 @@ func NewListOrgUsersRequest(server string, organizationId string, params *ListOr
 		if params.IncludeWorkspaceRoles != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeWorkspaceRoles", runtime.ParamLocationQuery, *params.IncludeWorkspaceRoles); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeDagRoles != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeDagRoles", runtime.ParamLocationQuery, *params.IncludeDagRoles); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -14944,6 +17440,60 @@ func NewMutateOrgUserRoleRequestWithBody(server string, organizationId string, u
 	}
 
 	operationPath := fmt.Sprintf("/organizations/%s/users/%s/role", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdateUserRolesRequest calls the generic UpdateUserRoles builder with application/json body
+func NewUpdateUserRolesRequest(server string, organizationId string, userId string, body UpdateUserRolesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateUserRolesRequestWithBody(server, organizationId, userId, "application/json", bodyReader)
+}
+
+// NewUpdateUserRolesRequestWithBody generates requests for UpdateUserRoles with any type of body
+func NewUpdateUserRolesRequestWithBody(server string, organizationId string, userId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "organizationId", runtime.ParamLocationPath, organizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "userId", runtime.ParamLocationPath, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/users/%s/roles", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -15321,6 +17871,22 @@ func NewListWorkspaceApiTokensRequest(server string, organizationId string, work
 		if params.TokenTypes != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "tokenTypes", runtime.ParamLocationQuery, *params.TokenTypes); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Kind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "kind", runtime.ParamLocationQuery, *params.Kind); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -17986,6 +20552,11 @@ type ClientWithResponsesInterface interface {
 	// DeleteClusterRouteWithResponse request
 	DeleteClusterRouteWithResponse(ctx context.Context, organizationId string, clusterId string, routeId string, reqEditors ...RequestEditorFn) (*DeleteClusterRouteResponse, error)
 
+	// UpdateClusterFailedOverStatusWithBodyWithResponse request with any body
+	UpdateClusterFailedOverStatusWithBodyWithResponse(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateClusterFailedOverStatusResponse, error)
+
+	UpdateClusterFailedOverStatusWithResponse(ctx context.Context, organizationId string, clusterId string, body UpdateClusterFailedOverStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateClusterFailedOverStatusResponse, error)
+
 	// DeactivateOrganizationWithBodyWithResponse request with any body
 	DeactivateOrganizationWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeactivateOrganizationResponse, error)
 
@@ -18055,6 +20626,46 @@ type ClientWithResponsesInterface interface {
 	// RotateDeploymentApiTokenWithResponse request
 	RotateDeploymentApiTokenWithResponse(ctx context.Context, organizationId string, deploymentId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateDeploymentApiTokenResponse, error)
 
+	// DownloadBundleArchiveWithResponse request
+	DownloadBundleArchiveWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*DownloadBundleArchiveResponse, error)
+
+	// UploadBundleArchiveWithResponse request
+	UploadBundleArchiveWithResponse(ctx context.Context, organizationId string, deploymentId string, params *UploadBundleArchiveParams, reqEditors ...RequestEditorFn) (*UploadBundleArchiveResponse, error)
+
+	// ListBundleFilesWithResponse request
+	ListBundleFilesWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListBundleFilesParams, reqEditors ...RequestEditorFn) (*ListBundleFilesResponse, error)
+
+	// DeleteBundleFileWithResponse request
+	DeleteBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*DeleteBundleFileResponse, error)
+
+	// DownloadBundleFileWithResponse request
+	DownloadBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*DownloadBundleFileResponse, error)
+
+	// DuplicateBundleFileWithBodyWithResponse request with any body
+	DuplicateBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DuplicateBundleFileResponse, error)
+
+	DuplicateBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, body DuplicateBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*DuplicateBundleFileResponse, error)
+
+	// MoveBundleFileWithBodyWithResponse request with any body
+	MoveBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MoveBundleFileResponse, error)
+
+	MoveBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, body MoveBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveBundleFileResponse, error)
+
+	// UploadBundleFileWithResponse request
+	UploadBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*UploadBundleFileResponse, error)
+
+	// ListDeploymentDagFiltersWithResponse request
+	ListDeploymentDagFiltersWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*ListDeploymentDagFiltersResponse, error)
+
+	// ListDagApiTokensWithResponse request
+	ListDagApiTokensWithResponse(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagApiTokensParams, reqEditors ...RequestEditorFn) (*ListDagApiTokensResponse, error)
+
+	// ListDagTeamsWithResponse request
+	ListDagTeamsWithResponse(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagTeamsParams, reqEditors ...RequestEditorFn) (*ListDagTeamsResponse, error)
+
+	// ListDagUsersWithResponse request
+	ListDagUsersWithResponse(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagUsersParams, reqEditors ...RequestEditorFn) (*ListDagUsersResponse, error)
+
 	// TriggerGitDeployWithBodyWithResponse request with any body
 	TriggerGitDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TriggerGitDeployResponse, error)
 
@@ -18123,6 +20734,11 @@ type ClientWithResponsesInterface interface {
 
 	CreateEnvironmentObjectWithResponse(ctx context.Context, organizationId string, body CreateEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateEnvironmentObjectResponse, error)
 
+	// MigrateDeploymentEnvVarWithBodyWithResponse request with any body
+	MigrateDeploymentEnvVarWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MigrateDeploymentEnvVarResponse, error)
+
+	MigrateDeploymentEnvVarWithResponse(ctx context.Context, organizationId string, body MigrateDeploymentEnvVarJSONRequestBody, reqEditors ...RequestEditorFn) (*MigrateDeploymentEnvVarResponse, error)
+
 	// DeleteEnvironmentObjectWithResponse request
 	DeleteEnvironmentObjectWithResponse(ctx context.Context, organizationId string, environmentObjectId string, reqEditors ...RequestEditorFn) (*DeleteEnvironmentObjectResponse, error)
 
@@ -18141,6 +20757,11 @@ type ClientWithResponsesInterface interface {
 
 	// ListEnvironmentObjectMetricsExportsLogsWithResponse request
 	ListEnvironmentObjectMetricsExportsLogsWithResponse(ctx context.Context, organizationId string, environmentObjectId string, params *ListEnvironmentObjectMetricsExportsLogsParams, reqEditors ...RequestEditorFn) (*ListEnvironmentObjectMetricsExportsLogsResponse, error)
+
+	// PromoteEnvironmentObjectWithBodyWithResponse request with any body
+	PromoteEnvironmentObjectWithBodyWithResponse(ctx context.Context, organizationId string, environmentObjectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteEnvironmentObjectResponse, error)
+
+	PromoteEnvironmentObjectWithResponse(ctx context.Context, organizationId string, environmentObjectId string, body PromoteEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteEnvironmentObjectResponse, error)
 
 	// CreateUserInviteWithBodyWithResponse request with any body
 	CreateUserInviteWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUserInviteResponse, error)
@@ -18212,6 +20833,17 @@ type ClientWithResponsesInterface interface {
 
 	MutateOrgTeamRoleWithResponse(ctx context.Context, organizationId string, teamId string, body MutateOrgTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateOrgTeamRoleResponse, error)
 
+	// UpdateTeamRolesWithBodyWithResponse request with any body
+	UpdateTeamRolesWithBodyWithResponse(ctx context.Context, organizationId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTeamRolesResponse, error)
+
+	UpdateTeamRolesWithResponse(ctx context.Context, organizationId string, teamId string, body UpdateTeamRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTeamRolesResponse, error)
+
+	// ListApiTokensWithResponse request
+	ListApiTokensWithResponse(ctx context.Context, organizationId string, params *ListApiTokensParams, reqEditors ...RequestEditorFn) (*ListApiTokensResponse, error)
+
+	// GetApiTokenWithResponse request
+	GetApiTokenWithResponse(ctx context.Context, organizationId string, tokenId string, reqEditors ...RequestEditorFn) (*GetApiTokenResponse, error)
+
 	// ListOrgUsersWithResponse request
 	ListOrgUsersWithResponse(ctx context.Context, organizationId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*ListOrgUsersResponse, error)
 
@@ -18225,6 +20857,11 @@ type ClientWithResponsesInterface interface {
 	MutateOrgUserRoleWithBodyWithResponse(ctx context.Context, organizationId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateOrgUserRoleResponse, error)
 
 	MutateOrgUserRoleWithResponse(ctx context.Context, organizationId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateOrgUserRoleResponse, error)
+
+	// UpdateUserRolesWithBodyWithResponse request with any body
+	UpdateUserRolesWithBodyWithResponse(ctx context.Context, organizationId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateUserRolesResponse, error)
+
+	UpdateUserRolesWithResponse(ctx context.Context, organizationId string, userId string, body UpdateUserRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateUserRolesResponse, error)
 
 	// ListWorkspacesWithResponse request
 	ListWorkspacesWithResponse(ctx context.Context, organizationId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*ListWorkspacesResponse, error)
@@ -19096,6 +21733,32 @@ func (r DeleteClusterRouteResponse) StatusCode() int {
 	return 0
 }
 
+type UpdateClusterFailedOverStatusResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Cluster
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateClusterFailedOverStatusResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateClusterFailedOverStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type DeactivateOrganizationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -19588,6 +22251,302 @@ func (r RotateDeploymentApiTokenResponse) StatusCode() int {
 	return 0
 }
 
+type DownloadBundleArchiveResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r DownloadBundleArchiveResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DownloadBundleArchiveResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UploadBundleArchiveResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadBundleArchiveResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadBundleArchiveResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListBundleFilesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListBundleFilesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListBundleFilesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteBundleFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteBundleFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteBundleFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DownloadBundleFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r DownloadBundleFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DownloadBundleFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DuplicateBundleFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DuplicateBundleFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DuplicateBundleFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type MoveBundleFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r MoveBundleFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MoveBundleFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UploadBundleFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadBundleFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadBundleFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListDeploymentDagFiltersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentDagFilters
+	JSON4XX      *Error
+	JSON5XX      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDeploymentDagFiltersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDeploymentDagFiltersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListDagApiTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListApiTokensPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDagApiTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDagApiTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListDagTeamsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TeamsPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDagTeamsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDagTeamsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListDagUsersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *UsersPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDagUsersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDagUsersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type TriggerGitDeployResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20068,6 +23027,33 @@ func (r CreateEnvironmentObjectResponse) StatusCode() int {
 	return 0
 }
 
+type MigrateDeploymentEnvVarResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *EnvironmentObject
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r MigrateDeploymentEnvVarResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MigrateDeploymentEnvVarResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type DeleteEnvironmentObjectResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20198,6 +23184,33 @@ func (r ListEnvironmentObjectMetricsExportsLogsResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ListEnvironmentObjectMetricsExportsLogsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type PromoteEnvironmentObjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *EnvironmentObject
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r PromoteEnvironmentObjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PromoteEnvironmentObjectResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -20685,6 +23698,87 @@ func (r MutateOrgTeamRoleResponse) StatusCode() int {
 	return 0
 }
 
+type UpdateTeamRolesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SubjectRoles
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateTeamRolesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateTeamRolesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListApiTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListApiTokensPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListApiTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListApiTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListOrgUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20785,6 +23879,33 @@ func (r MutateOrgUserRoleResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r MutateOrgUserRoleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateUserRolesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SubjectRoles
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateUserRolesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateUserRolesResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -22138,6 +25259,23 @@ func (c *ClientWithResponses) DeleteClusterRouteWithResponse(ctx context.Context
 	return ParseDeleteClusterRouteResponse(rsp)
 }
 
+// UpdateClusterFailedOverStatusWithBodyWithResponse request with arbitrary body returning *UpdateClusterFailedOverStatusResponse
+func (c *ClientWithResponses) UpdateClusterFailedOverStatusWithBodyWithResponse(ctx context.Context, organizationId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateClusterFailedOverStatusResponse, error) {
+	rsp, err := c.UpdateClusterFailedOverStatusWithBody(ctx, organizationId, clusterId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateClusterFailedOverStatusResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateClusterFailedOverStatusWithResponse(ctx context.Context, organizationId string, clusterId string, body UpdateClusterFailedOverStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateClusterFailedOverStatusResponse, error) {
+	rsp, err := c.UpdateClusterFailedOverStatus(ctx, organizationId, clusterId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateClusterFailedOverStatusResponse(rsp)
+}
+
 // DeactivateOrganizationWithBodyWithResponse request with arbitrary body returning *DeactivateOrganizationResponse
 func (c *ClientWithResponses) DeactivateOrganizationWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeactivateOrganizationResponse, error) {
 	rsp, err := c.DeactivateOrganizationWithBody(ctx, organizationId, contentType, body, reqEditors...)
@@ -22355,6 +25493,130 @@ func (c *ClientWithResponses) RotateDeploymentApiTokenWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseRotateDeploymentApiTokenResponse(rsp)
+}
+
+// DownloadBundleArchiveWithResponse request returning *DownloadBundleArchiveResponse
+func (c *ClientWithResponses) DownloadBundleArchiveWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*DownloadBundleArchiveResponse, error) {
+	rsp, err := c.DownloadBundleArchive(ctx, organizationId, deploymentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDownloadBundleArchiveResponse(rsp)
+}
+
+// UploadBundleArchiveWithResponse request returning *UploadBundleArchiveResponse
+func (c *ClientWithResponses) UploadBundleArchiveWithResponse(ctx context.Context, organizationId string, deploymentId string, params *UploadBundleArchiveParams, reqEditors ...RequestEditorFn) (*UploadBundleArchiveResponse, error) {
+	rsp, err := c.UploadBundleArchive(ctx, organizationId, deploymentId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadBundleArchiveResponse(rsp)
+}
+
+// ListBundleFilesWithResponse request returning *ListBundleFilesResponse
+func (c *ClientWithResponses) ListBundleFilesWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListBundleFilesParams, reqEditors ...RequestEditorFn) (*ListBundleFilesResponse, error) {
+	rsp, err := c.ListBundleFiles(ctx, organizationId, deploymentId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListBundleFilesResponse(rsp)
+}
+
+// DeleteBundleFileWithResponse request returning *DeleteBundleFileResponse
+func (c *ClientWithResponses) DeleteBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*DeleteBundleFileResponse, error) {
+	rsp, err := c.DeleteBundleFile(ctx, organizationId, deploymentId, path, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBundleFileResponse(rsp)
+}
+
+// DownloadBundleFileWithResponse request returning *DownloadBundleFileResponse
+func (c *ClientWithResponses) DownloadBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*DownloadBundleFileResponse, error) {
+	rsp, err := c.DownloadBundleFile(ctx, organizationId, deploymentId, path, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDownloadBundleFileResponse(rsp)
+}
+
+// DuplicateBundleFileWithBodyWithResponse request with arbitrary body returning *DuplicateBundleFileResponse
+func (c *ClientWithResponses) DuplicateBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DuplicateBundleFileResponse, error) {
+	rsp, err := c.DuplicateBundleFileWithBody(ctx, organizationId, deploymentId, path, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDuplicateBundleFileResponse(rsp)
+}
+
+func (c *ClientWithResponses) DuplicateBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, body DuplicateBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*DuplicateBundleFileResponse, error) {
+	rsp, err := c.DuplicateBundleFile(ctx, organizationId, deploymentId, path, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDuplicateBundleFileResponse(rsp)
+}
+
+// MoveBundleFileWithBodyWithResponse request with arbitrary body returning *MoveBundleFileResponse
+func (c *ClientWithResponses) MoveBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MoveBundleFileResponse, error) {
+	rsp, err := c.MoveBundleFileWithBody(ctx, organizationId, deploymentId, path, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMoveBundleFileResponse(rsp)
+}
+
+func (c *ClientWithResponses) MoveBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, body MoveBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveBundleFileResponse, error) {
+	rsp, err := c.MoveBundleFile(ctx, organizationId, deploymentId, path, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMoveBundleFileResponse(rsp)
+}
+
+// UploadBundleFileWithResponse request returning *UploadBundleFileResponse
+func (c *ClientWithResponses) UploadBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, path string, reqEditors ...RequestEditorFn) (*UploadBundleFileResponse, error) {
+	rsp, err := c.UploadBundleFile(ctx, organizationId, deploymentId, path, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadBundleFileResponse(rsp)
+}
+
+// ListDeploymentDagFiltersWithResponse request returning *ListDeploymentDagFiltersResponse
+func (c *ClientWithResponses) ListDeploymentDagFiltersWithResponse(ctx context.Context, organizationId string, deploymentId string, reqEditors ...RequestEditorFn) (*ListDeploymentDagFiltersResponse, error) {
+	rsp, err := c.ListDeploymentDagFilters(ctx, organizationId, deploymentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDeploymentDagFiltersResponse(rsp)
+}
+
+// ListDagApiTokensWithResponse request returning *ListDagApiTokensResponse
+func (c *ClientWithResponses) ListDagApiTokensWithResponse(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagApiTokensParams, reqEditors ...RequestEditorFn) (*ListDagApiTokensResponse, error) {
+	rsp, err := c.ListDagApiTokens(ctx, organizationId, deploymentId, dagId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDagApiTokensResponse(rsp)
+}
+
+// ListDagTeamsWithResponse request returning *ListDagTeamsResponse
+func (c *ClientWithResponses) ListDagTeamsWithResponse(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagTeamsParams, reqEditors ...RequestEditorFn) (*ListDagTeamsResponse, error) {
+	rsp, err := c.ListDagTeams(ctx, organizationId, deploymentId, dagId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDagTeamsResponse(rsp)
+}
+
+// ListDagUsersWithResponse request returning *ListDagUsersResponse
+func (c *ClientWithResponses) ListDagUsersWithResponse(ctx context.Context, organizationId string, deploymentId string, dagId string, params *ListDagUsersParams, reqEditors ...RequestEditorFn) (*ListDagUsersResponse, error) {
+	rsp, err := c.ListDagUsers(ctx, organizationId, deploymentId, dagId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDagUsersResponse(rsp)
 }
 
 // TriggerGitDeployWithBodyWithResponse request with arbitrary body returning *TriggerGitDeployResponse
@@ -22575,6 +25837,23 @@ func (c *ClientWithResponses) CreateEnvironmentObjectWithResponse(ctx context.Co
 	return ParseCreateEnvironmentObjectResponse(rsp)
 }
 
+// MigrateDeploymentEnvVarWithBodyWithResponse request with arbitrary body returning *MigrateDeploymentEnvVarResponse
+func (c *ClientWithResponses) MigrateDeploymentEnvVarWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MigrateDeploymentEnvVarResponse, error) {
+	rsp, err := c.MigrateDeploymentEnvVarWithBody(ctx, organizationId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMigrateDeploymentEnvVarResponse(rsp)
+}
+
+func (c *ClientWithResponses) MigrateDeploymentEnvVarWithResponse(ctx context.Context, organizationId string, body MigrateDeploymentEnvVarJSONRequestBody, reqEditors ...RequestEditorFn) (*MigrateDeploymentEnvVarResponse, error) {
+	rsp, err := c.MigrateDeploymentEnvVar(ctx, organizationId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMigrateDeploymentEnvVarResponse(rsp)
+}
+
 // DeleteEnvironmentObjectWithResponse request returning *DeleteEnvironmentObjectResponse
 func (c *ClientWithResponses) DeleteEnvironmentObjectWithResponse(ctx context.Context, organizationId string, environmentObjectId string, reqEditors ...RequestEditorFn) (*DeleteEnvironmentObjectResponse, error) {
 	rsp, err := c.DeleteEnvironmentObject(ctx, organizationId, environmentObjectId, reqEditors...)
@@ -22634,6 +25913,23 @@ func (c *ClientWithResponses) ListEnvironmentObjectMetricsExportsLogsWithRespons
 		return nil, err
 	}
 	return ParseListEnvironmentObjectMetricsExportsLogsResponse(rsp)
+}
+
+// PromoteEnvironmentObjectWithBodyWithResponse request with arbitrary body returning *PromoteEnvironmentObjectResponse
+func (c *ClientWithResponses) PromoteEnvironmentObjectWithBodyWithResponse(ctx context.Context, organizationId string, environmentObjectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteEnvironmentObjectResponse, error) {
+	rsp, err := c.PromoteEnvironmentObjectWithBody(ctx, organizationId, environmentObjectId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePromoteEnvironmentObjectResponse(rsp)
+}
+
+func (c *ClientWithResponses) PromoteEnvironmentObjectWithResponse(ctx context.Context, organizationId string, environmentObjectId string, body PromoteEnvironmentObjectJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteEnvironmentObjectResponse, error) {
+	rsp, err := c.PromoteEnvironmentObject(ctx, organizationId, environmentObjectId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePromoteEnvironmentObjectResponse(rsp)
 }
 
 // CreateUserInviteWithBodyWithResponse request with arbitrary body returning *CreateUserInviteResponse
@@ -22862,6 +26158,41 @@ func (c *ClientWithResponses) MutateOrgTeamRoleWithResponse(ctx context.Context,
 	return ParseMutateOrgTeamRoleResponse(rsp)
 }
 
+// UpdateTeamRolesWithBodyWithResponse request with arbitrary body returning *UpdateTeamRolesResponse
+func (c *ClientWithResponses) UpdateTeamRolesWithBodyWithResponse(ctx context.Context, organizationId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTeamRolesResponse, error) {
+	rsp, err := c.UpdateTeamRolesWithBody(ctx, organizationId, teamId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTeamRolesResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateTeamRolesWithResponse(ctx context.Context, organizationId string, teamId string, body UpdateTeamRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTeamRolesResponse, error) {
+	rsp, err := c.UpdateTeamRoles(ctx, organizationId, teamId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTeamRolesResponse(rsp)
+}
+
+// ListApiTokensWithResponse request returning *ListApiTokensResponse
+func (c *ClientWithResponses) ListApiTokensWithResponse(ctx context.Context, organizationId string, params *ListApiTokensParams, reqEditors ...RequestEditorFn) (*ListApiTokensResponse, error) {
+	rsp, err := c.ListApiTokens(ctx, organizationId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListApiTokensResponse(rsp)
+}
+
+// GetApiTokenWithResponse request returning *GetApiTokenResponse
+func (c *ClientWithResponses) GetApiTokenWithResponse(ctx context.Context, organizationId string, tokenId string, reqEditors ...RequestEditorFn) (*GetApiTokenResponse, error) {
+	rsp, err := c.GetApiToken(ctx, organizationId, tokenId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiTokenResponse(rsp)
+}
+
 // ListOrgUsersWithResponse request returning *ListOrgUsersResponse
 func (c *ClientWithResponses) ListOrgUsersWithResponse(ctx context.Context, organizationId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*ListOrgUsersResponse, error) {
 	rsp, err := c.ListOrgUsers(ctx, organizationId, params, reqEditors...)
@@ -22904,6 +26235,23 @@ func (c *ClientWithResponses) MutateOrgUserRoleWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseMutateOrgUserRoleResponse(rsp)
+}
+
+// UpdateUserRolesWithBodyWithResponse request with arbitrary body returning *UpdateUserRolesResponse
+func (c *ClientWithResponses) UpdateUserRolesWithBodyWithResponse(ctx context.Context, organizationId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateUserRolesResponse, error) {
+	rsp, err := c.UpdateUserRolesWithBody(ctx, organizationId, userId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateUserRolesResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateUserRolesWithResponse(ctx context.Context, organizationId string, userId string, body UpdateUserRolesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateUserRolesResponse, error) {
+	rsp, err := c.UpdateUserRoles(ctx, organizationId, userId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateUserRolesResponse(rsp)
 }
 
 // ListWorkspacesWithResponse request returning *ListWorkspacesResponse
@@ -24987,6 +28335,60 @@ func ParseDeleteClusterRouteResponse(rsp *http.Response) (*DeleteClusterRouteRes
 	return response, nil
 }
 
+// ParseUpdateClusterFailedOverStatusResponse parses an HTTP response from a UpdateClusterFailedOverStatusWithResponse call
+func ParseUpdateClusterFailedOverStatusResponse(rsp *http.Response) (*UpdateClusterFailedOverStatusResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateClusterFailedOverStatusResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Cluster
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseDeactivateOrganizationResponse parses an HTTP response from a DeactivateOrganizationWithResponse call
 func ParseDeactivateOrganizationResponse(rsp *http.Response) (*DeactivateOrganizationResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -25986,6 +29388,536 @@ func ParseRotateDeploymentApiTokenResponse(rsp *http.Response) (*RotateDeploymen
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDownloadBundleArchiveResponse parses an HTTP response from a DownloadBundleArchiveWithResponse call
+func ParseDownloadBundleArchiveResponse(rsp *http.Response) (*DownloadBundleArchiveResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DownloadBundleArchiveResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadBundleArchiveResponse parses an HTTP response from a UploadBundleArchiveWithResponse call
+func ParseUploadBundleArchiveResponse(rsp *http.Response) (*UploadBundleArchiveResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadBundleArchiveResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListBundleFilesResponse parses an HTTP response from a ListBundleFilesWithResponse call
+func ParseListBundleFilesResponse(rsp *http.Response) (*ListBundleFilesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListBundleFilesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteBundleFileResponse parses an HTTP response from a DeleteBundleFileWithResponse call
+func ParseDeleteBundleFileResponse(rsp *http.Response) (*DeleteBundleFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteBundleFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDownloadBundleFileResponse parses an HTTP response from a DownloadBundleFileWithResponse call
+func ParseDownloadBundleFileResponse(rsp *http.Response) (*DownloadBundleFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DownloadBundleFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseDuplicateBundleFileResponse parses an HTTP response from a DuplicateBundleFileWithResponse call
+func ParseDuplicateBundleFileResponse(rsp *http.Response) (*DuplicateBundleFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DuplicateBundleFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMoveBundleFileResponse parses an HTTP response from a MoveBundleFileWithResponse call
+func ParseMoveBundleFileResponse(rsp *http.Response) (*MoveBundleFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MoveBundleFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUploadBundleFileResponse parses an HTTP response from a UploadBundleFileWithResponse call
+func ParseUploadBundleFileResponse(rsp *http.Response) (*UploadBundleFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadBundleFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDeploymentDagFiltersResponse parses an HTTP response from a ListDeploymentDagFiltersWithResponse call
+func ParseListDeploymentDagFiltersResponse(rsp *http.Response) (*ListDeploymentDagFiltersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDeploymentDagFiltersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentDagFilters
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 5:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON5XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDagApiTokensResponse parses an HTTP response from a ListDagApiTokensWithResponse call
+func ParseListDagApiTokensResponse(rsp *http.Response) (*ListDagApiTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDagApiTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListApiTokensPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDagTeamsResponse parses an HTTP response from a ListDagTeamsWithResponse call
+func ParseListDagTeamsResponse(rsp *http.Response) (*ListDagTeamsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDagTeamsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TeamsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDagUsersResponse parses an HTTP response from a ListDagUsersWithResponse call
+func ParseListDagUsersResponse(rsp *http.Response) (*ListDagUsersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDagUsersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UsersPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -27055,6 +30987,67 @@ func ParseCreateEnvironmentObjectResponse(rsp *http.Response) (*CreateEnvironmen
 	return response, nil
 }
 
+// ParseMigrateDeploymentEnvVarResponse parses an HTTP response from a MigrateDeploymentEnvVarWithResponse call
+func ParseMigrateDeploymentEnvVarResponse(rsp *http.Response) (*MigrateDeploymentEnvVarResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MigrateDeploymentEnvVarResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EnvironmentObject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseDeleteEnvironmentObjectResponse parses an HTTP response from a DeleteEnvironmentObjectWithResponse call
 func ParseDeleteEnvironmentObjectResponse(rsp *http.Response) (*DeleteEnvironmentObjectResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -27354,6 +31347,67 @@ func ParseListEnvironmentObjectMetricsExportsLogsResponse(rsp *http.Response) (*
 			return nil, err
 		}
 		response.JSON405 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePromoteEnvironmentObjectResponse parses an HTTP response from a PromoteEnvironmentObjectWithResponse call
+func ParsePromoteEnvironmentObjectResponse(rsp *http.Response) (*PromoteEnvironmentObjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PromoteEnvironmentObjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EnvironmentObject
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -28430,6 +32484,189 @@ func ParseMutateOrgTeamRoleResponse(rsp *http.Response) (*MutateOrgTeamRoleRespo
 	return response, nil
 }
 
+// ParseUpdateTeamRolesResponse parses an HTTP response from a UpdateTeamRolesWithResponse call
+func ParseUpdateTeamRolesResponse(rsp *http.Response) (*UpdateTeamRolesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateTeamRolesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SubjectRoles
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListApiTokensResponse parses an HTTP response from a ListApiTokensWithResponse call
+func ParseListApiTokensResponse(rsp *http.Response) (*ListApiTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListApiTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListApiTokensPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiTokenResponse parses an HTTP response from a GetApiTokenWithResponse call
+func ParseGetApiTokenResponse(rsp *http.Response) (*GetApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListOrgUsersResponse parses an HTTP response from a ListOrgUsersWithResponse call
 func ParseListOrgUsersResponse(rsp *http.Response) (*ListOrgUsersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -28615,6 +32852,67 @@ func ParseMutateOrgUserRoleResponse(rsp *http.Response) (*MutateOrgUserRoleRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest UserRole
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateUserRolesResponse parses an HTTP response from a UpdateUserRolesWithResponse call
+func ParseUpdateUserRolesResponse(rsp *http.Response) (*UpdateUserRolesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateUserRolesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SubjectRoles
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

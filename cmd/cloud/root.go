@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"io"
+	"net/http"
 
 	airflow "github.com/astronomer/astro-cli/airflow-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -15,6 +16,7 @@ var (
 	astroCoreIamClient astroiamcore.CoreClient
 	platformCoreClient astroplatformcore.CoreClient
 	airflowAPIClient   airflow.Client
+	bundleStreamClient astrocore.BundleFilesStreamClient
 )
 
 // AddCmds adds all the command initialized in this package for the cmd package to import
@@ -23,6 +25,7 @@ func AddCmds(astroPlatformCoreClient astroplatformcore.CoreClient, coreClient as
 	platformCoreClient = astroPlatformCoreClient
 	astroCoreIamClient = iamCoreClient
 	airflowAPIClient = airflowClient
+	bundleStreamClient = astrocore.NewBundleFilesStreamClient(&http.Client{})
 	return []*cobra.Command{
 		NewDeployCmd(),
 		newDeploymentRootCmd(out),

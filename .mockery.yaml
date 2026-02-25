@@ -32,6 +32,7 @@ packages:
       ClientWithResponsesInterface:
         config:
           filename: client.go
+      BundleFilesStreamClient:
   github.com/astronomer/astro-cli/astro-client-iam-core:
     config:
       dir: astro-client-iam-core/mocks

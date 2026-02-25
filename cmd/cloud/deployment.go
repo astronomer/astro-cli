@@ -139,6 +139,10 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentTokenRootCmd(out),
 		newDeploymentHibernateCmd(),
 		newDeploymentWakeUpCmd(),
+		newDeploymentRequirementsRootCmd(out),
+		newDeploymentPackagesRootCmd(out),
+		newDeploymentUpgradeCmd(out),
+		newDeploymentDagsCmd(out),
 	)
 	return cmd
 }

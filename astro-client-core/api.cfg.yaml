@@ -13,6 +13,7 @@ include-tags:
   - ApiToken
   - Deployment
   - Deploy
+  - BundleFiles
   - Environment
   - Role
   - Polaris Project
