@@ -766,7 +766,8 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 
 	imageName := "tmp-upgrade-test"
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, envFile, dockerfile, imageName)
 	if err != nil {
 		return err
 	}
@@ -1050,7 +1051,8 @@ func airflowBuild(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, envFile, dockerfile, imageName)
 	if err != nil {
 		return err
 	}

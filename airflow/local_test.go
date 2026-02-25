@@ -3,6 +3,7 @@ package airflow
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -576,13 +577,16 @@ func (s *Suite) TestStandaloneStart_VenvCreationFails() {
 	origLookPath := lookPath
 	origRunCommand := runCommand
 	origResolvePython := resolvePythonVersion
+	origCheckPort := checkPortAvailable
 	defer func() {
 		standaloneParseFile = origParseFile
 		lookPath = origLookPath
 		runCommand = origRunCommand
 		resolvePythonVersion = origResolvePython
+		checkPortAvailable = origCheckPort
 	}()
 
+	checkPortAvailable = func(_ string) error { return nil }
 	resolvePythonVersion = func(_, _ string) string { return "3.12" }
 
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
@@ -631,13 +635,16 @@ func (s *Suite) TestStandaloneStart_InstallFails() {
 	origLookPath := lookPath
 	origRunCommand := runCommand
 	origResolvePython := resolvePythonVersion
+	origCheckPort := checkPortAvailable
 	defer func() {
 		standaloneParseFile = origParseFile
 		lookPath = origLookPath
 		runCommand = origRunCommand
 		resolvePythonVersion = origResolvePython
+		checkPortAvailable = origCheckPort
 	}()
 
+	checkPortAvailable = func(_ string) error { return nil }
 	resolvePythonVersion = func(_, _ string) string { return "3.12" }
 
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
@@ -716,14 +723,17 @@ func (s *Suite) TestStandaloneStart_HappyPath() {
 	origRunCommand := runCommand
 	origCheckHealth := checkWebserverHealth
 	origResolvePython := resolvePythonVersion
+	origCheckPort := checkPortAvailable
 	defer func() {
 		standaloneParseFile = origParseFile
 		lookPath = origLookPath
 		runCommand = origRunCommand
 		checkWebserverHealth = origCheckHealth
 		resolvePythonVersion = origResolvePython
+		checkPortAvailable = origCheckPort
 	}()
 
+	checkPortAvailable = func(_ string) error { return nil }
 	resolvePythonVersion = func(_, _ string) string { return "3.12" }
 
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
@@ -778,14 +788,17 @@ func (s *Suite) TestStandaloneStart_Background() {
 	origRunCommand := runCommand
 	origCheckHealth := checkWebserverHealth
 	origResolvePython := resolvePythonVersion
+	origCheckPort := checkPortAvailable
 	defer func() {
 		standaloneParseFile = origParseFile
 		lookPath = origLookPath
 		runCommand = origRunCommand
 		checkWebserverHealth = origCheckHealth
 		resolvePythonVersion = origResolvePython
+		checkPortAvailable = origCheckPort
 	}()
 
+	checkPortAvailable = func(_ string) error { return nil }
 	resolvePythonVersion = func(_, _ string) string { return "3.12" }
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
 		return []docker.Command{
@@ -867,6 +880,51 @@ func (s *Suite) TestStandaloneStart_AlreadyRunning() {
 	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
 	s.Error(err)
 	s.Contains(err.Error(), "already running")
+}
+
+func (s *Suite) TestStandaloneStart_PortInUse() {
+	// Start a listener to simulate a port conflict
+	ln, err := net.Listen("tcp", "localhost:0")
+	s.NoError(err)
+	defer ln.Close()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	tmpDir, err := os.MkdirTemp("", "standalone-port-conflict")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(constraintsDir, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	s.NoError(err)
+
+	origParseFile := standaloneParseFile
+	origLookPath := lookPath
+	origResolvePython := resolvePythonVersion
+	defer func() {
+		standaloneParseFile = origParseFile
+		lookPath = origLookPath
+		resolvePythonVersion = origResolvePython
+	}()
+
+	resolvePythonVersion = func(_, _ string) string { return "3.12" }
+	standaloneParseFile = func(filename string) ([]docker.Command, error) {
+		return []docker.Command{
+			{Cmd: "from", Value: []string{"astrocrpublic.azurecr.io/runtime:3.1-12"}},
+		}, nil
+	}
+	lookPath = func(file string) (string, error) { return "/usr/local/bin/uv", nil }
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+	handler.SetPort(port)
+
+	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	s.Error(err)
+	s.Contains(err.Error(), "port "+port+" is already in use")
 }
 
 func (s *Suite) TestStandaloneStop_Running() {
@@ -1172,7 +1230,7 @@ func (s *Suite) TestStandaloneBuildEnv_CustomPort() {
 		}
 	}
 
-	s.Equal("9090", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_PORT"])
+	s.Equal("9090", envMap["AIRFLOW__API__PORT"])
 }
 
 func (s *Suite) TestStandaloneEnsureCredentials() {

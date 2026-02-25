@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -187,6 +188,15 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 		if pid, alive := s.readPID(); alive {
 			return fmt.Errorf("standalone Airflow is already running (PID %d). Run 'astro dev stop' first", pid)
 		}
+	}
+
+	// 3c. Check if the port is already in use by another process.
+	// airflow standalone doesn't crash when the port is taken — only the
+	// api-server subprocess fails — so the health check would pass against
+	// whichever service already occupies the port, misleading the user.
+	port := s.webserverPort()
+	if err := checkPortAvailable(port); err != nil {
+		return err
 	}
 
 	// 4. Fetch constraints and freeze files from CDN (cached locally)
@@ -409,6 +419,20 @@ func (s *Standalone) healthEndpoint() (url, component string) {
 	return "http://localhost:" + s.webserverPort() + "/api/v2/monitor/health", "api-server"
 }
 
+// checkPortAvailable tries to connect to localhost:port. If anything is already
+// listening, we return an error so the user doesn't silently connect to the
+// wrong Airflow instance.
+var checkPortAvailable = checkPortAvailableDefault
+
+func checkPortAvailableDefault(port string) error {
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", port), time.Second)
+	if err != nil {
+		return nil // Connection refused / timeout → port is free
+	}
+	conn.Close()
+	return fmt.Errorf("port %s is already in use — stop the other process or set a different port with 'astro config set api-server.port <port>'", port)
+}
+
 // ensureCredentials seeds the passwords file with admin:admin on first run.
 // If the file already exists it is left untouched, preserving custom credentials.
 func (s *Standalone) ensureCredentials() error {
@@ -575,8 +599,8 @@ func (s *Standalone) buildEnv() []string {
 	overrides["AIRFLOW__CORE__DAGS_FOLDER"] = filepath.Join(s.airflowHome, "dags")
 	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS"] = standaloneAdminUser + ":admin"
 	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE"] = s.passwordsFilePath()
-	if s.port != "" {
-		overrides["AIRFLOW__WEBSERVER__WEB_SERVER_PORT"] = s.port
+	if port := s.webserverPort(); port != defaultStandalonePort {
+		overrides["AIRFLOW__API__PORT"] = port
 	}
 
 	// Start with inherited env, filtering out keys we override.
