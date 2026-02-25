@@ -90,6 +90,7 @@ var (
 		RemoteClientRegistry:    newCfg("remote.client_registry", ""),
 		RemoteBaseImageRegistry: newCfg("remote.base_image_registry", "images.astronomer.cloud"),
 		DeployGitMetadata:       newCfg("deploy.git_metadata", "true"),
+		DevMode:                 newCfg("dev.mode", "docker"),
 		TelemetryEnabled:        newCfg("telemetry.enabled", "true"),
 		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
 		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),

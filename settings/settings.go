@@ -721,6 +721,14 @@ func jsonString(conn *Connection) string {
 	return string(extraBytes)
 }
 
+// SetExecAirflowCommand replaces the function used to execute airflow CLI commands.
+// It returns the previous function so callers can restore it.
+func SetExecAirflowCommand(fn func(id, command string) (string, error)) func(id, command string) (string, error) {
+	prev := execAirflowCommand
+	execAirflowCommand = fn
+	return prev
+}
+
 func WriteAirflowSettingstoYAML(settingsFile string) error {
 	err := InitSettings(settingsFile)
 	if err != nil {

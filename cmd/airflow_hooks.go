@@ -13,10 +13,26 @@ import (
 
 const failedToCreatePluginsDir = "failed to create plugins directory: %w"
 
+// noOpContainerRuntime is a ContainerRuntime that does nothing.
+// It is used in standalone mode so that downstream hooks can call
+// containerRuntime methods without nil-pointer guards.
+type noOpContainerRuntime struct{}
+
+func (n noOpContainerRuntime) Initialize() error      { return nil }
+func (n noOpContainerRuntime) Configure() error       { return nil }
+func (n noOpContainerRuntime) ConfigureOrKill() error { return nil }
+func (n noOpContainerRuntime) Kill() error            { return nil }
+
 // ConfigureContainerRuntime sets up the containerRuntime variable and is defined
 // as a PersistentPreRunE hook for all astro dev sub-commands. The containerRuntime
 // variable is then used in the following pre-run and post-run hooks defined here.
+// In standalone mode a no-op runtime is assigned so that downstream hooks never
+// encounter a nil containerRuntime.
 func ConfigureContainerRuntime(_ *cobra.Command, _ []string) error {
+	if isStandaloneMode() {
+		containerRuntime = noOpContainerRuntime{}
+		return nil
+	}
 	var err error
 	containerRuntime, err = runtimes.GetContainerRuntime()
 	if err != nil {
@@ -44,6 +60,7 @@ func EnsureRuntime(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize the runtime if it's not running.
+	// In standalone mode this is a no-op via noOpContainerRuntime.
 	return containerRuntime.Initialize()
 }
 
@@ -68,6 +85,5 @@ func KillPreRunHook(cmd *cobra.Command, args []string) error {
 // KillPostRunHook ensures that we stop and kill the
 // podman machine once a project has been killed.
 func KillPostRunHook(_ *cobra.Command, _ []string) error {
-	// Kill the runtime.
 	return containerRuntime.Kill()
 }

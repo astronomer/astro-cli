@@ -263,3 +263,51 @@ func getAstronomerCertifiedTag(availableReleases []AirflowVersionRaw, airflowVer
 	// case when airflowVersion requested is not present in certified astronomer endpoint, but is valid version as per Houston configuration
 	return airflowVersion, nil
 }
+
+// ResolveFloatingTag resolves a floating runtime tag (e.g., "3.1") to the
+// latest matching pinned version (e.g., "3.1-12") using the runtime versions JSON.
+// It matches versions that start with the floating tag followed by "-" (for X.Y
+// floating tags like "3.1") or "." (for single-number tags like "3").
+// Returns an error if no matching version is found.
+func ResolveFloatingTag(floatingTag string) (string, error) {
+	r := Request{}
+	resp, err := r.Do()
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch runtime versions: %w", err)
+	}
+
+	var latest string
+	for version := range resp.RuntimeVersionsV3 {
+		if strings.HasPrefix(version, floatingTag+"-") || strings.HasPrefix(version, floatingTag+".") {
+			if latest == "" || CompareRuntimeVersions(version, latest) > 0 {
+				latest = version
+			}
+		}
+	}
+
+	if latest == "" {
+		return "", fmt.Errorf("no runtime version found matching '%s'", floatingTag)
+	}
+
+	return latest, nil
+}
+
+// GetDefaultPythonVersion fetches the runtime versions JSON and returns the
+// defaultPythonVersion for the given runtime version. Returns an empty string
+// if the version is not found or the field is not yet populated.
+func GetDefaultPythonVersion(runtimeVersion string) string {
+	r := Request{}
+	resp, err := r.Do()
+	if err != nil {
+		logger.Debugf("Failed to fetch runtime versions for Python version lookup: %v", err)
+		return ""
+	}
+
+	if rv, ok := resp.RuntimeVersionsV3[runtimeVersion]; ok {
+		if rv.Metadata.DefaultPythonVersion != "" {
+			return rv.Metadata.DefaultPythonVersion
+		}
+	}
+
+	return ""
+}
