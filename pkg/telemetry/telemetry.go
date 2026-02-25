@@ -29,6 +29,9 @@ const (
 	envTelemetryDebug = "ASTRO_TELEMETRY_DEBUG"
 )
 
+// SkipPreRunAnnotation is the cobra annotation key used to skip PersistentPreRunE
+const SkipPreRunAnnotation = "skipPreRun"
+
 // Event types
 const (
 	EventCommandExecution = "CLI Command"
@@ -139,12 +142,26 @@ func DetectContext() string {
 	return "interactive"
 }
 
+// showFirstRunNotice prints a one-time notice about telemetry on the first CLI invocation.
+func showFirstRunNotice() {
+	if config.CFG.TelemetryNoticeShown.GetHomeString() != "" {
+		return
+	}
+	fmt.Fprintln(os.Stderr,
+		"The Astro CLI now collects anonymous usage data to help us prioritize and invest in CLI features.\n"+
+			"Only commands, OS, and CLI version are tracked — no personal information is collected.\n"+
+			"Opt out anytime: `astro telemetry disable` or ASTRO_TELEMETRY_DISABLED=1")
+	_ = config.CFG.TelemetryNoticeShown.SetHomeString("true")
+}
+
 // TrackCommand sends telemetry data for a command execution
 // It spawns a subprocess to send the data asynchronously
 func TrackCommand(cmd *cobra.Command) {
 	if !IsEnabled() {
 		return
 	}
+
+	showFirstRunNotice()
 
 	commandPath := GetCommandPath(cmd)
 	// Don't track root command, hidden commands, or telemetry commands
@@ -240,7 +257,12 @@ func spawnTelemetrySender(payload TelemetryPayload, apiURL string) {
 	cmd.Stderr = nil
 
 	// Start the process without waiting
-	_ = cmd.Start()
+	if err := cmd.Start(); err != nil {
+		if isDebugMode() {
+			fmt.Fprintf(os.Stderr, "[telemetry] failed to spawn sender: %v\n", err)
+		}
+		return
+	}
 
 	// Don't wait for the process to complete
 	if cmd.Process != nil {

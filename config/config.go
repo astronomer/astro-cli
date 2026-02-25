@@ -92,6 +92,7 @@ var (
 		DeployGitMetadata:       newCfg("deploy.git_metadata", "true"),
 		TelemetryEnabled:        newCfg("telemetry.enabled", "true"),
 		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
+		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
 	}
 
 	// viperHome is the viper object in the users home directory

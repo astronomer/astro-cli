@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/telemetry"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,4 +80,5 @@ func TestTelemetrySendCmd(t *testing.T) {
 
 	assert.Equal(t, "_telemetry-send", cmd.Use)
 	assert.True(t, cmd.Hidden, "Command should be hidden")
+	assert.Equal(t, "true", cmd.Annotations[telemetry.SkipPreRunAnnotation], "Should have skipPreRun annotation")
 }

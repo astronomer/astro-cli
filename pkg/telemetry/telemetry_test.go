@@ -234,6 +234,55 @@ func TestGetTelemetryAPIURL(t *testing.T) {
 	})
 }
 
+func TestShowFirstRunNotice(t *testing.T) {
+	t.Run("prints notice on first call", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		configRaw := []byte("telemetry:\n  enabled: true\n")
+		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+		config.InitConfig(fs)
+
+		// Capture stderr
+		oldStderr := os.Stderr
+		r, w, _ := os.Pipe()
+		os.Stderr = w
+
+		showFirstRunNotice()
+
+		w.Close()
+		out := make([]byte, 1024)
+		n, _ := r.Read(out)
+		os.Stderr = oldStderr
+
+		output := string(out[:n])
+		assert.Contains(t, output, "anonymous usage data")
+		assert.Contains(t, output, "astro telemetry disable")
+
+		// Config should now be marked
+		assert.Equal(t, "true", config.CFG.TelemetryNoticeShown.GetHomeString())
+	})
+
+	t.Run("does not print on subsequent calls", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		configRaw := []byte("telemetry:\n  enabled: true\n  notice_shown: \"true\"\n")
+		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+		config.InitConfig(fs)
+
+		// Capture stderr
+		oldStderr := os.Stderr
+		r, w, _ := os.Pipe()
+		os.Stderr = w
+
+		showFirstRunNotice()
+
+		w.Close()
+		out := make([]byte, 1024)
+		n, _ := r.Read(out)
+		os.Stderr = oldStderr
+
+		assert.Equal(t, 0, n, "Should not print anything on subsequent calls")
+	})
+}
+
 func TestGetAnonymousID(t *testing.T) {
 	initTestConfig(t)
 

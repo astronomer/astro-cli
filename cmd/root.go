@@ -68,8 +68,8 @@ func NewRootCmd() *cobra.Command {
 
 Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astro Private Cloud, or Local Development.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Skip heavy pre-run logic for the internal telemetry sender subprocess
-			if cmd.Name() == "_telemetry-send" {
+			// Skip heavy pre-run logic for commands that opt out via annotation
+			if cmd.Annotations[telemetry.SkipPreRunAnnotation] == "true" {
 				return nil
 			}
 			return utils.ChainRunEs(

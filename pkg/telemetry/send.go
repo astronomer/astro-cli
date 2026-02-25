@@ -39,6 +39,9 @@ func Send(payload TelemetryPayload, apiURL string) (int, error) {
 	}
 	defer resp.Body.Close()
 
+	// Drain body to allow connection reuse by http.DefaultClient
+	io.Copy(io.Discard, resp.Body)
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp.StatusCode, fmt.Errorf("telemetry API returned status %d", resp.StatusCode)
 	}
@@ -49,7 +52,7 @@ func Send(payload TelemetryPayload, apiURL string) (int, error) {
 // SendEvent reads a JSON payload from stdin and sends it to the telemetry API.
 // This is meant to be called from the hidden _telemetry-send command.
 func SendEvent() error {
-	payloadBytes, err := io.ReadAll(os.Stdin)
+	payloadBytes, err := io.ReadAll(io.LimitReader(os.Stdin, 1<<16)) // 64KB max
 	if err != nil {
 		return err
 	}
