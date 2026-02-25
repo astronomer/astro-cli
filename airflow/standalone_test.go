@@ -36,12 +36,19 @@ func (s *Suite) TestStandaloneHandlerInit() {
 func (s *Suite) TestStandaloneStart_Airflow2Rejected() {
 	// Airflow 2 runtime versions (old format like 12.0.0) should be rejected
 	origParseFile := standaloneParseFile
-	defer func() { standaloneParseFile = origParseFile }()
+	origResolve := resolveFloatingTag
+	defer func() {
+		standaloneParseFile = origParseFile
+		resolveFloatingTag = origResolve
+	}()
 
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
 		return []docker.Command{
 			{Cmd: "from", Value: []string{"quay.io/astronomer/astro-runtime:12.0.0"}},
 		}, nil
+	}
+	resolveFloatingTag = func(tag string) (string, error) {
+		return "", fmt.Errorf("no runtime version found matching '%s'", tag)
 	}
 
 	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
@@ -55,9 +62,11 @@ func (s *Suite) TestStandaloneStart_Airflow2Rejected() {
 func (s *Suite) TestStandaloneStart_UnsupportedVersion() {
 	origParseFile := standaloneParseFile
 	origGetImageTag := standaloneGetImageTag
+	origResolve := resolveFloatingTag
 	defer func() {
 		standaloneParseFile = origParseFile
 		standaloneGetImageTag = origGetImageTag
+		resolveFloatingTag = origResolve
 	}()
 
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
@@ -68,13 +77,87 @@ func (s *Suite) TestStandaloneStart_UnsupportedVersion() {
 	standaloneGetImageTag = func(cmds []docker.Command) (string, string) {
 		return "some-image", "unknown-tag"
 	}
+	// Resolution also fails — completely unrecognizable tag
+	resolveFloatingTag = func(tag string) (string, error) {
+		return "", fmt.Errorf("no runtime version found matching '%s'", tag)
+	}
 
 	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
 	s.NoError(err)
 
 	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
 	s.Error(err)
-	s.Equal(errUnsupportedAirflowVersion, err)
+	s.Contains(err.Error(), "could not determine runtime version")
+	s.Contains(err.Error(), "pinned Astronomer Runtime image")
+}
+
+func (s *Suite) TestStandaloneStart_FloatingTag() {
+	origParseFile := standaloneParseFile
+	origGetImageTag := standaloneGetImageTag
+	origLookPath := lookPath
+	origResolve := resolveFloatingTag
+	origResolvePython := resolvePythonVersion
+	origRunCommand := runCommand
+	origCheckHealth := checkWebserverHealth
+	origCheckPort := checkPortAvailable
+	defer func() {
+		standaloneParseFile = origParseFile
+		standaloneGetImageTag = origGetImageTag
+		lookPath = origLookPath
+		resolveFloatingTag = origResolve
+		resolvePythonVersion = origResolvePython
+		runCommand = origRunCommand
+		checkWebserverHealth = origCheckHealth
+		checkPortAvailable = origCheckPort
+	}()
+
+	standaloneParseFile = func(filename string) ([]docker.Command, error) {
+		return []docker.Command{
+			{Cmd: "from", Value: []string{"astrocrpublic.azurecr.io/runtime:3.1"}},
+		}, nil
+	}
+	standaloneGetImageTag = func(cmds []docker.Command) (string, string) {
+		return "astrocrpublic.azurecr.io/runtime", "3.1"
+	}
+	// "3.1" is a floating tag — resolve it to "3.1-12"
+	resolveFloatingTag = func(tag string) (string, error) {
+		if tag == "3.1" {
+			return "3.1-12", nil
+		}
+		return "", fmt.Errorf("no match")
+	}
+	resolvePythonVersion = func(_, _ string) string { return "3.12" }
+	lookPath = func(file string) (string, error) { return "/usr/local/bin/uv", nil }
+	checkPortAvailable = func(_ string) error { return nil }
+	runCommand = func(dir, name string, args ...string) error { return nil }
+	checkWebserverHealth = func(url string, timeout time.Duration, component string) error { return nil }
+
+	tmpDir, err := os.MkdirTemp("", "standalone-floating-tag")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Pre-create cached constraints + freeze (keyed on resolved tag 3.1-12)
+	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(constraintsDir, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	s.NoError(err)
+
+	// Create a fake airflow binary
+	venvBin := filepath.Join(tmpDir, ".venv", "bin")
+	err = os.MkdirAll(venvBin, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(venvBin, "airflow"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+	handler.SetForeground(true)
+
+	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	s.NoError(err)
 }
 
 func (s *Suite) TestStandaloneStart_MissingUV() {

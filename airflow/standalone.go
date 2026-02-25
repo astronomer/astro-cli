@@ -61,10 +61,14 @@ var (
 	standaloneExec        = standaloneExecDefault
 	osReadFile            = os.ReadFile
 	osFindProcess         = os.FindProcess
+	resolveFloatingTag    = airflowversions.ResolveFloatingTag
 )
 
 // runtimePythonRe matches the optional -python-X.Y (and optional -base) suffix on a runtime tag.
 var runtimePythonRe = regexp.MustCompile(`-python-(\d+\.\d+)(-base)?$`)
+
+// fullRuntimeTagRe matches a pinned runtime tag in the new format (X.Y-Z).
+var fullRuntimeTagRe = regexp.MustCompile(`^\d+\.\d+-\d+`)
 
 // parseRuntimeTagPython extracts the base runtime tag and the Python version from a
 // full image tag. Returns an empty pythonVersion when the tag has no explicit
@@ -170,7 +174,19 @@ func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretStri
 
 	baseTag, tagPython := parseRuntimeTagPython(tag)
 
-	// 2. Validate Airflow version (AF3 only)
+	// 2. Validate Airflow version (AF3 only).
+	// If the tag isn't a pinned runtime version (X.Y-Z), try to resolve it
+	// as a floating tag (e.g., "3.1" → "3.1-12") via the runtime versions JSON.
+	if !fullRuntimeTagRe.MatchString(baseTag) {
+		resolved, resolveErr := resolveFloatingTag(baseTag)
+		if resolveErr == nil {
+			baseTag = resolved
+		} else if airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag) == "" {
+			// Not a recognized format and not resolvable
+			return fmt.Errorf("could not determine runtime version from Dockerfile image tag '%s'.\nStandalone mode requires a pinned Astronomer Runtime image (e.g., astro-runtime:3.1-12)", tag)
+		}
+		// If it's an old-format tag (e.g., "12.0.0"), fall through to the AF3 check
+	}
 	if airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag) != "3" {
 		return errUnsupportedAirflowVersion
 	}
