@@ -8,7 +8,7 @@ require (
 	github.com/briandowns/spinner v1.23.1
 	github.com/docker/cli v27.4.0+incompatible
 	github.com/docker/compose/v2 v2.31.0
-	github.com/docker/docker v27.4.0+incompatible
+	github.com/docker/docker v28.0.0+incompatible
 	github.com/gorilla/websocket v1.5.3
 	github.com/iancoleman/strcase v0.3.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
