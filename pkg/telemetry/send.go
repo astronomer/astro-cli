@@ -14,6 +14,8 @@ import (
 const (
 	// sendTimeout is the maximum time to wait for the telemetry to be sent
 	sendTimeout = 5 * time.Second
+	// maxStdinBytes is the maximum bytes to read from stdin for the telemetry payload
+	maxStdinBytes = 64 * 1024 // 64KB
 )
 
 // Send posts a TelemetryPayload to the given API URL synchronously.
@@ -40,7 +42,7 @@ func Send(payload TelemetryPayload, apiURL string) (int, error) {
 	defer resp.Body.Close()
 
 	// Drain body to allow connection reuse by http.DefaultClient
-	io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp.StatusCode, fmt.Errorf("telemetry API returned status %d", resp.StatusCode)
@@ -52,7 +54,7 @@ func Send(payload TelemetryPayload, apiURL string) (int, error) {
 // SendEvent reads a JSON payload from stdin and sends it to the telemetry API.
 // This is meant to be called from the hidden _telemetry-send command.
 func SendEvent() error {
-	payloadBytes, err := io.ReadAll(io.LimitReader(os.Stdin, 1<<16)) // 64KB max
+	payloadBytes, err := io.ReadAll(io.LimitReader(os.Stdin, maxStdinBytes))
 	if err != nil {
 		return err
 	}
