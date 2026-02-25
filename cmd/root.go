@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/telemetry"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -66,10 +67,17 @@ func NewRootCmd() *cobra.Command {
     \__\/\__\/ \_____\/   \__\/    \_\/ \_\/ \_____\/           \_____\/ \_____\/\________\/
 
 Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astro Private Cloud, or Local Development.`,
-		PersistentPreRunE: utils.ChainRunEs(
-			SetupLogging,
-			CreateRootPersistentPreRunE(astroCoreClient, platformCoreClient),
-		),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Skip heavy pre-run logic for commands that opt out via annotation
+			if cmd.Annotations[telemetry.SkipPreRunAnnotation] == "true" {
+				return nil
+			}
+			return utils.ChainRunEs(
+				SetupLogging,
+				CreateRootPersistentPreRunE(astroCoreClient, platformCoreClient),
+				telemetry.CreateTrackingHook(),
+			)(cmd, args)
+		},
 	}
 
 	rootCmd.AddCommand(
@@ -81,6 +89,8 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
 		api.NewAPICmd(),
+		newTelemetryCmd(os.Stdout),
+		newTelemetrySendCmd(),
 	)
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
