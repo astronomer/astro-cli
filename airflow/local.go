@@ -758,19 +758,68 @@ func (s *Standalone) PS() error {
 	return nil
 }
 
+// standaloneLogPrefixMap maps Docker container names (passed by the cmd layer)
+// to the log prefixes used by `airflow standalone`.
+var standaloneLogPrefixMap = map[string]string{
+	WebserverDockerContainerName:    "api-server",
+	APIServerDockerContainerName:    "api-server",
+	SchedulerDockerContainerName:    "scheduler",
+	TriggererDockerContainerName:    "triggerer",
+	DAGProcessorDockerContainerName: "dag-processor",
+}
+
+// buildLogPrefixes converts Docker container names to standalone log prefix
+// filters. Returns nil when no filtering should be applied.
+func buildLogPrefixes(containerNames []string) []string {
+	if len(containerNames) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var prefixes []string
+	for _, name := range containerNames {
+		if p, ok := standaloneLogPrefixMap[name]; ok && !seen[p] {
+			seen[p] = true
+			prefixes = append(prefixes, p+" ")
+		}
+	}
+	return prefixes
+}
+
+// matchesLogPrefix returns true if the line starts with any of the given prefixes,
+// or if prefixes is nil (no filtering).
+func matchesLogPrefix(line string, prefixes []string) bool {
+	if prefixes == nil {
+		return true
+	}
+	for _, p := range prefixes {
+		if strings.HasPrefix(line, p) {
+			return true
+		}
+	}
+	return false
+}
+
 // Logs streams the standalone Airflow log file.
-func (s *Standalone) Logs(follow bool, _ ...string) error {
+// When containerNames are provided (via --scheduler, --api-server, etc. flags),
+// only lines matching those components are shown.
+func (s *Standalone) Logs(follow bool, containerNames ...string) error {
 	logPath := s.logFilePath()
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
 		return fmt.Errorf("no log file found at %s — has standalone been started?", logPath)
 	}
+
+	prefixes := buildLogPrefixes(containerNames)
 
 	if !follow {
 		data, err := osReadFile(logPath)
 		if err != nil {
 			return fmt.Errorf("error reading log file: %w", err)
 		}
-		fmt.Print(string(data))
+		for _, line := range strings.SplitAfter(string(data), "\n") {
+			if line != "" && matchesLogPrefix(line, prefixes) {
+				fmt.Print(line)
+			}
+		}
 		return nil
 	}
 
@@ -790,7 +839,7 @@ func (s *Standalone) Logs(follow bool, _ ...string) error {
 
 	for {
 		line, err := reader.ReadString('\n')
-		if line != "" {
+		if line != "" && matchesLogPrefix(line, prefixes) {
 			fmt.Print(line)
 		}
 		if err != nil {

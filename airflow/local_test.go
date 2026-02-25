@@ -933,6 +933,171 @@ func (s *Suite) TestStandaloneLogs_NoFile() {
 	s.Contains(err.Error(), "no log file found")
 }
 
+func (s *Suite) TestStandaloneLogs_FilterByComponent() {
+	tmpDir, err := os.MkdirTemp("", "standalone-logs-filter")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(standaloneStateDir, 0o755)
+	s.NoError(err)
+
+	logContent := `standalone | Starting Airflow Standalone
+standalone | Database ready
+scheduler  | Starting the scheduler
+api-server | Uvicorn running on http://0.0.0.0:8080
+triggerer  | Starting the triggerer
+dag-processor | Processing files
+scheduler  | Adopting orphaned tasks
+api-server | GET /health 200 OK
+`
+	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.log"), []byte(logContent), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	// Capture stdout
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+
+	err = handler.Logs(false, SchedulerDockerContainerName)
+	s.NoError(err)
+
+	w.Close()
+	os.Stdout = origStdout
+	out, _ := io.ReadAll(r)
+	output := string(out)
+
+	s.Contains(output, "Starting the scheduler")
+	s.Contains(output, "Adopting orphaned tasks")
+	s.NotContains(output, "standalone")
+	s.NotContains(output, "api-server")
+	s.NotContains(output, "triggerer")
+	s.NotContains(output, "dag-processor")
+}
+
+func (s *Suite) TestStandaloneLogs_WebserverMapsToAPIServer() {
+	tmpDir, err := os.MkdirTemp("", "standalone-logs-webserver")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(standaloneStateDir, 0o755)
+	s.NoError(err)
+
+	logContent := `scheduler  | scheduler line
+api-server | api line
+`
+	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.log"), []byte(logContent), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+
+	// "webserver" flag should map to "api-server" prefix
+	err = handler.Logs(false, WebserverDockerContainerName)
+	s.NoError(err)
+
+	w.Close()
+	os.Stdout = origStdout
+	out, _ := io.ReadAll(r)
+	output := string(out)
+
+	s.Contains(output, "api line")
+	s.NotContains(output, "scheduler line")
+}
+
+func (s *Suite) TestStandaloneLogs_NoFilterShowsAll() {
+	tmpDir, err := os.MkdirTemp("", "standalone-logs-nofilter")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(standaloneStateDir, 0o755)
+	s.NoError(err)
+
+	logContent := `standalone | startup
+scheduler  | sched line
+api-server | api line
+`
+	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.log"), []byte(logContent), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+
+	// No filter — show everything
+	err = handler.Logs(false)
+	s.NoError(err)
+
+	w.Close()
+	os.Stdout = origStdout
+	out, _ := io.ReadAll(r)
+	output := string(out)
+
+	s.Contains(output, "standalone | startup")
+	s.Contains(output, "scheduler  | sched line")
+	s.Contains(output, "api-server | api line")
+}
+
+func TestBuildLogPrefixes(t *testing.T) {
+	t.Run("empty returns nil", func(t *testing.T) {
+		assert.Nil(t, buildLogPrefixes(nil))
+		assert.Nil(t, buildLogPrefixes([]string{}))
+	})
+
+	t.Run("maps docker names to standalone prefixes", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{SchedulerDockerContainerName})
+		assert.Equal(t, []string{"scheduler "}, prefixes)
+	})
+
+	t.Run("webserver maps to api-server", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{WebserverDockerContainerName})
+		assert.Equal(t, []string{"api-server "}, prefixes)
+	})
+
+	t.Run("deduplicates webserver and api-server", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{WebserverDockerContainerName, APIServerDockerContainerName})
+		assert.Equal(t, []string{"api-server "}, prefixes)
+	})
+
+	t.Run("multiple components", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{SchedulerDockerContainerName, TriggererDockerContainerName})
+		assert.Contains(t, prefixes, "scheduler ")
+		assert.Contains(t, prefixes, "triggerer ")
+		assert.Len(t, prefixes, 2)
+	})
+
+	t.Run("unknown names are ignored", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{"postgres"})
+		assert.Empty(t, prefixes)
+	})
+}
+
+func TestMatchesLogPrefix(t *testing.T) {
+	t.Run("nil prefixes matches everything", func(t *testing.T) {
+		assert.True(t, matchesLogPrefix("anything", nil))
+	})
+
+	t.Run("matches prefix", func(t *testing.T) {
+		assert.True(t, matchesLogPrefix("scheduler  | some log", []string{"scheduler "}))
+	})
+
+	t.Run("no match", func(t *testing.T) {
+		assert.False(t, matchesLogPrefix("triggerer  | some log", []string{"scheduler "}))
+	})
+}
+
 func (s *Suite) TestStandalonePS_NotRunning() {
 	tmpDir, err := os.MkdirTemp("", "standalone-ps-test")
 	s.NoError(err)
