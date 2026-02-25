@@ -9,6 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -64,13 +65,17 @@ func Create(label, desc string, client houston.ClientInterface, out io.Writer) e
 func List(client houston.ClientInterface, out io.Writer) error {
 	ws, err := houston.Call(client.ListWorkspaces)(nil)
 	if err != nil {
+		logger.Debugf("Failed to fetch workspaces: %v", err)
 		return err
 	}
+	logger.Debugf("Successfully retrieved %d workspace(s)", len(ws))
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
+		logger.Debugf("Failed to get current context: %v", err)
 		return err
 	}
+	logger.Debugf("Current context - Workspace: %s", c.Workspace)
 
 	tab := newTableOut()
 	for i := range ws {
@@ -82,6 +87,7 @@ func List(client houston.ClientInterface, out io.Writer) error {
 
 		if c.Workspace == w.ID {
 			color = true
+			logger.Debugf("Workspace '%s' (ID: %s) is the current workspace", name, workspace)
 		} else {
 			color = false
 		}
