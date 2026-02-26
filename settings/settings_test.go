@@ -374,7 +374,7 @@ func (s *Suite) TestExport() {
 				return `{
 					"myvar": "myval"
 				}`, nil
-			case ariflowPoolsList:
+			case airflowPoolsList:
 				return `
 - description: Default pool
   pool: default_pool
