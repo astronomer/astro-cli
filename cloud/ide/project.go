@@ -255,11 +255,16 @@ func saveSessionAndCleanup(client astrocore.CoreClient, organizationID, workspac
 }
 
 // openProjectInBrowser opens the project URL in the default browser
-func openProjectInBrowser(client astrocore.CoreClient, organizationID, workspaceID, projectID string, out io.Writer) {
+// If sessionID is provided, opens the session URL instead of the project URL
+func openProjectInBrowser(client astrocore.CoreClient, organizationID, workspaceID, projectID, sessionID string, out io.Writer) {
 	projectResp, err := getProject(client, organizationID, workspaceID, projectID)
 	var url string
 	if err == nil && projectResp != nil && projectResp.JSON200 != nil && projectResp.JSON200.Url != nil && *projectResp.JSON200.Url != "" {
 		url = *projectResp.JSON200.Url
+		// If sessionID is provided, append the session path to the URL
+		if sessionID != "" {
+			url = fmt.Sprintf("%s/sessions/%s", url, sessionID)
+		}
 	} else {
 		return
 	}
@@ -376,8 +381,8 @@ func ExportProject(client astrocore.CoreClient, projectID, organizationID, works
 	}
 	fmt.Fprintf(out, "Successfully exported project to %s\n", projectName)
 
-	// Open project in browser
-	openProjectInBrowser(client, organizationID, workspaceID, projectID, out)
+	// Open project session in browser
+	openProjectInBrowser(client, organizationID, workspaceID, projectID, sessionResp.JSON200.Id, out)
 
 	return nil
 }
