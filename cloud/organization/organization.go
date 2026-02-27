@@ -42,7 +42,10 @@ func newTableOut() *printutil.Table {
 }
 
 func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Organization, error) {
-	organizationListParams := &astroplatformcore.ListOrganizationsParams{}
+	limit := 100
+	organizationListParams := &astroplatformcore.ListOrganizationsParams{
+		Limit: &limit,
+	}
 	resp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 	if err != nil {
 		return nil, err
@@ -54,6 +57,18 @@ func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astro
 	orgsPaginated := *resp.JSON200
 	orgs := orgsPaginated.Organizations
 	return orgs, nil
+}
+
+func GetOrganization(orgID string, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {
+	resp, err := platformCoreClient.GetOrganizationWithResponse(http_context.Background(), orgID, &astroplatformcore.GetOrganizationParams{})
+	if err != nil {
+		return nil, err
+	}
+	err = astroplatformcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return resp.JSON200, nil
 }
 
 // List all Organizations
@@ -171,6 +186,14 @@ func Switch(orgNameOrID string, coreClient astrocore.CoreClient, platformCoreCli
 			}
 			if or[i].Id == orgNameOrID {
 				targetOrg = &or[i]
+			}
+		}
+		// If not found in list, try to get org by ID directly
+		// This handles cases where user has access to more orgs than the list limit
+		if targetOrg == nil {
+			org, err := GetOrganization(orgNameOrID, platformCoreClient)
+			if err == nil && org != nil {
+				targetOrg = org
 			}
 		}
 	}
