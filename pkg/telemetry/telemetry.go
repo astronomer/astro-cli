@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/version"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 const (
@@ -62,8 +63,13 @@ var agentEnvVars = []envMapping{
 	{"CLAUDECODE", "claude-code"},
 	{"CLAUDE_CODE_ENTRYPOINT", "claude-code"},
 	{"CURSOR_TRACE_ID", "cursor"},
+	{"CURSOR_AGENT", "cursor"},
 	{"AIDER_MODEL", "aider"},
 	{"CONTINUE_GLOBAL_DIR", "continue"},
+	{"CORTEX_SESSION_ID", "snowflake-cortex"},
+	{"GEMINI_CLI", "gemini-cli"},
+	{"OPENCODE", "opencode"},
+	{"CODEX_API_KEY", "codex"},
 }
 
 // ciEnvVars is an ordered list of environment variables to detect CI contexts.
@@ -72,7 +78,15 @@ var ciEnvVars = []envMapping{
 	{"GITHUB_ACTIONS", "github-actions"},
 	{"GITLAB_CI", "gitlab-ci"},
 	{"JENKINS_URL", "jenkins"},
+	{"HUDSON_URL", "jenkins"},
 	{"CIRCLECI", "circleci"},
+	{"TF_BUILD", "azure-devops"},
+	{"BITBUCKET_BUILD_NUMBER", "bitbucket-pipelines"},
+	{"CODEBUILD_BUILD_ID", "aws-codebuild"},
+	{"TEAMCITY_VERSION", "teamcity"},
+	{"BUILDKITE", "buildkite"},
+	{"CF_BUILD_ID", "codefresh"},
+	{"TRAVIS", "travis-ci"},
 	{"CI", "ci-unknown"},
 }
 
@@ -123,23 +137,29 @@ func GetCommandPath(cmd *cobra.Command) string {
 	return ""
 }
 
-// DetectContext detects the invocation context (agent, CI, or interactive)
-func DetectContext() string {
-	// Check for agent environment variables first
+// DetectAgent returns the name of the detected agent (e.g. "claude-code"), or "" if none.
+func DetectAgent() string {
 	for _, m := range agentEnvVars {
 		if os.Getenv(m.envVar) != "" {
 			return m.name
 		}
 	}
+	return ""
+}
 
-	// Check for CI environment variables (generic "CI" is last)
+// DetectCISystem returns the name of the detected CI system (e.g. "github-actions"), or "" if none.
+func DetectCISystem() string {
 	for _, m := range ciEnvVars {
 		if os.Getenv(m.envVar) != "" {
 			return m.name
 		}
 	}
+	return ""
+}
 
-	return "interactive"
+// IsInteractive returns true if stdin is a terminal.
+func IsInteractive() bool {
+	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
 // showFirstRunNotice prints a one-time notice about telemetry on the first CLI invocation.
@@ -154,10 +174,20 @@ func showFirstRunNotice() {
 	_ = config.CFG.TelemetryNoticeShown.SetHomeString("true")
 }
 
+// isTestRun returns true if the current process is a Go test binary.
+// Go test binaries are always named with a ".test" suffix.
+func isTestRun() bool {
+	executable, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	return strings.HasSuffix(executable, ".test") || strings.HasSuffix(executable, ".test.exe")
+}
+
 // TrackCommand sends telemetry data for a command execution
 // It spawns a subprocess to send the data asynchronously
 func TrackCommand(cmd *cobra.Command) {
-	if !IsEnabled() {
+	if !IsEnabled() || isTestRun() {
 		return
 	}
 
@@ -169,19 +199,33 @@ func TrackCommand(cmd *cobra.Command) {
 		return
 	}
 
+	context := "non-interactive"
+	if IsInteractive() {
+		context = "interactive"
+	}
+
+	properties := map[string]interface{}{
+		"command":      commandPath,
+		"cli_version":  version.CurrVersion,
+		"os":           runtime.GOOS,
+		"os_version":   getOSVersion(),
+		"go_version":   runtime.Version(),
+		"context":      context,
+		"architecture": runtime.GOARCH,
+	}
+
+	if agent := DetectAgent(); agent != "" {
+		properties["agent"] = agent
+	}
+	if ciSystem := DetectCISystem(); ciSystem != "" {
+		properties["ci_system"] = ciSystem
+	}
+
 	payload := TelemetryPayload{
 		Source:      SourceName,
 		Event:       EventCommandExecution,
 		AnonymousID: GetAnonymousID(),
-		Properties: map[string]interface{}{
-			"command":      commandPath,
-			"cli_version":  version.CurrVersion,
-			"os":           runtime.GOOS,
-			"os_version":   getOSVersion(),
-			"go_version":   runtime.Version(),
-			"context":      DetectContext(),
-			"architecture": runtime.GOARCH,
-		},
+		Properties:  properties,
 	}
 
 	apiURL := GetTelemetryAPIURL()
