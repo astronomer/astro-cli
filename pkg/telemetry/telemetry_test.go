@@ -123,15 +123,14 @@ func TestGetCommandPath(t *testing.T) {
 	}
 }
 
-func TestDetectContext(t *testing.T) {
-	// Save and clear relevant env vars
-	envVarsToSave := []string{
+func TestDetectAgent(t *testing.T) {
+	// Save and clear agent env vars
+	agentVars := []string{
 		"CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CURSOR_TRACE_ID",
 		"AIDER_MODEL", "CONTINUE_GLOBAL_DIR",
-		"GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "CIRCLECI", "CI",
 	}
 	savedVals := make(map[string]string)
-	for _, env := range envVarsToSave {
+	for _, env := range agentVars {
 		savedVals[env] = os.Getenv(env)
 		os.Unsetenv(env)
 	}
@@ -170,6 +169,56 @@ func TestDetectContext(t *testing.T) {
 			expected: "cursor",
 		},
 		{
+			name:     "no agent",
+			envVar:   "",
+			envValue: "",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, env := range agentVars {
+				os.Unsetenv(env)
+			}
+			if tt.envVar != "" {
+				os.Setenv(tt.envVar, tt.envValue)
+				defer os.Unsetenv(tt.envVar)
+			}
+
+			result := DetectAgent()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestDetectCISystem(t *testing.T) {
+	// Save and clear CI env vars
+	ciVars := []string{
+		"GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "CIRCLECI", "CI",
+	}
+	savedVals := make(map[string]string)
+	for _, env := range ciVars {
+		savedVals[env] = os.Getenv(env)
+		os.Unsetenv(env)
+	}
+	defer func() {
+		for env, val := range savedVals {
+			if val != "" {
+				os.Setenv(env, val)
+			} else {
+				os.Unsetenv(env)
+			}
+		}
+	}()
+
+	tests := []struct {
+		name     string
+		envVar   string
+		envValue string
+		expected string
+	}{
+		{
 			name:     "github actions",
 			envVar:   "GITHUB_ACTIONS",
 			envValue: "true",
@@ -188,29 +237,39 @@ func TestDetectContext(t *testing.T) {
 			expected: "ci-unknown",
 		},
 		{
-			name:     "interactive",
+			name:     "no ci",
 			envVar:   "",
 			envValue: "",
-			expected: "interactive",
+			expected: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clear all env vars for this test
-			for _, env := range envVarsToSave {
+			for _, env := range ciVars {
 				os.Unsetenv(env)
 			}
-
 			if tt.envVar != "" {
 				os.Setenv(tt.envVar, tt.envValue)
 				defer os.Unsetenv(tt.envVar)
 			}
 
-			result := DetectContext()
+			result := DetectCISystem()
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestIsInteractive(t *testing.T) {
+	// In a test runner, stdin is not a terminal
+	result := IsInteractive()
+	assert.False(t, result, "should return false in test runner since stdin is not a terminal")
+}
+
+func TestIsTestRun(t *testing.T) {
+	// The current process is a Go test binary, so isTestRun should return true
+	result := isTestRun()
+	assert.True(t, result, "should return true when running inside a Go test binary")
 }
 
 func TestGetTelemetryAPIURL(t *testing.T) {
