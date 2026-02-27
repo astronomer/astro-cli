@@ -127,7 +127,8 @@ func TestDetectAgent(t *testing.T) {
 	// Save and clear agent env vars
 	agentVars := []string{
 		"CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CURSOR_TRACE_ID",
-		"AIDER_MODEL", "CONTINUE_GLOBAL_DIR",
+		"CURSOR_AGENT", "AIDER_MODEL", "CONTINUE_GLOBAL_DIR",
+		"CORTEX_SESSION_ID", "GEMINI_CLI", "OPENCODE", "CODEX_API_KEY",
 	}
 	savedVals := make(map[string]string)
 	for _, env := range agentVars {
@@ -169,6 +170,30 @@ func TestDetectAgent(t *testing.T) {
 			expected: "cursor",
 		},
 		{
+			name:     "snowflake cortex",
+			envVar:   "CORTEX_SESSION_ID",
+			envValue: "session-123",
+			expected: "snowflake-cortex",
+		},
+		{
+			name:     "gemini cli",
+			envVar:   "GEMINI_CLI",
+			envValue: "1",
+			expected: "gemini-cli",
+		},
+		{
+			name:     "opencode",
+			envVar:   "OPENCODE",
+			envValue: "1",
+			expected: "opencode",
+		},
+		{
+			name:     "codex",
+			envVar:   "CODEX_API_KEY",
+			envValue: "sk-test",
+			expected: "codex",
+		},
+		{
 			name:     "no agent",
 			envVar:   "",
 			envValue: "",
@@ -195,7 +220,9 @@ func TestDetectAgent(t *testing.T) {
 func TestDetectCISystem(t *testing.T) {
 	// Save and clear CI env vars
 	ciVars := []string{
-		"GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "CIRCLECI", "CI",
+		"GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "HUDSON_URL", "CIRCLECI",
+		"TF_BUILD", "BITBUCKET_BUILD_NUMBER", "CODEBUILD_BUILD_ID",
+		"TEAMCITY_VERSION", "BUILDKITE", "CF_BUILD_ID", "TRAVIS", "CI",
 	}
 	savedVals := make(map[string]string)
 	for _, env := range ciVars {
@@ -229,6 +256,54 @@ func TestDetectCISystem(t *testing.T) {
 			envVar:   "GITLAB_CI",
 			envValue: "true",
 			expected: "gitlab-ci",
+		},
+		{
+			name:     "jenkins via hudson",
+			envVar:   "HUDSON_URL",
+			envValue: "http://jenkins:8080",
+			expected: "jenkins",
+		},
+		{
+			name:     "azure devops",
+			envVar:   "TF_BUILD",
+			envValue: "True",
+			expected: "azure-devops",
+		},
+		{
+			name:     "bitbucket pipelines",
+			envVar:   "BITBUCKET_BUILD_NUMBER",
+			envValue: "42",
+			expected: "bitbucket-pipelines",
+		},
+		{
+			name:     "aws codebuild",
+			envVar:   "CODEBUILD_BUILD_ID",
+			envValue: "build-123",
+			expected: "aws-codebuild",
+		},
+		{
+			name:     "teamcity",
+			envVar:   "TEAMCITY_VERSION",
+			envValue: "2023.05",
+			expected: "teamcity",
+		},
+		{
+			name:     "buildkite",
+			envVar:   "BUILDKITE",
+			envValue: "true",
+			expected: "buildkite",
+		},
+		{
+			name:     "codefresh",
+			envVar:   "CF_BUILD_ID",
+			envValue: "build-456",
+			expected: "codefresh",
+		},
+		{
+			name:     "travis ci",
+			envVar:   "TRAVIS",
+			envValue: "true",
+			expected: "travis-ci",
 		},
 		{
 			name:     "generic ci",

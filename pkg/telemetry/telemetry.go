@@ -63,8 +63,13 @@ var agentEnvVars = []envMapping{
 	{"CLAUDECODE", "claude-code"},
 	{"CLAUDE_CODE_ENTRYPOINT", "claude-code"},
 	{"CURSOR_TRACE_ID", "cursor"},
+	{"CURSOR_AGENT", "cursor"},
 	{"AIDER_MODEL", "aider"},
 	{"CONTINUE_GLOBAL_DIR", "continue"},
+	{"CORTEX_SESSION_ID", "snowflake-cortex"},
+	{"GEMINI_CLI", "gemini-cli"},
+	{"OPENCODE", "opencode"},
+	{"CODEX_API_KEY", "codex"},
 }
 
 // ciEnvVars is an ordered list of environment variables to detect CI contexts.
@@ -73,7 +78,15 @@ var ciEnvVars = []envMapping{
 	{"GITHUB_ACTIONS", "github-actions"},
 	{"GITLAB_CI", "gitlab-ci"},
 	{"JENKINS_URL", "jenkins"},
+	{"HUDSON_URL", "jenkins"},
 	{"CIRCLECI", "circleci"},
+	{"TF_BUILD", "azure-devops"},
+	{"BITBUCKET_BUILD_NUMBER", "bitbucket-pipelines"},
+	{"CODEBUILD_BUILD_ID", "aws-codebuild"},
+	{"TEAMCITY_VERSION", "teamcity"},
+	{"BUILDKITE", "buildkite"},
+	{"CF_BUILD_ID", "codefresh"},
+	{"TRAVIS", "travis-ci"},
 	{"CI", "ci-unknown"},
 }
 
