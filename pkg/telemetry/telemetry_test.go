@@ -11,6 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// envVarNames extracts the environment variable names from an envMapping slice.
+func envVarNames(mappings []envMapping) []string {
+	names := make([]string, len(mappings))
+	for i, m := range mappings {
+		names[i] = m.envVar
+	}
+	return names
+}
+
 func initTestConfig(t *testing.T) {
 	t.Helper()
 	fs := afero.NewMemMapFs()
@@ -124,12 +133,8 @@ func TestGetCommandPath(t *testing.T) {
 }
 
 func TestDetectAgent(t *testing.T) {
-	// Save and clear agent env vars
-	agentVars := []string{
-		"CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CURSOR_TRACE_ID",
-		"CURSOR_AGENT", "AIDER_MODEL", "CONTINUE_GLOBAL_DIR",
-		"CORTEX_SESSION_ID", "GEMINI_CLI", "OPENCODE", "CODEX_API_KEY",
-	}
+	// Derive env var list from the source-of-truth slice
+	agentVars := envVarNames(agentEnvVars)
 	savedVals := make(map[string]string)
 	for _, env := range agentVars {
 		savedVals[env] = os.Getenv(env)
@@ -218,12 +223,8 @@ func TestDetectAgent(t *testing.T) {
 }
 
 func TestDetectCISystem(t *testing.T) {
-	// Save and clear CI env vars
-	ciVars := []string{
-		"GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "HUDSON_URL", "CIRCLECI",
-		"TF_BUILD", "BITBUCKET_BUILD_NUMBER", "CODEBUILD_BUILD_ID",
-		"TEAMCITY_VERSION", "BUILDKITE", "CF_BUILD_ID", "TRAVIS", "CI",
-	}
+	// Derive env var list from the source-of-truth slice
+	ciVars := envVarNames(ciEnvVars)
 	savedVals := make(map[string]string)
 	for _, env := range ciVars {
 		savedVals[env] = os.Getenv(env)
