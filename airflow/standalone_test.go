@@ -1314,6 +1314,134 @@ func (s *Suite) TestStandaloneBuildEnv_CustomPort() {
 	s.Equal("9090", envMap["AIRFLOW__API__PORT"])
 }
 
+// --- proxy bypass tests ---
+
+func (s *Suite) TestStandaloneBuildEnv_NoProxySetsNO_PROXY() {
+	// When no proxy is configured anywhere, NO_PROXY=* should be injected
+	origHasSystemProxy := hasSystemProxy
+	defer func() { hasSystemProxy = origHasSystemProxy }()
+	hasSystemProxy = func() bool { return false }
+
+	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
+	s.NoError(err)
+
+	env := handler.buildEnv()
+	envMap := make(map[string]string)
+	for _, e := range env {
+		parts := splitEnvVar(e)
+		if parts != nil {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	s.Equal("*", envMap["NO_PROXY"])
+	s.Equal("*", envMap["no_proxy"])
+}
+
+func (s *Suite) TestStandaloneBuildEnv_SystemProxySkipsNO_PROXY() {
+	// When macOS reports a system proxy, we should NOT set NO_PROXY
+	origHasSystemProxy := hasSystemProxy
+	defer func() { hasSystemProxy = origHasSystemProxy }()
+	hasSystemProxy = func() bool { return true }
+
+	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
+	s.NoError(err)
+
+	env := handler.buildEnv()
+	envMap := make(map[string]string)
+	for _, e := range env {
+		parts := splitEnvVar(e)
+		if parts != nil {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	_, hasNO := envMap["NO_PROXY"]
+	s.False(hasNO, "NO_PROXY should not be set when system proxy is active")
+}
+
+func (s *Suite) TestStandaloneBuildEnv_EnvVarProxySkipsNO_PROXY() {
+	// When a proxy env var is already set in the inherited env, don't override
+	origHasSystemProxy := hasSystemProxy
+	defer func() { hasSystemProxy = origHasSystemProxy }()
+	hasSystemProxy = func() bool { return false }
+
+	s.T().Setenv("HTTPS_PROXY", "http://corp-proxy:8080")
+
+	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
+	s.NoError(err)
+
+	env := handler.buildEnv()
+	envMap := make(map[string]string)
+	for _, e := range env {
+		parts := splitEnvVar(e)
+		if parts != nil {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	_, hasNO := envMap["NO_PROXY"]
+	s.False(hasNO, "NO_PROXY should not be set when HTTPS_PROXY env var exists")
+}
+
+func (s *Suite) TestStandaloneBuildEnv_DotEnvProxySkipsNO_PROXY() {
+	// When .env file contains a proxy setting, don't override
+	origHasSystemProxy := hasSystemProxy
+	defer func() { hasSystemProxy = origHasSystemProxy }()
+	hasSystemProxy = func() bool { return false }
+
+	tmpDir, err := os.MkdirTemp("", "standalone-proxy-test")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	envContent := "HTTP_PROXY=http://my-proxy:3128\n"
+	err = os.WriteFile(filepath.Join(tmpDir, ".env"), []byte(envContent), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, "", "Dockerfile")
+	s.NoError(err)
+
+	env := handler.buildEnv()
+	envMap := make(map[string]string)
+	for _, e := range env {
+		parts := splitEnvVar(e)
+		if parts != nil {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	// The proxy from .env should be preserved
+	s.Equal("http://my-proxy:3128", envMap["HTTP_PROXY"])
+	// NO_PROXY should NOT be injected
+	_, hasNO := envMap["NO_PROXY"]
+	s.False(hasNO, "NO_PROXY should not be set when .env contains HTTP_PROXY")
+}
+
+func TestHasProxyConfigured(t *testing.T) {
+	origHasSystemProxy := hasSystemProxy
+	defer func() { hasSystemProxy = origHasSystemProxy }()
+
+	// No proxy anywhere
+	hasSystemProxy = func() bool { return false }
+	result := hasProxyConfigured(map[string]string{})
+	assert.False(t, result)
+
+	// System proxy active
+	hasSystemProxy = func() bool { return true }
+	result = hasProxyConfigured(map[string]string{})
+	assert.True(t, result)
+
+	// Proxy in overrides
+	hasSystemProxy = func() bool { return false }
+	result = hasProxyConfigured(map[string]string{"HTTP_PROXY": "http://proxy:8080"})
+	assert.True(t, result)
+
+	// NO_PROXY already set in overrides
+	hasSystemProxy = func() bool { return false }
+	result = hasProxyConfigured(map[string]string{"NO_PROXY": "localhost"})
+	assert.True(t, result)
+}
+
 // --- ensureVenv tests ---
 
 func (s *Suite) TestStandaloneEnsureVenv_NoVenv() {

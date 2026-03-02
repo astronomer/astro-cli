@@ -571,6 +571,18 @@ func (s *Standalone) buildEnv() []string {
 	}
 	overrides["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"] = "http://localhost:" + port + "/execution/"
 
+	// Layer 3: macOS proxy workaround.
+	// Python's _scproxy calls SCDynamicStoreCopyProxies which is not fork-safe.
+	// When Airflow's LocalExecutor forks, this can spin at 100% CPU indefinitely.
+	// Setting NO_PROXY=* tells Python to skip _scproxy entirely.
+	// We only do this when no proxy is configured (env vars or macOS system settings)
+	// so corporate proxy users aren't affected.
+	if !hasProxyConfigured(overrides) {
+		overrides["NO_PROXY"] = "*"
+		overrides["no_proxy"] = "*"
+		logger.Debugf("No proxy detected — setting NO_PROXY=* to avoid macOS _scproxy hang")
+	}
+
 	// Start with inherited env, filtering out keys we override.
 	env := make([]string, 0, len(os.Environ())+len(overrides))
 	for _, kv := range os.Environ() {
@@ -1040,6 +1052,34 @@ func (s *Standalone) Parse(_, _, _ string) error {
 
 func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astroplatformcore.ClientWithResponsesInterface) error {
 	return errors.New("astro dev upgrade-test is not available in standalone mode")
+}
+
+// proxyEnvKeys lists environment variable names that indicate a proxy is configured.
+var proxyEnvKeys = []string{
+	"HTTP_PROXY", "http_proxy",
+	"HTTPS_PROXY", "https_proxy",
+	"ALL_PROXY", "all_proxy",
+	"NO_PROXY", "no_proxy",
+}
+
+// hasProxyConfigured returns true if any proxy-related environment variable
+// is set — either in the inherited environment, the .env overrides, or the
+// macOS system proxy settings. When true, we leave proxy settings alone.
+func hasProxyConfigured(overrides map[string]string) bool {
+	// Check .env overrides
+	for _, key := range proxyEnvKeys {
+		if _, ok := overrides[key]; ok {
+			return true
+		}
+	}
+	// Check inherited environment
+	for _, key := range proxyEnvKeys {
+		if os.Getenv(key) != "" {
+			return true
+		}
+	}
+	// Check macOS system proxy (no-op on other platforms)
+	return hasSystemProxy()
 }
 
 // execCommand runs a command in the given directory.
