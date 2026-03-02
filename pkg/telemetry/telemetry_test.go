@@ -11,6 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// envVarNames extracts the environment variable names from an envMapping slice.
+func envVarNames(mappings []envMapping) []string {
+	names := make([]string, len(mappings))
+	for i, m := range mappings {
+		names[i] = m.envVar
+	}
+	return names
+}
+
 func initTestConfig(t *testing.T) {
 	t.Helper()
 	fs := afero.NewMemMapFs()
@@ -123,15 +132,11 @@ func TestGetCommandPath(t *testing.T) {
 	}
 }
 
-func TestDetectContext(t *testing.T) {
-	// Save and clear relevant env vars
-	envVarsToSave := []string{
-		"CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CURSOR_TRACE_ID",
-		"AIDER_MODEL", "CONTINUE_GLOBAL_DIR",
-		"GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "CIRCLECI", "CI",
-	}
+func TestDetectAgent(t *testing.T) {
+	// Derive env var list from the source-of-truth slice
+	agentVars := envVarNames(agentEnvVars)
 	savedVals := make(map[string]string)
-	for _, env := range envVarsToSave {
+	for _, env := range agentVars {
 		savedVals[env] = os.Getenv(env)
 		os.Unsetenv(env)
 	}
@@ -170,6 +175,78 @@ func TestDetectContext(t *testing.T) {
 			expected: "cursor",
 		},
 		{
+			name:     "snowflake cortex",
+			envVar:   "CORTEX_SESSION_ID",
+			envValue: "session-123",
+			expected: "snowflake-cortex",
+		},
+		{
+			name:     "gemini cli",
+			envVar:   "GEMINI_CLI",
+			envValue: "1",
+			expected: "gemini-cli",
+		},
+		{
+			name:     "opencode",
+			envVar:   "OPENCODE",
+			envValue: "1",
+			expected: "opencode",
+		},
+		{
+			name:     "codex",
+			envVar:   "CODEX_API_KEY",
+			envValue: "sk-test",
+			expected: "codex",
+		},
+		{
+			name:     "no agent",
+			envVar:   "",
+			envValue: "",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, env := range agentVars {
+				os.Unsetenv(env)
+			}
+			if tt.envVar != "" {
+				os.Setenv(tt.envVar, tt.envValue)
+				defer os.Unsetenv(tt.envVar)
+			}
+
+			result := DetectAgent()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestDetectCISystem(t *testing.T) {
+	// Derive env var list from the source-of-truth slice
+	ciVars := envVarNames(ciEnvVars)
+	savedVals := make(map[string]string)
+	for _, env := range ciVars {
+		savedVals[env] = os.Getenv(env)
+		os.Unsetenv(env)
+	}
+	defer func() {
+		for env, val := range savedVals {
+			if val != "" {
+				os.Setenv(env, val)
+			} else {
+				os.Unsetenv(env)
+			}
+		}
+	}()
+
+	tests := []struct {
+		name     string
+		envVar   string
+		envValue string
+		expected string
+	}{
+		{
 			name:     "github actions",
 			envVar:   "GITHUB_ACTIONS",
 			envValue: "true",
@@ -182,35 +259,93 @@ func TestDetectContext(t *testing.T) {
 			expected: "gitlab-ci",
 		},
 		{
+			name:     "jenkins via hudson",
+			envVar:   "HUDSON_URL",
+			envValue: "http://jenkins:8080",
+			expected: "jenkins",
+		},
+		{
+			name:     "azure devops",
+			envVar:   "TF_BUILD",
+			envValue: "True",
+			expected: "azure-devops",
+		},
+		{
+			name:     "bitbucket pipelines",
+			envVar:   "BITBUCKET_BUILD_NUMBER",
+			envValue: "42",
+			expected: "bitbucket-pipelines",
+		},
+		{
+			name:     "aws codebuild",
+			envVar:   "CODEBUILD_BUILD_ID",
+			envValue: "build-123",
+			expected: "aws-codebuild",
+		},
+		{
+			name:     "teamcity",
+			envVar:   "TEAMCITY_VERSION",
+			envValue: "2023.05",
+			expected: "teamcity",
+		},
+		{
+			name:     "buildkite",
+			envVar:   "BUILDKITE",
+			envValue: "true",
+			expected: "buildkite",
+		},
+		{
+			name:     "codefresh",
+			envVar:   "CF_BUILD_ID",
+			envValue: "build-456",
+			expected: "codefresh",
+		},
+		{
+			name:     "travis ci",
+			envVar:   "TRAVIS",
+			envValue: "true",
+			expected: "travis-ci",
+		},
+		{
 			name:     "generic ci",
 			envVar:   "CI",
 			envValue: "true",
 			expected: "ci-unknown",
 		},
 		{
-			name:     "interactive",
+			name:     "no ci",
 			envVar:   "",
 			envValue: "",
-			expected: "interactive",
+			expected: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clear all env vars for this test
-			for _, env := range envVarsToSave {
+			for _, env := range ciVars {
 				os.Unsetenv(env)
 			}
-
 			if tt.envVar != "" {
 				os.Setenv(tt.envVar, tt.envValue)
 				defer os.Unsetenv(tt.envVar)
 			}
 
-			result := DetectContext()
+			result := DetectCISystem()
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestIsInteractive(t *testing.T) {
+	// In a test runner, stdin is not a terminal
+	result := IsInteractive()
+	assert.False(t, result, "should return false in test runner since stdin is not a terminal")
+}
+
+func TestIsTestRun(t *testing.T) {
+	// The current process is a Go test binary, so isTestRun should return true
+	result := isTestRun()
+	assert.True(t, result, "should return true when running inside a Go test binary")
 }
 
 func TestGetTelemetryAPIURL(t *testing.T) {
