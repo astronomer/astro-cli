@@ -443,6 +443,9 @@ func TestCheckAPIToken(t *testing.T) {
 			Organizations: []astroplatformcore.Organization{
 				{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
 			},
+			TotalCount: 1,
+			Limit:      100,
+			Offset:     0,
 		},
 	}
 	permissions = []string{
@@ -472,7 +475,7 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
@@ -495,7 +498,7 @@ func TestCheckAPIToken(t *testing.T) {
 			return nil, errors.New("Failed to parse token")
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
@@ -517,7 +520,7 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 		err := config.ResetCurrentContext()
@@ -551,7 +554,7 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
@@ -591,7 +594,7 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
@@ -630,7 +633,7 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
