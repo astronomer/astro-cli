@@ -8,11 +8,9 @@ import (
 	"io"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -27,8 +25,7 @@ import (
 type StartOptions = types.StartOptions
 
 type ContainerHandler interface {
-	Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error
-	SetStartOpts(opts types.StartOptions)
+	Start(opts *types.StartOptions) error
 	Stop(waitForExit bool) error
 	PS() error
 	Kill() error

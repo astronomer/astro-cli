@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow/types"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,7 +54,7 @@ func (s *Suite) TestStandaloneStart_Airflow2Rejected() {
 	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
 	s.Error(err)
 	s.Equal(errUnsupportedAirflowVersion, err)
 }
@@ -86,7 +85,7 @@ func (s *Suite) TestStandaloneStart_UnsupportedVersion() {
 	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
 	s.Error(err)
 	s.Contains(err.Error(), "could not determine runtime version")
 	s.Contains(err.Error(), "pinned Astronomer Runtime image")
@@ -155,9 +154,8 @@ func (s *Suite) TestStandaloneStart_FloatingTag() {
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
-	handler.SetStartOpts(types.StartOptions{Foreground: true})
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute, Foreground: true})
 	s.NoError(err)
 }
 
@@ -183,7 +181,7 @@ func (s *Suite) TestStandaloneStart_MissingUV() {
 	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
 	s.Error(err)
 	s.Equal(errUVNotFound, err)
 }
@@ -199,7 +197,7 @@ func (s *Suite) TestStandaloneStart_DockerfileParseError() {
 	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
 	s.Error(err)
 	s.Contains(err.Error(), "error parsing Dockerfile")
 }
@@ -217,7 +215,7 @@ func (s *Suite) TestStandaloneStart_EmptyTag() {
 	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
 	s.Error(err)
 	s.Contains(err.Error(), "could not determine runtime version")
 }
@@ -710,7 +708,7 @@ func (s *Suite) TestStandaloneStart_VenvCreationFails() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
 	s.Error(err)
 	s.Contains(err.Error(), "error creating virtual environment")
 }
@@ -767,7 +765,7 @@ func (s *Suite) TestStandaloneStart_InstallFails() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
 	s.Error(err)
 	s.Contains(err.Error(), "error installing dependencies")
 }
@@ -841,9 +839,8 @@ func (s *Suite) TestStandaloneStart_HappyPath() {
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
-	handler.SetStartOpts(types.StartOptions{Foreground: true}) // Use foreground mode for this test
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil))
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute, Foreground: true})
 	s.NoError(err)
 }
 
@@ -861,7 +858,7 @@ func (s *Suite) TestStandaloneStart_Background() {
 	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
 	s.NoError(err)
 
-	// Create a fake airflow binary that sleeps briefly then exits
+	// Create a fake airflow binary that sleeps until killed
 	venvBin := filepath.Join(tmpDir, ".venv", "bin")
 	err = os.MkdirAll(venvBin, 0o755)
 	s.NoError(err)
@@ -898,7 +895,7 @@ func (s *Suite) TestStandaloneStart_Background() {
 	s.NoError(err)
 	// Default is background mode (foreground = false)
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
 	s.NoError(err)
 
 	// Verify PID file was written
@@ -962,7 +959,7 @@ func (s *Suite) TestStandaloneStart_AlreadyRunning() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
 	s.Error(err)
 	s.Contains(err.Error(), "already running")
 }
@@ -1005,9 +1002,8 @@ func (s *Suite) TestStandaloneStart_PortInUse() {
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
-	handler.SetStartOpts(types.StartOptions{Port: port})
 
-	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute, Port: port})
 	s.Error(err)
 	s.Contains(err.Error(), "port "+port+" is already in use")
 }
@@ -1022,11 +1018,14 @@ func (s *Suite) TestStandaloneStop_Running() {
 	err = os.MkdirAll(standaloneStateDir, 0o755)
 	s.NoError(err)
 
-	// Start a sleep process
+	// Start a sleep process and reap it in the background so it doesn't
+	// become a zombie after SIGTERM (zombies still respond to signal 0,
+	// which would cause the Stop poll loop to spin for the full timeout).
 	cmd := exec.Command("sleep", "60")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	err = cmd.Start()
 	s.NoError(err)
+	go cmd.Wait() //nolint:errcheck
 
 	// Write its PID
 	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.pid"), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o644)
@@ -1274,32 +1273,10 @@ func (s *Suite) TestStandalonePS_Running() {
 	s.NoError(err)
 }
 
-func (s *Suite) TestStandaloneSetStartOpts() {
-	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
-	s.NoError(err)
-
-	s.False(handler.foreground)
-	s.Equal("8080", handler.webserverPort())
-
-	handler.SetStartOpts(types.StartOptions{Foreground: true, Port: "9090"})
-	s.True(handler.foreground)
-	s.Equal("9090", handler.webserverPort())
-
-	// Health endpoint uses custom port
-	url, comp := handler.healthEndpoint()
-	s.Contains(url, ":9090/")
-	s.Equal("api-server", comp)
-
-	// Empty port should not reset
-	handler.SetStartOpts(types.StartOptions{Foreground: false})
-	s.False(handler.foreground)
-	s.Equal("9090", handler.webserverPort())
-}
-
 func (s *Suite) TestStandaloneBuildEnv_CustomPort() {
 	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
 	s.NoError(err)
-	handler.SetStartOpts(types.StartOptions{Port: "9090"})
+	handler.port = "9090"
 
 	env := handler.buildEnv()
 

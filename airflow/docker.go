@@ -163,9 +163,6 @@ type DockerCompose struct {
 	ruffImageHandler ImageHandler
 }
 
-// SetStartOpts is a no-op for DockerCompose; standalone-specific options are ignored.
-func (d *DockerCompose) SetStartOpts(_ airflowTypes.StartOptions) {}
-
 func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*DockerCompose, error) {
 	// Get project name from config
 	projectName, err := ProjectNameUnique()
@@ -217,7 +214,16 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 // Start starts a local airflow development cluster
 //
 //nolint:gocognit
-func (d *DockerCompose) Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
+	imageName := opts.ImageName
+	settingsFile := opts.SettingsFile
+	composeFile := opts.ComposeFile
+	buildSecretString := opts.BuildSecretString
+	noCache := opts.NoCache
+	noBrowser := opts.NoBrowser
+	waitTime := opts.WaitTime
+	envConns := opts.EnvConns
+
 	// Build this project image
 	if imageName == "" {
 		if !config.CFG.DisableAstroRun.GetBool() {

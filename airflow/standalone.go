@@ -121,14 +121,6 @@ func StandaloneInit(airflowHome, envFile, dockerfile string) (*Standalone, error
 	}, nil
 }
 
-// SetStartOpts applies standalone-specific start options.
-func (s *Standalone) SetStartOpts(opts types.StartOptions) {
-	s.foreground = opts.Foreground
-	if opts.Port != "" {
-		s.port = opts.Port
-	}
-}
-
 // webserverPort returns the configured port. It checks (in order):
 // 1. Explicit --port flag
 // 2. api-server.port from .astro/config.yaml (same config used by `astro dev start`)
@@ -154,7 +146,15 @@ func (s *Standalone) logFilePath() string {
 // Start runs airflow standalone locally without Docker.
 //
 //nolint:gocognit,gocyclo
-func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (s *Standalone) Start(opts *types.StartOptions) error {
+	settingsFile := opts.SettingsFile
+	waitTime := opts.WaitTime
+	envConns := opts.EnvConns
+	s.foreground = opts.Foreground
+	if opts.Port != "" {
+		s.port = opts.Port
+	}
+
 	fmt.Println(ansi.Bold("Note:") + " Standalone mode is experimental. Report issues at https://github.com/astronomer/astro-cli/issues")
 	fmt.Println()
 
@@ -390,6 +390,12 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 	if err != nil {
 		return fmt.Errorf("error starting airflow standalone: %w", err)
 	}
+
+	// Reap the child process when it exits to prevent zombies.  In normal
+	// usage the CLI exits right after Start() returns and the child is
+	// reparented to init, but during tests (or if the parent stays alive)
+	// an un-reaped child would appear alive to signal-0 checks in Stop().
+	go cmd.Wait() //nolint:errcheck
 
 	err = os.WriteFile(s.pidFilePath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), filePermissions)
 	if err != nil {

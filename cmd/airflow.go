@@ -813,14 +813,20 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 		return err
 	}
 
-	containerHandler.SetStartOpts(airflow.StartOptions{
-		Foreground: localForeground,
-		Port:       localPort,
-	})
-
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	return containerHandler.Start(customImageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns)
+	return containerHandler.Start(&airflow.StartOptions{
+		ImageName:         customImageName,
+		SettingsFile:      settingsFile,
+		ComposeFile:       composeFile,
+		BuildSecretString: buildSecretString,
+		NoCache:           noCache,
+		NoBrowser:         noBrowser,
+		WaitTime:          waitTime,
+		EnvConns:          envConns,
+		Foreground:        localForeground,
+		Port:              localPort,
+	})
 }
 
 // airflowRun
@@ -954,14 +960,20 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 		}
 	}
 
-	containerHandler.SetStartOpts(airflow.StartOptions{
-		Foreground: localForeground,
-		Port:       localPort,
-	})
-
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	return containerHandler.Start(customImageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns)
+	return containerHandler.Start(&airflow.StartOptions{
+		ImageName:         customImageName,
+		SettingsFile:      settingsFile,
+		ComposeFile:       composeFile,
+		BuildSecretString: buildSecretString,
+		NoCache:           noCache,
+		NoBrowser:         noBrowser,
+		WaitTime:          waitTime,
+		EnvConns:          envConns,
+		Foreground:        localForeground,
+		Port:              localPort,
+	})
 }
 
 // run pytest on an airflow project
