@@ -5,6 +5,7 @@ package mocks
 import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/airflow/types"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -247,6 +248,11 @@ func (_m *ContainerHandler) RunDAG(dagID string, settingsFile string, dagFile st
 	}
 
 	return r0
+}
+
+// SetStartOpts provides a mock function with given fields: opts
+func (_m *ContainerHandler) SetStartOpts(opts types.StartOptions) {
+	_m.Called(opts)
 }
 
 // Start provides a mock function with given fields: imageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns

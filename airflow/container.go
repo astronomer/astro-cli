@@ -23,8 +23,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+// StartOptions is re-exported from airflow/types for use by callers.
+type StartOptions = types.StartOptions
+
 type ContainerHandler interface {
 	Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error
+	SetStartOpts(opts types.StartOptions)
 	Stop(waitForExit bool) error
 	PS() error
 	Kill() error

@@ -163,6 +163,9 @@ type DockerCompose struct {
 	ruffImageHandler ImageHandler
 }
 
+// SetStartOpts is a no-op for DockerCompose; standalone-specific options are ignored.
+func (d *DockerCompose) SetStartOpts(_ airflowTypes.StartOptions) {}
+
 func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*DockerCompose, error) {
 	// Get project name from config
 	projectName, err := ProjectNameUnique()

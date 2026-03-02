@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -120,14 +121,12 @@ func StandaloneInit(airflowHome, envFile, dockerfile string) (*Standalone, error
 	}, nil
 }
 
-// SetForeground controls whether Start() runs the process in the foreground.
-func (s *Standalone) SetForeground(fg bool) {
-	s.foreground = fg
-}
-
-// SetPort overrides the default webserver port.
-func (s *Standalone) SetPort(port string) {
-	s.port = port
+// SetStartOpts applies standalone-specific start options.
+func (s *Standalone) SetStartOpts(opts types.StartOptions) {
+	s.foreground = opts.Foreground
+	if opts.Port != "" {
+		s.port = opts.Port
+	}
 }
 
 // webserverPort returns the configured port. It checks (in order):
@@ -156,6 +155,9 @@ func (s *Standalone) logFilePath() string {
 //
 //nolint:gocognit,gocyclo
 func (s *Standalone) Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+	fmt.Println(ansi.Bold("Note:") + " Standalone mode is experimental. Report issues at https://github.com/astronomer/astro-cli/issues")
+	fmt.Println()
+
 	// 1. Parse Dockerfile to get runtime image + tag
 	cmds, err := standaloneParseFile(filepath.Join(s.airflowHome, "Dockerfile"))
 	if err != nil {
@@ -301,14 +303,21 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 	// Forward signals to the entire process group so child processes
 	// (scheduler, triggerer, api-server, etc.) are also terminated.
 	sigChan := make(chan os.Signal, 1)
+	done := make(chan struct{})
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-sigChan
-		if cmd.Process != nil {
-			syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck
+		select {
+		case <-sigChan:
+			if cmd.Process != nil {
+				syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck
+			}
+		case <-done:
 		}
 	}()
-	defer signal.Stop(sigChan)
+	defer func() {
+		signal.Stop(sigChan)
+		close(done)
+	}()
 
 	var wg sync.WaitGroup
 	wg.Add(2) //nolint:mnd

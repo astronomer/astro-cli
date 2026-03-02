@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/astronomer/astro-cli/airflow/types"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/stretchr/testify/assert"
@@ -154,7 +155,7 @@ func (s *Suite) TestStandaloneStart_FloatingTag() {
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
-	handler.SetForeground(true)
+	handler.SetStartOpts(types.StartOptions{Foreground: true})
 
 	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
 	s.NoError(err)
@@ -840,7 +841,7 @@ func (s *Suite) TestStandaloneStart_HappyPath() {
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
-	handler.SetForeground(true) // Use foreground mode for this test
+	handler.SetStartOpts(types.StartOptions{Foreground: true}) // Use foreground mode for this test
 
 	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, map[string]astrocore.EnvironmentObjectConnection(nil))
 	s.NoError(err)
@@ -1004,7 +1005,7 @@ func (s *Suite) TestStandaloneStart_PortInUse() {
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
-	handler.SetPort(port)
+	handler.SetStartOpts(types.StartOptions{Port: port})
 
 	err = handler.Start("", "airflow_settings.yaml", "", "", false, false, 1*time.Minute, nil)
 	s.Error(err)
@@ -1273,36 +1274,32 @@ func (s *Suite) TestStandalonePS_Running() {
 	s.NoError(err)
 }
 
-func (s *Suite) TestStandaloneSetForeground() {
+func (s *Suite) TestStandaloneSetStartOpts() {
 	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
 	s.NoError(err)
 
 	s.False(handler.foreground)
-	handler.SetForeground(true)
-	s.True(handler.foreground)
-}
-
-func (s *Suite) TestStandaloneSetPort() {
-	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
-	s.NoError(err)
-
-	// Default port
 	s.Equal("8080", handler.webserverPort())
 
-	// Override via SetPort
-	handler.SetPort("9090")
+	handler.SetStartOpts(types.StartOptions{Foreground: true, Port: "9090"})
+	s.True(handler.foreground)
 	s.Equal("9090", handler.webserverPort())
 
 	// Health endpoint uses custom port
 	url, comp := handler.healthEndpoint()
 	s.Contains(url, ":9090/")
 	s.Equal("api-server", comp)
+
+	// Empty port should not reset
+	handler.SetStartOpts(types.StartOptions{Foreground: false})
+	s.False(handler.foreground)
+	s.Equal("9090", handler.webserverPort())
 }
 
 func (s *Suite) TestStandaloneBuildEnv_CustomPort() {
 	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
 	s.NoError(err)
-	handler.SetPort("9090")
+	handler.SetStartOpts(types.StartOptions{Port: "9090"})
 
 	env := handler.buildEnv()
 

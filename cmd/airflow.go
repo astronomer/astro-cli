@@ -813,13 +813,10 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 		return err
 	}
 
-	// Set standalone-specific options
-	if sa, ok := containerHandler.(*airflow.Standalone); ok {
-		sa.SetForeground(localForeground)
-		if localPort != "" {
-			sa.SetPort(localPort)
-		}
-	}
+	containerHandler.SetStartOpts(airflow.StartOptions{
+		Foreground: localForeground,
+		Port:       localPort,
+	})
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
@@ -957,13 +954,10 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 		}
 	}
 
-	// Set standalone-specific options
-	if sa, ok := containerHandler.(*airflow.Standalone); ok {
-		sa.SetForeground(localForeground)
-		if localPort != "" {
-			sa.SetPort(localPort)
-		}
-	}
+	containerHandler.SetStartOpts(airflow.StartOptions{
+		Foreground: localForeground,
+		Port:       localPort,
+	})
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
