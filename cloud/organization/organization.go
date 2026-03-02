@@ -210,18 +210,19 @@ func Switch(orgNameOrID string, coreClient astrocore.CoreClient, platformCoreCli
 
 	// get target org
 	var targetOrg *astroplatformcore.Organization
-	if orgNameOrID == "" {
+	switch {
+	case orgNameOrID == "":
 		targetOrg, err = getOrganizationSelection(out, platformCoreClient)
 		if err != nil {
 			return err
 		}
-	} else if isCUID(orgNameOrID) {
+	case isCUID(orgNameOrID):
 		// Input looks like a CUID — fetch directly by ID
 		targetOrg, err = GetOrganization(orgNameOrID, platformCoreClient)
 		if err != nil {
 			return err
 		}
-	} else {
+	default:
 		// Input is a name — paginate through all orgs to find it
 		targetOrg, err = findOrganizationByName(orgNameOrID, platformCoreClient)
 		if err != nil {
