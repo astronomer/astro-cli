@@ -15,6 +15,7 @@ import (
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
@@ -48,6 +49,9 @@ var (
 				{Id: "org1", Name: "org1", Product: &mockOrganizationProduct},
 				{Id: "org2", Name: "org2", Product: &mockOrganizationProduct},
 			},
+			TotalCount: 2,
+			Limit:      100,
+			Offset:     0,
 		},
 	}
 	auditLogsResp          = []int{}
@@ -235,11 +239,6 @@ func (s *Suite) TestSwitch() {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
-		// Mock GetOrganization to return error (org not found by ID either)
-		mockPlatformCoreClient.On("GetOrganizationWithResponse", mock.Anything, "name-wrong", mock.Anything).Return(&astroplatformcore.GetOrganizationResponse{
-			HTTPResponse: &http.Response{StatusCode: 404},
-			JSON404:      &astroplatformcore.Error{Message: "not found"},
-		}, nil).Once()
 		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
@@ -284,6 +283,9 @@ func (s *Suite) TestSwitch() {
 				Organizations: []astroplatformcore.Organization{
 					{Id: "org1", Name: "org1"},
 				},
+				TotalCount: 1,
+				Limit:      100,
+				Offset:     0,
 			},
 		}
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -300,29 +302,76 @@ func (s *Suite) TestSwitch() {
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 
-	s.Run("successful switch with ID not in list but found via GetOrganization", func() {
-		// Simulate org not being in the paginated list (e.g., user has >100 orgs)
-		emptyListResponse := astroplatformcore.ListOrganizationsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astroplatformcore.OrganizationsPaginated{
-				Organizations: []astroplatformcore.Organization{},
-			},
-		}
+	s.Run("successful switch with CUID calls GetOrganization directly", func() {
+		testCUID := "clh1rai0g000008l50d5hahbc"
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&emptyListResponse, nil).Once()
-		// Mock GetOrganization to return the org by ID
-		mockPlatformCoreClient.On("GetOrganizationWithResponse", mock.Anything, "org3-id", mock.Anything).Return(&astroplatformcore.GetOrganizationResponse{
+		// Only GetOrganization should be called — no ListOrganizations
+		mockPlatformCoreClient.On("GetOrganizationWithResponse", mock.Anything, testCUID, mock.Anything).Return(&astroplatformcore.GetOrganizationResponse{
 			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200:      &astroplatformcore.Organization{Id: "org3-id", Name: "org3", Product: &mockOrganizationProduct},
+			JSON200:      &astroplatformcore.Organization{Id: testCUID, Name: "org3", Product: &mockOrganizationProduct},
 		}, nil).Once()
 		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("org3-id", mockCoreClient, mockPlatformCoreClient, buf, false)
+		err := Switch(testCUID, mockCoreClient, mockPlatformCoreClient, buf, false)
+		s.NoError(err)
+		s.Equal("\nSuccessfully switched organization\n", buf.String())
+		mockCoreClient.AssertExpectations(s.T())
+		mockPlatformCoreClient.AssertExpectations(s.T())
+	})
+
+	s.Run("switch with CUID not found returns error", func() {
+		testCUID := "clh1rai0g000008l50d5hahbc"
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		errorBody, _ := json.Marshal(astroplatformcore.Error{Message: "organization not found"})
+		mockPlatformCoreClient.On("GetOrganizationWithResponse", mock.Anything, testCUID, mock.Anything).Return(&astroplatformcore.GetOrganizationResponse{
+			HTTPResponse: &http.Response{StatusCode: 404},
+			Body:         errorBody,
+		}, nil).Once()
+		buf := new(bytes.Buffer)
+		err := Switch(testCUID, mockCoreClient, mockPlatformCoreClient, buf, false)
+		s.Error(err)
+		s.Contains(err.Error(), "organization not found")
+		mockCoreClient.AssertExpectations(s.T())
+		mockPlatformCoreClient.AssertExpectations(s.T())
+	})
+
+	s.Run("switch with name paginates across pages", func() {
+		page1Response := astroplatformcore.ListOrganizationsResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200: &astroplatformcore.OrganizationsPaginated{
+				Organizations: []astroplatformcore.Organization{
+					{Id: "org1", Name: "org1", Product: &mockOrganizationProduct},
+				},
+				TotalCount: 200,
+				Limit:      100,
+				Offset:     0,
+			},
+		}
+		page2Response := astroplatformcore.ListOrganizationsResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200: &astroplatformcore.OrganizationsPaginated{
+				Organizations: []astroplatformcore.Organization{
+					{Id: "org-target", Name: "target-org", Product: &mockOrganizationProduct},
+				},
+				TotalCount: 200,
+				Limit:      100,
+				Offset:     100,
+			},
+		}
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		// First call returns page 1 (offset 0), second call returns page 2 (offset 100)
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&page1Response, nil).Once()
+		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&page2Response, nil).Once()
+		CheckUserSession = func(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+			return nil
+		}
+		buf := new(bytes.Buffer)
+		err := Switch("target-org", mockCoreClient, mockPlatformCoreClient, buf, false)
 		s.NoError(err)
 		s.Equal("\nSuccessfully switched organization\n", buf.String())
 		mockCoreClient.AssertExpectations(s.T())
@@ -439,4 +488,27 @@ func (s *Suite) TestExportAuditLogs() {
 		mockPlatformClient.AssertExpectations(s.T())
 		mockClient.AssertExpectations(s.T())
 	})
+}
+
+func TestIsCUID(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		expect bool
+	}{
+		{"valid CUID", "clh1rai0g000008l50d5hahbc", true},
+		{"valid CUID all zeros", "c000000000000000000000000", true},
+		{"too short", "clh1rai0g000008l50d5hahb", false},
+		{"too long", "clh1rai0g000008l50d5hahbcc", false},
+		{"wrong prefix", "xlh1rai0g000008l50d5hahbc", false},
+		{"uppercase chars", "cLH1RAI0G000008L50D5HAHBC", false},
+		{"org name", "my-organization", false},
+		{"empty string", "", false},
+		{"name containing cuid substring", "clh1rai0g000008l50d5hahbc-prod", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expect, isCUID(tt.input))
+		})
+	}
 }

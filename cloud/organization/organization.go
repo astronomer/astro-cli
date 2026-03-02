@@ -71,6 +71,46 @@ func GetOrganization(orgID string, platformCoreClient astroplatformcore.CoreClie
 	return resp.JSON200, nil
 }
 
+// isCUID returns true if s is a valid CUID (25 chars: 'c' + 24 lowercase alphanumeric).
+func isCUID(s string) bool {
+	if len(s) != 25 || s[0] != 'c' {
+		return false
+	}
+	for _, ch := range s[1:] {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) {
+			return false
+		}
+	}
+	return true
+}
+
+func findOrganizationByName(name string, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {
+	pageSize := 100
+	offset := 0
+	for {
+		params := &astroplatformcore.ListOrganizationsParams{Limit: &pageSize, Offset: &offset}
+		resp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), params)
+		if err != nil {
+			return nil, err
+		}
+		err = astroplatformcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		paginated := *resp.JSON200
+		for i := range paginated.Organizations {
+			if paginated.Organizations[i].Name == name {
+				return &paginated.Organizations[i], nil
+			}
+		}
+		offset += pageSize
+		if offset >= paginated.TotalCount {
+			break
+		}
+	}
+	return nil, nil
+}
+
 // List all Organizations
 func List(out io.Writer, platformCoreClient astroplatformcore.CoreClient) error {
 	c, err := config.GetCurrentContext()
@@ -175,26 +215,17 @@ func Switch(orgNameOrID string, coreClient astrocore.CoreClient, platformCoreCli
 		if err != nil {
 			return err
 		}
-	} else {
-		or, err := ListOrganizations(platformCoreClient)
+	} else if isCUID(orgNameOrID) {
+		// Input looks like a CUID — fetch directly by ID
+		targetOrg, err = GetOrganization(orgNameOrID, platformCoreClient)
 		if err != nil {
 			return err
 		}
-		for i := range or {
-			if or[i].Name == orgNameOrID {
-				targetOrg = &or[i]
-			}
-			if or[i].Id == orgNameOrID {
-				targetOrg = &or[i]
-			}
-		}
-		// If not found in list, try to get org by ID directly
-		// This handles cases where user has access to more orgs than the list limit
-		if targetOrg == nil {
-			org, err := GetOrganization(orgNameOrID, platformCoreClient)
-			if err == nil && org != nil {
-				targetOrg = org
-			}
+	} else {
+		// Input is a name — paginate through all orgs to find it
+		targetOrg, err = findOrganizationByName(orgNameOrID, platformCoreClient)
+		if err != nil {
+			return err
 		}
 	}
 	if targetOrg == nil {
