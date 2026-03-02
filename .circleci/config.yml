@@ -51,7 +51,7 @@ workflows:
             - lint
             - test
             - approve-run-integration-tests
-      - approve-release:
+      - approve-pre-release:
           requires:
             - lint
             - test
@@ -63,7 +63,7 @@ workflows:
           context:
             - github-repo
           requires:
-            - approve-release
+            - approve-pre-release
           filters:
             branches:
               only: "/release-.*/"
