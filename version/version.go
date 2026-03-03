@@ -2,21 +2,33 @@ package version
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
 
 	semver "github.com/Masterminds/semver/v3"
-	"github.com/google/go-github/v48/github"
 )
 
 var CurrVersion string
 
 const (
-	cliCurrentVersion = "Astro CLI Version: "
+	cliCurrentVersion  = "Astro CLI Version: "
+	astroCLIReleaseURL = "https://updates.astronomer.io/astro-cli"
 )
+
+type astroCLIRelease struct {
+	Version string `json:"version"`
+}
+
+type astroCLIReleaseResponse struct {
+	AvailableReleases []astroCLIRelease `json:"available_releases"`
+}
 
 // PrintVersion outputs current cli version and git commit if exists
 func PrintVersion() {
@@ -24,49 +36,76 @@ func PrintVersion() {
 	fmt.Println(cliCurrentVersion + version)
 }
 
-func getLatestRelease(client *github.Client, owner, repo string) (*github.RepositoryRelease, error) {
-	ctx := context.Background()
-
-	// Get the list of releases for the repository
-	releases, _, err := client.Repositories.ListReleases(ctx, owner, repo, nil)
+func getCLIReleases(ctx context.Context, client *http.Client, url string) (*astroCLIReleaseResponse, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
 
-	// Find the latest release (by release tag)
-	var latestRelease *github.RepositoryRelease
-	for _, release := range releases {
-		// Skip pre-releases
-		if release.GetPrerelease() {
-			continue
-		}
-		if latestRelease == nil || release.GetTagName() > latestRelease.GetTagName() {
-			latestRelease = release
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("astro-cli releases endpoint request failed with status: %d", response.StatusCode)
+	}
+
+	var releases astroCLIReleaseResponse
+	err = json.NewDecoder(response.Body).Decode(&releases)
+	if err != nil {
+		return nil, err
+	}
+
+	return &releases, nil
+}
+
+func getLatestRelease(ctx context.Context, client *http.Client, url string) (*semver.Version, error) {
+	releases, err := getCLIReleases(ctx, client, url)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(releases.AvailableReleases) == 0 {
+		return nil, errors.New("astro-cli releases endpoint returned 0 results")
+	}
+
+	var validVersions []*semver.Version
+
+	for _, r := range releases.AvailableReleases {
+		// discard any versions that we cannot parse
+		version, err := semver.NewVersion(r.Version)
+		if err == nil {
+			validVersions = append(validVersions, version)
 		}
 	}
+
+	if len(validVersions) == 0 {
+		return nil, errors.New("astro-cli releases endpoint returned 0 valid versions")
+	}
+
+	latestRelease := slices.MaxFunc(validVersions, func(a, b *semver.Version) int {
+		return a.Compare(b)
+	})
 
 	return latestRelease, nil
 }
 
-func CompareVersions(client *github.Client, owner, repo string) error {
-	// Get the latest release
-	latestRelease, err := getLatestRelease(client, owner, repo)
-	if err != nil {
-		return err
-	}
-
+func CompareVersions(ctx context.Context, client *http.Client) error {
 	// Check if current version is a local build
 	if strings.Contains(CurrVersion, "SNAPSHOT") {
 		return nil
 	}
 
-	// Parse the current and latest versions into semver objects
-	currentSemver, err := semver.NewVersion(CurrVersion)
+	// Get the latest release
+	latestSemver, err := getLatestRelease(ctx, client, astroCLIReleaseURL)
 	if err != nil {
 		return err
 	}
 
-	latestSemver, err := semver.NewVersion(latestRelease.GetTagName())
+	// Parse the current and latest versions into semver objects
+	currentSemver, err := semver.NewVersion(CurrVersion)
 	if err != nil {
 		return err
 	}
