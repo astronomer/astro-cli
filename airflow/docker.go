@@ -44,6 +44,7 @@ import (
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/term"
 )
 
 const (
@@ -1251,7 +1252,12 @@ func (d *DockerCompose) Bash(component string) error {
 	if err != nil {
 		return err
 	}
-	err = cmdExec(containerRuntime, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
+	execArgs := []string{"exec", "-i"}
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		execArgs = append(execArgs, "-t")
+	}
+	execArgs = append(execArgs, containerName, "bash")
+	err = cmdExec(containerRuntime, os.Stdout, os.Stderr, execArgs...)
 	if err != nil {
 		return err
 	}
