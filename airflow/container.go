@@ -8,11 +8,9 @@ import (
 	"io"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -23,8 +21,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+// StartOptions is re-exported from airflow/types for use by callers.
+type StartOptions = types.StartOptions
+
 type ContainerHandler interface {
-	Start(imageName, settingsFile, composeFile, buildSecretString string, noCache, noBrowser bool, waitTime time.Duration, envConns map[string]astrocore.EnvironmentObjectConnection) error
+	Start(opts *types.StartOptions) error
 	Stop(waitForExit bool) error
 	PS() error
 	Kill() error
@@ -76,6 +77,10 @@ type DockerRegistryAPI interface {
 
 func ContainerHandlerInit(airflowHome, envFile, dockerfile, projectName string) (ContainerHandler, error) {
 	return DockerComposeInit(airflowHome, envFile, dockerfile, projectName)
+}
+
+func StandaloneHandlerInit(airflowHome, envFile, dockerfile, projectName string) (ContainerHandler, error) {
+	return StandaloneInit(airflowHome, envFile, dockerfile)
 }
 
 func RegistryHandlerInit(registry string) (RegistryHandler, error) {
