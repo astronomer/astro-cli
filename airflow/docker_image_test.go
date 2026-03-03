@@ -544,17 +544,20 @@ func (s *Suite) TestDockerImageGetLabel() {
 		s.ErrorIs(err, errMockDocker)
 	})
 
-	s.Run("cmdExec failure", func() {
+	s.Run("cmdExec stderr warning", func() {
 		mockLabel := "test-label"
+		mockStdout := "label-value"
 		mockErrResp := "test-err-response"
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			s.Contains(args[2], mockLabel)
+			io.WriteString(stdout, mockStdout)
 			io.WriteString(stderr, mockErrResp)
 			return nil
 		}
 
-		_, err := handler.GetLabel("", mockLabel)
-		s.ErrorIs(err, errGetImageLabel)
+		resp, err := handler.GetLabel("", mockLabel)
+		s.NoError(err)
+		s.Equal(mockStdout, resp)
 	})
 }
 
