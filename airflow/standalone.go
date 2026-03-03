@@ -396,22 +396,8 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 		uiURL := "http://localhost:" + s.webserverPort()
 
 		// Register proxy route in foreground mode
-		if s.useProxy && s.proxyHostname != "" {
-			if _, ensureErr := proxy.EnsureRunning(s.proxyPort); ensureErr != nil {
-				fmt.Printf("Warning: could not start proxy: %s\n", ensureErr.Error())
-			} else {
-				route := proxy.Route{
-					Hostname:   s.proxyHostname,
-					Port:       s.webserverPort(),
-					ProjectDir: s.airflowHome,
-					PID:        cmd.Process.Pid,
-				}
-				if addErr := proxy.AddRoute(route); addErr != nil {
-					fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
-				} else {
-					uiURL = fmt.Sprintf("http://%s:%s", s.proxyHostname, s.proxyPort)
-				}
-			}
+		if proxyURL := s.registerProxyRoute(cmd.Process.Pid); proxyURL != "" {
+			uiURL = proxyURL
 		}
 
 		fmt.Println("\n" + ansi.Green("\u2714") + " Airflow is ready!")
@@ -484,22 +470,8 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 	uiURL := "http://localhost:" + s.webserverPort()
 
 	// Register proxy route and show proxy URL
-	if s.useProxy && s.proxyHostname != "" {
-		if _, ensureErr := proxy.EnsureRunning(s.proxyPort); ensureErr != nil {
-			fmt.Printf("Warning: could not start proxy: %s\n", ensureErr.Error())
-		} else {
-			route := proxy.Route{
-				Hostname:   s.proxyHostname,
-				Port:       s.webserverPort(),
-				ProjectDir: s.airflowHome,
-				PID:        cmd.Process.Pid,
-			}
-			if addErr := proxy.AddRoute(route); addErr != nil {
-				fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
-			} else {
-				uiURL = fmt.Sprintf("http://%s:%s", s.proxyHostname, s.proxyPort)
-			}
-		}
+	if proxyURL := s.registerProxyRoute(cmd.Process.Pid); proxyURL != "" {
+		uiURL = proxyURL
 	}
 
 	fmt.Printf("\n%s Airflow is ready! (PID %d)\n", ansi.Green("\u2714"), cmd.Process.Pid)
@@ -508,6 +480,30 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 	fmt.Printf("%sStop:      %s\n", bullet, ansi.Bold("astro dev stop"))
 
 	return nil
+}
+
+// registerProxyRoute ensures the proxy daemon is running and registers a route
+// for this standalone instance. Returns the proxy URL on success, or "" if the
+// proxy is disabled or registration failed.
+func (s *Standalone) registerProxyRoute(pid int) string {
+	if !s.useProxy || s.proxyHostname == "" {
+		return ""
+	}
+	if _, err := proxy.EnsureRunning(s.proxyPort); err != nil {
+		fmt.Printf("Warning: could not start proxy: %s\n", err.Error())
+		return ""
+	}
+	route := &proxy.Route{
+		Hostname:   s.proxyHostname,
+		Port:       s.webserverPort(),
+		ProjectDir: s.airflowHome,
+		PID:        pid,
+	}
+	if err := proxy.AddRoute(route); err != nil {
+		fmt.Printf("Warning: could not register proxy route: %s\n", err.Error())
+		return ""
+	}
+	return fmt.Sprintf("http://%s:%s", s.proxyHostname, s.proxyPort)
 }
 
 // healthEndpoint returns the health check URL and component name.

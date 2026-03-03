@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	portRangeMin  = 10000
-	portRangeMax  = 19999
-	maxRetries    = 50
-	dialTimeout   = 500 * time.Millisecond
+	portRangeMin = 10000
+	portRangeMax = 19999
+	maxRetries   = 50
+	dialTimeout  = 500 * time.Millisecond
 )
 
 // AllocatePort picks a random available port from the pool (10000-19999).

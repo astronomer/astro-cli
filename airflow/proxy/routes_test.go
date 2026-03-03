@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDir(t *testing.T) string {
+func setupTestDir(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
 	origProxyDirPath := proxyDirPath
@@ -19,13 +19,13 @@ func setupTestDir(t *testing.T) string {
 	t.Cleanup(func() {
 		proxyDirPath = origProxyDirPath
 	})
-	return dir
+	_ = dir
 }
 
 func TestAddRoute(t *testing.T) {
 	setupTestDir(t)
 
-	route := Route{
+	route := &Route{
 		Hostname:   "my-project.localhost",
 		Port:       "12345",
 		ProjectDir: "/home/user/my-project",
@@ -46,7 +46,7 @@ func TestAddRoute_UpdateSameProject(t *testing.T) {
 	setupTestDir(t)
 	pid := os.Getpid()
 
-	route1 := Route{
+	route1 := &Route{
 		Hostname:   "my-project.localhost",
 		Port:       "12345",
 		ProjectDir: "/home/user/my-project",
@@ -56,7 +56,7 @@ func TestAddRoute_UpdateSameProject(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update with new port for same project
-	route2 := Route{
+	route2 := &Route{
 		Hostname:   "my-project.localhost",
 		Port:       "12346",
 		ProjectDir: "/home/user/my-project",
@@ -75,7 +75,7 @@ func TestAddRoute_HostnameCollision(t *testing.T) {
 	setupTestDir(t)
 	pid := os.Getpid()
 
-	route1 := Route{
+	route1 := &Route{
 		Hostname:   "my-project.localhost",
 		Port:       "12345",
 		ProjectDir: "/home/user/project-a",
@@ -85,7 +85,7 @@ func TestAddRoute_HostnameCollision(t *testing.T) {
 	require.NoError(t, err)
 
 	// Different project with same hostname should fail
-	route2 := Route{
+	route2 := &Route{
 		Hostname:   "my-project.localhost",
 		Port:       "12346",
 		ProjectDir: "/home/user/project-b",
@@ -100,7 +100,7 @@ func TestRemoveRoute(t *testing.T) {
 	setupTestDir(t)
 	pid := os.Getpid()
 
-	err := AddRoute(Route{
+	err := AddRoute(&Route{
 		Hostname:   "project-a.localhost",
 		Port:       "12345",
 		ProjectDir: "/home/user/project-a",
@@ -108,7 +108,7 @@ func TestRemoveRoute(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = AddRoute(Route{
+	err = AddRoute(&Route{
 		Hostname:   "project-b.localhost",
 		Port:       "12346",
 		ProjectDir: "/home/user/project-b",
@@ -129,7 +129,7 @@ func TestRemoveRoute(t *testing.T) {
 func TestRemoveRoute_LastRoute(t *testing.T) {
 	setupTestDir(t)
 
-	err := AddRoute(Route{
+	err := AddRoute(&Route{
 		Hostname:   "project-a.localhost",
 		Port:       "12345",
 		ProjectDir: "/home/user/project-a",
@@ -153,7 +153,7 @@ func TestListRoutes_Empty(t *testing.T) {
 func TestGetRoute(t *testing.T) {
 	setupTestDir(t)
 
-	err := AddRoute(Route{
+	err := AddRoute(&Route{
 		Hostname:   "my-project.localhost",
 		Port:       "12345",
 		ProjectDir: "/home/user/my-project",
@@ -186,7 +186,7 @@ func TestPruneStaleRoutes(t *testing.T) {
 		return pid == alivePID
 	}
 
-	err := AddRoute(Route{
+	err := AddRoute(&Route{
 		Hostname:   "alive.localhost",
 		Port:       "12345",
 		ProjectDir: "/home/user/alive",
@@ -216,7 +216,7 @@ func TestPruneStaleRoutes(t *testing.T) {
 func TestAddRoute_WithServices(t *testing.T) {
 	setupTestDir(t)
 
-	route := Route{
+	route := &Route{
 		Hostname:   "my-project.localhost",
 		Port:       "12345",
 		ProjectDir: "/home/user/my-project",

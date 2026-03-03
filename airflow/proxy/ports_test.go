@@ -33,7 +33,7 @@ func TestAllocatePort_AvoidAllocated(t *testing.T) {
 	setupTestDir(t)
 
 	// Pre-register a route so its port is taken
-	_ = AddRoute(Route{
+	_ = AddRoute(&Route{
 		Hostname:   "existing.localhost",
 		Port:       "12345",
 		ProjectDir: "/tmp/existing",

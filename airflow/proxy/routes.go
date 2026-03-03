@@ -17,6 +17,8 @@ const (
 	lockDirName    = "routes.lock"
 	lockTimeout    = 5 * time.Second
 	lockPoll       = 50 * time.Millisecond
+	filePermRW     = 0o600 // owner read/write
+	dirPermRWX     = 0o755 // owner rwx, group/other rx
 )
 
 // Route represents a registered project route.
@@ -47,20 +49,20 @@ func lockPath() string {
 // acquireLock acquires a directory-based lock with timeout.
 func acquireLock() error {
 	// Ensure the proxy directory exists
-	if err := os.MkdirAll(proxyDirPath(), 0o755); err != nil {
+	if err := os.MkdirAll(proxyDirPath(), dirPermRWX); err != nil {
 		return fmt.Errorf("error creating proxy directory: %w", err)
 	}
 
 	deadline := time.Now().Add(lockTimeout)
 	for {
-		err := os.Mkdir(lockPath(), 0o755)
+		err := os.Mkdir(lockPath(), dirPermRWX)
 		if err == nil {
 			return nil // lock acquired
 		}
 		if time.Now().After(deadline) {
 			// Force-remove stale lock after timeout
 			os.Remove(lockPath())
-			return os.Mkdir(lockPath(), 0o755)
+			return os.Mkdir(lockPath(), dirPermRWX)
 		}
 		time.Sleep(lockPoll)
 	}
@@ -93,16 +95,16 @@ func readRoutes() ([]Route, error) {
 
 // writeRoutes writes routes to the routes file atomically.
 func writeRoutes(routes []Route) error {
-	if err := os.MkdirAll(proxyDirPath(), 0o755); err != nil {
+	if err := os.MkdirAll(proxyDirPath(), dirPermRWX); err != nil {
 		return fmt.Errorf("error creating proxy directory: %w", err)
 	}
 
 	data, err := json.MarshalIndent(routes, "", "  ")
 	if err != nil {
-		return fmt.Errorf("error marshalling routes: %w", err)
+		return fmt.Errorf("error marshaling routes: %w", err)
 	}
 
-	return os.WriteFile(routesFilePath(), data, 0o644)
+	return os.WriteFile(routesFilePath(), data, filePermRW)
 }
 
 // isPIDAlive checks if a process with the given PID is still running.
@@ -134,7 +136,7 @@ func pruneStaleRoutes(routes []Route) []Route {
 // AddRoute registers a new route. It acquires the file lock, prunes stale routes,
 // and adds the new route. Returns an error if the hostname is already registered
 // for a different project directory.
-func AddRoute(route Route) error {
+func AddRoute(route *Route) error {
 	if err := acquireLock(); err != nil {
 		return fmt.Errorf("error acquiring routes lock: %w", err)
 	}
@@ -152,14 +154,14 @@ func AddRoute(route Route) error {
 		if r.Hostname == route.Hostname {
 			if r.ProjectDir == route.ProjectDir {
 				// Same project, update the route
-				routes[i] = route
+				routes[i] = *route
 				return writeRoutes(routes)
 			}
 			return fmt.Errorf("hostname %q is already registered for project %s", route.Hostname, r.ProjectDir)
 		}
 	}
 
-	routes = append(routes, route)
+	routes = append(routes, *route)
 	return writeRoutes(routes)
 }
 

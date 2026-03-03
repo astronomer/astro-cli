@@ -70,11 +70,11 @@ func EnsureRunning(port string) (string, error) {
 // StartDaemon starts the proxy as a background process.
 // It re-executes the current CLI binary with a hidden subcommand.
 var StartDaemon = func(port string) error {
-	if err := os.MkdirAll(proxyDirPath(), 0o755); err != nil {
+	if err := os.MkdirAll(proxyDirPath(), dirPermRWX); err != nil {
 		return fmt.Errorf("error creating proxy directory: %w", err)
 	}
 
-	logFile, err := os.OpenFile(logFilePath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logFile, err := os.OpenFile(logFilePath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, filePermRW)
 	if err != nil {
 		return fmt.Errorf("error opening proxy log file: %w", err)
 	}
@@ -102,7 +102,7 @@ var StartDaemon = func(port string) error {
 
 	// Write PID file
 	pid := cmd.Process.Pid
-	if err := os.WriteFile(pidFilePath(), []byte(strconv.Itoa(pid)), 0o644); err != nil {
+	if err := os.WriteFile(pidFilePath(), []byte(strconv.Itoa(pid)), filePermRW); err != nil {
 		syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck
 		logFile.Close()
 		return fmt.Errorf("error writing proxy PID file: %w", err)

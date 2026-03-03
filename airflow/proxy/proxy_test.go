@@ -16,7 +16,7 @@ func TestProxy_LandingPage(t *testing.T) {
 	setupTestDir(t)
 
 	p := NewProxy("6563")
-	req := httptest.NewRequest(http.MethodGet, "http://localhost:6563/", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost:6563/", http.NoBody)
 	w := httptest.NewRecorder()
 	p.handler(w, req)
 
@@ -28,7 +28,7 @@ func TestProxy_LandingPage(t *testing.T) {
 func TestProxy_LandingPageWithRoutes(t *testing.T) {
 	setupTestDir(t)
 
-	err := AddRoute(Route{
+	err := AddRoute(&Route{
 		Hostname:   "my-project.localhost",
 		Port:       "12345",
 		ProjectDir: "/home/user/my-project",
@@ -37,7 +37,7 @@ func TestProxy_LandingPageWithRoutes(t *testing.T) {
 	require.NoError(t, err)
 
 	p := NewProxy("6563")
-	req := httptest.NewRequest(http.MethodGet, "http://localhost:6563/", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost:6563/", http.NoBody)
 	w := httptest.NewRecorder()
 	p.handler(w, req)
 
@@ -50,7 +50,7 @@ func TestProxy_NotFound(t *testing.T) {
 	setupTestDir(t)
 
 	p := NewProxy("6563")
-	req := httptest.NewRequest(http.MethodGet, "http://unknown.localhost:6563/", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://unknown.localhost:6563/", http.NoBody)
 	w := httptest.NewRecorder()
 	p.handler(w, req)
 
@@ -72,7 +72,7 @@ func TestProxy_ReverseProxy(t *testing.T) {
 	// Extract port from backend URL
 	backendPort := backend.Listener.Addr().(*net.TCPAddr).Port
 
-	err := AddRoute(Route{
+	err := AddRoute(&Route{
 		Hostname:   "my-project.localhost",
 		Port:       fmt.Sprintf("%d", backendPort),
 		ProjectDir: "/home/user/my-project",
@@ -81,7 +81,7 @@ func TestProxy_ReverseProxy(t *testing.T) {
 	require.NoError(t, err)
 
 	p := NewProxy("6563")
-	req := httptest.NewRequest(http.MethodGet, "http://my-project.localhost:6563/", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://my-project.localhost:6563/", http.NoBody)
 	w := httptest.NewRecorder()
 	p.handler(w, req)
 

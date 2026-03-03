@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"text/tabwriter"
 	"os"
+	"text/tabwriter"
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
@@ -68,9 +68,10 @@ func proxyStatus(_ *cobra.Command, _ []string) error {
 	}
 
 	pid, alive := proxy.IsRunning()
-	if alive {
+	switch {
+	case alive:
 		fmt.Printf("%s Proxy is running (PID %d) on port %s\n", ansi.Green("\u2714"), pid, port)
-	} else if len(routes) > 0 {
+	case len(routes) > 0:
 		// Routes exist but daemon is dead — auto-restart
 		fmt.Println("Proxy is not running. Restarting…")
 		if _, ensureErr := proxy.EnsureRunning(port); ensureErr != nil {
@@ -81,7 +82,7 @@ func proxyStatus(_ *cobra.Command, _ []string) error {
 				fmt.Printf("%s Proxy restarted (PID %d) on port %s\n", ansi.Green("\u2714"), pid, port)
 			}
 		}
-	} else {
+	default:
 		fmt.Println("Proxy is not running.")
 	}
 
@@ -91,7 +92,7 @@ func proxyStatus(_ *cobra.Command, _ []string) error {
 	}
 
 	fmt.Println("\nActive routes:")
-	tw := tabwriter.NewWriter(os.Stdout, 0, 8, 2, '\t', 0)
+	tw := tabwriter.NewWriter(os.Stdout, 0, 8, 2, '\t', 0) //nolint:mnd
 	fmt.Fprintln(tw, "URL\tBackend Port\tPostgres Port\tProject Dir\tPID")
 	for _, r := range routes {
 		pgPort := "-"

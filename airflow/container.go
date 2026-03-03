@@ -119,7 +119,7 @@ func normalizeName(s string) string {
 // PortOverrides allows callers to override the default ports used in the
 // generated compose config. When nil, ports are read from config as usual.
 type PortOverrides struct {
-	PostgresPort string
+	PostgresPort  string
 	WebserverPort string
 	APIServerPort string
 }
