@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/astronomer/astro-cli/pkg/logger"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context/ctxhttp"
 )
+
+const defaultHTTPTimeout = 30 * time.Second
 
 var ErrorBaseURL = errors.New("invalid baseurl")
 
@@ -121,6 +124,7 @@ func DownloadResponseToFile(sourceURL, path string) {
 	}
 
 	client := http.Client{
+		Timeout: defaultHTTPTimeout,
 		CheckRedirect: func(r *http.Request, via []*http.Request) error {
 			r.URL.Opaque = r.URL.Path
 			return nil
@@ -141,7 +145,8 @@ func DownloadResponseToFile(sourceURL, path string) {
 }
 
 func RequestAndGetJSONBody(route string) map[string]interface{} {
-	res, err := http.Get(route) //nolint
+	client := &http.Client{Timeout: defaultHTTPTimeout}
+	res, err := client.Get(route) //nolint
 	if err != nil {
 		logger.Fatal(err)
 	}
