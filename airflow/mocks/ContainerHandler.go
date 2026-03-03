@@ -3,8 +3,8 @@
 package mocks
 
 import (
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/airflow/types"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
 	mock "github.com/stretchr/testify/mock"
 )
