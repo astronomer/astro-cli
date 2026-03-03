@@ -50,7 +50,7 @@ func newRegistryAddProviderCmd(out io.Writer) *cobra.Command {
 
 func getProviderSearchRoute(providerName string) string {
 	getProviderURL := url.URL{
-		Scheme:   "https",
+		Scheme:   registryScheme,
 		Host:     registryHost,
 		Path:     fmt.Sprintf("%s/%s", registryAPI, providerSearchRoute),
 		RawQuery: fmt.Sprintf(providerSearchQuery, url.QueryEscape(providerName)),
@@ -60,7 +60,7 @@ func getProviderSearchRoute(providerName string) string {
 
 func getProviderRoute(providerID, providerVersion string) string {
 	getProviderURL := url.URL{
-		Scheme: "https",
+		Scheme: registryScheme,
 		Host:   registryHost,
 		Path:   fmt.Sprintf("%s/%s", registryAPI, fmt.Sprintf(providerRoute, providerID, providerVersion)),
 	}

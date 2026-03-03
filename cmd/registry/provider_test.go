@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"os"
 
-	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -26,6 +25,11 @@ func execProviderCmd(args ...string) (string, error) {
 func (s *Suite) TestProviderAdd() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
+	server := newMockRegistryServer()
+	defer server.Close()
+	cleanup := setMockRegistry(server)
+	defer cleanup()
+
 	defer os.Remove("requirements.txt")
 
 	cmdArgs := []string{"add", "snowflake"}
@@ -33,14 +37,13 @@ func (s *Suite) TestProviderAdd() {
 	s.NoError(err)
 	s.NotContains(resp, "I don't know why this is empty", "I don't know why stdout is empty")
 
-	fileContents, _ := fileutil.ReadFileToString("requirements.txt")
-	s.Regexp(`apache-airflow-providers-snowflake==\d+\.\d+\.\d+\n$`, fileContents, "We added the provider to the file")
+	fileContents, _ := os.ReadFile("requirements.txt")
+	s.Regexp(`apache-airflow-providers-snowflake==\d+\.\d+\.\d+\n$`, string(fileContents), "We added the provider to the file")
 
 	_, err = execProviderCmd(cmdArgs...)
 	s.NoError(err)
-	// TODO - assert against stdout "apache-airflow-providers-snowflake already exists in requirements.txt"
-	fileContents, _ = fileutil.ReadFileToString("requirements.txt")
-	s.Regexp(`apache-airflow-providers-snowflake==\d+\.\d+\.\d+\n$`, fileContents, "We didn't write it again")
+	fileContents, _ = os.ReadFile("requirements.txt")
+	s.Regexp(`apache-airflow-providers-snowflake==\d+\.\d+\.\d+\n$`, string(fileContents), "We didn't write it again")
 
 	_ = os.Remove("requirements.txt")
 }
