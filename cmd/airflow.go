@@ -302,7 +302,7 @@ func newAirflowStartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	// Common flags
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
-	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for webserver to get healthy. The default is 5 minutes. Use --wait 2m to wait for 2 minutes.")
+	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for webserver to get healthy. Use --wait 2m to wait for 2 minutes.")
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from. If not specified uses the current Workspace.")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
 
@@ -403,7 +403,7 @@ func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 		},
 	}
 	// Common flags
-	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for webserver to get healthy. The default is 5 minutes. Use --wait 2m to wait for 2 minutes.")
+	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for webserver to get healthy. Use --wait 2m to wait for 2 minutes.")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from. If not specified uses the current Workspace.")

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -74,11 +73,7 @@ func CompareVersions(client *github.Client, owner, repo string) error {
 
 	// Compare the versions and print a message to the user if the current version is outdated
 	if currentSemver.LessThan(latestSemver) {
-		if runtime.GOOS == "darwin" {
-			fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease update to the latest version using 'brew upgrade astro'\n\n", latestSemver)
-		} else {
-			fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease see https://www.astronomer.io/docs/astro/cli/install-cli#upgrade-the-astro-cli for information on how to update the Astro CLI\n\n", latestSemver)
-		}
+		fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease see https://www.astronomer.io/docs/astro/cli/install-cli#upgrade-the-astro-cli for information on how to update the Astro CLI\n\n", latestSemver)
 		fmt.Fprint(os.Stderr, ansi.Cyan("\nTo learn more about what's new in this version, please see https://www.astronomer.io/docs/astro/cli/release-notes\n\n"))
 		fmt.Fprintf(os.Stderr, "If you don't want to see this message again run 'astro config set -g upgrade_message false' or pass '2>/dev/null' to print this text to stderr\n\n")
 	}
