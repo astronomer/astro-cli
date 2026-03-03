@@ -13,8 +13,11 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
+var registryHost = "api.astronomer.io"
+
+var registryScheme = "https"
+
 const (
-	registryHost        = "api.astronomer.io"
 	registryAPI         = "registryV2/v1alpha1/organizations/public"
 	dagRoute            = "dags/%s/versions/%s"
 	providerRoute       = "providers/%s/versions/%s"
@@ -103,7 +106,7 @@ func downloadDag(dagID, dagVersion string, addProviders bool, out io.Writer) {
 func getDagRoute(dagID, dagVersion string) string {
 	filledDagRoute := fmt.Sprintf(dagRoute, dagID, dagVersion)
 	getDagURL := url.URL{
-		Scheme: "https",
+		Scheme: registryScheme,
 		Host:   registryHost,
 		Path:   fmt.Sprintf("%s/%s", registryAPI, filledDagRoute),
 	}

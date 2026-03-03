@@ -366,9 +366,7 @@ services:
   AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
   AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: True
-  AIRFLOW__WEBSERVER__SECRET_KEY: "test-project-name"
-  AIRFLOW__WEBSERVER__RBAC: "True"
-  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+  AIRFLOW__API__SECRET_KEY: "test-project-name"
   ASTRONOMER_ENVIRONMENT: local
 
 networks:

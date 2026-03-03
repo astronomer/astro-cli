@@ -1620,6 +1620,9 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load project")
 	}
+	if project == nil {
+		return nil, errors.New("failed to load compose project: parsed project is nil")
+	}
 
 	// The latest versions of compose libs handle adding these labels at an outer layer,
 	// near the cobra entrypoint. Without these labels, compose will lose track of the containers its

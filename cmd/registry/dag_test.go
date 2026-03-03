@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"os"
 
-	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -26,6 +25,11 @@ func execDagCmd(args ...string) (string, error) {
 func (s *Suite) TestDagAdd() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
+	server := newMockRegistryServer()
+	defer server.Close()
+	cleanup := setMockRegistry(server)
+	defer cleanup()
+
 	defer os.Remove("dags/sagemaker-batch-inference.py")
 
 	cmdArgs := []string{"add", "sagemaker-batch-inference"}
@@ -33,9 +37,9 @@ func (s *Suite) TestDagAdd() {
 	s.NoError(err)
 	s.Contains(resp, "dags/sagemaker-batch-inference.py", "we mention where we downloaded it in stdout")
 
-	fileContents, _ := fileutil.ReadFileToString("dags/sagemaker-batch-inference.py")
-	s.Contains(fileContents, "airflow", "The DAG has words in it")
-	s.Contains(fileContents, "DAG", "The DAG has words in it")
+	fileContents, _ := os.ReadFile("dags/sagemaker-batch-inference.py")
+	s.Contains(string(fileContents), "airflow", "The DAG has words in it")
+	s.Contains(string(fileContents), "DAG", "The DAG has words in it")
 
 	_ = os.Remove("dags/sagemaker-batch-inference.py")
 }
