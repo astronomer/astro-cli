@@ -207,9 +207,9 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 		}
 	}
 
-	// 3c. Determine port: allocate random port when proxy is enabled and no explicit port was set
+	// 3c. Determine port: try default port first, allocate random only if taken
 	var proxyHostname, proxyPort string
-	if useProxy && opts.Port == "" {
+	if useProxy {
 		proxyPort = config.CFG.ProxyPort.GetString()
 		if proxyPort == "" {
 			proxyPort = proxy.DefaultPort
@@ -222,23 +222,18 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 		} else {
 			proxyHostname = hostname
 
-			allocatedPort, aErr := proxy.AllocatePort()
-			if aErr != nil {
-				return fmt.Errorf("error allocating webserver port: %w", aErr)
+			// Only allocate a port if no explicit --port was set
+			if opts.Port == "" {
+				defaultPort := s.webserverPort()
+				if !proxy.IsPortAvailable(defaultPort) {
+					allocatedPort, aErr := proxy.AllocatePort()
+					if aErr != nil {
+						return fmt.Errorf("error allocating webserver port: %w", aErr)
+					}
+					s.port = allocatedPort
+				}
+				// else: keep defaultPort as-is
 			}
-			s.port = allocatedPort
-		}
-	} else if useProxy && opts.Port != "" {
-		// User explicitly requested a port — skip proxy port allocation but still route
-		proxyPort = config.CFG.ProxyPort.GetString()
-		if proxyPort == "" {
-			proxyPort = proxy.DefaultPort
-		}
-		hostname, hErr := proxy.DeriveHostname(s.airflowHome)
-		if hErr != nil {
-			useProxy = false
-		} else {
-			proxyHostname = hostname
 		}
 	}
 

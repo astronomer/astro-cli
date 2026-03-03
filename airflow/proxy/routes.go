@@ -14,9 +14,8 @@ import (
 const (
 	proxyDir       = "proxy"
 	routesFileName = "routes.json"
-	lockDirName    = "routes.lock"
+	lockFileName   = "routes.lock"
 	lockTimeout    = 5 * time.Second
-	lockPoll       = 50 * time.Millisecond
 	filePermRW     = 0o600 // owner read/write
 	dirPermRWX     = 0o755 // owner rwx, group/other rx
 )
@@ -41,36 +40,44 @@ func routesFilePath() string {
 	return filepath.Join(proxyDirPath(), routesFileName)
 }
 
-// lockPath returns the path used for the directory-based file lock.
-func lockPath() string {
-	return filepath.Join(proxyDirPath(), lockDirName)
+// lockFilePath returns the path used for the flock-based file lock.
+func lockFilePath() string {
+	return filepath.Join(proxyDirPath(), lockFileName)
 }
 
-// acquireLock acquires a directory-based lock with timeout.
-func acquireLock() error {
-	// Ensure the proxy directory exists
+// acquireLock acquires an exclusive file lock (flock) with timeout.
+// Returns the lock file which must be passed to releaseLock.
+func acquireLock() (*os.File, error) {
 	if err := os.MkdirAll(proxyDirPath(), dirPermRWX); err != nil {
-		return fmt.Errorf("error creating proxy directory: %w", err)
+		return nil, fmt.Errorf("error creating proxy directory: %w", err)
+	}
+
+	f, err := os.OpenFile(lockFilePath(), os.O_CREATE|os.O_RDWR, filePermRW)
+	if err != nil {
+		return nil, fmt.Errorf("error opening lock file: %w", err)
 	}
 
 	deadline := time.Now().Add(lockTimeout)
 	for {
-		err := os.Mkdir(lockPath(), dirPermRWX)
+		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
-			return nil // lock acquired
+			return f, nil
 		}
 		if time.Now().After(deadline) {
-			// Force-remove stale lock after timeout
-			os.Remove(lockPath())
-			return os.Mkdir(lockPath(), dirPermRWX)
+			f.Close()
+			return nil, fmt.Errorf("timed out waiting for routes lock")
 		}
-		time.Sleep(lockPoll)
+		time.Sleep(50 * time.Millisecond) //nolint:mnd
 	}
 }
 
-// releaseLock releases the directory-based lock.
-func releaseLock() {
-	os.Remove(lockPath())
+// releaseLock releases the flock and closes the lock file.
+func releaseLock(f *os.File) {
+	if f == nil {
+		return
+	}
+	syscall.Flock(int(f.Fd()), syscall.LOCK_UN) //nolint:errcheck
+	f.Close()
 }
 
 // readRoutes reads routes from the routes file. Returns empty slice if file doesn't exist.
@@ -93,7 +100,7 @@ func readRoutes() ([]Route, error) {
 	return routes, nil
 }
 
-// writeRoutes writes routes to the routes file atomically.
+// writeRoutes writes routes to the routes file atomically using a temp file + rename.
 func writeRoutes(routes []Route) error {
 	if err := os.MkdirAll(proxyDirPath(), dirPermRWX); err != nil {
 		return fmt.Errorf("error creating proxy directory: %w", err)
@@ -104,7 +111,15 @@ func writeRoutes(routes []Route) error {
 		return fmt.Errorf("error marshaling routes: %w", err)
 	}
 
-	return os.WriteFile(routesFilePath(), data, filePermRW)
+	tmpFile := routesFilePath() + ".tmp"
+	if err := os.WriteFile(tmpFile, data, filePermRW); err != nil {
+		return fmt.Errorf("error writing routes temp file: %w", err)
+	}
+	if err := os.Rename(tmpFile, routesFilePath()); err != nil {
+		os.Remove(tmpFile) //nolint:errcheck
+		return fmt.Errorf("error renaming routes temp file: %w", err)
+	}
+	return nil
 }
 
 // isPIDAlive checks if a process with the given PID is still running.
@@ -137,10 +152,11 @@ func pruneStaleRoutes(routes []Route) []Route {
 // and adds the new route. Returns an error if the hostname is already registered
 // for a different project directory.
 func AddRoute(route *Route) error {
-	if err := acquireLock(); err != nil {
+	lockFile, err := acquireLock()
+	if err != nil {
 		return fmt.Errorf("error acquiring routes lock: %w", err)
 	}
-	defer releaseLock()
+	defer releaseLock(lockFile)
 
 	routes, err := readRoutes()
 	if err != nil {
@@ -167,10 +183,11 @@ func AddRoute(route *Route) error {
 
 // RemoveRoute deregisters a route by hostname. Returns the number of remaining routes.
 func RemoveRoute(hostname string) (int, error) {
-	if err := acquireLock(); err != nil {
+	lockFile, err := acquireLock()
+	if err != nil {
 		return 0, fmt.Errorf("error acquiring routes lock: %w", err)
 	}
-	defer releaseLock()
+	defer releaseLock(lockFile)
 
 	routes, err := readRoutes()
 	if err != nil {
@@ -194,10 +211,11 @@ func RemoveRoute(hostname string) (int, error) {
 
 // ListRoutes returns all active routes (after pruning stale ones).
 func ListRoutes() ([]Route, error) {
-	if err := acquireLock(); err != nil {
+	lockFile, err := acquireLock()
+	if err != nil {
 		return nil, fmt.Errorf("error acquiring routes lock: %w", err)
 	}
-	defer releaseLock()
+	defer releaseLock(lockFile)
 
 	routes, err := readRoutes()
 	if err != nil {
@@ -215,8 +233,11 @@ func ListRoutes() ([]Route, error) {
 }
 
 // GetRoute returns the route for a given hostname, or nil if not found.
+// This is a read-only operation that does not acquire the write lock or
+// prune stale routes, making it safe to call on the hot path (e.g. per
+// HTTP request in the proxy handler).
 func GetRoute(hostname string) (*Route, error) {
-	routes, err := ListRoutes()
+	routes, err := readRoutes()
 	if err != nil {
 		return nil, err
 	}

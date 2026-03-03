@@ -45,6 +45,11 @@ func AllocatePort() (string, error) {
 	return "", fmt.Errorf("failed to find an available port after %d attempts", maxRetries)
 }
 
+// IsPortAvailable checks if a port is free by attempting to connect.
+func IsPortAvailable(port string) bool {
+	return isPortAvailable(port)
+}
+
 // isPortAvailable checks if a port is free by attempting to connect.
 var isPortAvailable = func(port string) bool {
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", port), dialTimeout)

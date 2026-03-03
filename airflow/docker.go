@@ -230,11 +230,9 @@ func (d *DockerCompose) removeProxyRoute() {
 }
 
 // proxyEnabled returns true if the reverse proxy should be used for this start.
+// The proxy is always on unless --no-proxy is explicitly passed.
 func proxyEnabled(noProxy bool) bool {
-	if noProxy {
-		return false
-	}
-	return config.CFG.ProxyEnabled.GetBool()
+	return !noProxy
 }
 
 // Start starts a local airflow development cluster
@@ -300,13 +298,22 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 		} else {
 			proxyHostname = hostname
 
-			webPort, aErr := proxy.AllocatePort()
-			if aErr != nil {
-				return fmt.Errorf("error allocating webserver port: %w", aErr)
+			// Try default ports first; allocate random only if taken
+			webPort := config.CFG.APIServerPort.GetString()
+			if !proxy.IsPortAvailable(webPort) {
+				var aErr error
+				webPort, aErr = proxy.AllocatePort()
+				if aErr != nil {
+					return fmt.Errorf("error allocating webserver port: %w", aErr)
+				}
 			}
-			pgPort, aErr := proxy.AllocatePort()
-			if aErr != nil {
-				return fmt.Errorf("error allocating postgres port: %w", aErr)
+			pgPort := config.CFG.PostgresPort.GetString()
+			if !proxy.IsPortAvailable(pgPort) {
+				var aErr error
+				pgPort, aErr = proxy.AllocatePort()
+				if aErr != nil {
+					return fmt.Errorf("error allocating postgres port: %w", aErr)
+				}
 			}
 
 			portOvr = &PortOverrides{

@@ -53,6 +53,18 @@ func TestAllocatePort_AvoidAllocated(t *testing.T) {
 	}
 }
 
+func TestIsPortAvailable(t *testing.T) {
+	// Override the internal function to control results
+	origIsPortAvailable := isPortAvailable
+	defer func() { isPortAvailable = origIsPortAvailable }()
+
+	isPortAvailable = func(_ string) bool { return true }
+	assert.True(t, IsPortAvailable("9999"))
+
+	isPortAvailable = func(_ string) bool { return false }
+	assert.False(t, IsPortAvailable("9999"))
+}
+
 func TestAllocatePort_AllBusy(t *testing.T) {
 	setupTestDir(t)
 

@@ -70,9 +70,10 @@ func (p *Proxy) handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(target)
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		http.Error(w, fmt.Sprintf("Backend unavailable: %v", err), http.StatusBadGateway)
+	rp := httputil.NewSingleHostReverseProxy(target)
+	rp.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, proxyErr error) {
+		logger.Debugf("proxy error for %s: %v", req.Host, proxyErr)
+		http.Error(rw, "Backend unavailable", http.StatusBadGateway)
 	}
 
 	// Set forwarding headers
@@ -82,7 +83,7 @@ func (p *Proxy) handler(w http.ResponseWriter, r *http.Request) {
 		r.Header.Set("X-Forwarded-For", r.RemoteAddr)
 	}
 
-	proxy.ServeHTTP(w, r)
+	rp.ServeHTTP(w, r)
 }
 
 // landingPage shows a table of active routes.
