@@ -60,6 +60,8 @@ type cfgs struct {
 	TelemetryEnabled        cfg
 	TelemetryAnonymousID    cfg
 	TelemetryNoticeShown    cfg
+	ProxyEnabled            cfg
+	ProxyPort               cfg
 }
 
 // Creates a new cfg struct

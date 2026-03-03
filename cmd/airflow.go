@@ -138,6 +138,8 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	localPort            string
 	standaloneFlag       bool
 	dockerFlag           bool
+	noProxyFlag          bool
+	proxyPortFlag        string
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
@@ -173,6 +175,7 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
 		newAirflowUpgradeTestCmd(platformCoreClient),
+		newProxyRootCmd(),
 	)
 	return cmd
 }
@@ -324,6 +327,9 @@ func newAirflowStartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	annotateFlag(cmd, "foreground", "standalone")
 	annotateFlag(cmd, "port", "standalone")
 
+	// Proxy flags
+	cmd.Flags().BoolVar(&noProxyFlag, "no-proxy", false, "Disable the reverse proxy (use fixed ports instead)")
+
 	cmd.SetUsageTemplate(groupedFlagsUsageTemplate)
 	return cmd
 }
@@ -423,6 +429,9 @@ func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd.Flags().StringVarP(&localPort, "port", "p", "", "Port for the Airflow webserver")
 	annotateFlag(cmd, "foreground", "standalone")
 	annotateFlag(cmd, "port", "standalone")
+
+	// Proxy flags
+	cmd.Flags().BoolVar(&noProxyFlag, "no-proxy", false, "Disable the reverse proxy (use fixed ports instead)")
 
 	cmd.SetUsageTemplate(groupedFlagsUsageTemplate)
 	return cmd
@@ -824,6 +833,7 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 		NoBrowser:         noBrowser,
 		WaitTime:          waitTime,
 		EnvConns:          envConns,
+		NoProxy:           noProxyFlag,
 		Foreground:        localForeground,
 		Port:              localPort,
 	})
@@ -971,6 +981,7 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 		NoBrowser:         noBrowser,
 		WaitTime:          waitTime,
 		EnvConns:          envConns,
+		NoProxy:           noProxyFlag,
 		Foreground:        localForeground,
 		Port:              localPort,
 	})

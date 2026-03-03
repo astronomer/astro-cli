@@ -94,6 +94,8 @@ var (
 		TelemetryEnabled:        newCfg("telemetry.enabled", "true"),
 		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
 		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
+		ProxyEnabled:            newCfg("proxy.enabled", "true"),
+		ProxyPort:               newCfg("proxy.port", "6563"),
 	}
 
 	// viperHome is the viper object in the users home directory
