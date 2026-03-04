@@ -38,6 +38,21 @@ func TestIsRunning_AlivePID(t *testing.T) {
 	pid := os.Getpid()
 	dir := proxyDirPath()
 	os.MkdirAll(dir, 0o755)
+	// PID file format: "<pid> <version>"
+	os.WriteFile(filepath.Join(dir, pidFileName), []byte(strconv.Itoa(pid)+" 1.0.0"), 0o644)
+
+	gotPid, alive := IsRunning()
+	assert.True(t, alive)
+	assert.Equal(t, pid, gotPid)
+}
+
+func TestIsRunning_AlivePID_NoVersion(t *testing.T) {
+	setupTestDir(t)
+
+	// Backwards-compat: PID file with no version (old daemon)
+	pid := os.Getpid()
+	dir := proxyDirPath()
+	os.MkdirAll(dir, 0o755)
 	os.WriteFile(filepath.Join(dir, pidFileName), []byte(strconv.Itoa(pid)), 0o644)
 
 	gotPid, alive := IsRunning()

@@ -158,7 +158,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	if opts.Port != "" {
 		s.port = opts.Port
 	}
-	useProxy := proxyEnabled(opts.NoProxy)
+	useProxy := !opts.NoProxy
 
 	fmt.Println(ansi.Bold("Note:") + " Standalone mode is experimental. Report issues at https://github.com/astronomer/astro-cli/issues")
 	fmt.Println()
@@ -817,10 +817,12 @@ func (s *Standalone) Stop(_ bool) error {
 func (s *Standalone) removeProxyRoute() {
 	hostname, err := proxy.DeriveHostname(s.airflowHome)
 	if err != nil {
+		logger.Debugf("could not derive proxy hostname: %s", err)
 		return
 	}
 	remaining, err := proxy.RemoveRoute(hostname)
 	if err != nil {
+		logger.Debugf("could not remove proxy route for %s: %s", hostname, err)
 		return
 	}
 	if remaining == 0 {

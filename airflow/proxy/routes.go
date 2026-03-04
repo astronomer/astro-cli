@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -89,12 +90,13 @@ func readRoutes() ([]Route, error) {
 		}
 		return nil, fmt.Errorf("error reading routes file: %w", err)
 	}
-	if len(data) == 0 {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 {
 		return []Route{}, nil
 	}
 
 	var routes []Route
-	if err := json.Unmarshal(data, &routes); err != nil {
+	if err := json.Unmarshal(trimmed, &routes); err != nil {
 		return nil, fmt.Errorf("error parsing routes file: %w", err)
 	}
 	return routes, nil

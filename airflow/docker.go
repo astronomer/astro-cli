@@ -218,21 +218,17 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 func (d *DockerCompose) removeProxyRoute() {
 	hostname, err := proxy.DeriveHostname(d.airflowHome)
 	if err != nil {
+		logger.Debugf("could not derive proxy hostname: %s", err)
 		return
 	}
 	remaining, err := proxy.RemoveRoute(hostname)
 	if err != nil {
+		logger.Debugf("could not remove proxy route for %s: %s", hostname, err)
 		return
 	}
 	if remaining == 0 {
 		proxy.StopIfEmpty()
 	}
-}
-
-// proxyEnabled returns true if the reverse proxy should be used for this start.
-// The proxy is always on unless --no-proxy is explicitly passed.
-func proxyEnabled(noProxy bool) bool {
-	return !noProxy
 }
 
 // Start starts a local airflow development cluster
@@ -247,7 +243,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 	noBrowser := opts.NoBrowser
 	waitTime := opts.WaitTime
 	envConns := opts.EnvConns
-	useProxy := proxyEnabled(opts.NoProxy)
+	useProxy := !opts.NoProxy
 
 	// Build this project image
 	if imageName == "" {
@@ -298,7 +294,11 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 		} else {
 			proxyHostname = hostname
 
-			// Try default ports first; allocate random only if taken
+			// Try default ports first; allocate random only if taken.
+			// NOTE: there is an inherent TOCTOU race between checking port availability
+			// here and Docker Compose binding the port later. If another process grabs the
+			// port in between, compose up will fail with a clear "port already in use" error.
+			// This is acceptable — the window is small and the failure mode is obvious.
 			webPort := config.CFG.APIServerPort.GetString()
 			if !proxy.IsPortAvailable(webPort) {
 				var aErr error

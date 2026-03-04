@@ -1,23 +1,36 @@
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"html"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
+	"os/signal"
 	"strings"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 const (
-	DefaultPort = "6563"
+	DefaultPort        = "6563"
+	readHeaderTimeout  = 10 * time.Second
+	writeTimeout       = 60 * time.Second
+	idleTimeout        = 120 * time.Second
+	shutdownGraceTime  = 5 * time.Second
 )
 
 // Proxy is an HTTP reverse proxy that routes requests based on the Host header.
 type Proxy struct {
-	port string
+	port      string
+	mu        sync.RWMutex
+	proxies   map[string]*httputil.ReverseProxy // keyed by backend "host:port"
+	transport *http.Transport
 }
 
 // NewProxy creates a new Proxy listening on the given port.
@@ -25,17 +38,73 @@ func NewProxy(port string) *Proxy {
 	if port == "" {
 		port = DefaultPort
 	}
-	return &Proxy{port: port}
+	return &Proxy{
+		port:      port,
+		proxies:   make(map[string]*httputil.ReverseProxy),
+		transport: &http.Transport{},
+	}
 }
 
-// Serve starts the proxy HTTP server. This blocks until the server exits.
+// Serve starts the proxy HTTP server. It handles SIGTERM/SIGINT for graceful shutdown.
 func (p *Proxy) Serve() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", p.handler)
 
 	addr := "127.0.0.1:" + p.port
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: readHeaderTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+	}
+
+	// Graceful shutdown on SIGTERM/SIGINT
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-sigCh
+		logger.Debugf("proxy received shutdown signal")
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownGraceTime)
+		defer cancel()
+		srv.Shutdown(ctx) //nolint:errcheck
+	}()
+
 	logger.Debugf("proxy listening on %s", addr)
-	return http.ListenAndServe(addr, mux) //nolint:gosec
+	err := srv.ListenAndServe()
+	if err == http.ErrServerClosed {
+		return nil
+	}
+	return err
+}
+
+// getOrCreateProxy returns a cached reverse proxy for the given backend port,
+// creating one if it doesn't exist yet.
+func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
+	p.mu.RLock()
+	rp, ok := p.proxies[backendPort]
+	p.mu.RUnlock()
+	if ok {
+		return rp
+	}
+
+	target, _ := url.Parse("http://127.0.0.1:" + backendPort)
+	rp = httputil.NewSingleHostReverseProxy(target)
+	rp.Transport = p.transport
+	rp.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, proxyErr error) {
+		logger.Debugf("proxy error for %s: %v", req.Host, proxyErr)
+		http.Error(rw, "Backend unavailable", http.StatusBadGateway)
+	}
+
+	p.mu.Lock()
+	// Double-check in case another goroutine created it
+	if existing, ok := p.proxies[backendPort]; ok {
+		p.mu.Unlock()
+		return existing
+	}
+	p.proxies[backendPort] = rp
+	p.mu.Unlock()
+	return rp
 }
 
 // handler routes requests based on the Host header.
@@ -63,18 +132,7 @@ func (p *Proxy) handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Proxy to the backend
-	target, err := url.Parse("http://127.0.0.1:" + route.Port)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	rp := httputil.NewSingleHostReverseProxy(target)
-	rp.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, proxyErr error) {
-		logger.Debugf("proxy error for %s: %v", req.Host, proxyErr)
-		http.Error(rw, "Backend unavailable", http.StatusBadGateway)
-	}
+	rp := p.getOrCreateProxy(route.Port)
 
 	// Set forwarding headers
 	r.Header.Set("X-Forwarded-Host", r.Host)

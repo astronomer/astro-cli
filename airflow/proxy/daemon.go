@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/version"
 )
 
 const (
@@ -30,16 +31,35 @@ func logFilePath() string {
 	return filepath.Join(proxyDirPath(), logFileName)
 }
 
+// parsePIDFile reads the PID file and returns the PID and version.
+// The PID file format is "<pid> <version>" (version may be absent for old daemons).
+func parsePIDFile() (pid int, ver string, err error) {
+	data, err := os.ReadFile(pidFilePath())
+	if err != nil {
+		return 0, "", err
+	}
+
+	fields := strings.Fields(strings.TrimSpace(string(data)))
+	if len(fields) == 0 {
+		return 0, "", fmt.Errorf("empty PID file")
+	}
+
+	pid, err = strconv.Atoi(fields[0])
+	if err != nil || pid <= 0 {
+		return 0, "", fmt.Errorf("invalid PID in PID file")
+	}
+
+	if len(fields) >= 2 {
+		ver = fields[1]
+	}
+	return pid, ver, nil
+}
+
 // IsRunning checks if the proxy daemon is running by reading the PID file
 // and verifying the process is alive.
 func IsRunning() (int, bool) {
-	data, err := os.ReadFile(pidFilePath())
+	pid, _, err := parsePIDFile()
 	if err != nil {
-		return 0, false
-	}
-
-	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
-	if err != nil || pid <= 0 {
 		return 0, false
 	}
 
@@ -50,15 +70,23 @@ func IsRunning() (int, bool) {
 }
 
 // EnsureRunning starts the proxy daemon if it's not already running.
+// If the running daemon was started by a different CLI version, it is
+// restarted to avoid incompatibilities with route file formats.
 // Returns the port the proxy is listening on.
 func EnsureRunning(port string) (string, error) {
 	if port == "" {
 		port = DefaultPort
 	}
 
-	if _, alive := IsRunning(); alive {
-		logger.Debugf("proxy daemon already running")
-		return port, nil
+	pid, ver, err := parsePIDFile()
+	if err == nil && isPIDAlive(pid) {
+		if ver == version.CurrVersion || version.CurrVersion == "" {
+			logger.Debugf("proxy daemon already running (PID %d)", pid)
+			return port, nil
+		}
+		// Version mismatch — restart the daemon
+		logger.Debugf("proxy daemon version %q doesn't match CLI version %q, restarting", ver, version.CurrVersion)
+		StopDaemon() //nolint:errcheck
 	}
 
 	// Clean up stale PID file
@@ -100,9 +128,13 @@ var StartDaemon = func(port string) error {
 		return fmt.Errorf("error starting proxy daemon: %w", err)
 	}
 
-	// Write PID file
+	// Write PID file with version: "<pid> <version>"
 	pid := cmd.Process.Pid
-	if err := os.WriteFile(pidFilePath(), []byte(strconv.Itoa(pid)), filePermRW); err != nil {
+	pidContent := strconv.Itoa(pid)
+	if version.CurrVersion != "" {
+		pidContent += " " + version.CurrVersion
+	}
+	if err := os.WriteFile(pidFilePath(), []byte(pidContent), filePermRW); err != nil {
 		syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck
 		logFile.Close()
 		return fmt.Errorf("error writing proxy PID file: %w", err)
