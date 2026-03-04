@@ -116,8 +116,16 @@ func normalizeName(s string) string {
 	return strings.TrimLeft(s, "_-")
 }
 
+// PortOverrides allows callers to override the default ports used in the
+// generated compose config. When nil, ports are read from config as usual.
+type PortOverrides struct {
+	PostgresPort  string
+	WebserverPort string
+	APIServerPort string
+}
+
 // generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string) (string, error) {
+func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string, portOverrides ...*PortOverrides) (string, error) {
 	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
 	if !ok {
 		return "", errors.New("runtime version label not found")
@@ -169,18 +177,35 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		logger.Debug(err)
 	}
 
+	// Determine ports: use overrides if provided, otherwise read from config
+	pgPort := config.CFG.PostgresPort.GetString()
+	wsPort := config.CFG.WebserverPort.GetString()
+	apiPort := config.CFG.APIServerPort.GetString()
+	if len(portOverrides) > 0 && portOverrides[0] != nil {
+		po := portOverrides[0]
+		if po.PostgresPort != "" {
+			pgPort = po.PostgresPort
+		}
+		if po.WebserverPort != "" {
+			wsPort = po.WebserverPort
+		}
+		if po.APIServerPort != "" {
+			apiPort = po.APIServerPort
+		}
+	}
+
 	cfg := ComposeConfig{
 		PostgresUser:          config.CFG.PostgresUser.GetString(),
 		PostgresPassword:      config.CFG.PostgresPassword.GetString(),
 		PostgresHost:          config.CFG.PostgresHost.GetString(),
-		PostgresPort:          config.CFG.PostgresPort.GetString(),
+		PostgresPort:          pgPort,
 		PostgresRepository:    config.CFG.PostgresRepository.GetString(),
 		PostgresTag:           config.CFG.PostgresTag.GetString(),
 		AirflowImage:          airflowImage,
 		AirflowHome:           airflowHome,
 		AirflowUser:           "astro",
-		AirflowWebserverPort:  config.CFG.WebserverPort.GetString(),
-		AirflowAPIServerPort:  config.CFG.APIServerPort.GetString(),
+		AirflowWebserverPort:  wsPort,
+		AirflowAPIServerPort:  apiPort,
 		AirflowEnvFile:        envFile,
 		AirflowExposePort:     config.CFG.AirflowExposePort.GetBool(),
 		MountLabel:            "z",

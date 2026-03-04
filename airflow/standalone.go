@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -105,11 +106,14 @@ var resolvePythonVersion = func(baseTag, tagPython string) string {
 
 // Standalone implements ContainerHandler using `airflow standalone` instead of Docker Compose.
 type Standalone struct {
-	airflowHome string
-	envFile     string
-	dockerfile  string
-	foreground  bool   // if true, run in foreground (stream output, block on Wait)
-	port        string // webserver port; defaults to defaultStandalonePort
+	airflowHome   string
+	envFile       string
+	dockerfile    string
+	foreground    bool   // if true, run in foreground (stream output, block on Wait)
+	port          string // webserver port; defaults to defaultStandalonePort
+	useProxy      bool   // whether the reverse proxy is active
+	proxyHostname string // e.g. "my-project.localhost"
+	proxyPort     string // proxy listener port (default 6563)
 }
 
 // StandaloneInit creates a new Standalone handler.
@@ -154,6 +158,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	if opts.Port != "" {
 		s.port = opts.Port
 	}
+	useProxy := !opts.NoProxy
 
 	fmt.Println(ansi.Bold("Note:") + " Standalone mode is experimental. Report issues at https://github.com/astronomer/astro-cli/issues")
 	fmt.Println()
@@ -202,7 +207,37 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 		}
 	}
 
-	// 3c. Check if the port is already in use by another process.
+	// 3c. Determine port: try default port first, allocate random only if taken
+	var proxyHostname, proxyPort string
+	if useProxy {
+		proxyPort = config.CFG.ProxyPort.GetString()
+		if proxyPort == "" {
+			proxyPort = proxy.DefaultPort
+		}
+
+		hostname, hErr := proxy.DeriveHostname(s.airflowHome)
+		if hErr != nil {
+			// Fall back to non-proxy mode if hostname derivation fails
+			useProxy = false
+		} else {
+			proxyHostname = hostname
+
+			// Only allocate a port if no explicit --port was set
+			if opts.Port == "" {
+				defaultPort := s.webserverPort()
+				if !proxy.IsPortAvailable(defaultPort) {
+					allocatedPort, aErr := proxy.AllocatePort()
+					if aErr != nil {
+						return fmt.Errorf("error allocating webserver port: %w", aErr)
+					}
+					s.port = allocatedPort
+				}
+				// else: keep defaultPort as-is
+			}
+		}
+	}
+
+	// 3d. Check if the port is already in use by another process.
 	// airflow standalone doesn't crash when the port is taken — only the
 	// api-server subprocess fails — so the health check would pass against
 	// whichever service already occupies the port, misleading the user.
@@ -210,6 +245,10 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	if err := checkPortAvailable(port); err != nil {
 		return err
 	}
+
+	s.proxyHostname = proxyHostname
+	s.proxyPort = proxyPort
+	s.useProxy = useProxy
 
 	// 4. Fetch constraints and freeze files from CDN (cached locally)
 	freezePath, airflowVersion, taskSDKVersion, err := s.getConstraints(baseTag, pythonVersion)
@@ -350,6 +389,12 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 		}
 		bullet := ansi.Cyan("\u27A4") + " "
 		uiURL := "http://localhost:" + s.webserverPort()
+
+		// Register proxy route in foreground mode
+		if proxyURL := s.registerProxyRoute(cmd.Process.Pid); proxyURL != "" {
+			uiURL = proxyURL
+		}
+
 		fmt.Println("\n" + ansi.Green("\u2714") + " Airflow is ready!")
 		fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
 		fmt.Println()
@@ -418,12 +463,42 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 
 	bullet := ansi.Cyan("\u27A4") + " "
 	uiURL := "http://localhost:" + s.webserverPort()
+
+	// Register proxy route and show proxy URL
+	if proxyURL := s.registerProxyRoute(cmd.Process.Pid); proxyURL != "" {
+		uiURL = proxyURL
+	}
+
 	fmt.Printf("\n%s Airflow is ready! (PID %d)\n", ansi.Green("\u2714"), cmd.Process.Pid)
 	fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
 	fmt.Printf("%sView logs: %s\n", bullet, ansi.Bold("astro dev logs -f"))
 	fmt.Printf("%sStop:      %s\n", bullet, ansi.Bold("astro dev stop"))
 
 	return nil
+}
+
+// registerProxyRoute ensures the proxy daemon is running and registers a route
+// for this standalone instance. Returns the proxy URL on success, or "" if the
+// proxy is disabled or registration failed.
+func (s *Standalone) registerProxyRoute(pid int) string {
+	if !s.useProxy || s.proxyHostname == "" {
+		return ""
+	}
+	if _, err := proxy.EnsureRunning(s.proxyPort); err != nil {
+		fmt.Printf("Warning: could not start proxy: %s\n", err.Error())
+		return ""
+	}
+	route := &proxy.Route{
+		Hostname:   s.proxyHostname,
+		Port:       s.webserverPort(),
+		ProjectDir: s.airflowHome,
+		PID:        pid,
+	}
+	if err := proxy.AddRoute(route); err != nil {
+		fmt.Printf("Warning: could not register proxy route: %s\n", err.Error())
+		return ""
+	}
+	return fmt.Sprintf("http://%s:%s", s.proxyHostname, s.proxyPort)
 }
 
 // healthEndpoint returns the health check URL and component name.
@@ -698,6 +773,9 @@ func (s *Standalone) readPID() (int, bool) {
 
 // Stop terminates the standalone Airflow process.
 func (s *Standalone) Stop(_ bool) error {
+	// Deregister proxy route
+	s.removeProxyRoute()
+
 	pid, alive := s.readPID()
 	if pid == 0 {
 		fmt.Println("No standalone Airflow process found.")
@@ -732,6 +810,24 @@ func (s *Standalone) Stop(_ bool) error {
 	os.Remove(s.pidFilePath())
 	fmt.Println("Airflow standalone stopped.")
 	return nil
+}
+
+// removeProxyRoute deregisters the proxy route for this project and
+// stops the proxy daemon if no routes remain.
+func (s *Standalone) removeProxyRoute() {
+	hostname, err := proxy.DeriveHostname(s.airflowHome)
+	if err != nil {
+		logger.Debugf("could not derive proxy hostname: %s", err)
+		return
+	}
+	remaining, err := proxy.RemoveRoute(hostname)
+	if err != nil {
+		logger.Debugf("could not remove proxy route for %s: %s", hostname, err)
+		return
+	}
+	if remaining == 0 {
+		proxy.StopIfEmpty()
+	}
 }
 
 // Kill stops a running process (if any) and cleans up standalone state files.

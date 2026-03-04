@@ -27,6 +27,9 @@ type StartOptions struct {
 	WaitTime          time.Duration
 	EnvConns          map[string]astrocore.EnvironmentObjectConnection
 
+	// Proxy options
+	NoProxy bool // disable the reverse proxy (use fixed ports instead)
+
 	// Standalone-specific options (ignored by DockerCompose)
 	Foreground bool   // standalone: run in the foreground
 	Port       string // standalone: webserver port override
