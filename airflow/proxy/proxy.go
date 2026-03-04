@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	DefaultPort        = "6563"
-	readHeaderTimeout  = 10 * time.Second
-	writeTimeout       = 60 * time.Second
-	idleTimeout        = 120 * time.Second
-	shutdownGraceTime  = 5 * time.Second
+	DefaultPort       = "6563"
+	readHeaderTimeout = 10 * time.Second
+	writeTimeout      = 60 * time.Second
+	idleTimeout       = 120 * time.Second
+	shutdownGraceTime = 5 * time.Second
 )
 
 // Proxy is an HTTP reverse proxy that routes requests based on the Host header.
