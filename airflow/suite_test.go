@@ -20,6 +20,8 @@ type Suite struct {
 	origCheckWebserverHealth func(url string, timeout time.Duration, component string) error
 	origCheckPortAvailable   func(port string) error
 	origResolveFloatingTag   func(tag string) (string, error)
+	origOpenURL              func(url string) error
+	origStandaloneOpenURL    func(url string) error
 	origStdout               *os.File
 }
 
@@ -42,10 +44,14 @@ func (s *Suite) SetupSuite() {
 	s.origCheckWebserverHealth = checkWebserverHealth
 	s.origCheckPortAvailable = checkPortAvailable
 	s.origResolveFloatingTag = resolveFloatingTag
+	s.origOpenURL = openURL
+	s.origStandaloneOpenURL = standaloneOpenURL
 }
 
 func (s *Suite) SetupTest() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	openURL = func(url string) error { return nil }
+	standaloneOpenURL = func(url string) error { return nil }
 }
 
 func (s *Suite) TearDownTest() {
@@ -59,4 +65,6 @@ func (s *Suite) TearDownSubTest() {
 	checkWebserverHealth = s.origCheckWebserverHealth
 	checkPortAvailable = s.origCheckPortAvailable
 	resolveFloatingTag = s.origResolveFloatingTag
+	openURL = s.origOpenURL
+	standaloneOpenURL = s.origStandaloneOpenURL
 }
