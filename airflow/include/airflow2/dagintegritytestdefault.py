@@ -46,6 +46,10 @@ def os_getenv_monkeypatch(key: str, *args, **kwargs):
         key == "JENKINS_HOME" and default is None
     ):  # fix https://github.com/astronomer/astro-cli/issues/601
         return None
+    if (
+        key == "PYTEST_THEME" and default is None
+    ):  # fix pytest validation of pygment styles
+        return None
     if default:
         return default  # otherwise return whatever default has been passed
     return f"MOCKED_{key.upper()}_VALUE"  # if absolutely nothing has been passed - return the mocked value
