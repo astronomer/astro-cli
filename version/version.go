@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -71,25 +70,20 @@ func getLatestRelease(ctx context.Context, client *http.Client, url string) (*se
 		return nil, errors.New("astro-cli releases endpoint returned 0 results")
 	}
 
-	var validVersions []*semver.Version
-
+	var latest *semver.Version
 	for _, r := range releases.AvailableReleases {
 		// discard any versions that we cannot parse
-		version, err := semver.NewVersion(r.Version)
-		if err == nil {
-			validVersions = append(validVersions, version)
+		v, err := semver.NewVersion(r.Version)
+		if err == nil && (latest == nil || v.GreaterThan(latest)) {
+			latest = v
 		}
 	}
 
-	if len(validVersions) == 0 {
+	if latest == nil {
 		return nil, errors.New("astro-cli releases endpoint returned 0 valid versions")
 	}
 
-	latestRelease := slices.MaxFunc(validVersions, func(a, b *semver.Version) int {
-		return a.Compare(b)
-	})
-
-	return latestRelease, nil
+	return latest, nil
 }
 
 func CompareVersions(ctx context.Context, client *http.Client) error {
