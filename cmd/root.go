@@ -10,7 +10,6 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cmd/api"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
-	"github.com/astronomer/astro-cli/cmd/registry"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
@@ -103,10 +102,6 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		)
 		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}
-
-	rootCmd.AddCommand( // include all the commands for interacting with the registry
-		registry.AddCmds(os.Stdout)...,
-	)
 
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
