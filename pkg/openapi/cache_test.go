@@ -10,10 +10,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// minimalSpecJSON returns a minimal valid OpenAPI 3.0 spec as JSON bytes.
+func minimalSpecJSON(title string, paths map[string]map[string]map[string]any) []byte {
+	spec := map[string]any{
+		"openapi": "3.0.0",
+		"info":    map[string]any{"title": title, "version": "1.0"},
+		"paths":   paths,
+	}
+	data, _ := json.Marshal(spec)
+	return data
+}
 
 // --- Constructors ------------------------------------------------------------
 
@@ -93,18 +103,20 @@ func TestGetHTTPClient_Custom(t *testing.T) {
 	assert.Equal(t, custom, cache.getHTTPClient())
 }
 
-// --- GetSpec / IsLoaded ------------------------------------------------------
+// --- GetDoc / IsLoaded -------------------------------------------------------
 
-func TestGetSpec_Nil(t *testing.T) {
+func TestGetDoc_Nil(t *testing.T) {
 	cache := &Cache{}
-	assert.Nil(t, cache.GetSpec())
+	assert.Nil(t, cache.GetDoc())
 	assert.False(t, cache.IsLoaded())
 }
 
-func TestGetSpec_Loaded(t *testing.T) {
-	spec := &openapi3.T{Info: &openapi3.Info{Title: "Test"}}
-	cache := &Cache{spec: spec}
-	assert.Equal(t, spec, cache.GetSpec())
+func TestGetDoc_Loaded(t *testing.T) {
+	body := minimalSpecJSON("Test", map[string]map[string]map[string]any{})
+	doc, err := parseSpec(body)
+	require.NoError(t, err)
+	cache := &Cache{doc: doc}
+	assert.NotNil(t, cache.GetDoc())
 	assert.True(t, cache.IsLoaded())
 }
 
@@ -116,24 +128,27 @@ func TestGetEndpoints_NilSpec(t *testing.T) {
 }
 
 func TestGetEndpoints_NoPrefix(t *testing.T) {
-	paths := openapi3.NewPaths()
-	paths.Set("/dags", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "get_dags"}})
-	cache := &Cache{
-		spec: &openapi3.T{Paths: paths},
-	}
+	body := minimalSpecJSON("Test", map[string]map[string]map[string]any{
+		"/dags": {"get": {"operationId": "get_dags"}},
+	})
+	doc, err := parseSpec(body)
+	require.NoError(t, err)
+
+	cache := &Cache{doc: doc}
 	endpoints := cache.GetEndpoints()
 	assert.Len(t, endpoints, 1)
 	assert.Equal(t, "/dags", endpoints[0].Path)
 }
 
 func TestGetEndpoints_WithPrefixStripping(t *testing.T) {
-	paths := openapi3.NewPaths()
-	paths.Set("/api/v2/dags", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "get_dags"}})
-	paths.Set("/api/v2/version", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "version"}})
-	cache := &Cache{
-		spec:        &openapi3.T{Paths: paths},
-		stripPrefix: "/api/v2",
-	}
+	body := minimalSpecJSON("Test", map[string]map[string]map[string]any{
+		"/api/v2/dags":    {"get": {"operationId": "get_dags"}},
+		"/api/v2/version": {"get": {"operationId": "version"}},
+	})
+	doc, err := parseSpec(body)
+	require.NoError(t, err)
+
+	cache := &Cache{doc: doc, stripPrefix: "/api/v2"}
 	endpoints := cache.GetEndpoints()
 	assert.Len(t, endpoints, 2)
 	for _, ep := range endpoints {
@@ -166,21 +181,20 @@ func TestCacheReadWriteRoundTrip(t *testing.T) {
 	tmpDir := t.TempDir()
 	cachePath := filepath.Join(tmpDir, "cache.json")
 
-	paths := openapi3.NewPaths()
-	paths.Set("/test", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "getTest"}})
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "Test API", Version: "1.0"},
-		Paths:   paths,
-	}
+	rawSpec := minimalSpecJSON("Test API", map[string]map[string]map[string]any{
+		"/test": {"get": {"operationId": "getTest"}},
+	})
+	doc, err := parseSpec(rawSpec)
+	require.NoError(t, err)
 
 	// Write
 	writer := &Cache{
 		cachePath: cachePath,
-		spec:      spec,
+		doc:       doc,
+		rawSpec:   rawSpec,
 		fetchedAt: time.Now(),
 	}
-	err := writer.saveCache()
+	err = writer.saveCache()
 	require.NoError(t, err)
 
 	// Verify file exists
@@ -191,7 +205,7 @@ func TestCacheReadWriteRoundTrip(t *testing.T) {
 	reader := &Cache{cachePath: cachePath}
 	err = reader.readCache()
 	require.NoError(t, err)
-	assert.Equal(t, "Test API", reader.spec.Info.Title)
+	assert.Equal(t, "Test API", reader.doc.Info.Title)
 	assert.False(t, reader.fetchedAt.IsZero())
 }
 
@@ -214,13 +228,9 @@ func TestReadCache_CorruptData(t *testing.T) {
 // --- fetchSpec ---------------------------------------------------------------
 
 func TestFetchSpec_JSON(t *testing.T) {
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "JSON Spec", Version: "1.0"},
-		Paths:   openapi3.NewPaths(),
-	}
-	spec.Paths.Set("/test", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "test"}})
-	body, _ := json.Marshal(spec)
+	body := minimalSpecJSON("JSON Spec", map[string]map[string]map[string]any{
+		"/test": {"get": {"operationId": "test"}},
+	})
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -231,7 +241,7 @@ func TestFetchSpec_JSON(t *testing.T) {
 	cache := &Cache{specURL: ts.URL}
 	err := cache.fetchSpec()
 	require.NoError(t, err)
-	assert.Equal(t, "JSON Spec", cache.spec.Info.Title)
+	assert.Equal(t, "JSON Spec", cache.doc.Info.Title)
 	assert.False(t, cache.fetchedAt.IsZero())
 }
 
@@ -251,7 +261,7 @@ paths: {}
 	cache := &Cache{specURL: ts.URL}
 	err := cache.fetchSpec()
 	require.NoError(t, err)
-	assert.Equal(t, "YAML Spec", cache.spec.Info.Title)
+	assert.Equal(t, "YAML Spec", cache.doc.Info.Title)
 }
 
 func TestFetchSpec_UnknownContentType_YAML(t *testing.T) {
@@ -270,15 +280,11 @@ paths: {}
 	cache := &Cache{specURL: ts.URL}
 	err := cache.fetchSpec()
 	require.NoError(t, err)
-	assert.Equal(t, "Unknown CT", cache.spec.Info.Title)
+	assert.Equal(t, "Unknown CT", cache.doc.Info.Title)
 }
 
 func TestFetchSpec_UnknownContentType_JSON(t *testing.T) {
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "JSON via unknown", Version: "1.0"},
-	}
-	body, _ := json.Marshal(spec)
+	body := minimalSpecJSON("JSON via unknown", map[string]map[string]map[string]any{})
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -289,7 +295,7 @@ func TestFetchSpec_UnknownContentType_JSON(t *testing.T) {
 	cache := &Cache{specURL: ts.URL}
 	err := cache.fetchSpec()
 	require.NoError(t, err)
-	assert.Equal(t, "JSON via unknown", cache.spec.Info.Title)
+	assert.Equal(t, "JSON via unknown", cache.doc.Info.Title)
 }
 
 func TestFetchSpec_ErrorStatus(t *testing.T) {
@@ -347,13 +353,9 @@ func TestFetchSpec_AcceptHeader(t *testing.T) {
 // --- Load --------------------------------------------------------------------
 
 func TestLoad_FetchAndCache(t *testing.T) {
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "Load Test", Version: "1.0"},
-		Paths:   openapi3.NewPaths(),
-	}
-	spec.Paths.Set("/test", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "test"}})
-	body, _ := json.Marshal(spec)
+	body := minimalSpecJSON("Load Test", map[string]map[string]map[string]any{
+		"/test": {"get": {"operationId": "test"}},
+	})
 
 	fetchCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -370,7 +372,7 @@ func TestLoad_FetchAndCache(t *testing.T) {
 	err := cache.Load(false)
 	require.NoError(t, err)
 	assert.Equal(t, 1, fetchCount)
-	assert.Equal(t, "Load Test", cache.GetSpec().Info.Title)
+	assert.Equal(t, "Load Test", cache.GetDoc().Info.Title)
 
 	// Second load uses cache (no additional fetch)
 	err = cache.Load(false)
@@ -379,12 +381,7 @@ func TestLoad_FetchAndCache(t *testing.T) {
 }
 
 func TestLoad_ForceRefresh(t *testing.T) {
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "Refresh", Version: "1.0"},
-		Paths:   openapi3.NewPaths(),
-	}
-	body, _ := json.Marshal(spec)
+	body := minimalSpecJSON("Refresh", map[string]map[string]map[string]any{})
 
 	fetchCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -406,12 +403,7 @@ func TestLoad_ForceRefresh(t *testing.T) {
 }
 
 func TestLoad_FetchFailWithStaleCache(t *testing.T) {
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "Stale", Version: "1.0"},
-		Paths:   openapi3.NewPaths(),
-	}
-	body, _ := json.Marshal(spec)
+	body := minimalSpecJSON("Stale", map[string]map[string]map[string]any{})
 
 	alive := true
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -438,7 +430,7 @@ func TestLoad_FetchFailWithStaleCache(t *testing.T) {
 	// Load should succeed using stale cache
 	err = cache.Load(false)
 	require.NoError(t, err)
-	assert.Equal(t, "Stale", cache.GetSpec().Info.Title)
+	assert.Equal(t, "Stale", cache.GetDoc().Info.Title)
 }
 
 func TestLoad_FetchFailNoCache(t *testing.T) {

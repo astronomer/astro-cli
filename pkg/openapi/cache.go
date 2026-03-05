@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/getkin/kin-openapi/openapi3"
+	v3high "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 const (
@@ -52,9 +52,10 @@ func CloudCacheFileNameForDomain(domain string) string {
 }
 
 // CachedSpec wraps raw spec data with metadata for caching.
+// RawSpec is stored as []byte which json.Marshal encodes as base64.
 type CachedSpec struct {
-	RawSpec   json.RawMessage `json:"rawSpec"`
-	FetchedAt time.Time       `json:"fetchedAt"`
+	RawSpec   []byte    `json:"rawSpec"`
+	FetchedAt time.Time `json:"fetchedAt"`
 }
 
 // Cache manages fetching and caching of an OpenAPI specification.
@@ -63,7 +64,8 @@ type Cache struct {
 	cachePath   string
 	stripPrefix string // optional prefix to strip from endpoint paths (e.g. "/api/v2")
 	httpClient  *http.Client
-	spec        *openapi3.T
+	doc         *v3high.Document
+	rawSpec     []byte // raw spec bytes for cache serialization
 	fetchedAt   time.Time
 }
 
@@ -135,7 +137,7 @@ func (c *Cache) Load(forceRefresh bool) error {
 	// Fetch fresh spec
 	if err := c.fetchSpec(); err != nil {
 		// If fetch fails and we have a stale cache, use it
-		if c.spec != nil {
+		if c.doc != nil {
 			return nil
 		}
 		return err
@@ -150,18 +152,18 @@ func (c *Cache) GetSpecURL() string {
 	return c.specURL
 }
 
-// GetSpec returns the loaded OpenAPI spec.
-func (c *Cache) GetSpec() *openapi3.T {
-	return c.spec
+// GetDoc returns the loaded OpenAPI document.
+func (c *Cache) GetDoc() *v3high.Document {
+	return c.doc
 }
 
 // GetEndpoints extracts all endpoints from the loaded spec.
 // If a stripPrefix is configured, it is removed from each endpoint path.
 func (c *Cache) GetEndpoints() []Endpoint {
-	if c.spec == nil {
+	if c.doc == nil {
 		return nil
 	}
-	endpoints := ExtractEndpoints(c.spec)
+	endpoints := ExtractEndpoints(c.doc)
 	if c.stripPrefix != "" {
 		for i := range endpoints {
 			endpoints[i].Path = strings.TrimPrefix(endpoints[i].Path, c.stripPrefix)
@@ -172,7 +174,7 @@ func (c *Cache) GetEndpoints() []Endpoint {
 
 // IsLoaded returns true if a spec has been loaded.
 func (c *Cache) IsLoaded() bool {
-	return c.spec != nil
+	return c.doc != nil
 }
 
 // readCache attempts to read the cached spec from disk.
@@ -187,25 +189,21 @@ func (c *Cache) readCache() error {
 		return err
 	}
 
-	spec, err := parseSpec(cached.RawSpec)
+	doc, err := parseSpec(cached.RawSpec)
 	if err != nil {
 		return err
 	}
 
-	c.spec = spec
+	c.doc = doc
+	c.rawSpec = cached.RawSpec
 	c.fetchedAt = cached.FetchedAt
 	return nil
 }
 
 // saveCache saves the current spec to disk.
 func (c *Cache) saveCache() error {
-	specBytes, err := json.Marshal(c.spec)
-	if err != nil {
-		return err
-	}
-
 	cached := CachedSpec{
-		RawSpec:   specBytes,
+		RawSpec:   c.rawSpec,
 		FetchedAt: c.fetchedAt,
 	}
 
@@ -256,21 +254,32 @@ func (c *Cache) fetchSpec() error {
 		return fmt.Errorf("reading response body: %w", err)
 	}
 
-	spec, err := parseSpec(body)
+	doc, err := parseSpec(body)
 	if err != nil {
 		return fmt.Errorf("parsing OpenAPI spec: %w", err)
 	}
 
-	c.spec = spec
+	c.doc = doc
+	c.rawSpec = body
 	c.fetchedAt = time.Now()
 	return nil
 }
 
-// parseSpec parses raw bytes into an OpenAPI spec using kin-openapi's loader.
+// parseSpec parses raw bytes into an OpenAPI v3 document using libopenapi.
 // This handles both JSON and YAML formats and resolves $ref references.
-func parseSpec(data []byte) (*openapi3.T, error) {
-	loader := openapi3.NewLoader()
-	return loader.LoadFromData(data)
+func parseSpec(data []byte) (*v3high.Document, error) {
+	doc, err := newDocument(data)
+	if err != nil {
+		return nil, fmt.Errorf("creating document: %w", err)
+	}
+	model, err := doc.BuildV3Model()
+	if err != nil {
+		return nil, fmt.Errorf("building v3 model: %w", err)
+	}
+	if model == nil {
+		return nil, fmt.Errorf("building v3 model: unknown error")
+	}
+	return &model.Model, nil
 }
 
 // ClearCache removes the cached spec file.

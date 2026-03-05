@@ -2,25 +2,18 @@ package openapi
 
 import (
 	"strings"
-
-	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // SchemaResolver provides helpers for working with OpenAPI schema references.
-// Since kin-openapi resolves $ref during loading, this is primarily used for
-// extracting ref names for display purposes.
-type SchemaResolver struct {
-	spec *openapi3.T
-}
+type SchemaResolver struct{}
 
 // NewSchemaResolver creates a new schema resolver.
-func NewSchemaResolver(spec *openapi3.T) *SchemaResolver {
-	return &SchemaResolver{spec: spec}
+func NewSchemaResolver() *SchemaResolver {
+	return &SchemaResolver{}
 }
 
 // ResolveSchema extracts the resolved schema and ref name from a SchemaRef.
-// Since kin-openapi resolves references during loading, Value is already populated.
-func (r *SchemaResolver) ResolveSchema(ref *openapi3.SchemaRef) (resolved *openapi3.Schema, refName string) {
+func (r *SchemaResolver) ResolveSchema(ref *SchemaRef) (resolved *Schema, refName string) {
 	if ref == nil {
 		return nil, ""
 	}

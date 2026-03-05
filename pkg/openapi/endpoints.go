@@ -4,40 +4,40 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	v3high "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/orderedmap"
+	"go.yaml.in/yaml/v4"
 )
 
 const defaultMethodOrder = 99
 
-// ExtractEndpoints extracts all endpoints from an OpenAPI spec.
-func ExtractEndpoints(spec *openapi3.T) []Endpoint {
-	if spec == nil || spec.Paths == nil {
+// ExtractEndpoints extracts all endpoints from an OpenAPI v3 document.
+func ExtractEndpoints(doc *v3high.Document) []Endpoint {
+	if doc == nil || doc.Paths == nil || doc.Paths.PathItems == nil {
 		return nil
 	}
 
 	var endpoints []Endpoint
 
-	for path, pathItem := range spec.Paths.Map() {
-		if pathItem.Get != nil {
-			endpoints = append(endpoints, newEndpoint("GET", path, pathItem.Get))
+	for path, pathItem := range doc.Paths.PathItems.FromOldest() {
+		type methodOp struct {
+			method string
+			op     *v3high.Operation
 		}
-		if pathItem.Post != nil {
-			endpoints = append(endpoints, newEndpoint("POST", path, pathItem.Post))
+		ops := []methodOp{
+			{"GET", pathItem.Get},
+			{"POST", pathItem.Post},
+			{"PUT", pathItem.Put},
+			{"PATCH", pathItem.Patch},
+			{"DELETE", pathItem.Delete},
+			{"OPTIONS", pathItem.Options},
+			{"HEAD", pathItem.Head},
 		}
-		if pathItem.Put != nil {
-			endpoints = append(endpoints, newEndpoint("PUT", path, pathItem.Put))
-		}
-		if pathItem.Patch != nil {
-			endpoints = append(endpoints, newEndpoint("PATCH", path, pathItem.Patch))
-		}
-		if pathItem.Delete != nil {
-			endpoints = append(endpoints, newEndpoint("DELETE", path, pathItem.Delete))
-		}
-		if pathItem.Options != nil {
-			endpoints = append(endpoints, newEndpoint("OPTIONS", path, pathItem.Options))
-		}
-		if pathItem.Head != nil {
-			endpoints = append(endpoints, newEndpoint("HEAD", path, pathItem.Head))
+		for _, mo := range ops {
+			if mo.op != nil {
+				endpoints = append(endpoints, newEndpoint(mo.method, path, mo.op))
+			}
 		}
 	}
 
@@ -52,20 +52,195 @@ func ExtractEndpoints(spec *openapi3.T) []Endpoint {
 	return endpoints
 }
 
-// newEndpoint creates an Endpoint from an Operation.
-func newEndpoint(method, path string, op *openapi3.Operation) Endpoint {
-	return Endpoint{
+// newEndpoint creates an Endpoint from a libopenapi Operation.
+func newEndpoint(method, path string, op *v3high.Operation) Endpoint {
+	ep := Endpoint{
 		Method:      method,
 		Path:        path,
-		OperationID: op.OperationID,
+		OperationID: op.OperationId,
 		Summary:     op.Summary,
 		Description: op.Description,
 		Tags:        op.Tags,
-		Parameters:  op.Parameters,
-		RequestBody: op.RequestBody,
-		Responses:   op.Responses,
-		Deprecated:  op.Deprecated,
+		Deprecated:  op.Deprecated != nil && *op.Deprecated,
 	}
+
+	// Convert parameters
+	for _, p := range op.Parameters {
+		ep.Parameters = append(ep.Parameters, convertParameter(p))
+	}
+
+	// Convert request body
+	if op.RequestBody != nil {
+		ep.RequestBody = convertRequestBody(op.RequestBody)
+	}
+
+	// Convert responses
+	if op.Responses != nil {
+		ep.Responses = convertResponses(op.Responses)
+	}
+
+	return ep
+}
+
+// convertParameter converts a libopenapi Parameter to our Parameter type.
+func convertParameter(p *v3high.Parameter) *Parameter {
+	param := &Parameter{
+		Name:        p.Name,
+		In:          p.In,
+		Description: p.Description,
+		Required:    p.Required != nil && *p.Required,
+	}
+	if p.Schema != nil {
+		param.Schema = convertSchemaProxy(p.Schema)
+	}
+	return param
+}
+
+// convertRequestBody converts a libopenapi RequestBody to our RequestBody type.
+func convertRequestBody(rb *v3high.RequestBody) *RequestBody {
+	body := &RequestBody{
+		Description: rb.Description,
+		Required:    rb.Required != nil && *rb.Required,
+	}
+	if rb.Content != nil {
+		body.Content = convertContentMap(rb.Content)
+	}
+	return body
+}
+
+// convertResponses converts libopenapi Responses to our Responses type.
+func convertResponses(r *v3high.Responses) *Responses {
+	resp := &Responses{}
+
+	if r.Codes != nil {
+		for code, response := range r.Codes.FromOldest() {
+			entry := ResponseEntry{
+				Code:        code,
+				Description: response.Description,
+			}
+			if response.Content != nil {
+				entry.Content = convertContentMap(response.Content)
+			}
+			resp.Codes = append(resp.Codes, entry)
+		}
+	}
+
+	// Also include the default response if present
+	if r.Default != nil {
+		entry := ResponseEntry{
+			Code:        "default",
+			Description: r.Default.Description,
+		}
+		if r.Default.Content != nil {
+			entry.Content = convertContentMap(r.Default.Content)
+		}
+		resp.Codes = append(resp.Codes, entry)
+	}
+
+	return resp
+}
+
+// convertContentMap converts a libopenapi content ordered map to our map type.
+func convertContentMap(content *orderedmap.Map[string, *v3high.MediaType]) map[string]*MediaType {
+	result := make(map[string]*MediaType)
+	for key, val := range content.FromOldest() {
+		mt := &MediaType{}
+		if val.Schema != nil {
+			mt.Schema = convertSchemaProxy(val.Schema)
+		}
+		result[key] = mt
+	}
+	return result
+}
+
+// convertSchemaProxy converts a libopenapi SchemaProxy to our SchemaRef type.
+func convertSchemaProxy(sp *base.SchemaProxy) *SchemaRef {
+	if sp == nil {
+		return nil
+	}
+	ref := &SchemaRef{
+		Ref: sp.GetReference(),
+	}
+	schema, err := sp.BuildSchema()
+	if err != nil || schema == nil {
+		return ref
+	}
+	ref.Value = convertSchema(schema)
+	return ref
+}
+
+// convertSchema converts a libopenapi Schema to our Schema type.
+func convertSchema(s *base.Schema) *Schema {
+	if s == nil {
+		return nil
+	}
+	schema := &Schema{
+		Format:      s.Format,
+		Description: s.Description,
+		Required:    s.Required,
+		ReadOnly:    s.ReadOnly != nil && *s.ReadOnly,
+		Deprecated:  s.Deprecated != nil && *s.Deprecated,
+	}
+
+	// Type
+	if len(s.Type) > 0 {
+		schema.Type = s.Type[0]
+	}
+
+	// Properties (ordered)
+	if s.Properties != nil {
+		for name, proxy := range s.Properties.FromOldest() {
+			schema.Properties = append(schema.Properties, SchemaProperty{
+				Name:   name,
+				Schema: convertSchemaProxy(proxy),
+			})
+		}
+	}
+
+	// Items
+	if s.Items != nil && s.Items.A != nil {
+		schema.Items = convertSchemaProxy(s.Items.A)
+	}
+
+	// Composition
+	for _, sp := range s.OneOf {
+		schema.OneOf = append(schema.OneOf, convertSchemaProxy(sp))
+	}
+	for _, sp := range s.AnyOf {
+		schema.AnyOf = append(schema.AnyOf, convertSchemaProxy(sp))
+	}
+	for _, sp := range s.AllOf {
+		schema.AllOf = append(schema.AllOf, convertSchemaProxy(sp))
+	}
+
+	// Enum
+	for _, node := range s.Enum {
+		schema.Enum = append(schema.Enum, yamlNodeToValue(node))
+	}
+
+	// Default
+	if s.Default != nil {
+		schema.Default = yamlNodeToValue(s.Default)
+	}
+
+	// Example
+	if s.Example != nil {
+		schema.Example = yamlNodeToValue(s.Example)
+	}
+
+	return schema
+}
+
+// yamlNodeToValue converts a *yaml.Node to a Go value.
+func yamlNodeToValue(node *yaml.Node) any {
+	if node == nil {
+		return nil
+	}
+	var val any
+	if err := node.Decode(&val); err != nil {
+		return node.Value
+	}
+	return val
 }
 
 // methodOrder returns an ordering value for HTTP methods.
@@ -106,33 +281,23 @@ func FilterEndpoints(endpoints []Endpoint, filter string) []Endpoint {
 
 // matchesFilter checks if an endpoint matches the filter string.
 func matchesFilter(ep *Endpoint, filter string) bool {
-	// Check path
 	if strings.Contains(strings.ToLower(ep.Path), filter) {
 		return true
 	}
-
-	// Check method
 	if strings.Contains(strings.ToLower(ep.Method), filter) {
 		return true
 	}
-
-	// Check operation ID
 	if strings.Contains(strings.ToLower(ep.OperationID), filter) {
 		return true
 	}
-
-	// Check summary
 	if strings.Contains(strings.ToLower(ep.Summary), filter) {
 		return true
 	}
-
-	// Check tags
 	for _, tag := range ep.Tags {
 		if strings.Contains(strings.ToLower(tag), filter) {
 			return true
 		}
 	}
-
 	return false
 }
 

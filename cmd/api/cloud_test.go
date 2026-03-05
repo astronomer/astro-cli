@@ -9,7 +9,6 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/openapi"
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -237,18 +236,17 @@ func TestApplyPathParams(t *testing.T) {
 // --- resolveOperationID ------------------------------------------------------
 
 func TestResolveOperationID(t *testing.T) {
-	// Serve a minimal OpenAPI spec
-	paths := openapi3.NewPaths()
-	paths.Set("/things", &openapi3.PathItem{
-		Get: &openapi3.Operation{OperationID: "listThings", Summary: "List things"},
-	})
-	paths.Set("/version", &openapi3.PathItem{
-		Get: &openapi3.Operation{OperationID: "getVersion"},
-	})
-	spec := openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
-		Paths:   paths,
+	spec := map[string]any{
+		"openapi": "3.0.0",
+		"info":    map[string]any{"title": "Test", "version": "1.0"},
+		"paths": map[string]any{
+			"/things": map[string]any{
+				"get": map[string]any{"operationId": "listThings", "summary": "List things"},
+			},
+			"/version": map[string]any{
+				"get": map[string]any{"operationId": "getVersion"},
+			},
+		},
 	}
 	body, _ := json.Marshal(spec)
 
@@ -317,12 +315,6 @@ func TestInitCloudSpecCache(t *testing.T) {
 	})
 }
 
-// --- runCloudInteractive (requires cloud context, hard to unit test) ---------
-// The runCloud and runCloudInteractive functions require full cloud context
-// setup and are covered by integration tests. The utility functions they call
-// (fillPlaceholders, applyPathParams, buildURL, etc.) are thoroughly tested
-// above.
-
 // --- placeholderRE -----------------------------------------------------------
 
 func TestPlaceholderRE(t *testing.T) {
@@ -351,9 +343,6 @@ func TestPlaceholderRE(t *testing.T) {
 // --- NewCloudCmd RunE dispatch (no-args shows help) --------------------------
 
 func TestCloudCmd_NoArgs_ShowsHelp(t *testing.T) {
-	// When invoked without args, RunE calls runCloudInteractive which
-	// requires a cloud context. Since we can't easily set that up, we
-	// just verify the command accepts 0 or 1 args.
 	out := new(bytes.Buffer)
 	cmd := NewCloudCmd(out)
 	// Verify Args validator
@@ -367,12 +356,7 @@ func TestCloudCmd_NoArgs_ShowsHelp(t *testing.T) {
 	assert.Error(t, err) // Too many args
 }
 
-// --- generateCurl integration via NewCloudCmd --------------------------------
-// Full runCloud tests require cloud context. The underlying executeRequest,
-// generateCurl, fillPlaceholders, etc. are all tested via their own test files.
-
 func TestCloudCmdLongDescription(t *testing.T) {
-	// NewCloudCmd should produce a command whose Long description mentions Astro
 	out := new(bytes.Buffer)
 	cmd := NewCloudCmd(out)
 	assert.Contains(t, cmd.Long, "Astro Cloud API")

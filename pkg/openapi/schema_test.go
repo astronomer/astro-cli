@@ -3,7 +3,6 @@ package openapi
 import (
 	"testing"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -52,45 +51,46 @@ func TestExtractRefName(t *testing.T) {
 // --- NewSchemaResolver -------------------------------------------------------
 
 func TestNewSchemaResolver(t *testing.T) {
-	spec := &openapi3.T{Info: &openapi3.Info{Title: "Test"}}
-	r := NewSchemaResolver(spec)
+	r := NewSchemaResolver()
 	assert.NotNil(t, r)
-	assert.Equal(t, spec, r.spec)
 }
 
 // --- ResolveSchema -----------------------------------------------------------
 
 func TestResolveSchema_Nil(t *testing.T) {
-	r := NewSchemaResolver(&openapi3.T{})
+	r := NewSchemaResolver()
 	resolved, refName := r.ResolveSchema(nil)
 	assert.Nil(t, resolved)
 	assert.Empty(t, refName)
 }
 
 func TestResolveSchema_NoRef(t *testing.T) {
-	r := NewSchemaResolver(&openapi3.T{})
-	schema := openapi3.NewStringSchema()
-	ref := &openapi3.SchemaRef{Value: schema}
+	r := NewSchemaResolver()
+	schema := &Schema{Type: "string"}
+	ref := &SchemaRef{Value: schema}
 	resolved, refName := r.ResolveSchema(ref)
 	assert.Equal(t, schema, resolved)
 	assert.Empty(t, refName)
 }
 
 func TestResolveSchema_WithRef(t *testing.T) {
-	r := NewSchemaResolver(&openapi3.T{})
-	resolvedSchema := openapi3.NewObjectSchema()
-	resolvedSchema.Properties = openapi3.Schemas{
-		"name": {Value: openapi3.NewStringSchema()},
+	r := NewSchemaResolver()
+	resolvedSchema := &Schema{
+		Type: "object",
+		Properties: []SchemaProperty{
+			{Name: "name", Schema: &SchemaRef{Value: &Schema{Type: "string"}}},
+		},
 	}
-	ref := &openapi3.SchemaRef{
+	ref := &SchemaRef{
 		Ref:   "#/components/schemas/Pet",
 		Value: resolvedSchema,
 	}
 	resolved, refName := r.ResolveSchema(ref)
 	assert.Equal(t, "Pet", refName)
 	assert.Equal(t, resolvedSchema, resolved)
-	assert.True(t, resolved.Type.Is("object"))
-	assert.Contains(t, resolved.Properties, "name")
+	assert.Equal(t, "object", resolved.Type)
+	assert.Len(t, resolved.Properties, 1)
+	assert.Equal(t, "name", resolved.Properties[0].Name)
 }
 
 // --- IsRequired --------------------------------------------------------------
