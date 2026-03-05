@@ -18,6 +18,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/airflow/types"
+	"github.com/pkg/browser"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -28,6 +29,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/spinner"
 	"github.com/astronomer/astro-cli/settings"
+	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -62,6 +64,7 @@ var (
 	osReadFile            = os.ReadFile
 	osFindProcess         = os.FindProcess
 	resolveFloatingTag    = airflowversions.ResolveFloatingTag
+	standaloneOpenURL     = browser.OpenURL
 )
 
 // runtimePythonRe matches the optional -python-X.Y (and optional -base) suffix on a runtime tag.
@@ -110,6 +113,7 @@ type Standalone struct {
 	envFile       string
 	dockerfile    string
 	foreground    bool   // if true, run in foreground (stream output, block on Wait)
+	noBrowser     bool   // if true, don't open the browser after startup
 	port          string // webserver port; defaults to defaultStandalonePort
 	useProxy      bool   // whether the reverse proxy is active
 	proxyHostname string // e.g. "my-project.localhost"
@@ -155,6 +159,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	waitTime := opts.WaitTime
 	envConns := opts.EnvConns
 	s.foreground = opts.Foreground
+	s.noBrowser = opts.NoBrowser
 	if opts.Port != "" {
 		s.port = opts.Port
 	}
@@ -398,6 +403,12 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 		fmt.Println("\n" + ansi.Green("\u2714") + " Airflow is ready!")
 		fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
 		fmt.Println()
+
+		if !(s.noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {
+			if err := standaloneOpenURL(uiURL); err != nil {
+				fmt.Println("Unable to open the Airflow UI, please visit the following link: " + uiURL)
+			}
+		}
 	}()
 
 	wg.Wait()
@@ -473,6 +484,12 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 	fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
 	fmt.Printf("%sView logs: %s\n", bullet, ansi.Bold("astro dev logs -f"))
 	fmt.Printf("%sStop:      %s\n", bullet, ansi.Bold("astro dev stop"))
+
+	if !(s.noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {
+		if err := standaloneOpenURL(uiURL); err != nil {
+			fmt.Println("\nUnable to open the Airflow UI, please visit the following link: " + uiURL)
+		}
+	}
 
 	return nil
 }
