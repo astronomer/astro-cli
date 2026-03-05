@@ -2,21 +2,32 @@ package version
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
 
 	semver "github.com/Masterminds/semver/v3"
-	"github.com/google/go-github/v48/github"
 )
 
 var CurrVersion string
 
 const (
-	cliCurrentVersion = "Astro CLI Version: "
+	cliCurrentVersion  = "Astro CLI Version: "
+	astroCLIReleaseURL = "https://updates.astronomer.io/astro-cli"
 )
+
+type astroCLIRelease struct {
+	Version string `json:"version"`
+}
+
+type astroCLIReleaseResponse struct {
+	AvailableReleases []astroCLIRelease `json:"available_releases"`
+}
 
 // PrintVersion outputs current cli version and git commit if exists
 func PrintVersion() {
@@ -24,40 +35,67 @@ func PrintVersion() {
 	fmt.Println(cliCurrentVersion + version)
 }
 
-func getLatestRelease(client *github.Client, owner, repo string) (*github.RepositoryRelease, error) {
-	ctx := context.Background()
-
-	// Get the list of releases for the repository
-	releases, _, err := client.Repositories.ListReleases(ctx, owner, repo, nil)
+func getCLIReleases(ctx context.Context, client *http.Client, url string) (*astroCLIReleaseResponse, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
 
-	// Find the latest release (by release tag)
-	var latestRelease *github.RepositoryRelease
-	for _, release := range releases {
-		// Skip pre-releases
-		if release.GetPrerelease() {
-			continue
-		}
-		if latestRelease == nil || release.GetTagName() > latestRelease.GetTagName() {
-			latestRelease = release
-		}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("astro-cli releases endpoint request failed with status: %d", response.StatusCode)
 	}
 
-	return latestRelease, nil
+	var releases astroCLIReleaseResponse
+	err = json.NewDecoder(response.Body).Decode(&releases)
+	if err != nil {
+		return nil, err
+	}
+
+	return &releases, nil
 }
 
-func CompareVersions(client *github.Client, owner, repo string) error {
-	// Get the latest release
-	latestRelease, err := getLatestRelease(client, owner, repo)
+func getLatestRelease(ctx context.Context, client *http.Client, url string) (*semver.Version, error) {
+	releases, err := getCLIReleases(ctx, client, url)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	if len(releases.AvailableReleases) == 0 {
+		return nil, errors.New("astro-cli releases endpoint returned 0 results")
+	}
+
+	var latest *semver.Version
+	for _, r := range releases.AvailableReleases {
+		// discard any versions that we cannot parse
+		v, err := semver.NewVersion(r.Version)
+		if err == nil && (latest == nil || v.GreaterThan(latest)) {
+			latest = v
+		}
+	}
+
+	if latest == nil {
+		return nil, errors.New("astro-cli releases endpoint returned 0 valid versions")
+	}
+
+	return latest, nil
+}
+
+func CompareVersions(ctx context.Context, client *http.Client) error {
 	// Check if current version is a local build
 	if strings.Contains(CurrVersion, "SNAPSHOT") {
 		return nil
+	}
+
+	// Get the latest release
+	latestSemver, err := getLatestRelease(ctx, client, astroCLIReleaseURL)
+	if err != nil {
+		return err
 	}
 
 	// Parse the current and latest versions into semver objects
@@ -66,14 +104,9 @@ func CompareVersions(client *github.Client, owner, repo string) error {
 		return err
 	}
 
-	latestSemver, err := semver.NewVersion(latestRelease.GetTagName())
-	if err != nil {
-		return err
-	}
-
 	// Compare the versions and print a message to the user if the current version is outdated
 	if currentSemver.LessThan(latestSemver) {
-		fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease see https://www.astronomer.io/docs/astro/cli/install-cli#upgrade-the-astro-cli for information on how to update the Astro CLI\n\n", latestSemver)
+		fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease see https://www.astronomer.io/docs/astro/cli/upgrade-cli for information on how to update the Astro CLI\n\n", latestSemver)
 		fmt.Fprint(os.Stderr, ansi.Cyan("\nTo learn more about what's new in this version, please see https://www.astronomer.io/docs/astro/cli/release-notes\n\n"))
 		fmt.Fprintf(os.Stderr, "If you don't want to see this message again run 'astro config set -g upgrade_message false' or pass '2>/dev/null' to print this text to stderr\n\n")
 	}

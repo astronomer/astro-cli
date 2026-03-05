@@ -14,7 +14,6 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/version"
-	"github.com/google/go-github/v48/github"
 	"github.com/spf13/cobra"
 )
 
@@ -30,10 +29,11 @@ func CreateRootPersistentPreRunE(astroCoreClient astrocore.CoreClient, platformC
 	return func(cmd *cobra.Command, args []string) error {
 		// Check for latest version
 		if config.CFG.UpgradeMessage.GetBool() {
-			// create github client with 3 second timeout, setting an aggressive timeout since its not mandatory to get a response in each command execution
-			githubClient := github.NewClient(&http.Client{Timeout: 3 * time.Second})
+			// create http client with 3 second timeout, setting an aggressive timeout since its not mandatory to get a response in each command execution
+			httpClient := &http.Client{Timeout: 3 * time.Second}
+
 			// compare current version to latest
-			err := version.CompareVersions(githubClient, "astronomer", "astro-cli")
+			err := version.CompareVersions(cmd.Context(), httpClient)
 			if err != nil {
 				softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error comparing CLI versions: "+err.Error())
 			}
