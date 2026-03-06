@@ -77,11 +77,13 @@ workflows:
           requires:
             - lint
             - test
+            - test-windows
             - approve-run-integration-tests
       - approve-release:
           requires:
             - lint
             - test
+            - test-windows
           type: approval
           filters:
             branches:
