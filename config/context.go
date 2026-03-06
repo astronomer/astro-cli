@@ -31,6 +31,7 @@ type Context struct {
 	OrganizationProduct string `mapstructure:"organization_product"`
 	Workspace           string `mapstructure:"workspace"`
 	LastUsedWorkspace   string `mapstructure:"last_used_workspace"`
+	Deployment          string `mapstructure:"deployment"`
 	Token               string `mapstructure:"token"`
 	RefreshToken        string `mapstructure:"refreshtoken"`
 	UserEmail           string `mapstructure:"user_email"`
@@ -129,6 +130,7 @@ func (c *Context) SetContext() error {
 		"organization_product": c.OrganizationProduct,
 		"workspace":            c.Workspace,
 		"last_used_workspace":  c.Workspace,
+		"deployment":           c.Deployment,
 		"refreshtoken":         c.RefreshToken,
 		"user_email":           c.UserEmail,
 	}

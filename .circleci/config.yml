@@ -8,18 +8,24 @@ jobs:
     docker:
       - image: quay.io/astronomer/ap-dind-golang:24.0.6
     resource_class: large
+    environment:
+      GOPRIVATE: github.com/astronomer/*
     steps:
       - lint
   test:
     working_directory: /go/src/github.com/astronomer/astro-cli
     docker:
       - image: quay.io/astronomer/ap-dind-golang:24.0.6
+    environment:
+      GOPRIVATE: github.com/astronomer/*
     steps:
       - test
   integration-test:
     machine:
       resource_class: medium
       image: ubuntu-2204:current
+    environment:
+      GOPRIVATE: github.com/astronomer/*
     steps:
       - integration-test
   new-tag:
@@ -29,11 +35,14 @@ jobs:
       - commit-next-tag
   release:
     docker:
-      - image: golang:1.24
+      - image: golang:1.26
     working_directory: /go/src/github.com/astronomer/astro-cli
     resource_class: xlarge
+    environment:
+      GOPRIVATE: github.com/astronomer/*
     steps:
       - checkout
+      - configure-private-modules
       - setup-cross-build-libs
       - run:
           name: goreleaser
@@ -42,11 +51,17 @@ workflows:
   version: 2.1
   build-images:
     jobs:
-      - lint
-      - test
+      - lint:
+          context:
+            - github-repo
+      - test:
+          context:
+            - github-repo
       - approve-run-integration-tests:
           type: approval
       - integration-test:
+          context:
+            - github-repo
           requires:
             - lint
             - test
@@ -83,10 +98,31 @@ executors:
     docker:
       - image: cimg/python:3.11
 commands:
+  configure-private-modules:
+    description: "Configure git for private Go module access"
+    steps:
+      - run:
+          name: Configure private Go modules
+          command: git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+  install-go:
+    description: "Install Go 1.26.0 from official tarball"
+    steps:
+      - run:
+          name: Install Go 1.26.0
+          command: |
+            set -e
+            cd /tmp
+            curl -Lo go.tar.gz https://go.dev/dl/go1.26.0.linux-amd64.tar.gz
+            rm -rf /usr/local/go
+            tar -C /usr/local -xzf go.tar.gz
+            echo 'export PATH="/usr/local/go/bin:$PATH"' >> $BASH_ENV
+            /usr/local/go/bin/go version
   lint:
     description: "Run linting checks"
     steps:
       - checkout
+      - install-go
+      - configure-private-modules
       - run:
           name: Run golangci-lint
           command: make lint
@@ -94,6 +130,8 @@ commands:
     description: "Run tests and code coverage"
     steps:
       - checkout
+      - install-go
+      - configure-private-modules
       - setup_remote_docker
       - run:
           name: install dockerize
@@ -112,16 +150,8 @@ commands:
     description: "Run integration tests"
     steps:
       - checkout
-      - run:
-          name: Install Go
-          command: |
-            set -e
-            cd /tmp
-            curl -Lo go.tar.gz https://go.dev/dl/go1.24.0.linux-amd64.tar.gz
-            sudo rm -rf /usr/local/go
-            sudo tar -C /usr/local -xvf go.tar.gz
-            GOROOT=/usr/local/go go version
-            echo 'export GOROOT=/usr/local/go' >> $BASH_ENV
+      - configure-private-modules
+      - install-go
       - run:
           name: Setup python env
           command: |
