@@ -17,6 +17,8 @@ cover.out
 coverage-2.txt
 coverage.txt
 dist/
+go.work
+go.work.sum
 hello-astro/
 meta/
 packages.txt
