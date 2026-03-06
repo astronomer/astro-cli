@@ -21,7 +21,6 @@ jobs:
     executor:
       name: win/default
       size: large
-    parallelism: 4
     steps:
       - checkout
       - run:
@@ -31,17 +30,11 @@ jobs:
             choco install golang --version=1.24.0 -y
             refreshenv
       - run:
-          name: Split and run tests
+          name: Run unit tests
           shell: powershell.exe
           command: |
             $env:Path = "C:\Program Files\Go\bin;" + $env:Path
-            $packages = go list ./... | Out-String
-            $packages = $packages.Trim() -split "`n"
-            $packages | Out-File -FilePath packages.txt
-            $split = circleci tests split packages.txt
-            $split = $split.Trim() -split "`n"
-            $joined = $split -join " "
-            go test -count=1 -cover -covermode=atomic -test.v $split
+            go test -count=1 -cover -covermode=atomic -test.v ./...
   integration-test:
     machine:
       resource_class: medium
