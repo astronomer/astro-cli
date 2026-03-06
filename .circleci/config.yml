@@ -2,6 +2,7 @@
 version: 2.1
 orbs:
   coveralls: coveralls/coveralls@2.2.5
+  win: circleci/windows@5.0
 jobs:
   lint:
     working_directory: /go/src/github.com/astronomer/astro-cli
@@ -16,6 +17,24 @@ jobs:
       - image: quay.io/astronomer/ap-dind-golang:24.0.6
     steps:
       - test
+  test-windows:
+    executor:
+      name: win/default
+      size: large
+    steps:
+      - checkout
+      - run:
+          name: Install Go
+          shell: powershell.exe
+          command: |
+            choco install golang --version=1.24.0 -y
+            refreshenv
+      - run:
+          name: Run unit tests
+          shell: powershell.exe
+          command: |
+            $env:Path = "C:\Program Files\Go\bin;" + $env:Path
+            go test -count=1 -cover -covermode=atomic -test.v ./...
   integration-test:
     machine:
       resource_class: medium
@@ -44,17 +63,20 @@ workflows:
     jobs:
       - lint
       - test
+      - test-windows
       - approve-run-integration-tests:
           type: approval
       - integration-test:
           requires:
             - lint
             - test
+            - test-windows
             - approve-run-integration-tests
       - approve-release:
           requires:
             - lint
             - test
+            - test-windows
           type: approval
           filters:
             branches:

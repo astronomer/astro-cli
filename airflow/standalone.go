@@ -1,3 +1,5 @@
+//go:build !windows
+
 package airflow
 
 import (
@@ -18,7 +20,6 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/airflow/types"
-	"github.com/pkg/browser"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -28,8 +29,9 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/spinner"
-	"github.com/astronomer/astro-cli/settings"
 	"github.com/astronomer/astro-cli/pkg/util"
+	"github.com/astronomer/astro-cli/settings"
+	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
