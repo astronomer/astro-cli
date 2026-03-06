@@ -24,7 +24,7 @@ type Standalone struct {
 	dockerfile  string
 }
 
-var errStandaloneWindows = errors.New("standalone mode is not supported on Windows. Use Docker-based mode instead: astro config set -g dev.mode docker")
+var errStandaloneWindows = errors.New("standalone mode is not supported on Windows. Use Docker mode instead: astro config set -g dev.mode docker")
 
 func StandaloneInit(airflowHome, envFile, dockerfile string) (*Standalone, error) {
 	return nil, errStandaloneWindows
