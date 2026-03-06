@@ -272,9 +272,14 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	}
 
 	// 6. Install dependencies (2-step install)
+	// --python explicitly targets the project venv so uv never installs into
+	// a parent venv even if VIRTUAL_ENV leaks through the environment.
+	venvPython := filepath.Join(s.airflowHome, ".venv", "bin", "python")
+
 	// Step 1: Install airflow with full freeze constraints (reproduces runtime env exactly)
 	installArgs := []string{
 		"pip", "install",
+		"--python", venvPython,
 		fmt.Sprintf("apache-airflow==%s", airflowVersion),
 		"-c", freezePath,
 		"--index-url", standaloneIndexURL,
@@ -290,6 +295,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	if exists, _ := fileutil.Exists(requirementsPath, nil); exists {
 		userInstallArgs := []string{
 			"pip", "install",
+			"--python", venvPython,
 			"-r", requirementsPath,
 			fmt.Sprintf("apache-airflow==%s", airflowVersion),
 		}
