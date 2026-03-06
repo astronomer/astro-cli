@@ -3,27 +3,25 @@ package openapi
 import (
 	"testing"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExtractEndpoints(t *testing.T) {
-	paths := openapi3.NewPaths()
-	paths.Set("/organizations", &openapi3.PathItem{
-		Get:  &openapi3.Operation{OperationID: "listOrganizations", Summary: "List organizations", Tags: []string{"Organizations"}},
-		Post: &openapi3.Operation{OperationID: "createOrganization", Summary: "Create organization", Tags: []string{"Organizations"}},
+	specJSON := minimalSpecJSON("Test", map[string]map[string]map[string]any{
+		"/organizations": {
+			"get":  {"operationId": "listOrganizations", "summary": "List organizations", "tags": []string{"Organizations"}},
+			"post": {"operationId": "createOrganization", "summary": "Create organization", "tags": []string{"Organizations"}},
+		},
+		"/organizations/{organizationId}": {
+			"get":    {"operationId": "getOrganization", "summary": "Get organization", "tags": []string{"Organizations"}},
+			"delete": {"operationId": "deleteOrganization", "summary": "Delete organization", "tags": []string{"Organizations"}, "deprecated": true},
+		},
 	})
-	paths.Set("/organizations/{organizationId}", &openapi3.PathItem{
-		Get:    &openapi3.Operation{OperationID: "getOrganization", Summary: "Get organization", Tags: []string{"Organizations"}},
-		Delete: &openapi3.Operation{OperationID: "deleteOrganization", Summary: "Delete organization", Tags: []string{"Organizations"}, Deprecated: true},
-	})
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
-		Paths:   paths,
-	}
+	doc, err := parseSpec(specJSON)
+	require.NoError(t, err)
 
-	endpoints := ExtractEndpoints(spec)
+	endpoints := ExtractEndpoints(doc)
 
 	assert.Len(t, endpoints, 4)
 
@@ -123,23 +121,21 @@ func TestFindEndpointByPath(t *testing.T) {
 }
 
 func TestExtractEndpointsAllMethods(t *testing.T) {
-	paths := openapi3.NewPaths()
-	paths.Set("/resource", &openapi3.PathItem{
-		Get:     &openapi3.Operation{OperationID: "getResource"},
-		Post:    &openapi3.Operation{OperationID: "postResource"},
-		Put:     &openapi3.Operation{OperationID: "putResource"},
-		Patch:   &openapi3.Operation{OperationID: "patchResource"},
-		Delete:  &openapi3.Operation{OperationID: "deleteResource"},
-		Options: &openapi3.Operation{OperationID: "optionsResource"},
-		Head:    &openapi3.Operation{OperationID: "headResource"},
+	specJSON := minimalSpecJSON("Test", map[string]map[string]map[string]any{
+		"/resource": {
+			"get":     {"operationId": "getResource"},
+			"post":    {"operationId": "postResource"},
+			"put":     {"operationId": "putResource"},
+			"patch":   {"operationId": "patchResource"},
+			"delete":  {"operationId": "deleteResource"},
+			"options": {"operationId": "optionsResource"},
+			"head":    {"operationId": "headResource"},
+		},
 	})
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
-		Paths:   paths,
-	}
+	doc, err := parseSpec(specJSON)
+	require.NoError(t, err)
 
-	endpoints := ExtractEndpoints(spec)
+	endpoints := ExtractEndpoints(doc)
 	assert.Len(t, endpoints, 7)
 
 	// Verify method ordering: GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD
@@ -150,12 +146,11 @@ func TestExtractEndpointsAllMethods(t *testing.T) {
 }
 
 func TestExtractEndpointsEmptyPaths(t *testing.T) {
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
-		Paths:   openapi3.NewPaths(),
-	}
-	endpoints := ExtractEndpoints(spec)
+	specJSON := minimalSpecJSON("Test", map[string]map[string]map[string]any{})
+	doc, err := parseSpec(specJSON)
+	require.NoError(t, err)
+
+	endpoints := ExtractEndpoints(doc)
 	assert.Empty(t, endpoints)
 }
 

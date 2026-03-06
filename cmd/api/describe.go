@@ -9,7 +9,6 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/openapi"
 	"github.com/fatih/color"
-	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const (
@@ -45,7 +44,6 @@ func runDescribe(opts *DescribeOptions) error {
 		return fmt.Errorf("loading OpenAPI spec: %w", err)
 	}
 
-	spec := opts.specCache.GetSpec()
 	endpoints := opts.specCache.GetEndpoints()
 	if len(endpoints) == 0 {
 		return fmt.Errorf("no endpoints found in API specification")
@@ -92,7 +90,7 @@ func runDescribe(opts *DescribeOptions) error {
 	}
 
 	// If multiple matches and no method specified, show all
-	resolver := openapi.NewSchemaResolver(spec)
+	resolver := openapi.NewSchemaResolver()
 
 	for i := range matches {
 		if i > 0 {
@@ -134,7 +132,7 @@ func printEndpointDetails(out io.Writer, ep *openapi.Endpoint, resolver *openapi
 	printParameters(out, ep.Parameters)
 
 	// Request Body
-	if ep.RequestBody != nil && ep.RequestBody.Value != nil {
+	if ep.RequestBody != nil {
 		printRequestBody(out, ep.RequestBody, resolver)
 	}
 
@@ -143,7 +141,7 @@ func printEndpointDetails(out io.Writer, ep *openapi.Endpoint, resolver *openapi
 }
 
 // printParameters prints parameter information.
-func printParameters(out io.Writer, params openapi3.Parameters) {
+func printParameters(out io.Writer, params []*openapi.Parameter) {
 	if len(params) == 0 {
 		return
 	}
@@ -155,45 +153,39 @@ func printParameters(out io.Writer, params openapi3.Parameters) {
 
 	if len(pathParams) > 0 {
 		fmt.Fprintf(out, "\n%s\n", color.New(color.Bold).Sprint("Path Parameters:"))
-		for _, pRef := range pathParams {
-			if pRef.Value != nil {
-				printParam(out, pRef.Value)
-			}
+		for _, p := range pathParams {
+			printParam(out, p)
 		}
 	}
 
 	if len(queryParams) > 0 {
 		fmt.Fprintf(out, "\n%s\n", color.New(color.Bold).Sprint("Query Parameters:"))
-		for _, pRef := range queryParams {
-			if pRef.Value != nil {
-				printParam(out, pRef.Value)
-			}
+		for _, p := range queryParams {
+			printParam(out, p)
 		}
 	}
 
 	if len(headerParams) > 0 {
 		fmt.Fprintf(out, "\n%s\n", color.New(color.Bold).Sprint("Header Parameters:"))
-		for _, pRef := range headerParams {
-			if pRef.Value != nil {
-				printParam(out, pRef.Value)
-			}
+		for _, p := range headerParams {
+			printParam(out, p)
 		}
 	}
 }
 
 // filterParams filters parameters by location.
-func filterParams(params openapi3.Parameters, in string) openapi3.Parameters {
-	var result openapi3.Parameters
-	for _, pRef := range params {
-		if pRef.Value != nil && pRef.Value.In == in {
-			result = append(result, pRef)
+func filterParams(params []*openapi.Parameter, in string) []*openapi.Parameter {
+	var result []*openapi.Parameter
+	for _, p := range params {
+		if p.In == in {
+			result = append(result, p)
 		}
 	}
 	return result
 }
 
 // printParam prints a single parameter.
-func printParam(out io.Writer, p *openapi3.Parameter) {
+func printParam(out io.Writer, p *openapi.Parameter) {
 	required := ""
 	if p.Required {
 		required = color.RedString(" (required)")
@@ -202,14 +194,14 @@ func printParam(out io.Writer, p *openapi3.Parameter) {
 	typeStr := "string"
 	if p.Schema != nil && p.Schema.Value != nil {
 		s := p.Schema.Value
-		sType := schemaType(s)
+		sType := s.Type
 		if sType != "" {
 			typeStr = sType
 			if s.Format != "" {
 				typeStr += " (" + s.Format + ")"
 			}
 			if sType == "array" && s.Items != nil && s.Items.Value != nil {
-				typeStr = "array of " + schemaType(s.Items.Value)
+				typeStr = "array of " + s.Items.Value.Type
 			}
 		}
 	}
@@ -230,9 +222,7 @@ func printParam(out io.Writer, p *openapi3.Parameter) {
 }
 
 // printRequestBody prints request body schema.
-func printRequestBody(out io.Writer, bodyRef *openapi3.RequestBodyRef, resolver *openapi.SchemaResolver) {
-	body := bodyRef.Value
-
+func printRequestBody(out io.Writer, body *openapi.RequestBody, resolver *openapi.SchemaResolver) {
 	fmt.Fprintf(out, "\n%s", color.New(color.Bold).Sprint("Request Body"))
 	if body.Required {
 		fmt.Fprintf(out, " %s", color.RedString("(required)"))
@@ -311,11 +301,11 @@ func isSuccessCode(code string) bool {
 }
 
 // printResponseSchema prints the JSON schema for a success response, if present.
-func printResponseSchema(out io.Writer, resp *openapi3.Response, resolver *openapi.SchemaResolver) {
-	if resp.Content == nil {
+func printResponseSchema(out io.Writer, entry *openapi.ResponseEntry, resolver *openapi.SchemaResolver) {
+	if entry.Content == nil {
 		return
 	}
-	mt, ok := resp.Content["application/json"]
+	mt, ok := entry.Content["application/json"]
 	if !ok || mt.Schema == nil {
 		return
 	}
@@ -329,7 +319,7 @@ func printResponseSchema(out io.Writer, resp *openapi3.Response, resolver *opena
 }
 
 // printResponses prints response information.
-func printResponses(out io.Writer, responses *openapi3.Responses, resolver *openapi.SchemaResolver) {
+func printResponses(out io.Writer, responses *openapi.Responses, resolver *openapi.SchemaResolver) {
 	if responses == nil || responses.Len() == 0 {
 		return
 	}
@@ -337,28 +327,18 @@ func printResponses(out io.Writer, responses *openapi3.Responses, resolver *open
 	fmt.Fprintf(out, "\n%s\n", color.New(color.Bold).Sprint("Responses:"))
 
 	// Sort response codes
-	codes := make([]string, 0, responses.Len())
-	for code := range responses.Map() {
-		codes = append(codes, code)
-	}
-	sort.Strings(codes)
+	codes := make([]openapi.ResponseEntry, len(responses.Codes))
+	copy(codes, responses.Codes)
+	sort.Slice(codes, func(i, j int) bool {
+		return codes[i].Code < codes[j].Code
+	})
 
-	for _, code := range codes {
-		respRef := responses.Value(code)
-		if respRef == nil || respRef.Value == nil {
-			continue
-		}
-		resp := respRef.Value
+	for i := range codes {
+		entry := &codes[i]
+		fmt.Fprintf(out, "  %s: %s\n", responseCodeColorFn(entry.Code)(entry.Code), entry.Description)
 
-		description := ""
-		if resp.Description != nil {
-			description = *resp.Description
-		}
-
-		fmt.Fprintf(out, "  %s: %s\n", responseCodeColorFn(code)(code), description)
-
-		if isSuccessCode(code) {
-			printResponseSchema(out, resp, resolver)
+		if isSuccessCode(entry.Code) {
+			printResponseSchema(out, entry, resolver)
 		}
 	}
 }
@@ -367,7 +347,7 @@ func printResponses(out io.Writer, responses *openapi3.Responses, resolver *open
 // The schemaPrintOpts control which features (composition, defaults, etc.) are rendered.
 //
 //nolint:gocognit,gocyclo // Complex but necessary for comprehensive schema display
-func printSchema(out io.Writer, schemaRef *openapi3.SchemaRef, resolver *openapi.SchemaResolver, indent int, visited map[string]bool, opts schemaPrintOpts) {
+func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.SchemaResolver, indent int, visited map[string]bool, opts schemaPrintOpts) {
 	if schemaRef == nil || schemaRef.Value == nil {
 		return
 	}
@@ -446,22 +426,23 @@ func printSchema(out io.Writer, schemaRef *openapi3.SchemaRef, resolver *openapi
 
 	// Print properties
 	if len(schema.Properties) > 0 {
+		// Properties are already in order from the spec; sort alphabetically for consistency
 		propNames := make([]string, 0, len(schema.Properties))
-		for name := range schema.Properties {
-			propNames = append(propNames, name)
+		propMap := make(map[string]*openapi.SchemaRef, len(schema.Properties))
+		for _, prop := range schema.Properties {
+			propNames = append(propNames, prop.Name)
+			propMap[prop.Name] = prop.Schema
 		}
 		sort.Strings(propNames)
 
 		for _, name := range propNames {
-			propRef := schema.Properties[name]
+			propRef := propMap[name]
 			if propRef == nil || propRef.Value == nil {
 				continue
 			}
 			prop := propRef.Value
 
-			// Skip read-only properties in request schemas (they're server-set
-			// and not accepted in the request body). Response schemas keep them
-			// because those are the fields the API actually returns.
+			// Skip read-only properties in request schemas
 			if opts.SkipReadOnly && prop.ReadOnly {
 				continue
 			}
@@ -496,7 +477,7 @@ func printSchema(out io.Writer, schemaRef *openapi3.SchemaRef, resolver *openapi
 				fmt.Fprintf(out, "%s    Default: %v\n", prefix, prop.Default)
 			}
 
-			propType := schemaType(prop)
+			propType := prop.Type
 
 			// Show nested object properties (but limit depth)
 			if indent < opts.MaxIndent && propType == schemaTypeObject && len(prop.Properties) > 0 {
@@ -512,7 +493,7 @@ func printSchema(out io.Writer, schemaRef *openapi3.SchemaRef, resolver *openapi
 }
 
 // getTypeString returns a human-readable type string for a schema.
-func getTypeString(schema *openapi3.Schema, refName string) string {
+func getTypeString(schema *openapi.Schema, refName string) string {
 	if schema == nil {
 		return "any"
 	}
@@ -521,7 +502,7 @@ func getTypeString(schema *openapi3.Schema, refName string) string {
 		return refName
 	}
 
-	typeStr := schemaType(schema)
+	typeStr := schema.Type
 	if typeStr == "" {
 		typeStr = "object"
 	}
@@ -530,10 +511,10 @@ func getTypeString(schema *openapi3.Schema, refName string) string {
 		typeStr += " (" + schema.Format + ")"
 	}
 
-	if schemaType(schema) == "array" && schema.Items != nil {
+	if schema.Type == "array" && schema.Items != nil {
 		itemType := ""
 		if schema.Items.Value != nil {
-			itemType = schemaType(schema.Items.Value)
+			itemType = schema.Items.Value.Type
 		}
 		if schema.Items.Ref != "" {
 			// Extract ref name
@@ -547,16 +528,4 @@ func getTypeString(schema *openapi3.Schema, refName string) string {
 	}
 
 	return typeStr
-}
-
-// schemaType returns the primary type string from an OpenAPI schema.
-func schemaType(schema *openapi3.Schema) string {
-	if schema == nil || schema.Type == nil {
-		return ""
-	}
-	types := schema.Type.Slice()
-	if len(types) > 0 {
-		return types[0]
-	}
-	return ""
 }

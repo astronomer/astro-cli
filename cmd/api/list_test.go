@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/openapi"
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -135,31 +134,29 @@ func TestPrintEndpointsVerbose_NoOptionalFields(t *testing.T) {
 
 // --- runList -----------------------------------------------------------------
 
-func newTestSpecServer(t *testing.T, spec *openapi3.T) *httptest.Server {
+func newTestSpecServer(t *testing.T, specJSON []byte) *httptest.Server {
 	t.Helper()
-	body, err := json.Marshal(spec)
-	require.NoError(t, err)
-
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(body)
+		_, _ = w.Write(specJSON)
 	}))
 }
 
 func TestRunList(t *testing.T) {
-	paths := openapi3.NewPaths()
-	paths.Set("/dags", &openapi3.PathItem{
-		Get: &openapi3.Operation{OperationID: "get_dags", Summary: "List DAGs", Tags: []string{"DAGs"}},
-	})
-	paths.Set("/health", &openapi3.PathItem{
-		Get: &openapi3.Operation{OperationID: "health", Summary: "Health check"},
-	})
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
-		Paths:   paths,
+	spec := map[string]any{
+		"openapi": "3.0.0",
+		"info":    map[string]any{"title": "Test", "version": "1.0"},
+		"paths": map[string]any{
+			"/dags": map[string]any{
+				"get": map[string]any{"operationId": "get_dags", "summary": "List DAGs", "tags": []string{"DAGs"}},
+			},
+			"/health": map[string]any{
+				"get": map[string]any{"operationId": "health", "summary": "Health check"},
+			},
+		},
 	}
-	ts := newTestSpecServer(t, spec)
+	body, _ := json.Marshal(spec)
+	ts := newTestSpecServer(t, body)
 	defer ts.Close()
 
 	t.Run("lists all endpoints", func(t *testing.T) {
@@ -209,12 +206,13 @@ func TestRunList(t *testing.T) {
 }
 
 func TestRunList_EmptySpec(t *testing.T) {
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info:    &openapi3.Info{Title: "Test", Version: "1.0"},
-		Paths:   openapi3.NewPaths(),
+	spec := map[string]any{
+		"openapi": "3.0.0",
+		"info":    map[string]any{"title": "Test", "version": "1.0"},
+		"paths":   map[string]any{},
 	}
-	ts := newTestSpecServer(t, spec)
+	body, _ := json.Marshal(spec)
+	ts := newTestSpecServer(t, body)
 	defer ts.Close()
 
 	var buf bytes.Buffer
