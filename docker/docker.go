@@ -9,6 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/stdcopy"
+	"golang.org/x/term"
 )
 
 const (
@@ -22,7 +23,12 @@ func AirflowCommand(id, airflowCommand string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	cmd := exec.Command(containerRuntime, "exec", "-it", id, "bash", "-c", airflowCommand)
+	args := []string{"exec", "-i"}
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		args = append(args, "-t")
+	}
+	args = append(args, id, "bash", "-c", airflowCommand)
+	cmd := exec.Command(containerRuntime, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 

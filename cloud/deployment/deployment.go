@@ -1433,7 +1433,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	}
 
 	overrideDeploymentHibernationBody := astroplatformcore.OverrideDeploymentHibernationBody{
-		IsHibernating: isHibernating,
+		IsHibernating: &isHibernating,
 		OverrideUntil: overrideUntil,
 	}
 

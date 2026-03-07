@@ -8,14 +8,15 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/cmd/api"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
-	"github.com/astronomer/astro-cli/cmd/registry"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/telemetry"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -65,10 +66,17 @@ func NewRootCmd() *cobra.Command {
     \__\/\__\/ \_____\/   \__\/    \_\/ \_\/ \_____\/           \_____\/ \_____\/\________\/
 
 Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astro Private Cloud, or Local Development.`,
-		PersistentPreRunE: utils.ChainRunEs(
-			SetupLogging,
-			CreateRootPersistentPreRunE(astroCoreClient, platformCoreClient),
-		),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Skip heavy pre-run logic for commands that opt out via annotation
+			if cmd.Annotations[telemetry.SkipPreRunAnnotation] == "true" {
+				return nil
+			}
+			return utils.ChainRunEs(
+				SetupLogging,
+				CreateRootPersistentPreRunE(astroCoreClient, platformCoreClient),
+				telemetry.CreateTrackingHook(),
+			)(cmd, args)
+		},
 	}
 
 	rootCmd.AddCommand(
@@ -79,6 +87,9 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
+		api.NewAPICmd(),
+		newTelemetryCmd(os.Stdout),
+		newTelemetrySendCmd(),
 	)
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
@@ -91,10 +102,6 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		)
 		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}
-
-	rootCmd.AddCommand( // include all the commands for interacting with the registry
-		registry.AddCmds(os.Stdout)...,
-	)
 
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")

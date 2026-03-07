@@ -55,6 +55,12 @@ type cfgs struct {
 	RuffImage               cfg
 	RemoteClientRegistry    cfg
 	RemoteBaseImageRegistry cfg
+	DeployGitMetadata       cfg
+	DevMode                 cfg
+	TelemetryEnabled        cfg
+	TelemetryAnonymousID    cfg
+	TelemetryNoticeShown    cfg
+	ProxyPort               cfg
 }
 
 // Creates a new cfg struct

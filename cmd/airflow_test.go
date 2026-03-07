@@ -183,6 +183,17 @@ func (s *AirflowSuite) TestNewAirflowKillCmd() {
 	s.Nil(cmd.PreRunE(new(cobra.Command), []string{}))
 }
 
+func (s *AirflowSuite) TestNewAirflowRestartCmd() {
+	cmd := newAirflowRestartCmd(nil)
+	s.NotNil(cmd)
+	// Verify the --kill flag exists
+	killFlag := cmd.Flag("kill")
+	s.NotNil(killFlag)
+	s.Equal("k", killFlag.Shorthand)
+	s.Equal("false", killFlag.DefValue)
+	s.Contains(killFlag.Usage, "Remove all data before restarting")
+}
+
 func (s *AirflowSuite) Test_airflowInitNonEmptyDir() {
 	s.Run("test airflow init with non empty dir", func() {
 		cmd := newAirflowInitCmd()
@@ -638,7 +649,7 @@ func (s *AirflowSuite) TestAirflowStart() {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", false, false, defaultWaitTime, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
+			mockContainerHandler.On("Start", mock.Anything).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -673,7 +684,7 @@ func (s *AirflowSuite) TestAirflowStart() {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", false, false, defaultWaitTime, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
+			mockContainerHandler.On("Start", mock.Anything).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -709,7 +720,7 @@ func (s *AirflowSuite) TestAirflowStart() {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", false, false, defaultWaitTime, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
+			mockContainerHandler.On("Start", mock.Anything).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -725,7 +736,7 @@ func (s *AirflowSuite) TestAirflowStart() {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", false, false, defaultWaitTime, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(errMock).Once()
+			mockContainerHandler.On("Start", mock.Anything).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1069,7 +1080,7 @@ func (s *AirflowSuite) TestAirflowRestart() {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop", true).Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", true, true, defaultWaitTime, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(nil).Once()
+			mockContainerHandler.On("Start", mock.Anything).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1104,7 +1115,7 @@ func (s *AirflowSuite) TestAirflowRestart() {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop", true).Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", true, true, defaultWaitTime, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
+			mockContainerHandler.On("Start", mock.Anything).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1139,7 +1150,7 @@ func (s *AirflowSuite) TestAirflowRestart() {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop", true).Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", true, true, defaultWaitTime, map[string]astrocore.EnvironmentObjectConnection{envObj.ObjectKey: *envObj.Connection}).Return(nil).Once()
+			mockContainerHandler.On("Start", mock.Anything).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1172,7 +1183,7 @@ func (s *AirflowSuite) TestAirflowRestart() {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop", true).Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", "", "", true, true, defaultWaitTime, map[string]astrocore.EnvironmentObjectConnection(nil)).Return(errMock).Once()
+			mockContainerHandler.On("Start", mock.Anything).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1192,6 +1203,96 @@ func (s *AirflowSuite) TestAirflowRestart() {
 
 		err := airflowRestart(cmd, args, nil)
 		s.ErrorIs(err, errMock)
+	})
+
+	s.Run("success with kill flag", func() {
+		cmd := newAirflowRestartCmd(nil)
+		cmd.Flag("no-cache").Value.Set("true")
+		cmd.Flag("kill").Value.Set("true")
+		args := []string{"test-env-file"}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Kill").Return(nil).Once()
+			mockContainerHandler.On("Start", mock.Anything).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowRestart(cmd, args, nil)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("kill flag failure", func() {
+		cmd := newAirflowRestartCmd(nil)
+		cmd.Flag("no-cache").Value.Set("true")
+		cmd.Flag("kill").Value.Set("true")
+		args := []string{"test-env-file"}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Kill").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowRestart(cmd, args, nil)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("success with kill flag and deployment id", func() {
+		cmd := newAirflowRestartCmd(nil)
+		cmd.Flag("no-cache").Value.Set("true")
+		cmd.Flag("kill").Value.Set("true")
+		deploymentID := "test-deployment-id"
+		cmd.Flag("deployment-id").Value.Set(deploymentID)
+		args := []string{"test-env-file"}
+
+		envObj := astrocore.EnvironmentObject{
+			ObjectKey:  "test-object-key",
+			Connection: &astrocore.EnvironmentObjectConnection{Type: "test-conn-type"},
+		}
+		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(params *astrocore.ListEnvironmentObjectsParams) bool {
+			return *params.DeploymentId == deploymentID
+		})).Return(&astrocore.ListEnvironmentObjectsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.EnvironmentObjectsPaginated{
+				EnvironmentObjects: []astrocore.EnvironmentObject{envObj},
+			},
+		}, nil).Once()
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Kill").Return(nil).Once()
+			mockContainerHandler.On("Start", mock.Anything).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowRestart(cmd, args, mockCoreClient)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+		mockCoreClient.AssertExpectations(s.T())
+	})
+
+	s.Run("kill flag with start failure", func() {
+		cmd := newAirflowRestartCmd(nil)
+		cmd.Flag("no-cache").Value.Set("true")
+		cmd.Flag("kill").Value.Set("true")
+		args := []string{"test-env-file"}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Kill").Return(nil).Once()
+			mockContainerHandler.On("Start", mock.Anything).Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowRestart(cmd, args, nil)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 }
 
@@ -1588,6 +1689,248 @@ func (s *AirflowSuite) TestAirflowObjectExport() {
 		}
 
 		err := airflowSettingsExport(cmd, args)
+		s.ErrorIs(err, errMock)
+	})
+}
+
+func (s *AirflowSuite) TestResolveDevMode() {
+	s.Run("standalone flag takes priority", func() {
+		standaloneFlag = true
+		dockerFlag = false
+		s.Equal("standalone", resolveDevMode())
+		standaloneFlag = false
+	})
+
+	s.Run("docker flag takes priority over config", func() {
+		standaloneFlag = false
+		dockerFlag = true
+		s.Equal("docker", resolveDevMode())
+		dockerFlag = false
+	})
+
+	s.Run("defaults to config value", func() {
+		standaloneFlag = false
+		dockerFlag = false
+		// Default config value is "docker"
+		s.Equal("docker", resolveDevMode())
+	})
+}
+
+func (s *AirflowSuite) TestStandaloneModeStart() {
+	s.Run("standalone flag uses localHandlerInit", func() {
+		cmd := newAirflowStartCmd(nil)
+		args := []string{"test-env-file"}
+
+		standaloneFlag = true
+		defer func() { standaloneFlag = false }()
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		localHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Start", mock.Anything).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowStart(cmd, args, nil)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("standalone handler init error", func() {
+		cmd := newAirflowStartCmd(nil)
+		args := []string{}
+
+		standaloneFlag = true
+		defer func() { standaloneFlag = false }()
+
+		localHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowStart(cmd, args, nil)
+		s.ErrorIs(err, errMock)
+	})
+}
+
+func (s *AirflowSuite) TestStandaloneModeStop() {
+	s.Run("standalone flag uses localHandlerInit", func() {
+		cmd := newAirflowStopCmd()
+
+		standaloneFlag = true
+		defer func() { standaloneFlag = false }()
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		localHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Stop", false).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowStop(cmd, nil)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+}
+
+func (s *AirflowSuite) TestStandaloneModeKill() {
+	s.Run("standalone flag uses localHandlerInit", func() {
+		cmd := newAirflowKillCmd()
+
+		standaloneFlag = true
+		defer func() { standaloneFlag = false }()
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		localHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Kill").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowKill(cmd, nil)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+}
+
+func (s *AirflowSuite) TestStandaloneModeLogs() {
+	s.Run("standalone flag uses localHandlerInit", func() {
+		cmd := newAirflowLogsCmd()
+
+		standaloneFlag = true
+		defer func() { standaloneFlag = false }()
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		localHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			// When no component flags are set, all container names are passed
+			mockContainerHandler.On("Logs", false,
+				airflow.WebserverDockerContainerName,
+				airflow.SchedulerDockerContainerName,
+				airflow.TriggererDockerContainerName,
+				airflow.APIServerDockerContainerName,
+				airflow.DAGProcessorDockerContainerName,
+			).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowLogs(cmd, nil)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+}
+
+func (s *AirflowSuite) TestStandaloneModePS() {
+	s.Run("standalone flag uses localHandlerInit", func() {
+		cmd := newAirflowPSCmd()
+
+		standaloneFlag = true
+		defer func() { standaloneFlag = false }()
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		localHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("PS").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowPS(cmd, nil)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+}
+
+func (s *AirflowSuite) TestDevCommandLocalSubcommandRemoved() {
+	output, err := executeCommand("dev", "--help")
+	s.NoError(err)
+	// Ensure "local" does not appear as a subcommand in help output.
+	// It may appear in descriptions like "Start a local Airflow environment",
+	// but should not appear as a top-level command name.
+	s.NotContains(output, "  local")
+}
+
+func (s *AirflowSuite) TestStandaloneDockerFlagsMutuallyExclusive() {
+	// Verify that the flags are registered as mutually exclusive on the dev root command
+	cmd := newDevRootCmd(nil, nil)
+	s.NotNil(cmd.PersistentFlags().Lookup("standalone"))
+	s.NotNil(cmd.PersistentFlags().Lookup("docker"))
+
+	// Set both flags and verify the command rejects them
+	cmd.PersistentFlags().Set("standalone", "true")
+	cmd.PersistentFlags().Set("docker", "true")
+	err := cmd.ValidateFlagGroups()
+	s.Error(err)
+	s.Contains(err.Error(), "if any flags in the group [standalone docker] are set none of the others can be")
+}
+
+func (s *AirflowSuite) TestAirflowBuild() {
+	s.Run("success", func() {
+		cmd := newAirflowBuildCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Build", "", "", false).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBuild(cmd, args)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("success with no-cache flag", func() {
+		cmd := newAirflowBuildCmd()
+		noCache = true
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Build", "", "", true).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBuild(cmd, args)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+		noCache = false // reset
+	})
+
+	s.Run("success with custom image name", func() {
+		cmd := newAirflowBuildCmd()
+		customImageName = "my-custom-image:latest"
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Build", "my-custom-image:latest", "", false).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBuild(cmd, args)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
+		customImageName = "" // reset
+	})
+
+	s.Run("failure", func() {
+		cmd := newAirflowBuildCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Build", "", "", false).Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBuild(cmd, args)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("containerHandlerInit failure", func() {
+		cmd := newAirflowBuildCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowBuild(cmd, args)
 		s.ErrorIs(err, errMock)
 	})
 }

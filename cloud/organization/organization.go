@@ -42,7 +42,10 @@ func newTableOut() *printutil.Table {
 }
 
 func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Organization, error) {
-	organizationListParams := &astroplatformcore.ListOrganizationsParams{}
+	limit := 100
+	organizationListParams := &astroplatformcore.ListOrganizationsParams{
+		Limit: &limit,
+	}
 	resp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 	if err != nil {
 		return nil, err
@@ -54,6 +57,58 @@ func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astro
 	orgsPaginated := *resp.JSON200
 	orgs := orgsPaginated.Organizations
 	return orgs, nil
+}
+
+func GetOrganization(orgID string, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {
+	resp, err := platformCoreClient.GetOrganizationWithResponse(http_context.Background(), orgID, &astroplatformcore.GetOrganizationParams{})
+	if err != nil {
+		return nil, err
+	}
+	err = astroplatformcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return resp.JSON200, nil
+}
+
+// isCUID returns true if s is a valid CUID (25 chars: 'c' + 24 lowercase alphanumeric).
+func isCUID(s string) bool {
+	if len(s) != 25 || s[0] != 'c' {
+		return false
+	}
+	for _, ch := range s[1:] {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) {
+			return false
+		}
+	}
+	return true
+}
+
+func findOrganizationByName(name string, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {
+	pageSize := 100
+	offset := 0
+	for {
+		params := &astroplatformcore.ListOrganizationsParams{Limit: &pageSize, Offset: &offset}
+		resp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), params)
+		if err != nil {
+			return nil, err
+		}
+		err = astroplatformcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		paginated := *resp.JSON200
+		for i := range paginated.Organizations {
+			if paginated.Organizations[i].Name == name {
+				return &paginated.Organizations[i], nil
+			}
+		}
+		offset += pageSize
+		if offset >= paginated.TotalCount {
+			break
+		}
+	}
+	return nil, nil
 }
 
 // List all Organizations
@@ -155,23 +210,23 @@ func Switch(orgNameOrID string, coreClient astrocore.CoreClient, platformCoreCli
 
 	// get target org
 	var targetOrg *astroplatformcore.Organization
-	if orgNameOrID == "" {
+	switch {
+	case orgNameOrID == "":
 		targetOrg, err = getOrganizationSelection(out, platformCoreClient)
 		if err != nil {
 			return err
 		}
-	} else {
-		or, err := ListOrganizations(platformCoreClient)
+	case isCUID(orgNameOrID):
+		// Input looks like a CUID — fetch directly by ID
+		targetOrg, err = GetOrganization(orgNameOrID, platformCoreClient)
 		if err != nil {
 			return err
 		}
-		for i := range or {
-			if or[i].Name == orgNameOrID {
-				targetOrg = &or[i]
-			}
-			if or[i].Id == orgNameOrID {
-				targetOrg = &or[i]
-			}
+	default:
+		// Input is a name — paginate through all orgs to find it
+		targetOrg, err = findOrganizationByName(orgNameOrID, platformCoreClient)
+		if err != nil {
+			return err
 		}
 	}
 	if targetOrg == nil {

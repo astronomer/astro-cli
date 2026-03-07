@@ -366,9 +366,7 @@ services:
   AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
   AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: True
-  AIRFLOW__WEBSERVER__SECRET_KEY: "test-project-name"
-  AIRFLOW__WEBSERVER__RBAC: "True"
-  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+  AIRFLOW__API__SECRET_KEY: "test-project-name"
   ASTRONOMER_ENVIRONMENT: local
 
 networks:
@@ -578,10 +576,10 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
+		err := mockDockerCompose.Start(&airflowTypes.StartOptions{NoCache: noCache, NoBrowser: true, WaitTime: waitTime})
 		s.NoError(err)
 
-		err = mockDockerCompose.Start("custom-image", "", "", "", noCache, true, waitTime, nil)
+		err = mockDockerCompose.Start(&airflowTypes.StartOptions{ImageName: "custom-image", NoCache: noCache, NoBrowser: true, WaitTime: waitTime})
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -607,7 +605,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, true, defaultTimeOut, nil)
+		err := mockDockerCompose.Start(&airflowTypes.StartOptions{NoCache: noCache, NoBrowser: true, WaitTime: defaultTimeOut})
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -633,7 +631,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, true, expectedTimeout, nil)
+		err := mockDockerCompose.Start(&airflowTypes.StartOptions{NoCache: noCache, NoBrowser: true, WaitTime: expectedTimeout})
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -659,7 +657,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, true, userProvidedTimeOut, nil)
+		err := mockDockerCompose.Start(&airflowTypes.StartOptions{NoCache: noCache, NoBrowser: true, WaitTime: userProvidedTimeOut})
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -684,10 +682,10 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
+		err := mockDockerCompose.Start(&airflowTypes.StartOptions{NoCache: noCache, NoBrowser: true, WaitTime: waitTime})
 		s.NoError(err)
 
-		err = mockDockerCompose.Start("custom-image", "", "", "", noCache, true, waitTime, nil)
+		err = mockDockerCompose.Start(&airflowTypes.StartOptions{ImageName: "custom-image", NoCache: noCache, NoBrowser: true, WaitTime: waitTime})
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -708,7 +706,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
+		err := mockDockerCompose.Start(&airflowTypes.StartOptions{NoCache: noCache, NoBrowser: true, WaitTime: waitTime})
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
@@ -730,7 +728,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
+		err := mockDockerCompose.Start(&airflowTypes.StartOptions{NoCache: noCache, NoBrowser: true, WaitTime: waitTime})
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
@@ -753,7 +751,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
+		err := mockDockerCompose.Start(&airflowTypes.StartOptions{NoCache: noCache, NoBrowser: true, WaitTime: waitTime})
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
@@ -776,7 +774,7 @@ func (s *Suite) TestDockerComposeStart() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start("", "", "", "", noCache, true, waitTime, nil)
+		err := mockDockerCompose.Start(&airflowTypes.StartOptions{NoCache: noCache, NoBrowser: true, WaitTime: waitTime})
 		s.ErrorIs(err, errMockDocker)
 
 		imageHandler.AssertExpectations(s.T())
@@ -1606,6 +1604,73 @@ func (s *Suite) TestDockerComposeParse() {
 
 		err := mockDockerCompose.Parse("", "test", "")
 		s.Contains(err.Error(), "invalid argument")
+	})
+}
+
+func (s *Suite) TestDockerComposeBuild() {
+	s.Run("success", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", mock.Anything, "", airflowTypes.ImageBuildConfig{Path: "", NoCache: false}).Return(nil).Once()
+
+		mockDockerCompose := DockerCompose{
+			imageHandler: imageHandler,
+		}
+
+		err := mockDockerCompose.Build("", "", false)
+		s.NoError(err)
+		imageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("success with no-cache", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", mock.Anything, "", airflowTypes.ImageBuildConfig{Path: "", NoCache: true}).Return(nil).Once()
+
+		mockDockerCompose := DockerCompose{
+			imageHandler: imageHandler,
+		}
+
+		err := mockDockerCompose.Build("", "", true)
+		s.NoError(err)
+		imageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("success with custom image", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("TagLocalImage", "my-custom-image:latest").Return(nil).Once()
+
+		mockDockerCompose := DockerCompose{
+			imageHandler: imageHandler,
+		}
+
+		err := mockDockerCompose.Build("my-custom-image:latest", "", false)
+		s.NoError(err)
+		imageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("build failure", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", mock.Anything, "", airflowTypes.ImageBuildConfig{Path: "", NoCache: false}).Return(errMock).Once()
+
+		mockDockerCompose := DockerCompose{
+			imageHandler: imageHandler,
+		}
+
+		err := mockDockerCompose.Build("", "", false)
+		s.ErrorIs(err, errMock)
+		imageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("tag local image failure", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("TagLocalImage", "my-custom-image:latest").Return(errMock).Once()
+
+		mockDockerCompose := DockerCompose{
+			imageHandler: imageHandler,
+		}
+
+		err := mockDockerCompose.Build("my-custom-image:latest", "", false)
+		s.ErrorIs(err, errMock)
+		imageHandler.AssertExpectations(s.T())
 	})
 }
 

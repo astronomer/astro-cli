@@ -73,6 +73,7 @@ var (
 	lintFix                bool
 	lintConfigFile         string
 	waitTime               time.Duration
+	forceKill              bool
 	containerRuntime       runtimes.ContainerRuntime
 	RunExample             = `
 # Create default admin user.
@@ -121,6 +122,7 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 
 	// this is used to monkey patch the function in order to write unit test cases
 	containerHandlerInit = airflow.ContainerHandlerInit
+	localHandlerInit     = airflow.StandaloneHandlerInit
 	getDefaultImageTag   = airflowversions.GetDefaultImageTag
 	projectNameUnique    = airflow.ProjectNameUnique
 
@@ -132,6 +134,12 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	TemplateList                = airflow.FetchTemplateList
 	defaultWaitTime             = 1 * time.Minute
 	directoryPermissions uint32 = 0o755
+	localForeground      bool
+	localPort            string
+	standaloneFlag       bool
+	dockerFlag           bool
+	noProxyFlag          bool
+	proxyPortFlag        string
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
@@ -149,9 +157,13 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 			ConfigureContainerRuntime,
 		),
 	}
+	cmd.PersistentFlags().BoolVar(&standaloneFlag, "standalone", false, "Run in standalone mode (without Docker)")
+	cmd.PersistentFlags().BoolVar(&dockerFlag, "docker", false, "Run in Docker mode")
+	cmd.MarkFlagsMutuallyExclusive("standalone", "docker")
 	cmd.AddCommand(
 		newAirflowInitCmd(),
 		newAirflowStartCmd(astroCoreClient),
+		newAirflowBuildCmd(),
 		newAirflowRunCmd(),
 		newAirflowPSCmd(),
 		newAirflowLogsCmd(),
@@ -163,8 +175,33 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
 		newAirflowUpgradeTestCmd(platformCoreClient),
+		newProxyRootCmd(),
 	)
 	return cmd
+}
+
+// resolveDevMode returns "docker" or "standalone" based on flag priority then config.
+func resolveDevMode() string {
+	if standaloneFlag {
+		return "standalone"
+	}
+	if dockerFlag {
+		return "docker"
+	}
+	return config.CFG.DevMode.GetString()
+}
+
+// isStandaloneMode returns true if the current dev mode is standalone.
+func isStandaloneMode() bool {
+	return resolveDevMode() == "standalone"
+}
+
+// resolveHandlerInit returns the appropriate handler init function based on mode.
+func resolveHandlerInit() func(string, string, string, string) (airflow.ContainerHandler, error) {
+	if isStandaloneMode() {
+		return localHandlerInit
+	}
+	return containerHandlerInit
 }
 
 func newAirflowInitCmd() *cobra.Command {
@@ -258,32 +295,50 @@ func newAirflowStartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "start",
 		Short:   "Start a local Airflow environment",
-		Long:    "Start a local Airflow environment. This command will spin up 4 Docker containers on your machine, each for a different Airflow component: Webserver, scheduler, triggerer and metadata database.",
+		Long:    "Start a local Airflow environment. In Docker mode (default), this spins up containers for each Airflow component. In standalone mode, this runs Airflow directly on your machine without Docker.",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: EnsureRuntime,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return airflowStart(cmd, args, astroCoreClient)
 		},
 	}
+	// Common flags
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
-	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
-	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
-	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
-	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for webserver to get healthy. The default is 5 minutes. Use --wait 2m to wait for 2 minutes.")
-	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Location of a custom compose file to use for starting Airflow")
-	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
+	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for webserver to get healthy. Use --wait 2m to wait for 2 minutes.")
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from. If not specified uses the current Workspace.")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
 
+	// Docker mode flags
+	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
+	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
+	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Location of a custom compose file to use for starting Airflow")
+	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
+	annotateFlag(cmd, "no-cache", "docker")
+	annotateFlag(cmd, "image-name", "docker")
+	annotateFlag(cmd, "no-browser", "docker")
+	annotateFlag(cmd, "compose-file", "docker")
+	annotateFlag(cmd, "build-secrets", "docker")
+
+	// Standalone mode flags
+	cmd.Flags().BoolVarP(&localForeground, "foreground", "f", false, "Run in the foreground")
+	cmd.Flags().StringVarP(&localPort, "port", "p", "", "Port for the Airflow webserver")
+	annotateFlag(cmd, "foreground", "standalone")
+	annotateFlag(cmd, "port", "standalone")
+
+	// Proxy flags
+	cmd.Flags().BoolVar(&noProxyFlag, "no-proxy", false, "Disable the reverse proxy (use fixed ports instead)")
+
+	cmd.SetUsageTemplate(groupedFlagsUsageTemplate)
 	return cmd
 }
 
 func newAirflowPSCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "ps",
-		Short:   "List locally running Airflow containers",
-		Long:    "List locally running Airflow containers",
+		Short:   "List the status of your local Airflow environment",
+		Long:    "List the status of your local Airflow environment",
 		PreRunE: SetRuntimeIfExists,
 		RunE:    airflowPS,
 	}
@@ -306,8 +361,8 @@ func newAirflowRunCmd() *cobra.Command {
 func newAirflowLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs",
-		Short:   "Display component logs for your local Airflow environment",
-		Long:    "Display scheduler, worker, api-server, and webserver logs for your local Airflow environment",
+		Short:   "Display logs for your local Airflow environment",
+		Long:    "Display logs for your local Airflow environment. In Docker mode, you can filter by component. In standalone mode, the unified log is shown.",
 		PreRunE: SetRuntimeIfExists,
 		RunE:    airflowLogs,
 	}
@@ -323,8 +378,8 @@ func newAirflowLogsCmd() *cobra.Command {
 func newAirflowStopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "stop",
-		Short:   "Stop all locally running Airflow containers",
-		Long:    "Stop all Airflow containers running on your local machine. This command preserves container data.",
+		Short:   "Stop your local Airflow environment",
+		Long:    "Stop your local Airflow environment. This command preserves data so you can resume later.",
 		PreRunE: SetRuntimeIfExists,
 		RunE:    airflowStop,
 	}
@@ -334,8 +389,8 @@ func newAirflowStopCmd() *cobra.Command {
 func newAirflowKillCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:      "kill",
-		Short:    "Kill all locally running Airflow containers",
-		Long:     "Kill all Airflow containers running on your local machine. This command permanently deletes all container data.",
+		Short:    "Kill your local Airflow environment and remove all data",
+		Long:     "Kill your local Airflow environment and permanently delete all data. In Docker mode, this removes containers and volumes. In standalone mode, this removes the virtual environment, database, and logs.",
 		PreRunE:  KillPreRunHook,
 		RunE:     airflowKill,
 		PostRunE: KillPostRunHook,
@@ -346,22 +401,39 @@ func newAirflowKillCmd() *cobra.Command {
 func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "restart",
-		Short:   "Restart all locally running Airflow containers",
-		Long:    "Restart all Airflow containers running on your local machine. This command stops and then starts locally running containers to apply changes to your local environment.",
+		Short:   "Restart your local Airflow environment",
+		Long:    "Restart your local Airflow environment. This command stops and then starts your environment to apply changes.",
 		PreRunE: SetRuntimeIfExists,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return airflowRestart(cmd, args, astroCoreClient)
 		},
 	}
-	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for webserver to get healthy. The default is 5 minutes. Use --wait 2m to wait for 2 minutes.")
+	// Common flags
+	cmd.Flags().DurationVar(&waitTime, "wait", defaultWaitTime, "Duration to wait for webserver to get healthy. Use --wait 2m to wait for 2 minutes.")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
-	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
-	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
-	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the Workspace to retrieve environment connections from. If not specified uses the current Workspace.")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the Deployment to retrieve environment connections from")
+	cmd.Flags().BoolVarP(&forceKill, "kill", "k", false, "Remove all data before restarting")
 
+	// Docker mode flags
+	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
+	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
+	annotateFlag(cmd, "no-cache", "docker")
+	annotateFlag(cmd, "image-name", "docker")
+	annotateFlag(cmd, "build-secrets", "docker")
+
+	// Standalone mode flags
+	cmd.Flags().BoolVarP(&localForeground, "foreground", "f", false, "Run in the foreground")
+	cmd.Flags().StringVarP(&localPort, "port", "p", "", "Port for the Airflow webserver")
+	annotateFlag(cmd, "foreground", "standalone")
+	annotateFlag(cmd, "port", "standalone")
+
+	// Proxy flags
+	cmd.Flags().BoolVar(&noProxyFlag, "no-proxy", false, "Disable the reverse proxy (use fixed ports instead)")
+
+	cmd.SetUsageTemplate(groupedFlagsUsageTemplate)
 	return cmd
 }
 
@@ -392,6 +464,21 @@ func newAirflowParseCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to run parse with")
+	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
+
+	return cmd
+}
+
+func newAirflowBuildCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "build",
+		Short:   "Build your Astro project into a Docker image",
+		Long:    "Build your Astro project into a Docker image without starting the local Airflow environment. This is useful for testing that your project builds successfully or for preparing an image before deployment.",
+		PreRunE: EnsureRuntime,
+		RunE:    airflowBuild,
+	}
+	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to tag as the project image")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
 
 	return cmd
@@ -688,7 +775,8 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 
 	imageName := "tmp-upgrade-test"
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, envFile, dockerfile, imageName)
 	if err != nil {
 		return err
 	}
@@ -728,14 +816,27 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 		}
 	}
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {
 		return err
 	}
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	return containerHandler.Start(customImageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns)
+	return containerHandler.Start(&airflow.StartOptions{
+		ImageName:         customImageName,
+		SettingsFile:      settingsFile,
+		ComposeFile:       composeFile,
+		BuildSecretString: buildSecretString,
+		NoCache:           noCache,
+		NoBrowser:         noBrowser,
+		WaitTime:          waitTime,
+		EnvConns:          envConns,
+		NoProxy:           noProxyFlag,
+		Foreground:        localForeground,
+		Port:              localPort,
+	})
 }
 
 // airflowRun
@@ -745,9 +846,9 @@ func airflowRun(cmd *cobra.Command, args []string) error {
 
 	// Add airflow command, to simplify astro cli usage
 	args = append([]string{"airflow"}, args...)
-	// ignore last user parameter
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -760,7 +861,8 @@ func airflowPS(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -795,7 +897,8 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -808,7 +911,8 @@ func airflowKill(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -821,7 +925,8 @@ func airflowStop(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -829,17 +934,22 @@ func airflowStop(cmd *cobra.Command, args []string) error {
 	return containerHandler.Stop(false)
 }
 
-// Stop an airflow cluster
+// Restart an airflow cluster
 func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore.CoreClient) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {
 		return err
 	}
 
-	err = containerHandler.Stop(true)
+	if forceKill {
+		err = containerHandler.Kill()
+	} else {
+		err = containerHandler.Stop(true)
+	}
 	if err != nil {
 		return err
 	}
@@ -862,7 +972,19 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	return containerHandler.Start(customImageName, settingsFile, composeFile, buildSecretString, noCache, noBrowser, waitTime, envConns)
+	return containerHandler.Start(&airflow.StartOptions{
+		ImageName:         customImageName,
+		SettingsFile:      settingsFile,
+		ComposeFile:       composeFile,
+		BuildSecretString: buildSecretString,
+		NoCache:           noCache,
+		NoBrowser:         noBrowser,
+		WaitTime:          waitTime,
+		EnvConns:          envConns,
+		NoProxy:           noProxyFlag,
+		Foreground:        localForeground,
+		Port:              localPort,
+	})
 }
 
 // run pytest on an airflow project
@@ -896,7 +1018,8 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Running your test suite…")
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, envFile, dockerfile, imageName)
 	if err != nil {
 		return err
 	}
@@ -924,7 +1047,8 @@ func airflowParse(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, envFile, dockerfile, imageName)
 	if err != nil {
 		return err
 	}
@@ -932,6 +1056,27 @@ func airflowParse(cmd *cobra.Command, args []string) error {
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
 	return containerHandler.Parse(customImageName, "", buildSecretString)
+}
+
+// Build the Airflow project image
+func airflowBuild(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	imageName, err := projectNameUnique()
+	if err != nil {
+		return err
+	}
+
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, envFile, dockerfile, imageName)
+	if err != nil {
+		return err
+	}
+
+	buildSecretString = util.GetbuildSecretString(buildSecrets)
+
+	return containerHandler.Build(customImageName, buildSecretString, noCache)
 }
 
 // Exec into an airflow container
@@ -965,7 +1110,8 @@ func airflowBash(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -978,7 +1124,8 @@ func airflowSettingsImport(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -989,7 +1136,8 @@ func airflowSettingsExport(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
+	handlerInit := resolveHandlerInit()
+	containerHandler, err := handlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}

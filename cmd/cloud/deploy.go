@@ -29,6 +29,7 @@ var (
 	imageName         string
 	deploymentName    string
 	deployDescription string
+	noDagsBaseDir     bool
 	deployExample     = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
 
@@ -69,6 +70,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy, or image name with custom tag when used with --client")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
+	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
 	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have DAG Deploy enabled your DAGs will not be affected.")
 	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
@@ -158,6 +160,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		DeploymentName:    deploymentName,
 		Prompt:            forcePrompt,
 		Dags:              dags,
+		NoDagsBaseDir:     noDagsBaseDir,
 		Image:             image,
 		WaitForStatus:     waitForDeploy,
 		WaitTime:          waitTime,

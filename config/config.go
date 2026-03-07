@@ -89,6 +89,12 @@ var (
 		RuffImage:               newCfg("ruff.image", "ghcr.io/astral-sh/ruff:latest"),
 		RemoteClientRegistry:    newCfg("remote.client_registry", ""),
 		RemoteBaseImageRegistry: newCfg("remote.base_image_registry", "images.astronomer.cloud"),
+		DeployGitMetadata:       newCfg("deploy.git_metadata", "true"),
+		DevMode:                 newCfg("dev.mode", "docker"),
+		TelemetryEnabled:        newCfg("telemetry.enabled", "true"),
+		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
+		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
+		ProxyPort:               newCfg("proxy.port", "6563"),
 	}
 
 	// viperHome is the viper object in the users home directory

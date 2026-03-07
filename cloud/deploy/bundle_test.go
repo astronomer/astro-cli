@@ -13,6 +13,7 @@ import (
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/git"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
@@ -184,6 +185,46 @@ func (s *BundleSuite) TestBundleDeploy_GitHasUncommittedChanges() {
 	}
 
 	err := DeployBundle(input)
+	assert.NoError(s.T(), err)
+
+	s.mockCoreClient.AssertExpectations(s.T())
+	s.mockPlatformCoreClient.AssertExpectations(s.T())
+}
+
+func (s *BundleSuite) TestBundleDeploy_GitMetadataDisabledViaConfig() {
+	// Create a git repo that would normally have metadata retrieved
+	_, gitPath := s.createTestGitRepository(false)
+	defer os.RemoveAll(gitPath)
+
+	// Disable git metadata via config
+	err := config.CFG.DeployGitMetadata.SetHomeString("false")
+	require.NoError(s.T(), err)
+	defer config.CFG.DeployGitMetadata.SetHomeString("true") // Reset after test
+
+	input := &DeployBundleInput{
+		BundlePath:         gitPath,
+		PlatformCoreClient: s.mockPlatformCoreClient,
+		CoreClient:         s.mockCoreClient,
+	}
+
+	mockGetDeployment(s.mockPlatformCoreClient, true, false)
+
+	// Expect deploy request WITHOUT git metadata (Git: nil)
+	expectedDeploy := &astrocore.CreateDeployRequest{
+		Type:            astrocore.CreateDeployRequestTypeBUNDLE,
+		BundleType:      &input.BundleType,
+		BundleMountPath: &input.MountPath,
+		Description:     &input.Description,
+		Git:             nil,
+	}
+	mockCreateDeploy(s.mockCoreClient, "http://bundle-upload-url", expectedDeploy)
+	mockUpdateDeploy(s.mockCoreClient, "version-id")
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	err = DeployBundle(input)
 	assert.NoError(s.T(), err)
 
 	s.mockCoreClient.AssertExpectations(s.T())
