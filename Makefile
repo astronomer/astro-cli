@@ -11,8 +11,14 @@ lint:
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint version
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint run --timeout 15m0s --verbose
 
-build:
+embed-opencode:
+	./script/embed-opencode.sh
+
+build: embed-opencode
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
+
+build-no-agent:
+	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" -tags no_agent main.go
 
 test:
 	go test -count=1 -cover -coverprofile=coverage.txt -covermode=atomic ./... -test.v

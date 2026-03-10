@@ -8,6 +8,7 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	agentCmd "github.com/astronomer/astro-cli/cmd/agent"
 	"github.com/astronomer/astro-cli/cmd/api"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
@@ -90,6 +91,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		api.NewAPICmd(),
 		newTelemetryCmd(os.Stdout),
 		newTelemetrySendCmd(),
+		agentCmd.NewAgentCmd(),
 	)
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users

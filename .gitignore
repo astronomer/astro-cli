@@ -16,6 +16,8 @@ cmd/dags/.airflowignore
 cover.out
 coverage-2.txt
 coverage.txt
+cmd/agent/embedded/opencode.gz
+cmd/agent/embedded/version.txt
 dist/
 hello-astro/
 meta/
