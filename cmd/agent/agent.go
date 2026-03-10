@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/spf13/cobra"
 )
@@ -46,17 +45,16 @@ func runAgent(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("opencode binary not embedded — run 'make embed-opencode' first")
 	}
 
+	if strings.TrimSpace(opencodeVersion) == "unsupported" {
+		return fmt.Errorf("astro agent is not supported on %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
 	binPath, err := ensureBinary()
 	if err != nil {
 		return fmt.Errorf("failed to extract opencode binary: %w", err)
 	}
 
-	// Use syscall.Exec to replace this process with opencode.
-	// This gives opencode full control of the terminal (TUI, signals, etc).
-	argv := append([]string{binaryName}, args...)
-	env := os.Environ()
-
-	return syscall.Exec(binPath, argv, env)
+	return execOpencode(binPath, args)
 }
 
 // ensureBinary extracts the embedded opencode binary to a cache directory.

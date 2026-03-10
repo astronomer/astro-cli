@@ -20,6 +20,12 @@ builds:
   - id: darwin-build
     main: main.go
     binary: astro
+    hooks:
+      pre:
+        - cmd: ./script/embed-opencode.sh
+          env:
+            - TARGET_OS={{ .Os }}
+            - TARGET_ARCH={{ .Arch }}
     env:
       - CGO_ENABLED=1
       - CC=o64-clang
@@ -36,6 +42,12 @@ builds:
   - id: linux-windows-build
     main: main.go
     binary: astro
+    hooks:
+      pre:
+        - cmd: ./script/embed-opencode.sh
+          env:
+            - TARGET_OS={{ .Os }}
+            - TARGET_ARCH={{ .Arch }}
     env:
       - CGO_ENABLED=0
     goos:
