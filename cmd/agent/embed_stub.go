@@ -7,3 +7,4 @@ package agent
 
 var opencodeCompressed []byte
 var opencodeVersion = "none"
+var skillsCompressed []byte

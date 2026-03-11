@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"archive/tar"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -22,7 +23,7 @@ func NewAgentCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "agent [prompt]",
 		Short: "AI-powered development agent for Airflow",
-		Long:  "Start an interactive AI agent session powered by opencode, pre-configured for Apache Airflow development.",
+		Long:  "Start an interactive AI agent session pre-configured for Apache Airflow development.",
 		RunE:  runAgent,
 		// Skip the heavy astro pre-run hooks — agent doesn't need them
 		Annotations: map[string]string{
@@ -42,7 +43,7 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(opencodeCompressed) == 0 {
-		return fmt.Errorf("opencode binary not embedded — run 'make embed-opencode' first")
+		return fmt.Errorf("agent binary not embedded — run 'make build' first")
 	}
 
 	if strings.TrimSpace(opencodeVersion) == "unsupported" {
@@ -51,7 +52,12 @@ func runAgent(cmd *cobra.Command, args []string) error {
 
 	binPath, err := ensureBinary()
 	if err != nil {
-		return fmt.Errorf("failed to extract opencode binary: %w", err)
+		return fmt.Errorf("failed to set up agent: %w", err)
+	}
+
+	if _, err := ensureSkills(); err != nil {
+		// Skills are non-fatal — agent still works, just without built-in skills
+		fmt.Fprintf(os.Stderr, "Warning: could not extract skills: %v\n", err)
 	}
 
 	return execOpencode(binPath, args)
@@ -87,7 +93,7 @@ func ensureBinary() (string, error) {
 	}
 
 	// Extract
-	fmt.Fprintf(os.Stderr, "Extracting opencode %s...\n", strings.TrimSpace(opencodeVersion))
+	fmt.Fprintf(os.Stderr, "Setting up agent...\n")
 
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return "", err
@@ -95,7 +101,7 @@ func ensureBinary() (string, error) {
 
 	r, err := gzip.NewReader(bytes.NewReader(opencodeCompressed))
 	if err != nil {
-		return "", fmt.Errorf("decompressing opencode: %w", err)
+		return "", fmt.Errorf("decompressing agent binary: %w", err)
 	}
 	defer r.Close()
 
@@ -127,6 +133,99 @@ func ensureBinary() (string, error) {
 	os.WriteFile(checksumPath, []byte(currentChecksum), 0o644) //nolint:errcheck
 
 	return binPath, nil
+}
+
+// ensureSkills extracts the embedded skills tarball to ~/.agents/skills/.
+// Opencode already scans this directory by default (EXTERNAL_DIRS = [".claude", ".agents"]),
+// so the skills are discovered automatically without any config needed.
+func ensureSkills() (string, error) {
+	if len(skillsCompressed) == 0 {
+		return "", nil
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	skillsDir := filepath.Join(home, ".agents", "skills")
+	checksumPath := filepath.Join(home, ".agents", ".astro-skills-checksum")
+
+	hash := sha256.Sum256(skillsCompressed)
+	currentChecksum := hex.EncodeToString(hash[:])
+
+	// Check if already extracted with matching checksum
+	if existingChecksum, err := os.ReadFile(checksumPath); err == nil {
+		if strings.TrimSpace(string(existingChecksum)) == currentChecksum {
+			if _, err := os.Stat(filepath.Join(skillsDir, "index.json")); err == nil {
+				return skillsDir, nil
+			}
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "Updating skills...\n")
+
+	// Remove old skills and extract fresh
+	os.RemoveAll(skillsDir)
+	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
+		return "", err
+	}
+
+	if err := extractTarGz(skillsCompressed, skillsDir); err != nil {
+		return "", fmt.Errorf("extracting skills: %w", err)
+	}
+
+	os.WriteFile(checksumPath, []byte(currentChecksum), 0o644) //nolint:errcheck
+
+	return skillsDir, nil
+}
+
+// extractTarGz extracts a gzipped tarball into the destination directory.
+func extractTarGz(data []byte, dest string) error {
+	gz, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	defer gz.Close()
+
+	tr := tar.NewReader(gz)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		target := filepath.Join(dest, filepath.Clean(header.Name)) //nolint:gosec
+		// Prevent path traversal
+		if !strings.HasPrefix(target, filepath.Clean(dest)+string(os.PathSeparator)) && target != filepath.Clean(dest) {
+			continue
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				f.Close()
+				return err
+			}
+			f.Close()
+		}
+	}
+
+	return nil
 }
 
 // agentCacheDir returns ~/.astro/agent/ as the cache location.

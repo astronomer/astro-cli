@@ -16,6 +16,7 @@ func execOpencode(binPath string, args []string) error {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = appendConfigEnv(os.Environ())
 
 	// Forward interrupt signals to the child process
 	sigCh := make(chan os.Signal, 1)

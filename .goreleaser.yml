@@ -4,9 +4,12 @@ project_name: astro
 version: 2
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod download
     - go mod tidy
+    # Build ALL opencode platform binaries once, then per-build hooks pick the right one.
+    # This avoids rebuilding opencode for each goreleaser target.
+    - ./script/build-opencode-all.sh
+    - ./script/embed-skills.sh
 release:
   github:
     owner: astronomer
@@ -22,7 +25,7 @@ builds:
     binary: astro
     hooks:
       pre:
-        - cmd: ./script/embed-opencode.sh
+        - cmd: ./script/pick-opencode.sh
           env:
             - TARGET_OS={{ .Os }}
             - TARGET_ARCH={{ .Arch }}
@@ -44,7 +47,7 @@ builds:
     binary: astro
     hooks:
       pre:
-        - cmd: ./script/embed-opencode.sh
+        - cmd: ./script/pick-opencode.sh
           env:
             - TARGET_OS={{ .Os }}
             - TARGET_ARCH={{ .Arch }}

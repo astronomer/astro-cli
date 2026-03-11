@@ -18,6 +18,8 @@ coverage-2.txt
 coverage.txt
 cmd/agent/embedded/opencode.gz
 cmd/agent/embedded/version.txt
+cmd/agent/embedded/skills.tar.gz
+.opencode-build/
 dist/
 hello-astro/
 meta/

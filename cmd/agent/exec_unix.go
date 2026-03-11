@@ -12,5 +12,6 @@ import (
 // (TUI rendering, signal handling, etc.) with no parent process overhead.
 func execOpencode(binPath string, args []string) error {
 	argv := append([]string{binaryName}, args...)
-	return syscall.Exec(binPath, argv, os.Environ())
+	env := appendConfigEnv(os.Environ())
+	return syscall.Exec(binPath, argv, env)
 }

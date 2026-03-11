@@ -9,3 +9,6 @@ var opencodeCompressed []byte
 
 //go:embed embedded/version.txt
 var opencodeVersion string
+
+//go:embed embedded/skills.tar.gz
+var skillsCompressed []byte
