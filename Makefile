@@ -11,27 +11,26 @@ lint:
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint version
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint run --timeout 15m0s --verbose
 
-embed-opencode:
-	./script/embed-opencode.sh
+# --- Agent (Pi-based) ---
+embed-agent:
+	./script/embed-agent.sh
 
 embed-skills:
 	./script/embed-skills.sh
 
-embed: embed-opencode embed-skills
+embed: embed-agent embed-skills
 
 build: embed
-	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
-
-# Build using local checkouts of opencode and agents repos (avoids cloning)
-# Usage: make build-local OPENCODE_REPO_PATH=../opencode AGENTS_REPO_PATH=../agents
-build-local: export OPENCODE_REPO_PATH ?= ../opencode
-build-local: export AGENTS_REPO_PATH ?= ../agents
-build-local: embed
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
 
 build-no-agent:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" -tags no_agent main.go
 
+# --- Agent dev (run directly without embedding) ---
+agent-dev:
+	cd agent && bun run dev
+
+# --- Tests ---
 test:
 	go test -count=1 -cover -coverprofile=coverage.txt -covermode=atomic ./... -test.v
 

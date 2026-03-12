@@ -1,0 +1,26 @@
+{
+  "name": "astro-agent",
+  "version": "0.57.1",
+  "private": true,
+  "type": "module",
+  "piConfig": {
+    "name": "astro-agent",
+    "configDir": ".astro"
+  },
+  "scripts": {
+    "dev": "bun run src/main.ts",
+    "build": "bun build --compile ./src/main.ts --outfile dist/astro-agent",
+    "build:all": "bun run build:darwin-arm64 && bun run build:darwin-x64 && bun run build:linux-arm64 && bun run build:linux-x64",
+    "build:darwin-arm64": "bun build --compile --target=bun-darwin-arm64 ./src/main.ts --outfile dist/astro-agent-darwin-arm64",
+    "build:darwin-x64": "bun build --compile --target=bun-darwin-x64 ./src/main.ts --outfile dist/astro-agent-darwin-x64",
+    "build:linux-arm64": "bun build --compile --target=bun-linux-arm64 ./src/main.ts --outfile dist/astro-agent-linux-arm64",
+    "build:linux-x64": "bun build --compile --target=bun-linux-x64 ./src/main.ts --outfile dist/astro-agent-linux-x64",
+    "build:windows-x64": "bun build --compile --target=bun-windows-x64 ./src/main.ts --outfile dist/astro-agent-windows-x64.exe"
+  },
+  "dependencies": {
+    "@mariozechner/pi-coding-agent": "^0.57.1",
+    "@mariozechner/pi-ai": "^0.57.1",
+    "@mariozechner/pi-tui": "^0.57.1",
+    "@sinclair/typebox": "^0.34.0"
+  }
+}

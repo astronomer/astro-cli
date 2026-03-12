@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const binaryName = "opencode"
+const binaryName = "astro-agent"
 
 func NewAgentCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -29,7 +29,7 @@ func NewAgentCmd() *cobra.Command {
 		Annotations: map[string]string{
 			"skipPreRun": "true",
 		},
-		DisableFlagParsing: true, // Pass all flags through to opencode
+		DisableFlagParsing: true, // Pass all flags through to the agent
 	}
 	return cmd
 }
@@ -60,72 +60,50 @@ func runAgent(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "Warning: could not extract skills: %v\n", err)
 	}
 
-	return execOpencode(binPath, args)
+	return execAgent(binPath, args)
 }
 
-// ensureBinary extracts the embedded opencode binary to a cache directory.
-// It only re-extracts when the version or checksum changes.
+// ensureBinary extracts the embedded agent tarball (binary + assets) to a cache directory.
+// It only re-extracts when the checksum changes.
 func ensureBinary() (string, error) {
 	cacheDir, err := agentCacheDir()
 	if err != nil {
 		return "", err
 	}
 
-	binPath := filepath.Join(cacheDir, binaryName)
+	binName := binaryName
 	if runtime.GOOS == "windows" {
-		binPath += ".exe"
+		binName += ".exe"
 	}
-
+	binPath := filepath.Join(cacheDir, binName)
 	checksumPath := filepath.Join(cacheDir, "checksum")
 
-	// Compute checksum of the embedded binary to detect changes
+	// Compute checksum of the embedded tarball to detect changes
 	hash := sha256.Sum256(opencodeCompressed)
 	currentChecksum := hex.EncodeToString(hash[:])
 
 	// Check if we already have the right version extracted
 	if existingChecksum, err := os.ReadFile(checksumPath); err == nil {
 		if strings.TrimSpace(string(existingChecksum)) == currentChecksum {
-			// Verify the binary still exists
 			if _, err := os.Stat(binPath); err == nil {
 				return binPath, nil
 			}
 		}
 	}
 
-	// Extract
+	// Extract the tarball (binary + theme files + package.json)
 	fmt.Fprintf(os.Stderr, "Setting up agent...\n")
 
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return "", err
 	}
 
-	r, err := gzip.NewReader(bytes.NewReader(opencodeCompressed))
-	if err != nil {
-		return "", fmt.Errorf("decompressing agent binary: %w", err)
-	}
-	defer r.Close()
-
-	// Write to a temp file first, then rename for atomicity
-	tmpFile, err := os.CreateTemp(cacheDir, "opencode-*.tmp")
-	if err != nil {
-		return "", err
-	}
-	tmpPath := tmpFile.Name()
-
-	if _, err := io.Copy(tmpFile, r); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpPath)
-		return "", err
-	}
-	tmpFile.Close()
-
-	if err := os.Chmod(tmpPath, 0o755); err != nil {
-		os.Remove(tmpPath)
-		return "", err
+	if err := extractTarGz(opencodeCompressed, cacheDir); err != nil {
+		return "", fmt.Errorf("extracting agent: %w", err)
 	}
 
-	if err := os.Rename(tmpPath, binPath); err != nil {
-		os.Remove(tmpPath)
+	// Ensure the binary is executable
+	if err := os.Chmod(binPath, 0o755); err != nil {
 		return "", err
 	}
 
@@ -136,8 +114,7 @@ func ensureBinary() (string, error) {
 }
 
 // ensureSkills extracts the embedded skills tarball to ~/.agents/skills/.
-// Opencode already scans this directory by default (EXTERNAL_DIRS = [".claude", ".agents"]),
-// so the skills are discovered automatically without any config needed.
+// Pi auto-discovers skills from this directory.
 func ensureSkills() (string, error) {
 	if len(skillsCompressed) == 0 {
 		return "", nil
@@ -237,8 +214,7 @@ func agentCacheDir() (string, error) {
 	return filepath.Join(home, ".astro", "agent"), nil
 }
 
-// BinaryPath returns the path to the extracted opencode binary, if it exists.
-// Useful for other commands that may want to check if the agent is available.
+// BinaryPath returns the path to the extracted agent binary, if it exists.
 func BinaryPath() string {
 	cacheDir, err := agentCacheDir()
 	if err != nil {

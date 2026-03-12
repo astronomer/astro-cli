@@ -8,15 +8,14 @@ import (
 	"os/signal"
 )
 
-// execOpencode runs the opencode binary as a child process on Windows.
+// execAgent runs the agent binary as a child process on Windows.
 // Windows doesn't support syscall.Exec (process replacement), so we
 // run it as a subprocess and forward stdio + signals.
-func execOpencode(binPath string, args []string) error {
+func execAgent(binPath string, args []string) error {
 	cmd := exec.Command(binPath, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = appendConfigEnv(os.Environ())
 
 	// Forward interrupt signals to the child process
 	sigCh := make(chan os.Signal, 1)

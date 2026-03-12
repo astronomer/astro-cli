@@ -20,6 +20,8 @@ cmd/agent/embedded/opencode.gz
 cmd/agent/embedded/version.txt
 cmd/agent/embedded/skills.tar.gz
 .opencode-build/
+agent/dist/
+agent/node_modules/
 dist/
 hello-astro/
 meta/

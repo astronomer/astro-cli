@@ -7,11 +7,10 @@ import (
 	"syscall"
 )
 
-// execOpencode replaces the current process with the opencode binary.
-// On Unix, syscall.Exec gives opencode full control of the terminal
+// execAgent replaces the current process with the agent binary.
+// On Unix, syscall.Exec gives the agent full control of the terminal
 // (TUI rendering, signal handling, etc.) with no parent process overhead.
-func execOpencode(binPath string, args []string) error {
+func execAgent(binPath string, args []string) error {
 	argv := append([]string{binaryName}, args...)
-	env := appendConfigEnv(os.Environ())
-	return syscall.Exec(binPath, argv, env)
+	return syscall.Exec(binPath, argv, os.Environ())
 }
