@@ -181,19 +181,11 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	if err != nil {
 		return "", err
 	}
-	// Bind-mount host directories into the pytest container, matching
-	// the mounts that astro dev start provides via docker-compose.
-	// This ensures tests/, plugins/, include/, and dags/ are all
-	// available without needing COPY in the Dockerfile.
 	args := []string{
 		"create",
 		"-i",
 		"--name",
 		"astro-pytest",
-		"-v", airflowHome + "/dags:/usr/local/airflow/dags:z",
-		"-v", airflowHome + "/tests:/usr/local/airflow/tests:z",
-		"-v", airflowHome + "/plugins:/usr/local/airflow/plugins:z",
-		"-v", airflowHome + "/include:/usr/local/airflow/include:z",
 	}
 	fileExist, err := util.Exists(airflowHome + "/" + envFile)
 	if err != nil {
@@ -220,18 +212,19 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		return "", err
 	}
 
-	// cp .astro folder
-	// on some machine .astro is being docker ignored, but not
-	// on every machine, hence to keep behavior consistent
-	// copying the .astro folder explicitly
-	args = []string{
-		"cp",
-		airflowHome + "/.astro",
-		"astro-pytest:/usr/local/airflow/",
-	}
-	docErr := cmdExec(containerRuntime, stdout, stderr, args...)
-	if docErr != nil {
-		return "", docErr
+	// Copy host directories into the container using docker cp.
+	// This ensures fresh files from the host are used (not stale from
+	// image build cache) and works with remote Docker daemons (CI).
+	copyDirs := []string{"dags", "tests", "plugins", "include", ".astro"}
+	for _, dir := range copyDirs {
+		srcPath := airflowHome + "/" + dir
+		if exists, _ := util.Exists(srcPath); !exists {
+			continue
+		}
+		docErr := cmdExec(containerRuntime, stdout, stderr, "cp", srcPath, "astro-pytest:/usr/local/airflow/")
+		if docErr != nil {
+			return "", docErr
+		}
 	}
 
 	// start pytest container
@@ -247,23 +240,23 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		"--format='{{.State.ExitCode}}'",
 	}
 	var outb bytes.Buffer
-	docErr = cmdExec(containerRuntime, &outb, stderr, args...)
-	if docErr != nil {
-		logger.Debug(docErr)
+	inspectErr := cmdExec(containerRuntime, &outb, stderr, args...)
+	if inspectErr != nil {
+		logger.Debug(inspectErr)
 	}
 
 	if htmlReport {
 		// Copy the dag-test-report.html file from the container to the destination folder
-		docErr = cmdExec(containerRuntime, nil, stderr, "cp", "astro-pytest:/usr/local/airflow/dag-test-report.html", "./"+testHomeDirectory)
-		if docErr != nil {
-			logger.Debugf("Error copying dag-test-report.html file from the pytest container: %s", docErr.Error())
+		cpErr := cmdExec(containerRuntime, nil, stderr, "cp", "astro-pytest:/usr/local/airflow/dag-test-report.html", "./"+testHomeDirectory)
+		if cpErr != nil {
+			logger.Debugf("Error copying dag-test-report.html file from the pytest container: %s", cpErr.Error())
 		}
 	}
 
 	// delete container
-	docErr = cmdExec(containerRuntime, nil, stderr, "rm", "astro-pytest")
-	if docErr != nil {
-		logger.Debugf("Error removing the astro-pytest container: %s", docErr.Error())
+	rmErr := cmdExec(containerRuntime, nil, stderr, "rm", "astro-pytest")
+	if rmErr != nil {
+		logger.Debugf("Error removing the astro-pytest container: %s", rmErr.Error())
 	}
 
 	return outb.String(), err

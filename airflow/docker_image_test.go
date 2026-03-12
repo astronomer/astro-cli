@@ -186,6 +186,11 @@ func (s *Suite) TestDockerImagePytest() {
 	})
 
 	s.Run("copy error", func() {
+		// Create a directory so the docker cp loop has something to copy
+		dagsDir := cwd + "/dags"
+		s.NoError(os.MkdirAll(dagsDir, os.ModePerm))
+		defer os.RemoveAll(dagsDir)
+
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			switch {
 			case args[0] == "cp":
@@ -194,7 +199,7 @@ func (s *Suite) TestDockerImagePytest() {
 				return nil
 			}
 		}
-		_, err = handler.Pytest("", "", "", "", []string{}, true, options)
+		_, err = handler.Pytest("", cwd, "", "", []string{}, true, options)
 		s.Error(err)
 	})
 
