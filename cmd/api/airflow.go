@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/cloud/platformclient"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -472,7 +472,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions) (baseURL, authToken strin
 	}
 
 	// Create platform client
-	platformCoreClient := astroplatformcore.NewPlatformCoreClient(httputil.NewHTTPClient())
+	platformCoreClient := platformclient.NewPlatformCoreClient(httputil.NewHTTPClient())
 
 	// Fetch deployment
 	dep, err := deployment.CoreGetDeployment(orgID, opts.DeploymentID, platformCoreClient)
