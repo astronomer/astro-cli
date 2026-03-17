@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/astroauth"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -59,12 +60,8 @@ var authenticator = Authenticator{
 	callbackHandler:   authorizeCallbackHandler,
 }
 
-// Config holds data related to oAuth and basic authentication
-type Config struct {
-	ClientID  string `json:"clientId"`
-	Audience  string `json:"audience"`
-	DomainURL string `json:"domainUrl"`
-}
+// Config is an alias for astroauth.AuthConfig.
+type Config = astroauth.AuthConfig
 
 func requestUserInfo(authConfig Config, accessToken string) (UserInfo, error) {
 	addr := authConfig.DomainURL + "userinfo"
