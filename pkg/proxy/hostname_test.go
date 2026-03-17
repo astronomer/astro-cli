@@ -6,18 +6,17 @@ import (
 	"strings"
 	"testing"
 
-	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDeriveHostname(t *testing.T) {
 	// Ensure worktree detection doesn't interfere with basic tests
-	origReadDotGit := pkgproxy.ReadDotGit
-	pkgproxy.ReadDotGit = func(_ string) ([]byte, bool, error) {
+	origReadDotGit := ReadDotGit
+	ReadDotGit = func(_ string) ([]byte, bool, error) {
 		return nil, false, os.ErrNotExist
 	}
-	defer func() { pkgproxy.ReadDotGit = origReadDotGit }()
+	defer func() { ReadDotGit = origReadDotGit }()
 
 	tests := []struct {
 		name       string
@@ -71,11 +70,11 @@ func TestDeriveHostname(t *testing.T) {
 }
 
 func TestDeriveHostname_Empty(t *testing.T) {
-	origReadDotGit := pkgproxy.ReadDotGit
-	pkgproxy.ReadDotGit = func(_ string) ([]byte, bool, error) {
+	origReadDotGit := ReadDotGit
+	ReadDotGit = func(_ string) ([]byte, bool, error) {
 		return nil, false, os.ErrNotExist
 	}
-	defer func() { pkgproxy.ReadDotGit = origReadDotGit }()
+	defer func() { ReadDotGit = origReadDotGit }()
 
 	// A directory that results in an empty label after cleanup
 	_, err := DeriveHostname("/home/user/---")
@@ -83,27 +82,27 @@ func TestDeriveHostname_Empty(t *testing.T) {
 }
 
 func TestDeriveHostname_LongName(t *testing.T) {
-	origReadDotGit := pkgproxy.ReadDotGit
-	pkgproxy.ReadDotGit = func(_ string) ([]byte, bool, error) {
+	origReadDotGit := ReadDotGit
+	ReadDotGit = func(_ string) ([]byte, bool, error) {
 		return nil, false, os.ErrNotExist
 	}
-	defer func() { pkgproxy.ReadDotGit = origReadDotGit }()
+	defer func() { ReadDotGit = origReadDotGit }()
 
 	longName := strings.Repeat("a", 100)
 	hostname, err := DeriveHostname("/home/user/" + longName)
 	require.NoError(t, err)
 	// Should be truncated to 63 chars + ".localhost"
 	label := strings.TrimSuffix(hostname, ".localhost")
-	assert.LessOrEqual(t, len(label), 63)
+	assert.LessOrEqual(t, len(label), maxLabelLen)
 	assert.True(t, strings.HasSuffix(hostname, ".localhost"))
 }
 
 func TestDeriveHostname_Worktree(t *testing.T) {
-	origReadDotGit := pkgproxy.ReadDotGit
-	defer func() { pkgproxy.ReadDotGit = origReadDotGit }()
+	origReadDotGit := ReadDotGit
+	defer func() { ReadDotGit = origReadDotGit }()
 
 	// Simulate a git worktree where .git is a file
-	pkgproxy.ReadDotGit = func(_ string) ([]byte, bool, error) {
+	ReadDotGit = func(_ string) ([]byte, bool, error) {
 		return []byte("gitdir: /home/user/my-repo/.git/worktrees/feature-branch\n"), false, nil
 	}
 
@@ -113,10 +112,10 @@ func TestDeriveHostname_Worktree(t *testing.T) {
 }
 
 func TestDeriveHostname_WorktreeRelativePath(t *testing.T) {
-	origReadDotGit := pkgproxy.ReadDotGit
-	defer func() { pkgproxy.ReadDotGit = origReadDotGit }()
+	origReadDotGit := ReadDotGit
+	defer func() { ReadDotGit = origReadDotGit }()
 
-	pkgproxy.ReadDotGit = func(_ string) ([]byte, bool, error) {
+	ReadDotGit = func(_ string) ([]byte, bool, error) {
 		return []byte("gitdir: ../../../.git/worktrees/my-worktree\n"), false, nil
 	}
 
@@ -126,11 +125,11 @@ func TestDeriveHostname_WorktreeRelativePath(t *testing.T) {
 }
 
 func TestDeriveHostname_NormalRepo(t *testing.T) {
-	origReadDotGit := pkgproxy.ReadDotGit
-	defer func() { pkgproxy.ReadDotGit = origReadDotGit }()
+	origReadDotGit := ReadDotGit
+	defer func() { ReadDotGit = origReadDotGit }()
 
 	// Normal repo: .git is a directory
-	pkgproxy.ReadDotGit = func(_ string) ([]byte, bool, error) {
+	ReadDotGit = func(_ string) ([]byte, bool, error) {
 		return nil, true, nil // isDir=true
 	}
 
@@ -147,13 +146,13 @@ func TestDeriveHostname_RealWorktree(t *testing.T) {
 	worktreesGitDir := filepath.Join(mainRepo, ".git", "worktrees", "my-worktree")
 
 	// Set up main repo .git directory structure
-	require.NoError(t, os.MkdirAll(filepath.Join(mainRepo, ".git"), 0o755))
-	require.NoError(t, os.MkdirAll(worktreesGitDir, 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(mainRepo, ".git"), DirPermRWX))
+	require.NoError(t, os.MkdirAll(worktreesGitDir, DirPermRWX))
 
 	// Set up worktree directory with .git file
-	require.NoError(t, os.MkdirAll(worktreeDir, 0o755))
+	require.NoError(t, os.MkdirAll(worktreeDir, DirPermRWX))
 	gitFileContent := "gitdir: " + worktreesGitDir + "\n"
-	require.NoError(t, os.WriteFile(filepath.Join(worktreeDir, ".git"), []byte(gitFileContent), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(worktreeDir, ".git"), []byte(gitFileContent), FilePermRW))
 
 	hostname, err := DeriveHostname(worktreeDir)
 	require.NoError(t, err)

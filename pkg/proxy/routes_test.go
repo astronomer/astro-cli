@@ -3,10 +3,8 @@ package proxy
 import (
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
-	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,20 +12,9 @@ import (
 func setupTestDir(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
-
-	// Reset initOnce so ensureInit doesn't overwrite our test dir
-	origOnce := initOnce
-	initOnce = sync.Once{}
-
-	// Set routes dir to temp dir via pkg/proxy directly
-	pkgproxy.SetRoutesDir(filepath.Join(dir, "proxy"))
-
-	// Mark initOnce as "done" so ensureInit is a no-op
-	initOnce.Do(func() {})
-
+	SetRoutesDir(filepath.Join(dir, "proxy"))
 	t.Cleanup(func() {
-		initOnce = origOnce
-		pkgproxy.SetRoutesDir("")
+		SetRoutesDir("")
 	})
 }
 
@@ -181,17 +168,39 @@ func TestGetRoute(t *testing.T) {
 	assert.Nil(t, route)
 }
 
+func TestGetRouteByProject(t *testing.T) {
+	setupTestDir(t)
+
+	err := AddRoute(&Route{
+		Hostname:   "my-project.localhost",
+		Port:       "12345",
+		ProjectDir: "/home/user/my-project",
+		PID:        os.Getpid(),
+	})
+	require.NoError(t, err)
+
+	route, err := GetRouteByProject("/home/user/my-project")
+	require.NoError(t, err)
+	require.NotNil(t, route)
+	assert.Equal(t, "12345", route.Port)
+
+	// Non-existent project
+	route, err = GetRouteByProject("/home/user/other")
+	require.NoError(t, err)
+	assert.Nil(t, route)
+}
+
 func TestPruneStaleRoutes(t *testing.T) {
 	setupTestDir(t)
 
 	// Override IsPIDAlive to simulate stale routes
-	origIsPIDAlive := pkgproxy.IsPIDAlive
-	defer func() { pkgproxy.IsPIDAlive = origIsPIDAlive }()
+	origIsPIDAlive := IsPIDAlive
+	defer func() { IsPIDAlive = origIsPIDAlive }()
 
 	alivePID := os.Getpid()
 	deadPID := 99999999 // very unlikely to be a real PID
 
-	pkgproxy.IsPIDAlive = func(pid int) bool {
+	IsPIDAlive = func(pid int) bool {
 		return pid == alivePID
 	}
 
@@ -212,7 +221,7 @@ func TestPruneStaleRoutes(t *testing.T) {
 		ProjectDir: "/home/user/dead",
 		PID:        deadPID,
 	})
-	err = pkgproxy.WriteRoutes(routes)
+	err = WriteRoutes(routes)
 	require.NoError(t, err)
 
 	// ListRoutes should prune the dead route
@@ -220,6 +229,23 @@ func TestPruneStaleRoutes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, routes, 1)
 	assert.Equal(t, "alive.localhost", routes[0].Hostname)
+}
+
+func TestPruneStaleRoutes_DockerNotPruned(t *testing.T) {
+	setupTestDir(t)
+
+	origIsPIDAlive := IsPIDAlive
+	defer func() { IsPIDAlive = origIsPIDAlive }()
+	IsPIDAlive = func(_ int) bool { return false }
+
+	// Docker routes should survive pruning even with dead PIDs
+	routes := []Route{
+		{Hostname: "docker.localhost", Port: "12345", ProjectDir: "/tmp/docker", PID: 99999, Mode: "docker"},
+		{Hostname: "standalone.localhost", Port: "12346", ProjectDir: "/tmp/standalone", PID: 99999},
+	}
+	pruned := PruneStaleRoutes(routes)
+	assert.Len(t, pruned, 1)
+	assert.Equal(t, "docker.localhost", pruned[0].Hostname)
 }
 
 func TestAddRoute_WithServices(t *testing.T) {

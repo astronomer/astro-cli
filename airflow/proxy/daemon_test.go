@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"testing"
 
+	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,13 +23,13 @@ func TestIsRunning_StalePIDFile(t *testing.T) {
 	setupTestDir(t)
 
 	// Write a PID file with a dead PID
-	dir := proxyDirPath()
+	dir := pkgproxy.RoutesDir()
 	os.MkdirAll(dir, 0o755)
 	os.WriteFile(filepath.Join(dir, pidFileName), []byte("99999999"), 0o644)
 
-	origIsPIDAlive := isPIDAlive
-	defer func() { isPIDAlive = origIsPIDAlive }()
-	isPIDAlive = func(_ int) bool { return false }
+	origIsPIDAlive := pkgproxy.IsPIDAlive
+	defer func() { pkgproxy.IsPIDAlive = origIsPIDAlive }()
+	pkgproxy.IsPIDAlive = func(_ int) bool { return false }
 
 	_, alive := IsRunning()
 	assert.False(t, alive)
@@ -38,7 +39,7 @@ func TestIsRunning_AlivePID(t *testing.T) {
 	setupTestDir(t)
 
 	pid := os.Getpid()
-	dir := proxyDirPath()
+	dir := pkgproxy.RoutesDir()
 	os.MkdirAll(dir, 0o755)
 	// PID file format: "<pid> <version>"
 	os.WriteFile(filepath.Join(dir, pidFileName), []byte(strconv.Itoa(pid)+" 1.0.0"), 0o644)
@@ -53,7 +54,7 @@ func TestIsRunning_AlivePID_NoVersion(t *testing.T) {
 
 	// Backwards-compat: PID file with no version (old daemon)
 	pid := os.Getpid()
-	dir := proxyDirPath()
+	dir := pkgproxy.RoutesDir()
 	os.MkdirAll(dir, 0o755)
 	os.WriteFile(filepath.Join(dir, pidFileName), []byte(strconv.Itoa(pid)), 0o644)
 
