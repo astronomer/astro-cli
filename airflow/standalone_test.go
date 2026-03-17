@@ -16,6 +16,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/docker"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -373,7 +374,7 @@ another-package==2.0.0`
 	err = os.WriteFile(constraintsFile, []byte(content), 0o644)
 	require.NoError(t, err)
 
-	version, err := parseAirflowVersionFromConstraints(constraintsFile)
+	version, err := airflowrt.ParsePackageVersion(constraintsFile, "apache-airflow")
 	assert.NoError(t, err)
 	assert.Equal(t, "3.0.0", version)
 }
@@ -389,7 +390,7 @@ another-package==2.0.0`
 	err = os.WriteFile(constraintsFile, []byte(content), 0o644)
 	require.NoError(t, err)
 
-	_, err = parseAirflowVersionFromConstraints(constraintsFile)
+	_, err = airflowrt.ParsePackageVersion(constraintsFile, "apache-airflow")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "could not find apache-airflow version")
 }
@@ -409,7 +410,7 @@ EMPTY=`
 	err = os.WriteFile(envFilePath, []byte(content), 0o644)
 	require.NoError(t, err)
 
-	envVars, err := loadEnvFile(envFilePath)
+	envVars, err := airflowrt.LoadEnvFile(envFilePath)
 	assert.NoError(t, err)
 	assert.Contains(t, envVars, "FOO=bar")
 	assert.Contains(t, envVars, "BAZ=qux")
@@ -418,7 +419,7 @@ EMPTY=`
 }
 
 func TestLoadEnvFile_NotFound(t *testing.T) {
-	_, err := loadEnvFile("/nonexistent/.env")
+	_, err := airflowrt.LoadEnvFile("/nonexistent/.env")
 	assert.Error(t, err)
 }
 
@@ -432,7 +433,7 @@ func TestLoadEnvFile_ValueWithEquals(t *testing.T) {
 	err = os.WriteFile(envFilePath, []byte(content), 0o644)
 	require.NoError(t, err)
 
-	envVars, err := loadEnvFile(envFilePath)
+	envVars, err := airflowrt.LoadEnvFile(envFilePath)
 	assert.NoError(t, err)
 	assert.Len(t, envVars, 1)
 	assert.Equal(t, "DB_URL=postgres://user:pass@host:5432/db?sslmode=require", envVars[0])
@@ -453,7 +454,7 @@ EMPTY_SINGLE=''`
 	err = os.WriteFile(envFilePath, []byte(content), 0o644)
 	require.NoError(t, err)
 
-	envVars, err := loadEnvFile(envFilePath)
+	envVars, err := airflowrt.LoadEnvFile(envFilePath)
 	assert.NoError(t, err)
 	assert.Contains(t, envVars, "DOUBLE=hello world")
 	assert.Contains(t, envVars, "SINGLE=hello world")
@@ -480,7 +481,7 @@ func TestStripQuotes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			assert.Equal(t, tt.expected, stripQuotes(tt.input))
+			assert.Equal(t, tt.expected, airflowrt.StripQuotes(tt.input))
 		})
 	}
 }
@@ -609,17 +610,19 @@ func (s *Suite) TestStandaloneGetConstraints_FetchesFromURL() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	// Mock fetchConstraintsURL — called twice (constraints then freeze)
-	origFetch := fetchConstraintsURL
-	defer func() { fetchConstraintsURL = origFetch }()
+	// Mock airflowrt.DownloadFile — called twice (constraints then freeze)
+	origFetch := airflowrt.DownloadFile
+	defer func() { airflowrt.DownloadFile = origFetch }()
 
-	fetchConstraintsURL = func(url string) (string, error) {
+	airflowrt.DownloadFile = func(url, dest string) error {
 		s.Contains(url, "runtime-3.1-13-python-3.12.txt")
+		var content string
 		if strings.Contains(url, "runtime-constraints") {
-			return "apache-airflow==3.0.2\napache-airflow-task-sdk==1.0.0\n", nil
+			content = "apache-airflow==3.0.2\napache-airflow-task-sdk==1.0.0\n"
+		} else {
+			content = "apache-airflow==3.0.2\nsome-dep==1.2.3\n"
 		}
-		// freeze URL
-		return "apache-airflow==3.0.2\nsome-dep==1.2.3\n", nil
+		return os.WriteFile(dest, []byte(content), 0o644)
 	}
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
@@ -641,11 +644,11 @@ func (s *Suite) TestStandaloneGetConstraints_FetchFails() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	origFetch := fetchConstraintsURL
-	defer func() { fetchConstraintsURL = origFetch }()
+	origFetch := airflowrt.DownloadFile
+	defer func() { airflowrt.DownloadFile = origFetch }()
 
-	fetchConstraintsURL = func(url string) (string, error) {
-		return "", fmt.Errorf("network error")
+	airflowrt.DownloadFile = func(url, dest string) error {
+		return fmt.Errorf("network error")
 	}
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
@@ -1304,9 +1307,9 @@ func (s *Suite) TestStandaloneBuildEnv_CustomPort() {
 
 func (s *Suite) TestStandaloneBuildEnv_NoProxySetsNO_PROXY() {
 	// When no proxy is configured anywhere, NO_PROXY=* should be injected
-	origHasSystemProxy := hasSystemProxy
-	defer func() { hasSystemProxy = origHasSystemProxy }()
-	hasSystemProxy = func() bool { return false }
+	origHasSystemProxy := airflowrt.HasSystemProxy
+	defer func() { airflowrt.HasSystemProxy = origHasSystemProxy }()
+	airflowrt.HasSystemProxy = func() bool { return false }
 
 	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
 	s.NoError(err)
@@ -1326,9 +1329,9 @@ func (s *Suite) TestStandaloneBuildEnv_NoProxySetsNO_PROXY() {
 
 func (s *Suite) TestStandaloneBuildEnv_SystemProxySkipsNO_PROXY() {
 	// When macOS reports a system proxy, we should NOT set NO_PROXY
-	origHasSystemProxy := hasSystemProxy
-	defer func() { hasSystemProxy = origHasSystemProxy }()
-	hasSystemProxy = func() bool { return true }
+	origHasSystemProxy := airflowrt.HasSystemProxy
+	defer func() { airflowrt.HasSystemProxy = origHasSystemProxy }()
+	airflowrt.HasSystemProxy = func() bool { return true }
 
 	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
 	s.NoError(err)
@@ -1348,9 +1351,9 @@ func (s *Suite) TestStandaloneBuildEnv_SystemProxySkipsNO_PROXY() {
 
 func (s *Suite) TestStandaloneBuildEnv_EnvVarProxySkipsNO_PROXY() {
 	// When a proxy env var is already set in the inherited env, don't override
-	origHasSystemProxy := hasSystemProxy
-	defer func() { hasSystemProxy = origHasSystemProxy }()
-	hasSystemProxy = func() bool { return false }
+	origHasSystemProxy := airflowrt.HasSystemProxy
+	defer func() { airflowrt.HasSystemProxy = origHasSystemProxy }()
+	airflowrt.HasSystemProxy = func() bool { return false }
 
 	s.T().Setenv("HTTPS_PROXY", "http://corp-proxy:8080")
 
@@ -1372,9 +1375,9 @@ func (s *Suite) TestStandaloneBuildEnv_EnvVarProxySkipsNO_PROXY() {
 
 func (s *Suite) TestStandaloneBuildEnv_DotEnvProxySkipsNO_PROXY() {
 	// When .env file contains a proxy setting, don't override
-	origHasSystemProxy := hasSystemProxy
-	defer func() { hasSystemProxy = origHasSystemProxy }()
-	hasSystemProxy = func() bool { return false }
+	origHasSystemProxy := airflowrt.HasSystemProxy
+	defer func() { airflowrt.HasSystemProxy = origHasSystemProxy }()
+	airflowrt.HasSystemProxy = func() bool { return false }
 
 	tmpDir, err := os.MkdirTemp("", "standalone-proxy-test")
 	s.NoError(err)
@@ -1404,27 +1407,27 @@ func (s *Suite) TestStandaloneBuildEnv_DotEnvProxySkipsNO_PROXY() {
 }
 
 func TestHasProxyConfigured(t *testing.T) {
-	origHasSystemProxy := hasSystemProxy
-	defer func() { hasSystemProxy = origHasSystemProxy }()
+	origHasSystemProxy := airflowrt.HasSystemProxy
+	defer func() { airflowrt.HasSystemProxy = origHasSystemProxy }()
 
 	// No proxy anywhere
-	hasSystemProxy = func() bool { return false }
-	result := hasProxyConfigured(map[string]string{})
+	airflowrt.HasSystemProxy = func() bool { return false }
+	result := airflowrt.HasProxyConfigured(map[string]string{})
 	assert.False(t, result)
 
 	// System proxy active
-	hasSystemProxy = func() bool { return true }
-	result = hasProxyConfigured(map[string]string{})
+	airflowrt.HasSystemProxy = func() bool { return true }
+	result = airflowrt.HasProxyConfigured(map[string]string{})
 	assert.True(t, result)
 
 	// Proxy in overrides
-	hasSystemProxy = func() bool { return false }
-	result = hasProxyConfigured(map[string]string{"HTTP_PROXY": "http://proxy:8080"})
+	airflowrt.HasSystemProxy = func() bool { return false }
+	result = airflowrt.HasProxyConfigured(map[string]string{"HTTP_PROXY": "http://proxy:8080"})
 	assert.True(t, result)
 
 	// NO_PROXY already set in overrides
-	hasSystemProxy = func() bool { return false }
-	result = hasProxyConfigured(map[string]string{"NO_PROXY": "localhost"})
+	airflowrt.HasSystemProxy = func() bool { return false }
+	result = airflowrt.HasProxyConfigured(map[string]string{"NO_PROXY": "localhost"})
 	assert.True(t, result)
 }
 
@@ -1843,31 +1846,31 @@ func TestResolveInEnvPath(t *testing.T) {
 
 	t.Run("resolves binary in env PATH", func(t *testing.T) {
 		env := []string{"PATH=" + tmpDir + ":/usr/bin"}
-		result := resolveInEnvPath("mybinary", env)
+		result := airflowrt.ResolveInEnvPath("mybinary", env)
 		assert.Equal(t, fakeBin, result)
 	})
 
 	t.Run("returns original when not found", func(t *testing.T) {
 		env := []string{"PATH=/nonexistent"}
-		result := resolveInEnvPath("mybinary", env)
+		result := airflowrt.ResolveInEnvPath("mybinary", env)
 		assert.Equal(t, "mybinary", result)
 	})
 
 	t.Run("skips resolution for absolute paths", func(t *testing.T) {
 		env := []string{"PATH=" + tmpDir}
-		result := resolveInEnvPath("/usr/bin/bash", env)
+		result := airflowrt.ResolveInEnvPath("/usr/bin/bash", env)
 		assert.Equal(t, "/usr/bin/bash", result)
 	})
 
 	t.Run("skips resolution for relative paths with separator", func(t *testing.T) {
 		env := []string{"PATH=" + tmpDir}
-		result := resolveInEnvPath("./mybinary", env)
+		result := airflowrt.ResolveInEnvPath("./mybinary", env)
 		assert.Equal(t, "./mybinary", result)
 	})
 
 	t.Run("no PATH in env falls through", func(t *testing.T) {
 		env := []string{"HOME=/tmp"}
-		result := resolveInEnvPath("mybinary", env)
+		result := airflowrt.ResolveInEnvPath("mybinary", env)
 		assert.Equal(t, "mybinary", result)
 	})
 }
