@@ -1,16 +1,28 @@
 package airflowclient
 
 import (
+	stdctx "context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/sirupsen/logrus"
 )
 
 var errDecode = errors.New("failed to decode response from API")
+
+// sleepFn is a variable so tests can replace it with a no-op to avoid real sleeps.
+var sleepFn = time.Sleep
+
+const (
+	pageLimit    = 100
+	maxRetries   = 10
+	retryBackoff = time.Second
+)
 
 type Client interface {
 	// connections
@@ -39,18 +51,36 @@ func NewAirflowClient(c *httputil.HTTPClient) *HTTPClient {
 	}
 }
 
-func (c *HTTPClient) GetConnections(airflowURL string) (Response, error) {
-	doOpts := &httputil.DoOptions{
-		Path:   "https://" + airflowURL + "/connections",
-		Method: http.MethodGet,
+// fetchAllPages fetches paginated results from an Airflow REST endpoint, accumulating
+// all items across pages. When TotalEntries is absent (0), it stops on a short page.
+func fetchAllPages[T any](c *HTTPClient, airflowURL, resource string, extract func(Response) []T) ([]T, error) {
+	var all []T
+	offset := 0
+	for {
+		doOpts := &httputil.DoOptions{
+			Path:   fmt.Sprintf("https://%s/%s?limit=%d&offset=%d", airflowURL, resource, pageLimit, offset),
+			Method: http.MethodGet,
+		}
+		page, err := c.DoAirflowClient(doOpts)
+		if err != nil {
+			return nil, err
+		}
+		items := extract(*page)
+		all = append(all, items...)
+		offset += len(items)
+		if len(items) < pageLimit || (page.TotalEntries > 0 && offset >= page.TotalEntries) {
+			break
+		}
 	}
+	return all, nil
+}
 
-	response, err := c.DoAirflowClient(doOpts)
+func (c *HTTPClient) GetConnections(airflowURL string) (Response, error) {
+	conns, err := fetchAllPages(c, airflowURL, "connections", func(r Response) []Connection { return r.Connections })
 	if err != nil {
 		return Response{}, err
 	}
-
-	return *response, nil
+	return Response{Connections: conns}, nil
 }
 
 func (c *HTTPClient) CreateConnection(airflowURL string, conn *Connection) error {
@@ -94,17 +124,11 @@ func (c *HTTPClient) UpdateConnection(airflowURL string, conn *Connection) error
 }
 
 func (c *HTTPClient) GetVariables(airflowURL string) (Response, error) {
-	doOpts := &httputil.DoOptions{
-		Path:   "https://" + airflowURL + "/variables",
-		Method: http.MethodGet,
-	}
-
-	response, err := c.DoAirflowClient(doOpts)
+	vars, err := fetchAllPages(c, airflowURL, "variables", func(r Response) []Variable { return r.Variables })
 	if err != nil {
 		return Response{}, err
 	}
-
-	return *response, nil
+	return Response{Variables: vars}, nil
 }
 
 func (c *HTTPClient) CreateVariable(airflowURL string, variable Variable) error {
@@ -148,17 +172,11 @@ func (c *HTTPClient) UpdateVariable(airflowURL string, variable Variable) error 
 }
 
 func (c *HTTPClient) GetPools(airflowURL string) (Response, error) {
-	doOpts := &httputil.DoOptions{
-		Path:   "https://" + airflowURL + "/pools",
-		Method: http.MethodGet,
-	}
-
-	response, err := c.DoAirflowClient(doOpts)
+	pools, err := fetchAllPages(c, airflowURL, "pools", func(r Response) []Pool { return r.Pools })
 	if err != nil {
 		return Response{}, err
 	}
-
-	return *response, nil
+	return Response{Pools: pools}, nil
 }
 
 func (c *HTTPClient) CreatePool(airflowURL string, pool Pool) error {
@@ -207,6 +225,21 @@ func (c *HTTPClient) UpdatePool(airflowURL string, pool Pool) error {
 	return nil
 }
 
+// isRetryable returns true for errors that warrant a retry: 5xx HTTP errors and
+// connection-level errors (timeouts, resets, etc.). Context cancellation and
+// deadline exceeded are not retried.
+func isRetryable(err error) bool {
+	if errors.Is(err, stdctx.Canceled) || errors.Is(err, stdctx.DeadlineExceeded) {
+		return false
+	}
+	var httpErr *httputil.Error
+	if errors.As(err, &httpErr) {
+		return httpErr.Status >= 500
+	}
+	// Non-httputil errors are connection-level failures.
+	return true
+}
+
 func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, error) {
 	cl, err := context.GetCurrentContext() // get current context
 	if err != nil {
@@ -219,22 +252,37 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 		}
 	}
 
-	response, err := c.Do(doOpts)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			logrus.Warnf("Airflow API request failed (%v), retrying (attempt %d/%d)...", lastErr, attempt, maxRetries)
+			sleepFn(retryBackoff)
+		}
 
-	// Check the response status code, return error for non-2xx codes
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("unexpected response status code: %d", response.StatusCode)
+		response, err := c.Do(doOpts)
+		if err != nil {
+			if isRetryable(err) {
+				lastErr = err
+				continue
+			}
+			return nil, err
+		}
+
+		// Check the response status code, return error for non-2xx codes
+		if response.StatusCode < 200 || response.StatusCode >= 300 {
+			response.Body.Close()
+			return nil, fmt.Errorf("unexpected response status code: %d", response.StatusCode)
+		}
+
+		decode := Response{}
+		decodeErr := json.NewDecoder(response.Body).Decode(&decode)
+		response.Body.Close()
+		if decodeErr != nil {
+			return nil, errDecode
+		}
+
+		return &decode, nil
 	}
 
-	decode := Response{}
-	err = json.NewDecoder(response.Body).Decode(&decode)
-	if err != nil {
-		return nil, errDecode
-	}
-
-	return &decode, nil
+	return nil, lastErr
 }
