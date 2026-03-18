@@ -234,7 +234,7 @@ func isRetryable(err error) bool {
 	}
 	var httpErr *httputil.Error
 	if errors.As(err, &httpErr) {
-		return httpErr.Status >= 500
+		return httpErr.Status >= http.StatusInternalServerError
 	}
 	// Non-httputil errors are connection-level failures.
 	return true
