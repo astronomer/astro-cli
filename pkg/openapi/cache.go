@@ -2,16 +2,19 @@ package openapi
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/astronomer/astro-cli/config"
+	v2high "github.com/pb33f/libopenapi/datamodel/high/v2"
 	v3high "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
@@ -63,9 +66,11 @@ type Cache struct {
 	specURL     string
 	cachePath   string
 	stripPrefix string // optional prefix to strip from endpoint paths (e.g. "/api/v2")
+	authToken   string // optional auth token for fetching specs
 	httpClient  *http.Client
 	doc         *v3high.Document
-	rawSpec     []byte // raw spec bytes for cache serialization
+	v2doc       *v2high.Swagger // non-nil if spec is Swagger 2.0
+	rawSpec     []byte          // raw spec bytes for cache serialization
 	fetchedAt   time.Time
 }
 
@@ -96,6 +101,21 @@ func NewCacheWithOptions(specURL, cachePath string) *Cache {
 		specURL:   specURL,
 		cachePath: cachePath,
 	}
+}
+
+// NewCacheWithAuth creates a new OpenAPI cache that sends an auth token when fetching specs.
+func NewCacheWithAuth(specURL, cachePath, authToken string) *Cache {
+	return &Cache{
+		specURL:   specURL,
+		cachePath: cachePath,
+		authToken: authToken,
+	}
+}
+
+// SpecCacheFileName returns a deterministic cache file name derived from a spec URL.
+func SpecCacheFileName(specURL string) string {
+	h := sha256.Sum256([]byte(specURL))
+	return fmt.Sprintf("openapi-cache-%x.json", h[:8])
 }
 
 // NewAirflowCacheForVersion creates a new OpenAPI cache configured for a specific Airflow version.
@@ -137,7 +157,7 @@ func (c *Cache) Load(forceRefresh bool) error {
 	// Fetch fresh spec
 	if err := c.fetchSpec(); err != nil {
 		// If fetch fails and we have a stale cache, use it
-		if c.doc != nil {
+		if c.IsLoaded() {
 			return nil
 		}
 		return err
@@ -160,10 +180,15 @@ func (c *Cache) GetDoc() *v3high.Document {
 // GetEndpoints extracts all endpoints from the loaded spec.
 // If a stripPrefix is configured, it is removed from each endpoint path.
 func (c *Cache) GetEndpoints() []Endpoint {
-	if c.doc == nil {
+	var endpoints []Endpoint
+	switch {
+	case c.doc != nil:
+		endpoints = ExtractEndpoints(c.doc)
+	case c.v2doc != nil:
+		endpoints = ExtractEndpointsV2(c.v2doc)
+	default:
 		return nil
 	}
-	endpoints := ExtractEndpoints(c.doc)
 	if c.stripPrefix != "" {
 		for i := range endpoints {
 			endpoints[i].Path = strings.TrimPrefix(endpoints[i].Path, c.stripPrefix)
@@ -174,7 +199,23 @@ func (c *Cache) GetEndpoints() []Endpoint {
 
 // IsLoaded returns true if a spec has been loaded.
 func (c *Cache) IsLoaded() bool {
-	return c.doc != nil
+	return c.doc != nil || c.v2doc != nil
+}
+
+// GetServerPath returns the base path from the loaded spec.
+// For OpenAPI 3.x it extracts the path from servers[0].url.
+// For Swagger 2.0 it returns the basePath field.
+func (c *Cache) GetServerPath() string {
+	if c.doc != nil && len(c.doc.Servers) > 0 {
+		u, err := url.Parse(c.doc.Servers[0].URL)
+		if err == nil {
+			return strings.TrimSuffix(u.Path, "/")
+		}
+	}
+	if c.v2doc != nil {
+		return strings.TrimSuffix(c.v2doc.BasePath, "/")
+	}
+	return ""
 }
 
 // readCache attempts to read the cached spec from disk.
@@ -189,12 +230,13 @@ func (c *Cache) readCache() error {
 		return err
 	}
 
-	doc, err := parseSpec(cached.RawSpec)
+	v3doc, v2doc, err := parseSpec(cached.RawSpec)
 	if err != nil {
 		return err
 	}
 
-	c.doc = doc
+	c.doc = v3doc
+	c.v2doc = v2doc
 	c.rawSpec = cached.RawSpec
 	c.fetchedAt = cached.FetchedAt
 	return nil
@@ -239,6 +281,10 @@ func (c *Cache) fetchSpec() error {
 	// Accept both JSON and YAML
 	req.Header.Set("Accept", "application/json, application/yaml, text/yaml, */*")
 
+	if c.authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.authToken)
+	}
+
 	resp, err := c.getHTTPClient().Do(req)
 	if err != nil {
 		return fmt.Errorf("fetching OpenAPI spec: %w", err)
@@ -254,32 +300,47 @@ func (c *Cache) fetchSpec() error {
 		return fmt.Errorf("reading response body: %w", err)
 	}
 
-	doc, err := parseSpec(body)
+	v3doc, v2doc, err := parseSpec(body)
 	if err != nil {
 		return fmt.Errorf("parsing OpenAPI spec: %w", err)
 	}
 
-	c.doc = doc
+	c.doc = v3doc
+	c.v2doc = v2doc
 	c.rawSpec = body
 	c.fetchedAt = time.Now()
 	return nil
 }
 
-// parseSpec parses raw bytes into an OpenAPI v3 document using libopenapi.
+// parseSpec parses raw bytes into an OpenAPI document using libopenapi.
+// It detects the spec version and returns either a v3 or v2 model.
 // This handles both JSON and YAML formats and resolves $ref references.
-func parseSpec(data []byte) (*v3high.Document, error) {
+func parseSpec(data []byte) (*v3high.Document, *v2high.Swagger, error) {
 	doc, err := newDocument(data)
 	if err != nil {
-		return nil, fmt.Errorf("creating document: %w", err)
+		return nil, nil, fmt.Errorf("creating document: %w", err)
 	}
+
+	version := doc.GetVersion()
+	if strings.HasPrefix(version, "2.") {
+		model, err := doc.BuildV2Model()
+		if err != nil {
+			return nil, nil, fmt.Errorf("building v2 model: %w", err)
+		}
+		if model == nil {
+			return nil, nil, fmt.Errorf("building v2 model: unknown error")
+		}
+		return nil, &model.Model, nil
+	}
+
 	model, err := doc.BuildV3Model()
 	if err != nil {
-		return nil, fmt.Errorf("building v3 model: %w", err)
+		return nil, nil, fmt.Errorf("building v3 model: %w", err)
 	}
 	if model == nil {
-		return nil, fmt.Errorf("building v3 model: unknown error")
+		return nil, nil, fmt.Errorf("building v3 model: unknown error")
 	}
-	return &model.Model, nil
+	return &model.Model, nil, nil
 }
 
 // ClearCache removes the cached spec file.
