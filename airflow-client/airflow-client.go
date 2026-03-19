@@ -52,7 +52,8 @@ func NewAirflowClient(c *httputil.HTTPClient) *HTTPClient {
 }
 
 // fetchAllPages fetches paginated results from an Airflow REST endpoint, accumulating
-// all items across pages. When TotalEntries is absent (0), it stops on a short page.
+// all items across pages. It stops on the first page with fewer than pageLimit entries, or when
+// the offset exceeds the response's TotalEntries value (if present).
 func fetchAllPages[T any](c *HTTPClient, airflowURL, resource string, extract func(Response) []T) ([]T, error) {
 	var all []T
 	offset := 0
