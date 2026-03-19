@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/cloud/platformclient"
 	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/cloud/platformclient"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"

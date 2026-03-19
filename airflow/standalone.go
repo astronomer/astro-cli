@@ -44,7 +44,6 @@ var (
 	stopPollInterval      = airflowrt.StopPollInterval
 	stopTimeout           = airflowrt.StopTimeout
 	filePermissions       = airflowrt.FilePermissions
-	dirPermissions        = airflowrt.DirPermissions
 )
 
 var (

@@ -30,16 +30,6 @@ var proxyDirPath = func() string {
 	return pkgproxy.RoutesDir()
 }
 
-func readRoutes() ([]Route, error) {
-	ensureInit()
-	return pkgproxy.ReadRoutes()
-}
-
-func writeRoutes(routes []Route) error {
-	ensureInit()
-	return pkgproxy.WriteRoutes(routes)
-}
-
 // AddRoute registers a new route.
 func AddRoute(route *Route) error {
 	ensureInit()

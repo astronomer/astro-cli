@@ -15,18 +15,14 @@ func setupTestDir(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
 
-	// Reset initOnce so ensureInit doesn't overwrite our test dir
-	origOnce := initOnce
-	initOnce = sync.Once{}
-
-	// Set routes dir to temp dir via pkg/proxy directly
+	// Reset initOnce so ensureInit doesn't overwrite our test dir.
+	// We use a fresh Once and mark it done so ensureInit is a no-op.
+	initOnce = sync.Once{} //nolint:govet // intentional reset for testing
 	pkgproxy.SetRoutesDir(filepath.Join(dir, "proxy"))
-
-	// Mark initOnce as "done" so ensureInit is a no-op
 	initOnce.Do(func() {})
 
 	t.Cleanup(func() {
-		initOnce = origOnce
+		initOnce = sync.Once{} //nolint:govet // intentional reset for testing
 		pkgproxy.SetRoutesDir("")
 	})
 }
