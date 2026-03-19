@@ -5,24 +5,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/sirupsen/logrus"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 var errDecode = errors.New("failed to decode response from API")
 
-// sleepFn is a variable so tests can replace it with a no-op to avoid real sleeps.
-var sleepFn = time.Sleep
-
 const (
-	pageLimit    = 100
-	maxRetries   = 10
-	retryBackoff = time.Second
+	pageLimit  = 100
+	maxRetries = 10
 )
+
+// retryBackoff is a var so tests can override it to avoid real sleeps.
+var retryBackoff = time.Second
 
 type Client interface {
 	// connections
@@ -226,23 +226,24 @@ func (c *HTTPClient) UpdatePool(airflowURL string, pool Pool) error {
 	return nil
 }
 
-// isRetryable returns true for errors that warrant a retry: 5xx HTTP errors and
-// connection-level errors (timeouts, resets, etc.). Context cancellation and
-// deadline exceeded are not retried.
-func isRetryable(err error) bool {
-	if errors.Is(err, stdctx.Canceled) || errors.Is(err, stdctx.DeadlineExceeded) {
-		return false
+// checkRetryPolicy returns a retry policy that only retries GET requests and
+// skips retries when the error wraps context.Canceled or context.DeadlineExceeded.
+func checkRetryPolicy(method string) retryablehttp.CheckRetry {
+	return func(ctx stdctx.Context, resp *http.Response, err error) (bool, error) {
+		if method != http.MethodGet {
+			return false, nil
+		}
+		if err != nil {
+			if errors.Is(err, stdctx.Canceled) || errors.Is(err, stdctx.DeadlineExceeded) {
+				return false, err
+			}
+		}
+		return retryablehttp.DefaultRetryPolicy(ctx, resp, err)
 	}
-	var httpErr *httputil.Error
-	if errors.As(err, &httpErr) {
-		return httpErr.Status >= http.StatusInternalServerError
-	}
-	// Non-httputil errors are connection-level failures.
-	return true
 }
 
 func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, error) {
-	cl, err := context.GetCurrentContext() // get current context
+	cl, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
@@ -253,37 +254,40 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 		}
 	}
 
-	var lastErr error
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			logrus.Warnf("Airflow API request failed (%v), retrying (attempt %d/%d)...", lastErr, attempt, maxRetries)
-			sleepFn(retryBackoff)
-		}
-
-		response, err := c.Do(doOpts)
-		if err != nil {
-			if isRetryable(err) {
-				lastErr = err
-				continue
-			}
-			return nil, err
-		}
-
-		// Check the response status code, return error for non-2xx codes
-		if response.StatusCode < 200 || response.StatusCode >= 300 {
-			response.Body.Close()
-			return nil, fmt.Errorf("unexpected response status code: %d", response.StatusCode)
-		}
-
-		decode := Response{}
-		decodeErr := json.NewDecoder(response.Body).Decode(&decode)
-		response.Body.Close()
-		if decodeErr != nil {
-			return nil, errDecode
-		}
-
-		return &decode, nil
+	req, err := retryablehttp.NewRequest(doOpts.Method, doOpts.Path, doOpts.Data)
+	if err != nil {
+		return nil, err
+	}
+	if len(doOpts.Data) > 0 {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	for k, v := range doOpts.Headers {
+		req.Header.Set(k, v)
 	}
 
-	return nil, lastErr
+	retryClient := retryablehttp.NewClient()
+	retryClient.HTTPClient = c.HTTPClient.HTTPClient
+	retryClient.RetryMax = maxRetries
+	retryClient.RetryWaitMin = retryBackoff
+	retryClient.RetryWaitMax = retryBackoff
+	retryClient.CheckRetry = checkRetryPolicy(doOpts.Method)
+	retryClient.ErrorHandler = retryablehttp.PassthroughErrorHandler
+	retryClient.Logger = nil // suppress retryablehttp's default stderr logging on retries
+
+	resp, err := retryClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		data, _ := io.ReadAll(resp.Body)
+		return nil, &httputil.Error{Status: resp.StatusCode, Message: string(data)}
+	}
+
+	decode := Response{}
+	if err := json.NewDecoder(resp.Body).Decode(&decode); err != nil {
+		return nil, errDecode
+	}
+	return &decode, nil
 }

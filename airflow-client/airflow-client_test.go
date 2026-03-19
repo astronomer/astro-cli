@@ -31,10 +31,10 @@ func TestAirflowClient(t *testing.T) {
 }
 
 func (s *Suite) SetupSuite() {
-	// Replace sleepFn with a no-op so retry backoff doesn't slow down tests.
-	original := sleepFn
-	sleepFn = func(time.Duration) {}
-	s.T().Cleanup(func() { sleepFn = original })
+	// Use minimal backoff so retry tests don't sleep.
+	original := retryBackoff
+	retryBackoff = time.Millisecond
+	s.T().Cleanup(func() { retryBackoff = original })
 }
 
 func (s *Suite) TestNew() {
@@ -812,6 +812,28 @@ func (s *Suite) TestDoAirflowClientRetry() {
 		_, err := airflowClient.DoAirflowClient(doOpts)
 		s.Error(err)
 		s.Contains(err.Error(), "API error (400)")
+		s.Equal(1, callCount)
+	})
+
+	s.Run("does not retry non-GET requests", func() {
+		callCount := 0
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			callCount++
+			return &http.Response{
+				StatusCode: 503,
+				Body:       io.NopCloser(bytes.NewBufferString("Service Unavailable")),
+				Header:     make(http.Header),
+			}
+		})
+		airflowClient := NewAirflowClient(client)
+
+		doOpts := &httputil.DoOptions{
+			Path:   "/test",
+			Method: http.MethodPost,
+		}
+		_, err := airflowClient.DoAirflowClient(doOpts)
+		s.Error(err)
+		s.Contains(err.Error(), "API error (503)")
 		s.Equal(1, callCount)
 	})
 
