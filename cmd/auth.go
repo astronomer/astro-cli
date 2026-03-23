@@ -27,33 +27,11 @@ var (
 )
 
 func newLoginCommand(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "login [BASEDOMAIN]",
-		Short: "Log in to Astronomer",
-		Long:  "Authenticate to Astro or Astro Private Cloud",
-		Args:  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return login(cmd, args, coreClient, platformCoreClient, out)
-		},
-	}
-
-	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
-	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
-	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for software login")
-	return cmd
+	return newAuthLoginCommand(coreClient, platformCoreClient, out)
 }
 
 func newLogoutCommand(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "logout",
-		Short: "Log out of Astronomer",
-		Long:  "Log out of Astronomer",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return logout(cmd, args, out)
-		},
-		Args: cobra.MaximumNArgs(1),
-	}
-	return cmd
+	return newAuthLogoutCommand(out)
 }
 
 func login(cmd *cobra.Command, args []string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
@@ -103,5 +81,85 @@ func logout(cmd *cobra.Command, args []string, out io.Writer) error {
 	} else {
 		softwareLogout(domain)
 	}
+	return nil
+}
+
+func newAuthRootCmd(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "auth",
+		Short: "Manage authentication to Astronomer",
+		Long:  "Commands for authenticating to Astro or Astro Private Cloud",
+	}
+	cmd.AddCommand(
+		newAuthLoginCommand(coreClient, platformCoreClient, out),
+		newAuthLogoutCommand(out),
+		newAuthTokenCommand(out),
+	)
+	return cmd
+}
+
+func newAuthLoginCommand(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "login [BASEDOMAIN]",
+		Short: "Log in to Astronomer",
+		Long:  "Authenticate to Astro or Astro Private Cloud",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return login(cmd, args, coreClient, platformCoreClient, out)
+		},
+	}
+
+	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
+	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
+	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for software login")
+	return cmd
+}
+
+func newAuthLogoutCommand(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "logout",
+		Short: "Log out of Astronomer",
+		Long:  "Log out of Astronomer",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return logout(cmd, args, out)
+		},
+		Args: cobra.MaximumNArgs(1),
+	}
+	return cmd
+}
+
+func newAuthTokenCommand(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "token",
+		Short: "Print the authentication token",
+		Long:  "Print the current authentication token to standard output. This is useful for using the token in scripts or CI/CD pipelines.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return printAuthToken(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func printAuthToken(cmd *cobra.Command, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	c, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	if c.Token == "" {
+		return fmt.Errorf("no token found. Please run 'astro login' to authenticate")
+	}
+
+	// Remove "Bearer " prefix if present, similar to how gh auth token works
+	token := c.Token
+	if len(token) > 7 && token[:7] == "Bearer " {
+		token = token[7:]
+	}
+
+	fmt.Fprintln(out, token)
 	return nil
 }
