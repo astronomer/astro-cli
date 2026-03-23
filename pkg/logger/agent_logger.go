@@ -4,6 +4,11 @@ import (
 	"os"
 )
 
+const (
+	// defaultFilePermissions sets file permissions to owner read/write only (0600)
+	defaultFilePermissions = 0o600
+)
+
 // AgentLogger is a simple logger that can write messages to files
 type AgentLogger struct {
 	filePath string
@@ -18,5 +23,5 @@ func NewAgentLogger(filePath string) *AgentLogger {
 
 // WriteMessage writes a message to the configured file
 func (al *AgentLogger) WriteMessage(message string) error {
-	return os.WriteFile(al.filePath, []byte(message), 0o644)
+	return os.WriteFile(al.filePath, []byte(message), defaultFilePermissions)
 }
