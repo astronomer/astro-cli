@@ -82,6 +82,12 @@ func (c *Cache) SetHTTPClient(client *http.Client) {
 	c.httpClient = client
 }
 
+// SetStripPrefix configures a path prefix to strip from endpoint paths
+// (e.g. "/api") so callers work with shorter paths.
+func (c *Cache) SetStripPrefix(prefix string) {
+	c.stripPrefix = prefix
+}
+
 // NewCache creates a new OpenAPI cache with default settings.
 func NewCache() *Cache {
 	return &Cache{

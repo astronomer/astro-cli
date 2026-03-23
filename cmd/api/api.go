@@ -28,8 +28,9 @@ func NewAPICmdWithOutput(out io.Writer) *cobra.Command {
 The 'astro api' command provides direct access to Astronomer's REST APIs.
 
 Available subcommands:
-  airflow  Make requests to the Airflow REST API
-  cloud    Make requests to the Astro Cloud API (api.astronomer.io)
+  airflow   Make requests to the Airflow REST API
+  cloud     Make requests to the Astro Cloud API (api.astronomer.io)
+  registry  Query the Airflow Provider Registry
 
 Use "astro api [command] --help" for more information about a command.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -69,6 +70,7 @@ Use "astro api [command] --help" for more information about a command.`,
 
 	cmd.AddCommand(NewAirflowCmd(out))
 	cmd.AddCommand(NewCloudCmd(out))
+	cmd.AddCommand(NewRegistryCmd(out))
 
 	return cmd
 }
