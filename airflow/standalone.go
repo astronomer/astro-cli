@@ -267,7 +267,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	sp.Start()
 
 	// 5. Create venv
-	err = runCommand(s.airflowHome, "uv", "venv", "--python", pythonVersion)
+	err = runCommand(s.airflowHome, "uv", "venv", "--python", pythonVersion, "--allow-existing")
 	if err != nil {
 		sp.Stop()
 		return fmt.Errorf("error creating virtual environment: %w", err)
