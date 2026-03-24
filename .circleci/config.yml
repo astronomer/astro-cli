@@ -27,7 +27,7 @@ jobs:
           name: Install Go
           shell: powershell.exe
           command: |
-            choco install golang --version=1.24.0 -y
+            choco install golang --version=1.26.1 -y
             refreshenv
       - run:
           name: Run unit tests
@@ -48,7 +48,7 @@ jobs:
       - commit-next-tag
   release:
     docker:
-      - image: golang:1.24
+      - image: golang:1.26
     working_directory: /go/src/github.com/astronomer/astro-cli
     resource_class: xlarge
     steps:
@@ -139,7 +139,7 @@ commands:
           command: |
             set -e
             cd /tmp
-            curl -Lo go.tar.gz https://go.dev/dl/go1.24.0.linux-amd64.tar.gz
+            curl -Lo go.tar.gz https://go.dev/dl/go1.26.1.linux-amd64.tar.gz
             sudo rm -rf /usr/local/go
             sudo tar -C /usr/local -xvf go.tar.gz
             GOROOT=/usr/local/go go version
