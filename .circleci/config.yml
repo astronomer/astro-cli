@@ -7,14 +7,14 @@ jobs:
   lint:
     working_directory: /go/src/github.com/astronomer/astro-cli
     docker:
-      - image: quay.io/astronomer/ap-dind-golang:24.0.6
+      - image: astrocrpublic.azurecr.io/astronomer/ap-dind-golang:29.3.0
     resource_class: large
     steps:
       - lint
   test:
     working_directory: /go/src/github.com/astronomer/astro-cli
     docker:
-      - image: quay.io/astronomer/ap-dind-golang:24.0.6
+      - image: astrocrpublic.azurecr.io/astronomer/ap-dind-golang:29.3.0
     steps:
       - test
   test-windows:
