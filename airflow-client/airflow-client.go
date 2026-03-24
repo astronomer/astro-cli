@@ -17,12 +17,10 @@ import (
 var errDecode = errors.New("failed to decode response from API")
 
 const (
-	pageLimit  = 100
-	maxRetries = 10
+	pageLimit    = 100
+	maxRetries   = 10
+	retryBackoff = time.Second
 )
-
-// retryBackoff is a var so tests can override it to avoid real sleeps.
-var retryBackoff = time.Second
 
 type Client interface {
 	// connections

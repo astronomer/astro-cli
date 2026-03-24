@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -28,13 +28,6 @@ func (f errorRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error)
 
 func TestAirflowClient(t *testing.T) {
 	suite.Run(t, new(Suite))
-}
-
-func (s *Suite) SetupSuite() {
-	// Use minimal backoff so retry tests don't sleep.
-	original := retryBackoff
-	retryBackoff = time.Millisecond
-	s.T().Cleanup(func() { retryBackoff = original })
 }
 
 func (s *Suite) TestNew() {
@@ -124,18 +117,20 @@ func (s *Suite) TestGetConnections() {
 	})
 
 	s.Run("error - http request failed", func() {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 500,
-				Body:       io.NopCloser(bytes.NewBufferString("Internal Service Error")),
-				Header:     make(http.Header),
-			}
-		})
-		airflowClient := NewAirflowClient(client)
+		synctest.Test(s.T(), func(_ *testing.T) {
+			client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+				return &http.Response{
+					StatusCode: 500,
+					Body:       io.NopCloser(bytes.NewBufferString("Internal Service Error")),
+					Header:     make(http.Header),
+				}
+			})
+			airflowClient := NewAirflowClient(client)
 
-		_, err := airflowClient.GetConnections("test-airflow-url")
-		s.Error(err)
-		s.Contains(err.Error(), "API error (500): Internal Service Error")
+			_, err := airflowClient.GetConnections("test-airflow-url")
+			s.Error(err)
+			s.Contains(err.Error(), "API error (500): Internal Service Error")
+		})
 	})
 	s.Run("error - failed to decode response", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
@@ -397,18 +392,20 @@ func (s *Suite) TestGetVariables() {
 	})
 
 	s.Run("error - http request failed", func() {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 500,
-				Body:       io.NopCloser(bytes.NewBufferString("Internal Service Error")),
-				Header:     make(http.Header),
-			}
-		})
-		airflowClient := NewAirflowClient(client)
+		synctest.Test(s.T(), func(_ *testing.T) {
+			client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+				return &http.Response{
+					StatusCode: 500,
+					Body:       io.NopCloser(bytes.NewBufferString("Internal Service Error")),
+					Header:     make(http.Header),
+				}
+			})
+			airflowClient := NewAirflowClient(client)
 
-		_, err := airflowClient.GetVariables("test-airflow-url")
-		s.Error(err)
-		s.Contains(err.Error(), "API error (500): Internal Service Error")
+			_, err := airflowClient.GetVariables("test-airflow-url")
+			s.Error(err)
+			s.Contains(err.Error(), "API error (500): Internal Service Error")
+		})
 	})
 }
 
@@ -703,19 +700,21 @@ func (s *Suite) TestGetPools() {
 	})
 
 	s.Run("error - http request failed", func() {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 500,
-				Body:       io.NopCloser(bytes.NewBufferString("Internal Service Error")),
-				Header:     make(http.Header),
-			}
-		})
-		airflowClient := NewAirflowClient(client)
+		synctest.Test(s.T(), func(_ *testing.T) {
+			client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+				return &http.Response{
+					StatusCode: 500,
+					Body:       io.NopCloser(bytes.NewBufferString("Internal Service Error")),
+					Header:     make(http.Header),
+				}
+			})
+			airflowClient := NewAirflowClient(client)
 
-		response, err := airflowClient.GetPools("test-airflow-url")
-		s.Error(err)
-		s.Contains(err.Error(), "API error (500): Internal Service Error")
-		s.Equal(Response{}, response)
+			response, err := airflowClient.GetPools("test-airflow-url")
+			s.Error(err)
+			s.Contains(err.Error(), "API error (500): Internal Service Error")
+			s.Equal(Response{}, response)
+		})
 	})
 
 	s.Run("error - failed to execute HTTP request", func() {
@@ -739,58 +738,62 @@ func (s *Suite) TestDoAirflowClientRetry() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	s.Run("succeeds after 503s then 200", func() {
-		callCount := 0
-		jsonResponse, err := json.Marshal(mockConnResponse)
-		s.NoError(err)
+		synctest.Test(s.T(), func(_ *testing.T) {
+			callCount := 0
+			jsonResponse, err := json.Marshal(mockConnResponse)
+			s.NoError(err)
 
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			callCount++
-			if callCount < 3 {
+			client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+				callCount++
+				if callCount < 3 {
+					return &http.Response{
+						StatusCode: 503,
+						Body:       io.NopCloser(bytes.NewBufferString("Service Unavailable")),
+						Header:     make(http.Header),
+					}
+				}
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+					Header:     make(http.Header),
+				}
+			})
+			airflowClient := NewAirflowClient(client)
+
+			doOpts := &httputil.DoOptions{
+				Path:   "/test",
+				Method: http.MethodGet,
+			}
+			resp, err := airflowClient.DoAirflowClient(doOpts)
+			s.NoError(err)
+			s.Equal(mockConnResponse.Connections, resp.Connections)
+			s.Equal(3, callCount)
+		})
+	})
+
+	s.Run("exhausts retries and returns last error", func() {
+		synctest.Test(s.T(), func(_ *testing.T) {
+			callCount := 0
+			client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+				callCount++
 				return &http.Response{
 					StatusCode: 503,
 					Body:       io.NopCloser(bytes.NewBufferString("Service Unavailable")),
 					Header:     make(http.Header),
 				}
+			})
+			airflowClient := NewAirflowClient(client)
+
+			doOpts := &httputil.DoOptions{
+				Path:   "/test",
+				Method: http.MethodGet,
 			}
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
+			_, err := airflowClient.DoAirflowClient(doOpts)
+			s.Error(err)
+			s.Contains(err.Error(), "API error (503)")
+			// 1 initial attempt + maxRetries retries
+			s.Equal(maxRetries+1, callCount)
 		})
-		airflowClient := NewAirflowClient(client)
-
-		doOpts := &httputil.DoOptions{
-			Path:   "/test",
-			Method: http.MethodGet,
-		}
-		resp, err := airflowClient.DoAirflowClient(doOpts)
-		s.NoError(err)
-		s.Equal(mockConnResponse.Connections, resp.Connections)
-		s.Equal(3, callCount)
-	})
-
-	s.Run("exhausts retries and returns last error", func() {
-		callCount := 0
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			callCount++
-			return &http.Response{
-				StatusCode: 503,
-				Body:       io.NopCloser(bytes.NewBufferString("Service Unavailable")),
-				Header:     make(http.Header),
-			}
-		})
-		airflowClient := NewAirflowClient(client)
-
-		doOpts := &httputil.DoOptions{
-			Path:   "/test",
-			Method: http.MethodGet,
-		}
-		_, err := airflowClient.DoAirflowClient(doOpts)
-		s.Error(err)
-		s.Contains(err.Error(), "API error (503)")
-		// 1 initial attempt + maxRetries retries
-		s.Equal(maxRetries+1, callCount)
 	})
 
 	s.Run("does not retry 4xx errors", func() {
