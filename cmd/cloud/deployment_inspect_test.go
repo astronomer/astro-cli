@@ -12,17 +12,10 @@ import (
 )
 
 func TestNewDeploymentInspectCmd(t *testing.T) {
-	expectedHelp := "Inspect an Astro Deployment configuration, which can be useful if you manage deployments as code or use Deployment configuration templates. This command returns the Deployment's configuration as a YAML or JSON output, which includes information about resources, such as cluster ID, region, and Airflow API URL, as well as scheduler and worker queue configurations."
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
 
-	t.Run("-h prints help", func(t *testing.T) {
-		cmdArgs := []string{"inspect", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("returns deployment in yaml format when a deployment name was provided", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)

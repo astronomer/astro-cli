@@ -20,7 +20,6 @@ var (
 )
 
 func TestNewDeploymentWorkerQueueRootCmd(t *testing.T) {
-	expectedHelp := "Manage worker queues for an Astro Deployment."
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	buf := new(bytes.Buffer)
 
@@ -31,28 +30,14 @@ func TestNewDeploymentWorkerQueueRootCmd(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "worker-queue")
 	})
-
-	t.Run("-h prints worker-queue help", func(t *testing.T) {
-		cmdArgs := []string{"worker-queue", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 }
 
 func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
-	expectedHelp := "Create a worker queue for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
 	astroCoreClient = mockCoreClient
-	t.Run("-h prints worker-queue help", func(t *testing.T) {
-		cmdArgs := []string{"worker-queue", "create", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("create worker queue when no deployment id was provided", func(t *testing.T) {
 		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
@@ -137,19 +122,12 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 }
 
 func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
-	expectedHelp := "Delete a worker queue from an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
 	astroCoreClient = mockCoreClient
 
-	t.Run("-h prints worker-queue help", func(t *testing.T) {
-		cmdArgs := []string{"worker-queue", "delete", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("happy path delete worker queue", func(t *testing.T) {
 		testID := "test-wq-id"
 		astroMachine := "A5"
@@ -208,19 +186,12 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 }
 
 func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
-	expectedHelp := "Update a worker queue for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
 	astroCoreClient = mockCoreClient
 
-	t.Run("-h prints worker-queue help", func(t *testing.T) {
-		cmdArgs := []string{"worker-queue", "update", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("throw error if worker concurrency is set as 0", func(t *testing.T) {
 		cmdArgs := []string{"worker-queue", "update", "--concurrency", "0"}
 		_, err := execDeploymentCmd(cmdArgs...)

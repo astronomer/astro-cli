@@ -59,7 +59,7 @@ func newDeploymentConnectionListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"li"},
 		Short:   "list a Deployment's connections",
-		Long:    "list connections for an Astro Deployment",
+		Long:    "List Airflow connections in a Deployment's metadata database. Passwords and sensitive extras are not included in the output.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentConnectionList(cmd, out)
 		},
@@ -76,7 +76,7 @@ func newDeploymentConnectionCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create connections for a Deployment",
-		Long:    "Create Airflow connections for an Astro Deployment",
+		Long:    "Create Airflow connections in a Deployment's metadata database. Provide connection details as JSON. Multiple connections can be created in a single call.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentConnectionCreate(cmd, out)
 		},
@@ -102,7 +102,7 @@ func newDeploymentConnectionUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update connections for a Deployment",
-		Long:    "Update existing Airflow connections for an Astro Deployment",
+		Long:    "Update existing Airflow connections in a Deployment's metadata database. Provide updated connection details as JSON.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentConnectionUpdate(cmd, out)
 		},
@@ -162,7 +162,7 @@ func newDeploymentAirflowVariableListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"li"},
 		Short:   "list a Deployment's Airflow variables",
-		Long:    "list Airflow variables stored in an Astro Deployment's metadata database",
+		Long:    "List Airflow variables stored in a Deployment's metadata database.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAirflowVariableList(cmd, out)
 		},
@@ -179,7 +179,7 @@ func newDeploymentAirflowVariableCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create Airflow variables for a Deployment",
-		Long:    "Create Airflow variables for an Astro Deployment",
+		Long:    "Create Airflow variables in a Deployment's metadata database. Provide variable key-value pairs as JSON. Multiple variables can be created in a single call.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAirflowVariableCreate(cmd, out)
 		},
@@ -199,7 +199,7 @@ func newDeploymentAirflowVariableUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update Airflow variables for a Deployment",
-		Long:    "Update Airflow variables for an Astro Deployment",
+		Long:    "Update existing Airflow variables in a Deployment's metadata database. Provide updated key-value pairs as JSON.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAirflowVariableUpdate(cmd, out)
 		},
@@ -253,7 +253,7 @@ func newDeploymentPoolListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"li"},
 		Short:   "list a Deployment's Airflow pools",
-		Long:    "list Airflow pools for an Astro Deployment",
+		Long:    "List Airflow pools in a Deployment. Pools limit how many task instances can run concurrently for tasks assigned to the pool.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentPoolList(cmd, out)
 		},
@@ -270,7 +270,7 @@ func newDeploymentPoolCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create Airflow pools for an Astro Deployment",
-		Long:    "Create Airflow pools for an Astro Deployment",
+		Long:    "Create Airflow pools in a Deployment. Each pool defines a slot count that limits concurrent task execution for tasks assigned to it.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentPoolCreate(cmd, out)
 		},
@@ -291,7 +291,7 @@ func newDeploymentPoolUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update Airflow pools for an Astro Deployment",
-		Long:    "Update Airflow pools for an Astro Deployment",
+		Long:    "Update an Airflow pool's slot count or description in a Deployment.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentPoolUpdate(cmd, out)
 		},

@@ -39,7 +39,7 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create a Deployment's worker queue",
-		Long:    "Create a worker queue for an Astro Deployment",
+		Long:    "Create a worker queue for a Deployment. Worker queues let you assign tasks to different machine types with independent autoscaling. Each queue has its own min/max worker count and concurrency settings. KubernetesExecutor Deployments support only a single default queue. Queue names must be lowercase alphanumeric or hyphens, start with a letter, and not exceed 63 characters.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
@@ -60,7 +60,7 @@ func newDeploymentWorkerQueueUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update a Deployment's worker queue",
-		Long:    "Update a worker queue for an Astro Deployment",
+		Long:    "Update a worker queue's machine type, scaling limits, or concurrency. Running tasks are not interrupted, but may be affected if the queue is scaled down below the current worker count. The default queue cannot be renamed.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
@@ -82,7 +82,7 @@ func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete",
 		Aliases: []string{"de"},
 		Short:   "Delete a Deployment's worker queue",
-		Long:    "Delete a worker queue from an Astro Deployment",
+		Long:    "Delete a worker queue from a Deployment. Tasks currently running on the queue may be interrupted. The default queue cannot be deleted.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueDelete(cmd, args, out)
 		},
