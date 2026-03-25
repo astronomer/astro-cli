@@ -40,6 +40,10 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cr"},
 		Short:   "Create a Deployment's worker queue",
 		Long:    "Create a worker queue for an Astro Deployment",
+		Example: `
+  $ astro deployment worker-queue create --deployment-id <deployment-id> --name my-queue --worker-type default
+  $ astro deployment worker-queue create --deployment-id <deployment-id> --name my-queue --min-count 2 --max-count 10 --concurrency 16
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
@@ -61,6 +65,10 @@ func newDeploymentWorkerQueueUpdateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"up"},
 		Short:   "Update a Deployment's worker queue",
 		Long:    "Update a worker queue for an Astro Deployment",
+		Example: `
+  $ astro deployment worker-queue update --deployment-id <deployment-id> --name my-queue --max-count 20
+  $ astro deployment worker-queue update --deployment-id <deployment-id> --name my-queue --concurrency 32 --force
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
@@ -83,6 +91,10 @@ func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"de"},
 		Short:   "Delete a Deployment's worker queue",
 		Long:    "Delete a worker queue from an Astro Deployment",
+		Example: `
+  $ astro deployment worker-queue delete --deployment-id <deployment-id> --name my-queue
+  $ astro deployment worker-queue delete --deployment-id <deployment-id> --name my-queue --force
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueDelete(cmd, args, out)
 		},

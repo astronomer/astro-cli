@@ -60,6 +60,10 @@ func newDeploymentConnectionListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"li"},
 		Short:   "list a Deployment's connections",
 		Long:    "list connections for an Astro Deployment",
+		Example: `
+  $ astro deployment connection list --deployment-id <deployment-id>
+  $ astro deployment connection list --deployment-name my-deployment
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentConnectionList(cmd, out)
 		},
@@ -77,6 +81,10 @@ func newDeploymentConnectionCreateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cr"},
 		Short:   "Create connections for a Deployment",
 		Long:    "Create Airflow connections for an Astro Deployment",
+		Example: `
+  $ astro deployment connection create --deployment-id <deployment-id> --conn-id my-conn --conn-type postgres --host localhost --port 5432
+  $ astro deployment connection create --deployment-id <deployment-id> --conn-id my-conn --conn-type http --host https://api.example.com
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentConnectionCreate(cmd, out)
 		},
@@ -103,6 +111,9 @@ func newDeploymentConnectionUpdateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"up"},
 		Short:   "Update connections for a Deployment",
 		Long:    "Update existing Airflow connections for an Astro Deployment",
+		Example: `
+  $ astro deployment connection update --deployment-id <deployment-id> --conn-id my-conn --conn-type postgres --host new-host
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentConnectionUpdate(cmd, out)
 		},
@@ -129,6 +140,10 @@ func newDeploymentConnectionCopyCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cp"},
 		Short:   "Copy connections from one Deployment to another",
 		Long:    "Copy Airflow connections from one Astro Deployment to another. Passwords and extra configurations will not copy over. If a connection already exits with same connection ID in the target Deployment, that connection will be updated",
+		Example: `
+  $ astro deployment connection copy --source-id <source-deployment-id> --target-id <target-deployment-id>
+  $ astro deployment connection copy --source-name my-source-deployment --target-name my-target-deployment
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentConnectionCopy(cmd, out)
 		},
@@ -163,6 +178,10 @@ func newDeploymentAirflowVariableListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"li"},
 		Short:   "list a Deployment's Airflow variables",
 		Long:    "list Airflow variables stored in an Astro Deployment's metadata database",
+		Example: `
+  $ astro deployment airflow-variable list --deployment-id <deployment-id>
+  $ astro deployment airflow-variable list --deployment-name my-deployment
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAirflowVariableList(cmd, out)
 		},
@@ -180,6 +199,10 @@ func newDeploymentAirflowVariableCreateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cr"},
 		Short:   "Create Airflow variables for a Deployment",
 		Long:    "Create Airflow variables for an Astro Deployment",
+		Example: `
+  $ astro deployment airflow-variable create --deployment-id <deployment-id> --key my_var --value my_value
+  $ astro deployment airflow-variable create --deployment-id <deployment-id> --key my_var --value my_value --description "A useful variable"
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAirflowVariableCreate(cmd, out)
 		},
@@ -200,6 +223,9 @@ func newDeploymentAirflowVariableUpdateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"up"},
 		Short:   "Update Airflow variables for a Deployment",
 		Long:    "Update Airflow variables for an Astro Deployment",
+		Example: `
+  $ astro deployment airflow-variable update --deployment-id <deployment-id> --key my_var --value new_value
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAirflowVariableUpdate(cmd, out)
 		},
@@ -220,6 +246,10 @@ func newDeploymentAirflowVariableCopyCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cp"},
 		Short:   "Copy the Airflow variables from one Deployment to another",
 		Long:    "Copy Airflow variables from one Astro Deployment to another Astro Deployment. If a variable already exits with same Key it will be updated",
+		Example: `
+  $ astro deployment airflow-variable copy --source-id <source-deployment-id> --target-id <target-deployment-id>
+  $ astro deployment airflow-variable copy --source-name my-source-deployment --target-name my-target-deployment
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAirflowVariableCopy(cmd, out)
 		},
@@ -254,6 +284,10 @@ func newDeploymentPoolListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"li"},
 		Short:   "list a Deployment's Airflow pools",
 		Long:    "list Airflow pools for an Astro Deployment",
+		Example: `
+  $ astro deployment pool list --deployment-id <deployment-id>
+  $ astro deployment pool list --deployment-name my-deployment
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentPoolList(cmd, out)
 		},
@@ -271,6 +305,10 @@ func newDeploymentPoolCreateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cr"},
 		Short:   "Create Airflow pools for an Astro Deployment",
 		Long:    "Create Airflow pools for an Astro Deployment",
+		Example: `
+  $ astro deployment pool create --deployment-id <deployment-id> --name my-pool --slots 5
+  $ astro deployment pool create --deployment-id <deployment-id> --name my-pool --slots 10 --description "Pool for ML tasks"
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentPoolCreate(cmd, out)
 		},
@@ -292,6 +330,10 @@ func newDeploymentPoolUpdateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"up"},
 		Short:   "Update Airflow pools for an Astro Deployment",
 		Long:    "Update Airflow pools for an Astro Deployment",
+		Example: `
+  $ astro deployment pool update --deployment-id <deployment-id> --name my-pool --slots 10
+  $ astro deployment pool update --deployment-id <deployment-id> --name my-pool --slots 10 --description "Updated pool"
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentPoolUpdate(cmd, out)
 		},
@@ -313,6 +355,10 @@ func newDeploymentPoolCopyCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cp"},
 		Short:   "Copy Airflow pools from one Astro Deployment to another",
 		Long:    "Copy Airflow pools from one Astro Deployment to another Astro Deployment. If a pool already exits with same name it will be updated",
+		Example: `
+  $ astro deployment pool copy --source-id <source-deployment-id> --target-id <target-deployment-id>
+  $ astro deployment pool copy --source-name my-source-deployment --target-name my-target-deployment
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentPoolCopy(cmd, out)
 		},
