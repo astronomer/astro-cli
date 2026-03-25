@@ -82,6 +82,25 @@ func TestWorkspaceList(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func TestWorkspaceListJSON(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+	astroCoreClient = mockClient
+
+	cmdArgs := []string{"list", "--json"}
+	resp, err := execWorkspaceCmd(cmdArgs...)
+	assert.NoError(t, err)
+
+	var result workspace.WorkspaceList
+	assert.NoError(t, json.Unmarshal([]byte(resp), &result))
+	assert.Len(t, result.Workspaces, 1)
+	assert.Equal(t, "test-workspace", result.Workspaces[0].Name)
+	assert.Equal(t, "workspace-id", result.Workspaces[0].ID)
+	mockClient.AssertExpectations(t)
+}
+
 func TestWorkspaceSwitch(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 

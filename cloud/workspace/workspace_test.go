@@ -79,6 +79,57 @@ func (s *Suite) TestListError() {
 	s.ErrorIs(err, errMock)
 }
 
+func (s *Suite) TestListData() {
+	s.Run("returns structured workspace data", func() {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+
+		data, err := ListData(mockClient)
+		s.NoError(err)
+		s.Len(data.Workspaces, 1)
+		s.Equal("test-workspace", data.Workspaces[0].Name)
+		s.Equal("workspace-id", data.Workspaces[0].ID)
+		mockClient.AssertExpectations(s.T())
+	})
+
+	s.Run("returns error on failure", func() {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
+
+		_, err := ListData(mockClient)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
+	})
+}
+
+func (s *Suite) TestListWithFormat() {
+	s.Run("json output", func() {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err := ListWithFormat(mockClient, "json", "", buf)
+		s.NoError(err)
+
+		var result WorkspaceList
+		s.NoError(json.Unmarshal(buf.Bytes(), &result))
+		s.Len(result.Workspaces, 1)
+		s.Equal("test-workspace", result.Workspaces[0].Name)
+		mockClient.AssertExpectations(s.T())
+	})
+
+	s.Run("table output", func() {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err := ListWithFormat(mockClient, "table", "", buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "test-workspace")
+		mockClient.AssertExpectations(s.T())
+	})
+}
+
 func (s *Suite) TestGetWorkspaceSelection() {
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 

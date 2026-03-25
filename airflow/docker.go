@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -521,34 +520,39 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 	}
 }
 
-func (d *DockerCompose) PS() error {
+// PS returns structured container status data
+func (d *DockerCompose) PS() (*airflowTypes.PSStatus, error) {
 	// List project containers
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
 	})
 	if err != nil {
-		return errors.Wrap(err, composeStatusCheckErrMsg)
+		return nil, errors.Wrap(err, composeStatusCheckErrMsg)
 	}
 
-	// Columns for table
-	infoColumns := []string{"Name", "State", "Ports"}
+	status := &airflowTypes.PSStatus{
+		Mode:       "docker",
+		Containers: make([]airflowTypes.ContainerStatus, 0, len(psInfo)),
+	}
 
-	// Create a new tabwriter
-	tw := new(tabwriter.Writer)
-	tw.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight) //nolint:mnd
-
-	// Append data to table
-	fmt.Fprintln(tw, strings.Join(infoColumns, "\t"))
 	for i := range psInfo {
-		data := []string{psInfo[i].Name, psInfo[i].State}
-		if len(psInfo[i].Publishers) != 0 {
-			data = append(data, fmt.Sprint(psInfo[i].Publishers[0].PublishedPort))
+		containerStatus := airflowTypes.ContainerStatus{
+			Name:  psInfo[i].Name,
+			State: psInfo[i].State,
+			Ports: make([]string, 0),
 		}
-		fmt.Fprintln(tw, strings.Join(data, "\t"))
+
+		// Collect port mappings
+		for _, pub := range psInfo[i].Publishers {
+			if pub.PublishedPort != 0 {
+				containerStatus.Ports = append(containerStatus.Ports, fmt.Sprintf("%d", pub.PublishedPort))
+			}
+		}
+
+		status.Containers = append(status.Containers, containerStatus)
 	}
 
-	// Flush to stdout
-	return tw.Flush()
+	return status, nil
 }
 
 // Kill stops a local airflow development cluster

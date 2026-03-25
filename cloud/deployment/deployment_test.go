@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -350,6 +351,64 @@ func (s *Suite) TestList() {
 		s.Contains(buf.String(), "region")
 		s.Contains(buf.String(), "cluster")
 
+		mockPlatformCoreClient.AssertExpectations(s.T())
+	})
+}
+
+func (s *Suite) TestListData() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	s.Run("returns structured deployment data", func() {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+
+		data, err := ListData(ws, false, mockPlatformCoreClient)
+		s.NoError(err)
+		s.Len(data.Deployments, 2)
+		s.Contains([]string{data.Deployments[0].DeploymentID, data.Deployments[1].DeploymentID}, "test-id-1")
+		mockPlatformCoreClient.AssertExpectations(s.T())
+	})
+
+	s.Run("returns error on failure", func() {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
+
+		_, err := ListData(ws, false, mockPlatformCoreClient)
+		s.ErrorIs(err, errMock)
+		mockPlatformCoreClient.AssertExpectations(s.T())
+	})
+
+	s.Run("empty result", func() {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
+
+		data, err := ListData(ws, false, mockPlatformCoreClient)
+		s.NoError(err)
+		s.Empty(data.Deployments)
+		mockPlatformCoreClient.AssertExpectations(s.T())
+	})
+}
+
+func (s *Suite) TestListWithFormat() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	s.Run("json output", func() {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err := ListWithFormat(ws, false, mockPlatformCoreClient, "json", "", buf)
+		s.NoError(err)
+
+		var result DeploymentList
+		s.NoError(json.Unmarshal(buf.Bytes(), &result))
+		s.Len(result.Deployments, 2)
+		mockPlatformCoreClient.AssertExpectations(s.T())
+	})
+
+	s.Run("table output", func() {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err := ListWithFormat(ws, false, mockPlatformCoreClient, "table", "", buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "test-id-1")
 		mockPlatformCoreClient.AssertExpectations(s.T())
 	})
 }

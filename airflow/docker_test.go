@@ -984,17 +984,13 @@ func (s *Suite) TestDockerComposePS() {
 
 		mockDockerCompose.composeService = composeMock
 
-		r, w, _ := os.Pipe()
-		os.Stdout = w
-
-		err := mockDockerCompose.PS()
+		data, err := mockDockerCompose.PS()
 		s.NoError(err)
-
-		w.Close()
-		out, _ := io.ReadAll(r)
-
-		s.Contains(string(out), "test-webserver")
-		s.Contains(string(out), "running")
+		s.Equal("docker", data.Mode)
+		s.Len(data.Containers, 1)
+		s.Equal("test-webserver", data.Containers[0].Name)
+		s.Equal("running", data.Containers[0].State)
+		s.Contains(data.Containers[0].Ports, "8080")
 		composeMock.AssertExpectations(s.T())
 	})
 
@@ -1004,7 +1000,7 @@ func (s *Suite) TestDockerComposePS() {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.PS()
+		_, err := mockDockerCompose.PS()
 		s.ErrorIs(err, errMockDocker)
 		composeMock.AssertExpectations(s.T())
 	})

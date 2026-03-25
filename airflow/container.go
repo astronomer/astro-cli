@@ -27,7 +27,7 @@ type StartOptions = types.StartOptions
 type ContainerHandler interface {
 	Start(opts *types.StartOptions) error
 	Stop(waitForExit bool) error
-	PS() error
+	PS() (*types.PSStatus, error)
 	Kill() error
 	Logs(follow bool, containerNames ...string) error
 	Run(args []string, user string) error

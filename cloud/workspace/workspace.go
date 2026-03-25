@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -26,14 +27,15 @@ var (
 	ErrWrongEnforceInput   = errors.New("the input to the `--enforce-cicd` flag")
 )
 
-func newTableOut() *printutil.Table {
-	return &printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"NAME", "ID"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
-	}
-}
+var workspaceTableConfig = output.BuildTableConfig(
+	[]output.Column[WorkspaceInfo]{
+		{Header: "NAME", Value: func(w WorkspaceInfo) string { return w.Name }},
+		{Header: "ID", Value: func(w WorkspaceInfo) string { return w.ID }},
+	},
+	func(d any) []WorkspaceInfo { return d.(*WorkspaceList).Workspaces },
+	output.WithColorRow(func(w WorkspaceInfo) bool { return w.IsCurrent }, [2]string{"\033[1;32m", "\033[0m"}),
+	output.WithPadding([]int{44, 50}),
+)
 
 // GetCurrentWorkspace gets the current workspace set in context config
 // Returns a string representing the current workspace and an error if it doesn't exist
@@ -50,36 +52,54 @@ func GetCurrentWorkspace() (string, error) {
 	return c.Workspace, nil
 }
 
-// List all workspaces
-func List(client astrocore.CoreClient, out io.Writer) error {
+// ListData returns workspace list data for structured output
+func ListData(client astrocore.CoreClient) (*WorkspaceList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ws, err := GetWorkspaces(client)
 	if err != nil {
+		return nil, err
+	}
+
+	result := &WorkspaceList{
+		Workspaces: make([]WorkspaceInfo, 0, len(ws)),
+	}
+
+	for i := range ws {
+		isCurrent := c.Workspace == ws[i].Id
+		result.Workspaces = append(result.Workspaces, WorkspaceInfo{
+			Name:      ws[i].Name,
+			ID:        ws[i].Id,
+			IsCurrent: isCurrent,
+		})
+	}
+
+	return result, nil
+}
+
+// List all workspaces
+func List(client astrocore.CoreClient, out io.Writer) error {
+	return ListWithFormat(client, output.FormatTable, "", out)
+}
+
+// ListWithFormat lists workspaces with the specified output format
+func ListWithFormat(client astrocore.CoreClient, format output.Format, template string, out io.Writer) error {
+	data, err := ListData(client)
+	if err != nil {
 		return err
 	}
 
-	tab := newTableOut()
-	for i := range ws {
-		name := ws[i].Name
-		workspace := ws[i].Id
+	printer := output.New(output.Options{
+		Format:   format,
+		Template: template,
+		Out:      out,
+		Table:    workspaceTableConfig,
+	})
 
-		var color bool
-
-		if c.Workspace == ws[i].Id {
-			color = true
-		} else {
-			color = false
-		}
-		tab.AddRow([]string{name, workspace}, color)
-	}
-
-	tab.Print(out)
-
-	return nil
+	return printer.Print(data)
 }
 
 var GetWorkspaceSelection = func(client astrocore.CoreClient, out io.Writer) (string, error) {
