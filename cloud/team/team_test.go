@@ -736,6 +736,17 @@ func (s *Suite) TestDelete() {
 		s.Equal(expectedOutMessage, out.String())
 	})
 
+	s.Run("happy path Delete with idp managed team using force flag", func() {
+		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully deleted\n", team2.Name)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Twice()
+		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseOK, nil).Once()
+		err := Delete(team2.Id, true, out, mockClient)
+		s.NoError(err)
+		s.Equal(expectedOutMessage, out.String())
+	})
+
 	s.Run("error path user reject delete", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -883,6 +894,17 @@ func (s *Suite) TestUpdate() {
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "y")()
 		err := UpdateTeam(team2.Id, "name", "description", "", false, out, mockClient)
+		s.NoError(err)
+		s.Equal(expectedOutMessage, out.String())
+	})
+
+	s.Run("happy path Update with idp managed team using force flag", func() {
+		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully updated\n", team2.Name)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		err := UpdateTeam(team2.Id, "name", "description", "", true, out, mockClient)
 		s.NoError(err)
 		s.Equal(expectedOutMessage, out.String())
 	})
@@ -1083,6 +1105,18 @@ func (s *Suite) TestAddUser() {
 		s.Equal(expectedOutMessage, out.String())
 	})
 
+	s.Run("happy path AddUser with idp managed team using force flag", func() {
+		expectedOutMessage := fmt.Sprintf("Astro User %s was successfully added to team %s \n", user1.Id, team2.Name)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Twice()
+		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
+		err := AddUser(team2.Id, user1.Id, true, out, mockClient)
+		s.NoError(err)
+		s.Equal(expectedOutMessage, out.String())
+	})
+
 	s.Run("user reject AddUser", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1244,6 +1278,18 @@ func (s *Suite) TestRemoveUser() {
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "y")()
 		err := RemoveUser(team2.Id, user1.Id, false, out, mockClient)
+		s.NoError(err)
+		s.Equal(expectedOutMessage, out.String())
+	})
+
+	s.Run("happy path RemoveUser with idp managed team using force flag", func() {
+		expectedOutMessage := fmt.Sprintf("Astro User %s was successfully removed from team %s \n", user1.Id, team2.Name)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Twice()
+		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
+		err := RemoveUser(team2.Id, user1.Id, true, out, mockClient)
 		s.NoError(err)
 		s.Equal(expectedOutMessage, out.String())
 	})
