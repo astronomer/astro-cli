@@ -44,7 +44,7 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be deleted.")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be deleted. Run 'astro deployment list' to find valid IDs")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment where the worker queue should be deleted.")
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue. Queue names must not exceed 63 characters and contain only lowercase alphanumeric characters or '-' and start with an alphabetical character.")
 	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", 0, "The min worker count of the worker queue.")
@@ -65,7 +65,7 @@ func newDeploymentWorkerQueueUpdateCmd(out io.Writer) *cobra.Command {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created.")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created. Run 'astro deployment list' to find valid IDs")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment where the worker queue should be created.")
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue. Queue names must not exceed 63 characters and contain only lowercase alphanumeric characters or '-' and start with an alphabetical character.")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force update: Don't prompt a user for confirmation")
@@ -87,7 +87,7 @@ func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 			return deploymentWorkerQueueDelete(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created.")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created. Run 'astro deployment list' to find valid IDs")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment where the worker queue should be created.")
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue to delete.")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force delete: Don't prompt a user for confirmation")
