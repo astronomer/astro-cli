@@ -11,6 +11,7 @@ tool (
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/semver/v3 v3.3.1
+	github.com/astronomer/astro-cli/pkg/telemetry v0.0.0
 	github.com/briandowns/spinner v1.23.1
 	github.com/docker/cli v27.4.0+incompatible
 	github.com/docker/compose/v2 v2.31.0
@@ -29,7 +30,6 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.11.1
-	github.com/astronomer/astro-cli/pkg/telemetry v0.0.0
 	golang.org/x/net v0.38.0
 	golang.org/x/sys v0.38.0
 )
@@ -47,6 +47,7 @@ require (
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
+	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/itchyny/gojq v0.12.18
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/neilotoole/jsoncolor v0.7.1
@@ -359,7 +360,7 @@ require (
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.6.0
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
