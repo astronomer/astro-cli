@@ -29,6 +29,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.11.1
+	github.com/astronomer/astro-cli/pkg/telemetry v0.0.0
 	golang.org/x/net v0.38.0
 	golang.org/x/sys v0.38.0
 )
@@ -421,6 +422,7 @@ replace github.com/jaguilar/vt100 => github.com/tonistiigi/vt100 v0.0.0-20190402
 
 replace github.com/ldez/tagliatelle => github.com/ldez/tagliatelle v0.5.0
 
+<<<<<<< Updated upstream
 replace github.com/astronomer/astro-cli/pkg/proxy => ./pkg/proxy
 
 replace github.com/astronomer/astro-cli/pkg/airflowrt => ./pkg/airflowrt
@@ -428,3 +430,6 @@ replace github.com/astronomer/astro-cli/pkg/airflowrt => ./pkg/airflowrt
 replace github.com/astronomer/astro-cli/pkg/astroauth => ./pkg/astroauth
 
 replace github.com/astronomer/astro-cli/astro-client-platform-core => ./astro-client-platform-core
+=======
+replace github.com/astronomer/astro-cli/pkg/telemetry => ./pkg/telemetry
+>>>>>>> Stashed changes
