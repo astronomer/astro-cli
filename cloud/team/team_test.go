@@ -419,6 +419,46 @@ func (s *Suite) TestListOrgTeam() {
 	})
 }
 
+func (s *Suite) TestListOrgTeamsData() {
+	s.Run("returns structured team data", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
+
+		data, err := ListOrgTeamsData(mockClient)
+		s.NoError(err)
+		s.NotEmpty(data.Teams)
+		s.Equal("team 1", data.Teams[0].Name)
+		s.Equal("team1-id", data.Teams[0].ID)
+	})
+
+	s.Run("returns error on failure", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
+
+		_, err := ListOrgTeamsData(mockClient)
+		s.Error(err)
+	})
+}
+
+func (s *Suite) TestListOrgTeamsWithFormat() {
+	s.Run("json output", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
+
+		buf := new(bytes.Buffer)
+		err := ListOrgTeamsWithFormat(mockClient, "json", "", buf)
+		s.NoError(err)
+
+		var result TeamList
+		s.NoError(json.Unmarshal(buf.Bytes(), &result))
+		s.NotEmpty(result.Teams)
+		s.Equal("team 1", result.Teams[0].Name)
+	})
+}
+
 func (s *Suite) TestListWorkspaceTeam() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.Run("happy path TestListWorkspaceTeam", func() {

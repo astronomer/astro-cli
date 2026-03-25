@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 
 	"github.com/pkg/errors"
@@ -640,4 +641,177 @@ func ListDeploymentUsers(out io.Writer, client astrocore.CoreClient, deploymentI
 
 	table.Print(out)
 	return nil
+}
+
+// ListDeploymentUsersData returns deployment user list data for structured output
+//
+//nolint:dupl
+func ListDeploymentUsersData(client astrocore.CoreClient, deploymentID string) (*UserList, error) {
+	users, err := GetDeploymentUsers(client, deploymentID, userPagnationLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	userInfos := make([]UserInfo, 0, len(users))
+	for i := range users {
+		deploymentRole := ""
+		if users[i].DeploymentRole != nil {
+			deploymentRole = *users[i].DeploymentRole
+		}
+		userInfos = append(userInfos, UserInfo{
+			FullName:       users[i].FullName,
+			Email:          users[i].Username,
+			ID:             users[i].Id,
+			DeploymentRole: deploymentRole,
+			CreatedAt:      users[i].CreatedAt,
+		})
+	}
+
+	return &UserList{Users: userInfos}, nil
+}
+
+var deploymentUserTableConfig = output.BuildTableConfig(
+	[]output.Column[UserInfo]{
+		{Header: "FULLNAME", Value: func(u UserInfo) string { return u.FullName }},
+		{Header: "EMAIL", Value: func(u UserInfo) string { return u.Email }},
+		{Header: "ID", Value: func(u UserInfo) string { return u.ID }},
+		{Header: "DEPLOYMENT ROLE", Value: func(u UserInfo) string { return u.DeploymentRole }},
+		{Header: "CREATE DATE", Value: func(u UserInfo) string { return u.CreatedAt.Format(time.RFC3339) }},
+	},
+	func(d any) []UserInfo { return d.(*UserList).Users },
+	output.WithPadding([]int{30, 50, 10, 50, 10, 10, 10}),
+)
+
+// ListDeploymentUsersWithFormat lists deployment users with the specified output format
+func ListDeploymentUsersWithFormat(client astrocore.CoreClient, deploymentID string, format output.Format, template string, out io.Writer) error {
+	data, err := ListDeploymentUsersData(client, deploymentID)
+	if err != nil {
+		return err
+	}
+
+	printer := output.New(output.Options{
+		Format:   format,
+		Template: template,
+		Out:      out,
+		Table:    deploymentUserTableConfig,
+	})
+
+	return printer.Print(data)
+}
+
+// ListWorkspaceUsersData returns workspace user list data for structured output
+//
+//nolint:dupl
+func ListWorkspaceUsersData(client astrocore.CoreClient, workspaceID string) (*UserList, error) {
+	users, err := GetWorkspaceUsers(client, workspaceID, userPagnationLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	userInfos := make([]UserInfo, 0, len(users))
+	for i := range users {
+		workspaceRole := ""
+		if users[i].WorkspaceRole != nil {
+			workspaceRole = *users[i].WorkspaceRole
+		}
+		userInfos = append(userInfos, UserInfo{
+			FullName:      users[i].FullName,
+			Email:         users[i].Username,
+			ID:            users[i].Id,
+			WorkspaceRole: workspaceRole,
+			CreatedAt:     users[i].CreatedAt,
+		})
+	}
+
+	return &UserList{Users: userInfos}, nil
+}
+
+var workspaceUserTableConfig = output.BuildTableConfig(
+	[]output.Column[UserInfo]{
+		{Header: "FULLNAME", Value: func(u UserInfo) string { return u.FullName }},
+		{Header: "EMAIL", Value: func(u UserInfo) string { return u.Email }},
+		{Header: "ID", Value: func(u UserInfo) string { return u.ID }},
+		{Header: "WORKSPACE ROLE", Value: func(u UserInfo) string { return u.WorkspaceRole }},
+		{Header: "CREATE DATE", Value: func(u UserInfo) string { return u.CreatedAt.Format(time.RFC3339) }},
+	},
+	func(d any) []UserInfo { return d.(*UserList).Users },
+	output.WithPadding([]int{30, 50, 10, 50, 10, 10, 10}),
+)
+
+// ListWorkspaceUsersWithFormat lists workspace users with the specified output format
+func ListWorkspaceUsersWithFormat(client astrocore.CoreClient, workspaceID string, format output.Format, template string, out io.Writer) error {
+	data, err := ListWorkspaceUsersData(client, workspaceID)
+	if err != nil {
+		return err
+	}
+
+	printer := output.New(output.Options{
+		Format:   format,
+		Template: template,
+		Out:      out,
+		Table:    workspaceUserTableConfig,
+	})
+
+	return printer.Print(data)
+}
+
+// ListOrgUsersData returns organization user list data for structured output
+func ListOrgUsersData(client astrocore.CoreClient) (*UserList, error) {
+	users, err := GetOrgUsers(client)
+	if err != nil {
+		return nil, err
+	}
+
+	userInfos := make([]UserInfo, 0, len(users))
+	for i := range users {
+		orgRole := ""
+		if users[i].OrgRole != nil {
+			orgRole = *users[i].OrgRole
+		}
+		userInfos = append(userInfos, UserInfo{
+			FullName:     users[i].FullName,
+			Email:        users[i].Username,
+			ID:           users[i].Id,
+			OrgRole:      orgRole,
+			IsIdpManaged: users[i].OrgUserRelationIsIdpManaged,
+			CreatedAt:    users[i].CreatedAt,
+		})
+	}
+
+	return &UserList{Users: userInfos}, nil
+}
+
+var orgUserTableConfig = output.BuildTableConfig(
+	[]output.Column[UserInfo]{
+		{Header: "FULLNAME", Value: func(u UserInfo) string { return u.FullName }},
+		{Header: "EMAIL", Value: func(u UserInfo) string { return u.Email }},
+		{Header: "ID", Value: func(u UserInfo) string { return u.ID }},
+		{Header: "ORGANIZATION ROLE", Value: func(u UserInfo) string { return u.OrgRole }},
+		{Header: "IDP MANAGED", Value: func(u UserInfo) string {
+			if u.IsIdpManaged != nil {
+				return strconv.FormatBool(*u.IsIdpManaged)
+			}
+			return ""
+		}},
+		{Header: "CREATE DATE", Value: func(u UserInfo) string { return u.CreatedAt.Format(time.RFC3339) }},
+	},
+	func(d any) []UserInfo { return d.(*UserList).Users },
+	output.WithPadding([]int{30, 50, 10, 50, 10, 10, 10}),
+)
+
+// ListOrgUsersWithFormat lists organization users with the specified output format
+func ListOrgUsersWithFormat(client astrocore.CoreClient, format output.Format, template string, out io.Writer) error {
+	data, err := ListOrgUsersData(client)
+	if err != nil {
+		return err
+	}
+
+	printer := output.New(output.Options{
+		Format:   format,
+		Template: template,
+		Out:      out,
+		Table:    orgUserTableConfig,
+	})
+
+	return printer.Print(data)
 }

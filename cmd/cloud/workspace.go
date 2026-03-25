@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	workspacetoken "github.com/astronomer/astro-cli/cloud/workspace-token"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 
 	"github.com/pkg/errors"
@@ -21,24 +22,27 @@ import (
 )
 
 var (
-	errInvalidWorkspaceRoleKey = errors.New("invalid workspace role selection")
-	workspaceID                string
-	addWorkspaceRole           string
-	updateWorkspaceRole        string
-	workspaceName              string
-	workspaceDescription       string
-	enforceCD                  string
-	tokenName                  string
-	tokenDescription           string
-	tokenRole                  string
-	orgTokenName               string
-	tokenID                    string
-	orgTokenID                 string
-	workspaceTokenID           string
-	cleanTokenOutput           bool
-	forceRotate                bool
-	tokenExpiration            int
-	validWorkspaceRoles        []string
+	errInvalidWorkspaceRoleKey   = errors.New("invalid workspace role selection")
+	workspaceID                  string
+	addWorkspaceRole             string
+	updateWorkspaceRole          string
+	workspaceName                string
+	workspaceDescription         string
+	enforceCD                    string
+	tokenName                    string
+	tokenDescription             string
+	tokenRole                    string
+	orgTokenName                 string
+	tokenID                      string
+	orgTokenID                   string
+	workspaceTokenID             string
+	cleanTokenOutput             bool
+	forceRotate                  bool
+	tokenExpiration              int
+	validWorkspaceRoles          []string
+	workspaceListOutputFlags     output.Flags
+	workspaceUserListOutputFlags output.Flags
+	workspaceTeamListOutputFlags output.Flags
 )
 
 const (
@@ -80,6 +84,7 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 			return workspaceList(cmd, out)
 		},
 	}
+	workspaceListOutputFlags.AddFlags(cmd)
 	return cmd
 }
 
@@ -187,6 +192,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 			return listWorkspaceUser(cmd, out)
 		},
 	}
+	workspaceUserListOutputFlags.AddFlags(cmd)
 	return cmd
 }
 
@@ -272,7 +278,6 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -283,6 +288,7 @@ func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
 			return listWorkspaceTeam(cmd, out)
 		},
 	}
+	workspaceTeamListOutputFlags.AddFlags(cmd)
 	return cmd
 }
 
@@ -511,8 +517,13 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 }
 
 func listWorkspaceTeam(cmd *cobra.Command, out io.Writer) error {
+	format, err := workspaceTeamListOutputFlags.Resolve()
+	if err != nil {
+		return err
+	}
+
 	cmd.SilenceUsage = true
-	return team.ListWorkspaceTeams(out, astroCoreClient, "")
+	return team.ListWorkspaceTeamsWithFormat(astroCoreClient, "", format, workspaceTeamListOutputFlags.Template, out)
 }
 
 func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -590,9 +601,14 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 }
 
 func workspaceList(cmd *cobra.Command, out io.Writer) error {
+	format, err := workspaceListOutputFlags.Resolve()
+	if err != nil {
+		return err
+	}
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.List(astroCoreClient, out)
+	return workspace.ListWithFormat(astroCoreClient, format, workspaceListOutputFlags.Template, out)
 }
 
 func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -646,8 +662,13 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 }
 
 func listWorkspaceUser(cmd *cobra.Command, out io.Writer) error {
+	format, err := workspaceUserListOutputFlags.Resolve()
+	if err != nil {
+		return err
+	}
+
 	cmd.SilenceUsage = true
-	return user.ListWorkspaceUsers(out, astroCoreClient, workspaceID)
+	return user.ListWorkspaceUsersWithFormat(astroCoreClient, workspaceID, format, workspaceUserListOutputFlags.Template, out)
 }
 
 func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {

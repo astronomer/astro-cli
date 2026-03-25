@@ -148,21 +148,33 @@ func (_m *ContainerHandler) Logs(follow bool, containerNames ...string) error {
 }
 
 // PS provides a mock function with no fields
-func (_m *ContainerHandler) PS() error {
+func (_m *ContainerHandler) PS() (*types.PSStatus, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for PS")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
+	var r0 *types.PSStatus
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (*types.PSStatus, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() *types.PSStatus); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.PSStatus)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Parse provides a mock function with given fields: customImageName, deployImageName, buildSecretString

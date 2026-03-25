@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/runtimes"
+	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -23,11 +25,14 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
+
+const modeStandalone = "standalone"
 
 var (
 	useAstronomerCertified bool
@@ -75,6 +80,7 @@ var (
 	waitTime               time.Duration
 	forceKill              bool
 	containerRuntime       runtimes.ContainerRuntime
+	psOutputFlags          output.Flags
 	RunExample             = `
 # Create default admin user.
 astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin
@@ -183,7 +189,7 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 // resolveDevMode returns "docker" or "standalone" based on flag priority then config.
 func resolveDevMode() string {
 	if standaloneFlag {
-		return "standalone"
+		return modeStandalone
 	}
 	if dockerFlag {
 		return "docker"
@@ -193,7 +199,7 @@ func resolveDevMode() string {
 
 // isStandaloneMode returns true if the current dev mode is standalone.
 func isStandaloneMode() bool {
-	return resolveDevMode() == "standalone"
+	return resolveDevMode() == modeStandalone
 }
 
 // resolveHandlerInit returns the appropriate handler init function based on mode.
@@ -342,6 +348,7 @@ func newAirflowPSCmd() *cobra.Command {
 		PreRunE: SetRuntimeIfExists,
 		RunE:    airflowPS,
 	}
+	psOutputFlags.AddFlags(cmd)
 	return cmd
 }
 
@@ -867,7 +874,61 @@ func airflowPS(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.PS()
+	format, err := psOutputFlags.Resolve()
+	if err != nil {
+		return err
+	}
+
+	data, err := containerHandler.PS()
+	if err != nil {
+		return err
+	}
+
+	// For table format, render based on mode
+	if format == output.FormatTable {
+		return printPSTable(data, cmd.OutOrStdout())
+	}
+
+	printer := output.New(output.Options{
+		Format:   format,
+		Template: psOutputFlags.Template,
+		Out:      cmd.OutOrStdout(),
+	})
+
+	return printer.Print(data)
+}
+
+func printPSTable(data *airflowTypes.PSStatus, out io.Writer) error {
+	if data.Mode == modeStandalone {
+		state := "stopped"
+		if data.Running != nil && *data.Running {
+			state = fmt.Sprintf("running (PID %d)", data.PID)
+		}
+		fmt.Fprintf(out, "Airflow standalone is %s\n", state)
+		return nil
+	}
+
+	cfg := output.BuildTableConfig(
+		[]output.Column[airflowTypes.ContainerStatus]{
+			{Header: "Name", Value: func(c airflowTypes.ContainerStatus) string { return c.Name }},
+			{Header: "State", Value: func(c airflowTypes.ContainerStatus) string { return c.State }},
+			{Header: "Ports", Value: func(c airflowTypes.ContainerStatus) string {
+				if len(c.Ports) > 0 {
+					return c.Ports[0]
+				}
+				return ""
+			}},
+		},
+		func(d any) []airflowTypes.ContainerStatus { return d.(*airflowTypes.PSStatus).Containers },
+	)
+
+	printer := output.New(output.Options{
+		Format: output.FormatTable,
+		Out:    out,
+		Table:  cfg,
+	})
+
+	return printer.Print(data)
 }
 
 // Outputs logs for a development airflow cluster

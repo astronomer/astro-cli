@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -964,4 +965,189 @@ func RemoveDeploymentTeam(id, deploymentID string, out io.Writer, client astroco
 	}
 	fmt.Fprintf(out, "Astro Team %s was successfully removed from deployment %s\n", team.Name, deploymentID)
 	return nil
+}
+
+// ListDeploymentTeamsData returns deployment team list data for structured output
+//
+//nolint:dupl
+func ListDeploymentTeamsData(client astrocore.CoreClient, deploymentID string) (*TeamList, error) {
+	teams, err := GetDeploymentTeams(client, deploymentID, teamPagnationLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	teamInfos := make([]TeamInfo, 0, len(teams))
+	for i := range teams {
+		teamRole := ""
+		teamDescription := ""
+		if teams[i].Description != nil {
+			teamDescription = *teams[i].Description
+		}
+		var roles []astrocore.TeamRole
+		if teams[i].Roles != nil {
+			roles = *teams[i].Roles
+		}
+		for _, role := range roles {
+			if role.EntityType == "DEPLOYMENT" && role.EntityId == deploymentID {
+				teamRole = role.Role
+			}
+		}
+		teamInfos = append(teamInfos, TeamInfo{
+			ID:             teams[i].Id,
+			Name:           teams[i].Name,
+			Description:    teamDescription,
+			DeploymentRole: teamRole,
+			CreatedAt:      teams[i].CreatedAt,
+		})
+	}
+
+	return &TeamList{Teams: teamInfos}, nil
+}
+
+var deploymentTeamTableConfig = output.BuildTableConfig(
+	[]output.Column[TeamInfo]{
+		{Header: "ID", Value: func(t TeamInfo) string { return t.ID }},
+		{Header: "Role", Value: func(t TeamInfo) string { return t.DeploymentRole }},
+		{Header: "Name", Value: func(t TeamInfo) string { return t.Name }},
+		{Header: "Description", Value: func(t TeamInfo) string { return t.Description }},
+		{Header: "Create Date", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
+	},
+	func(d any) []TeamInfo { return d.(*TeamList).Teams },
+)
+
+// ListDeploymentTeamsWithFormat lists deployment teams with the specified output format
+func ListDeploymentTeamsWithFormat(client astrocore.CoreClient, deploymentID string, format output.Format, template string, out io.Writer) error {
+	data, err := ListDeploymentTeamsData(client, deploymentID)
+	if err != nil {
+		return err
+	}
+
+	printer := output.New(output.Options{
+		Format:   format,
+		Template: template,
+		Out:      out,
+		Table:    deploymentTeamTableConfig,
+	})
+
+	return printer.Print(data)
+}
+
+// ListWorkspaceTeamsData returns workspace team list data for structured output
+//
+//nolint:dupl
+func ListWorkspaceTeamsData(client astrocore.CoreClient, workspaceID string) (*TeamList, error) {
+	teams, err := GetWorkspaceTeams(client, workspaceID, teamPagnationLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	teamInfos := make([]TeamInfo, 0, len(teams))
+	for i := range teams {
+		teamRole := ""
+		teamDescription := ""
+		if teams[i].Description != nil {
+			teamDescription = *teams[i].Description
+		}
+		var roles []astrocore.TeamRole
+		if teams[i].Roles != nil {
+			roles = *teams[i].Roles
+		}
+		for _, role := range roles {
+			if role.EntityType == "WORKSPACE" && role.EntityId == workspaceID {
+				teamRole = role.Role
+			}
+		}
+		teamInfos = append(teamInfos, TeamInfo{
+			ID:            teams[i].Id,
+			Name:          teams[i].Name,
+			Description:   teamDescription,
+			WorkspaceRole: teamRole,
+			CreatedAt:     teams[i].CreatedAt,
+		})
+	}
+
+	return &TeamList{Teams: teamInfos}, nil
+}
+
+var workspaceTeamTableConfig = output.BuildTableConfig(
+	[]output.Column[TeamInfo]{
+		{Header: "ID", Value: func(t TeamInfo) string { return t.ID }},
+		{Header: "Role", Value: func(t TeamInfo) string { return t.WorkspaceRole }},
+		{Header: "Name", Value: func(t TeamInfo) string { return t.Name }},
+		{Header: "Description", Value: func(t TeamInfo) string { return t.Description }},
+		{Header: "Create Date", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
+	},
+	func(d any) []TeamInfo { return d.(*TeamList).Teams },
+)
+
+// ListWorkspaceTeamsWithFormat lists workspace teams with the specified output format
+func ListWorkspaceTeamsWithFormat(client astrocore.CoreClient, workspaceID string, format output.Format, template string, out io.Writer) error {
+	data, err := ListWorkspaceTeamsData(client, workspaceID)
+	if err != nil {
+		return err
+	}
+
+	printer := output.New(output.Options{
+		Format:   format,
+		Template: template,
+		Out:      out,
+		Table:    workspaceTeamTableConfig,
+	})
+
+	return printer.Print(data)
+}
+
+// ListOrgTeamsData returns organization team list data for structured output
+func ListOrgTeamsData(client astrocore.CoreClient) (*TeamList, error) {
+	teams, err := GetOrgTeams(client)
+	if err != nil {
+		return nil, err
+	}
+
+	teamInfos := make([]TeamInfo, 0, len(teams))
+	for i := range teams {
+		teamDescription := ""
+		if teams[i].Description != nil {
+			teamDescription = *teams[i].Description
+		}
+		teamInfos = append(teamInfos, TeamInfo{
+			ID:           teams[i].Id,
+			Name:         teams[i].Name,
+			Description:  teamDescription,
+			OrgRole:      teams[i].OrganizationRole,
+			IsIdpManaged: teams[i].IsIdpManaged,
+			CreatedAt:    teams[i].CreatedAt,
+		})
+	}
+
+	return &TeamList{Teams: teamInfos}, nil
+}
+
+var orgTeamTableConfig = output.BuildTableConfig(
+	[]output.Column[TeamInfo]{
+		{Header: "ID", Value: func(t TeamInfo) string { return t.ID }},
+		{Header: "NAME", Value: func(t TeamInfo) string { return t.Name }},
+		{Header: "DESCRIPTION", Value: func(t TeamInfo) string { return t.Description }},
+		{Header: "ORG ROLE", Value: func(t TeamInfo) string { return t.OrgRole }},
+		{Header: "IDP MANAGED", Value: func(t TeamInfo) string { return strconv.FormatBool(t.IsIdpManaged) }},
+		{Header: "CREATE DATE", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
+	},
+	func(d any) []TeamInfo { return d.(*TeamList).Teams },
+)
+
+// ListOrgTeamsWithFormat lists organization teams with the specified output format
+func ListOrgTeamsWithFormat(client astrocore.CoreClient, format output.Format, template string, out io.Writer) error {
+	data, err := ListOrgTeamsData(client)
+	if err != nil {
+		return err
+	}
+
+	printer := output.New(output.Options{
+		Format:   format,
+		Template: template,
+		Out:      out,
+		Table:    orgTeamTableConfig,
+	})
+
+	return printer.Print(data)
 }

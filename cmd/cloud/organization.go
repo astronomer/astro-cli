@@ -14,13 +14,13 @@ import (
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/spf13/cobra"
 )
 
 var (
 	errInvalidOrganizationRoleKey      = errors.New("invalid organization role selection")
-	orgList                            = organization.List
 	orgSwitch                          = organization.Switch
 	orgExportAuditLogs                 = organization.ExportAuditLogs
 	wsSwitch                           = workspace.Switch
@@ -40,6 +40,9 @@ var (
 	teamOrgRole                        string
 	validOrganizationRoles             []string
 	shouldIncludeDefaultRoles          bool
+	organizationListOutputFlags        output.Flags
+	organizationUserListOutputFlags    output.Flags
+	organizationTeamListOutputFlags    output.Flags
 )
 
 const (
@@ -80,6 +83,7 @@ func newOrganizationListCmd(out io.Writer) *cobra.Command {
 			return organizationList(cmd, out)
 		},
 	}
+	organizationListOutputFlags.AddFlags(cmd)
 	return cmd
 }
 
@@ -172,6 +176,7 @@ func newOrganizationUserListCmd(out io.Writer) *cobra.Command {
 			return listUsers(cmd, out)
 		},
 	}
+	organizationUserListOutputFlags.AddFlags(cmd)
 	return cmd
 }
 
@@ -191,9 +196,14 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 func organizationList(cmd *cobra.Command, out io.Writer) error {
+	format, err := organizationListOutputFlags.Resolve()
+	if err != nil {
+		return err
+	}
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return orgList(out, platformCoreClient)
+	return organization.ListWithFormat(platformCoreClient, format, organizationListOutputFlags.Template, out)
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -242,8 +252,13 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 }
 
 func listUsers(cmd *cobra.Command, out io.Writer) error {
+	format, err := organizationUserListOutputFlags.Resolve()
+	if err != nil {
+		return err
+	}
+
 	cmd.SilenceUsage = true
-	return user.ListOrgUsers(out, astroCoreClient)
+	return user.ListOrgUsersWithFormat(astroCoreClient, format, organizationUserListOutputFlags.Template, out)
 }
 
 func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -292,12 +307,18 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 			return listTeams(cmd, out)
 		},
 	}
+	organizationTeamListOutputFlags.AddFlags(cmd)
 	return cmd
 }
 
 func listTeams(cmd *cobra.Command, out io.Writer) error {
+	format, err := organizationTeamListOutputFlags.Resolve()
+	if err != nil {
+		return err
+	}
+
 	cmd.SilenceUsage = true
-	return team.ListOrgTeams(out, astroCoreClient)
+	return team.ListOrgTeamsWithFormat(astroCoreClient, format, organizationTeamListOutputFlags.Template, out)
 }
 
 func newTeamUpdateCmd(out io.Writer) *cobra.Command {

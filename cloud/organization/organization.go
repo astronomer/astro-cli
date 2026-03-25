@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -32,14 +33,15 @@ var (
 	switchedOrganizationMessage = "\nSuccessfully switched organization"
 )
 
-func newTableOut() *printutil.Table {
-	return &printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"NAME", "ID"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
-	}
-}
+var organizationTableConfig = output.BuildTableConfig(
+	[]output.Column[OrganizationInfo]{
+		{Header: "NAME", Value: func(o OrganizationInfo) string { return o.Name }},
+		{Header: "ID", Value: func(o OrganizationInfo) string { return o.ID }},
+	},
+	func(d any) []OrganizationInfo { return d.(*OrganizationList).Organizations },
+	output.WithColorRow(func(o OrganizationInfo) bool { return o.IsCurrent }, [2]string{"\033[1;32m", "\033[0m"}),
+	output.WithPadding([]int{44, 50}),
+)
 
 func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Organization, error) {
 	limit := 100
@@ -111,32 +113,53 @@ func findOrganizationByName(name string, platformCoreClient astroplatformcore.Co
 	return nil, nil
 }
 
-// List all Organizations
-func List(out io.Writer, platformCoreClient astroplatformcore.CoreClient) error {
+// ListData returns organization list data for structured output
+func ListData(platformCoreClient astroplatformcore.CoreClient) (*OrganizationList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	or, err := ListOrganizations(platformCoreClient)
 	if err != nil {
-		return fmt.Errorf(AstronomerConnectionErrMsg+"%w", err)
+		return nil, fmt.Errorf(AstronomerConnectionErrMsg+"%w", err)
 	}
-	tab := newTableOut()
+
+	result := &OrganizationList{
+		Organizations: make([]OrganizationInfo, 0, len(or)),
+	}
+
 	for i := range or {
-		name := or[i].Name
-		organizationID := or[i].Id
-
-		var color bool
-
-		if c.Organization == or[i].Id {
-			color = true
-		}
-		tab.AddRow([]string{name, organizationID}, color)
+		isCurrent := c.Organization == or[i].Id
+		result.Organizations = append(result.Organizations, OrganizationInfo{
+			Name:      or[i].Name,
+			ID:        or[i].Id,
+			IsCurrent: isCurrent,
+		})
 	}
 
-	tab.Print(out)
+	return result, nil
+}
 
-	return nil
+// List all organizations
+func List(out io.Writer, platformCoreClient astroplatformcore.CoreClient) error {
+	return ListWithFormat(platformCoreClient, output.FormatTable, "", out)
+}
+
+// ListWithFormat lists organizations with the specified output format
+func ListWithFormat(platformCoreClient astroplatformcore.CoreClient, format output.Format, template string, out io.Writer) error {
+	data, err := ListData(platformCoreClient)
+	if err != nil {
+		return err
+	}
+
+	printer := output.New(output.Options{
+		Format:   format,
+		Template: template,
+		Out:      out,
+		Table:    organizationTableConfig,
+	})
+
+	return printer.Print(data)
 }
 
 func getOrganizationSelection(out io.Writer, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {

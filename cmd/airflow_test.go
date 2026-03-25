@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/airflow/runtimes"
+	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	coreMocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
@@ -874,13 +875,20 @@ func (s *AirflowSuite) TestAirflowRun() {
 }
 
 func (s *AirflowSuite) TestAirflowPS() {
+	mockPS := &airflowTypes.PSStatus{
+		Mode: "docker",
+		Containers: []airflowTypes.ContainerStatus{
+			{Name: "webserver", State: "running", Ports: []string{"8080"}},
+		},
+	}
+
 	s.Run("success", func() {
 		cmd := newAirflowPSCmd()
 		args := []string{}
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("PS").Return(nil).Once()
+			mockContainerHandler.On("PS").Return(mockPS, nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -895,7 +903,7 @@ func (s *AirflowSuite) TestAirflowPS() {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("PS").Return(errMock).Once()
+			mockContainerHandler.On("PS").Return(nil, errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -914,6 +922,63 @@ func (s *AirflowSuite) TestAirflowPS() {
 
 		err := airflowPS(cmd, args)
 		s.ErrorIs(err, errMock)
+	})
+}
+
+func (s *AirflowSuite) TestPrintPSTable() {
+	s.Run("docker mode with containers", func() {
+		var buf bytes.Buffer
+		data := &airflowTypes.PSStatus{
+			Mode: "docker",
+			Containers: []airflowTypes.ContainerStatus{
+				{Name: "webserver", State: "running", Ports: []string{"8080"}},
+				{Name: "scheduler", State: "running"},
+			},
+		}
+
+		err := printPSTable(data, &buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "webserver")
+		s.Contains(buf.String(), "scheduler")
+		s.Contains(buf.String(), "8080")
+	})
+
+	s.Run("standalone mode running", func() {
+		var buf bytes.Buffer
+		running := true
+		data := &airflowTypes.PSStatus{
+			Mode:    "standalone",
+			Running: &running,
+			PID:     1234,
+		}
+
+		err := printPSTable(data, &buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "running (PID 1234)")
+	})
+
+	s.Run("standalone mode stopped", func() {
+		var buf bytes.Buffer
+		running := false
+		data := &airflowTypes.PSStatus{
+			Mode:    "standalone",
+			Running: &running,
+		}
+
+		err := printPSTable(data, &buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "stopped")
+	})
+
+	s.Run("standalone mode nil running", func() {
+		var buf bytes.Buffer
+		data := &airflowTypes.PSStatus{
+			Mode: "standalone",
+		}
+
+		err := printPSTable(data, &buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "stopped")
 	})
 }
 
@@ -1822,9 +1887,16 @@ func (s *AirflowSuite) TestStandaloneModePS() {
 		standaloneFlag = true
 		defer func() { standaloneFlag = false }()
 
+		running := true
+		mockPS := &airflowTypes.PSStatus{
+			Mode:    "standalone",
+			Running: &running,
+			PID:     1234,
+		}
+
 		mockContainerHandler := new(mocks.ContainerHandler)
 		localHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("PS").Return(nil).Once()
+			mockContainerHandler.On("PS").Return(mockPS, nil).Once()
 			return mockContainerHandler, nil
 		}
 

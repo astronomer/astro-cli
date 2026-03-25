@@ -449,6 +449,48 @@ func TestListOrgUser(t *testing.T) {
 	})
 }
 
+func TestListOrgUsersData(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("returns structured user data", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+
+		data, err := ListOrgUsersData(mockClient)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, data.Users)
+		assert.Equal(t, "user 1", data.Users[0].FullName)
+		assert.Equal(t, "user@1.com", data.Users[0].Email)
+		assert.Equal(t, "ORGANIZATION_MEMBER", data.Users[0].OrgRole)
+	})
+
+	t.Run("returns error on failure", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
+
+		_, err := ListOrgUsersData(mockClient)
+		assert.Error(t, err)
+	})
+}
+
+func TestListOrgUsersWithFormat(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("json output", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+
+		buf := new(bytes.Buffer)
+		err := ListOrgUsersWithFormat(mockClient, "json", "", buf)
+		assert.NoError(t, err)
+
+		var result UserList
+		assert.NoError(t, json.Unmarshal(buf.Bytes(), &result))
+		assert.NotEmpty(t, result.Users)
+		assert.Equal(t, "user 1", result.Users[0].FullName)
+	})
+}
+
 func TestIsWorkspaceRoleValid(t *testing.T) {
 	var err error
 	t.Run("happy path when role is WORKSPACE_MEMBER", func(t *testing.T) {
