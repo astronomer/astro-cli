@@ -40,6 +40,7 @@ var (
 	teamOrgRole                        string
 	validOrganizationRoles             []string
 	shouldIncludeDefaultRoles          bool
+	forceTeam                          bool
 )
 
 const (
@@ -316,6 +317,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 		StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
 	cmd.Flags().StringVarP(&updateOrganizationRole, "role", "r", "", "The new role for the "+
 		"team. Possible values are "+allowedOrganizationRoleNamesProse)
+	cmd.Flags().BoolVarP(&forceTeam, "force", "f", false, "Force update: Skip confirmation for IDP-managed teams")
 	return cmd
 }
 
@@ -328,7 +330,7 @@ func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 
-	return team.UpdateTeam(id, teamName, teamDescription, updateOrganizationRole, out, astroCoreClient)
+	return team.UpdateTeam(id, teamName, teamDescription, updateOrganizationRole, forceTeam, out, astroCoreClient)
 }
 
 func newTeamCreateCmd(out io.Writer) *cobra.Command {
@@ -373,6 +375,7 @@ func newTeamDeleteCmd(out io.Writer) *cobra.Command {
 			return teamDelete(cmd, out, args)
 		},
 	}
+	cmd.Flags().BoolVarP(&forceTeam, "force", "f", false, "Force delete: Skip confirmation for IDP-managed teams")
 	return cmd
 }
 
@@ -385,7 +388,7 @@ func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 
-	return team.Delete(id, out, astroCoreClient)
+	return team.Delete(id, forceTeam, out, astroCoreClient)
 }
 
 func newOrganizationTeamUserRootCmd(out io.Writer) *cobra.Command {
@@ -404,6 +407,7 @@ func newOrganizationTeamUserRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remove",
@@ -415,14 +419,16 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's unique identifier \"\" ")
 	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's unique identifier \"\"")
+	cmd.Flags().BoolVarP(&forceTeam, "force", "f", false, "Force remove: Skip confirmation for IDP-managed teams")
 	return cmd
 }
 
 func removeTeamUser(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return team.RemoveUser(teamID, userID, out, astroCoreClient)
+	return team.RemoveUser(teamID, userID, forceTeam, out, astroCoreClient)
 }
 
+//nolint:dupl
 func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add",
@@ -434,12 +440,13 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's unique identifier \"\" ")
 	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's unique identifier \"\"")
+	cmd.Flags().BoolVarP(&forceTeam, "force", "f", false, "Force add: Skip confirmation for IDP-managed teams")
 	return cmd
 }
 
 func addTeamUser(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return team.AddUser(teamID, userID, out, astroCoreClient)
+	return team.AddUser(teamID, userID, forceTeam, out, astroCoreClient)
 }
 
 func newTeamListUsersCmd(out io.Writer) *cobra.Command {

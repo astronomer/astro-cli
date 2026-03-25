@@ -167,6 +167,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		DagsPath:          dagsPath,
 		Description:       deployDescription,
 		BuildSecretString: BuildSecretString,
+		Force:             forceDeploy,
 	}
 
 	return DeployImage(deployInput, platformCoreClient, astroCoreClient)

@@ -74,6 +74,7 @@ var (
 	lintConfigFile         string
 	waitTime               time.Duration
 	forceKill              bool
+	forceInit              bool
 	containerRuntime       runtimes.ContainerRuntime
 	RunExample             = `
 # Create default admin user.
@@ -215,6 +216,7 @@ func newAirflowInitCmd() *cobra.Command {
 		// Override the root PersistentPreRunE to prevent looking up for container runtime.
 		PersistentPreRunE: SetupLogging,
 	}
+	cmd.Flags().BoolVarP(&forceInit, "force", "f", false, "Initialize project without confirmation, even in a non-empty directory")
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
 	cmd.Flags().StringVarP(&fromTemplate, "from-template", "t", "", "Provides a list of templates to select from and create the local astro project based on the selected template. Please note template based astro projects use the latest runtime version, so runtime-version and airflow-version flags will be ignored when creating a project with template flag")
@@ -637,7 +639,7 @@ func airflowInit(cmd *cobra.Command, args []string) error { //nolint:gocognit,go
 
 	emptyDir := fileutil.IsEmptyDir(config.WorkingPath)
 
-	if !emptyDir {
+	if !emptyDir && !forceInit {
 		i, _ := input.Confirm(
 			fmt.Sprintf("%s is not an empty directory. Are you sure you want to initialize a project here?", config.WorkingPath))
 
