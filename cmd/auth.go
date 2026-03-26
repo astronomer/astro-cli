@@ -30,33 +30,15 @@ var (
 
 // newLoginCommand is a top-level alias for "astro auth login" kept for backward compatibility.
 func newLoginCommand(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "login [BASEDOMAIN]",
-		Short: "Log in to Astronomer",
-		Long:  "Authenticate to Astro or Astro Private Cloud. This is an alias for 'astro auth login'.",
-		Args:  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return login(cmd, args, coreClient, platformCoreClient, out)
-		},
-	}
-
-	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
-	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
-	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for software login")
+	cmd := newAuthLoginCommand(coreClient, platformCoreClient, out)
+	cmd.Long = "Authenticate to Astro or Astro Private Cloud. This is an alias for 'astro auth login'."
 	return cmd
 }
 
 // newLogoutCommand is a top-level alias for "astro auth logout" kept for backward compatibility.
 func newLogoutCommand(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "logout",
-		Short: "Log out of Astronomer",
-		Long:  "Log out of Astronomer. This is an alias for 'astro auth logout'.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return logout(cmd, args, out)
-		},
-		Args: cobra.MaximumNArgs(1),
-	}
+	cmd := newAuthLogoutCommand(out)
+	cmd.Long = "Log out of Astronomer. This is an alias for 'astro auth logout'."
 	return cmd
 }
 
