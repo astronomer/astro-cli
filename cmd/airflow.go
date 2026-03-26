@@ -109,6 +109,9 @@ astro dev init --airflow-version 2.2.3
 # Initialize a new template based Astro project with the latest Astro Runtime version
 astro dev init --from-template
 
+# Initialize a new Astro project using pyproject.toml (Airflow 3 only)
+astro dev init --format pyproject
+
 # Initialize a new Astro project with remote execution support
 astro dev init --remote-execution-enabled
 
@@ -140,6 +143,10 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	dockerFlag           bool
 	noProxyFlag          bool
 	proxyPortFlag        string
+	projectFormat        string
+
+	getAirflowVersionForRuntime = airflowversions.GetAirflowVersionForRuntime
+	getDefaultPythonVersion     = airflowversions.GetDefaultPythonVersion
 )
 
 func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
@@ -180,13 +187,24 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 	return cmd
 }
 
-// resolveDevMode returns "docker" or "standalone" based on flag priority then config.
+// resolveDevMode returns "docker" or "standalone" based on priority:
+// 1. CLI flags (--standalone, --docker)
+// 2. [tool.astro].mode from pyproject.toml
+// 3. dev.mode from .astro/config.yaml
 func resolveDevMode() string {
 	if standaloneFlag {
-		return "standalone"
+		return airflow.ModeStandalone
 	}
 	if dockerFlag {
-		return "docker"
+		return airflow.ModeDocker
+	}
+	// Check pyproject.toml mode
+	proj, found, tryErr := airflow.TryReadProject(config.WorkingPath)
+	if found && tryErr != nil {
+		fmt.Printf("Warning: could not read pyproject.toml for mode detection: %s\n", tryErr)
+	}
+	if proj != nil && proj.Mode != "" {
+		return proj.Mode
 	}
 	return config.CFG.DevMode.GetString()
 }
@@ -244,6 +262,9 @@ func newAirflowInitCmd() *cobra.Command {
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
 		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
 	}
+
+	cmd.Flags().StringVar(&projectFormat, "format", "", "Project format: 'pyproject' uses pyproject.toml (Airflow 3 only), 'dockerfile' uses the traditional Dockerfile (default)")
+
 	return cmd
 }
 
@@ -672,8 +693,39 @@ func airflowInit(cmd *cobra.Command, args []string) error { //nolint:gocognit,go
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	// Execute method
-	err = airflow.Init(config.WorkingPath, imageName, imageTag, fromTemplate, clientImageTag)
+	// Validate --format flag
+	if projectFormat != "" && projectFormat != airflow.ProjectFormatPy && projectFormat != airflow.ProjectFormatDocker {
+		return fmt.Errorf("invalid --format value %q: must be 'pyproject' or 'dockerfile'", projectFormat)
+	}
+	if projectFormat == airflow.ProjectFormatPy && fromTemplate != "" {
+		return errors.New("--format pyproject cannot be used with --from-template")
+	}
+
+	// Route to pyproject.toml init if requested
+	if projectFormat == airflow.ProjectFormatPy {
+		if airflowversions.AirflowMajorVersionForRuntimeVersion(imageTag) != "3" {
+			return errors.New("--format pyproject is only supported for Airflow 3")
+		}
+
+		// Resolve the Airflow version: use the user-provided value, or look it up from the runtime tag.
+		afVersion := airflowVersion
+		if afVersion == "" {
+			afVersion = getAirflowVersionForRuntime(imageTag)
+		}
+		if afVersion == "" {
+			return fmt.Errorf("could not determine Airflow version for runtime %s", imageTag)
+		}
+
+		// Resolve Python version from the runtime API or fall back to default.
+		pythonVersion := getDefaultPythonVersion(imageTag)
+		if pythonVersion == "" {
+			pythonVersion = airflow.DefaultPythonVersion
+		}
+
+		err = airflow.InitPyProject(config.WorkingPath, projectName, afVersion, imageTag, pythonVersion)
+	} else {
+		err = airflow.Init(config.WorkingPath, imageName, imageTag, fromTemplate, clientImageTag)
+	}
 	if err != nil {
 		return err
 	}

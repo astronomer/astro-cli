@@ -245,6 +245,12 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 	envConns := opts.EnvConns
 	useProxy := !opts.NoProxy
 
+	// Resolve Dockerfile: for pyproject.toml projects, generate from project definition.
+	dockerfile, resolveErr := EnsureDockerfile(d.airflowHome, d.dockerfile)
+	if resolveErr != nil {
+		return fmt.Errorf("error resolving Dockerfile: %w", resolveErr)
+	}
+
 	// Build this project image
 	if imageName == "" {
 		if !config.CFG.DisableAstroRun.GetBool() {
@@ -254,7 +260,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 				fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 			}
 		}
-		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, NoCache: noCache})
+		imageBuildErr := d.imageHandler.Build(dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, NoCache: noCache})
 		if !config.CFG.DisableAstroRun.GetBool() {
 			// remove astro-run-dag from requirments.txt
 			err := fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
@@ -1329,8 +1335,14 @@ func (d *DockerCompose) Build(customImageName, buildSecretString string, noCache
 		return d.imageHandler.TagLocalImage(customImageName)
 	}
 
-	// Build the image
-	return d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{
+	// Resolve Dockerfile: for pyproject.toml projects, generate from project definition.
+	// Done at build time (not init) so changes to pyproject.toml are always picked up.
+	dockerfile, err := EnsureDockerfile(d.airflowHome, d.dockerfile)
+	if err != nil {
+		return fmt.Errorf("error resolving Dockerfile: %w", err)
+	}
+
+	return d.imageHandler.Build(dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{
 		Path:    d.airflowHome,
 		NoCache: noCache,
 	})

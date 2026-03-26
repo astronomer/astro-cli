@@ -109,6 +109,19 @@ var resolvePythonVersion = func(baseTag, tagPython string) string {
 	return defaultPythonVersion
 }
 
+// extractPythonVersion extracts a bare version like "3.12" from a PEP 440
+// requires-python specifier such as ">=3.12" or "==3.12". Returns "" if the
+// input is empty or doesn't contain a recognizable version.
+var pythonVersionRe = regexp.MustCompile(`(\d+\.\d+)`)
+
+func extractPythonVersion(requiresPython string) string {
+	if requiresPython == "" {
+		return ""
+	}
+	m := pythonVersionRe.FindString(requiresPython)
+	return m
+}
+
 // Standalone implements ContainerHandler using `airflow standalone` instead of Docker Compose.
 type Standalone struct {
 	airflowHome   string
@@ -170,39 +183,82 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	fmt.Println(ansi.Bold("Note:") + " Standalone mode is experimental. Report issues at https://github.com/astronomer/astro-cli/issues")
 	fmt.Println()
 
-	// 1. Parse Dockerfile to get runtime image + tag
-	cmds, err := standaloneParseFile(filepath.Join(s.airflowHome, "Dockerfile"))
-	if err != nil {
-		return fmt.Errorf("error parsing Dockerfile: %w", err)
-	}
-	_, tag := standaloneGetImageTag(cmds)
-	if tag == "" {
-		return errors.New("could not determine runtime version from Dockerfile")
-	}
+	// 1. Resolve runtime version and Python version from project definition.
+	var baseTag, pythonVersion string
+	var userDeps []string   // populated only for pyproject format
+	var isPyProjectFmt bool // tracks format to avoid re-parsing pyproject.toml later
 
-	baseTag, tagPython := parseRuntimeTagPython(tag)
+	proj, found, tryErr := TryReadProject(s.airflowHome)
+	if found && tryErr != nil {
+		return fmt.Errorf("error reading pyproject.toml: %w", tryErr)
+	}
+	if proj != nil {
+		isPyProjectFmt = true
+		baseTag = proj.RuntimeVersion
+		if baseTag == "" {
+			// Resolve from airflow-version and pin it to pyproject.toml
+			if proj.AirflowVersion == "" {
+				return errors.New("[tool.astro] requires airflow-version in pyproject.toml")
+			}
+			baseTag = airflowversions.GetLatestRuntimeForAirflow(proj.AirflowVersion)
+			if baseTag == "" {
+				return fmt.Errorf("could not resolve a runtime version for airflow-version %q", proj.AirflowVersion)
+			}
+			fmt.Printf("Resolved runtime-version %q for airflow-version %q (pinning to pyproject.toml)\n", baseTag, proj.AirflowVersion)
+			fmt.Println("Note: one airflow-version may have multiple runtime versions. Pin runtime-version in pyproject.toml to avoid accidental upgrades on deploy.")
+			if pinErr := PinRuntimeVersion(s.airflowHome, baseTag); pinErr != nil {
+				fmt.Printf("Warning: could not pin runtime-version to pyproject.toml: %s\n", pinErr)
+			}
+		}
+		// Validate airflow-version matches runtime-version
+		if proj.AirflowVersion != "" {
+			actual := airflowversions.GetAirflowVersionForRuntime(baseTag)
+			if actual != "" && actual != proj.AirflowVersion {
+				fmt.Printf("Warning: airflow-version %q does not match runtime-version %q (which bundles Airflow %s). Consider updating airflow-version or runtime-version.\n",
+					proj.AirflowVersion, baseTag, actual)
+			}
+		}
+
+		pythonVersion = extractPythonVersion(proj.RequiresPython)
+		if pythonVersion == "" {
+			pythonVersion = resolvePythonVersion(baseTag, "")
+		}
+		userDeps = proj.Dependencies
+	} else {
+		// Legacy path: parse Dockerfile
+		cmds, parseErr := standaloneParseFile(filepath.Join(s.airflowHome, "Dockerfile"))
+		if parseErr != nil {
+			return fmt.Errorf("error parsing Dockerfile: %w", parseErr)
+		}
+		_, tag := standaloneGetImageTag(cmds)
+		if tag == "" {
+			return errors.New("could not determine runtime version from Dockerfile")
+		}
+
+		var tagPython string
+		baseTag, tagPython = parseRuntimeTagPython(tag)
+
+		// If the tag isn't a pinned runtime version (X.Y-Z), try to resolve it
+		// as a floating tag (e.g., "3.1" → "3.1-12") via the runtime versions JSON.
+		if !fullRuntimeTagRe.MatchString(baseTag) {
+			resolved, resolveErr := resolveFloatingTag(baseTag)
+			if resolveErr == nil {
+				baseTag = resolved
+			} else if airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag) == "" {
+				return fmt.Errorf("could not determine runtime version from Dockerfile image tag '%s'.\nStandalone mode requires a pinned Astronomer Runtime image (e.g., astro-runtime:3.1-12)", tag)
+			}
+		}
+
+		pythonVersion = resolvePythonVersion(baseTag, tagPython)
+	}
 
 	// 2. Validate Airflow version (AF3 only).
-	// If the tag isn't a pinned runtime version (X.Y-Z), try to resolve it
-	// as a floating tag (e.g., "3.1" → "3.1-12") via the runtime versions JSON.
-	if !fullRuntimeTagRe.MatchString(baseTag) {
-		resolved, resolveErr := resolveFloatingTag(baseTag)
-		if resolveErr == nil {
-			baseTag = resolved
-		} else if airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag) == "" {
-			// Not a recognized format and not resolvable
-			return fmt.Errorf("could not determine runtime version from Dockerfile image tag '%s'.\nStandalone mode requires a pinned Astronomer Runtime image (e.g., astro-runtime:3.1-12)", tag)
-		}
-		// If it's an old-format tag (e.g., "12.0.0"), fall through to the AF3 check
-	}
 	if airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag) != "3" {
 		return errUnsupportedAirflowVersion
 	}
 
-	pythonVersion := resolvePythonVersion(baseTag, tagPython)
-
 	// 3. Check uv is on PATH
-	_, err = lookPath("uv")
+	_, err := lookPath("uv")
 	if err != nil {
 		return errUVNotFound
 	}
@@ -292,23 +348,46 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 		return fmt.Errorf("error installing dependencies: %w", err)
 	}
 
-	// Step 2: Install user requirements with only airflow/sdk version locks
-	requirementsPath := filepath.Join(s.airflowHome, "requirements.txt")
-	if exists, _ := fileutil.Exists(requirementsPath, nil); exists {
-		userInstallArgs := []string{
-			"pip", "install",
-			"--python", venvPython,
-			"-r", requirementsPath,
-			fmt.Sprintf("apache-airflow==%s", airflowVersion),
+	// Step 2: Install user dependencies with only airflow/sdk version locks.
+	// If project uses pyproject.toml, install from [project.dependencies].
+	// Otherwise, install from requirements.txt (legacy path).
+	if isPyProjectFmt {
+		if len(userDeps) > 0 {
+			userInstallArgs := []string{
+				"pip", "install",
+				"--python", venvPython,
+				fmt.Sprintf("apache-airflow==%s", airflowVersion),
+			}
+			if taskSDKVersion != "" {
+				userInstallArgs = append(userInstallArgs, fmt.Sprintf("apache-airflow-task-sdk==%s", taskSDKVersion))
+			}
+			// Use -- to prevent dependency strings from being interpreted as flags
+			userInstallArgs = append(userInstallArgs, "--index-url", standaloneIndexURL, "--")
+			userInstallArgs = append(userInstallArgs, userDeps...)
+			err = runCommand(s.airflowHome, "uv", userInstallArgs...)
+			if err != nil {
+				sp.Stop()
+				return fmt.Errorf("error installing user dependencies: %w", err)
+			}
 		}
-		if taskSDKVersion != "" {
-			userInstallArgs = append(userInstallArgs, fmt.Sprintf("apache-airflow-task-sdk==%s", taskSDKVersion))
-		}
-		userInstallArgs = append(userInstallArgs, "--index-url", standaloneIndexURL)
-		err = runCommand(s.airflowHome, "uv", userInstallArgs...)
-		if err != nil {
-			sp.Stop()
-			return fmt.Errorf("error installing user requirements: %w", err)
+	} else {
+		requirementsPath := filepath.Join(s.airflowHome, "requirements.txt")
+		if exists, _ := fileutil.Exists(requirementsPath, nil); exists {
+			userInstallArgs := []string{
+				"pip", "install",
+				"--python", venvPython,
+				"-r", requirementsPath,
+				fmt.Sprintf("apache-airflow==%s", airflowVersion),
+			}
+			if taskSDKVersion != "" {
+				userInstallArgs = append(userInstallArgs, fmt.Sprintf("apache-airflow-task-sdk==%s", taskSDKVersion))
+			}
+			userInstallArgs = append(userInstallArgs, "--index-url", standaloneIndexURL)
+			err = runCommand(s.airflowHome, "uv", userInstallArgs...)
+			if err != nil {
+				sp.Stop()
+				return fmt.Errorf("error installing user requirements: %w", err)
+			}
 		}
 	}
 

@@ -90,6 +90,9 @@ var (
 
 	//go:embed include/airflow3/requirements-client.txt
 	Af3RequirementsTxtClient string
+
+	//go:embed include/airflow3/pyprojecttoml
+	Af3PyProjectTOML string
 )
 
 func initDirs(root string, dirs []string) error {
@@ -200,6 +203,35 @@ func Init(path, airflowImageName, airflowImageTag, template, clientImageTag stri
 		}
 	default:
 		return errors.New("unsupported Airflow major version for runtime version " + airflowImageTag)
+	}
+	if err := initFiles(path, files); err != nil {
+		return errors.Wrap(err, "failed to create project files")
+	}
+
+	return nil
+}
+
+// InitPyProject scaffolds a new Airflow project using pyproject.toml as the
+// project definition instead of a Dockerfile. Only supported for Airflow 3.
+func InitPyProject(path, projectName, airflowVersion, runtimeVersion, pythonVersion string) error {
+	dirs := []string{"dags", "plugins", "include"}
+	if err := initDirs(path, dirs); err != nil {
+		return errors.Wrap(err, "failed to create project directories")
+	}
+
+	files := map[string]string{
+		"pyproject.toml":                       fmt.Sprintf(Af3PyProjectTOML, projectName, pythonVersion, airflowVersion, runtimeVersion),
+		".gitignore":                           Af3Gitignore,
+		".dockerignore":                        Af3Dockerignore,
+		".env":                                 "",
+		"airflow_settings.yaml":                Af3Settingsyml,
+		"packages.txt":                         "",
+		"requirements.txt":                     Af3RequirementsTxt,
+		"dags/exampledag.py":                   Af3ExampleDag,
+		"dags/.airflowignore":                  "",
+		"tests/dags/test_dag_example.py":       Af3DagExampleTest,
+		".astro/test_dag_integrity_default.py": Af3DagIntegrityTestDefault,
+		".astro/dag_integrity_exceptions.txt":  "# Add dag files to exempt from parse test below. ex: dags/<test-file>",
 	}
 	if err := initFiles(path, files); err != nil {
 		return errors.Wrap(err, "failed to create project files")

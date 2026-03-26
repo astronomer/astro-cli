@@ -846,6 +846,125 @@ func (s *Suite) TestStandaloneStart_HappyPath() {
 	s.NoError(err)
 }
 
+func (s *Suite) TestStandaloneStart_PyProject() {
+	tmpDir, err := os.MkdirTemp("", "standalone-pyproject-test")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Write pyproject.toml instead of Dockerfile
+	pyprojectContent := `[project]
+name = "test-pyproject"
+requires-python = ">=3.12"
+dependencies = ["pandas>=2.0"]
+
+[tool.astro]
+airflow-version = "3.0.1"
+runtime-version = "3.1-12"
+mode = "standalone"
+`
+	err = os.WriteFile(filepath.Join(tmpDir, "pyproject.toml"), []byte(pyprojectContent), 0o644)
+	s.NoError(err)
+
+	// Pre-create cached constraints + freeze
+	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(constraintsDir, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\napache-airflow-task-sdk==1.0.0\n"), 0o644)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
+	s.NoError(err)
+
+	// Create a fake airflow binary that exits immediately
+	venvBin := filepath.Join(tmpDir, ".venv", "bin")
+	err = os.MkdirAll(venvBin, 0o755)
+	s.NoError(err)
+	airflowScript := filepath.Join(venvBin, "airflow")
+	err = os.WriteFile(airflowScript, []byte("#!/bin/sh\necho 'standalone started'\nexit 0\n"), 0o755)
+	s.NoError(err)
+
+	// Mock function variables
+	origLookPath := lookPath
+	origRunCommand := runCommand
+	origCheckHealth := checkWebserverHealth
+	origCheckPort := checkPortAvailable
+	defer func() {
+		lookPath = origLookPath
+		runCommand = origRunCommand
+		checkWebserverHealth = origCheckHealth
+		checkPortAvailable = origCheckPort
+	}()
+
+	checkPortAvailable = func(_ string) error { return nil }
+
+	lookPath = func(file string) (string, error) {
+		return "/usr/local/bin/uv", nil
+	}
+
+	// Track what uv commands were executed to verify pyproject.toml path
+	var uvCalls []string
+	runCommand = func(dir, name string, args ...string) error {
+		uvCalls = append(uvCalls, strings.Join(append([]string{name}, args...), " "))
+		return nil
+	}
+
+	checkWebserverHealth = func(url string, timeout time.Duration, component string) error {
+		return nil
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute, Foreground: true})
+	s.NoError(err)
+
+	// Verify that user deps from pyproject.toml were installed (not requirements.txt)
+	foundUserDeps := false
+	for _, call := range uvCalls {
+		if strings.Contains(call, "pandas>=2.0") {
+			foundUserDeps = true
+			break
+		}
+	}
+	s.True(foundUserDeps, "Expected uv install to include pandas>=2.0 from pyproject.toml dependencies, got calls: %v", uvCalls)
+
+	// Verify no requirements.txt was referenced
+	for _, call := range uvCalls {
+		s.NotContains(call, "requirements.txt", "Should not reference requirements.txt when pyproject.toml is used")
+	}
+}
+
+func (s *Suite) TestStandaloneStart_PyProject_MissingAirflowVersion() {
+	tmpDir, err := os.MkdirTemp("", "standalone-pyproject-noairflow")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// pyproject.toml without airflow-version — should error about the broken pyproject.toml
+	pyprojectContent := `[project]
+name = "test-no-airflow"
+
+[tool.astro]
+runtime-version = "3.1-12"
+`
+	err = os.WriteFile(filepath.Join(tmpDir, "pyproject.toml"), []byte(pyprojectContent), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
+	s.Error(err)
+	s.Contains(err.Error(), "airflow-version")
+}
+
+func (s *Suite) TestExtractPythonVersion() {
+	s.Equal("3.12", extractPythonVersion(">=3.12"))
+	s.Equal("3.11", extractPythonVersion(">=3.11"))
+	s.Equal("3.12", extractPythonVersion("==3.12"))
+	s.Equal("3.12", extractPythonVersion("~=3.12"))
+	s.Equal("3.12", extractPythonVersion("3.12"))
+	s.Equal("", extractPythonVersion(""))
+}
+
 func (s *Suite) TestStandaloneStart_Background() {
 	tmpDir, err := os.MkdirTemp("", "standalone-bg-test")
 	s.NoError(err)
