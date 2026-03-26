@@ -3,11 +3,13 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	softwareAuth "github.com/astronomer/astro-cli/software/auth"
@@ -26,12 +28,36 @@ var (
 	softwareLogout = softwareAuth.Logout
 )
 
+// newLoginCommand is a top-level alias for "astro auth login" kept for backward compatibility.
 func newLoginCommand(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
-	return newAuthLoginCommand(coreClient, platformCoreClient, out)
+	cmd := &cobra.Command{
+		Use:   "login [BASEDOMAIN]",
+		Short: "Log in to Astronomer",
+		Long:  "Authenticate to Astro or Astro Private Cloud. This is an alias for 'astro auth login'.",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return login(cmd, args, coreClient, platformCoreClient, out)
+		},
+	}
+
+	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
+	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
+	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for software login")
+	return cmd
 }
 
+// newLogoutCommand is a top-level alias for "astro auth logout" kept for backward compatibility.
 func newLogoutCommand(out io.Writer) *cobra.Command {
-	return newAuthLogoutCommand(out)
+	cmd := &cobra.Command{
+		Use:   "logout",
+		Short: "Log out of Astronomer",
+		Long:  "Log out of Astronomer. This is an alias for 'astro auth logout'.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return logout(cmd, args, out)
+		},
+		Args: cobra.MaximumNArgs(1),
+	}
+	return cmd
 }
 
 func login(cmd *cobra.Command, args []string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
@@ -129,23 +155,31 @@ func newAuthLogoutCommand(out io.Writer) *cobra.Command {
 }
 
 func newAuthTokenCommand(out io.Writer) *cobra.Command {
+	var tokenDomain string
 	cmd := &cobra.Command{
 		Use:   "token",
 		Short: "Print the authentication token",
 		Long:  "Print the current authentication token to standard output. This is useful for using the token in scripts or CI/CD pipelines.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return printAuthToken(cmd, out)
+			return printAuthToken(cmd, tokenDomain, out)
 		},
 	}
+	cmd.Flags().StringVarP(&tokenDomain, "domain", "d", "", "Print the token for a specific context domain instead of the current context")
 	return cmd
 }
 
-func printAuthToken(cmd *cobra.Command, out io.Writer) error {
+func printAuthToken(cmd *cobra.Command, contextDomain string, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	c, err := context.GetCurrentContext()
+	var c config.Context
+	var err error
+	if contextDomain != "" {
+		c, err = context.GetContext(contextDomain)
+	} else {
+		c, err = context.GetCurrentContext()
+	}
 	if err != nil {
 		return err
 	}
@@ -154,12 +188,7 @@ func printAuthToken(cmd *cobra.Command, out io.Writer) error {
 		return fmt.Errorf("no token found. Please run 'astro login' to authenticate")
 	}
 
-	// Remove "Bearer " prefix if present, similar to how gh auth token works
-	token := c.Token
-	if len(token) > 7 && token[:7] == "Bearer " {
-		token = token[7:]
-	}
-
-	fmt.Fprintln(out, token)
+	rawToken := strings.TrimPrefix(c.Token, "Bearer ")
+	fmt.Fprintln(out, rawToken)
 	return nil
 }

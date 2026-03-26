@@ -107,7 +107,7 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", "Bearer "+expectedToken)
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, buf)
+	err = printAuthToken(&cobra.Command{}, "", buf)
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
@@ -116,7 +116,7 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", expectedToken)
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, buf)
+	err = printAuthToken(&cobra.Command{}, "", buf)
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
@@ -125,13 +125,35 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", "")
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, buf)
+	err = printAuthToken(&cobra.Command{}, "", buf)
 	s.EqualError(err, "no token found. Please run 'astro login' to authenticate")
 
 	// Test with no current context set
 	buf.Reset()
 	config.ResetCurrentContext()
-	err = printAuthToken(&cobra.Command{}, buf)
+	err = printAuthToken(&cobra.Command{}, "", buf)
+	s.Error(err)
+}
+
+func (s *CmdSuite) TestAuthTokenWithContext() {
+	buf := new(bytes.Buffer)
+
+	// Set up a specific context with a token
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	c, err := config.GetCurrentContext()
+	s.NoError(err)
+	expectedToken := "context-specific-token"
+	err = c.SetContextKey("token", "Bearer "+expectedToken)
+	s.NoError(err)
+
+	// Retrieve token using explicit context domain
+	err = printAuthToken(&cobra.Command{}, c.Domain, buf)
+	s.NoError(err)
+	s.Equal(expectedToken+"\n", buf.String())
+
+	// Test with non-existent context
+	buf.Reset()
+	err = printAuthToken(&cobra.Command{}, "nonexistent.domain.com", buf)
 	s.Error(err)
 }
 
@@ -155,4 +177,5 @@ func (s *CmdSuite) TestAuthRootCmd() {
 	output, err = executeCommand("auth", "token", "--help")
 	s.NoError(err)
 	s.Contains(output, "Print the current authentication token")
+	s.Contains(output, "--domain")
 }
