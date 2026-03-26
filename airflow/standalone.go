@@ -666,6 +666,14 @@ func (s *Standalone) buildEnv() []string {
 	// Layer 2: Standalone-critical settings — these MUST take precedence over
 	// both inherited env and .env to prevent standalone mode from breaking.
 	overrides["PATH"] = fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH"))
+	// Add include/ to PYTHONPATH so user modules are importable — mirrors
+	// the Docker image which bakes /usr/local/airflow/include into PYTHONPATH.
+	includePath := filepath.Join(s.airflowHome, "include")
+	if existing := os.Getenv("PYTHONPATH"); existing != "" {
+		overrides["PYTHONPATH"] = fmt.Sprintf("%s:%s", includePath, existing)
+	} else {
+		overrides["PYTHONPATH"] = includePath
+	}
 	overrides["AIRFLOW_HOME"] = standaloneHome
 	overrides["ASTRONOMER_ENVIRONMENT"] = "local"
 	overrides["AIRFLOW__CORE__LOAD_EXAMPLES"] = "False"
