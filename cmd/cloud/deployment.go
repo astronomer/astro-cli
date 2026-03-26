@@ -168,7 +168,7 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all the teams in an Astro Deployment",
-		Long:    "List all the teams in an Astro Deployment",
+		Long:    "List all teams and their roles in a Deployment.",
 		Example: `
   $ astro deployment team list --deployment-id <deployment-id>
 `,
@@ -184,7 +184,7 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a team from an Astro Deployment",
-		Long:    "Remove a team from an Astro Deployment",
+		Long:    "Remove a team's role from a Deployment. Team members lose Deployment access unless they have access through another team or a direct user role assignment.",
 		Example: `
   $ astro deployment team remove <team-id> --deployment-id <deployment-id>
 `,
@@ -326,7 +326,7 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all the users in an Astro Deployment",
-		Long:    "List all the users in an Astro Deployment",
+		Long:    "List all users and their roles in a Deployment.",
 		Example: `
   $ astro deployment user list --deployment-id <deployment-id>
 `,
@@ -341,7 +341,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [email]",
 		Aliases: []string{"up"},
-		Short:   "Update a the role of a user in an Astro Deployment",
+		Short:   "Update the role of a user in an Astro Deployment",
 		Long:    "Update the role of a user in an Astro Deployment\n$astro deployment user update [email] --role [DEPLOYMENT_ADMIN or the custom role name].",
 		Example: `
   $ astro deployment user update user@company.com --deployment-id <deployment-id> --role DEPLOYMENT_ADMIN
@@ -360,7 +360,7 @@ func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a user from an Astro Deployment",
-		Long:    "Remove a user from an Astro Deployment",
+		Long:    "Remove a user's direct role from a Deployment. The user may retain access through team membership.",
 		Example: `
   $ astro deployment user remove user@company.com --deployment-id <deployment-id>
 `,
@@ -421,7 +421,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create a new Astro Deployment",
-		Long:    "Create a new Astro Deployment. All flags are optional",
+		Long:    "Create a new Deployment — an Airflow environment running on Astro. Configurable options include the executor type (Celery, Kubernetes, Astro), runtime version, worker queues, cloud provider, and region. On hosted Astro, a Deployment can be standard (shared infrastructure) or dedicated (isolated cluster). Use --deployment-file to create from a YAML/JSON configuration template. Use --wait to block until the Deployment is healthy.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentCreate(cmd, args, out)
 		},
@@ -521,7 +521,7 @@ func newDeploymentDeleteCmd() *cobra.Command {
 		Use:     "delete DEPLOYMENT-ID",
 		Aliases: []string{"de"},
 		Short:   "Delete an Astro Deployment",
-		Long:    "Delete an Astro Deployment",
+		Long:    "Permanently delete a Deployment and all of its data including DAGs, task logs, Airflow metadata, environment variables, connections, API tokens, and alerts. Running tasks are terminated without waiting. Cluster resources are deallocated asynchronously. This action cannot be undone.",
 		Example: `
   $ astro deployment delete <deployment-id>
   $ astro deployment delete --deployment-name my-deployment --force
@@ -1085,7 +1085,7 @@ func newDeploymentTokenListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all the API tokens in an Astro Deployment",
-		Long:    "List all the API tokens in an Astro Deployment",
+		Long:    "List all API tokens with a role in a Deployment, including Deployment-scoped tokens and any Organization or Workspace tokens that have been granted a Deployment role.",
 		Example: `
   $ astro deployment token list --deployment-id <deployment-id>
 `,
@@ -1102,7 +1102,7 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create an API token in an Astro Deployment",
-		Long:    "Create an API token in an Astro Deployment\n$astro workspace token create --name [token name] --role [Possible values are DEPLOYMENT_ADMIN or a custom role name].",
+		Long:    "Create a Deployment-scoped API token. The token value is displayed only once at creation and cannot be retrieved later — store it securely. Use --clean-output to print only the raw token value for scripts. Use --expiration to set a TTL in days (default: no expiration).",
 		Example: `
   $ astro deployment token create --name my-token --role DEPLOYMENT_ADMIN --deployment-id <deployment-id>
   $ astro deployment token create --name my-token --role DEPLOYMENT_ADMIN --deployment-id <deployment-id> --expiration 30
@@ -1126,7 +1126,7 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
 		Short:   "Update a Deployment API token",
-		Long:    "Update a Deployment API token that has a role in an Astro Deployment\n$astro deployment token update [TOKEN_ID] --name [new token name] --role [Possible values are DEPLOYMENT_ADMIN or a custom role name].",
+		Long:    "Update a Deployment API token's name, description, or role. Identify the token by its ID (positional argument) or current name (--name).",
 		Example: `
   $ astro deployment token update <token-id> --deployment-id <deployment-id> --new-name my-new-token-name --role DEPLOYMENT_ADMIN
 `,
@@ -1148,7 +1148,7 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
 		Use:     "rotate [TOKEN_ID]",
 		Aliases: []string{"ro"},
 		Short:   "Rotate a Deployment API token",
-		Long:    "Rotate a Deployment API token. You can only rotate Deployment API tokens. You cannot rotate Organization API tokens with this command",
+		Long:    "Rotate a Deployment API token, generating a new token value and invalidating the old one. The new value is displayed only once. You can only rotate Deployment-scoped tokens from this command — use the workspace or organization token rotate commands for tokens at other scopes.",
 		Example: `
   $ astro deployment token rotate <token-id> --deployment-id <deployment-id>
   $ astro deployment token rotate <token-id> --deployment-id <deployment-id> --force
@@ -1170,7 +1170,7 @@ func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete [TOKEN_ID]",
 		Aliases: []string{"de"},
 		Short:   "Delete a Deployment API token",
-		Long:    "Delete a Deployment API token",
+		Long:    "Permanently revoke a Deployment API token. All access the token grants is immediately revoked.",
 		Example: `
   $ astro deployment token delete <token-id> --deployment-id <deployment-id>
   $ astro deployment token delete <token-id> --deployment-id <deployment-id> --force

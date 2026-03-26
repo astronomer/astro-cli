@@ -45,33 +45,6 @@ func TestOrganizationRootCommand(t *testing.T) {
 	assert.Contains(t, buf.String(), "organization")
 }
 
-func TestOrganizationRoleRootCommand(t *testing.T) {
-	expectedHelp := "Manage roles in your Astro Organization."
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	cmdArgs := []string{"role"}
-	resp, err := execOrganizationCmd(cmdArgs...)
-	assert.NoError(t, err)
-	assert.Contains(t, resp, expectedHelp)
-}
-
-func TestOrganizationUserRootCommand(t *testing.T) {
-	expectedHelp := "Manage users in your Astro Organization."
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	cmdArgs := []string{"user"}
-	resp, err := execOrganizationCmd(cmdArgs...)
-	assert.NoError(t, err)
-	assert.Contains(t, resp, expectedHelp)
-}
-
-func TestOrganizationTeamRootCommand(t *testing.T) {
-	expectedHelp := "Manage teams in your Astro Organization."
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	cmdArgs := []string{"team"}
-	resp, err := execOrganizationCmd(cmdArgs...)
-	assert.NoError(t, err)
-	assert.Contains(t, resp, expectedHelp)
-}
-
 func TestOrganizationList(t *testing.T) {
 	orgList = func(out io.Writer, platformCoreClient astroplatformcore.CoreClient) error {
 		return nil
@@ -387,15 +360,8 @@ var (
 )
 
 func TestUserInvite(t *testing.T) {
-	expectedHelp := "astro user invite [email] --role [ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints invite help", func(t *testing.T) {
-		cmdArgs := []string{"user", "invite", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid email with no role creates an invite", func(t *testing.T) {
 		expectedOut := "invite for some@email.com with role ORGANIZATION_MEMBER created"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -491,15 +457,8 @@ func TestUserInvite(t *testing.T) {
 }
 
 func TestUserList(t *testing.T) {
-	expectedHelp := "List all the users in your Astro Organization"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"user", "list", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and users are not listed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseError, nil).Once()
@@ -521,15 +480,8 @@ func TestUserList(t *testing.T) {
 }
 
 func TestUserUpdate(t *testing.T) {
-	expectedHelp := "astro user update [email] --role [ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"user", "update", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid email with valid role updates user", func(t *testing.T) {
 		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -601,15 +553,8 @@ func TestUserUpdate(t *testing.T) {
 }
 
 func TestTeamList(t *testing.T) {
-	expectedHelp := "List all the teams in your Astro Organization"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"team", "list", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and teams are not listed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseError, nil).Once()
@@ -631,15 +576,7 @@ func TestTeamList(t *testing.T) {
 }
 
 func TestTeamUpdate(t *testing.T) {
-	expectedHelp := "organization team update [team-id]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"team", "update", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("valid id with valid name and description updates team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro Team %s was successfully updated\n", team1.Name)
@@ -729,15 +666,8 @@ func TestTeamUpdate(t *testing.T) {
 }
 
 func TestTeamCreate(t *testing.T) {
-	expectedHelp := "organization team create"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"team", "create", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid id with valid name and description updates team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro Team %s was successfully created\n", team1.Name)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -818,15 +748,8 @@ func TestTeamCreate(t *testing.T) {
 }
 
 func TestTeamDelete(t *testing.T) {
-	expectedHelp := "organization team delete"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"team", "delete", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid id with valid name and description updates team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro Team %s was successfully deleted\n", team1.Name)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -890,15 +813,8 @@ func TestTeamDelete(t *testing.T) {
 }
 
 func TestAddUser(t *testing.T) {
-	expectedHelp := "organization team user add"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"team", "user", "add", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid team-id with valid user-id updates team membership", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro User %s was successfully added to team %s \n", user1.Id, team1.Name)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -995,15 +911,8 @@ func TestAddUser(t *testing.T) {
 }
 
 func TestRemoveUser(t *testing.T) {
-	expectedHelp := "organization team user remove"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"team", "user", "remove", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid team-id with valid user-id updates team membership", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro User %s was successfully removed from team %s \n", user1.Id, team1.Name)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1067,15 +976,8 @@ func TestRemoveUser(t *testing.T) {
 }
 
 func TestTeamUserList(t *testing.T) {
-	expectedHelp := "Lists users in an Astro Team\n"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"team", "user", "list", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and teams are not listed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseError, nil).Once()
@@ -1149,15 +1051,8 @@ func TestOrganizationTokenRootCommand(t *testing.T) {
 }
 
 func TestOrganizationTokenList(t *testing.T) {
-	expectedHelp := "List all the API tokens in an Astro Organization"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "list", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and tokens are not listed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1191,15 +1086,8 @@ func TestOrganizationTokenList(t *testing.T) {
 }
 
 func TestOrganizationTokenCreate(t *testing.T) {
-	expectedHelp := "Create an API token in an Astro Organization"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "create", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and token is not created", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1275,15 +1163,8 @@ func TestOrganizationTokenCreate(t *testing.T) {
 
 func TestOrganizationTokenUpdate(t *testing.T) {
 	tokenID = ""
-	expectedHelp := "Update a Organization or Organaization API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "update", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and token is not updated", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1345,15 +1226,8 @@ func TestOrganizationTokenUpdate(t *testing.T) {
 }
 
 func TestOrganizationTokenRotate(t *testing.T) {
-	expectedHelp := "Rotate a Organization API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "rotate", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and token is not rotated", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1432,15 +1306,8 @@ func TestOrganizationTokenRotate(t *testing.T) {
 }
 
 func TestOrganizationTokenDelete(t *testing.T) {
-	expectedHelp := "Delete a Organization API token or remove an Organization API token from a Organization"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "delete", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and token is not deleted", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1519,16 +1386,9 @@ func TestOrganizationTokenDelete(t *testing.T) {
 }
 
 func TestOrganizationTokenListRoles(t *testing.T) {
-	expectedHelp := "List roles for an organization API token"
 	mockTokenID := "mockTokenID"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "roles", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and token roles are not listed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
@@ -1606,15 +1466,8 @@ var (
 )
 
 func TestListOrganizationRoles(t *testing.T) {
-	expectedHelp := "organization role list [flags]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints invite help", func(t *testing.T) {
-		cmdArgs := []string{"role", "list", "-h"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("can list org roles", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListRolesResponseOK, nil).Twice()

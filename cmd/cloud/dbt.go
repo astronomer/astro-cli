@@ -41,6 +41,7 @@ func newDbtCmd() *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newDbtDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy DEPLOYMENT-ID",
@@ -140,10 +141,12 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 	return DeployBundle(deployBundleInput)
 }
 
+//nolint:dupl
 func newDbtDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete DEPLOYMENT-ID",
 		Short: "Delete a dbt project from a Deployment on Astro",
+		Long:  "Delete a dbt project bundle from a Deployment. This removes the uploaded dbt project files but does not affect DAGs that were generated from the project.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  deleteDbt,
 		Example: `
