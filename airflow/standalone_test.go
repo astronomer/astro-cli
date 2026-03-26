@@ -1614,8 +1614,10 @@ func (s *Suite) TestStandalonePytest_Success() {
 	defer func() { standaloneExec = origExec }()
 
 	var capturedArgs []string
+	var capturedEnv []string
 	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
 		capturedArgs = args
+		capturedEnv = env
 		return nil
 	}
 
@@ -1626,6 +1628,19 @@ func (s *Suite) TestStandalonePytest_Success() {
 	s.NoError(err)
 	s.Equal("", exitCode)
 	s.Equal([]string{"pytest", "tests/"}, capturedArgs)
+
+	// Verify PYTHONPATH includes the include/ directory so user modules
+	// in include/ are importable during test runs.
+	expectedInclude := filepath.Join(tmpDir, "include")
+	var pythonPath string
+	for _, kv := range capturedEnv {
+		if strings.HasPrefix(kv, "PYTHONPATH=") {
+			pythonPath = strings.TrimPrefix(kv, "PYTHONPATH=")
+			break
+		}
+	}
+	s.NotEmpty(pythonPath, "PYTHONPATH should be set in pytest env")
+	s.Contains(pythonPath, expectedInclude, "PYTHONPATH should contain include/ directory")
 }
 
 func (s *Suite) TestStandalonePytest_WithFileAndArgs() {
