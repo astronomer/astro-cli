@@ -22,6 +22,12 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"in"},
 		Short:   "Inspect a deployment configuration",
 		Long:    "Inspect an Astro Deployment configuration, which can be useful if you manage deployments as code or use Deployment configuration templates. This command returns the Deployment's configuration as a YAML or JSON output, which includes information about resources, such as cluster ID, region, and Airflow API URL, as well as scheduler and worker queue configurations.",
+		Example: `
+  $ astro deployment inspect <deployment-id>
+  $ astro deployment inspect <deployment-id> --output json
+  $ astro deployment inspect --deployment-name my-deployment --key configuration.cluster_id
+  $ astro deployment inspect <deployment-id> --template
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentInspect(cmd, args, out)
 		},

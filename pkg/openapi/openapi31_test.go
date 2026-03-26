@@ -31,7 +31,7 @@ paths:
           description: Success
 `)
 
-	doc, err := parseSpec(spec)
+	doc, _, err := parseSpec(spec)
 	require.NoError(t, err)
 	require.NotNil(t, doc)
 
@@ -69,7 +69,7 @@ paths:
                       - "null"
 `)
 
-	doc, err := parseSpec(spec)
+	doc, _, err := parseSpec(spec)
 	require.NoError(t, err)
 	require.NotNil(t, doc)
 

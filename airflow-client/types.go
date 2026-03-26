@@ -29,7 +29,8 @@ type Pool struct {
 }
 
 type Response struct {
-	Connections []Connection `json:"connections"`
-	Variables   []Variable   `json:"variables"`
-	Pools       []Pool       `json:"pools"`
+	Connections  []Connection `json:"connections"`
+	Variables    []Variable   `json:"variables"`
+	Pools        []Pool       `json:"pools"`
+	TotalEntries int          `json:"total_entries"`
 }

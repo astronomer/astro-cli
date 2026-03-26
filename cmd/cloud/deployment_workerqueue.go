@@ -40,11 +40,15 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cr"},
 		Short:   "Create a Deployment's worker queue",
 		Long:    "Create a worker queue for a Deployment. Worker queues let you assign tasks to different machine types with independent autoscaling. Each queue has its own min/max worker count and concurrency settings. KubernetesExecutor Deployments support only a single default queue. Queue names must be lowercase alphanumeric or hyphens, start with a letter, and not exceed 63 characters.",
+		Example: `
+  $ astro deployment worker-queue create --deployment-id <deployment-id> --name my-queue --worker-type default
+  $ astro deployment worker-queue create --deployment-id <deployment-id> --name my-queue --min-count 2 --max-count 10 --concurrency 16
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be deleted.")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be deleted. Run 'astro deployment list' to find valid IDs")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment where the worker queue should be deleted.")
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue. Queue names must not exceed 63 characters and contain only lowercase alphanumeric characters or '-' and start with an alphabetical character.")
 	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", 0, "The min worker count of the worker queue.")
@@ -61,11 +65,15 @@ func newDeploymentWorkerQueueUpdateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"up"},
 		Short:   "Update a Deployment's worker queue",
 		Long:    "Update a worker queue's machine type, scaling limits, or concurrency. Running tasks are not interrupted, but may be affected if the queue is scaled down below the current worker count. The default queue cannot be renamed.",
+		Example: `
+  $ astro deployment worker-queue update --deployment-id <deployment-id> --name my-queue --max-count 20
+  $ astro deployment worker-queue update --deployment-id <deployment-id> --name my-queue --concurrency 32 --force
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created.")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created. Run 'astro deployment list' to find valid IDs")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment where the worker queue should be created.")
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue. Queue names must not exceed 63 characters and contain only lowercase alphanumeric characters or '-' and start with an alphabetical character.")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force update: Don't prompt a user for confirmation")
@@ -83,11 +91,15 @@ func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"de"},
 		Short:   "Delete a Deployment's worker queue",
 		Long:    "Delete a worker queue from a Deployment. Tasks currently running on the queue may be interrupted. The default queue cannot be deleted.",
+		Example: `
+  $ astro deployment worker-queue delete --deployment-id <deployment-id> --name my-queue
+  $ astro deployment worker-queue delete --deployment-id <deployment-id> --name my-queue --force
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueDelete(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created.")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created. Run 'astro deployment list' to find valid IDs")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment where the worker queue should be created.")
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue to delete.")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force delete: Don't prompt a user for confirmation")

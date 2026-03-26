@@ -110,6 +110,7 @@ type InputDeploy struct {
 	DagsPath          string
 	Description       string
 	BuildSecretString string
+	Force             bool
 }
 
 // InputClientDeploy contains inputs for client image deployments
@@ -302,7 +303,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	}
 
 	if deployInput.Dags {
-		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
+		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Force {
 			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
 
 			if !i {
@@ -381,7 +382,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
 		}
 
-		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Image {
+		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Image && !deployInput.Force {
 			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
 
 			if !i {

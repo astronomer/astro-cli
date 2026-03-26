@@ -1,12 +1,14 @@
 package airflowversions
 
 import (
+	"cmp"
 	"fmt"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/logger"
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -63,8 +65,8 @@ func ParseImageTag(imageTag string) (*ImageTagInfo, error) {
 	}, nil
 }
 
-// isBetterImage compares two ImageTagInfo objects to determine if the candidate has higher runtime version or python version than the current
-// Priority: Runtime version first, then Python version
+// isBetterImage reports whether candidate should replace current for default astro-agent image selection.
+// Priority: Astro runtime (CompareRuntimeVersions), then Python semver, then astro-agent semver.
 func isBetterImage(candidate, current *ImageTagInfo) bool {
 	if candidate == nil {
 		return false
@@ -72,18 +74,11 @@ func isBetterImage(candidate, current *ImageTagInfo) bool {
 	if current == nil {
 		return true
 	}
-
-	// Compare runtime versions first using existing function
-	runtimeComparison := CompareRuntimeVersions(candidate.RuntimeVersion, current.RuntimeVersion)
-	if runtimeComparison > 0 {
-		return true
-	}
-	if runtimeComparison < 0 {
-		return false
-	}
-
-	// Same runtime version, compare Python versions (string comparison works for semantic versions like "3.11" vs "3.12")
-	return candidate.PythonVersion > current.PythonVersion
+	return cmp.Or(
+		CompareRuntimeVersions(candidate.RuntimeVersion, current.RuntimeVersion),
+		semver.Compare("v"+candidate.PythonVersion, "v"+current.PythonVersion),
+		semver.Compare("v"+candidate.AgentVersion, "v"+current.AgentVersion),
+	) > 0
 }
 
 // GetDefaultImageTag returns default airflow image tag
@@ -176,12 +171,7 @@ func getAstroAgentTag(clientVersions map[string]ClientVersion, runtimeVersion st
 		return "", fmt.Errorf("no client versions found")
 	}
 
-	// sort the available versions by runtime version in descending order
-	sort.Slice(availableVersions, func(i, j int) bool {
-		return CompareRuntimeVersions(availableVersions[i], availableVersions[j]) < 0
-	})
-
-	// Parse and filter image tags, prioritizing latest Python version
+	// Parse and filter image tags; isBetterImage picks the best by runtime, Python, then agent semver.
 	var bestImageTag string
 	var bestInfo *ImageTagInfo
 
@@ -204,7 +194,7 @@ func getAstroAgentTag(clientVersions map[string]ClientVersion, runtimeVersion st
 				continue
 			}
 
-			// Select the best image based on runtime version first, then Python version
+			// Select the best image: runtime, then Python semver, then agent semver (isBetterImage).
 			if bestImageTag == "" || isBetterImage(tagInfo, bestInfo) {
 				bestImageTag = imageTags
 				bestInfo = tagInfo

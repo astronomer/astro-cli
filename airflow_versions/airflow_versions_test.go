@@ -566,6 +566,60 @@ func (s *Suite) TestIsBetterImage() {
 			},
 			expected: false, // Same runtime, so Python version is the tiebreaker
 		},
+		{
+			name: "same runtime, python 3.10 beats 3.9 (semver, not lexicographic)",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.10",
+				RuntimeVersion: "3.1-1",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.9",
+				RuntimeVersion: "3.1-1",
+			},
+			expected: true,
+		},
+		{
+			name: "same runtime and python, higher agent version",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-13",
+				AgentVersion:   "1.3.7",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-13",
+				AgentVersion:   "1.3.6",
+			},
+			expected: true,
+		},
+		{
+			name: "same runtime and python, lower agent version",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-13",
+				AgentVersion:   "1.3.6",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-13",
+				AgentVersion:   "1.3.7",
+			},
+			expected: false,
+		},
+		{
+			name: "same runtime and python, agent 1.3.10 beats 1.3.9 (semver)",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-13",
+				AgentVersion:   "1.3.10",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-13",
+				AgentVersion:   "1.3.9",
+			},
+			expected: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -631,6 +685,32 @@ func (s *Suite) TestGetAstroAgentTag() {
 			clientVersions: clientVersions,
 			runtimeVersion: "",
 			expected:       "3.1-1-python-3.12-astro-agent-1.1.0",
+			shouldError:    false,
+		},
+		{
+			name: "prefers newer astro-agent when runtime and python match across client versions",
+			clientVersions: map[string]ClientVersion{
+				"1.3.6": {
+					Metadata: ClientVersionMetadata{
+						Channel:     VersionChannelStable,
+						ReleaseDate: "2026-02-18",
+					},
+					ImageTags: []string{
+						"3.1-13-python-3.12-astro-agent-1.3.6",
+					},
+				},
+				"1.3.7": {
+					Metadata: ClientVersionMetadata{
+						Channel:     VersionChannelStable,
+						ReleaseDate: "2026-03-04",
+					},
+					ImageTags: []string{
+						"3.1-13-python-3.12-astro-agent-1.3.7",
+					},
+				},
+			},
+			runtimeVersion: "",
+			expected:       "3.1-13-python-3.12-astro-agent-1.3.7",
 			shouldError:    false,
 		},
 		{

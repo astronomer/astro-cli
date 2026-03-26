@@ -12,6 +12,16 @@ import (
 
 const defaultMethodOrder = 99
 
+// sortEndpoints sorts endpoints by path, then by method order.
+func sortEndpoints(endpoints []Endpoint) {
+	sort.Slice(endpoints, func(i, j int) bool {
+		if endpoints[i].Path != endpoints[j].Path {
+			return endpoints[i].Path < endpoints[j].Path
+		}
+		return methodOrder(endpoints[i].Method) < methodOrder(endpoints[j].Method)
+	})
+}
+
 // ExtractEndpoints extracts all endpoints from an OpenAPI v3 document.
 func ExtractEndpoints(doc *v3high.Document) []Endpoint {
 	if doc == nil || doc.Paths == nil || doc.Paths.PathItems == nil {
@@ -21,35 +31,32 @@ func ExtractEndpoints(doc *v3high.Document) []Endpoint {
 	var endpoints []Endpoint
 
 	for path, pathItem := range doc.Paths.PathItems.FromOldest() {
-		type methodOp struct {
-			method string
-			op     *v3high.Operation
-		}
-		ops := []methodOp{
-			{"GET", pathItem.Get},
-			{"POST", pathItem.Post},
-			{"PUT", pathItem.Put},
-			{"PATCH", pathItem.Patch},
-			{"DELETE", pathItem.Delete},
-			{"OPTIONS", pathItem.Options},
-			{"HEAD", pathItem.Head},
-		}
-		for _, mo := range ops {
+		for _, mo := range v3MethodOps(pathItem) {
 			if mo.op != nil {
 				endpoints = append(endpoints, newEndpoint(mo.method, path, mo.op))
 			}
 		}
 	}
 
-	// Sort endpoints by path, then method
-	sort.Slice(endpoints, func(i, j int) bool {
-		if endpoints[i].Path != endpoints[j].Path {
-			return endpoints[i].Path < endpoints[j].Path
-		}
-		return methodOrder(endpoints[i].Method) < methodOrder(endpoints[j].Method)
-	})
-
+	sortEndpoints(endpoints)
 	return endpoints
+}
+
+type v3MethodOp struct {
+	method string
+	op     *v3high.Operation
+}
+
+func v3MethodOps(pi *v3high.PathItem) []v3MethodOp {
+	return []v3MethodOp{
+		{"GET", pi.Get},
+		{"POST", pi.Post},
+		{"PUT", pi.Put},
+		{"PATCH", pi.Patch},
+		{"DELETE", pi.Delete},
+		{"OPTIONS", pi.Options},
+		{"HEAD", pi.Head},
+	}
 }
 
 // newEndpoint creates an Endpoint from a libopenapi Operation.
@@ -154,12 +161,19 @@ func convertContentMap(content *orderedmap.Map[string, *v3high.MediaType]) map[s
 }
 
 // convertSchemaProxy converts a libopenapi SchemaProxy to our SchemaRef type.
+// When the proxy is a $ref, we return just the ref name without resolving it
+// to avoid infinite recursion on circular references.
 func convertSchemaProxy(sp *base.SchemaProxy) *SchemaRef {
 	if sp == nil {
 		return nil
 	}
 	ref := &SchemaRef{
 		Ref: sp.GetReference(),
+	}
+	// If this is a $ref, don't resolve it — just return the ref name.
+	// Resolving would cause infinite recursion on circular schemas.
+	if ref.Ref != "" {
+		return ref
 	}
 	schema, err := sp.BuildSchema()
 	if err != nil || schema == nil {
