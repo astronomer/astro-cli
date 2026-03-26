@@ -113,7 +113,7 @@ func TestGetDoc_Nil(t *testing.T) {
 
 func TestGetDoc_Loaded(t *testing.T) {
 	body := minimalSpecJSON("Test", map[string]map[string]map[string]any{})
-	doc, err := parseSpec(body)
+	doc, _, err := parseSpec(body)
 	require.NoError(t, err)
 	cache := &Cache{doc: doc}
 	assert.NotNil(t, cache.GetDoc())
@@ -131,7 +131,7 @@ func TestGetEndpoints_NoPrefix(t *testing.T) {
 	body := minimalSpecJSON("Test", map[string]map[string]map[string]any{
 		"/dags": {"get": {"operationId": "get_dags"}},
 	})
-	doc, err := parseSpec(body)
+	doc, _, err := parseSpec(body)
 	require.NoError(t, err)
 
 	cache := &Cache{doc: doc}
@@ -145,7 +145,7 @@ func TestGetEndpoints_WithPrefixStripping(t *testing.T) {
 		"/api/v2/dags":    {"get": {"operationId": "get_dags"}},
 		"/api/v2/version": {"get": {"operationId": "version"}},
 	})
-	doc, err := parseSpec(body)
+	doc, _, err := parseSpec(body)
 	require.NoError(t, err)
 
 	cache := &Cache{doc: doc, stripPrefix: "/api/v2"}
@@ -184,7 +184,7 @@ func TestCacheReadWriteRoundTrip(t *testing.T) {
 	rawSpec := minimalSpecJSON("Test API", map[string]map[string]map[string]any{
 		"/test": {"get": {"operationId": "getTest"}},
 	})
-	doc, err := parseSpec(rawSpec)
+	doc, _, err := parseSpec(rawSpec)
 	require.NoError(t, err)
 
 	// Write
@@ -465,4 +465,144 @@ func TestClearCache_NotFound(t *testing.T) {
 	cache := &Cache{cachePath: "/nonexistent/cache.json"}
 	err := cache.ClearCache()
 	assert.Error(t, err)
+}
+
+// --- parseSpec version detection ---------------------------------------------
+
+func TestParseSpec_SwaggerV2(t *testing.T) {
+	spec := []byte(`{"swagger":"2.0","info":{"title":"V2 Spec","version":"1.0"},"basePath":"/api/v1","paths":{"/test":{"get":{"operationId":"getTest","responses":{"200":{"description":"OK"}}}}}}`)
+	v3doc, v2doc, err := parseSpec(spec)
+	require.NoError(t, err)
+	assert.Nil(t, v3doc)
+	require.NotNil(t, v2doc)
+	assert.Equal(t, "V2 Spec", v2doc.Info.Title)
+	assert.Equal(t, "/api/v1", v2doc.BasePath)
+}
+
+func TestParseSpec_OpenAPIV3(t *testing.T) {
+	spec := minimalSpecJSON("V3 Spec", map[string]map[string]map[string]any{})
+	v3doc, v2doc, err := parseSpec(spec)
+	require.NoError(t, err)
+	require.NotNil(t, v3doc)
+	assert.Nil(t, v2doc)
+	assert.Equal(t, "V3 Spec", v3doc.Info.Title)
+}
+
+// --- GetServerPath -----------------------------------------------------------
+
+func TestGetServerPath_V2(t *testing.T) {
+	spec := []byte(`{"swagger":"2.0","info":{"title":"T","version":"1"},"basePath":"/api/v1","paths":{}}`)
+	_, v2doc, err := parseSpec(spec)
+	require.NoError(t, err)
+
+	cache := &Cache{v2doc: v2doc}
+	assert.Equal(t, "/api/v1", cache.GetServerPath())
+}
+
+func TestGetServerPath_V3(t *testing.T) {
+	spec := []byte(`{"openapi":"3.0.0","info":{"title":"T","version":"1"},"servers":[{"url":"https://api.example.com/api/v2"}],"paths":{}}`)
+	v3doc, _, err := parseSpec(spec)
+	require.NoError(t, err)
+
+	cache := &Cache{doc: v3doc}
+	assert.Equal(t, "/api/v2", cache.GetServerPath())
+}
+
+func TestGetServerPath_V3_TrailingSlash(t *testing.T) {
+	spec := []byte(`{"openapi":"3.0.0","info":{"title":"T","version":"1"},"servers":[{"url":"https://api.example.com/v1/"}],"paths":{}}`)
+	v3doc, _, err := parseSpec(spec)
+	require.NoError(t, err)
+
+	cache := &Cache{doc: v3doc}
+	assert.Equal(t, "/v1", cache.GetServerPath())
+}
+
+func TestGetServerPath_NoServers(t *testing.T) {
+	cache := &Cache{}
+	assert.Equal(t, "", cache.GetServerPath())
+}
+
+// --- NewCacheWithAuth --------------------------------------------------------
+
+func TestNewCacheWithAuth(t *testing.T) {
+	cache := NewCacheWithAuth("https://example.com/spec", "/tmp/cache.json", "my-token")
+	assert.Equal(t, "https://example.com/spec", cache.specURL)
+	assert.Equal(t, "/tmp/cache.json", cache.cachePath)
+	assert.Equal(t, "my-token", cache.authToken)
+}
+
+// --- FetchSpec with auth -----------------------------------------------------
+
+func TestFetchSpec_WithAuth(t *testing.T) {
+	body := minimalSpecJSON("Auth Test", map[string]map[string]map[string]any{})
+
+	var receivedAuth string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	defer ts.Close()
+
+	cache := NewCacheWithAuth(ts.URL, t.TempDir()+"/cache.json", "test-token-123")
+	err := cache.fetchSpec()
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer test-token-123", receivedAuth)
+}
+
+func TestFetchSpec_NoAuth(t *testing.T) {
+	body := minimalSpecJSON("No Auth", map[string]map[string]map[string]any{})
+
+	var receivedAuth string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	defer ts.Close()
+
+	cache := NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
+	err := cache.fetchSpec()
+	require.NoError(t, err)
+	assert.Equal(t, "", receivedAuth)
+}
+
+// --- SpecCacheFileName -------------------------------------------------------
+
+func TestSpecCacheFileName(t *testing.T) {
+	name1 := SpecCacheFileName("https://api.example.com/spec/v1.0")
+	name2 := SpecCacheFileName("https://api.example.com/spec/v2")
+	name3 := SpecCacheFileName("https://api.example.com/spec/v1.0")
+
+	// Deterministic
+	assert.Equal(t, name1, name3)
+	// Different URLs produce different names
+	assert.NotEqual(t, name1, name2)
+	// Matches expected pattern
+	assert.Regexp(t, `^openapi-cache-[0-9a-f]+\.json$`, name1)
+}
+
+// --- IsLoaded with v2 --------------------------------------------------------
+
+func TestIsLoaded_V2(t *testing.T) {
+	spec := []byte(`{"swagger":"2.0","info":{"title":"T","version":"1"},"basePath":"/","paths":{}}`)
+	_, v2doc, err := parseSpec(spec)
+	require.NoError(t, err)
+
+	cache := &Cache{v2doc: v2doc}
+	assert.True(t, cache.IsLoaded())
+}
+
+// --- GetEndpoints with v2 ----------------------------------------------------
+
+func TestGetEndpoints_V2(t *testing.T) {
+	spec := []byte(`{"swagger":"2.0","info":{"title":"T","version":"1"},"basePath":"/api/v1","paths":{"/orgs":{"get":{"operationId":"ListOrgs","responses":{"200":{"description":"OK"}}}}}}`)
+	_, v2doc, err := parseSpec(spec)
+	require.NoError(t, err)
+
+	cache := &Cache{v2doc: v2doc}
+	endpoints := cache.GetEndpoints()
+	require.Len(t, endpoints, 1)
+	assert.Equal(t, "/orgs", endpoints[0].Path)
+	assert.Equal(t, "ListOrgs", endpoints[0].OperationID)
 }
