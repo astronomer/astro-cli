@@ -95,3 +95,87 @@ func (s *CmdSuite) TestLogout() {
 	err = logout(&cobra.Command{}, []string{}, os.Stdout)
 	s.EqualError(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 }
+
+func (s *CmdSuite) TestAuthToken() {
+	buf := new(bytes.Buffer)
+
+	// Test with valid token (with Bearer prefix)
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	c, err := config.GetCurrentContext()
+	s.NoError(err)
+	expectedToken := "test-token-12345"
+	err = c.SetContextKey("token", "Bearer "+expectedToken)
+	s.NoError(err)
+
+	err = printAuthToken(&cobra.Command{}, "", buf)
+	s.NoError(err)
+	s.Equal(expectedToken+"\n", buf.String())
+
+	// Test with token without Bearer prefix
+	buf.Reset()
+	err = c.SetContextKey("token", expectedToken)
+	s.NoError(err)
+
+	err = printAuthToken(&cobra.Command{}, "", buf)
+	s.NoError(err)
+	s.Equal(expectedToken+"\n", buf.String())
+
+	// Test with no token (not authenticated)
+	buf.Reset()
+	err = c.SetContextKey("token", "")
+	s.NoError(err)
+
+	err = printAuthToken(&cobra.Command{}, "", buf)
+	s.EqualError(err, "no token found. Please run 'astro login' to authenticate")
+
+	// Test with no current context set
+	buf.Reset()
+	config.ResetCurrentContext()
+	err = printAuthToken(&cobra.Command{}, "", buf)
+	s.Error(err)
+}
+
+func (s *CmdSuite) TestAuthTokenWithContext() {
+	buf := new(bytes.Buffer)
+
+	// Set up a specific context with a token
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	c, err := config.GetCurrentContext()
+	s.NoError(err)
+	expectedToken := "context-specific-token"
+	err = c.SetContextKey("token", "Bearer "+expectedToken)
+	s.NoError(err)
+
+	// Retrieve token using explicit context domain
+	err = printAuthToken(&cobra.Command{}, c.Domain, buf)
+	s.NoError(err)
+	s.Equal(expectedToken+"\n", buf.String())
+
+	// Test with non-existent context
+	buf.Reset()
+	err = printAuthToken(&cobra.Command{}, "nonexistent.domain.com", buf)
+	s.Error(err)
+}
+
+func (s *CmdSuite) TestAuthRootCmd() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	output, err := executeCommand("auth", "--help")
+	s.NoError(err)
+	s.Contains(output, "Commands for authenticating to Astro or Astro Private Cloud")
+
+	// Test auth login subcommand exists
+	output, err = executeCommand("auth", "login", "--help")
+	s.NoError(err)
+	s.Contains(output, "Authenticate to Astro or Astro Private Cloud")
+
+	// Test auth logout subcommand exists
+	output, err = executeCommand("auth", "logout", "--help")
+	s.NoError(err)
+	s.Contains(output, "Log out of Astronomer")
+
+	// Test auth token subcommand exists
+	output, err = executeCommand("auth", "token", "--help")
+	s.NoError(err)
+	s.Contains(output, "Print the current authentication token")
+	s.Contains(output, "--domain")
+}
